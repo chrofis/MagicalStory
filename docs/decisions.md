@@ -36658,3 +36658,49 @@ ROSTER rule exists to prevent.
 `tests/unit/gdino-mask-rider.test.ts`,
 `tests/unit/scene-review-removals.test.ts`, `tests/unit/one-roster.test.ts`
 **Status:**    ✅ active
+
+## 2026-09-14 — The scene review sees the Visual Bible and may correct a stated object's state page ranges
+**Context:** Staging `job_1789343124794_z2c779f7i`: the Art Director gave an
+artifact three states whose FIRST row was a change ("muddy and cracked")
+claiming pages 3-15, while the story finds the object clean on p3-p8, muddies
+it on p9 and cracks it on p10. `defaultObjectState` returns `states[0]` **by
+construction** (visualBible.js:111-124 — the authoring templates require the
+unaltered look first), so the bare citations on p3-p5 resolved to the mud
+state. The page-prompt path did catch the disagreement (`resolveObjectState`
+→ `contradicted`) and dropped the delta from the prose, but that runs AFTER
+the review and cannot swap the attached reference cell: p3-p5 rendered a dark,
+cracked, mud-crusted object six pages before the mud exists, and the cell
+identity gate had already answered NO twice ("dirt and rock, not a smooth
+eggshell") and shipped under the 2026-09-11 fail-open.
+Nothing reviewed the bible: `prompts/scene-review.txt` had no bible input at
+all, and `sceneBriefCheck` only verified that cited ids resolve.
+**Decision:** The bible reaches the scene review, which is the one stage with
+the plan lines in front of it, and the review may hand back corrected entries.
+- `sceneBriefCheck` emits `vb_state_contradicted` (reusing
+  `resolveObjectState(..., { silent: true })` — one resolver, two consumers)
+  and `vb_state_no_base`; both are REVIEWABLE, so they reach the prompt.
+- `scene-review.txt` gains a `{VISUAL_BIBLE}` block (entries with `states[]`
+  only), check `9f [vb_state_range]`, and an OPTIONAL `---VISUAL BIBLE---`
+  output section.
+- `beatsPipeline.applyReviewBibleCorrections` validates that section
+  strictly — known base ids only, `states[]` only, ids re-minted, pages inside
+  the book — then `syncVisualBibleSection` writes it back. Rejections are
+  logged, never thrown. Recorded on `sceneReviewReport.bibleCorrections`.
+- The Lab's `beats_scenes` passes the same bible, or it stops reproducing
+  production.
+**Rationale:** Owner's call, framed against a dedicated bible-review round:
+the review already runs, already holds the plan lines, and already rewrites
+briefs — the missing input was the bible itself. `applyBriefUsage` already
+rebuilds state-level pages from the final briefs and syncs them, so the
+correction survives downstream. Replayed on the stored story: the check fires
+on exactly p3, p4, p5.
+**Note:** `vb_state_no_base` fires on a first state that does not COVER the
+entry's earliest cited page. It does not fire on the motivating story (that
+state's range does include p3) — `vb_state_contradicted` is what catches it.
+Distinguishing "an opening state that is a change" mechanically would need an
+authored marker on the state; not built.
+**Touched:** `server/lib/sceneBriefCheck.js`, `prompts/scene-review.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js`, `tests/unit/vb-state-review.test.ts`
+**Status:** ✅ active — situational (fires only on a stated object whose ranges
+disagree with the pages).
