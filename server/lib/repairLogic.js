@@ -754,13 +754,35 @@ function repairAttemptFromResult(r) {
   };
 }
 
+/**
+ * The bucket key is the BARE method.
+ *
+ * Measured on staging `job_1789348171785_9oxos7dwv`: a SUCCESSFUL result carries
+ * the round-suffixed source string (`inpaint-round-1`, `char-fix-round-2`) while
+ * a FAILED one carries the bare method (`char-fix`). Bucketing on the raw value
+ * split one method's successes from its own failures — `char-fix` read
+ * `failed: 1, repaired: 0` beside `char-fix-round-1` reading `repaired: 3` — and
+ * split every method per round, so nothing could be compared across the book.
+ * That is precisely the number this record exists to produce.
+ *
+ * The raw value stays on the per-page row, where the round it came from is
+ * still readable.
+ */
+function baseRepairMethod(method) {
+  const m = String(method || '').trim();
+  if (!m) return 'unknown';
+  return m.replace(/-round-\d+$/i, '') || 'unknown';
+}
+
 function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {} }) {
   const byMethod = {};
   const pages = [];
 
   for (const a of attempts) {
     if (!a || a.pageNumber == null) continue;
-    const method = a.method || 'unknown';
+    const method = baseRepairMethod(a.method);
+    // The bucket is the bare method; the row keeps what the round actually said.
+    const rawMethod = a.method || method;
     const m = byMethod[method] || (byMethod[method] = {
       attempted: 0, repaired: 0, failed: 0,
       improved: 0, unchanged: 0, regressed: 0, unknown: 0,
@@ -770,7 +792,7 @@ function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterSc
 
     if (!a.ok) {
       m.failed++;
-      pages.push({ page: a.pageNumber, method, before: beforeScores[a.pageNumber] ?? null, after: null, delta: null, outcome: 'failed', error: a.error || null });
+      pages.push({ page: a.pageNumber, method: rawMethod, before: beforeScores[a.pageNumber] ?? null, after: null, delta: null, outcome: 'failed', error: a.error || null });
       continue;
     }
 
@@ -788,7 +810,7 @@ function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterSc
       m.totalDelta += delta;
       m.scoredPages++;
     }
-    pages.push({ page: a.pageNumber, method, before: before ?? null, after: after ?? null, delta, outcome });
+    pages.push({ page: a.pageNumber, method: rawMethod, before: before ?? null, after: after ?? null, delta, outcome });
   }
 
   for (const m of Object.values(byMethod)) {
@@ -869,4 +891,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
