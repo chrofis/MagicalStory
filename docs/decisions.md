@@ -39257,3 +39257,41 @@ notEvaluated record), `server/lib/images.js` (batch site passes `pagePrompt`),
 `tests/unit/fixtures/eval-required-objects-job_1789348171785_9oxos7dwv.json`.
 
 **Status:** ✅ active — live but unexercised; first real firing is still unseen.
+
+### MEASURED 2026-09-14: cover rule B — the prop half works, the backdrop half does not
+**Context:** Rule B (the entry two above) acts when the Art Director AUTHORS the
+cover hints, so it cannot be tested by regenerating a cover image. The Art
+Director was re-run on prod story `job_1789227389389_z18dmvnt6` with the same
+beats, cast and Visual Bible — only the new rules differ
+(`tests/manual/cover-backdrop-rule-b.js`, one Opus call, ~21k tokens in / ~17k
+out, roughly $1.50).
+
+**Result — authored cover hints:**
+```
+Title Page    Objects: LOC001, ART001.1, ART002.1     quay       ✅
+Initial Page  Objects: LOC001, ART003.2, ART001.4     quay       ✅
+Back Cover    Objects: LOC003, ART005.2, ART001.4     open water ❌
+```
+Before, the back cover was `LOC003, ART009, ART007, ART001, ART008` — open water
+**plus the lit quay lamp plus the autumn leaf pile**.
+
+- **The prop rule WORKS.** The lamp ("bolted to the stone paving; the lamp is
+  lit") and the pile of dry autumn leaves are gone from the underwater scene.
+  Only a fairy and the doudou remain, both of which genuinely belong there. This
+  removed the most absurd element of the shipped cover.
+- **The backdrop rule FAILS.** The back cover is still set in `LOC003`, whose own
+  description reads "no floor visible, only open dark green water in all
+  directions". The same failure mode as rule A: a constraint loses to the story's
+  pull toward its climactic setting.
+- **Residual:** the cast is still listed as `standard` clothing — dry winter
+  coats — in open water, so a render would still show dry clothes underwater,
+  just without a burning lamp beside them.
+
+**Verdict:** B is half effective and stays. The backdrop half likely needs the
+rule to state the CONSEQUENCE rather than the constraint ("the cover shows where
+the cast can stand, even when the climax happens somewhere they cannot"), and/or
+the cover scene builder to stop writing "stands"/`standard` into a water scene.
+Neither is built; re-testing costs ~$1.50 per Art Director call.
+
+**Touched:** `tests/manual/cover-backdrop-rule-b.js`
+**Status:** ✅ active (a measurement, not a behaviour change)
