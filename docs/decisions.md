@@ -36793,3 +36793,34 @@ secondary-character and artifact state schemas, the citation rule)
 **Status:** ✅ active — verify on the next `beats_scenes` Lab run that a stated
 object's first state is the unaltered look and covers the pages before the
 first change.
+
+## 2026-09-14 — Naming whose something is does not put the owner in the frame
+**Context:** `job_1789348171785_9oxos7dwv` gave the unhatched egg the baby
+dragon's name on p7 ("it is called <name>"), and the prose then referred to the
+EGG by that name for ten pages. The Art Director cited the ANIMAL entry from
+p7 on — `objects[]` on p8, p10, p11, p13 and p16 carried both the egg and the
+creature (verified against the raw brief: the AD wrote both ids, no code
+injected either). `buildImagePrompt` then emits a REQUIRED OBJECTS line and
+attaches a reference cell for every cited id, so the image model was handed the
+egg AND the creature inside it as two things that must both be in frame — and
+drew a cat-sized dragon standing beside its own unhatched egg on p11, p13 and
+p16. The hatching reveal on p17 was spoiled three pages running; the judge
+flagged one of the three. `job_1789337998754_apslnsq1z` had the identical
+setup (egg named on p8, hatches p19) and kept the creature at `pages [19]`, so
+the prompt permitted both readings and the model picked one per story.
+**Decision:** One rule in `prompts/scene-expansion-all.txt`, beside "include
+every recurring visual element visible in the scene": an element named only to
+say whose it is — a character's bag, a creature's egg — puts THAT element in
+the scene, not its owner; the owner is cited only on a page where the owner is
+in the picture, and on the page the owner arrives or the creature comes out of
+its egg both are cited.
+**Rationale:** Owner's framing, and it is the general case — "we can have Tom's
+bag without having Tom in the same scene". Rejected as wrong or overbuilt:
+gating the emission on whether the prose writes the creature's face (a creature
+half out of its shell is in frame and must still be drawn); making an element
+and its container mutually exclusive (the hatching page needs both); and a
+visibility ladder in the prompt (too complicated for what is a reference rule,
+not a staging rule).
+**Touched:** `prompts/scene-expansion-all.txt` (the `objects[]` citation rules)
+**Status:** ✅ active — verify on a Lab `beats_scenes` run that a creature named
+before it appears is not cited until the page it is seen.
