@@ -134,6 +134,10 @@ const STAGE_TEMPLATE_KEYS = {
   // A/B. Pair the override with params.model to vary the model applying them.
   consolidate: 'feedbackConsolidator',
   vb_element_cell: 'referenceSheet',
+  // The two trial-variety stages: the idea generator's own template, and the
+  // trial's one-call story template.
+  trial_idea_variety: 'trialIdea',
+  trial_challenge_draw: 'storyTrial',
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage

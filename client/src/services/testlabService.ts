@@ -570,6 +570,10 @@ export const TESTLAB_STAGES = [
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },
+  // Trial variety: is the idea generator repetitive, and does the random
+  // challenge draw (which the trial's one-call writer never receives) help?
+  { id: 'trial_idea_variety', label: 'Trial idea variety (N draws of the same pair → repeats)', producesImage: false, overridable: true, storyLevel: true },
+  { id: 'trial_challenge_draw', label: 'Trial challenge draw (story with vs without the catalogue draw)', producesImage: false, overridable: true, storyLevel: true },
 ] as const;
 
 export const testlabService = {

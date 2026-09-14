@@ -7894,7 +7894,438 @@ async function runVbElementCellStage(target, { experimentId, promptOverride = nu
   };
 }
 
+// ─── Trial variety stages ───────────────────────────────────────────────────
+// Two showcase runs of ONE rotation entry came back as near-identical chestnut
+// stories. That had a harness cause (the showcase never called the idea
+// endpoint, so storyDetails was empty and buildTrialStoryPrompt fell back to the
+// literal 'A fun adventure'), fixed elsewhere. It left two variety questions
+// nobody had measured, and these are the two stages that measure them.
+
+// Words that carry no subject. Deliberately small and multilingual-ish: the
+// grouping below is an eyeballing aid, not a similarity metric.
+const IDEA_STOPWORDS = new Set([
+  'the', 'and', 'with', 'that', 'this', 'from', 'into', 'their', 'there', 'them', 'they', 'when', 'while',
+  'where', 'what', 'which', 'would', 'could', 'must', 'have', 'has', 'her', 'his', 'she', 'him', 'its',
+  'for', 'but', 'not', 'are', 'was', 'were', 'been', 'will', 'then', 'than', 'all', 'one', 'two', 'out',
+  'about', 'after', 'before', 'again', 'just', 'only', 'even', 'more', 'most', 'every', 'each', 'own',
+  'der', 'die', 'das', 'und', 'mit', 'ein', 'eine', 'einen', 'einem', 'einer', 'sich', 'ist', 'sie', 'ihr',
+  'ihre', 'ihren', 'als', 'auf', 'aus', 'den', 'dem', 'des', 'für', 'von', 'zum', 'zur', 'nicht', 'aber',
+  'les', 'des', 'une', 'dans', 'pour', 'avec', 'que', 'qui', 'son', 'sur', 'elle', 'est', 'pas', 'plus',
+]);
+
+/** Content words of an idea, lowercased and deduped — the grouping key material. */
+function ideaSubjectWords(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !IDEA_STOPWORDS.has(w))
+  );
+}
+
+/**
+ * Greedy grouping of ideas by shared content words. Two ideas land in the same
+ * group when their word overlap (Jaccard) reaches `threshold`. Crude on purpose
+ * — the owner reads the ideas; this only says which ones to read together.
+ */
+function groupIdeasBySubject(ideas, threshold = 0.5) {
+  const groups = [];
+  for (const idea of ideas) {
+    const words = ideaSubjectWords(idea.text);
+    let placed = null;
+    for (const g of groups) {
+      const inter = [...words].filter(w => g.words.has(w)).length;
+      const union = new Set([...words, ...g.words]).size || 1;
+      if (inter / union >= threshold) { placed = g; break; }
+    }
+    if (placed) {
+      placed.members.push(idea);
+      for (const w of words) placed.words.add(w);
+    } else {
+      groups.push({ words: new Set(words), members: [idea] });
+    }
+  }
+  return groups
+    .map(g => ({ size: g.members.length, members: g.members, sharedWords: [...g.words].slice(0, 25) }))
+    .sort((a, b) => b.size - a.size);
+}
+
+/**
+ * TRIAL IDEA VARIETY — draw the SAME idea pair N times and look at the list.
+ *
+ * The trial hands the visitor two ideas that must differ in KIND: one grounded
+ * in the child's real town, one make-believe entered from home
+ * (server/routes/trial.js, POST /generate-ideas-stream). Whether that generator
+ * proposes the same premise every time has never been measured, and it is the
+ * variety question that survives the showcase-harness fix.
+ *
+ * MIRROR WARNING: the prompt assembly below duplicates the route's, because the
+ * route builds it inline inside an SSE handler and exports nothing. Every shared
+ * piece — the template, the costume instructions, the season note, the age-mode
+ * block, the landmark lookup, the two branch sentences — is taken from the
+ * production module, so only the glue is copied. The branch sentences are pinned
+ * against trial.js by tests/unit/testlab-trial-variety-stages.test.ts, so a
+ * production edit that this stage does not follow fails the suite.
+ *
+ * params.draws     — how many PAIRS to generate (default 5, max 20)
+ * params.model     — idea model (default claude-sonnet, as production)
+ * params.name / age / gender / traits — override the story's main character
+ * params.town / language / storyCategory / storyTopic / storyTheme — override the rest
+ * params.landmarks — 'false' skips the landmark lookup (ideas then name no real place)
+ * params.overlap   — word-overlap threshold for the repeat grouping (default 0.5)
+ */
+async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTrialIdeaCostumeInstructions, buildAgeModeSection, getTeachingGuide } = require('./promptBuilders');
+  const { buildSeasonInstruction } = require('./season');
+  const { getLanguageInstruction } = require('./languages');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+
+  const draws = Math.min(Math.max(parseInt(params.draws, 10) || 5, 1), 20);
+  const model = params.model || 'claude-sonnet';
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+  const overlap = Number.isFinite(Number(params.overlap)) ? Number(params.overlap) : 0.5;
+
+  // The inputs, held identical across every draw — that is the whole experiment.
+  const storedChar = (storyData.characters || [])[0] || {};
+  const mainChar = {
+    name: params.name || storedChar.name || 'the child',
+    age: params.age !== undefined ? params.age : storedChar.age,
+    gender: params.gender || storedChar.gender || 'male',
+    traits: params.traits ? String(params.traits).split(',').map(s => s.trim()).filter(Boolean)
+      : (Array.isArray(storedChar.traits) ? storedChar.traits : []),
+  };
+  const storyCategory = params.storyCategory || storyData.storyCategory || 'adventure';
+  const storyTopic = params.storyTopic !== undefined ? params.storyTopic : (storyData.storyTopic || '');
+  const storyTheme = params.storyTheme !== undefined ? params.storyTheme : (storyData.storyTheme || '');
+  const language = params.language || storyData.language || 'en';
+  const userLocation = params.town
+    ? { ...(storyData.userLocation || {}), city: String(params.town) }
+    : (storyData.userLocation || null);
+
+  // ── route mirror: character line ──
+  const charDesc = `${mainChar.name}${mainChar.age ? `, ${mainChar.age} years old` : ''}${mainChar.gender ? `, ${mainChar.gender}` : ''}${mainChar.traits?.length ? ` (${mainChar.traits.join(', ')})` : ''}`;
+
+  // ── route mirror: category context ──
+  let categoryContext = '';
+  if (storyCategory === 'life-challenge') {
+    const guide = getTeachingGuide('life-challenge', storyTopic);
+    categoryContext = `This is a life skills story about "${storyTopic}". The idea names one outside event that forces the child to use this skill — something lost, broken, blocked, run out or wanted by two at once — and what it costs them.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
+  } else if (storyCategory === 'historical') {
+    categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
+  } else if (storyCategory === 'swiss-stories') {
+    const { getSwissCityById } = require('./swissStories');
+    const cityId = (storyTopic || '').replace(/-\d+$/, '');
+    const cityMeta = getSwissCityById(cityId);
+    categoryContext = `This is a Swiss local story set in ${cityMeta?.name?.en || cityId}. Use real local landmarks and cultural elements from this city. Keep it age-appropriate and engaging.`;
+  } else {
+    categoryContext = `This is a ${storyTheme || 'adventure'} story${storyTopic ? ` about "${storyTopic}"` : ''}. Make it exciting and appropriate for children.`;
+  }
+
+  // ── route mirror: landmarks ──
+  let landmarksText = '';
+  const landmarkNames = [];
+  if (params.landmarks !== 'false' && params.landmarks !== false && userLocation?.city && storyCategory !== 'historical') {
+    try {
+      const { getIndexedLandmarks } = require('./landmarkPhotos');
+      const landmarks = await getIndexedLandmarks(userLocation, 3);
+      if (landmarks.length > 0) {
+        landmarkNames.push(...landmarks.map(l => l.name));
+        landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarkNames.join(', ') + '.';
+      }
+    } catch (err) {
+      log.debug(`[TESTLAB] idea-variety landmark lookup failed: ${err.message}`);
+    }
+  }
+
+  const { getTrialTitle } = require('../config/trialTitles');
+  const trialTitle = getTrialTitle(storyTopic, storyCategory, mainChar.gender, language);
+  const { getTrialCostumeForStory } = require('../config/trialCostumes');
+  const ideaCostume = getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender: mainChar.gender });
+  const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
+  const seasonInstruction = storyCategory === 'historical' ? '' : buildSeasonInstruction({});
+
+  const orig = PROMPT_TEMPLATES.trialIdea;
+  if (promptOverride) PROMPT_TEMPLATES.trialIdea = promptOverride;
+  let base;
+  try {
+    base = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
+      SEASON: seasonInstruction,
+      CHARACTER: charDesc,
+      CATEGORY_CONTEXT: categoryContext,
+      TITLE: trialTitle || '',
+      LANDMARKS: '',
+      LANG_INSTRUCTION: getLanguageInstruction(language),
+      AGE_MODE: buildAgeModeSection({ characters: [mainChar] }),
+      COSTUME_RULE: costumeRule,
+    });
+  } finally {
+    PROMPT_TEMPLATES.trialIdea = orig;
+  }
+  if (!base || !base.trim()) throw new Error('trial-idea template unavailable');
+
+  const townName = userLocation?.city || '';
+  const townClause = townName ? `in ${townName}` : `in the child's own town`;
+  const noInventedPlaces = landmarksText
+    ? '\nName no place beyond the landmarks listed above - no other river, lake, mountain, street, square or building. Any further setting must be generic ("the market", "the woods").'
+    : '';
+  const localIdea = `\n${landmarksText}\nSet this idea ${townClause}, at the real local places named above.${noInventedPlaces} ${themeShows} — the play is the story, never a trip somewhere else.`;
+  const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
+  const promptLocal = base + localIdea;
+  const promptFantasy = base + fantasyIdea;
+
+  const t0 = Date.now();
+  const usage = [];
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const pairs = [];
+  for (let i = 1; i <= draws; i++) {
+    // Both ideas of a pair in parallel, as the route does. One flaky response
+    // must not lose the whole run — the draw records its error and the rest
+    // still get generated (score_rejudge takes the same line).
+    const [localRes, fantasyRes] = await Promise.all([
+      callTextModelStreaming(promptLocal, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
+      callTextModelStreaming(promptFantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
+    ]);
+    for (const r of [localRes, fantasyRes]) if (!r.error) usage.push({ cost: costOf(r), modelId: r.modelId, usage: r.usage });
+    pairs.push({
+      draw: i,
+      local: localRes.error ? null : String(localRes.text || '').trim(),
+      fantasy: fantasyRes.error ? null : String(fantasyRes.text || '').trim(),
+      errors: [localRes.error, fantasyRes.error].filter(Boolean),
+    });
+  }
+
+  // Repeats are counted WITHIN an arm: the two arms are required to differ in
+  // kind, so pooling them would report the design as repetition.
+  const arms = {};
+  for (const arm of ['local', 'fantasy']) {
+    const ideas = pairs.filter(p => p[arm]).map(p => ({ draw: p.draw, text: p[arm] }));
+    const groups = groupIdeasBySubject(ideas, overlap);
+    const repeated = groups.filter(g => g.size > 1);
+    // Raw word frequency across the arm — the cheapest "is it always chestnuts?"
+    // read there is, and it needs no grouping decision to be trusted.
+    const freq = new Map();
+    for (const idea of ideas) for (const w of ideaSubjectWords(idea.text)) freq.set(w, (freq.get(w) || 0) + 1);
+    arms[arm] = {
+      drawsWithIdea: ideas.length,
+      distinctSubjects: groups.length,
+      repeatedGroups: repeated.length,
+      // "How many draws landed on a subject some other draw also landed on."
+      repeatCount: repeated.reduce((s, g) => s + g.size, 0),
+      groups: groups.map(g => ({ size: g.size, draws: g.members.map(m => m.draw), ideas: g.members.map(m => m.text), sharedWords: g.sharedWords })),
+      wordsInEveryDraw: [...freq.entries()].filter(([, n]) => n === ideas.length && ideas.length > 1).map(([w]) => w).sort(),
+      topWords: [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([w, n]) => `${w} ×${n}`),
+    };
+  }
+
+  return {
+    storyId: target.storyId,
+    model,
+    modelId: usage[0]?.modelId || null,
+    draws,
+    overlapThreshold: overlap,
+    elapsedMs: Date.now() - t0,
+    modelCalls: usage.length,
+    cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
+    usage: usage.reduce((a, u) => ({
+      input_tokens: (a.input_tokens || 0) + (u.usage?.input_tokens || 0),
+      output_tokens: (a.output_tokens || 0) + (u.usage?.output_tokens || 0),
+    }), {}),
+    inputs: { character: charDesc, storyCategory, storyTopic, storyTheme, language, town: townName || null, landmarks: landmarkNames, title: trialTitle || null, costume: ideaCostume?.description || null },
+    promptChars: promptLocal.length,
+    prompts: { local: promptLocal, fantasy: promptFantasy },
+    pairs,
+    arms,
+    failures: pairs.flatMap(p => p.errors),
+  };
+}
+
+/**
+ * TRIAL CHALLENGE DRAW — the random catalogue draw, with and without.
+ *
+ * buildChallengeIdeasSection() draws 15 age-banded challenges from
+ * prompts/challenge-catalogue.txt and injects them as prompt text (no model
+ * call, no cost). It reaches arc-create.txt through the beats pipeline, which
+ * draws once and persists the draw as `challengeDraw`. buildTrialStoryPrompt
+ * never receives it — the trial writes its whole story in ONE call from
+ * story-trial.txt.
+ *
+ * This stage writes a trial-shaped story twice from the same inputs, once with
+ * the draw appended and once without, so the owner can read both. The injection
+ * is LAB-ONLY: it appends the section to the prompt this stage built. Nothing is
+ * wired into buildTrialStoryPrompt, so a real trial is unaffected.
+ *
+ * Two things the result states outright:
+ *  - BAND SHAPE. `challengeCatalogueBands` returns nothing for the three simple
+ *    bands (routine / quest / tries), so at age 3 production draws NO challenges
+ *    at all — the catalogue is age-banded but not band-shape-aware, and the
+ *    `tries` band wants one problem met three times, which a list of fifteen
+ *    separate trials does not describe. The stage reports the resolved band, the
+ *    band's own plot-shape text, and every drawn entry with the trait it tests,
+ *    so the fit is judged on the entries rather than on a heuristic.
+ *  - `params.forceBands` draws anyway for a simple-band story (Lab-only; it
+ *    mirrors the production filter so the entries are the real catalogue ones).
+ *
+ * params.withDraw   — 'true' / 'false' runs ONE arm; omitted runs both
+ * params.drawCount  — entries to draw (default 15, production's count)
+ * params.forceBands — comma-separated catalogue bands ('3', '6', '9') for a
+ *                     story whose band suppresses the draw
+ * params.model      — writer (default MODEL_DEFAULTS.outline, as the trial's own call)
+ * params.pages      — scene count (default 5, the trial shape)
+ * params.storyDetails — override the commission (an empty one is the bug that
+ *                     started this; the stage refuses to run blind by accident)
+ */
+function labForcedChallengeDraw(inputData, count, bands) {
+  // Lab-only mirror of buildChallengeIdeasSection's catalogue filter, for the
+  // simple bands where production deliberately draws nothing. Same file, same
+  // fields, same peril rule — only the band filter is the caller's.
+  const lines = require('fs').readFileSync(
+    require('path').join(__dirname, '../../prompts/challenge-catalogue.txt'), 'utf-8').split('\n');
+  const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
+  const youngest = ages.length ? Math.min(...ages) : 8;
+  const entries = lines
+    .filter(l => l && !l.startsWith('#'))
+    .map(l => l.split('|'))
+    .filter(f => f.length >= 6)
+    .filter(f => bands.some(b => f[4].startsWith(b)))
+    .filter(f => youngest > 5 || f[5].trim() !== '1');
+  const picked = [];
+  const pool = [...entries];
+  while (picked.length < count && pool.length) {
+    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  if (!picked.length) return '';
+  return [
+    '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
+    'Build the story\'s challenges from one or two of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.',
+    '',
+    ...picked.map(f => `- ${f[2]} (tests: ${f[3]})`),
+  ].join('\n');
+}
+
+async function runTrialChallengeDrawStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTrialStoryPrompt, buildChallengeIdeasSection, resolveAgeBand, buildAgeModeSection } = require('./promptBuilders');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const pageCount = parseInt(params.pages, 10) || 5;
+  const model = params.model || MODEL_DEFAULTS.outline;
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+
+  // Trial-shaped inputs from the stored story. storyDetails is the commission —
+  // an empty one is exactly the showcase bug, so it is stated in the result
+  // rather than silently falling through to the template's 'A fun adventure'.
+  const inputData = {
+    ...storyData,
+    trialMode: true,
+    pages: pageCount,
+    storyDetails: params.storyDetails !== undefined ? String(params.storyDetails) : (storyData.storyDetails || ''),
+  };
+  if (params.age !== undefined) {
+    inputData.characters = (storyData.characters || []).map((c, i) => (i === 0 ? { ...c, age: params.age } : c));
+  }
+
+  const band = resolveAgeBand(inputData);
+  // The band's OWN plot-shape text, through the production resolver — the rules
+  // the drawn challenges have to sit inside (for `tries`: one problem met three
+  // times). Read next to challengeDraw, it is the fit question, unheuristic.
+  const bandShapeText = buildAgeModeSection(inputData);
+
+  const drawCount = parseInt(params.drawCount, 10) || 15;
+  const forceBands = String(params.forceBands || '').split(',').map(s => s.trim()).filter(Boolean);
+  let drawSection = buildChallengeIdeasSection(inputData, drawCount);
+  let drawSource = drawSection ? 'production' : 'none (band draws no challenges)';
+  if (!drawSection && forceBands.length) {
+    drawSection = labForcedChallengeDraw(inputData, drawCount, forceBands);
+    drawSource = `lab-forced (bands ${forceBands.join(',')})`;
+  }
+  // Same extraction the beats pipeline persists as `challengeDraw`
+  // (beatsPipeline.js:780), so a Lab row and a story record are read the same way.
+  const challengeDraw = drawSection.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
+
+  const wantWith = params.withDraw === undefined || params.withDraw === true || params.withDraw === 'true';
+  const wantWithout = params.withDraw === undefined || params.withDraw === false || params.withDraw === 'false';
+  if (wantWith && !challengeDraw.length) {
+    throw new Error(`no challenges drawn: band "${band}" draws none (SIMPLE_BANDS) — pass params.forceBands=3 (or 6/9) to draw anyway, or run withDraw=false`);
+  }
+
+  const orig = PROMPT_TEMPLATES.storyTrial;
+  if (promptOverride) PROMPT_TEMPLATES.storyTrial = promptOverride;
+  let basePrompt;
+  try {
+    basePrompt = buildTrialStoryPrompt(inputData, pageCount);
+  } finally {
+    PROMPT_TEMPLATES.storyTrial = orig;
+  }
+  if (!basePrompt) throw new Error('story-trial template unavailable');
+
+  const usage = [];
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const runArm = async (label, prompt) => {
+    const t = Date.now();
+    const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_trial_challenge_draw' });
+    if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
+      throw new Error(`writer ${model} returned an empty response on the "${label}" arm — provider failure, not a result`);
+    }
+    usage.push({ cost: costOf(res), modelId: res.modelId, usage: res.usage });
+    const body = String(res.text || '');
+    const pagesSection = body.includes('---STORY PAGES---') ? body.split('---STORY PAGES---').slice(1).join('---STORY PAGES---') : body;
+    return {
+      arm: label,
+      modelId: res.modelId,
+      elapsedMs: Date.now() - t,
+      cost: costOf(res),
+      usage: res.usage,
+      promptChars: prompt.length,
+      prompt,
+      title: (body.match(/TITLE:\s*(.+)/) || [, ''])[1].trim() || null,
+      pages: parsePageBlocks(pagesSection).map(p => ({ pageNumber: p.pageNumber, text: p.text.split('SCENE HINT:')[0].replace(/^TEXT:\s*/i, '').trim() })),
+      rawResponse: body.slice(0, 40000),
+    };
+  };
+
+  const armsOut = [];
+  // Sequential: two writer calls of a whole story, and a failure on the second
+  // must still leave the first readable.
+  if (wantWithout) armsOut.push(await runArm('without-draw', basePrompt));
+  if (wantWith) armsOut.push(await runArm('with-draw', `${basePrompt}\n\n${drawSection}`));
+
+  return {
+    storyId: target.storyId,
+    model,
+    modelId: usage[0]?.modelId || null,
+    pages: pageCount,
+    commission: inputData.storyDetails || null,
+    commissionEmpty: !String(inputData.storyDetails || '').trim(),
+    // The band question, stated rather than inferred.
+    ageBand: band,
+    bandDrawsChallenges: drawSource === 'production',
+    drawSource,
+    bandShapeText: bandShapeText.slice(0, 4000),
+    challengeDraw,
+    challengeDrawCount: challengeDraw.length,
+    drawSection,
+    modelCalls: usage.length,
+    cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
+    usage: usage.reduce((a, u) => ({
+      input_tokens: (a.input_tokens || 0) + (u.usage?.input_tokens || 0),
+      output_tokens: (a.output_tokens || 0) + (u.usage?.output_tokens || 0),
+    }), {}),
+    arms: armsOut,
+  };
+}
+
 const STORY_STAGES = {
+  trial_idea_variety: runTrialIdeaVarietyStage,
+  trial_challenge_draw: runTrialChallengeDrawStage,
   vb_element_cell: runVbElementCellStage,
   arc_rounds: runArcRoundsStage,
   cover: runCoverStage,
