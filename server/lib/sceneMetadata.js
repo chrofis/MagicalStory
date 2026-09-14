@@ -1935,6 +1935,38 @@ function normalizePositionToLCR(position) {
 
 
 /**
+ * Strip the text writer's page DELIMITER from the end of one page's text.
+ *
+ * The writer separates pages with a rule line ("---"). When it puts that rule
+ * INSIDE the last page's body instead of between the headings, the page parser
+ * (parseRefinedText) — which cuts a page at the NEXT "## Page N" heading — keeps
+ * it, and the rule ships under the illustration in the book and the PDF
+ * (job_1789348171785_9oxos7dwv, pages 1, 2 and 8: the body ends "... genau.",
+ * a blank line, then a bare "---").
+ *
+ * What counts as a delimiter, deliberately narrow:
+ *   - a run of TWO OR MORE dash characters (-, ‐ ‑ ‒ – — ―, mixed),
+ *   - standing at the VERY END of the page text, with nothing but whitespace
+ *     after it,
+ *   - preceded by whitespace (or being the whole string) — so it stands alone
+ *     rather than being attached to a word.
+ *
+ * Everything else is left byte-identical. In particular a SINGLE trailing dash
+ * is never stripped: German and French children's prose legitimately ends a
+ * line on an em-dash ("Und dann —"), and a two-dash run is not punctuation in
+ * any of our languages. A dash inside a sentence is never at the end, so it is
+ * never matched.
+ */
+const DELIMITER_DASHES = '\-\u2010\u2011\u2012\u2013\u2014\u2015';
+const TRAILING_DELIMITER_RE = new RegExp('(?:^|\\s)[' + DELIMITER_DASHES + ']{2,}\\s*$');
+
+function stripTrailingSeparator(text) {
+  const s = String(text == null ? '' : text);
+  if (!TRAILING_DELIMITER_RE.test(s)) return s;
+  return s.replace(TRAILING_DELIMITER_RE, '').replace(/\s+$/, '');
+}
+
+/**
  * Get text for a specific page from storyText
  * @param {string|Array} storyText - Full story text with page markers, or array of {pageNumber, text}
  * @param {number} pageNumber - Page number to extract
@@ -2261,5 +2293,6 @@ module.exports = {
   groupTrialPlatePagesByVantage,
   normalizePositionToLCR,
   getPageText,
-  updatePageText
+  updatePageText,
+  stripTrailingSeparator
 };

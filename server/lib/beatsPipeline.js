@@ -108,6 +108,7 @@ const {
   parseRefinedText,
   buildAvailableAvatarsForPrompt,
   extractSceneMetadata,
+  stripTrailingSeparator,
   getHistoricalLocations,
   getHistoricalObjects,
 } = require('./storyHelpers');
@@ -2595,7 +2596,10 @@ ${bibleBody}` : bibleBody;
   const pages = [];
   const scenes = [];
   for (const b of beats) {
-    const text = (textByPage.get(b.pageNumber) || '').trim();
+    // stripTrailingSeparator: the writer's "---" page rule, when it lands
+    // INSIDE the page body, survives the parser's cut at the next heading and
+    // ships under the illustration (job_1789348171785_9oxos7dwv p1/p2/p8).
+    const text = stripTrailingSeparator((textByPage.get(b.pageNumber) || '').trim());
     if (!text) {
       log.warn(`⚠️ [BEATS] Page ${b.pageNumber} has no text — dropped`);
       continue;

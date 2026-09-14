@@ -537,7 +537,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const {
-    buildTextRefinePrompt, parseRefinedText, buildTextAuditPrompt,
+    buildTextRefinePrompt, parseRefinedText, stripTrailingSeparator, buildTextAuditPrompt,
     buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt,
     countFaults, faultsByCategory,
   } = require('./storyHelpers');
@@ -774,7 +774,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const parsed = parseRefinedText(r.text || '', expected);
     // Omission is the CONTRACT: only rewritten pages come back, everything else
     // keeps its current text.
-    const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+    // Same delimiter leak as the beats writer: a rewritten page can come back
+    // with the model's "---" page rule glued to its last line, and that ships
+    // under the illustration. See stripTrailingSeparator (sceneMetadata.js).
+    const byPage = new Map(parsed.pages.map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
     const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
     const next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== base[idx].text).map(p => p.pageNumber);

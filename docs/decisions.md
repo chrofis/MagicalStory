@@ -38289,3 +38289,31 @@ regex), `tasks/BACKLOG.md`.
 **Open:**      The second RE-DIVIDE paragraph's count-neutral remedy ("Keep the page count by merging two pages ... or by dropping the weakest") assumes the whole division is in view; under a partial reply a merge would have to return — and renumber — pages no finding named, which the revert guard would undo. It is left in place unchanged as a brake against inventing pages; reworking it is an owner call.
 **Touched:**   `server/lib/promptBuilders.js` (`buildReplanSection`, `buildBeatsPrompt`), `prompts/story-beats.txt`, `tests/unit/built-prompt-values.test.ts`
 **Status:**    ✅ active
+
+## The writer's "---" page rule is trimmed off the END of a page's text (2026-09-14)
+**Context:**  Story `job_1789348171785_9oxos7dwv` (staging) shipped pages 1, 2 and 8
+with a bare `---` under the last sentence ("... beobachtete alles genau.
+
+---").
+This is READER-VISIBLE: `pageText` is rendered in the book and in the PDF. The text
+writer separates pages with a rule line; `parseRefinedText` cuts a page at the NEXT
+"## Page N" heading, so a rule the model wrote INSIDE the page body was never removed
+by anything — it was not "stripped only on its own line", it was not stripped at all.
+**Decision:** `stripTrailingSeparator()` (`server/lib/sceneMetadata.js`, the page-text
+helper module) removes ONE trailing delimiter, applied at the two sites that produce
+stored page text: the beats page assembly and the text-refine rewrite merge. A
+delimiter is, deliberately narrowly: a run of **two or more** dash characters
+(`-` `‐` `‑` `‒` `–` `—` `―`, mixed allowed), standing at the very end of the text
+with only whitespace after it, and preceded by whitespace (or being the whole
+string). Any leftover trailing whitespace goes with it. Everything else is returned
+byte-identical.
+**Rationale:** A **single** trailing dash is never touched — German and French
+children's prose legitimately ends a line on an em-dash ("Und dann —"), and dialogue
+uses dashes mid-clause; a two-dash run is not punctuation in any language we ship.
+Requiring the run to stand alone keeps word-attached typography ("Wort--") intact.
+The fix is applied at the page-text sites rather than inside `parseRefinedText`
+because that parser is also the SCENES/brief parser (briefs are not reader-visible)
+— and it lives in `promptBuilders.js`, which was locked by a concurrent session.
+Consolidating it into the parser is a fair later cleanup.
+**Touched files:** `server/lib/sceneMetadata.js`, `server/lib/beatsPipeline.js`,
+`server/lib/textRefine.js`, `tests/unit/page-text-trailing-separator.test.ts`
