@@ -701,6 +701,28 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
     .filter(info => info.hasPhoto);
 }
 
+/**
+ * Whole-cast reference photos for an evaluation (every character in the story,
+ * standard clothing, styled for the art style).
+ *
+ * The eval judge's identity check AND its clothing contract both read this
+ * list, so it must be built by the same resolver the generator uses — a
+ * hand-rolled `c.photoUrl || c.avatars?.styled` filter matched nothing after
+ * the character-storage normalisation and left every batch eval with zero
+ * references and no contract.
+ *
+ * @param {Array} characters - Story characters (stored shape: photos[], avatars)
+ * @param {string} artStyle - Art style, for the styled-avatar lookup
+ * @param {Object} clothingRequirements - Per-story clothing requirements from the outline
+ * @returns {Array} getCharacterPhotoDetails entries with styled avatars applied
+ */
+function buildWholeCastReferencePhotos(characters, artStyle = null, clothingRequirements = null) {
+  const photos = getCharacterPhotoDetails(characters, 'standard', artStyle, clothingRequirements);
+  // Lazy: styledAvatars → images → clothingResolve is a require cycle at load time.
+  const { applyStyledAvatars } = require('./styledAvatars');
+  return applyStyledAvatars(photos, artStyle);
+}
+
 // ============================================================================
 // Character visual profile — single source of truth
 // ----------------------------------------------------------------------------
@@ -989,6 +1011,7 @@ module.exports = {
   parseCharacterClothing,
   prefetchAvatarBytesForCharacters,
   getCharacterPhotoDetails,
+  buildWholeCastReferencePhotos,
   buildSceneClothingRequirements,
   resolveClothingForPage,
   buildUsedClothingText,

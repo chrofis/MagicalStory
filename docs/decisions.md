@@ -36580,3 +36580,45 @@ report), `server/lib/repairLogic.js` (`repairAttemptFromResult`),
 `server/lib/repairPipeline.js`, `tests/unit/repair-round-effectiveness.test.ts`
 **Status:**    ✅ active — the guard is situational (fires only when a re-plan
 changes the count); the two recording fixes show on the next story with a repair.
+
+## 2026-09-14 — The batch quality judge gets the whole cast as references again
+
+**Context:**   Since the character-storage normalisation (2158cc993, 2026-02-03)
+a character carries `photos[]` and `avatars.styledAvatars[<style>]`, never
+`photoUrl` or `avatars.styled`. Three sites still built the judge's whole-cast
+reference list from `c.photoUrl || c.avatars?.styled` (repairPipeline, and both
+re-evaluate endpoints in regeneration.js), so the list was empty for every
+story — and `(img.allCharacterPhotos || img.characterPhotos || [])` let the
+empty array win, because `[]` is truthy. The judge therefore saw ZERO reference
+images and, since the CLOTHING CONTRACT is built from the refs'
+`clothingDescription`, no contract. Staging story job_1789343124794_z2c779f7i:
+the N-16 "no clothing contract available" line on all 36 batch evals, every
+main-cast token logged unresolved, no `Character matches:` line on any page.
+
+**Decision:**  One builder, the same one generation uses:
+`buildWholeCastReferencePhotos(characters, artStyle, clothingRequirements)` =
+`getCharacterPhotoDetails(…, 'standard', …)` + `applyStyledAvatars`, called from
+all three sites. In `evaluateImageBatch` the reference list is composed by
+`composeEvalReferencePhotos(pagePhotos, wholeCastPhotos)`: the page's own photos
+first, the whole-cast entries appended only for names the page does not list,
+and an empty list never replaces a non-empty one. `evaluateImageBatch` also
+forwards `storyData` and `clothingRequirements` into the per-image `evalOptions`.
+
+**Rationale:** The page's photos hold the outfit the page was actually generated
+against (costumes, worn-item strips), so they outrank the story-level standard
+outfit in the contract — that is what the 2026-09-13 cover fix wanted the judge
+to score. The whole-cast entries exist for identity, so appending the missing
+names costs nothing and restores the cast the judge is meant to recognise.
+`storyData` is what `buildCastIndex` needs; without it the cast resolver has no
+main-cast index and every main-cast token resolves to nothing.
+
+**Touched:** `server/lib/clothingResolve.js` (new
+`buildWholeCastReferencePhotos`), `server/lib/storyHelpers.js` (facade
+re-export), `server/lib/repairPipeline.js` (whole-cast list + `storyData` at all
+five `evaluateImageBatch` call sites), `server/routes/regeneration.js` (both
+re-evaluate endpoints), `server/lib/images.js`
+(`composeEvalReferencePhotos`, `storyData`/`clothingRequirements` in
+`evalOptions`), `tests/unit/batch-eval-whole-cast-refs.test.ts`,
+`tests/unit/batch-eval-story-context.test.ts`
+**Status:**    ✅ active — visible on the next story run as a populated
+`Character matches:` list and no N-16 suppression line.

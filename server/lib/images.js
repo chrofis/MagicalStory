@@ -2328,6 +2328,25 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
  * @param {string|null} options.qualityModelOverride - Model override for quality evaluation
  * @returns {Promise<Array<Object>>} Array of evaluation results per page
  */
+/**
+ * Compose the reference list a page eval is judged against.
+ *
+ * Page photos win per name — they hold the outfit the page was generated
+ * against — and the whole-cast list only appends the names the page omits.
+ * Either side may legitimately be empty; an empty one never wins.
+ *
+ * @param {Array} pagePhotos - The page's own characterPhotos
+ * @param {Array} wholeCastPhotos - Story-level reference photos (all characters)
+ * @returns {Array} Merged reference list
+ */
+function composeEvalReferencePhotos(pagePhotos, wholeCastPhotos) {
+  const page = Array.isArray(pagePhotos) ? pagePhotos.filter(Boolean) : [];
+  const cast = Array.isArray(wholeCastPhotos) ? wholeCastPhotos.filter(Boolean) : [];
+  const key = (p) => String(p?.name || '').trim().toLowerCase();
+  const onPage = new Set(page.map(key).filter(Boolean));
+  return [...page, ...cast.filter(p => !onPage.has(key(p)))];
+}
+
 async function evaluateImageBatch(images, options = {}) {
   const {
     concurrency = 100,
@@ -2335,6 +2354,9 @@ async function evaluateImageBatch(images, options = {}) {
     visualBible = null,
     clothingRequirements = null,
     artStyle = null,
+    // Story context for the judge's cast resolver (main cast index) and the
+    // clothing contract — without it every main-cast token logged unresolved.
+    storyData = null,
     // Story-level context for eval_findings stats (best-effort; per-style works
     // from artStyle alone, the rest populate once the batch caller threads them).
     storyId = null,
@@ -2395,22 +2417,15 @@ async function evaluateImageBatch(images, options = {}) {
       // scene DESCRIPTION (no ART STYLE block), so without this every
       // style-dependent evaluator rule skipped silently in production too.
       //
-      // allCharacterPhotos (batch-global identity list, {name, photoUrl} only)
-      // wins the refs slot, and the eval's clothing-contract builder reads
-      // clothingDescription off THESE refs — so the contract was empty for
-      // every batch eval. Pages hid it (scene prose weaves the outfits into
-      // ORIGINAL_PROMPT); a cover's description has no clothing text, so the
-      // judge ruled the requested costume "unrequested" and the repair
-      // stripped it (verified: identical cover + prompt scores 0 without
-      // clothingDescription on refs, 100 with). Merge the per-page outfit in.
-      const richClothingByName = new Map((img.characterPhotos || [])
-        .filter(p => p?.name && p?.clothingDescription)
-        .map(p => [String(p.name).toLowerCase(), p.clothingDescription]));
-      const refsForEval = (img.allCharacterPhotos || img.characterPhotos || []).map(p =>
-        p?.clothingDescription ? p : {
-          ...p,
-          clothingDescription: richClothingByName.get(String(p?.name || '').toLowerCase()) || null,
-        });
+      // The judge's reference list, and with it the CLOTHING CONTRACT the
+      // eval builds from these refs' clothingDescription. The page's own
+      // photos come first: they carry the outfit the page was actually
+      // generated against (costumes, worn-item strips). A cover's description
+      // has no clothing text, so a contract built from the story-level outfit
+      // ruled the requested costume "unrequested" and the repair stripped it.
+      // The whole-cast list then adds the characters the page did not list,
+      // so identity checks still see the full cast.
+      const refsForEval = composeEvalReferencePhotos(img.characterPhotos, img.allCharacterPhotos);
       const qualityResult = await evaluateImageQuality(
         img.imageData,
         sceneDescWithClothing,
@@ -2429,6 +2444,8 @@ async function evaluateImageBatch(images, options = {}) {
           // used to render raw VB ids into a judge's prompt.
           visualBible,
           artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
+          storyData,
+          clothingRequirements,
           // Structured cover text contract from the pseudo-page record
           // (expectedText / textMode) — see evaluateImageQuality's cover branch.
           expectedText: img.expectedText ?? null,
@@ -5090,6 +5107,7 @@ module.exports = {
   generateWithIterativePlacement,
   applyStyleTransfer,
   evaluateImageBatch,
+  composeEvalReferencePhotos,
 
   // Unified repair pipeline (the only active repair pipeline)
   inpaintPage,

@@ -384,13 +384,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   log.info(`🔍 [UNIFIED PIPELINE] Step 1: Evaluating ${imagesWithData.length} images + entity consistency...`);
   const step1Start = Date.now();
 
-  // Build ALL character photos for evaluation (matches re-evaluate endpoint behavior)
-  const allCharacterPhotos = characters
-    .filter(c => c.photoUrl || c.avatars?.styled)
-    .map(c => ({
-      name: c.name,
-      photoUrl: c.avatars?.styled || c.photoUrl
-    }));
+  // Whole-cast references for the judge — built by the SAME resolver the
+  // generator uses (page gen: getCharacterPhotoDetails + applyStyledAvatars).
+  // The old hand-rolled `c.photoUrl || c.avatars?.styled` filter matched
+  // nothing once character storage normalised to photos[]/styledAvatars, so
+  // every batch eval ran with zero references and no clothing contract.
+  const { buildWholeCastReferencePhotos } = getStoryHelpers();
+  const allCharacterPhotos = buildWholeCastReferencePhotos(
+    characters,
+    artStyle,
+    storyData?.clothingRequirements || null
+  );
 
   // Reusable helper: build eval inputs for an array of image entries
   const buildEvalInputs = (imageEntries) => imageEntries.map(entry => {
@@ -552,7 +556,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   // Run both in parallel
   const [evaluations, entityReport] = await Promise.all([
-    images().evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle, ...evalStoryMeta }),
+    images().evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
       // Objects (LOC/ART/VEH/ANI) are NOT cross-page identity entities — a boat
@@ -651,7 +655,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   }
   const baselineEvalsByPage = new Map();
   if (baselineEvalInputs.length > 0) {
-    const baselineEvals = await images().evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle, ...evalStoryMeta });
+    const baselineEvals = await images().evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
     for (const ev of baselineEvals) {
       baselineEvalsByPage.set(ev.pageNumber, ev);
       if (ev.usage && usageTracker) {
@@ -2200,7 +2204,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           try {
             recolourEvals = await images().evaluateImageBatch(
               buildEvalInputs(recolourResults),
-              { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle, ...evalStoryMeta }
+              { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }
             );
           } catch (err) {
             // No score → no version. The bytes still go to the repair via
@@ -2493,7 +2497,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           minAppearances: 1,
           onHeartbeat: pingHeartbeat
         }),
-        images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle, ...evalStoryMeta }),
+        images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }),
       ]);
 
       if (freshEntityResult.status === 'fulfilled') {
@@ -2796,7 +2800,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     if (rescueEntries.length > 0) {
       log.info(`📊 [UNIFIED PIPELINE] Step 3b: scoring ${rescueEntries.length} unscored version(s) so every candidate has a score: page(s) ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
-      const rescueEvals = await images().evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle, ...evalStoryMeta });
+      const rescueEvals = await images().evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
       for (const ev of rescueEvals) {
         const entry = rescueEntries.find(r => r.pageNumber === ev.pageNumber);
         if (!entry) continue;

@@ -108,6 +108,7 @@ const {
   convertClothingToCurrentFormat,
   parseClothingCategory,
   getCharacterPhotoDetails,
+  buildWholeCastReferencePhotos,
   buildCharacterPhysicalDescription,
   buildCharacterDescriptionsForBbox,
   buildCharacterReferenceList,
@@ -3929,12 +3930,14 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
     // Get character photos for reference images
     const characters = storyData.characters || [];
-    const characterPhotos = characters
-      .filter(c => c.photoUrl || c.avatars?.styled)
-      .map(c => ({
-        name: c.name,
-        photoUrl: c.avatars?.styled || c.photoUrl
-      }));
+    // Same builder the generator and the repair pipeline use — the old
+    // `c.photoUrl || c.avatars?.styled` filter matches nothing on stored
+    // characters, so the judge got no references and no clothing contract.
+    const characterPhotos = buildWholeCastReferencePhotos(
+      characters,
+      storyData.artStyle || null,
+      storyData.clothingRequirements || null
+    );
 
     // Run evaluations in parallel with concurrency limit
     const evalLimit = pLimit(100);
@@ -4300,12 +4303,14 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
 
     // Build character reference images (same pattern as re-evaluate)
     const characters = storyData.characters || [];
-    const characterPhotos = characters
-      .filter(c => c.photoUrl || c.avatars?.styled)
-      .map(c => ({
-        name: c.name,
-        photoUrl: c.avatars?.styled || c.photoUrl
-      }));
+    // Same builder the generator and the repair pipeline use — the old
+    // `c.photoUrl || c.avatars?.styled` filter matches nothing on stored
+    // characters, so the judge got no references and no clothing contract.
+    const characterPhotos = buildWholeCastReferencePhotos(
+      characters,
+      storyData.artStyle || null,
+      storyData.clothingRequirements || null
+    );
 
     // Get page text and scene hint
     const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
