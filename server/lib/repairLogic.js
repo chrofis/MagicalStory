@@ -283,6 +283,102 @@ function collectShippedDefective(results, regenThreshold) {
 }
 
 /**
+ * THE CRITICALS THAT SURVIVED REPAIR, with the methods that were tried on them
+ * (owner, 2026-09-14 — REPORT ONLY, deliberately not a routing change).
+ *
+ * `collectShippedDefective` is the sibling record and the two OVERLAP but are
+ * not the same set. Its qualifying condition is "below the loop's threshold OR
+ * carrying a CRITICAL", so a page that ships ABOVE the threshold with a
+ * CRITICAL still on it is inside that list — but nothing in the run says which
+ * methods were spent on it, and the above-threshold case is exactly the one the
+ * threshold reading hides. Measured on job_1789337998754_apslnsq1z p8: a
+ * CRITICAL `missing_character` routed to `iterate` (any critical does), the
+ * re-roll scored -82, an inpaint round recovered the page to 53, and the page
+ * shipped with the CRITICAL still recorded. Iterate is a re-roll and inpaint
+ * cannot add an absent person, so nothing about that route was verified.
+ *
+ * The owner chose to keep the routing and record the evidence instead: the
+ * question "is rerouting a surviving CRITICAL worth it" needs per-page
+ * method-vs-outcome data across many stories, and that is what this gap was
+ * losing. Nothing here decides anything — no method, no severity, no score.
+ *
+ * Methods come from the round summaries `summarizeRepairRound` already
+ * produces (`pages[].method`, e.g. 'iterate-round-1'), never from a second
+ * derivation of the same fact.
+ *
+ * @param {Array} results        per-page pipeline results (pageNumber, finalScore, unrepairedCritical)
+ * @param {Array} repairRounds   `summarizeRepairRound` output, one per round
+ * @param {number} regenThreshold the SAME score floor the round loop used
+ * @returns {{recordedAt:string, pageCount:number, findingCount:number, aboveThresholdCount:number, byType:Object, byMethod:Object, pages:Array}|null}
+ *   null when no CRITICAL survived — never an empty husk.
+ */
+function collectSurvivingCriticals(results, repairRounds, regenThreshold) {
+  // Which methods touched which page, in round order, from the round record.
+  const methodsByPage = new Map();
+  for (const round of (Array.isArray(repairRounds) ? repairRounds : [])) {
+    for (const row of (Array.isArray(round?.pages) ? round.pages : [])) {
+      if (!row || row.page == null) continue;
+      if (!methodsByPage.has(row.page)) methodsByPage.set(row.page, []);
+      methodsByPage.get(row.page).push({
+        method: row.method || 'unknown',
+        outcome: row.outcome ?? null,
+        delta: row.delta ?? null,
+      });
+    }
+  }
+
+  // `Number(null)` is 0, not NaN — an UNSCORED page must not read as a zero.
+  const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  const floor = num(regenThreshold);
+
+  const pages = [];
+  const byType = {};
+  const byMethod = {};
+  for (const r of (Array.isArray(results) ? results : [])) {
+    const findings = Array.isArray(r?.unrepairedCritical) ? r.unrepairedCritical : [];
+    if (!findings.length) continue;
+    const finalScore = num(r.finalScore);
+    const attempts = methodsByPage.get(r.pageNumber) || [];
+    for (const f of findings) {
+      const t = String(f?.type || 'untyped').toLowerCase();
+      byType[t] = (byType[t] || 0) + 1;
+    }
+    // A page nothing was tried on is its own bucket: "no method reached it" and
+    // "every method failed" are different findings.
+    const bases = attempts.length ? [...new Set(attempts.map(a => baseRepairMethod(a.method)))] : ['none'];
+    for (const b of bases) byMethod[b] = (byMethod[b] || 0) + 1;
+    pages.push({
+      pageNumber: r.pageNumber ?? null,
+      finalScore,
+      // The case this record exists for: the score cleared the bar and the page
+      // is still known-broken.
+      aboveThreshold: floor !== null && finalScore !== null && finalScore >= floor,
+      findings: findings.map(f => ({
+        type: f?.type || 'untyped',
+        severity: f?.severity || null,
+        description: String(f?.description || '').slice(0, 300),
+      })),
+      methodsAttempted: attempts.map(a => a.method),
+      attempts,
+      roundsAttempted: attempts.length,
+    });
+  }
+  if (!pages.length) return null;
+  // Worst first; an unscored page sorts last rather than pretending to be a 0.
+  pages.sort((a, b) => (a.finalScore ?? Number.POSITIVE_INFINITY) - (b.finalScore ?? Number.POSITIVE_INFINITY)
+    || ((a.pageNumber ?? 0) - (b.pageNumber ?? 0)));
+  return {
+    recordedAt: new Date().toISOString(),
+    pageCount: pages.length,
+    findingCount: pages.reduce((n, p) => n + p.findings.length, 0),
+    aboveThresholdCount: pages.filter(p => p.aboveThreshold).length,
+    byType,
+    byMethod,
+    pages,
+  };
+}
+
+/**
  * Does this eval carry any CRITICAL or CATASTROPHIC finding? Reads the
  * structured severity field on the three finding pools (quality fixableIssues,
  * semantic issues, consolidated deduped_issues) — never the prose.
@@ -900,4 +996,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

@@ -37646,3 +37646,37 @@ yields 50 / 14, matching its runMetrics).
 `build`, `pipelineConfig.pipelineMode`),
 `tests/unit/quality-analytics-not-measured.test.ts`
 **Status:** ✅ active
+
+### A CRITICAL that survives repair is REPORTED, not rerouted (2026-09-14)
+**Context:** A CRITICAL finding does get a repair route — `chooseRepairStrategy`
+(`server/lib/repairPipeline.js`) sends any critical to `iterate`. But iterate is
+a re-roll, inpaint cannot add an absent person, and nothing verifies the person
+arrived, so a page can ship with the CRITICAL still recorded. Measured on Story A
+(`job_1789337998754_apslnsq1z`) p8: a CRITICAL `missing_character` went 15 →
+iterate −82 → inpaint-round-2 53, and shipped. The only trace of what had been
+tried was a log line; `unrepairedCritical` says a critical survived, and
+`shippedDefective` (D7) frames a page by its score — neither records the methods
+spent, and a page that clears the threshold while still carrying a CRITICAL is the
+case the score framing hides.
+**Decision:** The owner keeps the routing unchanged and closes the REPORTING gap
+instead. `collectSurvivingCriticals(results, repairRounds, regenThreshold)` (a
+pure function in `server/lib/repairLogic.js`, sibling to `collectShippedDefective`)
+rolls the survivors up per page with `aboveThreshold`, the findings, and the
+methods attempted — read from the round rows `summarizeRepairRound` already
+produces (`iterate-round-1`, `inpaint-round-2`), never a second derivation. It is
+counted in run metrics (`surviving_critical_pages` / `_findings` /
+`_above_threshold`, best-effort), carried on the pipeline result, and persisted as
+`finalChecksReport.survivingCriticals`. No routing constant, no severity and no
+score is touched; it never fails or blocks a run.
+**Rationale:** Rerouting a surviving CRITICAL (a verified-presence pass, a
+different method ladder) is a real option, but it costs money on every story and
+the evidence needed to judge it — which methods were spent on which surviving
+critical, and with what outcome — is exactly what this gap was throwing away.
+One story cannot answer it; the accumulated record across many can. Reporting
+first is also the cheap half: the routing change stays available, now with data
+behind it.
+**Touched:** `server/lib/repairLogic.js` (`collectSurvivingCriticals`),
+`server/lib/repairPipeline.js` (rollup + metrics + returned result),
+`storyJobPipeline.js` (`finalChecksReport.survivingCriticals`),
+`tests/unit/surviving-criticals.test.ts`
+**Status:** ✅ active

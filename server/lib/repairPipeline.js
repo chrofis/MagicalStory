@@ -3744,6 +3744,30 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     } catch { /* metrics are best-effort */ }
   }
 
+  // SURVIVING CRITICALS (owner, 2026-09-14). The per-page warnings above are log
+  // lines; `shippedDefective` is structured but says nothing about WHICH repair
+  // methods were spent on a page, and its threshold framing hides the case that
+  // matters most — a page that ships ABOVE the floor with a CRITICAL still on
+  // it. A CRITICAL does get a route (`chooseRepairStrategy` sends every critical
+  // to iterate), and the owner chose to KEEP that routing and record the
+  // evidence instead: iterate is a re-roll, inpaint cannot add an absent person,
+  // and nothing verifies the person arrived. Judging whether rerouting is worth
+  // it needs method-vs-outcome data across many stories — this is that data.
+  // Report only: it decides nothing and never fails a run.
+  const { collectSurvivingCriticals } = require('./repairLogic');
+  const survivingCriticals = collectSurvivingCriticals(results, repairRounds, regenThreshold);
+  if (survivingCriticals) {
+    try {
+      const m = require('./runMetrics').forJob(storyData?.id || jobId);
+      m.add('surviving_critical_pages', survivingCriticals.pageCount);
+      m.add('surviving_critical_findings', survivingCriticals.findingCount);
+      if (survivingCriticals.aboveThresholdCount > 0) {
+        m.add('surviving_critical_above_threshold', survivingCriticals.aboveThresholdCount);
+      }
+    } catch { /* metrics are best-effort */ }
+    log.warn(`⚠️  [UNIFIED PIPELINE] ${survivingCriticals.findingCount} CRITICAL finding(s) survived repair on ${survivingCriticals.pageCount} page(s) (${survivingCriticals.aboveThresholdCount} of them ABOVE the ${regenThreshold} threshold); methods tried: ${JSON.stringify(survivingCriticals.byMethod)}`);
+  }
+
   // Convert charFixDetails Map to plain object for serialization.
   // Image fields can arrive in three shapes after R2 migration:
   //   - data:image/...;base64,XXX  → pass through
@@ -3787,7 +3811,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.warn(`⚠️  [UNIFIED PIPELINE] ${notEvaluated.entryCount} dimension(s) went UNEVALUATED across ${notEvaluated.pages.length} page(s): ${notEvaluated.dimensions.join(', ')}`);
   }
 
-  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, notEvaluated };
+  // `survivingCriticals` travels with the result for the same reason
+  // `shippedDefective` does — and carries the one thing that record cannot: the
+  // repair methods a still-broken page actually consumed, which is the evidence
+  // a future routing decision would have to be made on (owner, 2026-09-14).
+  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, survivingCriticals, notEvaluated };
 }
 
 module.exports = {

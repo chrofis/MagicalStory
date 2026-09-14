@@ -4055,6 +4055,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Pages that ship below the repair threshold or still carrying a CRITICAL
     // (D7): the run must say so somewhere a reader will find it.
     let pipelineShippedDefective = null;
+    let pipelineSurvivingCriticals = null;
 
     {
       // =======================================================================
@@ -6168,7 +6169,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dedication: inputData.dedication || '',
         };
 
-        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, notEvaluated: pipelineNotEvaluatedRollup } = await runUnifiedRepairPipeline(rawImages, {
+        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, survivingCriticals, notEvaluated: pipelineNotEvaluatedRollup } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
           usageTracker: (provider, usage, funcName, modelId) => {
@@ -6219,6 +6220,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pipelineBookAuditRounds = (bookAuditRounds && bookAuditRounds.length) ? bookAuditRounds : null;
         pipelineRepairRounds = (repairRounds && repairRounds.length) ? repairRounds : null;
         pipelineShippedDefective = (shippedDefective && shippedDefective.length) ? shippedDefective : null;
+        pipelineSurvivingCriticals = survivingCriticals || null;
         pipelineNotEvaluated = pipelineNotEvaluatedRollup || null;
 
         // Map pipeline results to allImages format. Index rawImages by
@@ -6640,6 +6642,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (pipelineShippedDefective) {
       finalChecksReport = finalChecksReport || {};
       finalChecksReport.shippedDefective = pipelineShippedDefective;
+    }
+
+    // CRITICALS THAT SURVIVED REPAIR, AND WHAT WAS TRIED ON THEM (2026-09-14).
+    // The owner kept the existing routing (every critical goes to iterate) and
+    // asked for the evidence instead: which methods a still-broken page
+    // consumed, and whether it shipped above or below the threshold. Report
+    // only — it changes no route, no severity and no score.
+    if (pipelineSurvivingCriticals) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.survivingCriticals = pipelineSurvivingCriticals;
     }
 
     // UNJUDGED DIMENSIONS (2026-09-14). A check that could not run must say so
