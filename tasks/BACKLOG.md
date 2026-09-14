@@ -1131,6 +1131,30 @@ rebuilt: `resolveEvalSceneHint` (3b3070dce), `resolveGeneratedOutfit` (e403345b1
       `youngestMainAge()` (`server/lib/promptBuilders.js`) already encodes "the youngest main is the
       reader" and feeds the child critic. Ages alone may not separate "a grandmother trying it for
       herself" (she IS the reader) from "a mother making it for her child" (she is not). Raised
-      2026-09-14 alongside the journey-band change; deliberately NOT changed →
-      `server/lib/promptBuilders.js` `pickMainCharacters` / `resolveAgeBand` / `youngestMainAge`
+      2026-09-14 alongside the journey-band change; deliberately NOT changed.
+      **Measured on staging (read-only, 123 stories with a cast):** 75 have ≥2 declared mains and
+      ALL 75 are mixed-age. Under a youngest-main rule the SHAPE band would change for 20 (27%) and
+      the PACING band for 69 (92%). The damage is child-child, not adult-child: only 1 story in 123
+      pairs an adult with a child (Lukas 7 / Roger 45). Dominant patterns are Emma 5 / Noah 7 (47
+      stories, pacing `standard` where the 5-year-old rates `journey`) and Levin 5 + three
+      3-year-olds (17 stories, which get the 5-year-old's shape AND budgets).
+      **Precedent already conceded:** `creatureToneLevel` was converted to `youngestMainAge` by the
+      owner on 2026-09-13 after `job_1789227389389_z18dmvnt6` (mains Liz 5 / Ayan 8) briefed a
+      `formidable` creature — "claws and teeth visible… it may loom" — into a 5-year-old's book.
+      Same bug, fixed in one function instead of at the source. The peril filter is youngest-keyed
+      too, so the inconsistency is already live.
+      **Recommendation (agent, owner's call):** pacing axis → youngest main (it is a comprehension
+      budget; fixes 69/75); shape axis → keep oldest main (the 2026-08-25 rule is about whose story
+      it is, and the no-upper-cap ruling only makes sense if shape follows the oldest);
+      `buildTopicWindowSection` stays oldest (genuinely about the protagonist). Do NOT add a "who is
+      this book for" wizard field — it would serve 1 story in 123; `languageLevel` already exists as
+      a first-class reader signal and `readerAge()` already prefers it over cast age. Caveat: this
+      would split the two axes onto different age sources, and `pickMainCharacters`' docblock
+      currently claims to be "the ONE place that decides who the focus character is — the story
+      shape and the age mode must never disagree about it". Also note `pickMainCharacters` caps
+      mains at 2 AFTER sorting descending, so it discards the youngest main outright on a 3+ main
+      cast: a youngest rule cannot just reuse the picker.
+      → `server/lib/promptBuilders.js` `pickMainCharacters` / `resolveAgeBand` /
+      `resolvePacingBand` / `youngestMainAge` / `readerAge`,
+      `tests/unit/creature-tone-youngest-main.test.ts` (the precedent)
 
