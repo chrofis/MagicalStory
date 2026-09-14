@@ -278,6 +278,21 @@ function mergeEntityIssues(base, fresh, repairedPages) {
  * content. Covers (page < 0) have no scene record, so they take the first
  * characters with a sheet. Never throws — no sheet means prompt-only.
  *
+ * EMPTY IS NOT ABSENT (fixed 2026-09-14). The scene record's `sceneCharacters`
+ * has three states and they mean three different things:
+ *   - an array with names  → that page's cast; filter the sheets to exactly them
+ *   - an array of length 0 → the page has NO cast (real on staging, e.g.
+ *     job_1789337998754_apslnsq1z p13/p15/p19). Nobody from the cast is painted
+ *     on it, so there is no face whose style matters: collect NOTHING. The old
+ *     `wanted.size === 0` truthiness check read this as "no filter given" and
+ *     handed style repair the first two character sheets in the book — foreign
+ *     people, the exact leak the sheet mechanism exists to avoid.
+ *   - not an array (key missing, or no scene record at all — covers, page < 0)
+ *     → the caller did not say. Unfiltered, first characters with a sheet.
+ *     That is the documented cover behaviour above and is kept deliberately.
+ *
+ * @param {Array|null|undefined} rawImages scene records; a record whose
+ *   `sceneCharacters` is an array is authoritative, empty included.
  * @returns {Promise<string[]>} data-URIs, possibly empty
  */
 async function collectStyleRefSheets(page, rawImages, characters, artStyle) {
@@ -285,8 +300,13 @@ async function collectStyleRefSheets(page, rawImages, characters, artStyle) {
   try {
     const { getStyledAvatarForClothing } = require('./entityConsistency');
     const scene = (rawImages || []).find(r => r.pageNumber === page) || null;
-    const wanted = new Set((scene?.sceneCharacters || []).map(c => String(c?.name || '').toLowerCase()).filter(Boolean));
-    const pool = (characters || []).filter(c => wanted.size === 0 || wanted.has(String(c?.name || '').toLowerCase()));
+    // `declaredCast === null` is "not specified"; `[]` is "specified as nobody".
+    const declaredCast = Array.isArray(scene?.sceneCharacters) ? scene.sceneCharacters : null;
+    if (declaredCast && declaredCast.length === 0) return [];
+    const wanted = declaredCast
+      ? new Set(declaredCast.map(c => String(c?.name || '').toLowerCase()).filter(Boolean))
+      : null;
+    const pool = (characters || []).filter(c => !wanted || wanted.has(String(c?.name || '').toLowerCase()));
     const sheets = [];
     for (const char of pool) {
       if (sheets.length >= MAX_SHEETS) break;
