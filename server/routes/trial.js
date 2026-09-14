@@ -1912,35 +1912,44 @@ setInterval(async () => {
     const client = await pool.connect();
 
     try {
+      // Pick the accounts BEFORE opening the transaction: an account holding a
+      // story marked as evidence is held back, and the hold has to be visible.
+      // This used to be one inline `anonymous AND older than 48h` subquery
+      // reused by five DELETEs, which made "what did it skip, and why"
+      // unobservable — and it deleted the stories that are the measured basis
+      // for this week's findings, R2 objects included, 48h after the trial.
+      const {
+        ANON_SWEEP_CANDIDATES_SQL, selectAnonSweepTargets, logSkipped,
+      } = require('../lib/evidenceStories');
+      const candidates = await client.query(ANON_SWEEP_CANDIDATES_SQL);
+      const { deleteUserIds, skipped } = selectAnonSweepTargets(candidates.rows);
+      logSkipped(skipped, log, 'TRIAL CLEANUP');
+      if (!deleteUserIds.length) return; // the outer `finally` releases the client
+
       await client.query('BEGIN');
 
-      // Same anon-and-older-than-48h filter for every table.
-      const anonFilter = `
-        WHERE user_id IN (
-          SELECT id FROM users
-          WHERE anonymous = true
-            AND created_at < NOW() - INTERVAL '48 hours'
-        )`;
+      // Same set of account ids for every table — including `users` itself, so
+      // a held-back account keeps its characters and jobs too. A story row
+      // without its owner is unreadable evidence AND an orphan, which the
+      // orphan cleanup would then delete anyway.
+      const anonFilter = 'WHERE user_id = ANY($1::varchar[])';
+      const anonParams = [deleteUserIds];
 
-      const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter}`);
-      const charsResult = await client.query(`DELETE FROM characters ${anonFilter}`);
+      const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter}`, anonParams);
+      const charsResult = await client.query(`DELETE FROM characters ${anonFilter}`, anonParams);
       // RETURNING file_url: the files row is the only reference to the PDF's
       // R2 key (orders/{files.id}.pdf), which lives outside both prefixes
       // pruned below.
-      const filesResult = await client.query(`DELETE FROM files ${anonFilter} RETURNING id, file_url`);
+      const filesResult = await client.query(`DELETE FROM files ${anonFilter} RETURNING id, file_url`, anonParams);
       // Delete stories too — previously orphaned. stories.user_id has no
       // cascading FK, so a purged anonymous child's story (title, dedication,
       // likeness-derived illustrations) + its story_images survived forever.
       // story_images DOES cascade from stories, so deleting stories cleans it.
-      const storiesResult = await client.query(`DELETE FROM stories ${anonFilter} RETURNING id`);
+      const storiesResult = await client.query(`DELETE FROM stories ${anonFilter} RETURNING id`, anonParams);
 
-      // Delete the anonymous users themselves
-      const usersResult = await client.query(`
-        DELETE FROM users
-        WHERE anonymous = true
-          AND created_at < NOW() - INTERVAL '48 hours'
-        RETURNING id
-      `);
+      // Delete the anonymous users themselves — the same held-back set.
+      const usersResult = await client.query(
+        `DELETE FROM users WHERE id = ANY($1::varchar[]) RETURNING id`, anonParams);
 
       await client.query('COMMIT');
 

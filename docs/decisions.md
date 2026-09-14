@@ -38319,6 +38319,7 @@ comments), `tests/unit/parse-visual-bible-objects.test.ts` (new, 7 tests — 5 f
 regex), `tasks/BACKLOG.md`.
 **Status:** ✅ active
 
+
 ## The re-plan returns only the pages a finding named (2026-09-14)
 **Context:**   The `# RE-DIVIDE` block contradicted itself inside one paragraph: "Return ONLY the pages a finding names, one line each ... and nothing else" sat next to "Output the full plan again." (`promptBuilders.js` `buildReplanSection`). A third signal broke the tie the wrong way — `prompts/story-beats.txt` OUTPUT FORMAT said "One line per page, through page {PAGE_COUNT}" on every build, re-plan included. Two of three instructions ordered the whole book, and that is what the planner delivered: `beats_replan_unnamed_pages` fired 4 times across two stories, one story rewriting 8 unnamed pages in round 1 and 9 in round 2.
 **Decision:**  Owner decision, 2026-09-14: the re-plan returns ONLY the pages a finding names. The full-plan demand is removed and replaced with "Every page number you return is already in the plan above." (the page-count brake, backlog #42 — a re-plan once delivered 19 pages for an 18-page order). The template's scope sentence became `{OUTPUT_SCOPE}`, filled by `buildBeatsPrompt` from the replan section: empty replan (first plan) → "One line per page, through page N."; non-empty → "One line for each page named under RE-DIVIDE, and for no other page."
@@ -38618,6 +38619,7 @@ finding.
 **Status:** ✅ active
 
 
+
 ---
 
 ## A thrown Pass-1 row call consumes one try, never the whole 2×4 sheet (2026-09-14)
@@ -38866,3 +38868,73 @@ SOLID-GROUND entry) — both untested.
 **Touched:** `tests/manual/redo-back-cover-water-rule.js` (the harness; one paid
 cover generation)
 **Status:** ✅ active (a measurement, not a behaviour change)
+
+---
+
+## An invented "declaration" shipped two of a one-of-a-kind object: STORY_TEXT dialogue is not staging, and a rename may not fabricate a duplicate (2026-09-14)
+
+**Context.** Staging story `job_1789348171785_9oxos7dwv` page 7 shipped with two of its
+one plot object. Traced end to end from stored data, two independent faults stacked:
+
+1. **The compliance judge mined STORY_TEXT for a declaration.** The page's printed prose
+   contains a line of DIALOGUE in which a character says they will carry the object. No
+   stored spec field declares that — `sceneIntent` and the brief prose both name a
+   *different* character as the carrier, twice, and the page's single `interactions[]`
+   entry declares only "walking down the stairs" for everyone. The judge nevertheless
+   filed CRITICAL `action_interaction`: *"<name> is declared to carry <object> but
+   inventory shows hands empty"*. `image-semantic.txt` has carried a STORY_TEXT authority
+   rule since Feb 2026 (SETTLED.md line 34, "the page TEXT is not a checklist") and the
+   semantic judge got this page right; `image-prompt-compliance.txt` never had the rule,
+   listed STORY_TEXT as a bare input, and asks for a `main_action_check.story_text_action`
+   — an open invitation to derive an action from prose.
+2. **The identity reconciler then relabelled the finding onto a third character.**
+   `checkIdentityAgreement` pairs evaluator and detector figures by greedy nearest centre
+   with no mutual exclusion, so two evaluator figures can land on one detector figure: one
+   agrees, the other becomes a conflict pointing at the name the first already owns.
+   `buildRenameMap` checked for name collisions only *within the conflict set*, so a
+   one-name map passed its "clean permutation" test and was applied. Stored result on p7:
+   `matches[]` went from five distinct names to `[Julian, Levin, Kiaan, Kiaan, Nia]` — one
+   child named twice, one erased — and both of that child's findings, the CRITICAL one
+   included, were rewritten (`identityCorrected: true`) onto a name the spec never put
+   near the object. That is why the finding read as invented from nowhere.
+
+The consolidator then turned the CRITICAL into "Add red egg in <name>'s hands", round 2's
+inpaint executed it verbatim, and the page shipped with two. The consolidator half was
+already fixed separately (`3546394d2`, single-instance object has one holder); this entry
+covers the two upstream causes.
+
+**Systemic rate (60 days of staging, measured, not estimated).** Fault 2 is not an
+anecdote: of 51 stored eval versions where a rename was applied, **35 (69%) produced a
+duplicate name in `matches[]` and erased another name**, across 20+ distinct stories,
+relabelling 28 findings onto the wrong character. Fault 1's exact "is declared to"
+phrasing appears in only 2 of 4,811 stored findings, so its measured rate is low — the
+phrasing varies, so treat that as a floor, not a ceiling.
+
+**Decision.**
+- `prompts/image-prompt-compliance.txt` gains a STORY_TEXT authority rule governing every
+  step: ORIGINAL_PROMPT and DECLARED INTERACTIONS are the only inputs that say who does
+  what; dialogue is an intention, not staging; STORY_TEXT may corroborate an action the
+  prompt already names in `main_action_check.story_text_action` and is never the sole
+  basis of a `fixable_issues[]` entry. This EXTENDS SETTLED.md line 34 to the compliance
+  judge — it does not reverse it, so no reversal protocol applies.
+- `buildRenameMap` now also refuses a rename whose target is already held by an AGREEING
+  match, unless that holder is itself being renamed away in the same map (a true swap).
+  `checkIdentityAgreement` reports `agreedNames` to make that checkable. A refused rename
+  is still measured and still logged as `uncorrectable` — the disagreement is surfaced,
+  just not acted on.
+
+**Rationale.** Classification belongs to the prompt (CLAUDE.md), so fault 1 is prompt
+work. Fault 2 is a wiring defect and the module's own docstring already stated the
+intended rule — *"renaming would fabricate a duplicate. Those stay flagged and
+uncorrected"* — the check was simply incomplete. Leaving the evaluator's own name in place
+is strictly better than writing a name onto two figures: a wrong name on one figure is one
+wrong finding, a duplicated name erases a character and misroutes every finding about
+them. Today's `9715cabef` (EXPECTED CAST roster, ORIGINAL_PROMPT de-truncation) did NOT
+close either fault — p7's real prompt is 8,002 chars and the carrier declaration sits at
+char 2,329 (and the sceneIntent restates it at char 113), well inside the old 3,000-char cut, so the judge saw the correct declaration and
+contradicted it anyway.
+
+**Touched:** `prompts/image-prompt-compliance.txt`, `server/lib/identityAgreement.js`,
+`tests/unit/identity-rename-duplicate.test.ts`,
+`tests/unit/fixtures/identity-rename-job_1789348171785_9oxos7dwv-p7.json`
+**Status:** ✅ active

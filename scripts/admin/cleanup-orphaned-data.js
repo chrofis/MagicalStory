@@ -6,6 +6,9 @@
 
 const { Pool } = require('pg');
 require('dotenv').config();
+// Stories marked as evidence are never orphan-swept — one predicate, shared
+// with the admin route (server/lib/evidenceStories.js, migration 038).
+const { ORPHAN_STORIES_WHERE } = require('../../server/lib/evidenceStories');
 
 const DRY_RUN = !process.argv.includes('--apply');
 
@@ -29,7 +32,7 @@ async function cleanupOrphanedData() {
 
     // Check for orphaned stories
     const orphanedStoriesResult = await client.query(
-      `SELECT COUNT(*) as count FROM stories WHERE user_id IS NULL OR user_id = ''`
+      `SELECT COUNT(*) as count FROM stories ${ORPHAN_STORIES_WHERE}`
     );
     const orphanedStoriesCount = parseInt(orphanedStoriesResult.rows[0].count);
     console.log(`Found ${orphanedStoriesCount} orphaned stories (no user_id)`);
@@ -57,7 +60,7 @@ async function cleanupOrphanedData() {
     // Delete orphaned stories
     if (orphanedStoriesCount > 0) {
       const deleteStoriesResult = await client.query(
-        `DELETE FROM stories WHERE user_id IS NULL OR user_id = '' RETURNING id`
+        `DELETE FROM stories ${ORPHAN_STORIES_WHERE} RETURNING id`
       );
       console.log(`✓ Deleted ${deleteStoriesResult.rowCount} orphaned stories`);
 

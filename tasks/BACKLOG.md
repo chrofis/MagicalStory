@@ -1098,3 +1098,10 @@ rebuilt: `resolveEvalSceneHint` (3b3070dce), `resolveGeneratedOutfit` (e403345b1
       on 1 page. `wornItems[]` is the precedent against it: 88% empty where present, and its `off`
       state has never once been emitted in 478 pages. Recorded so it is not re-proposed → this file
 
+- [ ] **Six cited evidence stories are ALREADY GONE from both databases (found 2026-09-14).**
+      `job_1788285785501_sbpfd0i8s`, `job_1788698812047_q5b1vuds7`, `job_1788724538469_n6ylqxq7w`,
+      `job_1788727744192_gxf6gbywo`, `job_1788763045123_z8so79ngb`, `job_1788802404497_i1mm4yn6h`
+      (+14 older cited ids). Findings resting on them cannot be re-verified. Decide per finding:
+      re-derive from a surviving story, or mark the claim unfalsifiable. Prevention shipped —
+      `stories.evidence_reason` (migration 038) → `docs/decisions.md` 2026-09-14 "A story can be
+      marked as EVIDENCE", `server/lib/evidenceStories.js`

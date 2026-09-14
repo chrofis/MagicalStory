@@ -102,8 +102,11 @@ router.post('/cleanup-orphaned-data', authenticateToken, requireAdmin, async (re
     );
     const orphanedCharsCount = parseInt(orphanedCharsResult[0].count);
 
+    // Evidence stories are excluded everywhere below: an orphan that is the
+    // measured basis for a finding must not be swept. See evidenceStories.js.
+    const { ORPHAN_STORIES_WHERE } = require('../../lib/evidenceStories');
     const orphanedStoriesResult = await dbQuery(
-      `SELECT COUNT(*) as count FROM stories WHERE user_id IS NULL OR user_id = ''`
+      `SELECT COUNT(*) as count FROM stories ${ORPHAN_STORIES_WHERE}`
     );
     const orphanedStoriesCount = parseInt(orphanedStoriesResult[0].count);
 
@@ -127,10 +130,10 @@ router.post('/cleanup-orphaned-data', authenticateToken, requireAdmin, async (re
       if (orphanedStoriesCount > 0) {
         // Capture ids first so we can prune R2 after the row delete.
         const orphanIds = await dbQuery(
-          `SELECT id FROM stories WHERE user_id IS NULL OR user_id = ''`
+          `SELECT id FROM stories ${ORPHAN_STORIES_WHERE}`
         );
         const deleteStoriesResult = await dbQuery(
-          `DELETE FROM stories WHERE user_id IS NULL OR user_id = ''`
+          `DELETE FROM stories ${ORPHAN_STORIES_WHERE}`
         );
         deletedStories = deleteStoriesResult.rowCount;
         console.log(`✓ Deleted ${deletedStories} orphaned stories`);
