@@ -281,23 +281,25 @@ function replaceClothingSection(bibleSections, clothingRequirements) {
  *
  * A correction may also LOSE a look. On Lab 1264 the reviewer inserted the
  * missing unaltered state and returned three states where the bible held four,
- * silently dropping "broken" (page 17, the page the object breaks open) — and
- * because the merge replaces `states[]` wholesale, the brief on p17 citing
- * `ART001.3` afterwards read "cracked". Two rules guard that, both dropping the
+ * silently dropping "broken" — and page 17, the page the object breaks open,
+ * ended up covered by no state at all. The invariant is PAGE COVERAGE, not
+ * names: renaming, merging and re-ranging states is precisely what the reviewer
+ * is for, since it is the one stage holding the plan lines. On Lab 1265 it
+ * re-covered pages 9-11 with a differently named state ("unaltered" replacing
+ * "muddy"), losing nothing — a name-matching rule wrongly rejected that and the
+ * repair went net-zero. Two rules guard the real invariant, both dropping the
  * whole entry's correction so the authored bible stands:
- *   1. every current state carrying pages must come back, matched on its
- *      NAME (the reviewer renumbers ids when it reorders, so the id is not
- *      identity here);
- *   2. a handle a brief already cites (`ID.N`) must still mean the same name.
+ *   1. every page the current `states[]` covers must be covered by some
+ *      incoming state;
+ *   2. a handle a brief already cites (`ID.N`) must still have a state at that
+ *      id afterwards — a handle whose state changed name or delta is fine,
+ *      that is the correction working.
  *
  * @param {Set<string>|Array<string>} [citedHandles] dotted handles the briefs
  *   cite (e.g. `ART001.3`). Omitted → rule 2 is skipped.
  * @returns {{applied: Array, rejected: Array}} applied entries carry
  *   {id, name, oldPages, newPages}; rejected carry {id, reason}.
  */
-/** A state's identity for comparison: its name, trimmed and lowercased. */
-function stateKey(name) { return String(name == null ? '' : name).trim().toLowerCase(); }
-
 function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) {
   const out = { applied: [], rejected: [] };
   const text = String(raw || '');
@@ -367,37 +369,41 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
     states.forEach((st, i) => { st.id = `${id}.${i + 1}`; });
 
     const current = Array.isArray(entry.states) ? entry.states.filter(Boolean) : [];
-    const incomingNames = new Set(states.map(st => stateKey(st.name)));
-    // RULE 1 — a look the story still stands on may not vanish.
-    const dropped = current.find(o => Array.isArray(o.pages) && o.pages.length > 0
-      && !incomingNames.has(stateKey(o.name)));
-    if (dropped) {
+    // RULE 1 — no page loses its look. The names may change freely; the pages
+    // the bible already covers may not fall out from under the briefs.
+    const coveredNow = new Set();
+    for (const st of states) for (const p of st.pages) coveredNow.add(p);
+    let uncovered = null;
+    for (const o of current) {
+      const pages = (Array.isArray(o.pages) ? o.pages : []).map(Number).filter(n => Number.isFinite(n));
+      const lost = pages.filter(p => !coveredNow.has(p));
+      if (lost.length > 0) { uncovered = { from: o, lost }; break; }
+    }
+    if (uncovered) {
       out.rejected.push({
         id,
-        reason: `correction drops state ${dropped.id || `${id}.?`} ("${dropped.name}") which covers page(s) `
-          + `${JSON.stringify(dropped.pages)} — no incoming state carries that name`,
+        reason: `correction leaves page(s) ${JSON.stringify(uncovered.lost)} uncovered — they carry state `
+          + `${uncovered.from.id || `${id}.?`} ("${uncovered.from.name}"), and no incoming state covers them`,
       });
       continue;
     }
-    // RULE 2 — a handle a brief already cites may not change meaning.
+    // RULE 2 — a handle a brief already cites must still exist. Its state may
+    // change name or delta; there must simply BE a state at that id.
     const cited = citedHandles instanceof Set ? citedHandles
       : (Array.isArray(citedHandles) ? new Set(citedHandles) : null);
     if (cited && cited.size > 0) {
-      let repointed = null;
-      for (const o of current) {
-        const handle = String(o.id || '').trim().toUpperCase();
-        if (!handle || !handle.includes('.')) continue;
-        let isCited = false;
-        for (const h of cited) { if (String(h || '').trim().toUpperCase() === handle) { isCited = true; break; } }
-        if (!isCited) continue;
-        const now = states.find(st => String(st.id).toUpperCase() === handle);
-        if (now && stateKey(now.name) !== stateKey(o.name)) { repointed = { handle, was: o.name, is: now.name }; break; }
+      const incomingIds = new Set(states.map(st => String(st.id).toUpperCase()));
+      let vanished = null;
+      for (const h of cited) {
+        const handle = String(h || '').trim().toUpperCase();
+        if (!handle.includes('.') || handle.split('.')[0] !== id) continue;
+        if (!incomingIds.has(handle)) { vanished = handle; break; }
       }
-      if (repointed) {
+      if (vanished) {
         out.rejected.push({
           id,
-          reason: `correction re-points cited handle ${repointed.handle}: a brief cites it meaning `
-            + `"${repointed.was}", the correction makes it "${repointed.is}"`,
+          reason: `correction removes cited handle ${vanished}: a brief cites it, and the correction `
+            + `leaves no state at that id`,
         });
         continue;
       }

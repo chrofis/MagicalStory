@@ -189,8 +189,8 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
         { name: 'unaltered', delta: 'the shell as described, unmarked', pages: [3, 4, 5, 7, 8] },
         { name: 'muddy', delta: 'covered in thick dark mud', pages: [9] },
         { name: 'muddy and cracked', delta: 'mud with a jagged crack', pages: [10, 11, 12, 13, 14, 15] },
-        // Every state the bible holds with pages comes back — dropping one is
-        // refused outright (Lab 1264, below).
+        // Every page the bible covers stays covered — leaving one uncovered
+        // is refused outright (Lab 1264, below).
         { name: 'shining and cracked', delta: 'wiped clean, a jagged crack', pages: [16] },
         { name: 'broken open', delta: 'broken open into two empty shell halves', pages: [17] },
       ],
@@ -246,12 +246,13 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
     expect(applyReviewBibleCorrections('---VISUAL BIBLE---\nnonsense', vb, 17).applied).toHaveLength(0);
     expect(() => applyReviewBibleCorrections(null, vb, 17)).not.toThrow();
   });
-  // ── Lab #1264 (staging, 2026-09-14). The reviewer correctly inserted the
-  // missing unaltered state and returned THREE states where the bible held
-  // four — "broken" (page 17, the page the object breaks open) was absent, and
-  // the wholesale replacement deleted it. The p17 brief cites ART001.3, which
-  // after the merge meant "cracked". Both guards drop the whole correction.
-  describe('a correction that loses a look', () => {
+  // ── Lab #1264 vs #1265 (staging, 2026-09-14). The invariant is PAGE
+  // COVERAGE, not names. On #1264 the reviewer returned three states where the
+  // bible held four and page 17 — the page the object breaks open — ended up
+  // covered by nothing: refused. On #1265 it renamed "muddy" to "unaltered"
+  // and kept every page covered: a legitimate correction, which the earlier
+  // name-matching rule wrongly rejected.
+  describe('a correction that leaves a page uncovered', () => {
     const labBible = (): any => ({
       artifacts: [{
         id: 'ART001',
@@ -277,17 +278,51 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
       }],
     };
 
-    it('rejects the whole entry when a state carrying pages is absent from the correction', () => {
+    it('Lab #1264: rejects the whole entry when a covered page falls out of every state', () => {
       const vb = labBible();
       const res = applyReviewBibleCorrections(section(labCorrection), vb, 17);
       expect(res.applied).toHaveLength(0);
       expect(res.rejected).toHaveLength(1);
       expect(res.rejected[0].id).toBe('ART001');
-      expect(res.rejected[0].reason).toContain('ART001.3');
+      expect(res.rejected[0].reason).toContain('17');
       expect(res.rejected[0].reason).toContain('broken');
       // The authored bible stands, untouched.
       expect(vb.artifacts[0].states).toHaveLength(3);
       expect(vb.artifacts[0].states[2]).toMatchObject({ id: 'ART001.3', name: 'broken', pages: [17] });
+    });
+
+    it('Lab #1265: accepts a rename that keeps every page covered', () => {
+      const vb: any = {
+        artifacts: [{
+          id: 'ART002',
+          name: 'dragon egg',
+          description: DESCRIPTION,
+          appearsInPages: [3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+          states: [
+            { id: 'ART002.1', name: 'muddy', delta: 'smeared with wet mud', pages: [9, 10, 11] },
+            { id: 'ART002.2', name: 'cracked muddy', delta: 'a jagged crack, still mud-smeared', pages: [12, 13, 14, 15, 16, 17] },
+            { id: 'ART002.3', name: 'cracked clean', delta: 'a jagged crack, wiped clean', pages: [18, 19] },
+          ],
+        }],
+        secondaryCharacters: [], animals: [], vehicles: [], locations: [], clothing: [],
+      };
+      const correction = {
+        artifacts: [{
+          id: 'ART002',
+          states: [
+            { name: 'unaltered', delta: 'the shell as described, unmarked', pages: [3, 4, 7, 8, 9, 10, 11] },
+            { name: 'cracked muddy', delta: 'a jagged crack, still mud-smeared', pages: [12, 13, 14, 15, 16, 17] },
+            { name: 'cracked clean', delta: 'a jagged crack, wiped clean', pages: [18, 19] },
+          ],
+        }],
+      };
+      const res = applyReviewBibleCorrections(section(correction), vb, 19);
+      expect(res.rejected).toHaveLength(0);
+      expect(res.applied).toHaveLength(1);
+      const states = vb.artifacts[0].states;
+      expect(states.map((s: any) => s.id)).toEqual(['ART002.1', 'ART002.2', 'ART002.3']);
+      expect(states[0].name).toBe('unaltered');
+      expect(states[0].pages).toEqual([3, 4, 7, 8, 9, 10, 11]);
     });
 
     it('accepts a correction that drops a state carrying NO pages — nothing referenced it', () => {
@@ -299,7 +334,7 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
       expect(vb.artifacts[0].states.map((s: any) => s.name)).toEqual(['unaltered', 'mud-smeared', 'cracked']);
     });
 
-    it('accepts a reorder that keeps every paged state, re-minting the ids by position', () => {
+    it('accepts a reorder that keeps every page covered, re-minting the ids by position', () => {
       const vb = labBible();
       const reordered = {
         artifacts: [{
@@ -318,9 +353,33 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
       expect(vb.artifacts[0].states[0].name).toBe('Broken');
     });
 
-    it('rejects a correction that re-points a handle a brief cites — and skips the rule when none are passed', () => {
-      // Every paged state survives, but ART001.3 means "broken" before and
-      // "cracked" after: page 17 already asked for the handle.
+    it('rejects a correction that leaves no state at a handle a brief cites — and skips the rule when none are passed', () => {
+      // Every page stays covered, but the correction returns two states, so
+      // ART001.3 — which the p17 brief already cites — has nothing at that id.
+      const merged = {
+        artifacts: [{
+          id: 'ART001',
+          states: [
+            { name: 'mud-smeared', delta: 'thickly covered in dark wet mud', pages: [9, 12, 13] },
+            { name: 'cracked then broken', delta: 'a jagged crack, then broken open', pages: [14, 15, 17] },
+          ],
+        }],
+      };
+      const vb = labBible();
+      const res = applyReviewBibleCorrections(section(merged), vb, 17, new Set(['ART001.3']));
+      expect(res.applied).toHaveLength(0);
+      expect(res.rejected[0].reason).toContain('ART001.3');
+      expect(vb.artifacts[0].states[2].name).toBe('broken');
+
+      const vb2 = labBible();
+      const res2 = applyReviewBibleCorrections(section(merged), vb2, 17);
+      expect(res2.rejected).toHaveLength(0);
+      expect(res2.applied).toHaveLength(1);
+    });
+
+    it('accepts a cited handle whose state merely changes meaning — that is the correction working', () => {
+      // ART001.3 means "broken" before and "cracked" after; it still exists,
+      // and every page stays covered.
       const renumbered = {
         artifacts: [{
           id: 'ART001',
@@ -333,16 +392,9 @@ describe('applyReviewBibleCorrections — strict merge of the review\'s ---VISUA
       };
       const vb = labBible();
       const res = applyReviewBibleCorrections(section(renumbered), vb, 17, new Set(['ART001.3']));
-      expect(res.applied).toHaveLength(0);
-      expect(res.rejected[0].reason).toContain('ART001.3');
-      expect(res.rejected[0].reason).toContain('broken');
-      expect(res.rejected[0].reason).toContain('cracked');
-      expect(vb.artifacts[0].states[2].name).toBe('broken');
-
-      const vb2 = labBible();
-      const res2 = applyReviewBibleCorrections(section(renumbered), vb2, 17);
-      expect(res2.rejected).toHaveLength(0);
-      expect(res2.applied).toHaveLength(1);
+      expect(res.rejected).toHaveLength(0);
+      expect(res.applied).toHaveLength(1);
+      expect(vb.artifacts[0].states[1].name).toBe('broken');
     });
   });
 });

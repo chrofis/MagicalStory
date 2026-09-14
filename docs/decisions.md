@@ -36725,15 +36725,25 @@ untouched states was a reasonable reading.
   its COMPLETE list of looks — every state repeated, untouched ones included —
   and a state left out is deleted.
 - `applyReviewBibleCorrections` refuses the whole entry's correction (the
-  authored bible stands) when it drops a state that carries pages, matched on
-  the state's name because the reviewer renumbers ids; and when it re-points a
-  dotted handle a brief already cites at a different look. Both are reported
-  through `beats_scene_review_bible_rejected`, never thrown.
+  authored bible stands) when a page the current `states[]` covers is covered by
+  no incoming state, and when a dotted handle a brief already cites has no state
+  at that id after the correction. Both are reported through
+  `beats_scene_review_bible_rejected`, never thrown.
+- Names are deliberately not part of either rule. Renaming, merging and
+  re-ranging states is precisely what the reviewer is for — it is the only stage
+  holding the plan lines — so a look may change its name freely as long as its
+  pages stay covered, and a cited handle whose state changed name or delta is
+  the correction working.
 **Rationale:** The prompt makes the complete list the normal case; the
 validator makes the damaging case impossible rather than likely. Fail-safe in
 the direction the merge already chose — a rejected correction costs the repair,
-an accepted bad one costs a page its look. Regression fixture is the exact
-Lab #1264 bible and reviewer JSON.
+an accepted bad one costs a page its look. The first version of this validator
+matched on state NAMES, and Lab #1265 falsified it: the reviewer judged from the
+plan lines that the mud arrives later than the Art Director assumed and renamed
+"muddy" [9,10,11] to "unaltered" [3,4,7,8,9,10,11] — a legitimate merge losing
+no coverage, which the name rule rejected, leaving the repair net-zero.
+Regression fixtures are the exact Lab #1264 (reject) and Lab #1265 (accept)
+bibles and reviewer JSON.
 **Touched:** `prompts/scene-review.txt`, `server/lib/beatsPipeline.js`,
 `tests/unit/vb-state-review.test.ts`, `tasks/bugs.json`
 **Status:** ✅ active — the guard is situational; the prompt line applies to
