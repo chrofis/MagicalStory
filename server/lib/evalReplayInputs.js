@@ -35,7 +35,7 @@
  *
  * DELIBERATELY NOT MIRRORED: `storyMeta`. It is a pure statistics sink — the
  * only thing evaluateImageQuality does with it is fire-and-forget rows into
- * `eval_findings` for per-style/genre reporting (evalPipeline.js ~:2342). It
+ * `eval_finding_stats` for per-style/genre reporting (evalPipeline.js ~:2342). It
  * changes no score, no finding and no repair decision. Mirroring it would make
  * every Lab re-eval — including the `eval_variance` stage's 2-5 REPEATS of one
  * page — write duplicate findings for a story that was measured once, skewing

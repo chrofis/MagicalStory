@@ -277,7 +277,7 @@ function bucketForType(type) {
  * @param {object} [opts]
  * @param {boolean} [opts.bySubject=false] key by (bucket, subject) instead of
  *   bucket alone. OPT-IN because the two callers need different shapes: the
- *   eval_findings stats writer groups per bucket for a plain GROUP BY, while the
+ *   eval_finding_stats writer groups per bucket for a plain GROUP BY, while the
  *   multi-judge jury must NOT collapse two characters' findings of one class into
  *   one entry — scoring bills per (class, subject), so collapsing them silently
  *   reverts every page to a single charge per class. Entries always carry

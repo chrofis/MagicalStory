@@ -2399,7 +2399,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             art_style: sm.artStyle || null, genre: sm.genre || null, language: sm.language || null,
             char_count: sm.charCount ?? null, judges: process.env.EVAL_JUDGES || 'gemini',
           }));
-          if (rows.length && typeof db.recordEvalFindings === 'function') db.recordEvalFindings(rows).catch(() => {});
+          // Fire-and-forget, but NEVER silent: a bare `.catch(() => {})` here is
+          // half of why this sink recorded nothing for its whole lifetime.
+          // recordEvalFindings swallows its own DB errors loudly; this catch is
+          // only for a rejection it could not handle. Log, never throw.
+          if (rows.length && typeof db.recordEvalFindings === 'function') {
+            db.recordEvalFindings(rows).catch(err =>
+              log.error(`[EVAL] eval_finding_stats write rejected: ${err && err.message}`));
+          }
         }
       } catch (recErr) {
         log.warn(`[EVAL] eval_findings record skipped (${recErr.message})`);

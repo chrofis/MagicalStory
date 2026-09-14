@@ -38149,3 +38149,83 @@ at gate 8 is what makes that safe.
 **Touched:** `scripts/admin/check-push-idle.js` (`evaluateTargets`, `probe` DNS
 classification, manual-mode streams, exit code), `tests/unit/push-idle-gate-agreement.test.ts`
 **Status:** ✅ active
+
+---
+
+## `eval_findings` is the Lab registry ONLY; the eval stats sink is `eval_finding_stats` (2026-09-14)
+
+**Context:** Two different things in this repo were both called `eval_findings`,
+and the stats sink never wrote a single row in its entire lifetime — measured
+2026-09-14, staging and production both.
+
+1. The **Lab findings REGISTRY** — `migrations/013_eval_findings.sql`
+   (`slug / title / category / prompt_file / rule_text / rationale / evidence /
+   status`). Curated, hand-authored; seeded by
+   `scripts/admin/seed-eval-findings.js`, edited from the Test Lab
+   (`server/routes/admin/testlab.js`), read by the admin
+   `StoryStatsTab` findings panel. Live: **staging 25 rows**, **production 0 rows**.
+2. The **per-page eval STATS SINK** — `story_id / page_number / bucket /
+   severity / owner / agreement / eval_type / art_style / genre / language /
+   char_count / judges`, one row per merged eval bucket-hit, so "what goes wrong
+   per art style / per genre" is a plain `GROUP BY`. Written by
+   `db.recordEvalFindings`, read by `getEvalFindingsStats` /
+   `scripts/admin/eval-findings-stats.js`.
+
+The sink's table was declared **only** inside `initializeDatabase()` in
+`server/services/database.js` — a function that has not been on the boot path
+since `server.js:1608` (`REMOVED_initializeDatabase_DEAD`). So it was never
+created in any environment; migration 013 owned the name in both; and every
+`INSERT` from the sink targeted the registry's schema and could only fail on
+`column "story_id" does not exist`. The error was caught at `console.warn`
+level, and the call site in `evalPipeline.js` was `.catch(() => {})` — two
+layers of silence. It stayed invisible for a second reason: until the repair
+pipeline started threading `evalStoryMeta` (`server/lib/repairPipeline.js:337`),
+no caller passed `storyMeta`, so the block never ran at all. Production *does*
+now pass it (`server/lib/images.js:2491` → `evalPipeline.js` sink block); the
+Lab stages deliberately do not (pinned by `38e17173b`, see
+`evalReplayInputs.js` `NOT_MIRRORED_EVAL_OPTION_KEYS`) — that is correct and
+unchanged, a Lab re-eval must not pollute production statistics.
+
+This matters because CLAUDE.md makes the registry the first link in the
+evidence chain: *a `docs/decisions.md` entry born from a Lab run MUST cite its
+experiment/registry IDs*. The chain was broken at that first link.
+
+**Decision:**
+- `eval_findings` keeps its name and means **only** the curated Lab registry
+  (migration 013). No behaviour, schema or data of the registry is touched.
+- The statistics sink moves to its own table `eval_finding_stats`, created by
+  the new `migrations/037_eval_finding_stats.sql`. Nothing is dropped, renamed
+  or migrated — the sink table never existed, so there is no data to move.
+- One shared constant, `EVAL_FINDING_STATS_TABLE` in `database.js`, is the only
+  place the table name is spelled; writer and reader both interpolate it, so
+  the two can never drift.
+- The self-disabling schema probe is deleted. **A write failure is now LOUD**:
+  `console.error` naming the table, the error and the first failing row, once
+  per process (a broken table would otherwise log once per bucket per page —
+  hundreds of lines per story), with the running total exposed by
+  `getEvalFindingStatsFailureCount()`. It still never throws — per the owner's
+  standing rule a gate never kills a paid run.
+- The dead `initializeDatabase()` block no longer declares any table here, only
+  a comment pointing at the migration. Schema changes are migration files.
+
+**Rationale:** Renaming or dropping the live `eval_findings` table would touch
+25 rows of curated staging evidence for the benefit of a table with zero rows —
+the sink is the one with no users and no data, so the sink is the one that
+yields. A probe that silently disables a subsystem is worse than a crash: it
+converts a schema bug into permanent, invisible data loss, which is exactly how
+this survived from the day it was written. `warn` was not enough; `error` plus a
+countable failure total is. The guard test makes the collision structurally
+unrepeatable rather than relying on a comment.
+
+**Not done (needs owner approval):** nothing was DROPped, DELETEd or ALTERed.
+Migration 037 is additive and applies itself at boot via
+`server/services/migrate.js`; it has not been run by hand against either
+database.
+
+**Touched:** `migrations/037_eval_finding_stats.sql` (new),
+`server/services/database.js` (`EVAL_FINDING_STATS_TABLE`, `recordEvalFindings`,
+`getEvalFindingsStats`, `getEvalFindingStatsFailureCount`, dead-init block),
+`server/lib/evalPipeline.js` (sink call site no longer swallows),
+`server/lib/evalBuckets.js` + `server/lib/evalReplayInputs.js` +
+`scripts/admin/eval-findings-stats.js` (comments/messages name the right table),
+`tests/unit/eval-finding-stats-sink.test.ts` (new), `tasks/BACKLOG.md`.

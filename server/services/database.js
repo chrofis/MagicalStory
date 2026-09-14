@@ -690,30 +690,12 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_historical_locations_event ON historical_locations(event_id)`);
 
-    // eval_findings — one row per merged eval BUCKET-hit per page, flattened for
-    // per-style / per-genre stats (a plain GROUP BY). Written best-effort by the
-    // eval path; never blocks generation. No FK on story_id (eval can run for
-    // trials / before the story row is persisted). See server/lib/evalBuckets.js.
-    await dbPool.query(`
-      CREATE TABLE IF NOT EXISTS eval_findings (
-        id SERIAL PRIMARY KEY,
-        story_id VARCHAR(255),
-        page_number INT,
-        bucket VARCHAR(50) NOT NULL,
-        severity VARCHAR(20) NOT NULL,
-        owner VARCHAR(20),
-        agreement VARCHAR(10),
-        eval_type VARCHAR(20),
-        art_style VARCHAR(60),
-        genre VARCHAR(60),
-        language VARCHAR(10),
-        char_count INT,
-        judges VARCHAR(120),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_eval_findings_style_bucket ON eval_findings(art_style, bucket)`);
-    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_eval_findings_story ON eval_findings(story_id)`);
+    // The eval stats sink lives in migrations/037_eval_finding_stats.sql as
+    // `eval_finding_stats`. It used to be declared HERE as `eval_findings`,
+    // which collided with the Lab registry of that name (migration 013) — and
+    // since this whole function is dead (server.js:1608), the sink table was
+    // never created at all and recorded zero rows for its entire lifetime.
+    // Never re-add a CREATE TABLE here; schema changes are migration files.
 
     console.log('✓ Database tables initialized');
 
@@ -737,42 +719,36 @@ function isDatabaseMode() {
   return process.env.STORAGE_MODE === 'database' && getPool();
 }
 
+// ONE NAME, ONE MEANING (resolved 2026-09-14). `eval_findings` is the Lab's
+// curated findings REGISTRY (migrations/013_eval_findings.sql —
+// slug/title/category/rationale/evidence), and nothing else. The per-page
+// statistics sink below is `eval_finding_stats`
+// (migrations/037_eval_finding_stats.sql). Both writer and reader take the name
+// from this one constant so the two can never drift apart again; the guard test
+// tests/unit/eval-finding-stats-sink.test.ts fails if a second definition
+// of either name appears.
+const EVAL_FINDING_STATS_TABLE = 'eval_finding_stats';
+
 // Record merged eval bucket-hits for stats. Best-effort: never throws, never
-// blocks generation. `findings` = [{ story_id, page_number, bucket, severity,
-// owner, agreement, eval_type, art_style, genre, language, char_count, judges }].
-// TABLE-NAME COLLISION (found 2026-09-13, NOT fixed here — needs an owner call).
-// Two different `eval_findings` tables are defined in this repo: the per-finding
-// stats sink below (story_id/page_number/bucket/…, created by the dead
-// database.js init block) and migrations/013_eval_findings.sql — the Lab's
-// eval-findings REGISTRY (slug/title/category/rationale/evidence). The migration
-// wins, so on staging every INSERT here fails with `column "story_id" does not
-// exist`. It had never been noticed because no caller passed storyId, so this
-// function was never reached at all. Now that the repair pipeline threads the id,
-// it would fail once per bucket per page — so probe once, say so LOUDLY, and stop
-// rather than logging the same failure hundreds of times per story.
-let evalFindingsSinkUsable = null; // null = unprobed, false = wrong table / absent
+// blocks generation (a gate never kills a paid run). `findings` =
+// [{ story_id, page_number, bucket, severity, owner, agreement, eval_type,
+// art_style, genre, language, char_count, judges }].
+//
+// FAILURE IS LOUD. This sink recorded zero rows from the day it was written
+// because its table did not exist and the insert error was swallowed at
+// console.warn level. Any failure now goes to console.error with the table
+// name and the failing row, ONCE per process (a broken table would otherwise
+// log once per bucket per page — hundreds of lines per story), and the
+// suppressed-count is reported so the silence is never mistaken for success.
+let evalFindingStatsFailures = 0;
 
 async function recordEvalFindings(findings) {
   if (!Array.isArray(findings) || !findings.length) return;
-  if (evalFindingsSinkUsable === false) return;
-  if (evalFindingsSinkUsable === null) {
-    try {
-      const probe = await dbQuery(
-        `SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'eval_findings' AND column_name = 'story_id' LIMIT 1`
-      );
-      evalFindingsSinkUsable = probe.rows.length > 0;
-    } catch { evalFindingsSinkUsable = false; }
-    if (!evalFindingsSinkUsable) {
-      console.warn('⚠️ [eval_findings] per-finding stats DISABLED: the `eval_findings` table in this database is the Lab findings REGISTRY (migrations/013), which has no story_id column. The stats sink needs its own table name. See tasks/BACKLOG.md.');
-      return;
-    }
-  }
   try {
     for (const f of findings) {
       if (!f || !f.bucket || !f.severity) continue;
       await dbQuery(
-        `INSERT INTO eval_findings
+        `INSERT INTO ${EVAL_FINDING_STATS_TABLE}
            (story_id, page_number, bucket, severity, owner, agreement, eval_type, art_style, genre, language, char_count, judges)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [f.story_id || null, f.page_number ?? null, f.bucket, f.severity, f.owner || null,
@@ -781,8 +757,22 @@ async function recordEvalFindings(findings) {
       );
     }
   } catch (e) {
-    console.warn('[eval_findings] record failed (non-blocking):', e.message);
+    evalFindingStatsFailures++;
+    if (evalFindingStatsFailures === 1) {
+      console.error(
+        `❌ [${EVAL_FINDING_STATS_TABLE}] eval stats NOT recorded — the evidence registry is losing rows. ` +
+        `Check that migrations/037_eval_finding_stats.sql applied. Error: ${e.message}. ` +
+        `First failing row: ${JSON.stringify(findings[0])}`
+      );
+      console.error(`   Further ${EVAL_FINDING_STATS_TABLE} failures in this process are suppressed; ` +
+        `the running total is reported by getEvalFindingStatsFailureCount().`);
+    }
   }
+}
+
+/** How many recordEvalFindings calls failed in this process (0 = healthy). */
+function getEvalFindingStatsFailureCount() {
+  return evalFindingStatsFailures;
 }
 
 // Aggregate eval findings for reporting: counts per (groupBy, bucket). groupBy is
@@ -795,7 +785,7 @@ async function getEvalFindingsStats({ groupBy = 'art_style', since = null } = {}
   if (since) { params.push(since); where = 'WHERE created_at >= $1'; }
   const res = await dbQuery(
     `SELECT ${col} AS group_key, bucket, severity, COUNT(*)::int AS n
-       FROM eval_findings ${where}
+       FROM ${EVAL_FINDING_STATS_TABLE} ${where}
       GROUP BY ${col}, bucket, severity
       ORDER BY ${col} NULLS LAST, n DESC`,
     params
@@ -3886,6 +3876,8 @@ module.exports = {
   logActivity,
   recordEvalFindings,
   getEvalFindingsStats,
+  getEvalFindingStatsFailureCount,
+  EVAL_FINDING_STATS_TABLE,
   buildStoryMetadata,
   saveStoryData,
   saveScenePageData,
