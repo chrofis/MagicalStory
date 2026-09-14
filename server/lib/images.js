@@ -818,9 +818,27 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
 }
 
 /**
- * @param {Object|null} meta - optional out-param. When the LLM head-compression
- *   branch fires, `meta.compressedScene` receives the COMPRESSED SCENE BLOCK —
- *   the rewritten head, i.e. the scene prose the image model actually got. The
+ * The scene block of a prompt: everything strictly before the protected tail
+ * (`**REQUIRED OBJECTS` / `**ART STYLE`). Returns '' when there is no tail
+ * marker, so a caller can tell "no scene block found" from a real one.
+ */
+function sceneHeadOf(prompt) {
+  const o = prompt.indexOf('**REQUIRED OBJECTS');
+  const tailStart = o >= 0 ? o : prompt.indexOf('**ART STYLE');
+  return tailStart > 0 ? prompt.slice(0, tailStart).trim() : '';
+}
+
+/**
+ * @param {Object|null} meta - optional out-param. Whenever this function
+ *   actually CHANGES the prompt, `meta.compressedScene` receives the SCENE
+ *   BLOCK OF THE STRING IT RETURNS — the scene prose the image model really
+ *   got. That is the LLM-rewritten head on the compression branch, and the
+ *   post-dedupe / post-cut head on the other two. Stamping only the LLM branch
+ *   was measured leaving the field null on the one over-cap page of staging
+ *   job_1789348171785_9oxos7dwv (p7, 8,002 chars against grok-imagine-image-2.0's
+ *   7,900 cap): dedupe alone brought it to 7,242, so the compression branch
+ *   never ran and nothing recorded that the sent prose differed from the built
+ *   prose at all. The
  *   batch image eval judges the render against that description rather than the
  *   pre-shrink one (sceneMetadata.resolveEvalSceneDescription). It is the head
  *   ALONE: taken from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE`
@@ -834,6 +852,7 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
   let out = dedupeIdenticalBullets(prompt);
   if (out.length <= maxPromptLength) {
     log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${out.length} chars via dedupe (budget ${maxPromptLength})`);
+    if (meta) meta.compressedScene = sceneHeadOf(out) || undefined;
     return out;
   }
 
@@ -936,7 +955,9 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
   }
 
   // 3. Guarantee: section-aware cut that never drops the tail sections.
-  return sectionAwareCut(out, maxPromptLength, logLabel);
+  const cut = sectionAwareCut(out, maxPromptLength, logLabel);
+  if (meta) meta.compressedScene = sceneHeadOf(cut) || undefined;
+  return cut;
 }
 
 /**

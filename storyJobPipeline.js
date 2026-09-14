@@ -1367,7 +1367,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             imageData: genResult.imageData,
             modelId: genResult.modelId,
             usage: genResult.usage,
-            prompt: imagePrompt,
+            // Post-shrink sent text + sent scene block, like the unified page
+            // path — the trial page record had the same pre-shrink bug.
+            prompt: genResult.prompt || imagePrompt,
+            compressedScene: genResult.compressedScene || null,
             characterPhotos: pagePhotos,
             grokRefImages: genResult.grokRefImages || null,
             sceneDescription,
@@ -2452,7 +2455,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               type: 'frontCover',
               imageData: result.imageData,
               description: sceneDescription,
-              prompt: coverPrompt,
+              // Sent text, not the build — same fix as the streaming cover.
+              prompt: result.prompt || coverPrompt,
               modelId: result.modelId,
               referencePhotos: coverPhotos,
               landmarkPhotos: coverLandmarkPhotos,
@@ -5511,10 +5515,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               compositeDebug,
               thinkingText: genResult.thinkingText || null,
               usage: genResult.usage,
-              prompt: pageData.prompt,
+              // The prompt the model ACTUALLY received, not the pre-shrink
+              // build. generateImageOnly stamps the post-shrink string on
+              // `genResult.prompt`; storing `pageData.prompt` threw it away, so
+              // the dev panel and the batch eval's ORIGINAL_PROMPT fallback
+              // read text the model never saw — staging
+              // job_1789348171785_9oxos7dwv p7 stored 8,002 chars against
+              // grok-imagine-image-2.0's 7,900 cap. Falls back to the build
+              // for providers that report no sent text.
+              prompt: genResult.prompt || pageData.prompt,
               // Set ONLY when the built prompt went over the image model's
-              // character cap and shrinkPromptForModel LLM-compressed the scene
-              // prose: the description the model actually received. The batch
+              // character cap and shrinkPromptForModel changed the scene prose
+              // (compressed, deduped or cut): the description the model
+              // actually received. The batch
               // eval judges the render against it instead of the pre-shrink
               // `scene.sceneDescription`, which can name clauses the compressor
               // removed (sceneMetadata.resolveEvalSceneDescription). Undefined
@@ -5609,6 +5622,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             raw.usage = retryResult.usage;
             raw.thinkingText = retryResult.thinkingText || null;
             raw.grokRefImages = retryResult.grokRefImages || null;
+            // The retry is the render that survives, so its sent prompt and
+            // scene block are the ones that describe the stored image.
+            raw.prompt = retryResult.prompt || raw.prompt;
+            raw.compressedScene = retryResult.compressedScene || null;
             raw.error = null;
             if (retryResult.usage) {
               const m = retryResult.modelId || '';
