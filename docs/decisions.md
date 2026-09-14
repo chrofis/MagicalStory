@@ -38560,3 +38560,59 @@ the "~25 min image phase" comments corrected), `server/lib/textRefine.js`
 level, plus a bounded grace" entry above. Verify on the next long story that
 `text_refine_complete` appears with all rounds and that no
 `text_refine_join_partial` is logged.
+
+### A cover stands somewhere its cast can stand, and carries only that place's props (2026-09-14)
+**Context:** The back cover of prod `job_1789227389389_z18dmvnt6` shows the
+family in winter coats on a dry cobbled quay beside a **lit** gas lamp, with
+open green water, descending light shafts and rising bubbles behind them — a
+flame burning underwater and dry scarves in a lake. It is not a failure to
+follow the brief. It is a faithful resolution of a brief that contradicted
+itself, and the stored prompt shows both halves:
+
+- the scene: *"A wide group portrait set before Lake Léman Underwater — Open
+  Water (**no floor visible**, only open dark green water in all directions…)"*
+- `cover-composition.txt`, in all three sections: *"All characters stand firmly
+  on solid ground — feet flat on a stable surface (floor, pavement,
+  **cobblestones**, grass, path). **Never standing in or on water**, never
+  floating, never mid-air."*
+
+The cast was not described as swimming, so no exception applied. Told the
+setting has no floor and that every figure must stand on solid ground with
+cobblestones named as valid, the renderer paved the lake. The same prompt also
+carried `ART009 Quay Lamp` verbatim — *"bolted to the stone paving; the lamp is
+lit"* — a land fixture, specified as lit, in open water.
+
+Note `prompts/image-generation.txt:14` has carried the exception all along
+("…unless the scene description has them swim, float, or fly"). Covers were
+strictly *stricter* than pages, which is what made the conflict unresolvable.
+
+**Decision:** Two prompt-side rules.
+1. `cover-composition.txt` — the canonical cover solid-ground bullet gains the
+   water/air exception, added identically to all three sections (front,
+   initialPage, back): in water or air the characters swim, float or fly, no
+   ground is invented under them, and no land fixture is planted in the scene.
+2. `scene-expansion-all.txt` — every cover backdrop is a LOC the cast can stand
+   in (the Title Page already had a narrower version of this; the Initial Page
+   and Back Cover had none), and a cover's `Objects:` hold only props belonging
+   to that backdrop — a fixture described as mounted, bolted or planted
+   elsewhere does not travel, and a light source is only lit where it would burn.
+
+**Rationale:** Rule 2 prevents the incoherent scene being requested at all; rule
+1 makes covers consistent with pages for the cases where water is genuinely
+right. Both are prompt-side per the standing "classification belongs to the
+PROMPT" rule — the rejected alternative was code validating a location against
+its props, which needs code to decide "is this location wet" from prose, the
+pattern `docs/SETTLED.md` forbids and that got a regex guard built and removed
+in a day.
+
+`docs/SETTLED.md` carries "SOLID-GROUND rule: one canonical wording per prompt
+layer" (decisions.md 2026-07-11). Adding the same clause to all three cover
+sections **preserves** that verdict rather than reversing it — it remains one
+wording for the cover layer — so no reversal protocol is triggered.
+
+**Also covered:** the front cover of the same story (mermaid tails on the dry
+quay) is the same assembly defect pointing the other way, not a separate
+finding.
+
+**Touched:** `prompts/cover-composition.txt`, `prompts/scene-expansion-all.txt`
+**Status:** ✅ active
