@@ -14,6 +14,7 @@ const { resolveEvalImagePrompt } = require('./sceneMetadata');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
 const { coverKeyToType, coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
+const { parseHoldsId } = require('./coverHolds');
 const { normalizeName, isKnownName } = require('./phantomCharacters');
 const { canonicalName, buildCastIndex, sameEntity } = require('./castResolver');
 const { getUsedClothingCategories } = require('./clothingCategories');
@@ -110,8 +111,8 @@ function collectCoverHintElementIds(coverHint) {
     ? Object.values(coverHint.characterDetails)
     : [];
   for (const d of details) {
-    const m = String(d?.holds || '').trim().match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
-    if (m) ids.push(m[1].toUpperCase());
+    const heldId = parseHoldsId(d?.holds);
+    if (heldId) ids.push(heldId);
   }
   return ids.length > 0 ? [...new Set(ids)] : null;
 }
@@ -355,9 +356,8 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
   const heldByChar = new Map(); // charNameLower -> Set<id>
   const heldIds = new Set();
   for (const d of details) {
-    const m = String(d?.holds || '').trim().match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
-    if (!m || !d?.name) continue;
-    const id = m[1].toUpperCase();
+    const id = parseHoldsId(d?.holds);
+    if (!id || !d?.name) continue;
     heldIds.add(id);
     const key = canonicalName(d.name);  // COMPARE
     if (!heldByChar.has(key)) heldByChar.set(key, new Set());
@@ -1987,8 +1987,8 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
     const parts = [];
     if (pos) parts.push(`stands ${pos}`);
     if (holds && holds.toLowerCase() !== 'nothing') {
-      const m = holds.match(/^((?:ART|ANI|VEH|CLO)\d+)/i);
-      const name = m ? (resolveHoldable(m[1]) || holds) : holds;
+      const heldId = parseHoldsId(holds);
+      const name = heldId ? (resolveHoldable(heldId) || holds) : holds;
       parts.push(`holds the ${name}`);
     }
     parts.push('eyes on the viewer');

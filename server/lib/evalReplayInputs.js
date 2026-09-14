@@ -141,7 +141,10 @@ function buildEvalReplayOptions(ctx, opts = {}) {
     const contract = resolveCoverTextContract(coverKey, {
       titleBaked: scene.titleBaked === true,
       title: (ctx && ctx.title) || null,
-      dedication: scene.dedication || null,
+      // The dedication lives on the cover record for a Lab context and at the
+      // story root for a stored story (the pipeline's own cover loop reads
+      // `coverData.dedication || inputData.dedication`). Both, in that order.
+      dedication: scene.dedication || (ctx && ctx.dedication) || null,
     });
     options.expectedText = contract.expectedText;
     options.textMode = contract.textMode;
@@ -157,8 +160,40 @@ function buildEvalReplayOptions(ctx, opts = {}) {
   return { options, evaluationType: resolveEvalReplayType(pageNumber), coverKey, overridden };
 }
 
+/**
+ * The same resolver, for a STORED story rather than a Lab scene context.
+ *
+ * The admin re-evaluate / eval-replay / cover-edit endpoints in
+ * server/routes/regeneration.js each hand-spelled their own thinner evalOptions
+ * — no `visualBible`, no `clothingRequirements`, no art style, and on covers no
+ * text contract, so a correctly TEXTLESS cover was judged against a hand-built
+ * "TEXT REQUIREMENT - CRITICAL: the image MUST include this exact title" line
+ * and marked down for the title the app stamps afterwards. Same bug class as
+ * the Lab sites above and the cover ITERATE path (1f5101ef9); same remedy.
+ *
+ * @param {object} storyData - stories.data
+ * @param {object} scene - the sceneImages entry or the coverImages[key] record
+ * @param {number} pageNumber - page number, negative for covers
+ * @param {object} [opts] - forwarded to buildEvalReplayOptions (detectedFigures,
+ *                          artStyleKey, overrides)
+ */
+function buildStoryEvalOptions(storyData, scene, pageNumber, opts = {}) {
+  const data = storyData && typeof storyData === 'object' ? storyData : {};
+  return buildEvalReplayOptions({
+    scene: scene || {},
+    pageNumber,
+    visualBible: data.visualBible || null,
+    clothingRequirements: data.clothingRequirements || null,
+    characters: Array.isArray(data.characters) ? data.characters : [],
+    artStyle: data.artStyle || null,
+    title: data.title || data.storyTitle || null,
+    dedication: data.dedication || null,
+  }, opts);
+}
+
 module.exports = {
   MIRRORED_EVAL_OPTION_KEYS,
+  buildStoryEvalOptions,
   NOT_MIRRORED_EVAL_OPTION_KEYS,
   COVER_KEY_BY_PAGE,
   resolveEvalReplayType,

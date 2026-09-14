@@ -135,7 +135,20 @@ describe('wiring guard — the cover eval call sites cannot drift back', () => {
 
   it('both eval call sites carry the visualBible and the shared text contract', () => {
     expect((src.match(/resolveCoverTextContract\(coverKey/g) || []).length).toBe(2);
-    expect(src).toContain('resolveCoverTextContract');
+    // NAMED for the visualBible, and now actually asserting it. This test read
+    // only the text contract, so deleting `visualBible,` from either evalOptions
+    // object — the exact regression of 1f5101ef9 point 2 — passed green.
+    // Both eval calls sit inside iterateCover; each must pass the bible in its
+    // evalOptions object (the 10th positional argument).
+    const evalCalls = src.split('await evaluateImageQuality(').slice(1);
+    expect(evalCalls.length).toBe(2);
+    for (const call of evalCalls) {
+      const body = call.slice(0, call.indexOf('\n        );'));
+      expect(body).toMatch(/^\s*visualBible,\s*$/m);
+      // The contract is spread into evalOptions, so expectedText/textMode are
+      // never spelled here — the resolver call inside the object is the assertion.
+      expect(body).toMatch(/\.\.\.resolveCoverTextContract\(coverKey/);
+    }
   });
 
   it('the pipeline cover loop shares the same text-contract resolver', () => {

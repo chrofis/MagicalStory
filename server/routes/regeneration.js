@@ -158,7 +158,8 @@ const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing
 const { getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
-const { coverKeyToType, coverTypeToKey, coverLabel } = require('../lib/coverKeys');
+const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
+const { buildStoryEvalOptions } = require('../lib/evalReplayInputs');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -4002,30 +4003,21 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           sceneHint: scene.sceneHint,
         });
 
-        // For covers, include text requirements so the evaluator knows what text to expect
-        // Without this, the evaluator marks required text (title, dedication, magicalstory.ch) as "UNWANTED"
-        let evalPrompt = scene.description || scene.prompt || '';
-        if (evaluationType === 'cover') {
-          const coverType = getCoverType(pageNumber);
-          if (coverType === 'frontCover') {
-            const title = storyData.title || storyData.storyTitle || '';
-            if (title) {
-              evalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${title}"`;
-            }
-          } else if (coverType === 'initialPage') {
-            const dedication = storyData.dedication || '';
-            if (dedication) {
-              evalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact dedication text: "${dedication}"`;
-            }
-          } else if (coverType === 'backCover') {
-            evalPrompt += '\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
-          }
-        }
+        // The cover text contract is NOT hand-written here any more. This site
+        // appended "TEXT REQUIREMENT - CRITICAL: The image MUST include this
+        // exact title text" to every front cover — but the art is generated
+        // TEXTLESS and the app stamps the typography afterwards unless the run
+        // baked it in, so a correct cover was judged as missing its title. The
+        // shared resolver (resolveCoverTextContract, via buildStoryEvalOptions)
+        // decides per cover key and per baked-title flag, and evaluateImageQuality
+        // turns it into the right rule — including "the title is an app overlay,
+        // never flag it".
+        const evalPrompt = scene.description || scene.prompt || '';
 
         // Run evaluation with full parameters including storyText for semantic check
         const evaluation = await evaluateImageQuality(
           imageData,
-          evalPrompt,              // originalPrompt with text requirements for covers
+          evalPrompt,              // originalPrompt (the scene/cover brief)
           characterPhotos,         // referenceImages
           evaluationType,          // evaluationType
           qualityModelOverride || null,
@@ -4036,13 +4028,15 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           // EXPECTED CAST roster. The reference list above is the WHOLE
           // story cast, which is why it cannot serve as the roster here.
           scene.sceneCharacters || null,
-          {
-            // No new detector call: this endpoint scores the page's ACTIVE
-            // image and the stored detection was made on those same bytes.
+          // The ONE resolver, shared with the Lab replay sites and built from
+          // the same production baseline: visualBible, clothingRequirements,
+          // storyData cast, art style, landmark/era, and the cover text
+          // contract. Spelled by hand here, it carried none of them.
+          // No new detector call: this endpoint scores the page's ACTIVE image
+          // and the stored detection was made on those same bytes.
+          buildStoryEvalOptions(storyData, scene, pageNumber, {
             detectedFigures: scene.bboxDetection?.figures || null,
-            sceneMetadata: scene.sceneMetadata || null,
-            pageNumber: isCoverPage(pageNumber) ? null : pageNumber,
-          }
+          }).options
         );
 
         if (!evaluation) {
@@ -4275,12 +4269,22 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     let scene;
     let evaluationType = 'scene';
     let pageLabel = `PAGE ${pageNumber}`;
+    // Active-version keys are 'frontCover'/'initialPage'/'backCover' for covers
+    // (scoring.js recomputeAllActiveVersions, setActiveVersion) — NOT the
+    // negative page number, and the array position is not the DB index either.
+    // Same fix as the re-evaluate endpoint above: passing -1/-2/-3 matched no
+    // stored key, fell through to 0, and this endpoint re-evaluated v0 while
+    // reporting on "the active version".
+    let versionKey = pageNumber;
+    let versionType = 'scene';
     if (isCoverPage(pageNumber)) {
       const coverType = getCoverType(pageNumber);
       if (!coverType) return res.status(400).json({ error: 'Invalid cover page number' });
       scene = getCoverData(storyData, coverType);
       evaluationType = 'cover';
       pageLabel = coverType.toUpperCase();
+      versionKey = coverType;
+      versionType = coverType;
     } else {
       scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
     }
@@ -4291,8 +4295,8 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     // Get active version's image data
     let imageData = scene.imageData;
     if (scene.imageVersions?.length > 0) {
-      const activeDbIndex = await getActiveVersion(id, pageNumber);
-      const activeVersion = scene.imageVersions?.[activeDbIndex];
+      const activeDbIndex = await getActiveVersion(id, versionKey);
+      const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
       if (activeVersion?.imageData) {
         imageData = activeVersion.imageData;
       }
@@ -4364,11 +4368,14 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         null,                    // storyText — run quality only, semantic is separate
         null,                    // sceneHint — not used for quality-only
         scene.sceneCharacters || null,
-        {
-          // Same stored-bytes argument as the re-evaluate endpoint above.
+        // The ONE shared resolver (see the re-evaluate endpoint above). Without
+        // it this site ran degraded in the same three ways the cover iterate
+        // path did before 1f5101ef9: no visualBible, an outfit contract built
+        // from whatever rode on the reference photos, and no cover text
+        // contract. Same stored-bytes argument for detectedFigures.
+        buildStoryEvalOptions(storyData, scene, pageNumber, {
           detectedFigures: scene.bboxDetection?.figures || null,
-          sceneMetadata: scene.sceneMetadata || null,
-        }
+        }).options
       );
 
       if (!evaluation) {
@@ -6520,7 +6527,30 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     let qualityReasoning = null;
     try {
       const coverPrompt = existingCover.prompt || existingCover.description || '';
-      const evaluation = await evaluateImageQuality(editResult.imageData, coverPrompt, [], 'cover');
+      // Four bare positionals used to be the whole call: no references (so no
+      // CLOTHING CONTRACT at all), no cast roster, and no evalOptions — no
+      // visualBible, no art style, no cover text contract. The edited cover was
+      // scored by a judge holding almost none of the generator's spec. Same
+      // resolvers as every other cover eval site.
+      const coverPageNumber = COVER_PAGE_NUMBERS[coverKey];
+      const evaluation = await evaluateImageQuality(
+        editResult.imageData,
+        coverPrompt,
+        buildWholeCastReferencePhotos(
+          storyData.characters || [],
+          storyData.artStyle || null,
+          storyData.clothingRequirements || null
+        ),
+        'cover',
+        null,
+        coverKey.toUpperCase(),
+        null,                                   // storyText — a cover has no page prose
+        existingCover.description || existingCover.outlineExtract || null,
+        existingCover.sceneCharacters || null,
+        buildStoryEvalOptions(storyData, existingCover, coverPageNumber, {
+          detectedFigures: existingCover.bboxDetection?.figures || null,
+        }).options
+      );
       if (evaluation) {
         qualityScore = evaluation.score;
         qualityReasoning = evaluation.reasoning;

@@ -30,6 +30,7 @@ const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 const { persistStyledAvatar } = require('../services/database');
 const { slugifyCostume } = require('../utils/costumeKey');
 const { stripDataUriPrefix } = require('./r2');
+const { parseHoldsId } = require('./coverHolds');
 const { resolveCellPose } = require('./storyAvatars');
 const { buildCastIndex, resolveEntity, canonicalName, lookupByName } = require('./castResolver');
 
@@ -539,9 +540,9 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
     const parts = [];
     const holds = String(d.holds || '').trim();
     if (holds && holds.toLowerCase() !== 'nothing') {
-      const m = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-      if (m && artNames[m[1].toUpperCase()]) {
-        parts.push(`holds the ${artNames[m[1].toUpperCase()]}, both hands visibly gripping it`);
+      const heldId = parseHoldsId(holds);
+      if (heldId && artNames[heldId]) {
+        parts.push(`holds the ${artNames[heldId]}, both hands visibly gripping it`);
       } else {
         parts.push(`holds ${holds}`);
       }
