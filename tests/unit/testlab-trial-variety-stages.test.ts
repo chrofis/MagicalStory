@@ -79,12 +79,24 @@ describe('the idea stage runs the production idea prompt, not a copy of it', () 
   });
 });
 
-describe('the subject grouping stays crude, and per arm', () => {
-  // testlab.js cannot be required in a unit test (its require graph opens the
-  // DB pool), so these pin the source the way the other Lab-stage tests do.
+describe('the idea grouping stays crude, and per arm', () => {
+  // The grouping helper itself is unit-tested for BEHAVIOUR in
+  // tests/unit/idea-premise-grouping.test.ts against experiments 1273/1274.
+  // What only source can show is how the STAGE calls it — the stage function is
+  // not exported and every path through it makes a paid model call.
   it('groups within an arm, never across the two — the arms are REQUIRED to differ', () => {
+    // Pooling the arms would report the design (two arms that must differ in
+    // kind) as repetition.
     expect(ideaStage).toMatch(/for \(const arm of \['local', 'fantasy'\]\)/);
-    expect(ideaStage).toMatch(/groupIdeasBySubject\(ideas, overlap\)/);
+    const armLoop = ideaStage.slice(ideaStage.indexOf("for (const arm of ['local', 'fantasy'])"));
+    expect(armLoop).toMatch(/groupIdeas\w*\(ideas\b/);
+  });
+
+  it("excludes the experiment's own constants from the grouping evidence", () => {
+    // The name/town/landmark recur in every draw by construction; counting them
+    // reported five genuinely different wants as one premise (experiment 1274).
+    expect(ideaStage).toMatch(/const constantWords = /);
+    expect(ideaStage).toMatch(/groupIdeas\w*\(ideas, \{[^}]*constantWords/);
   });
 
   it('reports the raw ideas next to the counts, so the owner judges the list', () => {
@@ -93,10 +105,17 @@ describe('the subject grouping stays crude, and per arm', () => {
     expect(ideaStage).toMatch(/pairs,/);
   });
 
-  it('the grouping is word overlap only — no model call, no embedding', () => {
-    const helper = lab.slice(lab.indexOf('function groupIdeasBySubject'), lab.indexOf('/**\n * TRIAL IDEA VARIETY'));
-    expect(helper).not.toMatch(/callTextModel|await /);
-    expect(helper).toMatch(/inter \/ union >= threshold/);
+  it('the grouping is lexical — no model call, no embedding, no I/O', () => {
+    // Pinned as behaviour, not as an internal formula: a grouping that reached
+    // for a model or an embedding could not be synchronous, and could not be
+    // deterministic across repeated calls.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { groupIdeasByPremise } = require('../../server/lib/testlab.js');
+    const ideas = [1, 2, 3].map(draw => ({ draw, text: `Ein Kind versucht dreimal, dem Tier Nummer ${draw} zu helfen, und bemerkt dann den Weg.` }));
+    const first = groupIdeasByPremise(ideas);
+    expect(typeof (first as any).then).toBe('undefined');
+    expect(Array.isArray(first)).toBe(true);
+    expect(JSON.stringify(groupIdeasByPremise(ideas))).toBe(JSON.stringify(first));
   });
 });
 
