@@ -39099,3 +39099,48 @@ data change proposed to the owner, not applied by this session. No code changed,
 was added.
 
 **Status:** ✅ active.
+
+## An object's OWN light is a state; the world's lighting of it is not (2026-09-14)
+
+**Context:** The same object got opposite treatment depending on which template
+authored the Visual Bible. Three templates stated the rule three ways:
+
+- `prompts/scene-expansion-all.txt:139` — "How the WORLD lights it is not a
+  state — a lamp falling on it, a shadow crossing it, dusk: the scene decides
+  that, page by page. **Its OWN light is a state**: a thing that glows and goes
+  dark, lights up and goes out, changes what it gives off. Then the emission
+  lives in the states, never in `description`."
+- `prompts/story-unified.txt:609` — "**A change of light is not a state** —
+  emitting, glowing, dimming, lit or unlit leaves the thing itself unchanged;
+  the scene decides the light, page by page."
+- `prompts/story-trial.txt:166` — "**A change of light is not a state**; the
+  scene decides the light."
+
+A fourth site restated it in the `states[]` SCHEMA of `story-unified.txt:689`
+("never light, that belongs to the scene"), and `tests/unit/vb-authoring-contract.test.ts`
+pinned the old wording in both places.
+
+**Decision:** An object's own emission IS a state. `story-unified.txt` and
+`story-trial.txt` are brought into line with the beats template. The world
+lighting the object — a lamp, a shadow, dusk — stays NOT a state; the scene
+decides that, page by page. That exclusion is unchanged and stays sharp in all
+three. Owner verdict, 2026-09-14 (backlog #37), superseding the light half of
+the 2026-09-11 ruling (39fc0d0ff) for the object's own emission only.
+
+**Rationale:** A state is drawn as its own reference cell, and a reference cell
+is the only way a glowing look actually reaches the page. An emission described
+only in `description` is carried on every page or none — never on the pages the
+story turns it on. Story B `job_1789343124794_z2c779f7i` ART003 held the glow in
+`description` with no state for it, part of the chain that had pages 3, 4 and 5
+rendering the wrong object (backlog #63, closed). Two cells for one object under
+different SCENE light remain indistinguishable pictures, which is why the
+world-lighting exclusion survives intact.
+
+**Touched:**
+- `prompts/story-unified.txt` (state rule + `states[]` schema delta clause)
+- `prompts/story-trial.txt` (state rule)
+- `tests/unit/built-prompt-values.test.ts` (new cross-template drift guard)
+- `tests/unit/vb-authoring-contract.test.ts` (old wording unpinned, new pinned)
+- `docs/SETTLED.md`
+
+**Status:** ✅ active

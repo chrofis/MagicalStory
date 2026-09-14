@@ -481,3 +481,59 @@ describe('the re-plan asks for only the pages a finding named', () => {
     expect(unfilled(p)).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// An object's OWN light is a state (owner verdict, 2026-09-14 — backlog #37).
+//
+// The same object got opposite treatment depending on which template authored
+// the bible: the beats Art Director called its own emission a state, while
+// `story-unified.txt` and `story-trial.txt` said a change of light never is.
+// A state is drawn as its own reference cell, and a reference cell is the only
+// way a glowing look actually reaches the page — an emission carried only in
+// `description` is on every page or none. Story B
+// `job_1789343124794_z2c779f7i` ART003 held the glow in `description` with no
+// state for it, part of the chain that rendered the wrong object on three
+// pages (backlog #63).
+//
+// Both halves are pinned, in SUBSTANCE not wording: the world lighting the
+// object stays NOT a state, its own emission IS one, and the emission belongs
+// in `states[]`. A fourth template stating the rule differently is the way
+// this recurs, so the guard runs over every template that states it.
+// ---------------------------------------------------------------------------
+describe('the light rule agrees across every template that states it', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const PROMPTS = path.join(__dirname, '../../prompts');
+  const FILES = ['scene-expansion-all.txt', 'story-unified.txt', 'story-trial.txt'];
+
+  const lightLine = (file: string) =>
+    fs.readFileSync(path.join(PROMPTS, file), 'utf8')
+      .split('\n')
+      .find((l: string) => /is not a state/i.test(l) && /light/i.test(l)) || '';
+
+  for (const file of FILES) {
+    it(`${file} keeps the world's lighting out of states and its own emission in`, () => {
+      const line = lightLine(file);
+      expect(line, `${file} no longer states the light rule at all`).not.toBe('');
+      // The half that was always right: the scene decides the world's light.
+      expect(line, `${file} stopped excluding the world's lighting`)
+        .toMatch(/world lights it is not a state/i);
+      expect(line, `${file} no longer hands the world's light to the scene`)
+        .toMatch(/scene decides/i);
+      // The half the owner settled: the object's own emission IS a state...
+      expect(line, `${file} reverted to "a change of light is not a state"`)
+        .toMatch(/own light is a state/i);
+      // ...and it lives in the states, not in `description`.
+      expect(line, `${file} no longer sends the emission to states[]`)
+        .toMatch(/states(\[\])?`?[^.]*never in `description`|emission/i);
+    });
+  }
+
+  it('no template still says a change of light is never a state', () => {
+    const offenders = fs.readdirSync(PROMPTS)
+      .filter((f: string) => f.endsWith('.txt'))
+      .filter((f: string) => /change of light is not a state/i.test(
+        fs.readFileSync(path.join(PROMPTS, f), 'utf8')));
+    expect(offenders, 'a template still carries the reversed light rule').toEqual([]);
+  });
+});
