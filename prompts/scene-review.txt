@@ -112,4 +112,4 @@ NONE
 {"artifacts": [{"id": "<id>", "states": [{"id": "<id>.1", "name": "<look>", "delta": "<what differs from the entry's description>", "pages": [<pages>]}]}]}
 ```
 
-Optional, and the last block. Carry ONLY the entries you corrected, in the collection they came from, in the shape above. Omit the whole block when you corrected none. Only `states[]` may change; no entry is added, removed or renamed, and no other field is touched.
+Optional, and the last block. Carry ONLY the entries you corrected, in the collection they came from, in the shape above. Omit the whole block when you corrected none. Only `states[]` may change; no entry is added, removed or renamed, and no other field is touched. For an entry you do carry, `states[]` is its COMPLETE list of looks: repeat every state the entry already has, the ones you did not touch included. A state you leave out is deleted, and the pages that cited it lose the look they asked for.
