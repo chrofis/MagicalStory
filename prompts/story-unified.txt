@@ -602,6 +602,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 
 **Rules:**
 - Do NOT include main or primary characters ({CHARACTER_NAMES}) - they have reference photos
+- Every artifact carries `size`, and every animal too. The field is never omitted.
 - **ENGLISH `name` and `description` for artifacts, locations, vehicles, and clothing — even when the story is written in another language.** These fields are copied verbatim into ENGLISH image prompts; a story-language name leaks into the prompt and can even be painted as lettering. Characters and animals keep their given names.
 - **A prop's, vehicle's or garment's `name` is a plain description of the thing, never a proper noun or a label** ("toy treasure chest", "hand-drawn treasure map", "two-masted sailing ship"). A name the story gives an object goes in `properName` and nowhere else.
 - **Every physical item appears in exactly ONE category.** An item WORN by a character (cape, hat, mask, uniform, boots) belongs in `clothing` (and the wearer's `clothingRequirements`) ONLY — never also as an `artifacts` entry. `artifacts` is for props and objects that are not worn garments. Duplicating a worn item as an artifact produces two competing canonical descriptions and a stray standalone reference render of a garment that already appears on the character's avatar.
@@ -684,7 +685,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "properName": "[OMIT unless the story names this object; then that name]",
       "pages": [X, Y, Z],
       "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']",
-      "size": "[against a person: 'fits in one hand', 'carried in both arms', 'as tall as the child']",
+      "size": "[how big this object is beside a person: the body part it reaches on a character standing next to it, or the part of a hand or arm it spans. Measure THIS object — never reuse a wording from these instructions. No metric or imperial units. English, whatever the story language.]",
       "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, then the rest in the order the story reaches them, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words — never material, colour or size, those stay in description; never light, that belongs to the scene; never a feature `description` already carries]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]"
       "wornAs": "[OMIT unless this prop becomes part of a character's costume. Then: \"<CharacterName>.<slot>\", e.g. \"Emma.headwear\" — the slot in that character's clothingRequirements this same item fills once worn.]",
       "description": "[size, color, material, distinctive markings. A prop carrying writing has that writing 'illegible' / 'weathered' / 'smudged' / 'blurred' — never quote words to be painted, and never say 'handwritten letters visible' on its own, which makes the image model letter the prop's own name across it. A prop whose interest lies on its face gets two entries, one per side; what is drawn or written on the face stays out of both.]"

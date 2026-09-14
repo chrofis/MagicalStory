@@ -590,7 +590,7 @@ function tryParseVisualBibleJSON(outline) {
         // arms"); the REQUIRED OBJECTS line carries it verbatim.
         size: artifact.size || null,
         appearsInPages: artifact.pages || [],
-        description: artifact.description || `${artifact.type}: ${artifact.description}`,
+        description: buildArtifactDescription(artifact),
         type: artifact.type,
         // Words that must be READABLE on the object (a sign, a plaque). Its
         // cell renders solo on the typography-aware tier with the words
@@ -738,6 +738,28 @@ function buildAnimalDescription(animal) {
   if (animal.size) parts.push(animal.size);
   if (animal.features) parts.push(animal.features);
   return parts.join('. ');
+}
+
+/**
+ * Build description string from artifact JSON
+ *
+ * The artifact twin of buildAnimalDescription. Artifacts used to take their
+ * `description` verbatim, so `size` reached only the REQUIRED OBJECTS rider
+ * (promptBuilders: `sizeNote`) and never the blocks built from the description
+ * — the full Visual Bible block and the cover's KEY STORY ELEMENTS. A held
+ * prop therefore had no scale anchor on the cover at all.
+ *
+ * The size sentence is appended, not merged: `description` is authored as
+ * appearance prose and a state delta is layered onto it downstream.
+ */
+function buildArtifactDescription(artifact) {
+  const parts = [];
+  const desc = typeof artifact.description === 'string' ? artifact.description.trim() : '';
+  if (desc) parts.push(desc.replace(/\.\s*$/, ''));
+  else if (artifact.type) parts.push(String(artifact.type).trim());
+  const size = typeof artifact.size === 'string' ? artifact.size.trim() : '';
+  if (size) parts.push(`Size: ${size.replace(/\.\s*$/, '')}`);
+  return parts.filter(Boolean).join('. ');
 }
 
 /**
@@ -1786,7 +1808,8 @@ function tryParseNewEntriesJSON(section) {
         id: artifact.id || generateId('ART', idCounter.ART++),
         label: typeof artifact.label === 'string' && artifact.label.trim() ? artifact.label.trim() : null,
         name: artifact.name,
-        description: artifact.description || `${artifact.type}: ${artifact.description}`,
+        description: buildArtifactDescription(artifact),
+        size: artifact.size || null,
         type: artifact.type,
         pages: artifact.pages || [],
         source: 'story_text'
@@ -3203,6 +3226,7 @@ module.exports = {
   getElementsNeedingReferenceImages,
   updateElementReferenceImage,
   buildCharacterDescription,
+  buildArtifactDescription,
   getElementReferenceImagesForPage,
   MAX_OBJECT_STATES,
   normaliseObjectStates,
