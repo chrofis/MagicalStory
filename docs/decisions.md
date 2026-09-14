@@ -36748,3 +36748,48 @@ bibles and reviewer JSON.
 `tests/unit/vb-state-review.test.ts`, `tasks/bugs.json`
 **Status:** ✅ active — the guard is situational; the prompt line applies to
 every review that corrects an entry.
+
+## 2026-09-14 — The Art Director could not author a stated object's opening look: the schema forbade it
+**Context:** Measured 3 times out of 3 (the stored bible of
+`job_1789343124794_z2c779f7i`, Lab #1264, Lab #1265): a stated object's
+`states[]` began with a CHANGE, the pages before that change were claimed by no
+state, and `defaultObjectState` (`visualBible.js:111-124`) handed those pages
+`states[0]` — so the object rendered muddy, cracked or broken on the page it is
+found. The scene review now repairs this, but the repair was papering over an
+authoring instruction that made the correct output impossible to write:
+1. **The schema defined every state as a change.** `"delta": "[the change to
+   the object itself ...]"`, and rule 139 said a delta "describes the object's
+   own ALTERED look". The unaltered look has no change, so the first row could
+   not be filled in. The model dropped it and listed only real changes — the
+   only coherent reading.
+2. **The appearance was pushed into `description`.** The schema said "never
+   material, colour or size, those stay in description", and rule 137 said
+   `description` "holds what is always true of it". The Art Director therefore
+   recorded the opening look in `description` and reasonably believed it was
+   recorded — but `description` is not a reference cell, so the PICTURE still
+   came from `states[0]`.
+3. **The citation rule blessed the gap.** "An object with no states, **or a
+   page before its first change**, keeps the bare `ART###`" told the model those
+   pages need no state — while the code maps a bare citation to `states[0]`.
+   Prompt and code meant opposite things by the same citation.
+4. Rule 237's own tail ("every page falls in exactly one state") contradicted 3.
+**Decision:** `prompts/scene-expansion-all.txt` now makes the first row
+writable and mandatory:
+- `description` holds how the object is BUILT — material, shape, size — the part
+  that survives every state; the first state is explicitly not implied by it.
+- A `delta` is a LOOK: on the first state how the object looks before anything
+  happens, on later states what changed.
+- Both stated-entry schemas spell the first row out literally
+  (`{"name": "unaltered", "delta": "[how it looks before any change …]"}`) and
+  say every page up to the first change belongs to it.
+- An object WITH states is always cited dotted, the pages before its first
+  change included. Only a stateless object keeps the bare id.
+**Rationale:** Three identical failures across three runs is compliance, not
+variance — the model was following the prompt. Fixing the reviewer alone would
+have left every story paying a correction for a fault the author was instructed
+to make. The code's invariant is unchanged; the prompt now describes it.
+**Touched:** `prompts/scene-expansion-all.txt` (rules 137, 139, the
+secondary-character and artifact state schemas, the citation rule)
+**Status:** ✅ active — verify on the next `beats_scenes` Lab run that a stated
+object's first state is the unaltered look and covers the pages before the
+first change.
