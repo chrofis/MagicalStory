@@ -269,7 +269,7 @@ describe('reference sheet layout table', () => {
   const table: Array<[number, number, number, number[]]> = [
     // count, cols, rows, cell -> element map
     [1, 1, 1, [0]],
-    [2, 2, 1, [0, 1]],
+    [2, 2, 2, [0, 1, 0, 1]],
     [3, 2, 2, [0, 1, 2, 0]],
     [4, 2, 2, [0, 1, 2, 3]],
     [5, 3, 2, [0, 1, 2, 3, 4, 0]],
@@ -340,6 +340,50 @@ describe('count 3 — the first element is drawn twice', () => {
 // disagree, every cell mis-crops in silence. Synthetic sheets are drawn in the
 // requested shape with real gutters, so the production splitter runs
 // end-to-end: pixel grid detection, then the crop.
+describe('count 2 — 2x2 with a mirrored map', () => {
+  // Test Lab 1268/1269: the 2x1 row was drawn as a 1x3 sheet on both passes and
+  // the recovery lost one reference on one pass and both on the other, while the
+  // 2x2 came out exact 2/2. The map is mirrored so BOTH elements have a spare.
+  const els = [
+    { id: 'ART001', name: 'One', type: 'artifact', description: 'a small wooden box' },
+    { id: 'ART002', name: 'Two', type: 'artifact', description: 'a coiled rope' },
+  ];
+
+  it('names four cells, the bottom row repeating the cell above it', () => {
+    const prompt = buildReferenceSheetPrompt(els, 'watercolor', null);
+    expect(prompt).toMatch(/^Top-left: /m);
+    expect(prompt).toMatch(/^Top-right: /m);
+    expect(prompt).toMatch(/^Bottom-left: /m);
+    expect(prompt).toMatch(/^Bottom-right: /m);
+    const line = (p: string) => prompt.split('\n').find((l: string) => l.startsWith(p)) || '';
+    expect(line('Bottom-left:')).toContain('the same element as Top-left');
+    expect(line('Bottom-left:')).toContain('a small wooden box');
+    // The spare source is NOT hardcoded to the top-left.
+    expect(line('Bottom-right:')).toContain('the same element as Top-right');
+    expect(line('Bottom-right:')).toContain('a coiled rope');
+  });
+
+  it('returns exactly two references from the four cells', () => {
+    const layout = referenceSheetLayout(2);
+    expect(referencesFromCells(['a', 'b', 'c', 'd'], layout, 2)).toEqual(['a', 'b']);
+  });
+
+  it('element 1 falls back to the bottom-right when its own crop is unusable', () => {
+    const layout = referenceSheetLayout(2);
+    expect(referencesFromCells(['a', null, 'c', 'd'], layout, 2)).toEqual(['a', 'd']);
+  });
+
+  it('element 0 falls back to the bottom-left when its own crop is unusable', () => {
+    const layout = referenceSheetLayout(2);
+    expect(referencesFromCells([null, 'b', 'c', 'd'], layout, 2)).toEqual(['c', 'b']);
+  });
+
+  it('leaves an element null when neither of its cells cropped', () => {
+    const layout = referenceSheetLayout(2);
+    expect(referencesFromCells([null, 'b', null, 'd'], layout, 2)).toEqual([null, 'b']);
+  });
+});
+
 describe('crop geometry matches the requested shape', () => {
   const CELL = 120;
   const GUTTER = 8;

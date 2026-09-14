@@ -4064,11 +4064,11 @@ def split_reference_sheet():
             # Default layouts mirroring referenceSheetLayout() in
             # server/lib/referenceSheets.js (the JS caller always sends the
             # cols/rows hints, so this is a backstop):
-            # 1 -> 1x1, 2 -> 2x1, 3-4 -> 2x2, 5-6 -> 3x2
+            # 1 -> 1x1, 2-4 -> 2x2, 5-6 -> 3x2
+            # (count 2 moved from 2x1 to 2x2 on 2026-09-14: models drew a 1x3
+            # sheet for the single row, losing references.)
             if count <= 1:
                 cols, rows = 1, 1
-            elif count == 2:
-                cols, rows = 2, 1
             elif count <= 4:
                 cols, rows = 2, 2
             elif count <= 6:

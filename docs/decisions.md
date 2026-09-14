@@ -37024,3 +37024,19 @@ stale default was updated to mirror the table as a backstop).
 stories** — this changes the requested geometry for every story, so
 `vb_sheet_layout_mismatch` should become rare; if it does not, the new shapes
 are wrong rather than the recovery.
+
+**Measured, 2026-09-14 (Test Lab 1268 / 1269, `grok-imagine-image`, two passes
+each).** The count-3 2×2 with map `[0, 1, 2, 0]` came out **exact 2/2**:
+`2x2 = 4 cell(s)` detected from the pixels on both passes, all three elements
+identified, no mismatch and no identification call. The count-2 **2×1 row was
+0/2** — both passes drew a `1x3` sheet, and the recovery path then lost
+references: pass 1 mapped one element to NONE, pass 2 mapped **both** to NONE
+with two cells "showing no requested element". A 2-element sheet was therefore
+losing one or both of its reference pictures. **Count 2 moves to the 2×2**, the
+shape the model demonstrably renders, with a MIRRORED map `[0, 1, 0, 1]` rather
+than the generic spares-repeat-element-0 rule: it is symmetric, so both elements
+get a fallback cell, and it avoids asking for three identical cells out of four
+— an instruction that invites variation rather than repetition. The spare-cell
+LAYOUT phrasing now names the cell a spare actually repeats (the bottom-right
+repeats the **Top-right** here), not a hardcoded top-left. The 2×1 row is no
+longer requested by any count.

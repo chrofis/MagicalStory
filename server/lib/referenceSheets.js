@@ -110,8 +110,14 @@ async function identifySheetCellsWithRetry(buffer, cells, elements, genLog = nul
  * The shapes below are ones a model actually draws.
  *
  *   1 → one cell, no gridlines      4 → 2x2
- *   2 → 2 cols x 1 row              5-6 → 3 cols x 2 rows
+ *   2 → 2x2, both elements drawn    5-6 → 3 cols x 2 rows
+ *       twice (mirrored map)
  *   3 → 2x2, element 0 drawn twice (top-left AND bottom-right)
+ *
+ * Count 2 was a 2 x 1 row until Test Lab 1268/1269: grok-imagine-image drew a
+ * 1x3 sheet on BOTH passes, and the recovery path then lost one reference on
+ * one pass and BOTH on the other. The same runs rendered the count-3 2x2
+ * exactly, twice. So count 2 asks for the shape the model demonstrably draws.
  *
  * A partial row is never left blank: a blank cell invites the model to fill it
  * with an invented object or a stray duplicate (owner, 2026-09-14). The spare
@@ -128,7 +134,6 @@ function referenceSheetLayout(count) {
   let cols;
   let rows;
   if (n === 1) { cols = 1; rows = 1; }
-  else if (n === 2) { cols = 2; rows = 1; }
   else if (n <= 4) { cols = 2; rows = 2; }
   else if (n <= 6) { cols = 3; rows = 2; }
   else {
@@ -140,7 +145,16 @@ function referenceSheetLayout(count) {
   }
   const cells = cols * rows;
   // Row-major: the elements in order, then element 0 again in any spare cell.
-  const map = Array.from({ length: cells }, (_, i) => (i < n ? i : 0));
+  // Count 2 is the deliberate exception (owner, 2026-09-14): its four cells are
+  // MIRRORED, [0, 1, 0, 1], not the generic [0, 1, 0, 0]. Two reasons, both of
+  // which someone will otherwise "simplify" away — (a) it is symmetric, so BOTH
+  // elements get a duplicate cell to fall back on when one crop is unusable,
+  // instead of only element 0; (b) the generic rule would ask the model to draw
+  // three identical cells out of four, a strange instruction that invites
+  // variation rather than repetition.
+  const map = n === 2
+    ? [0, 1, 0, 1]
+    : Array.from({ length: cells }, (_, i) => (i < n ? i : 0));
   return { cols, rows, cells, map };
 }
 
@@ -614,10 +628,13 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     // A solo call has no position to name — a bare "Row 1:" prefix is a stringy
     // label on an image with nothing to index.
     if (count === 1) return desc;
-    // A spare cell repeats element 0. Say so: a cell the model cannot place is
+    // A spare cell repeats an element already named above. Say so, naming the
+    // cell it repeats — which is NOT always the top-left (count 2 mirrors, so
+    // the bottom-right repeats the top-right). A cell the model cannot place is
     // a cell it invents something for.
-    if (cellIdx >= count) {
-      return `${pos}: the same element as ${cellPositionName(0, cols, rows)}, drawn a second time, identical in every detail: ${desc}`;
+    const firstCell = layout.map.indexOf(elIdx);
+    if (cellIdx > firstCell) {
+      return `${pos}: the same element as ${cellPositionName(firstCell, cols, rows)}, drawn a second time, identical in every detail: ${desc}`;
     }
     return `${pos}: ${desc}`;
   });
@@ -629,6 +646,8 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   const gridShapePhrase = count === 1
     ? 'single full-frame illustration with no grid and no dividing lines'
     : (cols === 2 && rows === 1)
+      // No count asks for this shape since 2026-09-14; kept so a future table
+      // entry that does still gets a phrase rather than the generic fallback.
       ? 'single horizontal row of two cells side by side'
       : (cols === 2 && rows === 2)
         ? 'square grid with two rows and two columns (four cells total)'
