@@ -91,4 +91,45 @@ function tail(s) {
   return String(s).replace(/\s+/g, ' ').slice(-80);
 }
 
-module.exports = { assessIterateBrief, describeIterateBrief, METADATA_MARKER };
+/**
+ * Split one all-pages reply's parsed pages into the briefs that meet the
+ * contract and the ones that stop short of it.
+ *
+ * Why this is a decision and not a filter: `parseRefinedText` counts any
+ * non-empty run of text under a `## Page N` heading as a page, so a brief the
+ * reply cut mid-sentence used to merge exactly like a whole one — the generator
+ * rendered half a spec and the eval scored the render against that same half.
+ * Not merging a cut page hands it to the retry and the per-page fallback that
+ * already exist.
+ *
+ * `formatWide` is the escape hatch: when NOT ONE page meets the contract, the
+ * reply is in a shape the parser does not know rather than a truncated one, and
+ * re-expanding a whole book page by page would spend a paid call each to get
+ * the same shape back. The caller takes `cut` as written and says so loudly.
+ *
+ * @param {Array<{pageNumber:number, text:string}>} pages
+ * @returns {{whole:Array, cut:Array, formatWide:boolean}} entries carry `verdict`
+ */
+function partitionSceneBriefs(pages = []) {
+  const whole = [];
+  const cut = [];
+  for (const p of pages || []) {
+    if (!p || !p.text || !String(p.text).trim()) continue;
+    const verdict = assessIterateBrief(p.text);
+    (verdict.usable ? whole : cut).push({ ...p, verdict });
+  }
+  cut.sort((a, b) => a.pageNumber - b.pageNumber);
+  return { whole, cut, formatWide: whole.length === 0 && cut.length > 0 };
+}
+
+// The contract this checks — prose, parseable metadata, a sceneIntent — is the
+// scene-brief contract, not an iterate-round one. The beats all-pages expansion
+// reads the same verdict under the generic name (see beatsPipeline: a page cut
+// mid-stream used to count as delivered). One implementation, two callers.
+const assessSceneBrief = assessIterateBrief;
+const describeSceneBrief = describeIterateBrief;
+
+module.exports = {
+  assessIterateBrief, describeIterateBrief, METADATA_MARKER,
+  assessSceneBrief, describeSceneBrief, partitionSceneBriefs,
+};

@@ -38938,3 +38938,56 @@ contradicted it anyway.
 `tests/unit/identity-rename-duplicate.test.ts`,
 `tests/unit/fixtures/identity-rename-job_1789348171785_9oxos7dwv-p7.json`
 **Status:** ✅ active
+
+---
+
+## A scene brief that stops mid-sentence is not a delivered page (2026-09-14)
+
+**Context.** The Art Director expands every page in ONE call
+(`buildSceneExpansionAllPrompt` → `prompts/scene-expansion-all.txt`), which is the
+template every real beats story goes through. The all-pages path was reported as
+"truncating later pages". Measured on staging before touching anything: **no**. Across
+1035 stored briefs / 85 stories there is no cliff and no decay by page index — mean brief
+length by quartile is 3541 / 3501 / 3485 / 3920 characters, and the second half of a book
+is shorter than the first in 25 of 61 stories (below chance). The 2026-08-31 batch-retry
+guard plus the per-page fallback already recover a page the reply OMITS, and the no-caps
+rule is holding (`maxTokens=null`).
+
+What does still happen, once in 1035 pages: a page the reply cut MID-SENTENCE.
+`job_1789207854566_l43qgl34w` p7 — 1884 characters ending "a young adult young woman with
+dark", no metadata block at all — while p8 carried on normally. `parseRefinedText` counts
+any non-empty run of text under a `## Page N` heading as a page, so p7 merged exactly like
+a whole brief: no retry, no fallback, no warning. The generator rendered that page from
+half a spec, every metadata-driven supervisor (cast, objects, positions, worn items, text
+placement, empty-scene background) got nothing, and the eval then scored the render against
+the same half-spec — invisible to every judge.
+
+**Decision.** The merge tests each parsed page against the scene-brief CONTRACT — prose,
+parseable metadata, a `sceneIntent` — instead of "is it non-empty". A page that misses it is
+not merged, which hands it to the batch retry and the per-page fallback that already exist,
+and is reported at error level with the reason and the page number
+(`beats_scene_brief_incomplete`). The verdict is the one the iterate round already uses
+(`assessIterateBrief`, built from this very page), exported under the generic names
+`assessSceneBrief` / `partitionSceneBriefs` — one implementation, two callers.
+
+Two fail-soft rules, because a contract miss must never end a paid run:
+- **`formatWide`** — when NOT ONE page in the reply meets the contract, that is a reply in
+  a shape the parser does not know, not 18 truncations. Those briefs are taken as written
+  and the run says so loudly, rather than spending a paid call per page to get the same
+  shape back.
+- The per-page fallback keeps its best incomplete attempt as a **salvage**: after two cut
+  attempts it ships that brief with an error-level warning instead of throwing, because its
+  throw aborts the whole run (`Promise.all` over the missing pages).
+
+**Rationale.** The silence was the defect, not the cut itself — a model dropping a page
+mid-stream is rare and recoverable, but only if something notices. Measured against every
+stored brief the contract rejects 4 pages: p7, and three August pages that predate
+`sceneIntent`; no current story loses a page to it, so the recovery cost is ~0.1% of pages.
+No cap was raised or added.
+
+**Touched:** `server/lib/beatsPipeline.js` (the all-pages merge, `expandOnePage` salvage),
+`server/lib/iterateBriefGuard.js` (`partitionSceneBriefs` + generic aliases),
+`tests/unit/scene-expansion-all-incomplete.test.ts`,
+`tests/unit/fixtures/scene-brief-cut-job_1789207854566-p7.json`.
+
+**Status:** ✅ active.

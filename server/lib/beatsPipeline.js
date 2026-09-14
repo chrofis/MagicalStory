@@ -1653,6 +1653,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       }
     );
     let lastErr = null;
+    // The best incomplete brief seen, kept as the last resort. A page with half
+    // a spec still beats a page with none: this fallback's throw ABORTS the run
+    // (Promise.all over the missing pages), and a contract miss must never end a
+    // paid run (docs/SETTLED.md, gates are guidelines).
+    let salvage = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         // Own usage label (2026-08-31): fallback pages used to book under
@@ -1662,11 +1667,27 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // batch + 5 fallbacks from 6 batches).
         const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback' });
         if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
+        // Same contract as the batch merge above — a recovery that itself comes
+        // back cut is not a recovery. The second attempt is the retry; if both
+        // are cut the throw below names why, instead of storing half a spec.
+        const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
+        const verdict = assessSceneBrief(res.text);
+        if (!verdict.usable) {
+          if (!salvage) salvage = { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel, verdict };
+          throw new Error(`incomplete scene brief — ${describeSceneBrief(verdict)}`);
+        }
         return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
       } catch (err) {
         lastErr = err;
         log.warn(`⚠️ [BEATS] Scene expansion page ${b.pageNumber} attempt ${attempt} failed: ${err.message}`);
       }
+    }
+    if (salvage) {
+      const { describeSceneBrief } = require('./iterateBriefGuard');
+      const why = describeSceneBrief(salvage.verdict);
+      log.error(`🚨 [BEATS] Page ${b.pageNumber}: both per-page attempts returned an incomplete brief (${why}) — SHIPPING IT ANYWAY; every metadata-driven supervisor runs blind on this page`);
+      gl.warn('beats_scene_brief_incomplete', `Page ${b.pageNumber} ships with an incomplete brief after two per-page attempts — ${why}`, null, { pages: [b.pageNumber] });
+      return { pageNumber: salvage.pageNumber, brief: salvage.brief, prompt: salvage.prompt, modelId: salvage.modelId };
     }
     throw new Error(`Scene expansion failed for page ${b.pageNumber}: ${lastErr?.message || 'unknown error'}`);
   }
@@ -1734,8 +1755,32 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         }
       }
       const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
-      for (const p of parsed.pages) {
-        if (p.text && p.text.trim() && !byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
+      // A PAGE IS NOT A BRIEF. parseRefinedText accepts any non-empty run of
+      // text under a `## Page N` heading, so a page the reply cut mid-sentence
+      // counted as delivered: no retry, no fallback, no warning — the generator
+      // rendered half a spec and the eval judged it against that same half.
+      // Measured once in 955 staging pages (job_1789207854566_l43qgl34w p7).
+      // Incomplete pages are simply not merged, which hands them to the retry
+      // above and the per-page fallback below — the recovery that already
+      // exists. The verdict is the one the iterate round already uses
+      // (iterateBriefGuard.js), built from this very page: prose, parseable
+      // metadata, a sceneIntent. Measured over 1035 stored beats briefs / 85
+      // staging stories it rejects 4 — p7, and three August pages that predate
+      // sceneIntent. No current story loses a page to it.
+      const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
+      const { whole, cut, formatWide } = partitionSceneBriefs(parsed.pages);
+      for (const p of (formatWide ? cut : whole)) {
+        if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
+      }
+      if (formatWide) {
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) — accepting them as written rather than re-expanding the whole book`);
+        gl.warn('beats_scene_brief_contract_missed', `No scene brief in the all-pages reply meets the brief contract (${cut.length} page(s), first: ${describeSceneBrief(cut[0].verdict)}) — briefs ship as written and every metadata-driven supervisor runs blind`);
+      } else if (cut.length > 0) {
+        const detail = cut.sort((a, b) => a.pageNumber - b.pageNumber)
+          .map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ');
+        const pages = cut.map(p => p.pageNumber);
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: incomplete brief(s) — ${detail} — treating them as NOT delivered`);
+        gl.warn('beats_scene_brief_incomplete', `Brief(s) for page(s) ${pages.join(', ')} came back incomplete — ${detail}. Not accepted; re-expanded instead`, null, { pages });
       }
       if (byPage.size >= beats.length && adBible) break;
       if (attempt === 1) {
