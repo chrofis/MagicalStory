@@ -218,6 +218,69 @@ function entryNamedByRow(rowField, candidates) {
 }
 
 /**
+ * THE POSITION THE PAGE'S OWN BRIEF GIVES THIS OBJECT, or null.
+ *
+ * Read from the brief's structured `objects[]` records (`{id, name, position}`)
+ * kept on `fullData` — the same records `buildTextFromJson` turns into the
+ * prompt's `Objects: <name>: <position>` line. A brief whose `objects[]` is a
+ * plain id list (the beats/full scene format) places nothing structurally and
+ * yields null here.
+ *
+ * @returns {string|null} the trimmed position phrase, or null
+ */
+function scenePlacesObject(entry, sceneMetadata) {
+  const records = sceneMetadata?.fullData?.objects;
+  if (!Array.isArray(records) || records.length === 0) return null;
+  const base = baseVbId(entry?.id);
+  const names = new Set([entry?.name, entry?.properName, entry?.label]
+    .map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
+  for (const rec of records) {
+    if (!rec || typeof rec !== 'object') continue;
+    const recBase = baseVbId(rec.id);
+    const recName = String(rec.name || '').trim().toLowerCase();
+    const mine = (base && recBase && base === recBase) || (recName && names.has(recName));
+    if (!mine) continue;
+    const position = String(rec.position || '').trim();
+    if (position) return position;
+  }
+  return null;
+}
+
+// A PLACEMENT clause inside a state delta — where the object is, not what it
+// looks like. Either the segment opens with a locative preposition ("in a small
+// hand") or it pairs a locative verb with one ("resting in the grass", "wedged
+// between roots"). An appearance delta names no such pair: "shell split open",
+// "chestnut hidden inside", "fully visible", "cream patch facing upward".
+const PLACEMENT_PREP = '(?:in|into|inside|within|on|onto|atop|at|under|underneath|beneath|below|between|among|amongst|against|beside|alongside|behind|above|over|across|near|by|around|through|from)';
+const PLACEMENT_VERB = '(?:rest|rests|resting|lying|lies|laid|sitting|sits|standing|stands|held|holding|hold|cupped|clutched|cradled|gripped|grasped|clasped|carried|carrying|tucked|wedged|lodged|jammed|propped|perched|balanced|hanging|hung|dangling|leaning|placed|nestled|buried|floating)';
+const PLACEMENT_LEAD_RE = new RegExp(`^\\s*${PLACEMENT_PREP}\\b`, 'i');
+const PLACEMENT_PAIR_RE = new RegExp(`\\b${PLACEMENT_VERB}\\b[^,;]*?\\b${PLACEMENT_PREP}\\b`, 'i');
+
+/**
+ * Split a state delta into the part that describes the object's LOOK and the
+ * part that asserts WHERE it is.
+ *
+ * ONE OBJECT, ONE POSITION PER PAGE PROMPT. The REQUIRED OBJECTS block promises
+ * in its own header that each element "appears exactly as the scene description
+ * places it"; a state delta that also states a placement breaks that promise
+ * whenever the two disagree (staging job_1789337873076_qf2at21ui pages 2-4:
+ * "cupped in a small hand" against the brief's "wedged between roots at ground
+ * level"). The caller drops the placement half ONLY where the page places the
+ * object itself; the look half is never dropped, because a state's whole job is
+ * to say which variant of the object this page shows.
+ *
+ * @returns {{kept: string, dropped: string[]}}
+ */
+function splitStatePlacement(delta) {
+  const raw = String(delta || '').trim();
+  if (!raw) return { kept: '', dropped: [] };
+  const segments = raw.split(/\s*[,;]\s*/).filter(Boolean);
+  const dropped = segments.filter(s => PLACEMENT_LEAD_RE.test(s) || PLACEMENT_PAIR_RE.test(s));
+  if (dropped.length === 0) return { kept: raw, dropped: [] };
+  return { kept: segments.filter(s => !dropped.includes(s)).join(', '), dropped };
+}
+
+/**
  * Does the page's brief put a character's HANDS on this object?
  *
  * Read from the brief's structured `interactions[]` (character → object rows
@@ -415,12 +478,23 @@ function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetada
   }
   const heldContradicted = !!(state && typeof held === 'boolean' && typeof state.held === 'boolean' && state.held !== held);
   const appearance = heldContradicted ? null : appearanceContradiction(entry, state, sceneMetadata, visualBible);
+  // ONE OBJECT, ONE POSITION. Where the page's own brief places the object, the
+  // state's placement half is not asserted a second time; its appearance half
+  // always survives. Both existing contradiction axes need the state's `held`
+  // flag or a rival state's distinctive look to fire, and a brief that places
+  // the object somewhere BOTH states deny (the chestnut "between roots" against
+  // an "on ground" and a "held" state, both with `held: null`) trips neither.
+  const scenePlacement = scenePlacesObject(entry, sceneMetadata);
+  const split = splitStatePlacement(state?.delta);
   return {
     state, cited, declared, held,
     contradicted: heldContradicted || !!appearance,
     contradictedBy: heldContradicted ? 'held' : (appearance ? 'appearance' : null),
     rival: appearance?.rival || null,
     evidence: appearance?.evidence || null,
+    scenePlacement,
+    promptDelta: scenePlacement ? split.kept : String(state?.delta || '').trim(),
+    placementDropped: scenePlacement ? split.dropped : [],
   };
 }
 
@@ -3254,6 +3328,8 @@ module.exports = {
   citedEntries,
   resolveObjectState,
   appearanceContradiction,
+  scenePlacesObject,
+  splitStatePlacement,
   appearanceTokens,
   hasElementReference,
   elementRefCell,

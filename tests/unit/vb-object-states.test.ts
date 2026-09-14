@@ -756,3 +756,121 @@ describe('resolveObjectState — the page instant outranks a contradicting state
     expect(warnings.filter(w => /state clause dropped/.test(w))).toEqual([]);
   });
 });
+
+// ── 8. ONE OBJECT, ONE POSITION PER PAGE PROMPT ─────────────────────────────
+// The REQUIRED OBJECTS header promises each element "appears exactly as the
+// scene description places it". A state delta that ALSO states a placement
+// breaks that promise whenever the two disagree: staging
+// job_1789337873076_qf2at21ui pages 2-4 emitted "cupped in a small hand" on a
+// page whose own brief placed the object "wedged between roots at ground
+// level". Neither existing contradiction axis fires there — both states carried
+// `held: null`, and the brief asserted a THIRD placement that no sibling state
+// claims, so `appearanceContradiction` found no single rival.
+//
+// The contract: where the page's brief places the object, the state's PLACEMENT
+// half is not asserted a second time; its APPEARANCE half is never suppressed;
+// where the brief places nothing, the delta stands whole.
+describe('state placement vs the page`s own placement', () => {
+  const { splitStatePlacement, scenePlacesObject } = require_('../../server/lib/visualBible');
+
+  // The archetypal shape of the trial brief: `objects[]` as records carrying a
+  // per-page `position`. (The beats/full brief writes a plain id list and
+  // places nothing structurally.)
+  const jsonScene = (objects: any[]) => JSON.stringify({
+    scene: {
+      imageSummary: 'A quiet room.',
+      setting: { location: 'A room', camera: 'medium' },
+      characters: [{ name: 'Ada', position: 'center', depth: 'midground' }],
+      objects,
+      textPosition: 'bottom-left',
+    },
+  });
+  // One entry, one state, whose delta mixes a placement clause with a look.
+  const MIXED = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [],
+    artifacts: [{
+      id: 'ART001',
+      name: 'small round seed',
+      label: 'round seed',
+      type: 'natural object',
+      size: 'fits in one hand',
+      description: 'a small round seed with a pale patch on one side',
+      states: [
+        { id: 'ART001.1', name: 'on ground', delta: 'resting in the grass at the base of the tree, fully visible', pages: [1] },
+        { id: 'ART001.2', name: 'held', delta: 'cupped in a small hand, pale patch facing upward', pages: [2] },
+      ],
+      appearsInPages: [1, 2],
+    }],
+  });
+  const withWarns = <T,>(warnings: string[], fn: () => T): T => {
+    const listener = (level: string, line: string) => { if (level === 'warn') warnings.push(line); };
+    addLogListener(listener);
+    try { return fn(); } finally { removeLogListener(listener); }
+  };
+  const seedLine = (vb: any, page: number, objects: any[], warnings: string[] = []) =>
+    withWarns(warnings, () => requiredObjectsBlock(
+      buildImagePrompt(jsonScene(objects), { language: 'en' }, null, vb, page, null, {}),
+    ).split('\n').find(l => l.includes('round seed'))!);
+
+  it('splitStatePlacement separates the placement half from the look', () => {
+    expect(splitStatePlacement('cupped in a small hand, pale patch facing upward'))
+      .toEqual({ kept: 'pale patch facing upward', dropped: ['cupped in a small hand'] });
+    expect(splitStatePlacement('resting in the grass at the base of the tree, fully visible'))
+      .toEqual({ kept: 'fully visible', dropped: ['resting in the grass at the base of the tree'] });
+  });
+
+  it('APPEARANCE deltas carry no placement clause and are never split', () => {
+    for (const delta of [
+      'shell split open, brown seed visible inside',
+      'fully sealed green spiky shell, seed hidden inside',
+      'a jagged vertical split down one side wall, the cut edges parted',
+      'a small light source burns inside, light through the cut openings',
+      'filled to the brim, the lid seated',
+    ]) {
+      expect(splitStatePlacement(delta)).toEqual({ kept: delta, dropped: [] });
+    }
+  });
+
+  it('scenePlacesObject reads the brief`s own record, by id or by label', () => {
+    const entry = MIXED().artifacts[0];
+    const meta1 = { fullData: { objects: [{ id: 'ART001.2', name: 'round seed', position: 'wedged between roots' }] } };
+    expect(scenePlacesObject(entry, meta1)).toBe('wedged between roots');
+    const meta2 = { fullData: { objects: [{ name: 'round seed', position: 'on the table' }] } };
+    expect(scenePlacesObject(entry, meta2)).toBe('on the table');
+    // A plain id list places nothing; neither does a record with no position.
+    expect(scenePlacesObject(entry, { fullData: { objects: ['ART001'] } })).toBeNull();
+    expect(scenePlacesObject(entry, { fullData: { objects: [{ id: 'ART001' }] } })).toBeNull();
+    expect(scenePlacesObject(entry, null)).toBeNull();
+  });
+
+  it('the page`s placement wins: the state`s placement clause leaves the line, the look stays', () => {
+    const warnings: string[] = [];
+    const line = seedLine(MIXED(), 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots at ground level' }], warnings);
+    expect(line).toContain('pale patch facing upward');
+    expect(line).not.toMatch(/cupped in a small hand/);
+    expect(warnings.join('\n')).toMatch(/the scene places ART001 at "wedged between roots at ground level"/);
+  });
+
+  it('a brief that places nothing keeps the delta whole', () => {
+    const warnings: string[] = [];
+    const line = seedLine(MIXED(), 2, [{ id: 'ART001', name: 'round seed' }], warnings);
+    expect(line).toContain('cupped in a small hand, pale patch facing upward');
+    expect(warnings.filter(w => /the scene places/.test(w))).toEqual([]);
+  });
+
+  it('a pure APPEARANCE delta survives a brief that places the object', () => {
+    const vb = MIXED();
+    vb.artifacts[0].states[1].delta = 'shell split open, brown seed visible inside';
+    const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'held in both hands, centre frame' }]);
+    expect(line).toContain('shell split open, brown seed visible inside');
+  });
+
+  it('a delta that is placement ONLY leaves no state clause at all — never a dangling dash', () => {
+    const vb = MIXED();
+    vb.artifacts[0].states[1].delta = 'cupped in a small hand';
+    const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }]);
+    expect(line).not.toMatch(/cupped in a small hand/);
+    expect(line.trim()).toMatch(/— fits in one hand$/);
+  });
+});
