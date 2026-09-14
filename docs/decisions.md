@@ -38000,3 +38000,45 @@ sentence seams reworded so a removed menu leaves a whole sentence),
 (`runTrialIdeaVarietyStage` rebuilds per draw so the rotation is exercised),
 `tests/unit/trial-idea-variety.test.ts`, `tests/unit/testlab-trial-variety-stages.test.ts`
 **Status:**    ✅ active
+
+## The Art Director's size rule states the obligation unconditionally (2026-09-14)
+**Context:** Rule 8f of the Art Director prompt asks for a size ratio in the
+brief prose ("the mast rises five times her height"). Measured over three
+finished stories, the AD emitted **one** ratio clause in 18 pages (and that one
+was about a rock, not the story's creature), **one** in 19 pages, and **zero**
+in 18 pages. The worst case: a page holding two same-species creatures whose
+Visual Bible entries differ ONLY in size, plus four implied child figures, got
+no ratio at all — both creatures were described with adjectives ("a massive
+emerald green creature", "a tiny baby dragon"). Adjectives do not survive into
+a render as scale: the larger creature shipped at roughly van size with its
+head equal to a child's full height.
+**Decision:** 8f is rewritten so the obligation is unconditional. The old
+opener "When such an element shares the frame with a figure, name the ratio"
+became "Every page that cites an element whose Visual Bible entry states a
+size, and holds a figure too, names that size as a ratio against a figure in
+the prose", with an explicit "an adjective is not a ratio — massive, tiny,
+huge, enormous carry no scale into the picture" and a clause covering two
+entries of one kind that differ in size. The correct carve-out is kept: an
+element alone on a page is measured against nothing. The same edit lands in
+`scene-expansion.txt`, the per-page fallback, which shares the PAGE rule set by
+design.
+**Rationale:** Position was investigated first and cleared: `shrinkPromptForModel`
+is an IMAGE-prompt path only (`images.js`, reached from `generateImage*` and
+`grok.js`), and the beats route hands `buildSceneExpansionAllPrompt`'s output
+straight to `callTextModelStreaming` with no shrink or truncation. Rule 8f
+therefore always reaches the model; what failed was the phrasing, which reads as
+a conditional the model can decide does not apply. No mechanical code check was
+added — that is a separate owner decision.
+**Honest limit:** an explicit ratio is **necessary but not sufficient**. On a
+page where a repair had injected a numeric ratio ("roughly one-sixth the height
+of the Mother Dragon"), the render came back at about one-third. This change
+raises the odds that a ratio is stated at all; it does not make the renderer
+obey it.
+**Unproven:** validating that the AD now emits more ratio clauses needs a paid
+Test Lab `beats_scenes` run on a set holding a sized creature or vessel plus
+figures. Not run.
+**Touched:** `prompts/scene-expansion-all.txt` (rule 8f),
+`prompts/scene-expansion.txt` (rule 8f),
+`tests/unit/built-prompt-values.test.ts` (both AD prompts carry the rule, worded
+identically; the rule is unconditional; no shrink path on the beats route)
+**Status:** ✅ active

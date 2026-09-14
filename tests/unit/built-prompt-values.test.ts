@@ -385,3 +385,49 @@ describe('evaluateSheetRow hands the judge the real outfit, not the token', () =
     expect(promptUsed).not.toContain('8 years old');
   });
 });
+
+// ---------------------------------------------------------------------------
+// The Art Director's size-ratio requirement (backlog #77).
+//
+// Measured across three finished stories, the AD emitted ONE ratio clause in
+// 18 pages, ONE in 19, and NONE in 18 — the rule read as a condition the model
+// could decide did not apply. The rule was made unconditional. What must hold
+// from here on is the BEHAVIOUR, not the sentence:
+//
+//   - both Art Director prompts (all-pages and the per-page fallback) reach
+//     the model still demanding a ratio;
+//   - the two share the requirement verbatim, so a future edit to one cannot
+//     silently leave the other behind — the two files share their PAGE rule
+//     set by design;
+//   - no prompt-shrink path sits between the builder and the model on the
+//     beats route, so the rule's position in the prompt cannot cost it its
+//     life (shrinkPromptForModel is an IMAGE-prompt path only).
+// ---------------------------------------------------------------------------
+describe('the Art Director is told to name a size ratio', () => {
+  const ruleOf = (prompt: string) =>
+    (String(prompt).split('\n').find((l) => l.startsWith('8f.')) || '');
+
+  it('both Art Director prompts carry the rule, worded identically', () => {
+    const all = ruleOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    const one = ruleOf(PB.buildSceneExpansionPrompt(1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, {}));
+    expect(all.length, 'the all-pages Art Director prompt lost rule 8f').toBeGreaterThan(50);
+    expect(one, 'the per-page Art Director fallback drifted from the all-pages rule set').toBe(all);
+  });
+
+  it('the rule demands a ratio unconditionally', () => {
+    const rule = ruleOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    // A ratio is asked for...
+    expect(rule).toMatch(/\bratio\b/);
+    // ...and not behind a condition the model can rule out. The only carve-out
+    // that may remain is the page where the element is alone.
+    expect(rule).not.toMatch(/When such an element shares the frame/);
+    expect(rule).toMatch(/alone/);
+  });
+
+  it('nothing shrinks the Art Director prompt on the beats route', () => {
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '../../server/lib/beatsPipeline.js'), 'utf8');
+    expect(src, 'a shrink path appeared between the AD builder and the model')
+      .not.toMatch(/shrinkPromptForModel|truncatePromptForModel/);
+  });
+});
