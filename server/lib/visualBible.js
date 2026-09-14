@@ -8,7 +8,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
 const { stripDataUriPrefix } = require('./r2');
@@ -1531,6 +1531,8 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
       },
       { text: analysisPrompt }
     ];
+
+    assertPromptFilled(parts, 'analyzeVisualBibleElements');
 
     // Use utility model for fast photo analysis
     const modelId = MODEL_DEFAULTS.utility;

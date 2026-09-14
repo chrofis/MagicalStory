@@ -19,6 +19,7 @@ const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
 const { canonicalName } = require('./castResolver');
+const { assertPromptFilled } = require('../services/prompts');
 const { baseVbId } = require('./vbIdGuard');
 const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
 const { getCurrentLogger } = require('./generationLogger');
@@ -1214,6 +1215,7 @@ ${lines}${elimHint}
 Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   const fullPrompt = mkPrompt(fullLines);
   const sanitizedPrompt = mkPrompt(sanitizedLines);
+  assertPromptFilled([fullPrompt, sanitizedPrompt], '_somIdentifyFigures');
   const markedB64 = marked.toString('base64');
 
   // ── Vendor callers — each returns { text } or { fail: reason } ───────────

@@ -13,7 +13,7 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS, MODEL_DEFAULTS, resolveGrokImageModel } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
@@ -340,28 +340,24 @@ async function _extractTraitsWithGeminiOnce(imageData, languageInstruction = '')
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
+    const traitParts = [
+      {
+        text: fillTemplate(
+          PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`,
+          { LANGUAGE_INSTRUCTION: languageInstruction }
+        )
+      },
+      { inlineData: { mimeType: mimeType, data: base64Data } },
+    ];
+    assertPromptFilled(traitParts, '_extractTraitsWithGeminiOnce');
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: fillTemplate(
-                  PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`,
-                  { LANGUAGE_INSTRUCTION: languageInstruction }
-                )
-              },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data,
-                },
-              },
-            ],
-          }],
+          contents: [{ parts: traitParts }],
           generationConfig: {
             temperature: 0.2,
             responseMimeType: 'application/json'
@@ -577,6 +573,8 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       ]
     };
 
+    assertPromptFilled(requestBody.contents[0].parts, 'evaluateAvatarFaceMatch');
+
     // Gemini evaluation extracts clothing, physical traits, and face score.
     const geminiPromise = fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -720,6 +718,8 @@ async function callGeminiAvatarApi(opts) {
     ],
   };
 
+  assertPromptFilled([...requestBody.systemInstruction.parts, ...requestBody.contents[0].parts], 'callGeminiAvatarApi');
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiApiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) }
@@ -823,6 +823,8 @@ Set pass=true if:
         { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
       ]
     };
+
+    assertPromptFilled(requestBody.contents[0].parts, 'evaluateCostumeApplication');
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -1821,6 +1823,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
           ]
         };
+
+        assertPromptFilled(requestBody.contents[0].parts, 'processAvatarJobInBackground');
 
         // Log prompt for debugging IMAGE_OTHER issue
         log.info(`[AVATAR JOB ${jobId}] 🔍 Prompt for ${category} (${avatarPrompt.length} chars)`);

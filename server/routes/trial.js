@@ -21,6 +21,7 @@ const { trialSourceWhereClause } = require('../lib/trialSource');
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
 // failure it alarms and lets the write proceed (see its JSDoc).
 const { offloadCharacterImages } = require('../services/database');
+const { assertPromptFilled } = require('../services/prompts');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -923,6 +924,8 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
       ]
     };
+
+    assertPromptFilled(requestBody.contents[0].parts, 'trial:generate-preview-avatar');
 
     // Try Gemini with one retry on 503, then fall back to Grok
     let avatarImage = null;

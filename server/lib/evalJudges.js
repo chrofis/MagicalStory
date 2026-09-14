@@ -13,6 +13,7 @@
 const { log } = require('../utils/logger');
 const { withRetry } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
+const { assertPromptFilled } = require('../services/prompts');
 
 // EVAL_JUDGES=gemini            (default — single judge, no jury)
 //            =gemini,grok
@@ -31,6 +32,7 @@ const JUDGE_MODEL = { grok: 'grok-4-fast', qwen: 'qwen-vl' };
 // OpenRouter vision call — mirrors callGrokVisionAPI (Gemini parts → OpenAI
 // image_url content), returns the raw text or null on any failure.
 async function callOpenRouterVisionAPI(modelId, geminiParts) {
+  assertPromptFilled(geminiParts, 'evalJudges.callOpenRouterVisionAPI');
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) { log.warn('[EVAL JUDGE] OPENROUTER_API_KEY unset — skipping Qwen judge'); return null; }
   const content = [];

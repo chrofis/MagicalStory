@@ -45,6 +45,7 @@ const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 const { rembgRemoveBackground } = require('./rembg');
 const { scrubVbIds, warnIfVbIds } = require('./vbIdGuard');
+const { assertPromptFilled } = require('../services/prompts');
 
 /**
  * Every blend prompt goes through here before it reaches Grok. The blend
@@ -1955,6 +1956,7 @@ async function judgePopulatedPlate(plateBase64, castLines, styleDescription = ''
     ] }],
     generationConfig: { temperature: 0, responseMimeType: 'application/json' },
   };
+  assertPromptFilled(body.contents[0].parts, 'judgePopulatedPlate');
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }

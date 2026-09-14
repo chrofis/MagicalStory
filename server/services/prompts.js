@@ -448,6 +448,108 @@ function fillTemplate(template, replacements) {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// BOUNDARY GUARD — a prompt must never reach a model with a hole in it.
+//
+// fillTemplate() already warns-then-strips unfilled `{TOKEN}` placeholders, but
+// that guard failed twice over in practice (2026-09-14):
+//   * warn-then-strip HIDES the damage — the prompt still ships, minus a whole
+//     instruction, and the warning is one line among thousands; and
+//   * it is bypassed entirely by a caller that never calls fillTemplate at all,
+//     which is exactly what `evaluateSheetRow`'s heads branch did: it handed the
+//     judge the literal string `{REQUESTED_OUTFIT}`, so a rule shipped the day
+//     before could never fire on any story.
+//
+// A guard inside the filler cannot catch a caller who skips the filler, so the
+// check lives HERE and is called at the model-call boundary — the one place
+// every path must cross. In tests it throws (a hole is a bug, and the suite is
+// where it should surface). In production it reports and strips: the owner's
+// standing rule is that a gate ships with a warning and never kills a paid run.
+// ---------------------------------------------------------------------------
+
+const PLACEHOLDER_RE = /\{[A-Z][A-Z0-9_]*\}/g;
+
+// Narrow, named exemptions: tokens that are MEANT to survive into the prompt a
+// model sees (a template documenting its own format, an instruction that shows
+// the model a placeholder). Add an entry only with a comment saying why — never
+// loosen PLACEHOLDER_RE instead.
+const PLACEHOLDER_EXEMPT = new Set([
+  // (empty — every {TOKEN} in prompts/*.txt as of 2026-09-14 is a real fill)
+]);
+
+function isTestEnv() {
+  return process.env.VITEST === 'true' || process.env.VITEST === '1' || !!process.env.VITEST_WORKER_ID
+    || process.env.NODE_ENV === 'test';
+}
+
+/**
+ * Collect every human-readable string out of a prompt argument. Entry points
+ * pass a plain string, a Gemini `parts` array, or an OpenAI-style message list;
+ * all three are scanned, and anything else is ignored.
+ */
+function collectPromptText(prompt, out = [], depth = 0) {
+  if (depth > 6 || prompt == null) return out;
+  if (typeof prompt === 'string') { out.push(prompt); return out; }
+  if (Array.isArray(prompt)) {
+    for (const p of prompt) collectPromptText(p, out, depth + 1);
+    return out;
+  }
+  if (typeof prompt === 'object') {
+    // Only text-bearing fields — never inline_data/base64 payloads.
+    for (const k of ['text', 'content', 'prompt']) {
+      if (prompt[k] != null) collectPromptText(prompt[k], out, depth + 1);
+    }
+  }
+  return out;
+}
+
+/**
+ * Assert that a prompt about to be sent to a model carries no unfilled
+ * `{PLACEHOLDER}` token.
+ *
+ * @param {string|Array|Object} prompt - the prompt (string, Gemini parts, messages)
+ * @param {string} context - call-site label, e.g. 'callGeminiAPIForImage'
+ * @returns {string[]} the offending tokens (empty when clean)
+ * @throws {Error} in tests only
+ */
+function assertPromptFilled(prompt, context = 'unknown') {
+  let tokens = [];
+  for (const text of collectPromptText(prompt)) {
+    const hits = text.match(PLACEHOLDER_RE);
+    if (hits) tokens.push(...hits);
+  }
+  tokens = [...new Set(tokens)].filter((t) => !PLACEHOLDER_EXEMPT.has(t));
+  if (tokens.length === 0) return [];
+
+  const msg = `[PROMPT GUARD] Unfilled placeholder(s) reached the model call at ${context}: ${tokens.join(', ')}`;
+  if (isTestEnv()) {
+    const err = new Error(msg);
+    err.code = 'PROMPT_UNFILLED_PLACEHOLDER';
+    err.tokens = tokens;
+    throw err;
+  }
+  log.error(msg);
+  try {
+    const genLog = require('../lib/generationLogger').getCurrentLogger();
+    if (genLog) {
+      genLog.error('prompt_unfilled_placeholder', msg, null, { context, tokens });
+    }
+  } catch (_) { /* logger unavailable — the log.error above already carried it */ }
+  return tokens;
+}
+
+/**
+ * Strip unfilled placeholders after reporting them. Entry points that hold a
+ * plain prompt string use this so the call continues with a hole rather than
+ * a literal `{TOKEN}` in front of the model.
+ */
+function guardPromptString(prompt, context = 'unknown') {
+  if (typeof prompt !== 'string' || !prompt) return prompt;
+  const tokens = assertPromptFilled(prompt, context);
+  if (tokens.length === 0) return prompt;
+  return prompt.replace(PLACEHOLDER_RE, '');
+}
+
 /**
  * Build the empty-scene generation prompt from a known opts contract.
  *
@@ -702,4 +804,7 @@ module.exports = {
   isPhotographicArtStyle,
   repairStyleGuard,
   applyRepairStyleGuard,
+  assertPromptFilled,
+  guardPromptString,
+  PLACEHOLDER_EXEMPT,
 };

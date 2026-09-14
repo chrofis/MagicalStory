@@ -25,6 +25,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
+const { assertPromptFilled } = require('../services/prompts');
 
 // Pages per vision call. Six pages = six images + six text parts per request,
 // which keeps a chunk well under the inline-data request ceiling and keeps the
@@ -139,11 +140,64 @@ function inlinePart(imageData) {
   return { inline_data: { mime_type: mime, data } };
 }
 
-/** One vision call over one chunk of pages. Returns raw text + usage. */
-async function judgeChunk(template, chunk, modelId) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY missing');
+/**
+ * A model id carrying a vendor prefix (`x-ai/grok-4.6`, `openai/gpt-5.6-sol`)
+ * is an OpenRouter id; a bare `gemini-*` id is a native Google one. Production
+ * passes no override and lands on the Google path with the body it always sent.
+ */
+function isOpenRouterId(modelId) {
+  return String(modelId || '').includes('/');
+}
 
+/**
+ * Same chunk, same prompt, same interleaving — sent as OpenAI chat parts with
+ * the images as data URIs. Lab-only path: nothing in production reaches it.
+ */
+async function judgeChunkOpenRouter(parts, modelId, thinkingLevel) {
+  assertPromptFilled(parts, 'bookAudit.judgeChunkOpenRouter');
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY missing');
+  const content = parts.map(p => (
+    p.inline_data
+      ? { type: 'image_url', image_url: { url: `data:${p.inline_data.mime_type};base64,${p.inline_data.data}` } }
+      : { type: 'text', text: p.text }
+  ));
+  // No max_tokens (owner rule: no output caps). Reasoning effort only when the
+  // caller names one — thinking tokens bill as output.
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: modelId,
+      temperature: 0,
+      messages: [{ role: 'user', content }],
+      usage: { include: true },
+      ...(thinkingLevel ? { reasoning: { effort: thinkingLevel } } : {}),
+    }),
+    signal: AbortSignal.timeout(600_000),
+  });
+  if (!response.ok) {
+    throw new Error(`book audit HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  }
+  const data = await response.json();
+  if (data.error) throw new Error(`book audit openrouter error: ${JSON.stringify(data.error).slice(0, 300)}`);
+  const choice = data.choices?.[0];
+  if (choice?.finish_reason && !['stop', 'end_turn'].includes(String(choice.finish_reason))) {
+    log.warn(`⚠️ [BOOK-AUDIT] chunk finished as ${choice.finish_reason} — faults may be missing`);
+  }
+  return {
+    text: String(choice?.message?.content || '').trim(),
+    usage: {
+      input_tokens: data.usage?.prompt_tokens || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
+      thinking_tokens: data.usage?.completion_tokens_details?.reasoning_tokens || 0,
+      cost_usd: data.usage?.cost ?? null,
+    },
+  };
+}
+
+/** One vision call over one chunk of pages. Returns raw text + usage. */
+async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   const { fillTemplate } = require('../services/prompts');
   const instructions = fillTemplate(template, {
     PAGE_LIST: chunk.map(p => p.pageNumber).join(', '),
@@ -157,6 +211,13 @@ async function judgeChunk(template, chunk, modelId) {
     parts.push({ text: `PAGE ${p.pageNumber} TEXT: ${p.text || '(no text on this page)'}` });
     parts.push(p.part);
   }
+
+  assertPromptFilled(parts, 'bookAudit.judgeChunk');
+
+  if (isOpenRouterId(modelId)) return judgeChunkOpenRouter(parts, modelId, thinkingLevel);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY missing');
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
@@ -172,6 +233,12 @@ async function judgeChunk(template, chunk, modelId) {
         // worst failure a measurement can have.
         // Eval judges run at temperature 0, always (docs/SETTLED.md).
         temperature: 0,
+        // Gemini 3 models take a thinking LEVEL ('low'|'medium'|'high'), not a
+        // budget. Lab-only knob: OMITTED entirely unless a caller asks, so every
+        // production audit sends the exact same body it always has and each
+        // model keeps its own default. Measured 2026-09-13: an unknown field
+        // here is a hard 400, so a typo cannot be silently ignored.
+        ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
       },
     }),
     signal: AbortSignal.timeout(180_000),
@@ -245,6 +312,8 @@ async function auditStoryBook(storyData, opts = {}) {
     activeVersions = null,
     usageTracker = null,
     modelId = MODEL_DEFAULTS.utility || 'gemini-2.5-flash',
+    // Lab-only. Absent = today's behaviour, byte-identical.
+    thinkingLevel = null,
   } = opts;
   const storyId = opts.storyId || storyData?.id || null;
 
@@ -285,14 +354,23 @@ async function auditStoryBook(storyData, opts = {}) {
     for (let i = 0; i < prepared.length; i += CHUNK_PAGES) chunks.push(prepared.slice(i, i + CHUNK_PAGES));
 
     const usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
+    // Per-chunk usage, kept so a Lab run can PROVE a thinking level took effect
+    // rather than assuming it. Report-only; nothing reads it in production.
+    const chunkUsage = [];
     const raws = [];
     for (const chunk of chunks) {
       try {
-        const r = await judgeChunk(template, chunk, modelId);
+        const r = await judgeChunk(template, chunk, modelId, thinkingLevel);
         raws.push(r.text);
+        chunkUsage.push({
+          pages: `${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber}`,
+          ...r.usage,
+        });
         usage.input_tokens += r.usage.input_tokens;
         usage.output_tokens += r.usage.output_tokens;
         usage.thinking_tokens += r.usage.thinking_tokens;
+        // OpenRouter reports the billed dollars per call; Gemini native does not.
+        if (typeof r.usage.cost_usd === 'number') usage.cost_usd = (usage.cost_usd || 0) + r.usage.cost_usd;
       } catch (err) {
         // One bad chunk must not cost the other chunks' findings.
         log.warn(`⚠️ [BOOK-AUDIT] chunk p${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber} failed: ${err.message}`);
@@ -313,7 +391,9 @@ async function auditStoryBook(storyData, opts = {}) {
       byRoute,
       raw,
       usage,
+      chunkUsage,
       modelId,
+      thinkingLevel,
       pagesRead: prepared.map(p => p.pageNumber),
       pagesSkipped: missing.sort((a, b) => a - b),
     };

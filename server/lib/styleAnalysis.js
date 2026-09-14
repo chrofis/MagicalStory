@@ -21,6 +21,7 @@ const { MODEL_DEFAULTS } = require('../config/models');
 // so checkStyleMatch/analyzeImageStyle threw `r2Lib is not defined` on every
 // call and the style-repair gate silently returned "unavailable" in production.
 const r2Lib = require('./r2');
+const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 
 const getStoryHelpers = () => require('./storyHelpers');
 
@@ -76,7 +77,7 @@ async function analyzeImageStyle(imageData) {
       contents: [{
         parts: [
           { inline_data: { mime_type: mimeType, data: base64Data } },
-          { text: `Analyze the art style of this illustration. Describe it in detail so another AI image generator could reproduce the same style. Include:
+          { text: guardPromptString(`Analyze the art style of this illustration. Describe it in detail so another AI image generator could reproduce the same style. Include:
 
 1. Medium/technique (watercolor, digital, oil, 3D render, etc.)
 2. Line work (bold outlines, soft edges, no outlines, etc.)
@@ -86,7 +87,7 @@ async function analyzeImageStyle(imageData) {
 6. Texture (smooth, grainy, brush strokes visible, paper texture, etc.)
 7. Overall mood/aesthetic
 
-Output ONLY the style description as a single paragraph (3-5 sentences) that could be used as an art style prompt. No headers, no bullet points, no analysis structure — just the description.` }
+Output ONLY the style description as a single paragraph (3-5 sentences) that could be used as an art style prompt. No headers, no bullet points, no analysis structure — just the description.`, 'analyzeImageStyle') }
         ]
       }],
       generationConfig: { temperature: 0.3, thinkingConfig: { thinkingBudget: 0 } }
@@ -169,6 +170,7 @@ async function compareStyleProximity(beforeImage, afterImage, opts = {}) {
 
 JSON only: {"better": "after"|"before"|"same", "changed": ["..."], "reason": "one short sentence"}`,
   });
+  assertPromptFilled(parts, 'compareStyleProximity');
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -220,7 +222,7 @@ async function checkStyleMatch(imageDataA, imageDataB) {
         part(imageDataA),
         { text: 'Image B (candidate repaint of the same scene):' },
         part(imageDataB),
-        { text: 'Is Image B rendered in the SAME artistic medium and stylization CLASS as Image A? The classes: painterly/watercolor, flat vector cartoon, anime/manga, 3D render, photo. Judge ONLY the rendering technique of faces and figures; content and layout differences are irrelevant. Answer false ONLY when the class differs (e.g. a flat-vector cartoon face in a watercolor scene, an anime face in a photo). Variation WITHIN a class — smoother vs more textured watercolor, more or less visible brushstrokes, softer edges — is the SAME style: answer true. JSON only: {"sameStyle": true/false, "styleA": "...", "styleB": "..."}' },
+        { text: guardPromptString('Is Image B rendered in the SAME artistic medium and stylization CLASS as Image A? The classes: painterly/watercolor, flat vector cartoon, anime/manga, 3D render, photo. Judge ONLY the rendering technique of faces and figures; content and layout differences are irrelevant. Answer false ONLY when the class differs (e.g. a flat-vector cartoon face in a watercolor scene, an anime face in a photo). Variation WITHIN a class — smoother vs more textured watercolor, more or less visible brushstrokes, softer edges — is the SAME style: answer true. JSON only: {"sameStyle": true/false, "styleA": "...", "styleB": "..."}', 'checkStyleMatch') },
       ] }],
       generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     }),
@@ -254,7 +256,7 @@ async function describeHeadPose(imageDataUri) {
     body: JSON.stringify({
       contents: [{ parts: [
         { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2Lib.stripDataUriPrefix(imageDataUri) } },
-        { text: 'This crop shows one person\'s head (an illustration). Describe the head for a repainting task. All directions FROM THE VIEWER\'S PERSPECTIVE (the person\'s nose pointing toward the left edge of the image = "left"). JSON only: {"facing":"...","headTilt":"...","gaze":"...","expression":"...","mouth":"..."} — each a short phrase, e.g. "three-quarter left", "tilted slightly down", "looking down at the object in their hands", "gentle concerned smile", "closed".' },
+        { text: guardPromptString('This crop shows one person\'s head (an illustration). Describe the head for a repainting task. All directions FROM THE VIEWER\'S PERSPECTIVE (the person\'s nose pointing toward the left edge of the image = "left"). JSON only: {"facing":"...","headTilt":"...","gaze":"...","expression":"...","mouth":"..."} — each a short phrase, e.g. "three-quarter left", "tilted slightly down", "looking down at the object in their hands", "gentle concerned smile", "closed".', 'describeHeadPose') },
       ] }],
       generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
     }),
@@ -290,7 +292,7 @@ async function compareImageStyles(imageDataA, imageDataB) {
           { inline_data: { mime_type: getMime(imageDataA), data: toBase64(imageDataA) } },
           { text: 'Image B:' },
           { inline_data: { mime_type: getMime(imageDataB), data: toBase64(imageDataB) } },
-          { text: `Compare the art styles of Image A and Image B. They depict the same scene but were generated by different AI models.
+          { text: guardPromptString(`Compare the art styles of Image A and Image B. They depict the same scene but were generated by different AI models.
 
 Evaluate their visual style similarity (ignore content differences — focus only on artistic rendering style).
 
@@ -308,7 +310,7 @@ Return a JSON object:
   "summary": "<2-3 sentences: what matches, what differs, and specific suggestions to make them more similar>"
 }
 
-Return ONLY the JSON, no markdown fences.` }
+Return ONLY the JSON, no markdown fences.`, 'compareImageStyles') }
         ]
       }],
       // thinkingBudget 0: 2.5-flash otherwise spends the small output budget

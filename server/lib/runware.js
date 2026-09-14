@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { withRunware } = require('./aiConcurrency');
 const { withRetry } = require('./textModels');
+const { guardPromptString } = require('../services/prompts');
 
 const RUNWARE_API_KEY = process.env.RUNWARE_API_KEY;
 const RUNWARE_API_URL = 'https://api.runware.ai/v1';
@@ -38,6 +39,16 @@ if (RUNWARE_API_KEY) {
  * propagate immediately. Matches the discipline of textModels.withRetry.
  */
 async function runwareFetchWithRetry(payload, opts = {}) {
+  // Placeholder guard at the outbound boundary: strip any unfilled {TOKEN}
+  // from the prompt-bearing fields of every task in the payload.
+  for (const task of (Array.isArray(payload) ? payload : [payload])) {
+    if (!task || typeof task !== 'object') continue;
+    for (const field of ['positivePrompt', 'negativePrompt', 'prompt']) {
+      if (typeof task[field] === 'string' && task[field]) {
+        task[field] = guardPromptString(task[field], `runware.runwareFetchWithRetry.${field}`);
+      }
+    }
+  }
   // Queue every Runware call against the global Runware semaphore so the
   // upstream pipeline can fan out widely without hammering Runware's GPU
   // pool. The retry+timeout logic runs inside the limit slot — one slot

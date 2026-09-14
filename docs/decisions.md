@@ -37105,3 +37105,68 @@ PAGE path) prefers `signature` over `description`, the inverse of
 `styledAvatars.js`. Harmless for these two stories (no `signature` key exists),
 but on an outline emitting both, pages would get the short signature while the
 sheet gets the full parts text.
+
+---
+
+## A prompt may not reach a model with a hole in it — the guard sits at the model-call boundary (2026-09-14)
+
+**Context:** Three checks shipped BLIND on 2026-09-14 and each failed silently
+rather than loudly:
+
+- **#51** — the batch quality judge was passed `[]` as its reference images and
+  had been dead since February: it was judging character consistency with
+  nothing to compare against.
+- **#61** — the reference-sheet identification reply was lost to a greedy
+  regex, so cells that *were* identified read as unidentified.
+- **#75** — `evaluateSheetRow` called `fillTemplate` only on its
+  `which === 'bodies'` branch. The head-row garment judge
+  (`prompts/sheet-row-heads-eval.txt`) was therefore handed the **literal
+  string `{REQUESTED_OUTFIT}`** and had nothing to compare against. The rule
+  added the previous day (`9238f8230`) could never fire on any story. Fixed for
+  that one call site in `b15600c49`.
+
+A guard for #75's class already existed and did not help. `fillTemplate`
+(`server/services/prompts.js`) matches `/\{[A-Z][A-Z0-9_]*\}/g`, **warns, then
+strips**. It fails twice over: warn-then-strip *hides* the damage — the prompt
+still ships, minus a whole instruction, and the warning is one line among
+thousands; and it is **bypassed entirely** by a caller that never calls
+`fillTemplate` at all, which is exactly what happened. A guard inside the
+filler cannot catch a caller who skips the filler.
+
+**Decision:** One shared assertion, `assertPromptFilled(prompt, context)` (and
+its string-returning sibling `guardPromptString`), defined next to
+`fillTemplate` in `server/services/prompts.js` and called at **the model-call
+boundary** — every function that actually issues the HTTP request to Anthropic,
+Gemini, xAI/Grok, OpenRouter or Runware. That is the one place every path must
+cross, whether or not it went through the template filler. It scans a plain
+prompt string, a Gemini `parts` array or an OpenAI-style message list, and
+never touches `inline_data` payloads.
+
+Behaviour splits by environment:
+- **In tests** (`VITEST` / `NODE_ENV=test`): **throw**, naming the surviving
+  token(s) and the calling function. A hole is a bug and the suite is where it
+  should surface.
+- **In production**: `log.error` plus a `prompt_unfilled_placeholder`
+  generation-log event naming the tokens, then **strip and continue**. It never
+  throws in production — the owner's standing rule is that a gate ships with a
+  warning and never kills a paid run.
+
+Exemptions are a named `PLACEHOLDER_EXEMPT` set with a comment per entry, never
+a loosened regex. It is empty: every `{TOKEN}` in `prompts/*.txt` as of
+2026-09-14 is a real fill, and JSON braces (`{"assignments": [...]}`),
+lowercase and mixed-case braces do not match the pattern in the first place.
+
+`fillTemplate`'s existing warn-then-strip is **unchanged** — it is still useful
+earlier in the chain, where it names the template rather than the HTTP call.
+
+**Rationale:** The alternative — tightening `fillTemplate` to throw — would not
+have caught #75 at all, because the buggy caller never invoked it. Only a check
+at the boundary is un-bypassable, and it covers future call sites for free.
+
+**Touched:**
+- `server/services/prompts.js` — `assertPromptFilled`, `guardPromptString`,
+  `PLACEHOLDER_EXEMPT`, `PLACEHOLDER_RE`
+- every model-call entry point in `server/lib/` and `server/routes/`
+- `tests/unit/prompt-placeholder-guard.test.ts`
+
+**Status:** ✅ active

@@ -22,7 +22,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 // Services
 const { log } = require('../utils/logger');
 const { saveStoryData, saveScenePageData, saveCoverData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 
 // Shared repair logic
 const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
@@ -4678,6 +4678,8 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
           { text: refinePrompt }
         ];
 
+        assertPromptFilled(refineParts, 'regeneration:bboxRefine');
+
         const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
         const refineModelConfig = TEXT_MODELS[refineModelId];
         let refineData;
@@ -4839,6 +4841,8 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
       { inline_data: { mime_type: overlayMime, data: overlayBase64 } },
       { text: iteratePrompt }
     ];
+
+    assertPromptFilled(parts, 'regeneration:iteratePlacement');
 
     const modelConfig = TEXT_MODELS[modelId];
     let data;

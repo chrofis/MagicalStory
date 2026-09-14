@@ -26,6 +26,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('../config/models');
 const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 const r2 = require('./r2');
@@ -38,6 +39,7 @@ const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', model = 'gemini-2.5-flash-image' } = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY missing for avatar style transfer');
+  prompt = guardPromptString(prompt, 'editWithGeminiImage');
   const parts = [{ text: prompt }, ...refImages.map(img => ({
     inlineData: { mimeType: (String(img).match(/^data:(image\/\w+);base64,/)?.[1]) || 'image/jpeg', data: r2.stripDataUriPrefix(img) },
   }))];
@@ -785,6 +787,7 @@ async function callSheetJudge(model, parts, _maxOutputTokens, geminiApiKey) {
   const cfg = TEXT_MODELS[model];
   const provider = cfg?.provider || 'google';
   const modelId = cfg?.modelId || model;
+  assertPromptFilled(parts, 'callSheetJudge');
   if (provider === 'google') {
     const body = {
       contents: [{ parts }],

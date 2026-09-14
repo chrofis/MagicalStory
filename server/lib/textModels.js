@@ -10,6 +10,7 @@ const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
 const { stripDataUriPrefix } = require('./r2');
 const { recordTextUsage } = require('./usageContext');
+const { guardPromptString } = require('../services/prompts');
 
 // Map a text-model provider to its tokenUsage accounting key. Text Gemini
 // calls bill to gemini_text (image/quality Gemini are tracked on their own
@@ -120,6 +121,7 @@ function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin
  * Call Anthropic Claude API
  */
 async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callAnthropicAPI');
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -241,6 +243,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
  * @returns {Promise<{text: string, usage: object}>} The complete generated text and usage
  */
 async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callAnthropicAPIStreaming');
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -409,6 +412,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
  * @returns {Promise<{text: string, usage: object, ttft: number|null}>}
  */
 async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callGeminiTextAPIStreaming');
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -559,6 +563,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
  * Includes retry logic with fallback to gemini-2.0-flash on empty responses
  */
 async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callGeminiTextAPI');
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -690,6 +695,7 @@ async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
  * Call xAI Grok API (OpenAI-compatible)
  */
 async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callXaiAPI');
   const apiKey = process.env.XAI_API_KEY;
 
   if (!apiKey) {
@@ -755,6 +761,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
  * Call xAI Grok API with streaming (OpenAI-compatible SSE)
  */
 async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callXaiAPIStreaming');
   const apiKey = process.env.XAI_API_KEY;
 
   if (!apiKey) {
@@ -905,6 +912,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
  * ceiling never applies and an inactivity timer catches a genuinely dead stream.
  */
 async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callOpenRouterAPIStreaming');
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('OpenRouter API key not configured (OPENROUTER_API_KEY)');

@@ -38,6 +38,7 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../services/prompts');
+const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { canonicalName } = require('./castResolver');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS } = require('../config/models');
@@ -524,6 +525,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       },
       { text: prompt }
     ];
+    assertPromptFilled(parts, '_detectAllBoundingBoxesImpl');
 
     // Bbox needs spatial precision — use dedicated bbox model
     const modelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
@@ -866,9 +868,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
             return `  ${i + 1}. "${f.name}" (${f.confidence}) — ${fb}, ${bb}`;
           }).join('\n');
 
-          const refinePrompt = fillTemplate(LOCAL_PROMPTS.bboxRefineOverlay, {
+          const refinePrompt = guardPromptString(fillTemplate(LOCAL_PROMPTS.bboxRefineOverlay, {
             FIGURES_SUMMARY: figuresSummary,
-          });
+          }), 'bboxDetection._detectAllBoundingBoxesImpl.refine');
 
           const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
           const refineModelConfig = TEXT_MODELS[refineModelId];
@@ -1136,6 +1138,7 @@ async function detectSubRegion(characterCrop, targetElement) {
       },
       { text: prompt }
     ];
+    assertPromptFilled(parts, 'detectSubRegion');
 
     // Bbox needs spatial precision — use dedicated bbox model (gemini-2.5-flash)
     const modelId = MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';

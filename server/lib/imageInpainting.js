@@ -41,6 +41,7 @@ const { editWithGrok, GROK_MODELS } = require('./grok');
 const { isRunwareConfigured } = require('./runware');
 const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../services/prompts');
+const { assertPromptFilled } = require('../services/prompts');
 
 // The one local prompt this cluster uses. Read here rather than importing
 // images.js's LOCAL_PROMPTS map, which would close a require cycle.
@@ -85,6 +86,7 @@ async function inspectImageForErrors(imageData) {
         }
       }
     ];
+    assertPromptFilled(parts, 'inspectImageForErrors');
 
     // Use utility model for fast analysis
     const modelId = MODEL_DEFAULTS.utility;
@@ -459,6 +461,7 @@ Output JSON only:
       }
     };
 
+    assertPromptFilled(requestBody, 'verifyInpaintWithLLM');
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_DEFAULTS.utility}:generateContent?key=${geminiApiKey}`,
       {
@@ -1162,6 +1165,7 @@ IMPORTANT INSTRUCTIONS:
         }
       }
     ];
+    assertPromptFilled(parts, 'inpaintWithMask');
 
     // Use page image model for editing with retry for socket errors
     const modelId = MODEL_DEFAULTS.pageImage;

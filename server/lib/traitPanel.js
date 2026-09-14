@@ -12,6 +12,7 @@
 // than an opinion.
 
 const { log } = require('../utils/logger');
+const { guardPromptString } = require('../services/prompts');
 
 const TRAIT_REVIEW_FIELDS = ['hairColor', 'hairStyle', 'hairLength', 'eyeColor', 'skinTone', 'facialHair'];
 const _TRAIT_HEX_ON_OVERRIDE = {
@@ -48,7 +49,7 @@ function _traitBucket(field, value) {
   }
 }
 async function _traitProbe(vendor, b64, mimeType) {
-  const prompt = 'Analyze this person\'s photo. Return ONLY JSON: {"hairColor": "...", "hairStyle": "straight|wavy|curly", "hairLength": "...", "eyeColor": "...", "skinTone": "...", "facialHair": "..."}. Be precise about colours (e.g. "light blonde", "dark brown").';
+  const prompt = guardPromptString('Analyze this person\'s photo. Return ONLY JSON: {"hairColor": "...", "hairStyle": "straight|wavy|curly", "hairLength": "...", "eyeColor": "...", "skinTone": "...", "facialHair": "..."}. Be precise about colours (e.g. "light blonde", "dark brown").', '_traitProbe');
   let text = '';
   if (vendor === 'qwen') {
     const key = process.env.OPENROUTER_API_KEY;

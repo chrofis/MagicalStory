@@ -29,6 +29,7 @@ const sharp = require('sharp');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
 const r2Lib = require('./r2');
@@ -102,6 +103,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     const inventoryPrompt = opts.promptOverride || PROMPT_TEMPLATES.imageInventoryUnified;
     const inventoryParts = [...parts];
     inventoryParts.push({ text: inventoryPrompt });
+    assertPromptFilled(inventoryParts, 'runVisualInventory');
 
     // Route to Grok vision API for xAI models
     let modelConfig = TEXT_MODELS[modelId];
@@ -478,7 +480,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             body: JSON.stringify({
               contents: [{ parts: [
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
-                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${eraBlock}${placementsBlock}${mainSceneBlock}
+                { text: guardPromptString(`This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${eraBlock}${placementsBlock}${mainSceneBlock}
 
 Check:
 - Setting / location: does it roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
@@ -488,7 +490,7 @@ Check:
 - Unrequested text or signage: does the image contain readable text, letters, numbers, shop signs, banners, posters, logos, labels, or written inscriptions that are NOT named in the expected scene? (FAIL — name where the text appears. A pub sign, street sign, poster text, or any inscription not explicitly requested counts. Distant painted banners with no readable text are OK.)${storyEra ? `
 - Anachronistic elements for the stated STORY ERA above: are there objects that don't fit the period? (FAIL — name them. Cars, parked vehicles, modern street lights, traffic signs, billboards, power lines, utility poles, satellite dishes, air conditioners, modern shopfront windows with price stickers, commercial ads, plastic bins, painted crosswalks, road markings, telephone poles, fire hydrants. Skip this check only if the story era is "present-day" or "modern".)` : ''}${placementsCheck}${geometryCheck}
 
-Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."}` }
+Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."}`, 'validateEmptyScene') }
               ]}],
               generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
@@ -1847,6 +1849,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // hidden reasoning. Without a cap, 2.5 Flash has been observed burning the
     // entire budget on thinking (30k+) and emitting truncated JSON → MAX_TOKENS.
     const callQualityAPI = async (model, thinkingBudget = EVAL_THINKING_BUDGET) => {
+      assertPromptFilled(parts, 'evaluateImageQuality');
       // Route to Grok vision API for xAI models
       const modelConfig = TEXT_MODELS[model];
       if (modelConfig?.provider === 'xai') {

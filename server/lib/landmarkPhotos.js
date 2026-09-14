@@ -6,6 +6,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { guardPromptString } = require('../services/prompts');
 const { compressImageToJPEG } = require('./images');
 const { getPool } = require('../services/database');
 const { callTextModel } = require('./textModels');
@@ -880,13 +881,15 @@ async function analyzeLandmarkPhoto(photoData, landmarkName, landmarkType) {
     const mimeType = 'image/jpeg';
     const base64Data = buf.toString('base64');
 
-    const prompt = `Describe this photo of "${landmarkName}"${landmarkType ? ` (a ${landmarkType})` : ''} for use in children's book illustration.
+    let prompt = `Describe this photo of "${landmarkName}"${landmarkType ? ` (a ${landmarkType})` : ''} for use in children's book illustration.
 
 Cover BOTH of:
 1. APPEARANCE — main architectural/natural features, colors, materials, textures, distinctive recognizable elements.
 2. LAYOUT IN FRAME — where the landmark sits and where the open space is. Use rough percentages or zones: "tower fills the right 60% of the frame from foreground to sky", "square dominates the lower two-thirds with the tower centered", "open plaza stretches across the foreground; landmark in the upper-right background", "open sky fills the upper third above the landmark roofline". Name which thirds/halves/corners are EMPTY GROUND, EMPTY SKY, or OPEN SQUARE — downstream prompts use this to decide where to place separate props (poles, fountains, signposts) without mounting them on the landmark.
 
 Write 3-5 sentences total. Be specific and visual. Do NOT mention the photo itself or use phrases like "The image shows".`;
+
+    prompt = guardPromptString(prompt, 'analyzeLandmarkPhoto');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -1067,7 +1070,7 @@ async function analyzeImageQuality(imageUrl, landmarkName, expectedLocation = nu
       ? `\n  "locationMatch": <1-10>,\n  "detectedLocation": "where this photo appears to be taken",`
       : '';
 
-    const prompt = `Analyze this image of "${landmarkName}"${expectedLocation ? ` (expected location: ${expectedLocation})` : ''} for use as a reference in children's book illustration.
+    let prompt = `Analyze this image of "${landmarkName}"${expectedLocation ? ` (expected location: ${expectedLocation})` : ''} for use as a reference in children's book illustration.
 
 Rate each criterion 1-10:
 1. PHOTO_QUALITY: Is it a clear, well-lit photograph? (not blurry, not too dark)
@@ -1088,6 +1091,8 @@ Respond in this exact JSON format:
 }
 
 IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illustration, engraving, historical artwork, or any non-photographic image. Only set TRUE for actual photographs.`;
+
+    prompt = guardPromptString(prompt, 'analyzeImageQuality');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 

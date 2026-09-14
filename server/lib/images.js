@@ -11,7 +11,7 @@ const sharp = require('sharp');
 const crypto = require('crypto');
 const pLimit = require('p-limit');
 const { log } = require('../utils/logger');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, guardPromptString, assertPromptFilled } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
@@ -145,6 +145,7 @@ const { getFacePhoto, loadVbReferenceBytes } = require('./characterPhotos');
  * @returns {Response} Fake Response object matching Gemini API shape
  */
 async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
+  assertPromptFilled(geminiParts, 'images.callGrokVisionAPI');
   const xaiApiKey = process.env.XAI_API_KEY;
   if (!xaiApiKey) {
     log.error('❌ [GROK VISION] XAI_API_KEY not configured');
@@ -222,6 +223,7 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
  * same parsing. Temperature 0 (SETTLED: eval judges run at temperature 0).
  */
 async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptText, options = {}) {
+  assertPromptFilled(geminiParts, 'images.callOpenRouterVisionAPI');
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     log.error('❌ [OPENROUTER VISION] OPENROUTER_API_KEY not configured');
@@ -1363,6 +1365,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
 async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null, sceneBackground = null, aspectRatioOverride = null, sceneCharacters = null) {
+  prompt = guardPromptString(prompt, 'images.callGeminiAPIForImage');
   // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
@@ -1780,6 +1783,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
  * @returns {Promise<{imageData: string, modelId: string, usage: Object}>}
  */
 async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
+  prompt = guardPromptString(prompt, 'images.generateImageOnly');
   const {
     previousImage = null,
     imageModelOverride = null,
@@ -4591,6 +4595,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
  * @returns {Promise<{imageData: string}|null>}
  */
 async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null, aspectRatioOverride = null) {
+  editInstruction = guardPromptString(editInstruction, 'images.editImageWithPrompt');
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
   const backend = modelConfig?.backend || 'gemini';

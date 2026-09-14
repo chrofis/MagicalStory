@@ -31,6 +31,7 @@
 // ============================================================================
 
 const { log } = require('../utils/logger');
+const { guardPromptString } = require('../services/prompts');
 
 // Run counters, keyed to the current job's cache scope. Module-level so every
 // function here shares ONE definition (it used to be a closure-local const in
@@ -805,7 +806,7 @@ async function checkRepairNaturalness(imageData, opts = {}) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return { skipped: 'no GEMINI_API_KEY' };
     const desc = `the figure wearing ${clothing.split(/[.;]/)[0].slice(0, 140)}`;
-    const prompt = fillTemplate(PROMPT_TEMPLATES.repairNaturalness, { CHARACTER_DESC: desc });
+    const prompt = guardPromptString(fillTemplate(PROMPT_TEMPLATES.repairNaturalness, { CHARACTER_DESC: desc }), 'checkRepairNaturalness');
     const r2Lib = require('./r2');
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const body = {

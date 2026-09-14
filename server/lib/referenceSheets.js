@@ -16,6 +16,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { guardPromptString } = require('../services/prompts');
 const { loadVbReferenceBytes } = require('./characterPhotos');
 const { escapeXml } = require('./repairGrid');
 // The physical grid bound (one Grok slot, 1/n cell size) — no longer the
@@ -43,7 +44,7 @@ async function identifySheetCellsImpl(buffer, cells, elements) {
   const elementList = elements
     .map((e, i) => `${i + 1}. ${e.description || e.appearance || e.name || `element ${i + 1}`}`)
     .join('\n');
-  const prompt = fillTemplate(PROMPT_TEMPLATES.sheetCellIdentification, { ELEMENT_LIST: elementList });
+  const prompt = guardPromptString(fillTemplate(PROMPT_TEMPLATES.sheetCellIdentification, { ELEMENT_LIST: elementList }), 'identifySheetCellsImpl');
 
   const labelled = await labelCells(buffer, cells);
   const body = {
@@ -802,6 +803,7 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
  * @returns {Promise<Object>} the parsed JSON reply
  */
 async function askCellGate(cellsBase64, prompt) {
+  prompt = guardPromptString(prompt, 'askCellGate');
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
