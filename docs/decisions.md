@@ -37170,3 +37170,73 @@ at the boundary is un-bypassable, and it covers future call sites for free.
 - `tests/unit/prompt-placeholder-guard.test.ts`
 
 **Status:** ✅ active
+
+## Three tries means three DIFFERENT tries, the shape section reaches the trial and unified writers, and causality is a writer-side rule (2026-09-14)
+
+**Context:** Three measured gaps in the youngest band.
+1. A `tries`-band story shipped **four** attempts, every one a variation of
+   pulling harder, and was fully compliant: `prompts/age-band-tries.txt` asked
+   only that the second try be "different", and listed *"a bit more effort"* as
+   a legitimate reason the third one works. Nothing required the tries to differ
+   in kind. An earlier story that resolved on an insight was over-delivery, not
+   compliance.
+2. `buildStoryShapeSection()` carries the explicit arithmetic — "Challenges:
+   one, met three times — two tries fail, the third succeeds" — but its only
+   call sites were the arc/beats builders and the scorecard. A stored 21,451-char
+   trial `outlinePrompt` contains no "the three tries", no "Challenges:", no
+   "STORY SHAPE": the trial writer was told the band's prose and never its
+   arithmetic. Its page line also rendered as "Opening 1, the three tries 4,
+   ending 1" — the 4 is the page span, and reads as a count of tries.
+3. Nothing anywhere checks that a described solution *causes* its outcome. A
+   story resolved by tipping out a container and setting it beside the obstacle
+   "as a step", then had the character kneel on the ground anyway — the object
+   did no mechanical work, and the illustration drew it discarded because the
+   physics said so.
+
+**Decision:** Three writer-side changes, no new review or eval stage.
+- **A.** The tries band now requires each try to be a *different kind* of
+  attempt ("pulling harder after pulling is the same try twice"), and the third
+  to follow from the main character noticing something about the problem the
+  first two missed. *"A bit more effort"* is deleted — it was the licence that
+  was used. A third clause caps the noticing at three-year-old size (looking at
+  the thing from another side, moving what is in the way first) and forbids a
+  plan, a trick or a child who reasons like a grown-up.
+- **B.** `{STORY_SHAPE}` is declared in `story-trial.txt`, `story-unified.txt`
+  and `story-unified-imagefirst.txt`, positioned **after `{CATEGORY_GUIDELINES}`
+  and before `{AGE_MODE}`** so the band prose stays the last word, as
+  2026-09-13 settled. Both builders pass the **lean `{ arc: true }` variant**:
+  for a non-simple band that suppresses the page budget, the thread/split rule,
+  the secondary-moment quota and the entrance choreography, all of which would
+  fight the scene-count and structure instructions those two templates already
+  carry. The simple bands are unaffected by the flag — they return before it —
+  so `tries` gets its full arithmetic, which is the point. The tries page line
+  is reworded to name the span as pages ("Pages: 6 — page 1 opens, pages 2-5
+  carry the three tries, page 6 ends") and falls back to non-numeric wording
+  below four pages.
+- **C.** One `CAUSAL_COHERENCE_RULE` constant, emitted from **all four** return
+  paths of `buildStoryShapeSection` (routine, quest, tries, arc, full): what the
+  character does is what makes the outcome happen, and an object brought into
+  the solution does real mechanical work, never a prop set down that plays no
+  part.
+
+**Rationale:** The shape section is the only block every writer path now
+receives, which is why the causal rule lives there rather than in the five band
+files — the trial path runs **no** review at all (`outlineReview` null;
+scene-review, plan-check and child-critic are beats-only; book-audit is behind
+`enableFullRepair:false`), so a rule the trial writer does not get is a rule
+that is never applied to a trial story. Putting it in the band files would also
+have scoped it to under-six, and a prop that does no work is wrong at every age.
+Suppressing the full page-budget half of the section on the trial/unified path
+follows the same reasoning as the 2026-09-14 coping-strategy scoping: two page
+budgets in one prompt is a contradiction the model resolves, sometimes wrongly.
+The generic short-story shape line in `story-trial.txt` ("Introduce quickly
+(scene 1), build tension (2-3), resolve (4-5)") is left untouched and does not
+contradict the band arithmetic — one names dramatic function, the other names
+which pages the tries occupy, and the spans coincide.
+
+**Touched:** `prompts/age-band-tries.txt`, `prompts/story-trial.txt`,
+`prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`server/lib/promptBuilders.js` (`CAUSAL_COHERENCE_RULE`,
+`buildStoryShapeSection`, `buildTrialStoryPrompt`, `buildUnifiedStoryPrompt`),
+`tests/unit/age-band.test.ts`
+**Status:** ✅ active
