@@ -265,6 +265,103 @@ function replaceClothingSection(bibleSections, clothingRequirements) {
  * @returns {string} the transcript with the section rewritten, or unchanged
  *   when there is no parseable section (the caller warns and keeps shipping).
  */
+/**
+ * Adopt the scene review's ---VISUAL BIBLE--- corrections.
+ *
+ * The review is the one stage holding both the plan lines and the bible, so it
+ * is the one stage that can say which pages a state covers. Evidence for the
+ * channel: job_1789343124794_z2c779f7i, whose first state was a change claiming
+ * every page of the story — the page-prompt path can drop a wrong delta from
+ * the prose but cannot swap the reference cell, so the first six pages rendered
+ * an object in a look the story had not reached.
+ *
+ * STRICTLY a page-range edit. Only `states[]` is taken, only for ids the bible
+ * already holds, and every structural problem drops that entry's correction
+ * with a warning — a malformed review section must never end a paid run.
+ *
+ * @returns {{applied: Array, rejected: Array}} applied entries carry
+ *   {id, name, oldPages, newPages}; rejected carry {id, reason}.
+ */
+function applyReviewBibleCorrections(raw, visualBible, pageCount) {
+  const out = { applied: [], rejected: [] };
+  const text = String(raw || '');
+  if (!text || !visualBible || typeof visualBible !== 'object') return out;
+  const marker = text.match(/---\s*VISUAL BIBLE\s*---/i);
+  if (!marker) return out;
+  const body = text.slice(marker.index + marker[0].length).split(/\n---\s*[A-Z][A-Z ]*---/)[0];
+  const fenced = body.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const jsonText = (fenced ? fenced[1] : body).trim();
+  if (!jsonText) return out;
+  let json;
+  try { json = JSON.parse(jsonText); } catch (err) {
+    out.rejected.push({ id: '(section)', reason: `unparseable JSON (${err.message})` });
+    return out;
+  }
+  if (!json || typeof json !== 'object') {
+    out.rejected.push({ id: '(section)', reason: 'section is not a JSON object' });
+    return out;
+  }
+
+  // Every entry the bible holds, by BASE id, whatever collection it sits in —
+  // a reviewer that files an artifact under the wrong key still names a real
+  // entry, and the id is the identity.
+  const byId = new Map();
+  for (const key of SYNCED_COLLECTIONS) {
+    for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      const id = e && e.id && String(e.id).trim().toUpperCase().split('.')[0];
+      if (id) byId.set(id, e);
+    }
+  }
+  const maxPage = Number.isFinite(Number(pageCount)) && Number(pageCount) > 0 ? Number(pageCount) : null;
+  const incoming = [];
+  for (const value of Object.values(json)) {
+    if (Array.isArray(value)) incoming.push(...value);
+  }
+  for (const row of incoming) {
+    const id = row && row.id && String(row.id).trim().toUpperCase().split('.')[0];
+    if (!id) { out.rejected.push({ id: '(none)', reason: 'entry has no id' }); continue; }
+    const entry = byId.get(id);
+    if (!entry) { out.rejected.push({ id, reason: 'no bible entry has that id' }); continue; }
+    if (!Array.isArray(row.states) || row.states.length === 0) {
+      out.rejected.push({ id, reason: 'correction carries no states[]' });
+      continue;
+    }
+    const states = [];
+    let bad = null;
+    for (const st of row.states) {
+      const name = st && String(st.name || '').trim();
+      const delta = st && String(st.delta || '').trim();
+      if (!name || !delta) { bad = 'a state is missing name or delta'; break; }
+      const pages = (Array.isArray(st.pages) ? st.pages : []).map(Number);
+      if (pages.length === 0 || pages.some(n => !Number.isFinite(n) || n < 1 || (maxPage && n > maxPage))) {
+        bad = `state "${name}" has pages outside the book`;
+        break;
+      }
+      // `held` is the object's contact flag, read by resolveObjectState. Take
+      // the reviewer's when it states one, else keep what the same look had.
+      const prior = (Array.isArray(entry.states) ? entry.states : [])
+        .find(o => String(o && o.name || '').trim().toLowerCase() === name.toLowerCase());
+      const held = typeof (st && st.held) === 'boolean' ? st.held
+        : (typeof (prior && prior.held) === 'boolean' ? prior.held : null);
+      states.push({ name, delta, pages, ...(typeof held === 'boolean' ? { held } : {}) });
+    }
+    if (bad) { out.rejected.push({ id, reason: bad }); continue; }
+    // Ids stay canonical: numbered by position, never carried over from the
+    // review (which renumbers nothing when it reorders).
+    states.forEach((st, i) => { st.id = `${id}.${i + 1}`; });
+    const oldPages = (Array.isArray(entry.states) ? entry.states : [])
+      .map(o => `${o && o.name}=${JSON.stringify((o && o.pages) || [])}`).join(' ');
+    entry.states = states;
+    out.applied.push({
+      id,
+      name: entry.name || null,
+      oldPages,
+      newPages: states.map(st => `${st.name}=${JSON.stringify(st.pages)}`).join(' '),
+    });
+  }
+  return out;
+}
+
 const SYNCED_COLLECTIONS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing'];
 function syncVisualBibleSection(bibleSections, visualBible) {
   const text = String(bibleSections || '');
@@ -1730,6 +1827,9 @@ ${bibleBody}` : bibleBody;
   // Same contract as beatsReviewReport above: null only when the review never
   // ran; an object with empty pages[] when it ran and rewrote nothing.
   let sceneReviewReport = null;
+  // What the review's optional ---VISUAL BIBLE--- section changed, so the next
+  // story proves the channel ran (the labelRound lesson).
+  let bibleCorrections = null;
   let castRemovalsDeclared = null;
   let castRemovalAudit = [];
   // Mechanical clothing faults, computed here and handed to the review — the
@@ -1846,8 +1946,9 @@ ${bibleBody}` : bibleBody;
   const srPrompt = buildSceneReviewPrompt(
     inputData,
     expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-    // Locked beats feed the review's check 5 (character in beat vs brief).
-    { clothingFindings, briefFindings, beats }
+    // Locked beats feed the review's check 5 (character in beat vs brief);
+    // the bible feeds check 9f (a stated object's state page ranges).
+    { clothingFindings, briefFindings, beats, visualBible }
   );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
@@ -1966,6 +2067,40 @@ ${bibleBody}` : bibleBody;
         log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
         gl.error('beats_scene_review_removal_undeclared',
           `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
+      }
+
+      // BIBLE CORRECTIONS (2026-09-14). The review may return an optional
+      // ---VISUAL BIBLE--- section correcting a stated object's state page
+      // ranges — the fault sceneBriefCheck's vb_state_* findings hand it. The
+      // merge is strict and fail-soft; see applyReviewBibleCorrections.
+      if (visualBible && !srTruncated) {
+        try {
+          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, expansions.length);
+          bibleCorrections = corr;
+          for (const r of corr.rejected) {
+            log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);
+            gl.warn('beats_scene_review_bible_rejected', `Bible correction for ${r.id} rejected: ${r.reason}`, null, r);
+          }
+          if (corr.applied.length > 0) {
+            for (const e of corr.applied) {
+              log.info(`[VB-STATE] ${e.id} "${e.name}" ${e.oldPages} → ${e.newPages}`);
+            }
+            gl.info('beats_scene_review_bible',
+              `Scene review corrected ${corr.applied.length} stated object(s): `
+              + corr.applied.map(e => `${e.id} ${e.oldPages} → ${e.newPages}`).join('; '), null, corr);
+            // ONE SOURCE OF TRUTH: the transcript is what every later reader
+            // re-parses, exactly as the label round and the age clamp do.
+            const synced = syncVisualBibleSection(bibleSections, visualBible);
+            if (synced === bibleSections) {
+              log.warn('⚠️ [BEATS] Scene review bible correction could not be written back into the transcript — downstream re-parses will read the UNCORRECTED bible');
+              gl.warn('beats_vb_sync_failed', 'Scene review bible correction could not be written back into the transcript — stored bible will not reflect it');
+            } else {
+              bibleSections = synced;
+            }
+          }
+        } catch (bcErr) {
+          log.warn(`⚠️ [BEATS] Scene review bible correction failed (${bcErr.message}) — bible unchanged`);
+        }
       }
 
       const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
@@ -2226,6 +2361,8 @@ ${bibleBody}` : bibleBody;
         // without this line it reached no stored report (job_1789337998754_apslnsq1z
         // had valid labels and a null labelRound everywhere).
         labelRound: meta.labelRound || null,
+        // {applied, rejected} from the review's ---VISUAL BIBLE--- section.
+        bibleCorrections,
         briefUnfixed: briefUnfixedList,
         briefIntroduced: briefIntroducedList,
         rewriteToZeroUnfixed,
@@ -2543,4 +2680,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

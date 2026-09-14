@@ -6689,6 +6689,47 @@ function parseBeats(raw, expectedPages = []) {
 }
 
 /**
+ * The stated objects of a Visual Bible — the entries carrying `states[]` — as
+ * the {VISUAL_BIBLE} block of scene-review.txt.
+ *
+ * Only stated entries are rendered: they are the subject of the review's state
+ * check, and a whole bible would swamp a prompt that already carries every
+ * brief. Empty string when the story has none, so fillTemplate drops the
+ * placeholder and the prompt is unchanged (same convention as
+ * {CLOTHING_FINDINGS} / {BRIEF_FINDINGS}).
+ *
+ * Judge-facing text, so the label comes from `elementDisplayLabel` — the same
+ * resolver every other judge-facing block reads (docs/SETTLED.md: one authored
+ * label per element).
+ */
+const SCENE_REVIEW_VB_COLLECTIONS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing'];
+function buildSceneReviewBibleBlock(visualBible) {
+  if (!visualBible || typeof visualBible !== 'object') return '';
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const lines = [];
+  for (const key of SCENE_REVIEW_VB_COLLECTIONS) {
+    const entries = Array.isArray(visualBible[key]) ? visualBible[key] : [];
+    for (const e of entries) {
+      if (!e || !e.id || !Array.isArray(e.states) || e.states.length === 0) continue;
+      const label = elementDisplayLabel(e) || e.name || String(e.id);
+      lines.push(`- ${String(e.id).trim().toUpperCase()} (${key}) "${label}": ${String(e.description || e.name || '').trim()}`);
+      for (const st of e.states) {
+        if (!st) continue;
+        lines.push(`  - ${st.id || '?'} "${st.name || '?'}" — ${st.delta || '?'} — pages ${JSON.stringify(Array.isArray(st.pages) ? st.pages.map(Number) : [])}`);
+      }
+    }
+  }
+  if (lines.length === 0) return '';
+  return [
+    '# VISUAL BIBLE — STATED OBJECTS',
+    '',
+    'One physical thing per entry, then the looks it wears and the pages each look covers.',
+    '',
+    ...lines,
+  ].join('\n');
+}
+
+/**
  * ONE review over ALL scene briefs. Repetition between pages, visual arc and
  * continuity are invisible to a per-scene reviewer, so the whole set goes in a
  * single call.
@@ -6727,6 +6768,11 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // Stated as contradictions, not orders: the reviewer wrote both halves and
     // may legitimately decline one.
     BRIEF_FINDINGS: options.briefFindings || '',
+    // The stated objects of the Visual Bible, for check 9f: the review is the
+    // one stage holding both the plan lines and the bible, so it is the one
+    // stage that can correct a state's page range. Empty for a story with no
+    // stated object, same convention as the two blocks above.
+    VISUAL_BIBLE: buildSceneReviewBibleBlock(options.visualBible),
   });
 }
 
@@ -7709,6 +7755,7 @@ module.exports = {
   planBlocks,
   planInstant,
   buildSceneReviewPrompt,
+  buildSceneReviewBibleBlock,
   buildDoNotWriteSection,
   buildStoryTextFromBeatsPrompt,
   buildTitleRule,

@@ -3791,6 +3791,10 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       // finding changes what it rewrites: exp 821 produced four two-action pages
       // and the review prompt carried no BRIEF FAULTS block at all.
       let briefFindings = '';
+      // Declared out here so the scene-review prompt below gets the SAME bible
+      // the pre-check read — production passes it (beatsPipeline.js) and a Lab
+      // that did not would stop reproducing the review it is measuring.
+      let vb = storyData.visualBible || null;
       try {
         const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
         // CHECK THE BIBLE THIS RUN AUTHORED, not the one the story shipped with
@@ -3800,7 +3804,6 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         // coin, no element_uncited could ever fire, and the reviewer was told
         // to drop an element by an id that meant something else in its own
         // bible. The stored bible stays the fallback for a run that authored none.
-        let vb = storyData.visualBible || null;
         if (authoredBible?.body) {
           try {
             const { UnifiedStoryParser } = require('./outlineParser/unified');
@@ -3830,7 +3833,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       }
       // finalBeats feeds the review's check 5 (character in beat vs brief),
       // same as the production callsite in beatsPipeline.js.
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings });
+      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings, visualBible: vb });
       if (srPrompt) {
         const reviewOnce = async (srModel) => {
           const t2 = Date.now();
