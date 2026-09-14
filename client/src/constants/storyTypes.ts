@@ -208,10 +208,10 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'understanding-rules', name: { en: 'Why Parents Say No', de: 'Warum Eltern Nein sagen', fr: 'Pourquoi les parents disent non', it: 'Perché i genitori dicono no' }, emoji: '🚦', ageGroup: 'preschool', suitableAges: [2, 7], liveness: 4, pole: 'friction' },
   // Family Changes (All ages)
   { id: 'moving-house', name: { en: 'Moving to a New Home', de: 'Umzug', fr: 'Déménagement', it: 'Trasloco' }, emoji: '🏠', ageGroup: 'family', liveness: 3, pole: 'both' },
-  { id: 'going-vacation', name: { en: 'Going on Vacation', de: 'In den Urlaub fahren', fr: 'Partir en vacances', it: 'Andare in vacanza' }, emoji: '✈️', ageGroup: 'family', liveness: 2, pole: 'milestone' },
+  { id: 'going-vacation', name: { en: 'Going on Vacation', de: 'In die Ferien fahren', fr: 'Partir en vacances', it: 'Andare in vacanza' }, emoji: '✈️', ageGroup: 'family', liveness: 2, pole: 'milestone' },
   { id: 'parents-splitting', name: { en: 'Parents Living Apart', de: 'Eltern leben getrennt', fr: 'Parents séparés', it: 'Genitori separati' }, emoji: '💔', ageGroup: 'family', liveness: 3, pole: 'both' },
   { id: 'visiting-doctor', name: { en: 'Going to the Doctor', de: 'Arztbesuch', fr: 'Visite chez le médecin', it: 'Andare dal dottore' }, emoji: '🏥', ageGroup: 'family', liveness: 1, pole: 'friction' },
-  { id: 'staying-hospital', name: { en: 'Staying in Hospital', de: 'Im Krankenhaus', fr: 'Séjour à l\'hôpital', it: 'In ospedale' }, emoji: '🩺', ageGroup: 'family', liveness: 3, pole: 'both' },
+  { id: 'staying-hospital', name: { en: 'Staying in Hospital', de: 'Im Spital', fr: 'Séjour à l\'hôpital', it: 'In ospedale' }, emoji: '🩺', ageGroup: 'family', liveness: 3, pole: 'both' },
   { id: 'death-pet', name: { en: 'Losing a Pet', de: 'Haustier verlieren', fr: 'Perte d\'un animal', it: 'Perdere un animale' }, emoji: '🌈', ageGroup: 'family', liveness: 3, pole: 'friction' },
   { id: 'grandparent-sick', name: { en: 'Grandparent is Sick', de: 'Grosseltern sind krank', fr: 'Grand-parent malade', it: 'I nonni sono malati' }, emoji: '❤️', ageGroup: 'family', liveness: 3, pole: 'friction' },
   // Pre-Teen (9-12 years)
@@ -271,9 +271,9 @@ export const lifeChallengeGroups: LifeChallengeGroup[] = [
   { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires', it: 'Popolari' }, ageRange: 'all' },
   { id: 'family', name: { en: 'Family Changes', de: 'Familien-Veränderungen', fr: 'Changements familiaux', it: 'Cambiamenti familiari' }, ageRange: 'all' },
   { id: 'toddler', name: { en: 'Baby & Toddler (0-4)', de: 'Baby & Kleinkind (0-4)', fr: 'Bébé & tout-petit (0-4)', it: 'Neonato e bambino piccolo (0-4)' }, ageRange: '0-4' },
-  { id: 'preschool', name: { en: 'Preschool (4-6)', de: 'Vorschule (4-6)', fr: 'Préscolaire (4-6)', it: 'Prescolare (4-6)' }, ageRange: '4-6' },
-  { id: 'early-school', name: { en: 'Early School (6-9)', de: 'Grundschule (6-9)', fr: 'École primaire (6-9)', it: 'Scuola elementare (6-9)' }, ageRange: '6-9' },
-  { id: 'preteen', name: { en: 'Pre-Teen (9-12)', de: 'Vorpubertät (9-12)', fr: 'Préadolescent (9-12)', it: 'Preadolescenza (9-12)' }, ageRange: '9-12' },
+  { id: 'preschool', name: { en: 'Preschool (4-6)', de: 'Kindergarten (4-6)', fr: 'Préscolaire (4-6)', it: 'Prescolare (4-6)' }, ageRange: '4-6' },
+  { id: 'early-school', name: { en: 'Early School (6-9)', de: 'Primarschule (6-9)', fr: 'École primaire (6-9)', it: 'Scuola elementare (6-9)' }, ageRange: '6-9' },
+  { id: 'preteen', name: { en: 'Pre-Teen (9-12)', de: 'Grosse Kinder (9-12)', fr: 'Préadolescent (9-12)', it: 'Preadolescenza (9-12)' }, ageRange: '9-12' },
 ];
 
 // =============================================================================
