@@ -1062,3 +1062,39 @@ rebuilt: `resolveEvalSceneHint` (3b3070dce), `resolveGeneratedOutfit` (e403345b1
 - [ ] **Two trial-variety Lab stages are BUILT but UNRUN (2026-09-14)** — `trial_idea_variety` (N draws of the trial idea pair, same inputs → repeat grouping) and `trial_challenge_draw` (trial story with vs without the random challenge draw, plus the age-band fit question: the three simple bands draw nothing in production). Running them is paid and the owner's call: ~$0.02 per idea draw-pair, ~$0.10 per story arm. → `server/lib/testlab.js` (`runTrialIdeaVarietyStage`, `runTrialChallengeDrawStage`), commit 880bea40e
 - [ ] **The landmark serving work is on `staging` and not on `master`** (2026-09-14). 39 commits touch `server/lib/landmarkPhotos.js`; `weakOnly` and the `story_score >= 40` + has-photo serving filters exist only on staging (`git show master:… | grep -c weakOnly` -> 0). `master..staging` is 2270 commits, so there is no landmark-only cherry-pick — shipping it is a full release. Enumeration, risk and the staging smoke checks are written; owner decides merge-now vs hold. → `tasks/landmark-master-push-2026-09-14.md`
 - [ ] **DRAFT fidelity wording for a wide-view landmark reference is UNAPPROVED** (2026-09-14). `photo_type` now reaches `buildLandmarkFidelityBlock`, and a `distant` / `view-from` reference takes a new branch instead of being told to "preserve the silhouette… never a tiny speck against a wide cityscape". The plumbing is the shipped part; the text needs owner sign-off or reversion before any master push. → `server/lib/promptBuilders.js` (buildLandmarkFidelityBlock), `tests/unit/landmark-photo-kind-to-prompt.test.ts`
+
+## Repair protection + cover/page parity (2026-09-14)
+
+- [ ] **The repair protection list is missing VB secondaries.** `repairPipeline` keeps an
+      enumerated list of things a repair must not disturb; Visual Bible secondary characters are
+      not on it, so a repair aimed at one figure can alter or remove a secondary the page
+      legitimately commissioned. Now has teeth: the presence derivation counts figures against the
+      cast, so a repair that drops a secondary produces a `missing_character` finding against its
+      own damage — and 37.7% of repairs regress (measured, n=3 stories). **Deferred by the owner
+      2026-09-14 as too involved for one sitting.** The fix is NOT "add secondaries to the list" —
+      it is to build the list from the page's RESOLVED CAST, so a new cast category can never be
+      forgotten again. Confirm from stored repairs that a secondary has actually been damaged
+      before building → `server/lib/repairPipeline.js`
+- [ ] **Covers are not evaluated by the stage that catches prop and cast defects.** `threeStageResult`
+      present on 0 of 96 cover records across 40 stories — the compliance evaluator does not run on
+      covers at all. Cover prompts also carry no REQUIRED OBJECTS block (`promptBuilders.js:2109`),
+      and `image-evaluation.txt:155` skips D-16b (held-object swap) without one, so it is disabled on
+      every cover — the one surface where `holds:` is a declared field. This is the measured answer
+      to the owner's "cover and normal pages must be the same" → task #51
+- [ ] **Three cover eval endpoints still on the pre-`1f5101ef9` pattern** (`regeneration.js:4008-4023`,
+      `:4357`, `:6523`); one appends "TEXT REQUIREMENT - CRITICAL" so a correct TEXTLESS cover is
+      judged as missing its title. Plus `regeneration.js:4294` passes `-1/-2/-3` to `getActiveVersion`
+      where cover keys are `frontCover`/`initialPage`/`backCover`, re-evaluating v0 instead of the
+      active version; `tests/unit/cover-eval-inputs.test.ts:136-139` is named for asserting
+      `visualBible` but never asserts it; the `holds` id regex exists in 5 copies with 2 disagreeing
+      vocabularies → task #52
+- [ ] **The compliance stage invented a holder declaration** — p7 of `job_1789348171785_9oxos7dwv`:
+      "Kiaan is declared to carry Ofeli" appears in NO stored field (the brief gives the egg to Julian
+      in two), the same version's summary names a third character, the consolidator turned it into
+      "add red egg in Kiaan's hands", and the book shipped with two of its one magic egg. The
+      consolidator half is fixed in `3546394d2`; the invention itself is untraced → task #50
+- [ ] **Structured holder field on page briefs — NOT PROPOSED, evidence against.** 478 pages: ~0
+      briefs give one prop to two characters (3 strict hits, all legitimate), 3 duplication findings
+      on 1 page. `wornItems[]` is the precedent against it: 88% empty where present, and its `off`
+      state has never once been emitted in 478 pages. Recorded so it is not re-proposed → this file
+
