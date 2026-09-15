@@ -7,12 +7,14 @@ elsewhere to build several challenges or a complicated plot.
 is wanted, and it is different in every book. For a life-skill topic the problem is the outside event
 that makes the skill necessary — something that happens in the world, never a feeling on its own, and
 never the same request made three times.[[/book]] Three tries, no more. Each try is a different kind of attempt, not
-more of the last one — pulling harder after pulling is the same try twice. The first two do not work.
-The third one does.[[/plot]]
+more of the last one — pulling harder after pulling is the same try twice. The first two do not
+work.[[/plot]]
 
 **The child's own doing.** Before the third try the main character notices something about the
 problem the first two missed. The third try comes from that noticing. Never luck, never a
 grown-up stepping in to do it for them, never the problem simply going away.
+
+**It resolves.** The third try works, and the problem is solved before the last page.
 
 [[plot]]**Small noticing, not cleverness.** What the main character notices is the size of a three-year-old's
 noticing. Never a plan, a trick, or a child who reasons like a grown-up.[[/plot]]

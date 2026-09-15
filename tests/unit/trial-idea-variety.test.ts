@@ -42,6 +42,39 @@ describe('age-band views — one file, three readers', () => {
     });
   }
 
+  // "Who resolves it" and "that it resolves" are one pair and belong to every
+  // reader. fdc85a290 moved only the first out of [[plot]]; measured at b0ffa352
+  // over 28 ideas, the journey band's fantasy arm still resolved 3/6 against the
+  // own-town arm's 6/6, and 9 of 28 cards stopped on the problem. The BEAT
+  // STRUCTURE stays writer/plot machinery — a 40-word premise cannot honour it.
+  const resolution: Array<[number, string, string, string]> = [
+    // age, agency rule (routine has none — its storyline line carries both), resolution rule, beat structure
+    [0, 'comes right', 'it is put right within a page or two', 'A day, not a plot'],
+    [2, '**The child does the finding.**', '**It resolves.** The wanted thing is found before the last page.', 'One tiny goal, and nothing else'],
+    [3, "**The child's own doing.**", '**It resolves.** The third try works', 'Three tries, no more'],
+    [4, "**The child's choice resolves it.**", '**It resolves.** The fear is real enough to feel', 'Something scary, faced and grown past'],
+    [5, "**The hero's own idea turns it.**", '**It resolves.** The turn comes before the last page', 'Every one of those beats is on the page'],
+  ];
+
+  for (const [age, agency, resolves, beats] of resolution) {
+    it(`age ${age}: the tone view carries agency AND resolution, never the beat structure`, () => {
+      const tone = pb.buildAgeModeSection({ characters: chars(age) }, { bandView: 'tone' });
+      expect(tone).toContain(agency);
+      expect(tone).toContain(resolves);
+      expect(tone).not.toContain(beats);
+      // and the writer keeps both halves plus the beats
+      const writer = pb.buildAgeModeSection({ characters: chars(age) }, { bandView: 'writer' });
+      for (const s of [agency, resolves, beats]) expect(writer).toContain(s);
+    });
+  }
+
+  it('the fantasy idea arm is told the story resolves, at every band', () => {
+    for (const age of [0, 2, 3, 4, 5, 8, 12, 38]) {
+      const { fantasy } = pb.buildTrialIdeaPrompts({ ...args(3), characters: chars(age) });
+      expect(fantasy).toMatch(/\*\*It resolves\.\*\*|it is put right within a page or two/);
+    }
+  });
+
   it('rejects an unknown view rather than silently shipping the whole file', () => {
     expect(() => pb.applyBandView('x', 'nonsense')).toThrow(/Unknown age-band view/);
   });

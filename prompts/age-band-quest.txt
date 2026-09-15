@@ -5,7 +5,7 @@ elsewhere to build a conflict, a tension or a challenge.
 
 [[plot]]**One tiny goal, and nothing else.** The whole book is one small wanted thing.[[book]] Something ordinary in this
 child's own day, and a different thing in every book.[[/book]] It is named on the first
-page and found near the end. No second goal, no subplot, no twist.
+page. No second goal, no subplot, no twist.
 
 **The search is the story.** The child looks in one place per page: opening, lifting, peeking behind,
 calling out. Each page is a new place and a new thing to see there, and the answer each time is a
@@ -20,6 +20,8 @@ child meets along the way is friendly and helps or simply waves.
 
 **The child does the finding.** They look and they find. Never anything that turns on working
 something out — clues, plans, puzzles, tricks or deciding for others.
+
+**It resolves.** The wanted thing is found before the last page.
 
 [[book]]**Food.** Only ordinary food a child of this age eats, named plainly. Never sweets or ice cream, and
 never anything a small child cannot chew or swallow safely.

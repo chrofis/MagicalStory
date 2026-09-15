@@ -41257,3 +41257,50 @@ figures re-opens the doubling the "no figures" rule exists to prevent.
 
 **Touched files.** `server/lib/visualBible.js`, `server/services/prompts.js`,
 `tests/unit/vb-plate-routing.test.ts`.
+
+---
+
+## "Who resolves it" and "that it resolves" are one pair, and both are untagged (2026-09-15)
+
+**Context.** `fdc85a290`, earlier the same day, moved each band's AGENCY rule out of `[[plot]]` so
+the make-believe idea arm would receive it — that arm reads the `tone` view, and
+`BAND_VIEW_DROPS.tone = ['book','plot']`. It worked, and it was only half the rule. The agency
+rule's PARTNER — the statement that the story ends with the thing resolved — stayed inside
+`[[plot]]` in every band, so the fantasy arm was still never told the story has to land.
+
+Measured over 28 ideas at deployed SHA `b0ffa352`:
+
+- the journey band's **own-town** arm resolves 6/6; its **fantasy** arm resolves **3/6**.
+- **9 of 28 cards stop on the problem** with no resolution at all (round two: 2-3).
+- The regression cancelled three otherwise-working fixes from the same day: overall rating fell
+  3.39→3.32 child and 3.29→3.18 parent, although agency violations fell 6→2, menu-template ideas
+  fell ~10→1 and autumn-as-plot fell ~24→4-6.
+
+**Decision.** An idea must state that the thing is resolved. One untagged resolution sentence per
+band, sitting next to the agency rule it partners:
+
+- `journey` — **It resolves.** The turn comes before the last page and they come home changed.
+- `fear-choice` — **It resolves.** The fear is real enough to feel, and by the end it no longer
+  holds them. (moved verbatim out of the `[[plot]]` opener.)
+- `tries` — **It resolves.** The third try works, and the problem is solved before the last page.
+  (replaces "The third one does." inside `[[plot]]`.)
+- `quest` — **It resolves.** The wanted thing is found before the last page. (replaces "and found
+  near the end" inside `[[plot]]`.)
+- `routine` — has no agency rule by design, but its whole storyline line *"One small thing goes
+  wrong, and comes right"* was `[[plot]]`-only, leaving the tone view with no statement of what
+  happens at all. The line is now untagged.
+
+**Rationale.** The BEAT STRUCTURE stays in `[[plot]]`: the six-beat order, "three tries, no more",
+"every one of those beats is on the page, in that order". That is writer machinery a 40-word premise
+cannot honour — the distinction `BAND_VIEW_DROPS` exists to draw. "It resolves" is not machinery; it
+is what kind of story this is, the same class as "who resolves it". The book-craft `**Ending.**`
+rules remain `[[book]]` and reach neither idea arm, unchanged.
+
+**Touched files.** `prompts/age-band-journey.txt`, `prompts/age-band-fear-choice.txt`,
+`prompts/age-band-tries.txt`, `prompts/age-band-quest.txt`, `prompts/age-band-routine.txt`,
+`server/lib/promptBuilders.js` (the `BAND_VIEW_DROPS` doc comment), and
+`tests/unit/trial-idea-variety.test.ts`, which now pins per band that the `tone` view carries the
+agency rule AND the resolution rule and still lacks the beat structure.
+
+**Status:** ✅ active — repairs an incomplete fix from `fdc85a290`. No corpus rerun (no paid calls
+authorised for this change).

@@ -3,12 +3,13 @@
 The child this book is for is four. Write for that child.
 
 [[plot]]**Something scary, faced and grown past.** The book turns on one thing the main character is afraid
-of.[[book]] Anything a child of this age is afraid of, and a different one in every book.[[/book]] It is real
-enough to feel, and by the end it no longer holds them.[[/plot]]
+of.[[book]] Anything a child of this age is afraid of, and a different one in every book.[[/book]][[/plot]]
 
 **The child's choice resolves it.** What ends the fear is a decision the main character makes and
 acts on: a brave step, a clever idea, or a kind act towards whoever or whatever frightened them.
 Never rescue by a grown-up, never luck, never the scary thing simply leaving.
+
+**It resolves.** The fear is real enough to feel, and by the end it no longer holds them.
 
 **A light villain is allowed.** Someone or something may want the wrong thing and get in the way —
 and is beaten by wit, by kindness, or by being understood, never by force or violence. They may end

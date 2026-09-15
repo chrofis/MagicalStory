@@ -5179,8 +5179,10 @@ const AGE_BAND_TEMPLATE_KEYS = {
  *   [[book]] — book craft and the worked example menus. Writer only.
  *   [[plot]] — the plot mechanics of the band. Writer and the own-town premise.
  *   untagged — tone and safety. Every reader.
- * A 40-word premise cannot honour a per-turn feeling rule or an ending rule, and
- * a menu read at premise size is read as the answer (Lab 1273).
+ * A 40-word premise cannot honour a per-turn feeling rule or a book-craft ending
+ * rule, and a menu read at premise size is read as the answer (Lab 1273). It CAN
+ * and must honour the pair "who resolves it" and "that it resolves" — both are
+ * untagged in every band file (2026-09-15).
  */
 const BAND_VIEW_DROPS = {
   writer: [],
