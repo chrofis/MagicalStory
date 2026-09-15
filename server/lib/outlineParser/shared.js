@@ -60,7 +60,8 @@ function parseCharacterClothingBlock(content) {
   const characterPerspectives = {};
   const characters = [];
 
-  // JSON scene hint format (current story-unified.txt page hints):
+  // JSON scene hint format (the page metadata block in
+  // prompts/scene-expansion-all.txt and prompts/story-trial.txt):
   //   "characters": [
   //     { "name": "Lukas", "position": "left", "clothing": "costumed:roman" },
   //     { "name": "Sophie", "clothing": "costumed:roman", "depth": "background", "perspective": "back view" }
@@ -100,7 +101,8 @@ function parseCharacterClothingBlock(content) {
     if (characters.length > 0) return { characterClothing, characterPerspectives, characters };
   }
 
-  // Bullet list format (used by cover scene hints in story-unified.txt):
+  // Bullet list format (used by cover scene hints:
+  // prompts/scene-expansion-all.txt §"Cover scene hints"):
   //   Characters:
   //   - Name1 (position): standard, holds: book
   //   - Name2 (alias): costumed:type, depth: background, perspective: back view
@@ -116,7 +118,8 @@ function parseCharacterClothingBlock(content) {
     // "gazes at" has a space inside the key — regex matches both with and without space.
     // Clothing tokens: bare `standard|winter|summer|formal|costumed` OR
     // `costumed:type` / `costumed:{type with spaces}`. The cover-hints prompt
-    // (prompts/story-unified.txt §COVER SCENE HINTS) instructs Sonnet to use
+    // (prompts/scene-expansion-all.txt §"Cover scene hints"; the rule lived in
+    // the since-deleted story-unified.txt when this was written) allows
     // bare `costumed`; earlier the regex required `costumed:something`, so
     // every cover character line that used bare `costumed` failed the match
     // → characters[] stayed empty → buildCoverSceneFromHint produced nothing

@@ -2154,8 +2154,8 @@ function buildCharacterReferenceList(photos, characters = null, { includeClothin
   if (!photos || photos.length === 0) return '';
 
   // Each character is already named with their physical description in the
-  // SCENE prose (per story-unified.txt: "Name each character explicitly on
-  // first mention, THEN weave the physical description in"), and each
+  // SCENE prose (per prompts/scene-expansion-all.txt rule 10: "Weave each
+  // character's physical description on first mention"), and each
   // attached image carries a `[Name]:` label in the parts array. Repeating
   // the description here was triple-binding the same info — drop it.
   // Just list the names so the model knows which images to expect.
@@ -3017,7 +3017,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // metadata key as an English phrase. That prose is the contract the quality
     // evaluator judges against, so the judge then scores a correct render as
     // off-spec ("clothing is non-standard"). Observed on staging
-    // job_1786147254924_8nuyywjii p7/p10. Same rule as story-unified.txt:127.
+    // job_1786147254924_8nuyywjii p7/p10. Same rule as the clothing contract in
+    // prompts/scene-expansion-all.txt / prompts/story-bible-from-beats.txt.
     let expectedClothingText = '';
     const clothingReqsForPrompt = options.clothingRequirements || null;
     const describeOutfit = (name, category) => {
@@ -3258,8 +3259,8 @@ function textDeclaresNonWornPlacement(text) {
  *
  * Cross-language caveat: token matching cannot bridge a story-language entry
  * ("Roter Umhang") against English prose ("red cape") — that gap is closed at
- * the ROOT by the story-unified VB language rule (English name + description
- * for artifacts/locations/vehicles/clothing).
+ * the ROOT by the VB language rule (English name + description for
+ * artifacts/locations/vehicles/clothing — prompts/scene-expansion-all.txt:140).
  */
 function sceneDeclaresNonWornState(entry, proseText, interactions) {
   const nameTokens = significantEntityTokens(entry?.name);
@@ -3524,7 +3525,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
 
   // Forward the scene hint's `background` field explicitly. It carries the
   // atmosphere AND any story-essential unnamed figures (antagonists, guards —
-  // see story-unified.txt BACKGROUND rule). The prose is supposed to weave it
+  // the scene hint's `background` field, emitted today only by
+  // prompts/story-trial.txt; on the full path the Art Director writes such
+  // figures into the SETTING prose instead). The prose is supposed to weave it
   // in but can drop the figures, and the evaluator scores against the hint —
   // generator and evaluator must receive the same contract.
   const sceneBackground = metadata?.background || metadata?.fullData?.background || null;
@@ -3595,8 +3598,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   //
   // This is NOT a reinstatement of the SECONDARY CHARACTERS block removed
   // 2026-06-09: that one was a THIRD copy of a description the prose format
-  // (story-unified.txt: "name each character, THEN weave the physical
-  // description in") already embedded inline. The JSON brief has no such
+  // (prompts/scene-expansion-all.txt rule 10: name each character, then weave
+  // the physical description in) already embedded inline. The JSON brief has no such
   // sentence to trust. Emitted only for entries in THIS page's cast that have
   // no reference photo of their own, so a commissioned character is never
   // doubled, and the entry's own single `description` string is used verbatim
@@ -3734,10 +3737,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
 
   // (Removed 2026-06-09) SECONDARY CHARACTERS IN THIS SCENE block — was
   // injecting a third copy of each secondary character's appearance onto
-  // pages where the SCENE prose already embeds it inline. story-unified.txt
-  // explicitly instructs Sonnet to "Name each character explicitly on first
-  // mention, THEN weave the physical description in" (prompts/story-
-  // unified.txt:125). Trust the prose. If a future bug shows Sonnet
+  // pages where the SCENE prose already embeds it inline. The Art Director
+  // prompt explicitly instructs "Weave each character's physical description
+  // on first mention" (prompts/scene-expansion-all.txt rule 10; the rule lived
+  // in story-unified.txt when this was removed). Trust the prose. If a future bug shows Sonnet
   // skipping the inline embed for secondaries, fix it at the Sonnet output
   // level — don't re-add a duplicate emitter here. Page 12 of the Miller
   // showcase wasted ~1050 chars triple-counting Sofia before this removal.
@@ -3848,7 +3851,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     };
     for (const objName of vbObjectCitations) {
       // Skip any character id in the objects list — the prose carries the
-      // character's description (story-unified.txt instructs the model to
+      // character's description (the Art Director prompt instructs the model to
       // both name antagonists in the prose AND list their CHR id here; the
       // id is presence metadata for the pipeline, not a prompt input).
       // Re-injecting the VB description would duplicate the prose.
@@ -4334,7 +4337,8 @@ function elementLeadLabel(entry, opts = {}) {
   if (!entry || typeof entry !== 'object') return 'object';
   if (String(entry.label || '').trim()) return labelOf(entry);
   const language = opts.language || 'en';
-  // An ENGLISH story's VB names are English by construction (story-unified.txt),
+  // An ENGLISH story's VB names are English by construction
+  // (prompts/scene-expansion-all.txt:140),
   // so the NAME is the label; a non-English story routes through the
   // English-only description ref (decisions.md 2026-07-31).
   const storyIsEnglish = /^en(?:[-_]|$)/.test(language);
@@ -4394,7 +4398,7 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
     idToName.set(String(entry.id).toUpperCase(), ref);
     // VANTAGE HANDLES. A location shown from more than one viewpoint carries
     // `vantages[]`, and the Art Director cites one as the dotted form
-    // `LOC005.1` (prompts/story-unified.txt "vantages"). The old id pattern
+    // `LOC005.1` (prompts/scene-expansion-all.txt "vantages"). The old id pattern
     // matched only the `LOC005` half and left a dangling ".1" glued to the
     // substituted text -- "The chestnut path to the Holzbruecke.1" -- which an
     // image model letters onto the page exactly as readily as the raw id did.
@@ -6281,9 +6285,9 @@ function buildArcBudgetSection(inputData, pageCount) {
  * 2026-08-19 round RAISED. See docs/decisions.md 2026-09-14.
  *
  * One constant, four consumers: {TELLING_RULES} (arc-create / arc-retell) and
- * the {RISK_FRAMING} placeholder in story-trial.txt, story-unified.txt and
- * story-unified-imagefirst.txt — the three templates the shared block never
- * reaches. Byte-identical everywhere by construction, not by discipline.
+ * the {RISK_FRAMING} placeholder in story-trial.txt — the template the shared
+ * block never reaches (story-unified.txt and story-unified-imagefirst.txt were
+ * the other two consumers until they were deleted 2026-09-15). Byte-identical everywhere by construction, not by discipline.
  */
 // Generator-side counterparts of two judge rules, kept as ONE constant each so
 // the instruction the illustrator receives and the rule the judge deducts on

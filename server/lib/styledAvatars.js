@@ -706,7 +706,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       // Get clothing description text (for explicit clothing in styled avatar).
       // Priority chain:
       //   1. clothingRequirements[char][category].description — Sonnet's
-      //      story-specific FULL final outfit (the new schema, story-unified.txt).
+      //      story-specific FULL final outfit (the new schema; authored today by
+      //      prompts/story-bible-from-beats.txt / prompts/scene-expansion-all.txt).
       //      Used verbatim. No concatenation.
       //   2. char.avatars.clothing[category] — the character's stored base
       //      clothing (e.g. Noah's green T-Rex hoodie). Used when no outline

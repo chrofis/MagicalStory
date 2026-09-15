@@ -130,8 +130,9 @@ function checkTextZoneCollision(page, metadata) {
 
 /**
  * R1 — the distribution floors, tallied across the finished book. Verbatim from
- * the old unified chain (story-unified.txt "Distribution requirements across the
- * full story" + outline-analysis check 20): full-width between 30% and 50% of
+ * the old unified chain (the since-deleted story-unified.txt "Distribution
+ * requirements across the full story" + outline-analysis check 20; the live
+ * statement of the rule is prompts/scene-expansion-all.txt): full-width between 30% and 50% of
  * pages, at least 30% top-*, at least 30% bottom-*, never more than 3
  * consecutive pages in the same half. Parity is NOT re-checked here — it
  * survived into the Art Director's own rule set.

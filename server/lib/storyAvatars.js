@@ -100,9 +100,9 @@ function projectStoryCharacterAvatars(characters, artStyle) {
 
 /**
  * Project per-character costume descriptions out of `clothingRequirements`
- * (the structure Sonnet emits during outline parsing — see
- * `prompts/story-unified.txt` for the `"costumed": { used, costume, description }`
- * spec) into a story-scoped map:
+ * (the structure the authoring call emits — see
+ * `prompts/story-bible-from-beats.txt` and `prompts/scene-expansion-all.txt`
+ * for the `"costumed": { used, costume, description }` spec) into a story-scoped map:
  *
  *   { Emma: 'burgundy frock coat with brass buttons, tricorn hat, red sash',
  *     Noah: '...', }

@@ -840,8 +840,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
   }
 
   // Strip any perspective/depth annotations from the cover description.
-  // Covers are group portraits — every character must face the viewer (see story-unified.txt
-  // COVER RULES). If Claude slipped a `, depth: background, perspective: back view` into a
+  // Covers are group portraits — every character must face the viewer
+  // (prompts/scene-expansion-all.txt §"Cover scene hints"; story-unified.txt held
+  // this rule until it was deleted 2026-09-15). If Claude slipped a `, depth: background, perspective: back view` into a
   // cover Characters line, drop it here so the cover prompt never sees it.
   const stripCoverAnnotations = (text) => {
     if (!text || typeof text !== 'string') return text;

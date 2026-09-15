@@ -233,7 +233,8 @@ describe('outfit text loses exactly the off item and nothing else', () => {
 });
 
 describe('non-English story path', () => {
-  // story-unified.txt mandates ENGLISH names + descriptions for artifacts, so a
+  // The bible-authoring prompts mandate ENGLISH names + descriptions for
+  // artifacts (prompts/scene-expansion-all.txt:140), so a
   // German story carries the same English `wornAs` link and the same slot
   // vocabulary. Only the character name and the prose are localised.
   const deVB = {

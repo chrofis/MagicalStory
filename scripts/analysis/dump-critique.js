@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Dump the raw outline checkpoint (story-unified.txt output, includes critique)
+// Dump the raw outline checkpoint (the authoring call's output, includes critique)
 // Usage: node scripts/analysis/dump-critique.js <jobId>
 require('dotenv').config();
 const { Pool } = require('pg');

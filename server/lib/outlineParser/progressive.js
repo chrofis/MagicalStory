@@ -53,7 +53,8 @@ class ProgressiveUnifiedParser {
     this._draftPages = null;          // Map<number, {text, sceneProse, sceneHint, content}>
     this._patchedPageNumbers = null;  // Set<number> | null (null = unknown / fallback)
 
-    // Section markers in order (must match actual output format from story-unified.txt)
+    // Section markers in order (must match the section format the live authoring
+    // templates emit: prompts/scene-expansion-all.txt, prompts/story-trial.txt)
     this.sectionMarkers = [
       '---TITLE---',
       '---CLOTHING REQUIREMENTS---',

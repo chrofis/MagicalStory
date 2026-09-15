@@ -19,7 +19,7 @@
  *
  * The id grammar matches the sanitiser's, INCLUDING the dotted vantage form
  * (`LOC005.1` — one camera viewpoint of a location, see
- * prompts/story-unified.txt "vantages").
+ * prompts/scene-expansion-all.txt "vantages").
  */
 
 const { log } = require('../utils/logger');
