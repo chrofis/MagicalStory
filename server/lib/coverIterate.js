@@ -366,13 +366,59 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
     heldByChar.get(key).add(id);
   }
 
+  const { parseWornAs, deriveSlotFromName, sameName, SLOT_NOUNS: WORN_SLOT_NOUNS, WORN_SLOTS } = require('./wornItems');
   const artifactMeta = artifacts
     .filter(a => a?.id)
     .map(a => ({
       id: String(a.id).toUpperCase(),
+      name: a.label || a.name,
       nameTokens: significantTokens(a.name),
       allTokens: new Set([...significantTokens(a.name), ...significantTokens(a.extractedDescription || a.description)]),
+      // Declarative slot identity. `wornAs` is the writer's own link and is
+      // authoritative when present; `type`/name give the slot when it is not.
+      wornAs: parseWornAs(a.wornAs),
+      slot: (() => {
+        const declared = String(a.type || '').trim().toLowerCase();
+        return WORN_SLOTS.includes(declared) ? declared : deriveSlotFromName(a.label || a.name);
+      })(),
     }));
+
+  /**
+   * What an artifact IS to the outfit segment it token-overlaps:
+   *
+   *   'duplicate'  the same garment, described twice → the artifact is the one
+   *                that goes (KEY STORY ELEMENTS must not emit it again).
+   *   'conflict'   a DIFFERENT garment in the SAME body slot → not a duplicate
+   *                at all. The contract and the bible disagree.
+   *   'unrelated'  different slots, or someone else's declared item → leave
+   *                both alone.
+   *
+   * The token rule below (≥2 overlap, or any name token) is loose by design —
+   * it has to survive rewording — and that makes a near-miss structural: a navy
+   * "captain's cap" matched a "captain's coat" segment and was dropped as a
+   * duplicate of it, so the cap's reference cell never entered the cover grid
+   * and the cover shipped the wardrobe's hat instead (staging
+   * job_1789420511893_zly5rcdej). Tightening the matcher would re-admit the
+   * genuine duplicates this function exists to remove, so the matcher is left
+   * alone and the verdict is decided on SLOT IDENTITY instead — `wornAs` when
+   * the writer declared one, the closed slot vocabulary otherwise.
+   */
+  const classifyOverlap = (segment, meta, charName) => {
+    const segSlot = deriveSlotFromName(segment);
+    if (meta.wornAs) {
+      if (!sameName(meta.wornAs.owner, charName)) return 'unrelated';
+      return meta.wornAs.slot === segSlot ? 'duplicate' : 'unrelated';
+    }
+    if (!meta.slot || !segSlot) return 'duplicate';   // unmappable → the old behaviour
+    if (meta.slot !== segSlot) return 'unrelated';
+    // Same slot: the slot's own garment nouns decide whether it is one item.
+    const nouns = (WORN_SLOT_NOUNS[segSlot] || []);
+    const inText = (text) => nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(text || '')));
+    const a = inText(meta.name);
+    const b = inText(segment);
+    if (a.length === 0 || b.length === 0) return 'duplicate';
+    return a.some(n => b.includes(n)) ? 'duplicate' : 'conflict';
+  };
 
   const segmentMatches = (segment, meta) => {
     const segTokens = significantTokens(segment);
@@ -403,9 +449,22 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
           drop = true;
           log.info(`🧥 [COVER-CLOTHING] ${photo.name}: dropped worn segment "${segment}" — ${meta.id} is held per cover hint`);
         } else if (!heldIds.has(meta.id)) {
-          // Worn (overlaps an outfit) and held by nobody → clothing keeps it,
-          // KEY STORY ELEMENTS must not emit it again.
-          excludeElementIds.add(meta.id);
+          const verdict = classifyOverlap(segment, meta, photo.name);
+          if (verdict === 'unrelated') {
+            // A token near-miss across two different slots. Neither side moves.
+          } else if (verdict === 'conflict') {
+            // NOT a duplicate — a different item in the same body slot. The
+            // contract and the bible disagree, and the tie was being resolved
+            // silently toward the wardrobe text. The VB wins: it has a rendered
+            // reference cell, so the artifact stays in KEY STORY ELEMENTS and
+            // the contradicting outfit segment goes.
+            drop = true;
+            log.warn(`⚠️ [COVER-CLOTHING] ${photo.name}: outfit segment "${segment}" and ${meta.id} "${meta.name}" are DIFFERENT items in the same slot — not a duplicate; the Visual Bible wins and the segment is dropped`);
+          } else {
+            // Worn (overlaps an outfit) and held by nobody → clothing keeps it,
+            // KEY STORY ELEMENTS must not emit it again.
+            excludeElementIds.add(meta.id);
+          }
         }
       }
       if (drop) changed = true;
