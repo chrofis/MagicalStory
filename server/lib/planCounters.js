@@ -439,37 +439,6 @@ function namesIn(text, cast, aliases = {}) {
   });
 }
 
-/**
- * How many pages of a book may stage a high-action instant — two characters
- * interlocked, a hand-over, an object in flight, a second figure off the
- * ground, two creatures each with its own state (owner ruling, 2026-09-05:
- * "relax it so that 2-3 pages per story can have more action").
- *
- * The number is mechanical, so it is computed here and injected into the
- * planner prompt ({HIGH_ACTION_PAGES}) rather than written into prose.
- *
- * NOTE FOR THE COUNTERS: no counter in this module penalises the allowance.
- * Nothing here counts elevated figures, interlocked pairs or creatures; the
- * only per-page cast counter (CAST_OVER_CEILING) counts NAMES in
- * the who-column, and a high-action instant adds no name to a page. The budget
- * is therefore carried through to `stats.highActionAllowance` for the report
- * and never used to suppress a finding — there is none to suppress.
- *
- * @param {number} pageCount
- * @returns {number} 1 for a short book, 2 for a normal one, 3 for a long one
- */
-function highActionPageBudget(pageCount) {
-  const n = parseInt(pageCount, 10);
-  if (!Number.isFinite(n) || n <= 8) return 1;
-  return n <= 16 ? 2 : 3;
-}
-
-/** The budget as the planner prompt says it: "one page" / "two pages". */
-function highActionPagesPhrase(pageCount) {
-  const n = highActionPageBudget(pageCount);
-  return n === 1 ? 'one page' : n === 2 ? 'two pages' : 'three pages';
-}
-
 /** Contiguous runs of 2+ page numbers in a sorted list. */
 function consecutiveRuns(sorted) {
   const runs = [];
@@ -495,14 +464,13 @@ function consecutiveRuns(sorted) {
  *   cast (collectPlaceNames: places, plus the calendar nouns of its language),
  *   whatever the plan grammar looks like
  * @param {number} [args.maxCharactersPerScene] the image model's ceiling for the one whole-cast page
- * @param {number} [args.highActionPages] the high-action page budget the planner was given
  * @param {Map<number,{people:string[],things:string[]}>} [args.roster] the plan check's
  *   per-page roster (`parsePlanCheckRoster`). Every counter that needs to know who is on a
  *   page needs this; without it the counters do not run, because the only alternative was
  *   guessing the cast out of the prose in code, which is what they were doing wrong.
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, highActionPages = null, declaredInvented = null, inventedAllowance = null, roster = null } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -706,7 +674,6 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
     cast,
     stats: {
       pageCount,
-      highActionAllowance: highActionPages == null ? highActionPageBudget(pages.length) : highActionPages,
       shotCounts,
       shotTypesUsed: usedShots,
       soloPages,
@@ -721,8 +688,6 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
 
 module.exports = {
   runPlanCounters,
-  highActionPageBudget,
-  highActionPagesPhrase,
   collectPlaceNames,
   collectCalendarNames,
   calendarNamesForLocale,

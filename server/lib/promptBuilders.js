@@ -24,7 +24,6 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
-const { highActionPagesPhrase } = require('./planCounters');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
 /**
@@ -3114,7 +3113,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
       MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3
     });
-    // Same gate as buildUnifiedStoryPrompt: text-overlay-only rules
+    // Text-overlay-only rules gate:
     // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,
     // emptyScenePrompt corner instruction) are wrapped in
     // <!-- TEXT_OVERLAY_BEGIN --> ... <!-- TEXT_OVERLAY_END --> markers in
@@ -4629,35 +4628,16 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
 // UNIFIED STORY GENERATION
 // ============================================================================
 
-// Injected into {ANALYSIS_INSTRUCTIONS} when the split outline review is ON
-// (MODEL_DEFAULTS.splitOutlineReview): the writer skips its self-critique and a
-// separate reviewer model (see buildOutlineReviewPrompt) emits the ANALYSIS +
-// FIXES REQUIRED + patches instead. The stub keeps the writer's output shape
-// byte-compatible with the parsers: the ---ANALYSIS--- marker still appears
-// (draft extraction ends there) and the bare ---STORY PAGES--- marker still
-// closes the output (cover-hint extraction ends there), but no FIXES REQUIRED
-// phrase and no patch blocks are emitted — those come from the reviewer, whose
-// output is appended after this one.
-const SPLIT_REVIEW_ANALYSIS_STUB = `The critique of this draft is performed by a SEPARATE external reviewer AFTER this response — not by you. In this section, write exactly one line and nothing else:
-
-Reviewed externally.
-
-Then continue directly with the ---TITLE--- section. Hard rules for this response:
-- Do NOT write any analysis and do NOT emit a "FIXES REQUIRED" list — never write that phrase anywhere in your output.
-- Do NOT emit any \`--- Page N ---\` patch blocks anywhere. Your draft is final as written; the external reviewer emits all patches.
-- At the very end, still output the bare \`---STORY PAGES---\` marker on its own line, followed by NOTHING. Any patch-related instructions in the ---STORY PAGES--- section or the FINAL CHECKLIST do not apply to this response.`;
-
 /**
  * Build the external outline-review prompt (split outline review, Call 2).
  *
- * The reviewer receives the writer's FULL output verbatim plus the SAME
- * analysis instructions the single-call mode would have used (variant-matched
- * body, one shared source file), and emits ---ANALYSIS--- + FIXES REQUIRED +
+ * The reviewer receives the writer's FULL output verbatim plus the shared
+ * analysis instruction body (prompts/outline-analysis-imagefirst.txt), and emits ---ANALYSIS--- + FIXES REQUIRED +
  * ---STORY PAGES--- patch blocks in the exact single-call format — so the
  * concatenation (writer output + reviewer output) parses through the unchanged
  * UnifiedStoryParser / ProgressiveUnifiedParser.
  *
- * @param {Object} inputData - Same story parameters given to buildUnifiedStoryPrompt
+ * @param {Object} inputData - Story parameters (same shape the writer stages receive)
  * @param {string} writerOutput - Call 1's complete response text
  * @param {Array}  [sceneConsistencyIssues] - deterministic validator findings
  *   ([{page, issues:[{type, detail}]}]) surfaced to the reviewer as REVIEW HINTS
@@ -4743,11 +4723,7 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
   const aspect = (opts.aspect === 'text' || opts.aspect === 'scene') ? opts.aspect : 'both';
   const priorReviews = Array.isArray(opts.priorReviews) ? opts.priorReviews.filter(Boolean) : [];
 
-  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
-  const useImageFirst = variant !== 'textFirst';
-  const analysisBody = sliceAnalysisAspect((useImageFirst
-    ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
-    : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '', aspect);
+  const analysisBody = sliceAnalysisAspect(PROMPT_TEMPLATES.outlineAnalysisImageFirst || '', aspect);
   if (!analysisBody) {
     log.error('[PROMPT] outline analysis instruction template missing — reviewer prompt will lack the check list');
   }
@@ -4864,11 +4840,8 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // `aspect: 'text'` uses. Reused rather than restated so the refiner and the
   // reviewer can never judge text by different standards; the tail is dropped
   // because that block dictates fix-line output and this stage returns pages.
-  const variant0 = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
   const analysisBody = sliceAnalysisAspect(
-    (variant0 !== 'textFirst'
-      ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
-      : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '',
+    PROMPT_TEMPLATES.outlineAnalysisImageFirst || '',
     'text',
     { includeTail: false }
   );
@@ -6011,9 +5984,6 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     OUTPUT_SCOPE: String(replan || '').trim()
       ? 'One line for each page named under RE-DIVIDE, and for no other page.'
       : `One line per page, through page ${pageCount}.`,
-    // Mechanical budget, computed in code and injected — never prose (owner,
-    // 2026-09-05: 2-3 pages per story may stage a high-action instant).
-    HIGH_ACTION_PAGES: highActionPagesPhrase(pageCount),
     READER_LINE: readerLine,
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
     ARC_HINTS: String(arcHints || '').trim()
@@ -7396,352 +7366,6 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
 }
 
 /**
- * Build unified story generation prompt
- * Generates complete story with character arcs, plot structure, visual bible, and all pages
- * @param {Object} inputData - Story parameters
- * @param {number} sceneCount - Number of story pages to generate
- * @returns {string} Filled prompt template
- */
-function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
-  const pageCount = sceneCount || inputData.pages || 15;
-  const readingLevel = getReadingLevel(inputData.languageLevel);
-  const mainCharacterIds = inputData.mainCharacters || [];
-  const language = inputData.language || 'en';
-
-  // Extract character info with strengths/flaws for character arcs
-  const characterSummary = (inputData.characters || []).map(char => {
-    const traits = getTraits(char);
-    return {
-      name: char.name,
-      isMainCharacter: mainCharacterIds.includes(char.id),
-      gender: char.gender,
-      age: char.age,
-      personality: char.personality,
-      strengths: traits.strengths,
-      flaws: traits.flaws,
-      challenges: traits.challenges,
-      specialDetails: traits.specialDetails
-    };
-  });
-
-  // Extract character names for Visual Bible exclusion
-  const characterNames = characterSummary.map(c => c.name).join(', ');
-
-  // Separate main and primary character names for prompt
-  const mainCharacterNames = characterSummary
-    .filter(c => c.isMainCharacter)
-    .map(c => c.name)
-    .join(', ') || 'None';
-  const primaryCharacterNames = characterSummary
-    .filter(c => !c.isMainCharacter)
-    .map(c => c.name)
-    .join(', ') || 'None';
-
-  // Build relationship descriptions
-  let relationshipDescriptions = '';
-  {
-    const relationshipLines = buildRelationshipLines(inputData);
-    if (relationshipLines.length > 0) {
-      relationshipDescriptions = `\n**Relationships:**\n${relationshipLines.map(r => `- ${r}`).join('\n')}`;
-    }
-  }
-
-  // Determine story category and build category-specific guidelines
-  const storyCategory = inputData.storyCategory || 'adventure';
-  const storyTopic = inputData.storyTopic || '';
-  const storyTheme = inputData.storyTheme || inputData.storyType || 'adventure';
-
-  // Get teaching guide from external file if available
-  const teachingGuide = getTeachingGuide(storyCategory, storyTopic);
-
-  let categoryGuidelines = '';
-  if (storyCategory === 'life-challenge') {
-    categoryGuidelines = buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide, inputData);
-  } else if (storyCategory === 'educational') {
-    categoryGuidelines = `This is an EDUCATIONAL story teaching about "<user_input>${storyTopic}</user_input>".
-
-**IMPORTANT GUIDELINES for Educational Stories:**
-- Weave the educational content naturally into an engaging narrative
-- Include accurate, age-appropriate information about the topic
-- Use repetition and reinforcement to help children learn
-- Make the learning fun and memorable through story elements
-- Include moments where characters discover or apply what they're learning
-${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}
-
-${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "<user_input>${storyTopic}</user_input>":**
-${teachingGuide}` : `- The story should teach children about: <user_input>${storyTopic}</user_input>`}`;
-  } else if (storyCategory === 'historical') {
-    // Get historical event context from txt guide
-    const historicalGuide = getTeachingGuide('historical', storyTopic);
-    const historicalEvent = getEventById(storyTopic);
-    // Get pre-fetched location photos (unified prompt)
-    const historicalLocations = getHistoricalLocations(storyTopic);
-    const historicalObjects = getHistoricalObjects(storyTopic);
-    if (historicalGuide) {
-      const eventName = historicalEvent?.name || storyTopic;
-      const eventYear = historicalEvent?.year || '';
-
-      // Build location references section if locations are available
-      let locationsSection = '';
-      if (historicalLocations?.length > 0) {
-        locationsSection = `
-
-**PRE-POPULATED LOCATIONS (canonical reference images for these landmarks — USE AS-IS):**
-${historicalLocations.map(loc => `- [dbKey: ${loc.dbKey}] ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
-RULES for these locations:
-1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants.
-2. **Set the \`dbKey\` field on every Visual Bible location entry** to the slug shown in brackets above (e.g. \`"dbKey": "marktplatz-altdorf"\`). This is the authoritative lookup key for attaching the reference photo — the linker uses it before falling back to name matching. Locations with no matching pre-populated entry get \`"dbKey": null\`.
-3. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
-4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.
-5. **Per-scene composition must match the description.** When a page's primary location is one of these entries, copy the description verbatim into that page's \`landmarkContext\` metadata field, AND keep the page's character \`depth\` / \`position\` / prose composition consistent with what the description spells out. If the description says the child is "in the right background, against the tree", that page's matching character is \`depth: background\`, on the right — do not place them at midground or center. Re-read the description before composing each scene that uses it.`;
-        log.debug(`[UNIFIED] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
-      }
-
-      // Build objects (Visual Bible) section if period objects are available
-      let objectsSection = '';
-      if (historicalObjects?.length > 0) {
-        objectsSection = `
-
-**PRE-POPULATED OBJECTS (canonical reference images for these period objects — USE AS-IS):**
-${historicalObjects.map(o => `- ${o.name} (${o.type}): ${o.description || 'Historical object'}`).join('\n')}
-RULES for these objects:
-1. Use the EXACT name shown above whenever you mention one of these objects (scene descriptions, the Visual Bible artifacts list, cover hints). The name is the lookup key for the reference photo.
-2. When you write the Visual Bible entry for one of these objects, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT invent alternative shapes, parts, or details — the reference photo was painted to match this exact description and any divergence will produce a different-looking object on the page.
-3. Do not create a parallel artifact entry with a different name for the same physical object.`;
-        log.debug(`[UNIFIED] Including ${historicalObjects.length} pre-fetched object photos for ${storyTopic}`);
-      }
-
-      categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
-
-**CRITICAL: HISTORICAL ACCURACY REQUIRED**
-This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
-
-${historicalGuide}${locationsSection}${objectsSection}
-
-**GUIDELINES:**
-- The main character(s) should witness or participate in this historical event
-- Include historically accurate details about the time period
-- Characters MUST use \`costumed:\` clothing for period-appropriate attire (e.g., costumed:1920s, costumed:medieval). Do NOT use \`standard\` — modern clothes in a historical setting looks wrong.
-- Use the suggested story angles or create a similar child-appropriate perspective
-- Make the history come alive through the eyes of a child character
-- Balance historical education with an engaging adventure narrative
-- The story should help children understand what life was like during this event`;
-    } else {
-      // Fallback if event not found
-      categoryGuidelines = `This is a HISTORICAL story about "<user_input>${storyTopic}</user_input>".
-
-**IMPORTANT GUIDELINES for Historical Stories:**
-- Create a story set during this historical event or period
-- Include historically accurate details about the time
-- Characters should wear period-appropriate clothing
-- Make history accessible and engaging for children
-- Balance education with entertainment`;
-    }
-  } else if (storyCategory === 'swiss-stories') {
-    const cityId = storyTopic.replace(/-\d+$/, '');
-    const cityData = getSwissStoryResearch(cityId);
-    const cityMeta = getSwissCityById(cityId);
-
-    if (cityData) {
-      const ideaNum = parseInt(storyTopic.split('-').pop());
-      const idea = cityData.ideas[ideaNum - 1];
-      // Support both localized {en,de,fr} and plain string formats
-      const ideaTitle = (idea?.title && typeof idea.title === 'object' ? idea.title.en : idea?.title) || storyTopic;
-      const ideaDesc = idea?.description && typeof idea.description === 'object' ? idea.description.en : idea?.description;
-      const cityName = cityMeta?.name?.en || cityId;
-
-      categoryGuidelines = `This is a SWISS LOCAL STORY set in ${cityName}, a real Swiss city.
-
-**STORY IDEA:** "${ideaTitle}"
-${ideaDesc ? `**CONCEPT:** ${ideaDesc}` : ''}
-
-**HISTORICAL & CULTURAL CONTEXT (verified research — use for accuracy):**
-${cityData.research}
-
-**GUIDELINES:**
-- Set the story in this specific Swiss city with real local landmarks
-- Use historically accurate details from the research above
-- Include local cultural elements, traditions, and geography
-- Characters should interact with real places described in the context
-- Make the local history and culture come alive for children
-- The story should feel authentic to this specific Swiss place`;
-    } else {
-      categoryGuidelines = `This is a SWISS LOCAL STORY. Create an engaging story set in a Swiss city with local landmarks and cultural elements.`;
-    }
-  } else if (storyCategory === 'custom') {
-    const customText = inputData.customThemeText || '';
-    categoryGuidelines = `This is a CUSTOM story. The user provided their own story concept:
-
-<user_input>${customText}</user_input>
-
-**IMPORTANT GUIDELINES for Custom Stories:**
-- Follow the user's concept closely - this is their creative vision
-- Build the story around the description provided above
-- Maintain age-appropriate content while honoring the user's idea
-- Create engaging characters and plot points that serve the user's concept`;
-  } else {
-    // Adventure category - get theme-specific guide
-    const adventureGuide = getTeachingGuide('adventure', storyTheme);
-
-    categoryGuidelines = `This is an ADVENTURE story with a "${storyTheme || 'adventure'}" theme.
-
-**IMPORTANT GUIDELINES for Adventure Stories:**
-- Create an exciting, engaging adventure appropriate for the age group
-- Include elements typical of the ${storyTheme || 'adventure'} theme
-- Balance action and excitement with character development
-- Include challenges that the characters must overcome
-- Historical and fantasy themes SHOULD use costumed clothing for authenticity
-- Signature theme props keep their full theme form even in a modern real-world setting: a pirate story's ship is a real pirate ship, a knight story's castle a real castle — never a scaled-down everyday stand-in
-
-${adventureGuide ? `**THEME-SPECIFIC GUIDANCE for "${storyTheme}":**
-${adventureGuide}` : ''}`;
-  }
-
-  // Build characters JSON with relationships
-  const charactersJson = JSON.stringify(characterSummary, null, 2) + relationshipDescriptions;
-
-  // Build the canonical per-character physical block. Sonnet is told to weave
-  // physical description into each scene's prose, so it needs the actual traits.
-  // Without this block it hallucinates — e.g. giving a character a beard when
-  // facialHair is 'clean-shaven', or dropping glasses entirely.
-  // Include the character's stored clothing description. Sonnet uses this as
-  // the STARTING POINT for clothingRequirements[char][category].description —
-  // it can keep it as-is, add an accessory, or change a garment for the story,
-  // but the avatar generator no longer concatenates a separate "signature"
-  // line that could conflict (Noah: green hoodie + signature "blue hoodie" =
-  // two contradictory tops in the same prompt). One field, one full outfit.
-  const characterPhysicalBlock = (inputData.characters || [])
-    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
-    .join('\n\n');
-
-  // Build available landmarks section if landmarks were pre-discovered
-  const availableLandmarksSection = buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote);
-  if (inputData.availableLandmarks?.length > 0) {
-    log.debug(`[PROMPT] Including ${inputData.availableLandmarks.length} pre-discovered landmarks in unified prompt`);
-  }
-
-  // Use template if available
-  // Look up maxCharactersPerScene from image model config
-  const imageModelKey = inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage;
-  const imageModelConfig = IMAGE_MODELS[imageModelKey];
-  const maxCharsPerScene = imageModelConfig?.maxCharactersPerScene || 3;
-
-  // Prompt-variant seam (roadmap §4 image-first). DEFAULT = the image-first
-  // template (owner 2026-07-31: arc → scenes → text is the production order).
-  // storyPromptVariant === 'textFirst' opts back into the legacy text-then-scene
-  // template (kept for the harness A/B via rerun-text inputOverrides; also set
-  // STORY_PROMPT_VARIANT=textFirst to flip the fleet without a deploy).
-  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
-  const useImageFirst = variant !== 'textFirst';
-  if (useImageFirst && !PROMPT_TEMPLATES.storyUnifiedImageFirst) {
-    log.warn('[PROMPT] image-first template not loaded — falling back to storyUnified (text-first)');
-  }
-  const unifiedTemplate = (useImageFirst && PROMPT_TEMPLATES.storyUnifiedImageFirst)
-    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
-    : PROMPT_TEMPLATES.storyUnified;
-
-  if (unifiedTemplate) {
-    // ── ANALYSIS placeholder (split outline review seam) ──
-    // Both templates carry {ANALYSIS_INSTRUCTIONS} in their ---ANALYSIS---
-    // section. Single-call mode injects the full self-critique instructions
-    // (variant-matched body, one source shared with the external reviewer);
-    // split mode injects a stub telling the writer the review happens
-    // externally — no FIXES REQUIRED, no patch blocks, bare ---STORY PAGES---
-    // marker so every parser boundary stays where it is today.
-    // Per-job override first (the rerun-text harness A/B seam:
-    // inputOverrides: { splitOutlineReview: false }), then the global default.
-    const splitReview = inputData.splitOutlineReview !== undefined
-      ? !!inputData.splitOutlineReview
-      : !!MODEL_DEFAULTS.splitOutlineReview;
-    const analysisBody = useImageFirst
-      ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
-      : PROMPT_TEMPLATES.outlineAnalysisTextFirst;
-    let analysisBlock;
-    if (splitReview) {
-      analysisBlock = SPLIT_REVIEW_ANALYSIS_STUB;
-    } else if (analysisBody) {
-      analysisBlock = analysisBody;
-    } else {
-      // Analysis body failed to load — ship the stub rather than an empty
-      // critique section (the model would otherwise invent its own format).
-      log.error('[PROMPT] outline analysis instruction template missing — falling back to reviewed-externally stub');
-      analysisBlock = SPLIT_REVIEW_ANALYSIS_STUB;
-    }
-    // Inject BEFORE fillTemplate so placeholders inside the analysis body
-    // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled below.
-    const templateWithAnalysis = unifiedTemplate.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBlock);
-
-    let prompt = fillTemplate(templateWithAnalysis, {
-      LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
-      PAGES: pageCount,
-      LANGUAGE: getLanguageNameEnglish(language),
-      LANGUAGE_NOTE: getLanguageNote(language),
-      READING_LEVEL: readingLevel,
-      STORY_CATEGORY: storyCategory,
-      STORY_TYPE: storyCategory === 'custom' ? 'custom' : storyTheme,
-      STORY_TOPIC: wrapUserInput(storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None')),
-      STORY_DETAILS: wrapUserInput(inputData.storyDetails || 'None'),
-      CHARACTERS: charactersJson,
-      CHARACTER_PHYSICAL_BLOCK: characterPhysicalBlock,
-      CHARACTER_NAMES: characterNames,
-      MAIN_CHARACTER_NAMES: mainCharacterNames,
-      PRIMARY_CHARACTER_NAMES: primaryCharacterNames,
-      CATEGORY_GUIDELINES: categoryGuidelines,
-      // The age band + topic-age-window nudge, the same block the trial and
-      // every beats stage carry. It sits AFTER the category guidelines in the
-      // template on purpose: the band text says its rules "override any
-      // instruction elsewhere", so it must be the last word on how hard the
-      // coping/empowering demand above may push (2026-09-13).
-      STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
-      AGE_MODE: buildAgeModeSection(inputData),
-      // Same string the arc prompts get inside {TELLING_RULES}; these templates
-      // never receive that block.
-      RISK_FRAMING: RISK_FRAMING_RULE,
-      PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
-      // The unified writer authors its own scene hints with no Art Director
-      // stage, so the composition rules reach it here or nowhere.
-      AD_COMPOSITION: AD_COMPOSITION_RULE,
-      AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
-      MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
-      // Reader age for the title pick the writer makes in its ---TITLE---
-      // section (2026-08-27, replaced the separate title-judge call).
-      AGE: readerAge(inputData),
-      // The list body under this template's own '## DO-NOT-WRITE LIST' heading.
-      // One copy, in prompts/do-not-write-list.txt.
-      DO_NOT_WRITE_LIST: String(PROMPT_TEMPLATES.doNotWriteList || '').trim()
-    });
-    // Hard gate for all text-overlay-only instructions. Layouts that render
-    // text BELOW the image (square-below, advanced reading level) don't
-    // need textPosition / textZoneDescription / forbidden-side / calm-zone
-    // rules — keeping them in the prompt makes Sonnet emit the fields and
-    // bake the calm-corner constraints into scene prose, polluting non-
-    // overlay stories. story-unified.txt wraps every overlay-only block
-    // in <!-- TEXT_OVERLAY_BEGIN --> … <!-- TEXT_OVERLAY_END -->. With
-    // overlay ON we strip just the markers; with overlay OFF we strip
-    // the markers AND their contents.
-    const textInImage = inputData.layout?.textInImage === true;
-    if (textInImage) {
-      prompt = prompt.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '');
-    } else {
-      prompt = prompt.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
-    }
-    log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars (textInImage=${textInImage}, variant=${useImageFirst ? 'imageFirst' : 'default'})`);
-    return prompt;
-  }
-
-  // Fallback to hardcoded prompt
-  log.warn('[PROMPT] storyUnified template not loaded, using fallback');
-  return `Create a complete children's story with ${pageCount} pages.
-Language: ${getLanguageNameEnglish(language)}
-Reading Level: ${readingLevel}
-Characters: ${charactersJson}
-Story Type: ${storyTheme}
-Story Details: <user_input>${inputData.storyDetails || 'None'}</user_input>
-
-Output: Title, clothing requirements, character arcs, plot structure, visual bible, cover scenes, and all ${pageCount} pages with text and scene hints.`;
-}
-
-/**
  * Build a lightweight story prompt for trial stories.
  * Much simpler than the full unified prompt — no critical analysis, no character arcs,
  * no plot structure planning. Just generates the story directly.
@@ -8246,7 +7870,6 @@ module.exports = {
   vbDeclaredLetteringNames,
   buildExactPosesBlock,
   buildReceiverPlacement,
-  SPLIT_REVIEW_ANALYSIS_STUB,
   sliceAnalysisAspect,
   stripReviewAspectMarkers,
   buildOutlineReviewPrompt,
@@ -8316,7 +7939,6 @@ module.exports = {
   buildStoryTextFromBeatsPrompt,
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
-  buildUnifiedStoryPrompt,
   buildTrialStoryPrompt,
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,

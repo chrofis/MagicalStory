@@ -1,6 +1,6 @@
 
 
-const { runPlanCounters, collectPlaceNames, highActionPageBudget } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames } = require('./planCounters');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -168,9 +168,17 @@ function resolvePipelineMode(inputData = {}) {
   if (inputData?.trialMode) return 'unified';
   const raw = inputData?.pipelineMode || require('../config/runtime').runtime('pipelineMode');
   const mode = String(raw).trim().toLowerCase();
+  // 'unified' is TRIAL-ONLY since 2026-09-15: the pre-beats unified writer
+  // (buildUnifiedStoryPrompt + prompts/story-unified*.txt) was deleted, so a
+  // non-trial job has no single-call writer to run. Anything unrecognised — and
+  // an explicit non-trial 'unified' — resolves to beats.
   if (!PIPELINE_MODES.includes(mode)) {
-    log.warn(`[BEATS] Unknown pipelineMode "${raw}" — falling back to 'unified'`);
-    return 'unified';
+    log.warn(`[BEATS] Unknown pipelineMode "${raw}" — falling back to 'beats'`);
+    return 'beats';
+  }
+  if (mode === 'unified') {
+    log.warn(`[BEATS] pipelineMode 'unified' is trial-only (the unified writer was deleted) — running beats`);
+    return 'beats';
   }
   return mode;
 }
@@ -1214,7 +1222,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount), declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster });
+    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster });
     if (counters.skipped) {
       const got = roster ? roster.size : 0;
       log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);

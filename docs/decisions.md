@@ -40618,3 +40618,33 @@ vocabulary cannot start faulting correct renders unnoticed.
 `tests/unit/worn-item-handover.test.ts`, `tests/unit/worn-handover-built-prompt.test.ts`,
 `tests/unit/worn-item-changes-hands.test.ts`, `tests/unit/worn-items.test.ts`
 **Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — The high-action page grant is removed; plan-check 9 and 10 are universal
+
+**Context:** The generator↔critic gap audit (row 6) found `story-beats.txt` granting up
+to `{HIGH_ACTION_PAGES}` pages that "may stage a high-action instant the rules above
+forbid… a second figure off the ground" — a two-heights case by definition. Checks 9
+(deed and effect) and 10 (two heights) in `plan-check.txt` know nothing about the
+budget, so the planner spends an allowance it was given and is then charged for it.
+
+**Decision:** Drop the grant. Owner chose removal over teaching the checker, so checks 9
+and 10 hold on every page with no exemption. Removed `{HIGH_ACTION_PAGES}` from the
+template, its injection in `buildBeatsPrompt`, and the budget machinery that existed only
+for it — `highActionPageBudget`, `highActionPagesPhrase`, the `highActionPages` argument
+of `runPlanCounters` and `stats.highActionAllowance`. The two sub-bullets under the grant
+(a beat holding two forbidden actions splits; the main event wins the picture) are
+independently sound and stay, folded into the instant rules.
+
+**Rationale:** Nothing depended on the budget functionally. Verified before deleting: no
+counter in `planCounters.js` suppressed a finding with it — the module's own comment said
+so — and `stats.highActionAllowance` had exactly two consumers, both assertions in
+`plan-replan-ranking.test.ts`. Teaching `plan-check.txt` the budget would have meant
+exempting named pages, which changes which findings fire; removing it changes nothing but
+what the planner is permitted. Supersedes the budget half of the 2026-09-05 entry "The
+beats planner gets a high-action budget…"; the other two changes in that entry (the
+wanted-picture-per-act check and the ranked re-plan) are untouched.
+
+**Touched files:** `prompts/story-beats.txt`, `server/lib/planCounters.js`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`tests/unit/plan-replan-ranking.test.ts`
+**Status:** ✅ active — staging only, not on master

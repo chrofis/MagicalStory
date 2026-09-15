@@ -1,46 +1,30 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
-const { highActionPageBudget, highActionPagesPhrase, runPlanCounters } = require('../../server/lib/planCounters');
+const { runPlanCounters } = require('../../server/lib/planCounters');
 const { parsePlanCheck, buildReplanSection, replanRank, findingPages, buildBeatsPrompt } = require('../../server/lib/promptBuilders');
 
-describe('high-action page budget', () => {
-  it('scales with the book: 1 short, 2 normal, 3 long', () => {
-    expect(highActionPageBudget(6)).toBe(1);
-    expect(highActionPageBudget(8)).toBe(1);
-    expect(highActionPageBudget(9)).toBe(2);
-    expect(highActionPageBudget(16)).toBe(2);
-    expect(highActionPageBudget(17)).toBe(3);
-    expect(highActionPageBudget(24)).toBe(3);
+// Owner ruling 2026-09-15: the high-action grant is GONE. plan-check.txt
+// checks 9 and 10 (deed-and-effect, two heights) are now universally true, so
+// the planner may no longer buy its way out of them, and no budget, phrase or
+// stat survives.
+describe('the high-action grant is gone', () => {
+  it('exports no budget helper', () => {
+    const pc = require('../../server/lib/planCounters');
+    expect(pc.highActionPageBudget).toBeUndefined();
+    expect(pc.highActionPagesPhrase).toBeUndefined();
   });
 
-  it('falls back to the short-book budget on a junk page count', () => {
-    expect(highActionPageBudget(undefined as any)).toBe(1);
-    expect(highActionPagesPhrase(18)).toBe('three pages');
-    expect(highActionPagesPhrase(12)).toBe('two pages');
-    expect(highActionPagesPhrase(4)).toBe('one page');
-  });
-});
-
-describe('counters stay consistent with the allowance', () => {
-  const pages = [
-    { pageNumber: 1, planLine: 'close-up — Mara — Mara grips the rail — she has decided' },
-    { pageNumber: 2, planLine: 'wide — Mara and the creature — the creature lifts Mara off the ground — they are together' },
-  ];
-  // The plan check's roster is what tells the counters who is a person; without
-  // it they refuse to run (the grammar that used to guess was deleted 2026-09-11).
-  const roster = new Map<number, { people: string[]; things: string[] }>([
-    [1, { people: ['Mara'], things: [] }],
-    [2, { people: ['Mara'], things: [] }],
-  ]);
-
-  it('carries the budget into the stats and raises no finding against a high-action page', () => {
-    const res = runPlanCounters({ pages, roster, commissionedNames: ['Mara'], highActionPages: 2 });
-    expect(res.stats.highActionAllowance).toBe(2);
-    // Nothing here counts interlocking, elevation or creatures; only NAMES.
-    expect(res.findings.some((f: any) => f.code === 'CAST_OVER_CEILING')).toBe(false);
-  });
-  it('defaults the allowance from the page count when the caller omits it', () => {
-    expect(runPlanCounters({ pages, roster }).stats.highActionAllowance).toBe(1);
+  it('reports no allowance in the stats', () => {
+    const pages = [
+      { pageNumber: 1, planLine: 'close-up — Mara — Mara grips the rail — she has decided' },
+      { pageNumber: 2, planLine: 'wide — Mara — Mara pulls the rope — the sail is up' },
+    ];
+    const roster = new Map<number, { people: string[]; things: string[] }>([
+      [1, { people: ['Mara'], things: [] }],
+      [2, { people: ['Mara'], things: [] }],
+    ]);
+    const res = runPlanCounters({ pages, roster, commissionedNames: ['Mara'] });
+    expect(res.stats).not.toHaveProperty('highActionAllowance');
   });
 });
 
@@ -122,12 +106,12 @@ describe('re-plan ranking', () => {
   });
 });
 
-describe('the planner prompt carries the injected budget', () => {
+describe('the planner prompt', () => {
   beforeAll(async () => {
     await require('../../server/services/prompts').loadPromptTemplates();
   });
 
-  it('fills {HIGH_ACTION_PAGES} and leaves no placeholder behind', () => {
+  it('grants no high-action exemption and leaves no placeholder behind', () => {
     const prompt = buildBeatsPrompt(
       { characters: [{ name: 'Mara', age: 7 }], language: 'de', pages: 18 },
       18,
@@ -135,7 +119,7 @@ describe('the planner prompt carries the injected budget', () => {
     );
     expect(prompt).toBeTruthy();
     expect(prompt).not.toContain('{HIGH_ACTION_PAGES}');
-    expect(prompt).toContain('Up to three pages in the book may stage a high-action instant');
+    expect(prompt).not.toContain('high-action instant');
     expect(prompt).toContain('the reunion outranks the bystander');
   });
 
