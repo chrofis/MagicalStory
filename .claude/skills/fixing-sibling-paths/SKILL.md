@@ -36,6 +36,13 @@ advisory; the registry is a control. Use both, and trust the registry.
 5. Commit message lists the siblings checked, so the next session can see coverage.
    If a declared sibling genuinely needs no change, say why with the gate's escape
    marker: `Siblings-Checked: <reason>`. An empty marker is not accepted.
+6. If the gate blocks an EARLIER commit whose sibling was fixed in an already-pushed
+   commit, do not rebase to reword it — add one `git commit --allow-empty` that
+   vouches for it by sha: `Siblings-Checked: <sha-prefix ≥ 7> — <reason>`. One such
+   commit can carry a line per blocked commit, and the gate prints `vouched by <sha>`.
+   A vouch adds history instead of rewriting hashes other notes cite. It fails closed
+   on an unresolvable, out-of-range, ambiguous or self-referential sha, or a missing
+   reason — and a vouch for another commit never excuses its own siblings.
 
 ## Sibling axes (every one has shipped a one-sided fix before)
 

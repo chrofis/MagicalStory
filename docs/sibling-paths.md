@@ -63,8 +63,29 @@ Two things let a one-sided commit through, both deliberate:
 2. **`Siblings-Checked: <reason>` in the commit message.** It is a statement, not a
    silencer: write why the sibling needs no change. An empty marker is not accepted.
 
-The marker's main honest use is a **catch-up commit** — the sibling was fixed in an
-earlier commit that has already been pushed, so the range cannot cover it. Say so.
+3. **A later commit in the same push vouches for it by sha:**
+   `Siblings-Checked: <sha-prefix ≥ 7> — <reason>`. The gate prints
+   `vouched by <sha>` so attribution stays visible.
+
+### When to vouch instead of amending
+
+The **catch-up commit** is the case the plain marker cannot serve: the sibling was
+fixed in a commit that has already been pushed, so the range cannot cover it, and
+the gate blocks — correctly, on the evidence it can see. Amending that commit means
+a rebase, which rewrites every hash after it, and handoff notes cite those hashes.
+A vouch ADDS a commit instead of rewriting history. One `--allow-empty` commit can
+carry several vouch lines, one per blocked commit.
+
+The vouch fails closed on every way it could become a loophole — all are errors,
+never passes:
+
+- a prefix that resolves to no commit **in the push range**
+- an ambiguous prefix (use a longer one; the gate never guesses)
+- a commit vouching for itself (use the plain marker for your own siblings)
+- a missing reason
+
+A message carrying only vouches for OTHER commits does **not** double as an excuse
+for its own siblings. Tested in `tests/unit/sibling-vouching.test.ts`.
 
 ## Fail-closed
 
