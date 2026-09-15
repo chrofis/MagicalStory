@@ -445,9 +445,20 @@ function applyCoverWornHeldDedupe(photos, coverHint, visualBible) {
       for (const meta of artifactMeta) {
         if (!segmentMatches(segment, meta)) continue;
         if (heldHere.has(meta.id)) {
-          // Held per hint → not ALSO worn. Drop the worn phrasing.
-          drop = true;
-          log.info(`🧥 [COVER-CLOTHING] ${photo.name}: dropped worn segment "${segment}" — ${meta.id} is held per cover hint`);
+          // Held per hint → not ALSO worn. Drop the worn phrasing — but only
+          // for the SAME item. SLOT IDENTITY DECIDES HERE TOO (2026-09-15): the
+          // loose token matcher fires across slots, so a held cap was deleting
+          // the coat, the trousers and the boots and the model then dressed the
+          // character freely. `unrelated` is a token near-miss; `conflict` is a
+          // different item in the same slot, which a held artifact does not
+          // contradict — one can hold a cap while wearing a hat.
+          const heldVerdict = classifyOverlap(segment, meta, photo.name);
+          if (heldVerdict === 'duplicate') {
+            drop = true;
+            log.info(`🧥 [COVER-CLOTHING] ${photo.name}: dropped worn segment "${segment}" — ${meta.id} is held per cover hint`);
+          } else {
+            log.info(`🧥 [COVER-CLOTHING] ${photo.name}: kept worn segment "${segment}" — held ${meta.id} "${meta.name}" is a ${heldVerdict} match, not the same item`);
+          }
         } else if (!heldIds.has(meta.id)) {
           const verdict = classifyOverlap(segment, meta, photo.name);
           if (verdict === 'unrelated') {

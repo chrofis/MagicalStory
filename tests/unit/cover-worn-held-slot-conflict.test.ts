@@ -46,12 +46,36 @@ describe('cover worn/held dedupe — duplicate vs slot conflict', () => {
     expect(out.photos[0].clothingDescription).toContain('coat');
   });
 
-  it('a held item still wins over the worn phrasing', () => {
+  /**
+   * THE HELD BRANCH IS THE SIBLING PATH (fixed 2026-09-15). Slot-identity
+   * classification was added to the NOT-held branch only; the held branch still
+   * dropped on the loose token match, so a held cap wiped the coat, the trousers
+   * and the boots off a cover character and the model dressed them freely —
+   * exactly the bug the classification was introduced to fix, surviving one
+   * branch over.
+   */
+  it('a held item drops only the segment that IS that item', () => {
+    const hint = { characterDetails: { a: { name: 'Sarah', holds: 'ART009' } } };
+    const coat = {
+      id: 'ART009', name: 'navy-blue captain’s coat', label: "captain's coat", type: 'outer layer',
+      description: 'a long navy-blue wool coat with brass buttons.',
+    };
+    const out = applyCoverWornHeldDedupe(photos(), hint, { artifacts: [coat] });
+    expect(out.excludeElementIds).not.toContain('ART009');
+    expect(out.photos[0].clothingDescription).not.toContain('coat');
+    // and nothing else is touched
+    expect(out.photos[0].clothingDescription).toContain('trousers');
+    expect(out.photos[0].clothingDescription).toContain('boots');
+    expect(out.photos[0].clothingDescription).toContain('blouse');
+  });
+
+  it('a HELD cap never deletes the coat, the trousers or the boots', () => {
     const hint = { characterDetails: { a: { name: 'Sarah', holds: 'ART002' } } };
     const out = applyCoverWornHeldDedupe(photos(), hint, { artifacts: [cap] });
     expect(out.excludeElementIds).not.toContain('ART002');
-    // Held wins over worn phrasing: the segment the artifact matched is dropped.
-    expect(out.photos[0].clothingDescription).not.toContain('coat');
+    for (const word of ['coat', 'trousers', 'boots', 'blouse']) {
+      expect(out.photos[0].clothingDescription, word).toContain(word);
+    }
   });
 
   it('a wornAs link on the same owner+slot is a duplicate, not a conflict', () => {
