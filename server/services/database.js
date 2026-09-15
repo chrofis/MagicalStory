@@ -742,20 +742,38 @@ const EVAL_FINDING_STATS_TABLE = 'eval_finding_stats';
 // suppressed-count is reported so the silence is never mistaken for success.
 let evalFindingStatsFailures = 0;
 
+// Columns match migrations/037_eval_finding_stats.sql (minus id / created_at).
+const EVAL_FINDING_STATS_COLUMNS = [
+  'story_id', 'page_number', 'bucket', 'severity', 'owner', 'agreement',
+  'eval_type', 'art_style', 'genre', 'language', 'char_count', 'judges',
+];
+
+function evalFindingRowValues(f) {
+  return [f.story_id || null, f.page_number ?? null, f.bucket, f.severity, f.owner || null,
+    f.agreement || null, f.eval_type || null, f.art_style || null, f.genre || null,
+    f.language || null, f.char_count ?? null, f.judges || null];
+}
+
 async function recordEvalFindings(findings) {
   if (!Array.isArray(findings) || !findings.length) return;
+  // One multi-row INSERT: a page's bucket-hits land together or not at all.
+  // The former per-row loop left partial batches behind on a mid-batch error.
+  const rows = findings.filter(f => f && f.bucket && f.severity);
+  if (!rows.length) return;
   try {
-    for (const f of findings) {
-      if (!f || !f.bucket || !f.severity) continue;
-      await dbQuery(
-        `INSERT INTO ${EVAL_FINDING_STATS_TABLE}
-           (story_id, page_number, bucket, severity, owner, agreement, eval_type, art_style, genre, language, char_count, judges)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [f.story_id || null, f.page_number ?? null, f.bucket, f.severity, f.owner || null,
-         f.agreement || null, f.eval_type || null, f.art_style || null, f.genre || null,
-         f.language || null, f.char_count ?? null, f.judges || null]
-      );
-    }
+    const width = EVAL_FINDING_STATS_COLUMNS.length;
+    const params = [];
+    const tuples = rows.map((f, i) => {
+      params.push(...evalFindingRowValues(f));
+      const ph = Array.from({ length: width }, (_, j) => `$${i * width + j + 1}`);
+      return `(${ph.join(',')})`;
+    });
+    await dbQuery(
+      `INSERT INTO ${EVAL_FINDING_STATS_TABLE}
+         (${EVAL_FINDING_STATS_COLUMNS.join(', ')})
+       VALUES ${tuples.join(',')}`,
+      params
+    );
   } catch (e) {
     evalFindingStatsFailures++;
     if (evalFindingStatsFailures === 1) {

@@ -89,12 +89,16 @@ describe('eval stats sink records to its own table', () => {
 
   it('a completed evaluation writes one row per bucket into eval_finding_stats', async () => {
     const rows = realSinkRows();
-    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeGreaterThan(1);
 
     await db.recordEvalFindings(rows);
 
+    // ONE statement carrying every row — atomic. The old per-row loop could
+    // leave a partial batch behind when a later row failed.
     const inserts = queries.filter(q => /INSERT INTO/.test(q.sql));
-    expect(inserts).toHaveLength(rows.length);
+    expect(inserts).toHaveLength(1);
+    const valueTuples = inserts[0].sql.match(/\(\$\d+(?:,\$\d+)*\)/g)!;
+    expect(valueTuples).toHaveLength(rows.length);
 
     // Against the OLD code this INSERT named `eval_findings` — the registry.
     expect(inserts[0].sql).toContain('INSERT INTO eval_finding_stats');
@@ -107,12 +111,23 @@ describe('eval stats sink records to its own table', () => {
     const cols = inserts[0].sql.match(/\(([^)]*)\)\s*VALUES/)![1]
       .split(',').map(c => c.trim());
     for (const c of cols) expect(declared).toContain(c);
-    expect(cols).toHaveLength(inserts[0].params.length);
+    expect(inserts[0].params).toHaveLength(cols.length * rows.length);
+    // Placeholders are numbered contiguously across the whole batch.
+    const nums = inserts[0].sql.match(/\$\d+/g)!.map(s => Number(s.slice(1)));
+    expect(nums).toEqual(nums.map((_, i) => i + 1));
+    // Second row's bucket sits at its own offset in the flat param list.
+    expect(inserts[0].params[cols.length + cols.indexOf('bucket')]).toBe(rows[1].bucket);
 
     // story_id is the column the old target did NOT have — the exact failure.
     expect(cols).toContain('story_id');
     expect(inserts[0].params[0]).toBe('job_1788471969309');
     expect(db.getEvalFindingStatsFailureCount()).toBe(0);
+  });
+
+  it('an empty or all-invalid batch issues no query', async () => {
+    await expect(db.recordEvalFindings([])).resolves.toBeUndefined();
+    await expect(db.recordEvalFindings([null, { bucket: 'x' }])).resolves.toBeUndefined();
+    expect(queries.filter(q => /INSERT INTO/.test(q.sql))).toHaveLength(0);
   });
 
   it('a write failure is logged at error level and does not throw', async () => {
