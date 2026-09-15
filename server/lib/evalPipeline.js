@@ -179,6 +179,11 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
             const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, inventoryPrompt);
             if (grokResp.ok) {
               p1Response = grokResp;
+              // `modelId` is what the caller is told ACTUALLY answered
+              // (servedByModel, recorded by the Lab at testlab.js:6546). Leaving
+              // it on the requested id makes an A/B compare a model with itself.
+              modelId = grokFallbackId;
+              modelConfig = grokFallbackModel;
             } else {
               return null;
             }
@@ -217,6 +222,10 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
             const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, inventoryPrompt);
             if (grokResp.ok) {
               p1Data = await grokResp.json();
+              // Same reason as the HTTP-error fallback above: report the model
+              // that answered, not the one that was asked.
+              modelId = grokFallbackId;
+              modelConfig = grokFallbackModel;
               inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
               outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
               if (p1Data?.candidates?.[0]?.content?.parts?.[0]?.text) {
