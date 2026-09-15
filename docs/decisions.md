@@ -40078,3 +40078,29 @@ someone happened to notice.
 **Touched:** `server/lib/sceneMetadata.js`, `storyJobPipeline.js`,
 `tests/unit/degraded-scene-marker.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — `scene_review` joins the VB-id allow-list; beats header names config keys, not models
+
+**Context:** `isVbIdLegitimateLabel` (`server/lib/vbIdGuard.js`) strips a leading `testlab_` and
+prefix-matches `VB_ID_LEGITIMATE_LABELS`. The list had `beats_scene_review` but no bare
+`scene_review`, so production (`usageLabel: 'beats_scene_review'`) was silent while the Lab
+(`testlab_scene_review` → strips to `scene_review`) warned on every run. The ids BELONG in that
+prompt: the guard's own doc names the scene reviewer as a stage whose contract IS the id vocabulary,
+and the stored prompt carries `"looksAt": "VEH001"` citations the reviewer must read back.
+Separately, the `beatsPipeline.js` header comment listed a hardcoded model per stage and had said
+"Sonnet" for the Art Director for weeks after it moved to `gemini-3.1-pro` — it sent an
+investigator to the wrong model for ten minutes.
+
+**Decision:** add `'scene_review'` to the allow-list (an allow-list entry, not sanitisation). As a
+prefix it also covers `testlab_scene_review_replay`, same contract — intended. Audited every
+`usageLabel` in `server/` and `scripts/`: the only labels beginning `scene_review` are the scene
+reviewer and its replay, so the prefix sweeps in nothing unintended. The beats header now names the
+`server/config/models.js` key each stage resolves from (`MODEL_DEFAULTS.outline`,
+`.sceneDescription`, `.sceneReviewModel`, `.storyText`) so it cannot go stale on a model swap.
+
+**Rationale:** an UNKNOWN label warns by design — that is the guard working. A known-legitimate
+stage that warns is noise that trains readers to ignore it.
+
+**Touched:** `server/lib/vbIdGuard.js`, `server/lib/beatsPipeline.js` (header comment only),
+`tests/unit/vbid-allowlist-scene-review.test.ts`
+**Status:** ✅ active

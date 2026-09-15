@@ -120,7 +120,7 @@ const VB_ID_LEGITIMATE_LABELS = [
   'clothing_review',
   'outline_review',
   'regen_expansion', 'regen_iterate', 'regen_refine', 'regen_scene',
-  'scene_expansion', 'scene_iterate', 'scene_rewrite', 'scene_validation',
+  'scene_expansion', 'scene_iterate', 'scene_review', 'scene_rewrite', 'scene_validation',
   'story_ideas',
 ];
 

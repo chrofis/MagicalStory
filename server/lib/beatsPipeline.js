@@ -21,16 +21,23 @@ const { buildCharacterDescription } = require('./visualBible');
  *      to one, a panel of outside models proposes solutions, the same creator
  *      re-tells the story whole. Replaces the old arc audit/review chain
  *      (owner, 2026-08-30 — see docs/decisions.md)
- *   1. beats_plan            Sonnet    PAGE PLAN (one plan line per page), FROM the approved arc
+ *   1. beats_plan            MODEL_DEFAULTS.outline    PAGE PLAN (one plan line per
+ *      page), FROM the approved arc
  *   2. plan_check            counters + one cheap call: arithmetic over the
  *      DIVISION only, then at most ONE re-plan by the planner. No story
  *      checking happens at this layer by design (owner, 2026-09-01)
- *   3. beats_story_bible     Sonnet    CLOTHING REQUIREMENTS only
- *   4. beats_scene_expansion Sonnet    ONE call over ALL pages: the VISUAL BIBLE
+ *   3. beats_story_bible     MODEL_DEFAULTS.outline    CLOTHING REQUIREMENTS only
+ *   4. beats_scene_expansion MODEL_DEFAULTS.sceneDescription  ONE call over ALL pages: the VISUAL BIBLE
  *      and the COVER SCENE HINTS first, then every page's brief (cross-page
  *      continuity, and no page can cite an element nobody declared)
- *   5. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
- *   6. beats_story_text      Sonnet    page text written from the arc + the locked plan lines
+ *   5. beats_scene_review    MODEL_DEFAULTS.sceneReviewModel  ONE call over ALL briefs, rewrites faulted
+ *   6. beats_story_text      MODEL_DEFAULTS.storyText  page text written from the arc + the locked plan lines
+ *
+ * Model names are NOT written here: every stage above names the
+ * server/config/models.js key it resolves from, so this header cannot go
+ * stale when a model is swapped. (It had said "Sonnet" for the Art Director
+ * for weeks after it moved to gemini-3.1-pro, and sent an investigator to the
+ * wrong model.)
  *
  * Scheduling is by data dependency, not by list order:
  *
