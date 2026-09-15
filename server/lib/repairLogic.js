@@ -138,11 +138,18 @@ function findSafeRepairableFinding(result) {
  * @param {boolean} o.extraRoundUsed   an extra round has already been granted
  * @returns {{ runAudit: boolean, mayGrantExtraRound: boolean }}
  */
-function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed }) {
+function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed, finalRound = null }) {
   const runAudit = !bookUnchanged;
+  // `finalRound` is the CALLER's answer to "is this the book that ships". The
+  // round loop also exits early — no bad pages left, or nothing actionable —
+  // and on those exits `round >= roundLimit` is false while the book in hand is
+  // nevertheless final, so deriving it here could never grant the extra round
+  // to a run that converged ahead of its limit. Omitted, the old derivation
+  // still applies.
+  const isFinal = finalRound === null ? round >= roundLimit : finalRound === true;
   return {
     runAudit,
-    mayGrantExtraRound: runAudit && !extraRoundUsed && round >= roundLimit,
+    mayGrantExtraRound: runAudit && !extraRoundUsed && isFinal,
   };
 }
 

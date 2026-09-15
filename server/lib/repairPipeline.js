@@ -1901,6 +1901,87 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // bad-page list, then cleared — it can only ever be filled once.
   let auditAdmittedNums = [];
 
+  /**
+   * ONE book-audit round. Extracted from the round loop so the two early exits
+   * (no bad pages left, nothing actionable) can run it before they break: this
+   * audit reads the book that actually SHIPS, and its one-extra-round grant is
+   * the only route back into repair for a CRITICAL the per-page judges missed.
+   * A run that converged in round 2 of 3 left the loop before this block and
+   * was never audited at all.
+   */
+  const runBookAuditRound = async ({ round, bookUnchanged, finalRound }) => {
+    const { planBookAuditRound, admitPagesFromAudit } = require('./repairLogic');
+    const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed, finalRound });
+    if (auditPlan.runAudit) {
+      try {
+        const { auditStoryBook, buildAuditPages } = require('./bookAudit');
+        // ONE resolver for "what does the reader actually get on this page" —
+        // the picked version's bytes and the final page text. Never rebuild
+        // this expression inline: the inline version read `img.text` straight
+        // off the page object, which was PRE-REFINE prose.
+        const auditPages = buildAuditPages(rawImages, (pageNumber) => selectBestVersion(pageVersions.get(pageNumber) || []));
+        const audit = auditPages.length > 0
+          ? await auditStoryBook({ id: consolidatorStoryId, sceneImages: auditPages }, { usageTracker })
+          : null;
+        if (audit) {
+          readerFindingsByPage.clear();
+          for (const f of audit.byRoute.IMG) {
+            // Page-scoped only — a fault with no page number cannot be routed
+            // to a consolidator call, which is per page.
+            if (f.page == null) continue;
+            if (!readerFindingsByPage.has(f.page)) readerFindingsByPage.set(f.page, []);
+            // PROVENANCE (2026-09-14): a `missing_character` CRITICAL that came
+            // from the READER pass rather than a per-page judge is by design, not
+            // a bug — a diagnosis that cost an investigation because this merge
+            // dropped the origin. `reader` rides along from here.
+            const fs_ = require('./findingSources');
+            readerFindingsByPage.get(f.page).push({
+              severity: f.severity || null,
+              line: f.line,
+              sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),
+            });
+          }
+          // Compact per-round record — same shape as entityHistory's entries.
+          // The full `raw` transcript is kept for the FINAL audit only.
+          bookAuditRounds.push({
+            round,
+            checkedAt: new Date().toISOString(),
+            modelId: audit.modelId,
+            faults: audit.faults,
+            byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
+            // IMG faults verbatim — the evidence for what the next round was
+            // told. TEXT faults are the final audit's business.
+            imgFaults: audit.byRoute.IMG,
+            pagesRead: audit.pagesRead,
+            pagesSkipped: audit.pagesSkipped,
+          });
+          const record = bookAuditRounds[bookAuditRounds.length - 1];
+          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);
+
+          // FINAL AUDIT → ONE EXTRA ROUND. Severity decides admission and
+          // nothing else; the fault lines reach the consolidator unread by code.
+          record.finalRound = finalRound === true || round >= roundLimit;
+          if (auditPlan.mayGrantExtraRound) {
+            const admitted = admitPagesFromAudit(audit.byRoute.IMG);
+            if (admitted.length > 0) {
+              auditAdmittedNums = admitted;
+              extraAuditRoundUsed = true;
+              roundLimit = round + 1;
+              record.extraRoundGranted = true;
+              record.extraRoundAdmittedPages = admitted;
+              log.warn(`📖 [BOOK-AUDIT] Final audit of the shipping book found CRITICAL/CATASTROPHIC IMG fault(s) on page(s) ${admitted.join(', ')} — granting ONE extra repair round (round ${roundLimit})`);
+            } else {
+              record.extraRoundGranted = false;
+              log.info(`📖 [BOOK-AUDIT] Final audit: no CRITICAL/CATASTROPHIC IMG fault — book ships as audited`);
+            }
+          }
+        }
+      } catch (auditErr) {
+        // A missing measurement never costs a paid-for repair round.
+        log.warn(`⚠️ [BOOK-AUDIT] Round ${round} mid-loop audit skipped: ${auditErr.message}`);
+      }
+    }
+  };
   for (let round = 1; round <= roundLimit; round++) {
     // Build eval map for this round using best versions so far. Each entry now
     // carries explicit visualScore / semanticPenalty / imageScore / entityPenalty /
@@ -2054,6 +2135,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     if (badPages.length === 0) {
       log.info(`✅ [UNIFIED PIPELINE] Round ${round}: No bad pages, stopping repair loop`);
+      // The book that SHIPS is read before the loop exits. Converging early
+      // used to skip the audit entirely, so the one-extra-round grant could
+      // never fire on a run that finished ahead of its round limit.
+      await runBookAuditRound({ round, bookUnchanged: false, finalRound: true });
+      if (auditAdmittedNums.length > 0) continue;  // the audit bought one more round
       break;
     }
     require('./runMetrics').forJob(storyData?.id || jobId).add('redo_trigger', badPages.length);
@@ -2155,6 +2241,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const repairableCount = (counts.iterate || 0) + (counts.inpaint || 0) + (counts['char-fix'] || 0) + (counts.recolour || 0);
     if (repairableCount === 0) {
       log.info(`✅ [UNIFIED PIPELINE] Round ${round}: nothing actionable, stopping repair loop`);
+      // The book that SHIPS is read before the loop exits. Converging early
+      // used to skip the audit entirely, so the one-extra-round grant could
+      // never fire on a run that finished ahead of its round limit.
+      await runBookAuditRound({ round, bookUnchanged: bookAuditRounds.length > 0, finalRound: true });
+      if (auditAdmittedNums.length > 0) continue;  // the audit bought one more round
       break;
     }
 
@@ -2697,78 +2788,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // Second spend guard: a round where every repair failed leaves the book
     // byte-identical, so re-auditing it buys the same findings twice. It still
     // runs when no audit has happened yet — those findings are new.
-    const bookUnchanged = roundSuccess.length === 0 && bookAuditRounds.length > 0;
-    const { planBookAuditRound, admitPagesFromAudit } = require('./repairLogic');
-    const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed });
-    if (auditPlan.runAudit) {
-      try {
-        const { auditStoryBook, buildAuditPages } = require('./bookAudit');
-        // ONE resolver for "what does the reader actually get on this page" —
-        // the picked version's bytes and the final page text. Never rebuild
-        // this expression inline: the inline version read `img.text` straight
-        // off the page object, which was PRE-REFINE prose.
-        const auditPages = buildAuditPages(rawImages, (pageNumber) => selectBestVersion(pageVersions.get(pageNumber) || []));
-        const audit = auditPages.length > 0
-          ? await auditStoryBook({ id: consolidatorStoryId, sceneImages: auditPages }, { usageTracker })
-          : null;
-        if (audit) {
-          readerFindingsByPage.clear();
-          for (const f of audit.byRoute.IMG) {
-            // Page-scoped only — a fault with no page number cannot be routed
-            // to a consolidator call, which is per page.
-            if (f.page == null) continue;
-            if (!readerFindingsByPage.has(f.page)) readerFindingsByPage.set(f.page, []);
-            // PROVENANCE (2026-09-14): a `missing_character` CRITICAL that came
-            // from the READER pass rather than a per-page judge is by design, not
-            // a bug — a diagnosis that cost an investigation because this merge
-            // dropped the origin. `reader` rides along from here.
-            const fs_ = require('./findingSources');
-            readerFindingsByPage.get(f.page).push({
-              severity: f.severity || null,
-              line: f.line,
-              sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),
-            });
-          }
-          // Compact per-round record — same shape as entityHistory's entries.
-          // The full `raw` transcript is kept for the FINAL audit only.
-          bookAuditRounds.push({
-            round,
-            checkedAt: new Date().toISOString(),
-            modelId: audit.modelId,
-            faults: audit.faults,
-            byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
-            // IMG faults verbatim — the evidence for what the next round was
-            // told. TEXT faults are the final audit's business.
-            imgFaults: audit.byRoute.IMG,
-            pagesRead: audit.pagesRead,
-            pagesSkipped: audit.pagesSkipped,
-          });
-          const record = bookAuditRounds[bookAuditRounds.length - 1];
-          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);
-
-          // FINAL AUDIT → ONE EXTRA ROUND. Severity decides admission and
-          // nothing else; the fault lines reach the consolidator unread by code.
-          record.finalRound = round >= roundLimit;
-          if (auditPlan.mayGrantExtraRound) {
-            const admitted = admitPagesFromAudit(audit.byRoute.IMG);
-            if (admitted.length > 0) {
-              auditAdmittedNums = admitted;
-              extraAuditRoundUsed = true;
-              roundLimit = round + 1;
-              record.extraRoundGranted = true;
-              record.extraRoundAdmittedPages = admitted;
-              log.warn(`📖 [BOOK-AUDIT] Final audit of the shipping book found CRITICAL/CATASTROPHIC IMG fault(s) on page(s) ${admitted.join(', ')} — granting ONE extra repair round (round ${roundLimit})`);
-            } else {
-              record.extraRoundGranted = false;
-              log.info(`📖 [BOOK-AUDIT] Final audit: no CRITICAL/CATASTROPHIC IMG fault — book ships as audited`);
-            }
-          }
-        }
-      } catch (auditErr) {
-        // A missing measurement never costs a paid-for repair round.
-        log.warn(`⚠️ [BOOK-AUDIT] Round ${round} mid-loop audit skipped: ${auditErr.message}`);
-      }
-    }
+    // Mid-loop audit of the CURRENT book. `finalRound` says this is the book
+    // that ships, which is what may buy one extra repair round.
+    await runBookAuditRound({
+      round,
+      bookUnchanged: roundSuccess.length === 0 && bookAuditRounds.length > 0,
+      finalRound: round >= roundLimit,
+    });
   }
 
   // =========================================================================
