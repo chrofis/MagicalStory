@@ -10,4 +10,6 @@ One line per fault, nothing else:
 
 PAGE <n>: '<the faulty words, copied exactly as they stand in that page's AFTER text>' -> '<the corrected words>'
 
-Quote the shortest span that contains the fault, character for character from the AFTER text. Give one correction, never alternatives. Correct only the faulty words, plus what agreement forces inside the span you quote. A page the rewrite did not damage gets no line. Write NONE when no page was damaged.
+Quote the WHOLE SENTENCE the fault stands in, character for character as it stands in that page's AFTER text, and give that whole sentence corrected. A fix that changes a word's gender, number or case forces agreement on the words around it — the article, the preposition and its contraction, the adjective, the participle — and a span that stops short of them leaves the sentence broken in a new way. Read the sentences before and after to judge the fault; quote and correct only the sentence it is in.
+
+One line per sentence, not one line per fault: a sentence with several faults is quoted once and comes back with all of them corrected. Give one correction, never alternatives. Change nothing in the sentence but the faults and the agreement they force. A page the rewrite did not damage gets no line. Write NONE when no page was damaged.
