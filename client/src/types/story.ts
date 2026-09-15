@@ -140,8 +140,11 @@ export interface LifeChallenge {
    * Which way the topic pulls. `friction` is a current struggle, `milestone` a
    * current joy or thing worth marking, `both` a topic that is genuinely each
    * at once — a new sibling is exciting AND produces jealousy; a first
-   * kindergarten day is proud AND frightening. `both` acts as a wildcard in the
-   * trial grid's pole quota, counting toward whichever side is short.
+   * kindergarten day is proud AND frightening. In the trial grid (`composeTrialGrid`)
+   * `both` counts toward NEITHER side: it is exempt from the friction quota, and
+   * it does not fill the reserved milestone seat, which only a `milestone` topic
+   * takes. Documented as "counts toward whichever side is short" until 2026-09-15;
+   * the code has never done that.
    */
   pole?: 'friction' | 'milestone' | 'both';
   /**

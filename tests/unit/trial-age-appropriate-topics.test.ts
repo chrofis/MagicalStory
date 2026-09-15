@@ -425,4 +425,22 @@ describe('adventure themes carry no age data', () => {
     const { storyTypes } = await import('../../client/src/constants/storyTypes');
     expect(storyTypes.every(t => !('suitableAges' in t))).toBe(true);
   });
+
+  it("a 'both' topic counts toward neither pole — it is exempt from the friction quota and never fills the milestone seat", () => {
+    // Pinned because client/src/types/story.ts documented the opposite (a
+    // wildcard counting toward whichever side is short) until 2026-09-15, while
+    // composeTrialGrid has only ever counted pole === 'friction' toward the
+    // quota and reserved the first seat for a pole === 'milestone' topic.
+    const MAX_FRICTION = 4; // TRIAL_MAX_FRICTION, private to storyTypes.ts
+    for (const age of [3, 5, 7, 9]) {
+      const grid = getTrialLifeChallenges(age);
+      // Only strict-friction tiles are counted — a 'both' tile does not add to
+      // the total, so a grid may hold MAX_FRICTION friction tiles plus 'both's.
+      expect(grid.filter(c => c.pole === 'friction').length).toBeLessThanOrEqual(MAX_FRICTION);
+      // And the reserved seat goes to a pure milestone, never to a 'both'.
+      const milestones = lifeChallenges.filter(c => c.pole === 'milestone' && topicFitsAge(c, age)
+        && trialLifeChallengeIds.includes(c.id));
+      if (milestones.length) expect(grid.some(c => c.pole === 'milestone')).toBe(true);
+    }
+  });
 });
