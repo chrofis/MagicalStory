@@ -3,7 +3,7 @@
 
 You write children's stories. Create a {PAGES}-scene story.
 SHORT story — {PAGES} scenes. Keep it focused:
-- One clear conflict, one resolution. No subplots. The conflict is an outside event with something at stake — a thing lost, broken, blocked, run out or wanted by two at once — never a feeling on its own.
+- One clear conflict, one resolution. No subplots. The conflict is an outside event with something at stake — something that happens in the world, never a feeling on its own.
 - Introduce quickly (scene 1), build tension (2-3), resolve (4-5).
 - The low point — the setback or loss — gets a scene of its own; the loss and its resolution never share a scene.
 

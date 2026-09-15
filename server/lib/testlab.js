@@ -8319,7 +8319,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
   let categoryContext = '';
   if (storyCategory === 'life-challenge') {
     const guide = getTeachingGuide('life-challenge', storyTopic);
-    categoryContext = `This is a life skills story about "${storyTopic}". The idea names one outside event that forces the child to use this skill — something lost, broken, blocked, run out or wanted by two at once — and what it costs them.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
+    categoryContext = `This is a life skills story about "${storyTopic}". The idea names one outside event that forces the child to use this skill — something that happens in the world, never a feeling on its own — and what it costs them.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
   } else if (storyCategory === 'historical') {
     categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
   } else if (storyCategory === 'swiss-stories') {
