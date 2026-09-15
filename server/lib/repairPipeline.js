@@ -1492,48 +1492,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return { pageNumber, imageData: null, error: 'char-fix produced no usable image' };
     }
 
-    // FACE-INTEGRITY GATE (owner, 2026-09-12). A char fix is a MASKLESS whole-frame
-    // edit (docs/SETTLED.md: the same class that erased a named animal's head), so
-    // an additive instruction can repaint a head it was never meant to touch. On
-    // job_1789207854566_l43qgl34w p9 the finding was a false "missing tricorn hat"
-    // against a figure already wearing one; the repair erased the face to a
-    // featureless smear AND removed the hat, then out-scored the original 70 to 10
-    // because no evaluator reads faces. Comparative, not a judgment: the input's
-    // faces are counted, the output's are counted, and a repair that DESTROYS one
-    // is refused. Fails OPEN — a detector outage returns the repair untouched
-    // rather than stalling a paid run: `detectIllustrationFaces` yields [] both
-    // for "no faces" and for "service down", so an outage reads as nBefore = 0
-    // and the gate simply does not act. NOT yet proven against a live detector
-    // — there is no Python analyzer on the dev machine — so the first real
-    // char fix on staging is the test; watch for the refusal log line and the
-    // `repair_reject_face_integrity` metric.
-    try {
-      const { PROMPT_TEMPLATES } = require('../services/prompts');
-      const { callTextModel } = require('./textModels');
-      const template = PROMPT_TEMPLATES.repairFaceCheck;
-      if (template) {
-        const res = await callTextModel(
-          template.replace(/\{CHARACTER\}/g, charName || 'the repaired character'),
-          // null = model max (owner rule: no output caps anywhere). A numeric
-          // 400 here was the one offender tests/unit/no-output-caps.test.ts
-          // found; a truncated JSON verdict is worse than a long one.
-          null,
-          MODEL_DEFAULTS.repairFaceCheck || 'gemini-3.7-flash',
-          { images: [currentImageData, repairResult.imageData], usageLabel: 'repair_face_check' }
-        );
-        if (res?.usage && usageTracker) usageTracker('openrouter', res.usage, 'repair_face_check', res.modelId);
-        const raw = String(res?.text || '');
-        const json = raw.match(/\{[\s\S]*\}/);
-        const verdict = json ? JSON.parse(json[0]) : null;
-        if (verdict && verdict.intact === false) {
-          log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair left the face unreadable (${verdict.reason || 'no reason given'}). Keeping the original.`);
-          require('./runMetrics').forJob(storyData?.id || jobId).count('repair_reject_face_integrity');
-          return { pageNumber, imageData: null, error: `char-fix refused: face not intact after repair (${verdict.reason || ''})` };
-        }
-        log.debug(`[CHAR-FIX] Page ${pageNumber} ${charName}: face check ${verdict ? 'intact' : 'unparsed'}`);
-      }
-    } catch (faceErr) {
-      log.warn(`⚠️ [CHAR-FIX] Page ${pageNumber}: face check unavailable (${faceErr.message}) — accepting the repair`);
+    // FACE-INTEGRITY GATE — one implementation, shared with the two manual
+    // char-repair entry points (faceIntegrityGate.js carries the rationale).
+    const faceGate = await require('./faceIntegrityGate').checkFaceIntegrity(
+      currentImageData,
+      repairResult.imageData,
+      charName,
+      { log, usageTracker, jobKey: storyData?.id || jobId, context: `CHAR-FIX Page ${pageNumber} ${charName}` }
+    );
+    if (!faceGate.ok) {
+      log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
+      return { pageNumber, imageData: null, error: `char-fix refused: face not intact after repair (${faceGate.reason})` };
     }
 
     if (repairResult.usage && usageTracker) {

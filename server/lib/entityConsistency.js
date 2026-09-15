@@ -3261,6 +3261,25 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       };
     }
 
+    // FACE-INTEGRITY GATE — the same gate the unified pipeline applies. A char
+    // fix is a maskless whole-frame edit and can smear the face it was meant to
+    // correct; this entry point shipped those unchecked until 2026-09-15.
+    const faceGate = await require('./faceIntegrityGate').checkFaceIntegrity(
+      pageImage,
+      grokResult.imageData,
+      charName,
+      { log, jobKey: storyData?.id || null, context: `SINGLE-PAGE-REPAIR p${pageNumber} ${charName}` }
+    );
+    if (!faceGate.ok) {
+      log.warn(`🚫 [SINGLE-PAGE-REPAIR] ${charName} p${pageNumber}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
+      return {
+        success: false,
+        error: `Repair rejected — face not intact after repair (${faceGate.reason})`,
+        rejectedReason: 'face_integrity',
+        gateMessage: faceGate.reason,
+      };
+    }
+
     const repairedPageData = grokResult.imageData;
 
     log.info(`✅ [SINGLE-PAGE-REPAIR] Page ${pageNumber} repaired for ${charName} via Grok blended`);

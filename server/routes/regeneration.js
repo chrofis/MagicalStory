@@ -5890,6 +5890,32 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             }
           );
 
+          // FACE-INTEGRITY GATE — the same gate the unified pipeline applies.
+          // A char fix is a maskless whole-frame edit and can smear the face it
+          // was meant to correct; the one repair a user can trigger by hand
+          // shipped those unchecked until 2026-09-15.
+          const faceGate = grokResult.imageData
+            ? await require('../lib/faceIntegrityGate').checkFaceIntegrity(
+              sceneImage.imageData,
+              grokResult.imageData,
+              characterName,
+              { log, jobKey: id, context: `CHAR REPAIR p${pageNumber} ${characterName}` }
+            )
+            : { ok: true, available: false, reason: null };
+          if (grokResult.imageData && !faceGate.ok) {
+            log.warn(`🚫 [CHAR REPAIR] Page ${pageNumber} ${characterName}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
+            return {
+              task, error: true,
+              failReason: `Repair rejected — face not intact after repair (${faceGate.reason})`,
+              rejectedReason: 'face_integrity',
+              gateMessage: faceGate.reason,
+              attempts: grokResult?.attempts ?? null,
+              // The pictures too — a rejected repair the panel cannot render is
+              // indistinguishable from one that never ran.
+              attemptFrames: grokResult?.attemptFrames || [],
+            };
+          }
+
           if (grokResult.imageData) {
             repairResult = {
               success: true,

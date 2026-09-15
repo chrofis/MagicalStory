@@ -492,6 +492,13 @@ const MODEL_DEFAULTS = {
   // Was the same key as qualityEval until 2026-09-07.
   inventoryModel: require('./runtime').runtime('inventoryModel'),
   bboxDetection: 'gemini-2.5-flash',        // Bounding box detection — kept on the same tier as qualityEval so missing-object detection lines up with the eval that uses it.
+  // Face-integrity gate on a char repair (faceIntegrityGate.js). Same tier as
+  // qualityEval: a two-image comparative yes/no, and the native Gemini path
+  // takes no `reasoning` option — gemini-3.7-flash, which the gate named as a
+  // hardcoded fallback while this key did not exist, 400s on OpenRouter without
+  // one ("reasoning is mandatory", evalPipeline.js:255) and the gate then failed
+  // open on every single call.
+  repairFaceCheck: 'gemini-2.5-flash',
 
   // Image-prompt compression — the head rewrite in shrinkPromptForModel when a
   // page prompt exceeds the backend's char budget. NOT a utility call: what it
