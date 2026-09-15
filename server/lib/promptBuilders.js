@@ -3989,7 +3989,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // decisions.md 2026-08-26 made that orientation reach the prompt via
         // the copied description; with the description gone it rides the lead
         // instead, so the pair mechanism keeps its text channel.
-        const qualifier = (obj.name && obj.name.match(/\(([^)]+)\)\s*$/)) ? ` (${obj.name.match(/\(([^)]+)\)\s*$/)[1]})` : '';
+        // ONLY an orientation qualifier rides the lead. The bible's clothing
+        // naming convention puts the WEARER in that same trailing parenthetical
+        // ("<garment> (<CharacterName>)"), and this regex took it too — so a
+        // character's name reached the image-facing label of a garment, which is
+        // exactly the leak 32c825a61 closed. Decided structurally against
+        // `wornBy`, never by reading the text.
+        const parenthetical = obj.name ? (obj.name.match(/\(([^)]+)\)\s*$/) || [])[1] : null;
+        const isWearerParenthetical = !!parenthetical && !!obj.wornBy
+          && parenthetical.trim().toLowerCase() === String(obj.wornBy).trim().toLowerCase();
+        const qualifier = (parenthetical && !isWearerParenthetical) ? ` (${parenthetical})` : '';
         const refName = (obj.type === 'animal' && obj.name)
           ? obj.name
           : elementLeadLabel(refEntry, { language, type: obj.type });
