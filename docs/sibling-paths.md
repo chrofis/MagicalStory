@@ -57,6 +57,52 @@ One entry in `sets`:
 The gate refuses to run against a set naming a file that does not exist — a stale
 member makes a set silently unenforceable.
 
+## Generator and critic are siblings too
+
+Owner, 2026-09-15: *"we fix the reviewer, but we never told the creator the change."*
+
+A judge and the thing it judges are a sibling pair, and the repo's second-commonest
+partial fix is a rule added to the critic and never given to the generator. The page
+is then penalised for something it was never asked to do — the finding is real, the
+deduction is real, and no rewrite can satisfy it, because the instruction does not
+exist on the side that writes the page.
+
+Those sets declare **roles** instead of a flat member list:
+
+```json
+{
+  "id": "page-image-generator-vs-critics",
+  "axis": "generator-vs-critic",
+  "generators": ["prompts/image-generation.txt"],
+  "critics": ["prompts/image-evaluation.txt", "prompts/image-semantic.txt",
+              "prompts/image-prompt-compliance.txt"],
+  "severity": "block"
+}
+```
+
+The rule is genuinely different and deliberately looser: a commit touching the set
+must touch **at least one generator AND at least one critic**, not every member.
+Three judges of one generator are not siblings of each other; each is a sibling of
+the generator.
+
+The gate names which direction it caught, because they are different mistakes:
+
+- **critic without generator** — "a rule added to a judge is a rule the generator
+  must be told."
+- **generator without critic** — "the generator learned something its judge does not
+  know; the judge will score the new behaviour as a defect."
+
+**Prefer one JS constant injected into both templates** over two hand-kept copies —
+two copies of a rule is the same disease one level down. A new placeholder must be
+declared where the builder fills it (`fillTemplate` drops an undeclared key silently)
+and pinned against the REAL builder in `tests/unit/built-prompt-values.test.ts`,
+never against template text.
+
+**Classification is not yours to change.** Altering what type a finding gets, which
+bucket it bills to, or what it costs is the owner's call — read `docs/SETTLED.md`
+and ask. Adding the generator-side counterpart of an existing judge rule is not a
+classification change. Skill: `syncing-generator-and-critic`.
+
 ## The escape hatch
 
 Two things let a one-sided commit through, both deliberate:

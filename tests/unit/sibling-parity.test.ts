@@ -18,6 +18,8 @@ import { describe, it, expect } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 
+const NL = String.fromCharCode(10);
+
 const ROOT = path.join(__dirname, '..', '..');
 const registry = JSON.parse(
   fs.readFileSync(path.join(ROOT, 'scripts/admin/sibling-registry.json'), 'utf8')
@@ -93,6 +95,26 @@ for (const set of registry.sets) {
           const have = new Set(keys);
           for (const k of union) {
             if (!have.has(k)) gaps.push(`${m} is missing "${k}" — omission reads as absent/false at runtime`);
+          }
+        }
+        expect(gaps, set.reason).toEqual([]);
+      });
+    }
+
+    if (Array.isArray(parity.ruleAnchors) && parity.ruleAnchors.length) {
+      it('every critic-side rule has its generator-side counterpart', () => {
+        // The owner's disease: "we fix the reviewer, but we never told the
+        // creator the change." A judge may only deduct for a rule the generator
+        // was given. Anchors are literal phrases, so a reworded rule fails loudly
+        // on the critic side too rather than silently ceasing to be checked.
+        const genText = (set.generators || []).map(read).join(NL);
+        const critText = (set.critics || []).map(read).join(NL);
+        const gaps: string[] = [];
+        for (const r of parity.ruleAnchors) {
+          if (!critText.includes(r.critic)) {
+            gaps.push(`critic anchor has gone stale: "${r.critic}" is no longer in ${(set.critics || []).join(', ')}. Update the registry entry, or restore the rule.`);
+          } else if (!genText.includes(r.generator)) {
+            gaps.push(`the judge enforces "${r.critic}" but no generator states "${r.generator}" — ${r.note || 'the page is penalised for something it was never asked to do'}`);
           }
         }
         expect(gaps, set.reason).toEqual([]);
