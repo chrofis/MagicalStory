@@ -217,6 +217,18 @@
       "severity": "block"
     },
     {
+      "id": "empty-scene-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15.",
+      "generators": [
+        "prompts/empty-scene.txt"
+      ],
+      "critics": [
+        "prompts/empty-scene-qc.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "cover-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module.",

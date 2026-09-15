@@ -393,6 +393,72 @@ function largestInteriorUniformFraction(mask, rows, cols) {
 }
 
 /**
+ * Build the empty-scene QC prompt (prompts/empty-scene-qc.txt).
+ *
+ * Extracted from validateEmptyScene 2026-09-15 so the built prompt can be
+ * asserted without a paid vision call, and so the plate generator/critic pair
+ * names two file paths instead of this module.
+ */
+function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '' } = {}) {
+  const sceneCtx = sceneDescription
+    ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
+    : '';
+  // Era context — explicit period so the vision model doesn't have to
+  // infer it. Caller derives this from storyType + costumed clothing.
+  // "present-day" (or null) disables the anachronism check.
+  const eraBlock = storyEra
+    ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; any modern elements visible in the photo must NOT appear in the output.`
+    : '';
+  // If the outline already declared where each character will land, ask
+  // the vision model to verify the empty scene has flat usable space at
+  // each of those spots — not blocked by walls, props, or scene edges.
+  const placementsBlock = Array.isArray(characterPlacements) && characterPlacements.length > 0
+    ? `\n\nCHARACTER PLACEMENTS TO BE COMPOSITED LATER:\n${characterPlacements.map(p => `- ${p.name || 'character'} at ${p.position || 'unspecified'}${p.depth ? ` (depth: ${p.depth})` : ''}`).join('\n')}`
+    : '';
+  // The judge's own text is prompts/empty-scene-qc.txt (sections BODY /
+  // ERA_CHECK / PLACEMENTS_CHECK), so the plate generator/critic pair is
+  // a registry set over two file paths. The conditional checks keep the
+  // leading newline here; the section bodies are trimmed.
+  const qc = promptSections(PROMPT_TEMPLATES.emptySceneQc);
+  const placementsCheck = placementsBlock ? `\n${qc.PLACEMENTS_CHECK}` : '';
+  // Composition geometry fidelity — the main scene will composite
+  // characters and aim lines onto this empty scene. If the path
+  // direction or vanishing point in the empty scene doesn't match what
+  // the main scene prose describes, the composite will be broken.
+  //
+  // NO RESERVED CORNER (owner, 2026-09-15: "Why does the empty scene
+  // need a reserved corner that is wrong. Change the judge."). The
+  // page's text area is computed later from the calmness map
+  // (server/lib/textRegion.js), so the plate reserves nothing.
+  //
+  // The three geometry checks below DO reach the generator since
+  // 2026-09-15: buildEmptyScenePrompt derives a geometry-only block
+  // from this same mainScenePrompt (server/lib/sceneGeometry.js), so
+  // the plate is graded on facts it was given. Adding a check here
+  // that is not derivable into that block re-creates the blind grade.
+  const mainSceneBlock = mainScenePrompt
+    ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
+    : '';
+  // The judge's three geometry questions come from the SAME constant
+  // that writes the plate author's geometry block
+  // (GEOMETRY_DIMENSIONS, server/lib/sceneGeometry.js), so the two
+  // sides name the same dimensions in the same words. A fourth check
+  // belongs in that constant, never inline here.
+  const geometryCheck = mainScenePrompt
+    ? require('./sceneGeometry').buildGeometryJudgeChecks(5)
+    : '';
+  return fillTemplate(qc.BODY, {
+    SCENE_CTX: sceneCtx,
+    ERA_BLOCK: eraBlock,
+    PLACEMENTS_BLOCK: placementsBlock,
+    MAIN_SCENE_BLOCK: mainSceneBlock,
+    ERA_CHECK: storyEra ? `\n${qc.ERA_CHECK}` : '',
+    PLACEMENTS_CHECK: placementsCheck,
+    GEOMETRY_CHECK: geometryCheck,
+  });
+}
+
+/**
  * Validate an empty scene (background-only) image.
  * Two-phase check:
  * Phase 1 (pixel): calmness heatmap — white boxes, too dark, text area readiness (<50ms, free)
@@ -521,50 +587,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const base64ForVision = r2Lib.stripDataUriPrefix(imageData);
           const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
 
-          const sceneCtx = sceneDescription
-            ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
-            : '';
-          // Era context — explicit period so the vision model doesn't have to
-          // infer it. Caller derives this from storyType + costumed clothing.
-          // "present-day" (or null) disables the anachronism check.
-          const eraBlock = storyEra
-            ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; any modern elements visible in the photo must NOT appear in the output.`
-            : '';
-          // If the outline already declared where each character will land, ask
-          // the vision model to verify the empty scene has flat usable space at
-          // each of those spots — not blocked by walls, props, or scene edges.
-          const placementsBlock = Array.isArray(characterPlacements) && characterPlacements.length > 0
-            ? `\n\nCHARACTER PLACEMENTS TO BE COMPOSITED LATER:\n${characterPlacements.map(p => `- ${p.name || 'character'} at ${p.position || 'unspecified'}${p.depth ? ` (depth: ${p.depth})` : ''}`).join('\n')}`
-            : '';
-          const placementsCheck = placementsBlock
-            ? `\n4. Given the character placements above, does the empty scene have open, flat, usable ground at EACH of those frame positions? FAIL if a character position (e.g. "far-left background") maps to a frame region that is blocked by a wall, a building facade, a large prop, or the very edge of a receding corridor. Name the blocked position in the issue.`
-            : '';
-          // Composition geometry fidelity — the main scene will composite
-          // characters and aim lines onto this empty scene. If the path
-          // direction or vanishing point in the empty scene doesn't match what
-          // the main scene prose describes, the composite will be broken.
-          //
-          // NO RESERVED CORNER (owner, 2026-09-15: "Why does the empty scene
-          // need a reserved corner that is wrong. Change the judge."). The
-          // page's text area is computed later from the calmness map
-          // (server/lib/textRegion.js), so the plate reserves nothing.
-          //
-          // The three geometry checks below DO reach the generator since
-          // 2026-09-15: buildEmptyScenePrompt derives a geometry-only block
-          // from this same mainScenePrompt (server/lib/sceneGeometry.js), so
-          // the plate is graded on facts it was given. Adding a check here
-          // that is not derivable into that block re-creates the blind grade.
-          const mainSceneBlock = mainScenePrompt
-            ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
-            : '';
-          // The judge's three geometry questions come from the SAME constant
-          // that writes the plate author's geometry block
-          // (GEOMETRY_DIMENSIONS, server/lib/sceneGeometry.js), so the two
-          // sides name the same dimensions in the same words. A fourth check
-          // belongs in that constant, never inline here.
-          const geometryCheck = mainScenePrompt
-            ? require('./sceneGeometry').buildGeometryJudgeChecks(5)
-            : '';
+          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt });
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -573,17 +596,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             body: JSON.stringify({
               contents: [{ parts: [
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
-                { text: guardPromptString(`This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${eraBlock}${placementsBlock}${mainSceneBlock}
-
-Check:
-- Setting / location: does it roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
-- Naturalness: does the image look like a natural, plausible illustration of the scene? Or are there strange artefacts, geometry that doesn't make sense, doubled props, melted shapes, surfaces that change material mid-stroke, perspective lines that contradict each other, or anything that looks "off" for a competent painter? (FAIL — describe what looks unnatural)
-- Geometric artefact patches: are there large artificial-looking patches — white or near-white **rectangles, triangles, diagonals, wedges, or any solid geometric shape**, monochrome panels, blank patches, or obvious AI glitches that cover a meaningful portion of the frame? Pay special attention to bright triangular or diagonal cutouts that don't belong to the scene's geometry. (FAIL — name the shape and where it is)
-- Foreground space: is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)
-- Unrequested text or signage: does the image contain readable text, letters, numbers, shop signs, banners, posters, logos, labels, or written inscriptions that are NOT named in the expected scene? (FAIL — name where the text appears. A pub sign, street sign, poster text, or any inscription not explicitly requested counts. Distant painted banners with no readable text are OK.)${storyEra ? `
-- Anachronistic elements for the stated STORY ERA above: are there objects that don't fit the period? (FAIL — name them. Cars, parked vehicles, modern street lights, traffic signs, billboards, power lines, utility poles, satellite dishes, air conditioners, modern shopfront windows with price stickers, commercial ads, plastic bins, painted crosswalks, road markings, telephone poles, fire hydrants. Skip this check only if the story era is "present-day" or "modern".)` : ''}${placementsCheck}${geometryCheck}
-
-Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."}`, 'validateEmptyScene') }
+                { text: guardPromptString(qcPrompt, 'validateEmptyScene') }
               ]}],
               generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
@@ -3135,6 +3148,7 @@ module.exports = {
   presenceCounterName,
   runVisualInventory,
   validateEmptyScene,
+  buildEmptySceneQcPrompt,
   largestInteriorUniformFraction,
   capComplianceIdentitySeverity,
   evaluateThreeStage,

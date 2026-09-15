@@ -40818,3 +40818,42 @@ zero-precision check on a different critic, outside this ruling.
 **Touched files:** `prompts/image-evaluation.txt`,
 `tests/unit/eval-critic-rules-reach-generators.test.ts`
 **Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — The last two critic prompts leave the code, so every generator/critic pair is gate-enforceable
+
+**Context:** two critics were string literals inside `server/lib/evalPipeline.js`:
+the cover-only evaluator preamble (COVER NOTE, the app-overlay TEXT NOTE, the
+TEXT RULES block) and the empty-scene QC judge. The sibling gate matches file
+paths, so neither pair could be declared: pairing a template against a
+5,000-line module blocks on every unrelated edit to that module, which is the
+fastest way to teach everyone to write `Siblings-Checked:` without reading it.
+They were the last two generator/critic pairs the registry could not express.
+
+**Decision:** both move verbatim into `prompts/` —
+`prompts/cover-evaluation-notes.txt` and `prompts/empty-scene-qc.txt` — loaded
+like every other template and split into their conditional parts by a new
+`promptSections()` helper (`### KEY` sections). Every interpolated runtime value
+is a DECLARED placeholder filled through `fillTemplate`. Two registry sets are
+added, `cover-generator-vs-critic` and `empty-scene-generator-vs-critic`, both
+`severity: "block"`.
+
+**Rationale:** a move, not an edit — no wording changed, and that is asserted
+rather than asserted-to. Each extraction ships with a test that builds the REAL
+prompt (`buildEmptySceneQcPrompt`, newly exported for exactly that reason; the
+cover notes through `fillTemplate`) and compares it byte for byte against the
+pre-extraction literal for fixture inputs, plus an assertion that no `{TOKEN}`
+survives — `fillTemplate` drops an undeclared key silently, so a placeholder
+nobody fills is a rule that quietly stops existing. The empty-scene judge's
+geometry checks stay GENERATED from `GEOMETRY_DIMENSIONS` (`sceneGeometry.js`),
+the same source that writes the plate author's geometry block, and reach the
+template through the declared `{GEOMETRY_CHECK}` placeholder — a frozen copy in
+the template would have re-created the blind grade that source was built to end.
+
+**Touched files:** `prompts/cover-evaluation-notes.txt`,
+`prompts/empty-scene-qc.txt`, `server/services/prompts.js`,
+`server/lib/evalPipeline.js`, `scripts/admin/sibling-registry.json`,
+`tests/unit/cover-eval-notes-extraction.test.ts`,
+`tests/unit/empty-scene-qc-extraction.test.ts`
+**Status:** ✅ active — staging only, not on master

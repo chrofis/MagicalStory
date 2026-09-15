@@ -373,6 +373,13 @@ async function loadPromptTemplates() {
     ['subRegionDetection', 'sub-region-detection.txt'],
     ['generatedImageAnalysis', 'generated-image-analysis.txt'],
     ['emptyScene', 'empty-scene.txt'],
+    // The plate's CRITIC (validateEmptyScene, evalPipeline.js) — the judge the
+    // empty-scene generator above is graded by. A string literal in that module
+    // until 2026-09-15; a template file so the pair is a registry set over two
+    // paths. Sections BODY / ERA_CHECK / PLACEMENTS_CHECK via promptSections();
+    // its {GEOMETRY_CHECK} is still generated from GEOMETRY_DIMENSIONS
+    // (sceneGeometry.js), the one source the plate prompt also reads.
+    ['emptySceneQc', 'empty-scene-qc.txt'],
     ['textSpaceRepair', 'text-space-repair.txt'],
     ['feedbackConsolidator', 'feedback-consolidator.txt'],
     ['storyTextQualityJudge', 'story-text-quality-judge.txt'],
