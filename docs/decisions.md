@@ -39442,6 +39442,64 @@ age each render their intended framing. No paid call and no story run was made.
 
 ---
 
+## 2026-09-15 — Four faults in the idea prompts, measured over 56 rated trial ideas
+
+**Context:** 56 trial ideas were generated across 7 ages × 2 genders and rated. Four faults fell
+out of the ratings, all of them in what the model is TOLD rather than in the model:
+
+1. Six of the ten worst-rated ideas are make-believe-arm cards, and all six are solved by an object
+   or by an adult rather than by the main character.
+2. ~24 of 28 round-two ideas are autumn-with-leaves stories, although every cell had a distinct
+   setting.
+3. One item from an illustrative list becomes the default answer: "there is a way in from another
+   side" came back verbatim in 8 of 10 ideas; "wanted by two at once" became the obstacle in ~10 of
+   28; the artifact `size` instruction's "fits in one hand" was copied into 6 of 9 stored values and
+   was fixed earlier the same day by deleting the exemplar outright.
+4. Ages 8 and 12 rate 2.75/2.75 and 3.00/3.25 — every card resolving through a plush toy, a craft
+   project or a talking object — and routing 6+ to the journey SHAPE did not lift them.
+
+**Decision:**
+
+- **The agency rule is untagged.** `BAND_VIEW_DROPS` gives the own-town idea arm the `premise` view
+  and the make-believe arm the `tone` view, which drops `[[plot]]`. Every band's "who resolves it"
+  rule lived inside `[[plot]]`, so the fantasy arm was never told it — fault 1, exactly. It is a rule
+  about what KIND of story this is, not plot mechanics, so it moved to the untagged section every
+  view receives: journey's "The hero's own idea turns it", fear-choice's "The child's choice resolves
+  it", tries' "The child's own doing", quest's "The child does the finding". Nothing else moved out
+  of `[[plot]]`. `routine` (age 0-1) has no agency rule — that band forbids the child working
+  anything out — and its safety sentence, an orphan fragment in the tone view, became its own line.
+- **Illustrative lists in RULE positions are ranges, not menus.** Rewritten or deleted in
+  `age-band-tries.txt` (three), `age-band-quest.txt`, `age-band-fear-choice.txt`, and at all three
+  sites carrying the life-skill outside-event sentence (`routes/trial.js`, `lib/testlab.js`,
+  `story-trial.txt`). Deliberately left: prohibition lists and closed sets, trait-to-page mappings,
+  and lists long enough to read as a span rather than a choice. The `size` fix is the model — a rule
+  with no exemplar at all held.
+- **The season constrains DETAIL, not subject.** `buildSeasonInstruction` said "The story takes place
+  in Autumn. Include seasonal details like weather, activities, and atmosphere typical for this
+  season" — hard fact beside softer neighbours, and it took the premise with it (fault 2). It now
+  governs the light, the weather, what is underfoot and what the cast wears, and states outright that
+  it does not choose the subject. TEXT side only: its image-side sibling `buildSeasonNote` wants the
+  visual detail and is unchanged, as is the wardrobe-side `SEASON_OUTFIT` table.
+- **`AGE_OWNS_PROPS_RULE`** — one new constant emitted by `buildAgeModeSection`, the single chokepoint
+  the writer and BOTH idea arms read the band through. The bands govern plot SHAPE; nothing governed
+  props or subject, which is fault 4. Not a line in each of the five band files: five hand-kept
+  copies drift, and it is the same rule at every age. No per-age examples, on fault 3's evidence; it
+  points at the age the band header already states, so it holds at 1, at 12 and at an adult reader.
+
+**Rationale:** three of the four are one disease — an instruction that reaches only some of the
+readers that need it, or reaches them in a shape they answer literally. The structural answer in each
+case is the same one the repo already uses elsewhere: put the rule where every reader passes, as ONE
+constant, with no exemplar a model can copy.
+
+**Touched files:** `prompts/age-band-{routine,quest,tries,fear-choice,journey}.txt`,
+`prompts/story-trial.txt`, `server/lib/season.js`, `server/lib/promptBuilders.js`,
+`server/lib/testlab.js`, `server/routes/trial.js`, `tests/unit/age-band.test.ts`,
+`tests/unit/trial-idea-variety.test.ts`.
+
+**Not settled:** nothing in `docs/SETTLED.md` covers band view slicing, the season instruction,
+example-list style or an age-props rule. The prompt-genericity and no-test-story-names lines were
+checked and are honoured — every replacement is archetypal.
+
 ## 2026-09-15 — `crowdExpected` must be declared by BOTH Art Director templates
 
 **Context:** staging story `job_1789420511893_zly5rcdej` (generated 2026-09-14 23:15 → 2026-09-15
