@@ -218,6 +218,11 @@ async function loadPromptTemplates() {
     // template pages use (buildCoverPrompt). The four cover templates above are
     // retired once every caller routes through it.
     ['coverComposition', 'cover-composition.txt'],
+    // The cover CRITIC's three notes — the cover-only preamble evaluateImageQuality
+    // prepends to the evaluator prompt. String literals in evalPipeline.js until
+    // 2026-09-15; a template file so the generator/critic sibling set can name a
+    // path instead of a 5,000-line module. Sections via promptSections().
+    ['coverEvaluationNotes', 'cover-evaluation-notes.txt'],
     ['rewriteBlockedScene', 'rewrite-blocked-scene.txt'],
     ['characterAnalysis', 'character-analysis.txt'],
     ['imageSystemInstruction', 'image-system-instruction.txt'],
@@ -407,6 +412,21 @@ async function loadPromptTemplates() {
     }
   }
   log.info(`📝 Prompt templates loaded: ${FILES.length - failures.length}/${FILES.length} ok`);
+}
+
+/**
+ * Split a multi-section template into { SECTION_KEY: body }.
+ *
+ * Sections are delimited by a `### KEY` line at column 0; each body is trimmed
+ * of surrounding blank lines so a section is byte-identical to the string
+ * literal it replaced.
+ */
+function promptSections(text) {
+  const out = {};
+  if (!text) return out;
+  const parts = String(text).split(/^### ([A-Z0-9_]+)[ 	]*$/m);
+  for (let i = 1; i < parts.length; i += 2) out[parts[i]] = parts[i + 1].replace(/^\n+/, '').replace(/\s+$/, '');
+  return out;
 }
 
 /**
@@ -825,6 +845,7 @@ module.exports = {
   withTemplates,
   loadPromptTemplates,
   fillTemplate,
+  promptSections,
   buildEmptyScenePrompt,
   buildEvaluationPrompt,
   extractArtStyle,

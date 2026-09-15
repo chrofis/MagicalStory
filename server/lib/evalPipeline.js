@@ -28,7 +28,7 @@ const path = require('path');
 const sharp = require('sharp');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, promptSections } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
@@ -2021,16 +2021,21 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // Strip art style description (noise for evaluator)
       promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
 
+      // The three cover notes live in prompts/cover-evaluation-notes.txt
+      // (sections COVER_NOTE / TEXT_NOTE_APP_OVERLAY / TEXT_RULES) so the
+      // cover generator/critic pair is a registry set over two file paths.
+      const coverNotes = promptSections(PROMPT_TEMPLATES.coverEvaluationNotes);
+
       // Cover portraits: viewer-gaze and a flat title are intended, not defects.
-      promptForEval = `COVER NOTE: a book-cover portrait. Do not deduct for characters facing or looking at the viewer, or for the title being flat 2D rather than three-dimensional.\n\n${promptForEval}`;
+      promptForEval = `${coverNotes.COVER_NOTE}\n\n${promptForEval}`;
 
       if (textMode === 'appOverlay') {
         // Mode B: art is textless; title/dedication/branding composited by the
         // app after persistence. Was previously appended to the pseudo-page's
         // sceneDescription as string surgery (server.js pipeline entry).
-        promptForEval = `TEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.\n\n${promptForEval}`;
+        promptForEval = `${coverNotes.TEXT_NOTE_APP_OVERLAY}\n\n${promptForEval}`;
       } else if (expectedText) {
-        promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE:\nAllowed text: "${expectedText}" — and nothing else prominent.\nSeverities for text issues:\n- Allowed text missing or misspelled (any character difference) → severity: CATASTROPHIC.\n- Other prominent unrequested text on the cover (labels, captions, watermarks, extra words) → severity: MAJOR.\n- Small incidental in-world signage in the background → do not flag; if garbled → severity: MINOR.\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.\n\n${promptForEval}`;
+        promptForEval = `${fillTemplate(coverNotes.TEXT_RULES, { EXPECTED_TEXT: expectedText })}\n\n${promptForEval}`;
       }
     }
 
