@@ -5269,12 +5269,13 @@ async function applyStyleTransfer(imageData, artStyle, options = {}) {
 }
 
 module.exports = {
-  carryEvalEvidence,
   // Everything the two domain modules export, forwarded by construction. The
   // explicit list below keeps the documented surface and wins for any name this
-  // file defines locally.
+  // file defines locally — so every locally defined name belongs BELOW the
+  // spreads, never above them.
   ...evalPipelineModule,
   ...bboxDetectionModule,
+  carryEvalEvidence,
 
   // Gemini plumbing consumed by imageInpainting via lazy accessors (the
   // inpaint LLM-verify path); exported for that one consumer.
