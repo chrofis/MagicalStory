@@ -148,12 +148,11 @@
           "\"name\"",
           "\"properName\"",
           "\"type\"",
-          "\"size\"",
           "\"isRealLandmark\"",
           "\"scaleClass\"",
           "\"generic\""
         ],
-        "anchorsNote": "the VB entry keys all four authoring sites genuinely declare today. `\"states\"` and `\"vantages\"` are deliberately NOT anchored: they are absent from story-unified-imagefirst.txt and from scene-expansion-all.txt respectively, which is a real divergence, not a parity target to assert into existence."
+        "anchorsNote": "the VB entry keys all four authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` and `\"vantages\"` are deliberately NOT anchored: they are absent from story-unified-imagefirst.txt and from scene-expansion-all.txt respectively, which is a real divergence, not a parity target to assert into existence."
       }
     },
     {

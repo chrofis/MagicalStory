@@ -1,5 +1,37 @@
 # VB scale class, generic gate, and plate routing for large elements — 2026-09-15
 
+> **REVERSED THE SAME DAY, BY THE OWNER — read this before the Design section below.**
+>
+> The Design section's Decision 1 says *"`size` stays … `scaleClass` is machine-facing and is never
+> printed verbatim into any image prompt"*. **That is no longer the design.** The owner:
+> *"Use the new enum for this and remove the size. That was the whole purpose and why the enum must
+> be granular."*
+>
+> What actually shipped on the afternoon of 2026-09-15:
+> 1. `SCALE_CLASSES` is **twelve** bands, not six:
+>    `fingertip, palm, hand, forearm, arm, knee, hip, chest, head, double, house, landmark`, each with
+>    one canonical render phrase in `SCALE_PHRASES`.
+> 2. **The enum renders into the image prompt.** `elementScaleNote()` replaced the `sizeNote` that
+>    rode `obj.entry.size`; code reads the token, the model reads the phrase, never both.
+> 3. **`size` is gone from all four VB-authoring schemas** and from the `vb-authoring-sites` parity
+>    anchors. story-trial.txt's PER-PAGE scene-hint `size` is a different field and is untouched.
+> 4. **No migration, no backfill, nothing stripped.** `elementScaleNote` falls back to a stored
+>    `size` whenever no band resolves; `LEGACY_SCALE_CLASSES` maps the morning's six tokens onto the
+>    granular list (person→hip, vehicle→double, building→house, landscape→landmark).
+> 5. `LARGE_SCALE_CLASSES` is re-derived as `{double, house, landmark}` — the image of the three
+>    retired large bands, so plate routing is unchanged in behaviour.
+>
+> The enum list was validated against the **stored size corpus**, read-only from both databases: 168
+> entries carrying a `size`, 151 distinct strings, of which 14 used banned metric units, 12 were not
+> in English, and ~10 were bare adjectives stating no scale. Every remaining cluster maps onto exactly
+> one band; band granularity follows where the data is dense. Full evidence in the superseding
+> `docs/decisions.md` entry of 2026-09-15.
+>
+> The old Decision-1 reasoning below ("the two fields have different consumers", "folding `size` away
+> would reverse e476ca314 with no evidence that `size` harms") is kept for the record and is now
+> **wrong on the remedy**: the corpus IS the evidence, and the split left the model reading the
+> unverifiable half.
+
 Status: SHIPPED (staging, not master) — phases 1-3 implemented 2026-09-15 in commits `590433735` (scaleClass), `7f072ee03` (generic gate) and `8763eab30` (plate routing). Phase 4 NOT BUILT (owner: not now).
 
 Deviations from the plan as written, both deliberate:

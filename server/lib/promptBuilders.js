@@ -12,7 +12,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState } = require('./visualBible');
+const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -454,7 +454,8 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     if (e.age) parts.push(`Age: ${e.age}`);
     if (e.build) parts.push(`Build: ${e.build}`);
     if (e.species) parts.push(`Species: ${e.species}`);
-    if (e.size) parts.push(`Size: ${e.size}`);
+    const eScale = elementScaleNote(e);
+    if (eScale) parts.push(`Size: ${eScale}`);
     if (e.coloring) parts.push(`Coloring: ${e.coloring}`);
     if (e.features) parts.push(`Features: ${e.features}`);
     if (e.hair) parts.push(`Hair: ${e.hair}`);
@@ -4021,10 +4022,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const offWhere = (wornState && wornState.state === 'off' && wornState.location)
           ? ` — ${wornState.location}`
           : '';
-        // The bible's `size` is the one look-field that rides along: it is the
-        // scale anchor against the figure, which nothing else in the prompt
+        // The element's SCALE rides along: the one look-field that does, because
+        // it is the anchor against the figure that nothing else in the prompt
         // states for a held or carried prop (a shoebox-sized chest rendered
         // torso-sized on every page of staging trial job_1788712851192).
+        //
+        // It is the `scaleClass` band's ONE canonical phrase (owner,
+        // 2026-09-15) — `elementScaleNote` renders the token, never prints it,
+        // and falls back to a pre-enum bible's stored free-text `size`.
         //
         // ANIMALS CARRY IT TOO (owner, 2026-09-11). They were excluded when
         // this rider was introduced (793049e40) because that change was scoped
@@ -4037,7 +4042,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // third and house-sized on a fourth. The pages that restated the size
         // in their prose were the ones that came closest; the pages that did
         // not (p8, p18) had nothing to go on, because this line dropped it.
-        const sizeNote = obj.entry?.size ? ` — ${String(obj.entry.size).trim()}` : '';
+        const sizeNote = elementScaleNote(obj.entry) ? ` — ${elementScaleNote(obj.entry)}` : '';
         // OBJECT STATE - the fourth rider on this line, beside `size`, the
         // clothing `(worn by X)` suffix and a two-sided prop's orientation
         // parenthetical. It says WHICH variant of the object this page shows;

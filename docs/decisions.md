@@ -40163,3 +40163,87 @@ claim that is false for the category trains readers to ignore the whole audit.
 
 **Touched:** `server/lib/outlineParser/shared.js`, `tests/unit/vb-authoring-contract.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — `scaleClass` is the SINGLE SOURCE OF SCALE TRUTH; the free-text `size` field is retired
+
+**Supersedes** (all five, and the morning's own entry on this page):
+- 2026-09-06 "A prop's `size` is a Visual Bible field and rides the REQUIRED OBJECTS line"
+- 2026-09-09 "Creature size in the VB is an age-scaled RECOMMENDATION, never a cap"
+- 2026-09-11 "A creature carries its stated size into every page prompt"
+- 2026-09-14 "Object size reaches the image as a relational anchor, and `foreground` no longer means 'big'"
+- 2026-09-14 "The Art Director's size rule states the obligation unconditionally"
+- 2026-09-15 "`scaleClass` is machine-facing and never reaches an image model" (reversed the same day, by the owner)
+
+**Context.** The morning of 2026-09-15 shipped `scaleClass` as a six-value, machine-facing enum
+(`hand | arm | person | vehicle | building | landscape`) used ONLY to route an element's reference to
+the plate or to a page cell, with a test pinning that it never reaches an image model; the free-text
+`size` sentence stayed as the only scale wording a model reads. The owner's intent was the opposite:
+*"Use the new enum for this and remove the size. That was the whole purpose and why the enum must be
+granular."*
+
+The free-text field was then measured across every stored Visual Bible on staging and production:
+**168 entries carrying a `size`, 151 distinct strings** (staging 87 entries / 73 distinct; production
+81 / 78). 90% of them are animals — artifacts contributed 23 and vehicles 1, so the sentence was
+barely authored on the collections that motivated it. What the strings contain:
+
+- **14 state metric units** the prompt explicitly banned ("approximately 15cm long", "etwa 60cm lang",
+  "roughly 65 cm body length", "body length approximately four metres"). A metric number is a value an
+  illustration has no way to act on.
+- **12 are German or Italian** where the prompt asked for English regardless of story language
+  ("mittelgross, sitzt auf der reling", "klein, passt in eine jackentasche",
+  "grande quanto un cavallo adulto").
+- **~10 are bare adjectives** that state no scale at all: "gross", "klein", "mittelgross",
+  "mittelgross, elegant", "mittelgross, schlank", "klein für ein pferd, robust".
+- The remainder are correct, and one of them is the motivating failure: ART004's
+  `"the size of a thumb"` on `job_1789420511893_zly5rcdej` p8, which rendered football-sized.
+
+That is the case against free text in one table: it is unverifiable, optional in practice, drifts
+across languages and units, and a *correct* value changed nothing because nothing could check it.
+
+**Decision.**
+1. `SCALE_CLASSES` becomes a **twelve-band, monotonic, body-referenced enum**:
+   `fingertip, palm, hand, forearm, arm, knee, hip, chest, head, double, house, landmark`.
+   Each band has exactly ONE canonical render phrase in `SCALE_PHRASES` (`visualBible.js`), from
+   "small enough to sit on a fingertip" to "fills the horizon behind everything". Bands are relative,
+   never metric — an illustration has no absolute scale.
+2. **The enum renders.** `elementScaleNote(entry)` is the single lookup: code reads the token, the
+   prompt gets the phrase, never both. It feeds the REQUIRED OBJECTS rider
+   (`promptBuilders.js`, the old `sizeNote`), the bbox rich description, `buildArtifactDescription`
+   and both parsers' animal descriptions.
+3. **`size` is dropped from the four VB-authoring prompt schemas** and from the
+   `vb-authoring-sites` parity anchors. story-trial.txt keeps its PER-PAGE scene-hint `size` — a
+   different field with a different consumer (`buildTextFromJson`), untouched.
+4. **Stored bibles are not migrated, not backfilled and not stripped.** `elementScaleNote` falls back
+   to a stored `size` whenever no band resolves, and the parsers still admit the key. This is what
+   preserves the capability the five superseded entries measured — above all the 2026-09-11 dragon
+   (`job_1789147573901_m3uam0nxi` ANI002, knee-high on two pages and house-sized on a fourth): a
+   repair, iterate or cover repaint re-reading that bible months from now still states the scale the
+   book shipped with.
+5. **The retired six-value tokens resolve** onto the granular list (`LEGACY_SCALE_CLASSES`:
+   person→hip, vehicle→double, building→house, landscape→landmark), so bibles authored during the
+   few hours the morning enum was live stay routable.
+6. **Plate routing is unchanged in behaviour.** `LARGE_SCALE_CLASSES` is re-derived as
+   `{double, house, landmark}`, which is exactly the image of the three retired large bands.
+
+**Rationale.** The two-field split the morning entry argued for ("different consumers — code cannot
+read a sentence") was right about the diagnosis and wrong about the remedy: it left the model reading
+the unverifiable half. One closed field that both routes and renders is always present, always
+checkable, and emits one wording per band instead of 151. The band names are deliberately the same
+body-part vocabulary the quality evaluator's D-21 `scale` rule already reasons in
+(`image-evaluation.txt:165` — apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ head, sword ≈ arm),
+so generator and critic speak one language without a judge-prompt change.
+
+Band granularity follows the corpus: the densest real cluster is hand-scale (~40 of 151 values), which
+gets three bands (`fingertip`/`palm`/`hand`); the cat-and-small-dog cluster (~37) gets
+`forearm`/`arm`/`knee`; the horse cluster (~15) gets `chest`; the dragon/bus/house cluster (~20) gets
+`double`/`house`. `head` is the one band the corpus does not populate directly and it is kept
+deliberately: it is the reference point the whole ladder is defined against, and it is the band every
+human `secondaryCharacters` entry takes.
+
+**Touched:** `server/lib/visualBible.js`, `server/lib/promptBuilders.js`,
+`server/lib/outlineParser/unified.js`, `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/vb-scale-class.test.ts`,
+`tests/unit/artifact-size.test.ts`, `tests/unit/vb-authoring-rule-parity.test.ts`,
+`docs/image-routing.md`, `tasks/vb-scale-class-plan-2026-09-15.md`
+**Status:** ✅ active

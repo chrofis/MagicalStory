@@ -296,9 +296,13 @@ class UnifiedStoryParser {
         if (this._cache.visualBible.animals) {
           this._cache.visualBible.animals = this._cache.visualBible.animals.map(animal => {
             if (!animal.description) {
+              const { elementScaleNote } = require('../visualBible');
               const parts = [];
               if (animal.species) parts.push(animal.species);
-              if (animal.size) parts.push(animal.size);
+              // Enum phrase when a class is authored, the stored free-text
+              // `size` when the bible predates the enum (2026-09-15).
+              const animalScale = elementScaleNote(animal);
+              if (animalScale) parts.push(animalScale);
               if (animal.coloring) parts.push(animal.coloring);
               if (animal.features) parts.push(animal.features);
               animal.description = parts.join('. ') || animal.name;

@@ -51,9 +51,17 @@ describe('shared Visual-Bible authoring rules reach every authoring site', () =>
     }
   });
 
-  it('every artifact and animal carries a size', () => {
+  // 2026-09-15: the free-text `size` rule was REPLACED by the enum rule, not
+  // dropped. Every element still has to state its scale at every authoring
+  // site — it now states it as a closed band instead of a sentence.
+  it('every element carries scaleClass, and no entry states a size of its own', () => {
     for (const rel of VB_AUTHORING_TEMPLATES) {
-      expect(/Every artifact carries `size`, and every animal too/.test(read(rel)), path.basename(rel)).toBe(true);
+      const text = read(rel);
+      const who = path.basename(rel);
+      expect(/Every Visual Bible element carries `scaleClass`/.test(text), who).toBe(true);
+      expect(/it is the only place an element’s size is stated/.test(text), who).toBe(true);
+      // the retired free-text rule must not linger at any site
+      expect(/Every artifact carries `size`/.test(text), who + ' still demands free-text size').toBe(false);
     }
   });
 });

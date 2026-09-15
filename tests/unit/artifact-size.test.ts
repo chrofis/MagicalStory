@@ -13,10 +13,28 @@ const NL = String.fromCharCode(10);
 const PROMPTS = path.join(__dirname, '..', '..', 'prompts');
 const read = (f: string) => fs.readFileSync(path.join(PROMPTS, f), 'utf-8');
 
+/** The page prompt a one-artifact bible produces, with that artifact cited. */
+const buildPagePrompt = (vb: any) => {
+  const brief = ['The main character carries a wooden pail across the yard.', '', '---METADATA---', JSON.stringify({
+    sceneIntent: 'the pail is carried',
+    characters: [{ name: 'Mira', position: 'center', depth: 'midground' }],
+    shot: 'wide', objects: ['ART001'], textPosition: 'bottom-left',
+  })].join(NL);
+  return String(PB.buildImagePrompt(brief, {
+    title: 'The Yard', characters: [{ id: 'c1', name: 'Mira', age: 8, gender: 'girl' }],
+    mainCharacters: ['c1'], language: 'en', languageLevel: 'medium', pages: 4,
+    artStyle: 'watercolor', relationships: {}, relationshipTexts: {},
+  } as any, null, vb, 1, null, {}));
+};
+
 // Templates that AUTHOR artifacts into a Visual Bible. Every one of them must
-// offer the `size` field, or the bible cannot emit it and the scale anchor
-// never reaches the image prompt (measured 2026-09-14: full path 2/176 on
-// staging, 0/29 on prod, because two of these four had no such field).
+// make the element state its scale, or the anchor never reaches the image
+// prompt (measured 2026-09-14: full path 2/176 on staging, 0/29 on prod,
+// because two of these four had no such field). Since 2026-09-15 the field is
+// the closed `scaleClass` band, not a free-text sentence.
+/** The bands every authoring site must offer, ascending. */
+const BANDS = ['fingertip', 'palm', 'hand', 'forearm', 'arm', 'knee', 'hip', 'chest', 'head', 'double', 'house', 'landmark'];
+
 const ARTIFACT_AUTHORING_TEMPLATES = [
   'story-unified.txt',
   'story-unified-imagefirst.txt',
@@ -25,17 +43,28 @@ const ARTIFACT_AUTHORING_TEMPLATES = [
 ];
 
 describe('artifact size — builder contract', () => {
-  it('folds a set size into the description, the way animals do', () => {
+  it('folds the authored band into the description, the way animals do', () => {
+    const desc = buildArtifactDescription({
+      description: 'a squat pail with two iron bands',
+      type: 'hand tool',
+      scaleClass: 'knee'
+    });
+    expect(desc).toContain('a squat pail with two iron bands');
+    expect(desc).toContain("reaches an adult's knee");
+    // the phrase, never the token
+    expect(desc).not.toMatch(/Size: knee$/);
+  });
+
+  it('falls back to a stored free-text size when the bible predates the enum', () => {
     const desc = buildArtifactDescription({
       description: 'a squat pail with two iron bands',
       type: 'hand tool',
       size: 'reaches the knee of a child standing beside it'
     });
-    expect(desc).toContain('a squat pail with two iron bands');
     expect(desc).toContain('reaches the knee of a child standing beside it');
   });
 
-  it('omits the size clause entirely when the field is unset', () => {
+  it('omits the size clause entirely when neither a band nor a size is set', () => {
     const desc = buildArtifactDescription({ description: 'a squat pail', type: 'hand tool' });
     expect(desc).toBe('a squat pail');
     expect(desc.toLowerCase()).not.toContain('size');
@@ -45,31 +74,32 @@ describe('artifact size — builder contract', () => {
     expect(buildArtifactDescription({ type: 'hand tool' })).not.toContain('undefined');
   });
 
-  // 2026-09-15: `scaleClass` was added beside `size`, not instead of it. The
-  // two have different consumers — `size` is the prose a model reads, the class
-  // is the token code routes on — and folding `size` away would reverse
-  // e476ca314 and the 2026-09-11 animal extension with no evidence it harms.
-  it('keeps the free-text size on the REQUIRED OBJECTS line once a class is authored too', () => {
+  // 2026-09-15 (afternoon, reversing that morning): the enum REPLACED the
+  // free-text size as the thing that reaches the model. `elementScaleNote` is
+  // the one lookup - code reads the token, the prompt gets the phrase.
+  it('puts the band phrase on the REQUIRED OBJECTS line, and not the token', () => {
     const outline = ['---VISUAL BIBLE---', '```json', JSON.stringify({
       artifacts: [{
         id: 'ART001', label: 'wooden pail', name: 'wooden pail', pages: [1],
-        type: 'hand tool', size: 'spans a child forearm', scaleClass: 'arm',
+        type: 'hand tool', scaleClass: 'forearm',
         description: 'a squat pail with two iron bands'
       }]
     }), '```'].join(NL);
-    const vb = parseVisualBible(outline);
-    const brief = ['The main character carries a wooden pail across the yard.', '', '---METADATA---', JSON.stringify({
-        sceneIntent: 'the pail is carried',
-        characters: [{ name: 'Mira', position: 'center', depth: 'midground' }],
-        shot: 'wide', objects: ['ART001'], textPosition: 'bottom-left',
-      })].join(NL);
-    const prompt = String(PB.buildImagePrompt(brief, {
-      title: 'The Yard', characters: [{ id: 'c1', name: 'Mira', age: 8, gender: 'girl' }],
-      mainCharacters: ['c1'], language: 'en', languageLevel: 'medium', pages: 4,
-      artStyle: 'watercolor', relationships: {}, relationshipTexts: {},
-    } as any, null, vb, 1, null, {}));
-    expect(prompt).toContain('spans a child forearm');
+    const prompt = buildPagePrompt(parseVisualBible(outline));
+    expect(prompt).toContain("about as big as an adult's forearm");
     expect(prompt).not.toMatch(/scaleClass/i);
+    expect(prompt).not.toMatch(/\u2014 forearm\b/);
+  });
+
+  it('still rides a pre-enum bible stored size onto the same line', () => {
+    const outline = ['---VISUAL BIBLE---', '```json', JSON.stringify({
+      artifacts: [{
+        id: 'ART001', label: 'wooden pail', name: 'wooden pail', pages: [1],
+        type: 'hand tool', size: 'spans a child forearm',
+        description: 'a squat pail with two iron bands'
+      }]
+    }), '```'].join(NL);
+    expect(buildPagePrompt(parseVisualBible(outline))).toContain('spans a child forearm');
   });
 
   it('survives the real Visual Bible parser', () => {
@@ -111,31 +141,40 @@ describe('artifact size — trial scene-hint slot', () => {
   });
 });
 
-describe('artifact size — authoring instruction contract', () => {
+describe('artifact scale — authoring instruction contract', () => {
   for (const file of ARTIFACT_AUTHORING_TEMPLATES) {
-    it(`${file} offers a size field on artifacts and demands it`, () => {
+    it(file + ' offers scaleClass on artifacts and demands it', () => {
       const text = read(file);
       const artifactBlock = text.slice(text.indexOf('"artifacts"'));
-      expect(artifactBlock).toContain('"size"');
-      expect(text).toContain('Every artifact carries `size`');
+      expect(artifactBlock).toContain('"scaleClass"');
+      expect(text).toContain('Every Visual Bible element carries `scaleClass`');
     });
 
-    it(`${file} forbids metric units in the size anchor`, () => {
+    it(file + ' offers no free-text size field on a Visual Bible entry', () => {
+      // The reversal, pinned: an authored sentence is unverifiable and drifts,
+      // so the schema no longer has a slot for one.
       const text = read(file);
-      const sizeLine = text.split('\n').find(l => l.includes('"size": "[how big this object is beside a person'));
-      expect(sizeLine, `${file} is missing the shared size instruction`).toBeTruthy();
-      expect(sizeLine!).toMatch(/No metric or imperial units/);
+      expect(text).not.toContain('"size": "[relative size]"');
+      expect(text).not.toContain('"size": "[how big this object is beside a person');
+      expect(text).not.toContain('Every artifact carries `size`');
     });
 
-    it(`${file} gives no copyable size exemplar`, () => {
+    it(file + ' lists the twelve bands and no others', () => {
       const text = read(file);
-      const start = text.indexOf('"size": "[how big this object is beside a person');
-      const instruction = text.slice(start, text.indexOf(']"', start));
-      // The exemplar the model collapsed onto (6 of 9 staging values verbatim).
-      expect(instruction).not.toContain('fits in one hand');
-      expect(instruction).not.toContain('carried in both arms');
-      // No quoted phrase at all inside the size instruction — nothing to copy.
-      expect(instruction.match(/'[^']{4,}'/g)).toBeNull();
+      const at = text.indexOf('"scaleClass": "[');
+      expect(at, file + ' has no scaleClass instruction').toBeGreaterThan(-1);
+      const instruction = text.slice(at, text.indexOf(']"', at));
+      for (const band of BANDS) expect(instruction, band).toContain(band);
+      // the retired six-value list must not survive as choices anywhere
+      expect(text).not.toContain('person, vehicle, building, landscape');
+    });
+
+    it(file + ' states the bands against an adult, never in units', () => {
+      const text = read(file);
+      const at = text.indexOf('"scaleClass": "[');
+      const instruction = text.slice(at, text.indexOf(']"', at));
+      expect(instruction).toContain('standing adult');
+      expect(instruction).not.toMatch(/\bcm\b|\bmetre|\bmeter|\binch/i);
     });
   }
 });

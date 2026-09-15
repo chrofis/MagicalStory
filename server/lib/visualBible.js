@@ -598,32 +598,122 @@ function parseVisualBible(outline) {
  * Returns null if JSON not found or invalid
  */
 /**
- * `scaleClass` — the authored, machine-facing scale band of a Visual Bible
- * element (2026-09-15). A closed enum, read by CODE only: routing decides
- * whether an element's reference belongs on the plate or in a page cell from
- * this field, never from prose. It is NEVER concatenated into `description`,
- * `label`, `sizeNote` or any string an image model sees — the free-text
- * `size` sentence remains the only scale wording a model reads.
+ * `scaleClass` — the authored scale band of a Visual Bible element, and THE
+ * SINGLE SOURCE OF SCALE TRUTH (owner, 2026-09-15, reversing the same day's
+ * machine-facing-only design).
  *
- * `null` is a first-class value, not an error: every bible stored before this
- * field existed has none, and every consumer falls back to its pre-2026-09-15
- * `type`-based behaviour when it is null. An unknown token is NEVER coerced to
- * the nearest band — a guessed class routes an object to the wrong pipeline.
+ * The enum both routes (plate vs page cell) AND renders: `scalePhrase()` turns
+ * the token into one canonical sentence that goes to the image model. The token
+ * itself is never printed — code reads the token, the model reads the phrase,
+ * never both.
+ *
+ * WHY THE FREE-TEXT `size` WENT AWAY. Measured over every stored bible on
+ * staging and production (168 sized entries, 151 distinct strings): 14 stated
+ * metric units the prompt banned, 12 were written in German or Italian when the
+ * prompt asked for English, and ~10 were bare adjectives ("gross", "klein",
+ * "mittelgross, elegant") that state no scale at all. A sentence cannot be
+ * checked, is optional in practice and drifts; a closed band is always present,
+ * always checkable, and renders the same phrase every time.
+ *
+ * The bands are RELATIVE, never metric — an illustration has no absolute
+ * scale — and every one is a phrase about a standing adult. The band names are
+ * the same body-part vocabulary the quality evaluator's D-21 `scale` rule
+ * already reasons in (apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ head,
+ * sword ≈ arm), so generator and critic speak one language.
+ *
+ * `null` is a first-class value: a bible stored before the field existed has
+ * none, and every consumer falls back to its pre-2026-09-15 behaviour — for
+ * the prompt renderer, to that bible's stored free-text `size`. An unknown
+ * token is NEVER coerced to the nearest band; a guessed class routes an object
+ * to the wrong pipeline.
  */
-const SCALE_CLASSES = ['hand', 'arm', 'person', 'vehicle', 'building', 'landscape'];
+const SCALE_PHRASES = Object.freeze({
+  fingertip: 'small enough to sit on a fingertip',
+  palm: 'small enough to close one hand around',
+  hand: 'fills an open hand',
+  forearm: "about as big as an adult's forearm",
+  arm: "about as big as an adult's whole arm",
+  knee: "reaches an adult's knee",
+  hip: "reaches an adult's hip",
+  chest: "reaches an adult's chest",
+  head: 'as big as a standing adult',
+  double: 'twice the size of a standing adult',
+  house: 'several adults high, the size of a house',
+  landmark: 'fills the horizon behind everything'
+});
+
+/** Ascending. The order IS the contract — a reader must be able to tell any two apart. */
+const SCALE_CLASSES = Object.keys(SCALE_PHRASES);
+
+/**
+ * The 2026-09-15 morning enum, mapped onto the granular one that replaced it
+ * the same afternoon. Bibles authored between the two carry these tokens, and
+ * repair, iterate, regeneration and cover paths re-read stored bibles months
+ * later — an unmapped token would make a stored element unroutable.
+ *
+ * `person` was defined as "knee-height to head-height" (a chest, a dog, a
+ * barrel, a chair, a child); `hip` is the centre of that span. The three large
+ * bands map so that `isLargeScaleClass` is unchanged in behaviour.
+ */
+const LEGACY_SCALE_CLASSES = Object.freeze({
+  person: 'hip',
+  vehicle: 'double',
+  building: 'house',
+  landscape: 'landmark'
+});
+
+/**
+ * Canonicalise an authored token: trim, lowercase, resolve a legacy alias.
+ * Pure and silent — the parser wraps it to log, every other consumer just asks.
+ */
+function resolveScaleClass(raw) {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim().toLowerCase();
+  if (!value) return null;
+  if (Object.prototype.hasOwnProperty.call(LEGACY_SCALE_CLASSES, value)) return LEGACY_SCALE_CLASSES[value];
+  return Object.prototype.hasOwnProperty.call(SCALE_PHRASES, value) ? value : null;
+}
+
+/**
+ * The one token -> phrase lookup. Every prompt that states an element's scale
+ * goes through here, so there is exactly one wording per band in the codebase.
+ */
+function scalePhrase(raw) {
+  const token = resolveScaleClass(raw);
+  return token ? SCALE_PHRASES[token] : null;
+}
+
+/**
+ * The scale sentence an element contributes to a prompt: the enum phrase when
+ * a class is authored, and otherwise the bible's stored free-text `size`.
+ *
+ * THE FALLBACK IS LOAD-BEARING, not politeness. Every finished story's bible
+ * predates the enum and carries only `size`; a repair or a cover repaint months
+ * from now must still state the scale it stated the day it shipped. That is the
+ * capability decisions.md 2026-09-06 / 09-09 / 09-11 / 09-14 measured — a
+ * dragon that rendered knee-high on two pages and house-sized on a fourth — and
+ * it may not be lost by switching fields.
+ */
+function elementScaleNote(entry) {
+  if (!entry) return null;
+  const phrase = scalePhrase(entry.scaleClass);
+  if (phrase) return phrase;
+  const size = typeof entry.size === 'string' ? entry.size.trim() : '';
+  return size || null;
+}
 
 function normaliseScaleClass(raw, id) {
   const who = id ? String(id) : 'entry';
   if (raw === undefined || raw === null || (typeof raw === 'string' && !raw.trim())) {
-    log.warn(`[VISUAL BIBLE] ${who}: no scaleClass authored — scale routing falls back to the entry type`);
+    log.warn(`[VISUAL BIBLE] ${who}: no scaleClass authored — scale routing falls back to the entry type and the prompt to any stored size text`);
     return null;
   }
   if (typeof raw !== 'string') {
     log.warn(`[VISUAL BIBLE] ${who}: scaleClass is not a string (${typeof raw}) — dropped, not guessed`);
     return null;
   }
-  const value = raw.trim().toLowerCase();
-  if (!SCALE_CLASSES.includes(value)) {
+  const value = resolveScaleClass(raw);
+  if (!value) {
     log.warn(`[VISUAL BIBLE] ${who}: unknown scaleClass "${raw}" — dropped, not coerced to a nearest band`);
     return null;
   }
@@ -941,7 +1031,11 @@ function buildAnimalDescription(animal) {
   const parts = [];
   if (animal.species) parts.push(animal.species);
   if (animal.coloring) parts.push(animal.coloring);
-  if (animal.size) parts.push(animal.size);
+  // The scale note is the enum phrase when a class is authored and the stored
+  // free-text `size` otherwise. A creature is the element whose scale drifts
+  // most and the one nothing else anchors (decisions.md 2026-09-11).
+  const animalScale = elementScaleNote(animal);
+  if (animalScale) parts.push(animalScale);
   if (animal.features) parts.push(animal.features);
   return parts.join('. ');
 }
@@ -963,7 +1057,7 @@ function buildArtifactDescription(artifact) {
   const desc = typeof artifact.description === 'string' ? artifact.description.trim() : '';
   if (desc) parts.push(desc.replace(/\.\s*$/, ''));
   else if (artifact.type) parts.push(String(artifact.type).trim());
-  const size = typeof artifact.size === 'string' ? artifact.size.trim() : '';
+  const size = elementScaleNote(artifact);
   if (size) parts.push(`Size: ${size.replace(/\.\s*$/, '')}`);
   return parts.filter(Boolean).join('. ');
 }
@@ -2894,10 +2988,17 @@ function sceneObjectsNameEntry(sceneObjects, entry) {
  * (feedback_no_scale_referent_in_vb_cell): anything sharing the cell leaks onto
  * the page.
  */
-const LARGE_SCALE_CLASSES = new Set(['vehicle', 'building', 'landscape']);
+/**
+ * The large bands of SCALE_CLASSES — everything at or above twice a standing
+ * adult. Re-derived from the granular enum 2026-09-15 so plate routing is
+ * UNCHANGED in behaviour: the morning enum's `vehicle`/`building`/`landscape`
+ * resolve to `double`/`house`/`landmark`, which is exactly this set.
+ */
+const LARGE_SCALE_CLASSES = new Set(['double', 'house', 'landmark']);
 
 function isLargeScaleClass(value) {
-  return typeof value === 'string' && LARGE_SCALE_CLASSES.has(value.trim().toLowerCase());
+  const token = resolveScaleClass(value);
+  return token !== null && LARGE_SCALE_CLASSES.has(token);
 }
 
 /**
@@ -3507,6 +3608,11 @@ function recordElementCellGate(visualBible, elementId, verdict) {
 module.exports = {
   recordElementCellGate,
   SCALE_CLASSES,
+  SCALE_PHRASES,
+  LEGACY_SCALE_CLASSES,
+  resolveScaleClass,
+  scalePhrase,
+  elementScaleNote,
   normaliseScaleClass,
   isGenericEntry,
   LARGE_SCALE_CLASSES,
