@@ -1146,9 +1146,16 @@ function extractSceneMetadata(sceneDescription) {
     } else if (!looksLikeJson) {
       log.debug(`[SCENE META] tail after ---METADATA--- isn't JSON (input wasn't a metadata block); using prose fallback. Head: ${tailHead}`);
     } else {
-      log.error(`[SCENE META] ---METADATA--- delimiter present but JSON parse failed in BOTH prose+JSON and legacy paths. Sonnet emitted malformed metadata; returning prose-only fallback. Tail snippet (first 200 chars): ${tailHead}`);
+      log.error(`[SCENE META] ---METADATA--- delimiter present but JSON parse failed in BOTH prose+JSON and legacy paths. The scene-expansion model emitted malformed metadata; returning prose-only fallback. Tail snippet (first 200 chars): ${tailHead}`);
     }
     if (prose && prose.length > 50) {
+      // CONSEQUENCES, not just the fact (2026-09-15). A page that reaches here
+      // renders from prose alone: the image prompt gets no cast list, no
+      // clothing contract, no props, no interactions and no text placement,
+      // and every downstream judge then scores the picture against a brief
+      // that was stripped before it was sent. Page 16 of
+      // job_1789420511893_zly5rcdej took four CRITICAL findings this way.
+      log.error(`[SCENE META] DEGRADED PAGE — rendering on prose alone. Empty for this page: characters[] (no cast), clothing/characterClothing (no clothing contract), objects[] (no props), interactions, textPosition, setting, emptyScenePrompt. Image prompt, clothing check, held-objects check and semantic eval all run against a stripped brief.`);
       return {
         characters: [],
         characterClothing: null,
@@ -2257,6 +2264,40 @@ function resolveSceneCastEntries(metadata, where = 'scene-cast') {
   return out;
 }
 
+/**
+ * Was this page's metadata produced by the prose-only recovery path?
+ *
+ * `extractSceneMetadata` returns a degraded object when the ---METADATA---
+ * delimiter is present but every parser failed (server/lib/sceneMetadata.js,
+ * "Recovery path"). That object sets `isRecovered: true` — and, for a trap
+ * worth naming, it ALSO sets `isJsonFormat: true`, so looking for
+ * `isJsonFormat === false` finds nothing. `isRecovered` is the only marker.
+ *
+ * Measured over 45 days: production 1 page in 288, staging 3 in 1,086. Zero
+ * pages carry an absent `objects` field WITHOUT this marker, so the marker is
+ * the complete population — there is no quieter second failure mode.
+ *
+ * Recording only. This describes a known-degraded input; it is never a
+ * deduction, a severity or a repair trigger (same contract as notEvaluated).
+ *
+ * @param {Object|null} sceneMetadata - an extractSceneMetadata() result
+ * @returns {{recovered: true, emptyInputs: string[]}|null} null when the page
+ *   had a normally parsed brief.
+ */
+function describeDegradedSceneMetadata(sceneMetadata) {
+  if (!sceneMetadata || typeof sceneMetadata !== 'object') return null;
+  if (sceneMetadata.isRecovered !== true) return null;
+  const empty = [];
+  if (!Array.isArray(sceneMetadata.characters) || sceneMetadata.characters.length === 0) empty.push('characters');
+  if (!sceneMetadata.clothing && !sceneMetadata.characterClothing) empty.push('clothing');
+  if (!Array.isArray(sceneMetadata.objects) || sceneMetadata.objects.length === 0) empty.push('objects');
+  if (!sceneMetadata.interactions) empty.push('interactions');
+  if (!sceneMetadata.textPosition) empty.push('textPosition');
+  if (!sceneMetadata.setting) empty.push('setting');
+  if (!sceneMetadata.emptyScenePrompt) empty.push('emptyScenePrompt');
+  return { recovered: true, emptyInputs: empty };
+}
+
 module.exports = {
   extractJsonFromText,
   sanitizeInteractions,
@@ -2271,6 +2312,7 @@ module.exports = {
   enforceSpreadTextPosition,
   mirrorLeftRight,
   extractSceneMetadata,
+  describeDegradedSceneMetadata,
   resolveEvalSceneHint,
   resolveEvalImagePrompt,
   resolveEvalSceneDescription,

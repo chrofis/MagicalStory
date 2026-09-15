@@ -79,6 +79,7 @@ const {
   getLandmarkPhotosForScene,
   ensureLandmarkPhotoBytes,
   extractSceneMetadata,
+  describeDegradedSceneMetadata,
   findCastMissingFromMetadata,
   getHistoricalLocations,
   convertClothingToCurrentFormat,
@@ -5921,6 +5922,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // and the UI showed empty for every trial page even though the
           // JSON description had the IDs all along.
           sceneMetadata: img.sceneMetadata || null,
+          // KNOWN-DEGRADED BRIEF (2026-09-15). The page's metadata came out of
+          // the prose-only recovery path, so this page went to the image model
+          // with no cast, no clothing contract, no props and no text placement.
+          // This whitelist is the single gate on what reaches stories.data —
+          // without this line the state exists only inside sceneMetadata and in
+          // a log line. null = normally parsed brief. Recording only: it changes
+          // no score, no severity and no repair route.
+          degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
@@ -6254,6 +6263,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // sceneMetadata from the saved row even though every generation
           // step computed it from the scene description.
           sceneMetadata: img.sceneMetadata || null,
+          // KNOWN-DEGRADED BRIEF (2026-09-15). The page's metadata came out of
+          // the prose-only recovery path, so this page went to the image model
+          // with no cast, no clothing contract, no props and no text placement.
+          // This whitelist is the single gate on what reaches stories.data —
+          // without this line the state exists only inside sceneMetadata and in
+          // a log line. null = normally parsed brief. Recording only: it changes
+          // no score, no severity and no repair route.
+          degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
@@ -6678,6 +6695,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (pipelineNotEvaluated) {
       finalChecksReport = finalChecksReport || {};
       finalChecksReport.notEvaluated = pipelineNotEvaluated;
+    }
+
+    // PAGES THAT SHIPPED ON PROSE ALONE (2026-09-15). Same contract as
+    // notEvaluated above: a page whose brief was stripped before it was sent
+    // must say so in the stored run, not only in a log line. An analyst reading
+    // finalChecksReport now sees "page N shipped on prose alone" next to that
+    // page's findings, which is what makes the scoring question answerable on
+    // evidence. Recording only — no score, severity or route changes.
+    const degradedScenePages = (allImages || [])
+      .filter(img => img && img.degradedScene)
+      .map(img => ({
+        pageNumber: img.pageNumber,
+        emptyInputs: img.degradedScene.emptyInputs || []
+      }));
+    if (degradedScenePages.length > 0) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.degradedScenes = degradedScenePages;
+      for (const p of degradedScenePages) {
+        log.warn(`⚠️  [DEGRADED SCENE] page ${p.pageNumber} shipped on prose alone — no ${p.emptyInputs.join(', ')}. Every judge scored it against a stripped brief.`);
+      }
     }
 
     // Deterministic scene metadata ↔ scene design consistency findings (see

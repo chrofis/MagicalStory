@@ -40040,3 +40040,41 @@ the name still resolved through the spread, then restoring it.
 `shared/topic-age-windows.json`, `server/lib/promptBuilders.js`,
 `client/src/constants/storyTypes.ts`, `client/tsconfig.json`, `tests/unit/age-band.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — A page that ships on prose alone is marked in stories.data, not only in a log line
+
+**Context:** page 16 of `job_1789420511893_zly5rcdej` scored **-40**, the worst page in the book.
+Its stored `sceneMetadata` carries `isRecovered: true` with `objects: []`, `characters: []`,
+`clothing: null`, `interactions: null`, `textPosition: null` — the prose-only recovery path in
+`server/lib/sceneMetadata.js` ("Recovery path", ~:1150-1190), taken when the `---METADATA---`
+delimiter is present but every parser fails. The page went to the image model with no cast, no
+clothing contract, no props and no text placement; it rendered the main character in a red coat
+instead of her red blouse and sash and omitted the hat she had just caught, then took four
+CRITICAL findings (`clothing`, `accessory_missing`, `extra_character`, `face_destroyed`) judged
+against a brief that had been stripped before it was sent. Nothing downstream ever said
+"this page is known-degraded". Two traps made it hard to find: the degraded object sets
+`isJsonFormat: true`, so searching for `isJsonFormat === false` finds nothing (`isRecovered` is the
+only marker), and the parse-failure log line named "Sonnet" while the configured Art Director has
+been `gemini-3.1-pro` since 2026-08-29.
+
+Measured over 45 days: production 1 page in 288 (`job_1786905427999_hxk530n5s` p8), staging 3 in
+1,086. Zero pages have a missing `objects` field WITHOUT the marker, so `isRecovered` is the
+complete population — there is no quieter second failure mode.
+
+**Decision:** `describeDegradedSceneMetadata()` (exported from `sceneMetadata.js`, forwarded by the
+`storyHelpers` facade) turns the marker into `{recovered: true, emptyInputs: [...]}`. It is stamped
+as `degradedScene` in BOTH `sceneImages` whitelists in `storyJobPipeline.js` — the repair-pipeline
+branch and the `skipQualityEval` (trial) branch — because that whitelist is the single gate on what
+reaches `stories.data`. The rollup lands on `finalChecksReport.degradedScenes` next to
+`notEvaluated` / `shippedDefective`, with one `log.warn` per page. The fallback log line now states
+the CONSEQUENCES (which downstream inputs are empty) rather than only the fact, and names no model.
+
+**Rationale:** same contract as `notEvaluated` (2026-09-14): recording only — no score, no
+severity, no repair route changes. Whether a `clothing` CRITICAL should be suppressed when the
+clothing contract was null is a real question and it is the owner's call (classification belongs to
+the prompt); this change exists so that decision can be taken on evidence instead of on one page
+someone happened to notice.
+
+**Touched:** `server/lib/sceneMetadata.js`, `storyJobPipeline.js`,
+`tests/unit/degraded-scene-marker.test.ts`
+**Status:** ✅ active
