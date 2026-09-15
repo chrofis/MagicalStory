@@ -60,12 +60,24 @@ describe('wardrobe contract vs Visual Bible', () => {
     expect(checkWardrobeAgainstBible(r, bible())).toHaveLength(0);
   });
 
+  it('a declared wornAs item restates the slot in the bible’s words', () => {
+    // Same garment, different wording: the writer said this prop IS her hat, so
+    // the bible's description becomes the contract's text for that slot.
+    const vb: any = bible();
+    vb.artifacts[0].wornAs = 'Emma.headwear';
+    const f = checkWardrobeAgainstBible(reqs(), vb).filter((x: any) => x.character === 'Emma');
+    expect(f).toHaveLength(1);
+    expect(f[0].kind).toBe('reconcile');
+    expect(f[0].after).toContain('three turned-up brim edges');
+  });
+
   it('honours an explicit wornAs link over token attribution', () => {
     const vb: any = bible();
     vb.artifacts[1].wornAs = 'Emma.headwear';
     const f = checkWardrobeAgainstBible(reqs(), vb);
     expect(f).toHaveLength(1);
     expect(f[0].character).toBe('Emma');
+    expect(f[0].kind).toBe('reconcile');
   });
 
   it('corrects the contract in place and logs loudly', () => {

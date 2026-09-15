@@ -54,6 +54,15 @@ describe('role clothing is not a costume', () => {
     }
   });
 
+  it('the BUILT wardrobe prompt keeps a plot-critical slot out of the outfit', () => {
+    const built = String(buildStoryBibleFromBeatsPrompt(inputData, beats) || '');
+    expect(built).toContain('A slot the PLOT turns on');
+  });
+
+  it('every wardrobe-authoring site carries the plot-slot rule', () => {
+    for (const f of WARDROBE_SITES) expect(read(f), f).toContain('A slot the PLOT turns on');
+  });
+
   it('a costume is still required where the theme really is a costume', () => {
     const built = String(buildStoryBibleFromBeatsPrompt(inputData, beats) || '');
     expect(built).toMatch(/costumed\.used/);

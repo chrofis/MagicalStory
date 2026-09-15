@@ -591,10 +591,18 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
         if (!clause) continue;                                        // wardrobe silent — the bible just adds it
         const elNouns = slotNounsIn(slot, elText);
         const clauseNouns = slotNounsIn(slot, clause);
-        if (elNouns.some(n => clauseNouns.includes(n))) continue;     // the same garment, twice
-
+        const sameGarment = elNouns.some(n => clauseNouns.includes(n));
         const replacement = String(el.description || elName).trim().replace(/\.\s*$/, '');
+        // A DECLARED item (`wornAs`) owns its slot outright: the writer said
+        // this prop IS that character's garment there, so the bible's words
+        // become the contract's words even when both name the same garment —
+        // "the same item in the same words" is the rule the Art Director works
+        // to. Without a link, only a different garment is a fault.
+        const kind = link ? 'reconcile' : 'conflict';
+        if (sameGarment && !link) continue;                           // the same garment, twice
+        if (link && clause === replacement) continue;                 // already in the same words
         findings.push({
+          kind,
           character,
           category,
           slot,
@@ -618,20 +626,30 @@ function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
  * @returns {{findings: Array, applied: Array}}
  */
 function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts = {}) {
+  const logger = opts.log || log;
   const findings = checkWardrobeAgainstBible(clothingRequirements, visualBible);
   const applied = [];
-  const logger = opts.log || log;
-  for (const f of findings) {
+  // One correction at a time, re-deriving after each: two entries can point at
+  // the same outfit, and the second's `before` is the first's `after`.
+  for (let pass = 0; pass < findings.length + 1; pass++) {
+    const pending = checkWardrobeAgainstBible(clothingRequirements, visualBible);
+    if (pending.length === 0) break;
+    const f = pending[0];
     const entry = clothingRequirements?.[f.character]?.[f.category];
-    if (!entry || entry.description !== f.before) {
-      logger.warn(`⚠️ [WARDROBE-BIBLE] ${f.character}/${f.slot}: contract and bible disagree (${f.elementId || '?'} "${f.elementLabel}" vs "${f.wardrobeClause}") and the outfit moved under us — NOT corrected`);
-      continue;
-    }
+    if (!entry || entry.description !== f.before) break;   // nothing safe to do
     entry.description = f.after;
     applied.push(f);
-    logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: the wardrobe said "${f.wardrobeClause}" while ${f.elementId || 'the bible'} says "${f.elementLabel}" on the same body — the Visual Bible wins, outfit clause rewritten`);
+    if (f.kind === 'reconcile') {
+      logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: ${f.elementId || 'the bible'} "${f.elementLabel}" is declared worn in this slot — the outfit clause "${f.wardrobeClause}" is restated in the bible's words`);
+    } else {
+      logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: the wardrobe said "${f.wardrobeClause}" while ${f.elementId || 'the bible'} says "${f.elementLabel}" on the same body — the Visual Bible wins, outfit clause rewritten`);
+    }
   }
-  return { findings, applied };
+  const unresolved = checkWardrobeAgainstBible(clothingRequirements, visualBible);
+  for (const f of unresolved) {
+    logger.warn(`⚠️ [WARDROBE-BIBLE] ${f.character}/${f.slot}: contract and bible still disagree (${f.elementId || '?'} "${f.elementLabel}" vs "${f.wardrobeClause}") — NOT corrected`);
+  }
+  return { findings, applied, unresolved };
 }
 
 // slotStated + missingGarments are exported so the image-prompt clothing check
