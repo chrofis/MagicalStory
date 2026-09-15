@@ -239,14 +239,24 @@ function unlinkedWornCandidates(visualBible, outfitTexts = new Map()) {
  *
  * @returns {{wearer: string, state: string|null, location: string|null}}
  */
-function resolveWearer({ id, owner, declaredWearer, state, location, castNames, pageLabel }) {
+function resolveWearer({ id, owner, declaredWearer, state, location, castNames, pageLabel, castComplete = true }) {
   const wearer = String(declaredWearer || '').trim();
   if (!wearer || sameName(wearer, owner)) return { wearer: owner, state, location };
   if (castNames.some(n => sameName(n, wearer))) return { wearer, state, location };
-  const place = location || `held by ${wearer}, who is not in this page's cast`;
-  log.error(`[WORN] Page ${pageLabel}: ${id} names wearer "${wearer}", who is not in this page's cast `
+  // NO OFF-PAGE NAME IN A PROMPT-FACING STRING. `location` is read back into the
+  // image prompt, and "held by <Name>" invites the model to draw the very person
+  // this page's cast excludes. The fact the prompt needs is that the item is not
+  // on the owner and not in frame; who has it is a log-side detail.
+  const place = location || 'not on this page';
+  // castComplete === false: the caller passed only the owner (the eval-side
+  // recompute, which walks one character at a time and has no cast). Every
+  // genuine handover then looks off-cast, so this is a debug line there — an
+  // error would fire once per page per character and mask the real coercions.
+  const message = `[WORN] Page ${pageLabel}: ${id} names wearer "${wearer}", who is not in this page's cast `
     + `(${castNames.join(', ') || 'no cast'}) — read as OFF ${owner}, ${place}. `
-    + 'It is NOT put back on the owner: that would draw the very item the row takes off them.');
+    + 'It is NOT put back on the owner: that would draw the very item the row takes off them.';
+  if (castComplete) log.error(message);
+  else log.debug(`${message} (cast not supplied by this caller)`);
   return { wearer: owner, state: 'off', location: place };
 }
 
@@ -312,6 +322,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     const w = resolveWearer({
       id: item.id, owner: item.owner, declaredWearer: (d && d.wearer) || null,
       state: stateDeclared || 'worn', location, castNames, pageLabel,
+      castComplete: options.castComplete !== false,
     });
     const wearer = w.wearer;
     const handedOver = !sameName(wearer, item.owner);
@@ -364,6 +375,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     const w2 = resolveWearer({
       id: d.id, owner, declaredWearer: d.wearer || null,
       state: d.state, location: d.location || null, castNames, pageLabel,
+      castComplete: options.castComplete !== false,
     });
     out.push({
       id: d.id,
@@ -829,7 +841,9 @@ function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sce
   const worn = [];
   for (const meta of metas) {
     if (!meta) continue;
-    for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta, { pageNumber: pageNumber || undefined })) {
+    // castComplete: false — this walks ONE character, so every genuine handover
+    // to another cast member would otherwise be logged as an off-cast coercion.
+    for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta, { pageNumber: pageNumber || undefined, castComplete: false })) {
       if (seen.has(r.id)) continue;
       if (isOffForCharacter(r, ownerName)) { seen.add(r.id); off.push(r); continue; }
       // A `worn` row that contradicts the contract is resolved only for a

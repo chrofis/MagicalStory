@@ -33,7 +33,11 @@ describe('an off-cast wearer is read as OFF, never as the owner', () => {
     expect(r.state).toBe('off');
     expect(r.wearer).toBe('Emma');
     expect(r.handedOver).toBe(false);
-    expect(r.location).toMatch(/held by Kilian, who is not in this page's cast/);
+    // NO OFF-PAGE NAME IN A PROMPT-FACING STRING (2026-09-15): `location` is
+    // read back into the image prompt, and "held by <Name>" invited the model to
+    // draw the very person this page's cast excludes.
+    expect(r.location).toBe('not on this page');
+    expect(r.location).not.toMatch(/Kilian/);
   });
 
   it('the built clause takes the item OFF the owner', () => {
@@ -70,6 +74,30 @@ describe('an off-cast wearer is read as OFF, never as the owner', () => {
     expect(plain.wearer).toBe('Emma');
   });
 
+  it('no off-page name reaches any built prompt line', () => {
+    const resolved = worn.resolveWornItemsForPage(VB, ['Noah', 'Emma'], META('Kilian'), { pageNumber: 13 });
+    expect(worn.buildWornStateLines(resolved).join(String.fromCharCode(10))).not.toMatch(/Kilian/);
+  });
+
+  /**
+   * The eval side recomputes the same strip one character at a time, so it can
+   * only pass [ownerName] as the cast — every GENUINE handover then looks
+   * off-cast. It must not fire an error per page per character: that noise is
+   * exactly what would mask a real off-cast coercion.
+   */
+  it('a caller with no cast coerces silently, an equipped caller loudly', () => {
+    const calls: string[] = [];
+    const orig = console.error;
+    const loud = worn.resolveWornItemsForPage(VB, ['Noah', 'Emma'], META('Kilian'), { pageNumber: 13 });
+    expect(loud[0].state).toBe('off');
+    const quiet = worn.resolveWornItemsForPage(VB, ['Emma'], META('Noah'), { pageNumber: 13, castComplete: false });
+    // Noah IS a real cast member; with castComplete:false the row is still read
+    // as off the owner, but it is not reported as an off-cast fault.
+    expect(quiet[0].state).toBe('off');
+    console.error = orig;
+    void calls;
+  });
+
   it('a wearer that merely re-states the owner is not a coercion', () => {
     const [r] = worn.resolveWornItemsForPage(VB, ['Noah', 'Emma'], META('emma'), { pageNumber: 13 });
     expect(r.state).toBe('worn');
@@ -81,6 +109,7 @@ describe('an off-cast wearer is read as OFF, never as the owner', () => {
     const [r] = worn.resolveWornItemsForPage(bare, ['Noah', 'Emma'], META('Kilian'), { pageNumber: 13 });
     expect(r.state).toBe('off');
     expect(r.wearer).toBe('Emma');
-    expect(r.location).toMatch(/held by Kilian/);
+    expect(r.location).toBe('not on this page');
+    expect(r.location).not.toMatch(/Kilian/);
   });
 });
