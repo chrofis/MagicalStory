@@ -140,6 +140,43 @@ describe('the page loses them — but only when a plate is actually sent', () =>
     expect(ids).toContain('VEH001');
   });
 
+  /**
+   * THE GATE ASYMMETRY (fixed 2026-09-15). The page-cell DROP filtered on
+   * scaleClass/type alone while the plate INCLUSION additionally requires the AD
+   * brief's objects[] to name the entry. A large element present via
+   * `appearsInPages` but absent from objects[] was therefore dropped from the
+   * page grid, never added to the plate and never named in STRUCTURES: rendered
+   * with zero reference and zero description. The two gates must read the same
+   * brief.
+   */
+  it('an element the AD brief does not name KEEPS its cell — it never reaches the plate', async () => {
+    const objects = ['ART002'];   // the brief names only the hand-scale prop
+    const plateIds = getEmptySceneElementReferences(VB, 1, 9, null, objects).map((r: any) => r.id);
+    expect(plateIds).not.toContain('ART001');
+    expect(plateIds).not.toContain('VEH001');
+
+    const { visualBibleGrid } = await buildPageCompositeRefs(VB, 1, [], {
+      hasBackground: true, sceneObjectIds: objects,
+    });
+    const ids = (visualBibleGrid as any).rawElements.map((e: any) => e.id).sort();
+    // nothing may be dropped from the page that the plate refused
+    expect(ids).toContain('ART001');
+    expect(ids).toContain('VEH001');
+    expect(ids).toContain('ART002');
+  });
+
+  it('the predicate itself refuses to drop what the brief does not name', () => {
+    const ship = { id: 'VEH001', name: 'wooden sailing ship', type: 'vehicle', scaleClass: 'building' };
+    expect(isPlateBorneElement(ship, ['VEH001'])).toBe(true);
+    expect(isPlateBorneElement(ship, ['ART002'])).toBe(false);
+    expect(isPlateBorneElement(ship, [])).toBe(false);
+    // no brief supplied (covers, trial plates) → unchanged behaviour
+    expect(isPlateBorneElement(ship)).toBe(true);
+    expect(isPlateBorneElement(ship, null)).toBe(true);
+    // a location is not AD-gated on either side
+    expect(isPlateBorneElement({ id: 'LOC001', name: 'the quay', type: 'location' }, ['ART002'])).toBe(true);
+  });
+
   it('a stored bible keeps exactly its pre-2026-09-15 behaviour', async () => {
     const withPlate = await buildPageCompositeRefs(LEGACY, 1, [], {
       hasBackground: true, sceneObjectIds: ['ART001', 'ART002', 'VEH001'],
@@ -209,7 +246,7 @@ describe('Phase 5a-pre-grid rebuilds the claim from the kept cells', () => {
   it('routes large elements to the plate through the shared predicate', () => {
     expect(src).toContain('isPlateBorneElement');
     // conditional on a plate being sent — the no-plate fallback
-    expect(src).toContain('? refs.filter(e => !isPlateBorneElement(e))');
+    expect(src).toContain('? refs.filter(e => !isPlateBorneElement(e, pageSceneObjectsForDrop))');
   });
 
   it('recomputes the prompt from the kept set, not from the selection', () => {

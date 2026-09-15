@@ -3014,10 +3014,21 @@ function isLargeScaleClass(value) {
  * page 1 of job_1788295892348_l028ggiq7a, a cast-0 ship exterior that attached
  * zero references while a finished plate of the ship existed and was discarded.
  */
-function isPlateBorneElement(ref) {
+function isPlateBorneElement(ref, sceneObjects = null) {
   if (!ref) return false;
-  if (isLargeScaleClass(ref.scaleClass)) return true;
-  return ref.type === 'vehicle' || ref.type === 'location';
+  // A location rides the plate on its `appearsInPages` membership alone — the
+  // locations loop below is not AD-gated, so neither is the drop.
+  if (ref.type === 'location') return true;
+  if (!isLargeScaleClass(ref.scaleClass) && ref.type !== 'vehicle') return false;
+  // THE TWO GATES MUST NOT DISAGREE (2026-09-15). Everything else reaches the
+  // plate only when the Art Director's objects[] names it (AD IS THE AUTHORITY,
+  // owner 2026-09-04). Dropping the cell on scale alone, while the plate refuses
+  // the same element for want of an objects[] mention, renders it with zero
+  // reference AND zero description. Callers that know the brief pass it here;
+  // callers with no AD metadata (covers, trial plates built before briefs exist)
+  // pass nothing and keep the pre-existing behaviour on both sides.
+  if (Array.isArray(sceneObjects) && !sceneObjectsNameEntry(sceneObjects, ref)) return false;
+  return true;
 }
 
 function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null, sceneObjects = null) {

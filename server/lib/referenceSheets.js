@@ -1580,8 +1580,11 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
     // for every stored bible), plus any element the bible classed at vehicle,
     // building or landscape scale — a building-scale ARTIFACT belongs to the
     // plate for exactly the same reason a ship does (owner, 2026-09-15).
+    // Gated on the SAME brief the plate is gated on (2026-09-15): an element the
+    // AD brief does not name never reaches the plate, so dropping its cell would
+    // leave it with no reference anywhere.
     const { isPlateBorneElement } = require('./visualBible');
-    elementReferences = elementReferences.filter(e => !isPlateBorneElement(e));
+    elementReferences = elementReferences.filter(e => !isPlateBorneElement(e, sceneObjectIds));
     finalLandmarkPhotos = [];
     log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
   } else if (hasOtherRefs || (landmarkPhotos || []).length > 0) {

@@ -5111,9 +5111,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // page 1 of job_1788295892348_l028ggiq7a was a cast-0 ship exterior
           // that attached zero references while a finished plate of the ship
           // existed and was discarded.
+          //
+          // CONDITIONAL ON THE ELEMENT ACTUALLY REACHING THE PLATE too: the
+          // plate admits a vehicle or a large element only when the AD brief's
+          // objects[] names it, so the same brief gates the drop. Without this
+          // the two gates disagree and the element is rendered with no
+          // reference and no STRUCTURES line at all.
+          const pageSceneObjectsForDrop = pageData.sceneMetadata?.objects || null;
           const { isPlateBorneElement } = require('./server/lib/visualBible');
           const kept = (hasPlate
-            ? refs.filter(e => !isPlateBorneElement(e))
+            ? refs.filter(e => !isPlateBorneElement(e, pageSceneObjectsForDrop))
             : refs
           ).filter(e => !aboardId || e.id !== aboardId);
           if (kept.length < refs.length) {
