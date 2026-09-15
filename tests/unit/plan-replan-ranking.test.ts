@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 
 const { highActionPageBudget, highActionPagesPhrase, runPlanCounters } = require('../../server/lib/planCounters');
-const { parsePlanCheck, buildReplanSection, replanRank, buildBeatsPrompt } = require('../../server/lib/promptBuilders');
+const { parsePlanCheck, buildReplanSection, replanRank, findingPages, buildBeatsPrompt } = require('../../server/lib/promptBuilders');
 
 describe('high-action page budget', () => {
   it('scales with the book: 1 short, 2 normal, 3 long', () => {
@@ -94,6 +94,31 @@ describe('re-plan ranking', () => {
     const legacy = buildReplanSection('Page 1: ...', ['PLAN[SHOT_VARIETY]: only two shot types']);
     expect(legacy).toContain('## ALSO NOTED');
     expect(legacy).not.toContain('## MUST FIX');
+  });
+  // Owner, 2026-09-15: PEOPLELESS_ON_INTERACTION_PAGE is must-fix, not advisory.
+  // A people-free page is a feature, but not on the page whose drama is between
+  // people — the re-plan resolves it rather than noting it.
+  it('treats a peopleless interaction page exactly like the other must-fix codes', () => {
+    const finding = {
+      kind: 'counter',
+      code: 'PEOPLELESS_ON_INTERACTION_PAGE',
+      pages: [12],
+      line: 'PLAN[PEOPLELESS_ON_INTERACTION_PAGE]: page 12 puts no one in frame',
+    };
+    expect(replanRank(finding)).toBe('must');
+    // The round loop counts must-fix findings with exactly this predicate
+    // (beatsPipeline.js mustFixCount / stillMustFix): an unresolved one keeps
+    // the round alive and blocks a discard, just like NO_FOCAL_PAGE.
+    const mustFixCount = (findings: any[]) => findings.filter(f => replanRank(f) === 'must').length;
+    expect(mustFixCount([finding, { kind: 'counter', code: 'SHOT_VARIETY' }])).toBe(1);
+    expect(mustFixCount([finding])).toBe(mustFixCount([{ kind: 'counter', code: 'NO_FOCAL_PAGE' }]));
+    // It names its page structurally, so the re-plan's restore-merge can ask
+    // for that page back.
+    expect(findingPages(finding)).toEqual([12]);
+    const section = buildReplanSection('Page 12: wide — ...', [finding]);
+    expect(section).toContain('## MUST FIX');
+    expect(section).toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(section).not.toContain('## ALSO NOTED');
   });
 });
 

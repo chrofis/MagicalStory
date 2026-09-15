@@ -5935,9 +5935,17 @@ const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
  * Counter codes that outrank the rest: a commissioned character the division
  * left out. Everything else a counter measures — shot distribution, repetition,
  * consecutive-page sameness — is a preference next to these.
+ *
+ * `PEOPLELESS_ON_INTERACTION_PAGE` joined 2026-09-15 (owner). It has the same
+ * shape as the rest of this set — the cast is missing from a page that needed
+ * it — and the page it names is the one that can least afford it: the drama
+ * between people. On job_1789420511893_zly5rcdej that page was the emotional
+ * climax, and it shipped empty. Interaction pages get faces; the re-plan
+ * resolves this finding, it does not merely note it.
  */
 const REPLAN_MUST_FIX_CODES = new Set([
   'NO_FOCAL_PAGE', 'UNDER_COVERED_CHARACTER', 'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE',
+  'PEOPLELESS_ON_INTERACTION_PAGE',
 ]);
 
 /**
