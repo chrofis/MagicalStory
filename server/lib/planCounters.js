@@ -458,7 +458,10 @@ function consecutiveRuns(sorted) {
  * Run every code-side counter over a divided plan.
  *
  * @param {Object} args
- * @param {Array}  args.pages  [{pageNumber, beat, planLine}]
+ * @param {Array}  args.pages  the divided plan, one row per page:
+ *   `{pageNumber, planLine}`. There is no separate beat prose — a page IS its
+ *   plan line (beat prose removed 2026-09-02) — and nothing here reads any
+ *   other field off a row.
  * @param {string[]} [args.commissionedNames] the characters the book was commissioned for
  * @param {string[]} [args.placeNames] named things this story already knows can never be
  *   cast (collectPlaceNames: places, plus the calendar nouns of its language),
