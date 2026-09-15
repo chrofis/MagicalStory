@@ -27,6 +27,21 @@ describe('shared Visual-Bible authoring rules reach every authoring site', () =>
     }
   });
 
+  // Closed world: the landmark list is the only source of a real landmark, and
+  // an ABSENT list means none are available. Without the empty-list clause the
+  // author was told to take the name "from the available landmarks list" while
+  // {AVAILABLE_LANDMARKS_SECTION} rendered to nothing.
+  it('the landmark closed-world rule, including the empty-list case', () => {
+    for (const rel of VB_AUTHORING_TEMPLATES) {
+      const text = read(rel);
+      expect(/isRealLandmark/.test(text), path.basename(rel)).toBe(true);
+      expect(
+        /[Nn]o (AVAILABLE )?LANDMARKS section/.test(text),
+        `${path.basename(rel)} states what happens with no landmark list`
+      ).toBe(true);
+    }
+  });
+
   it('every artifact and animal carries a size', () => {
     for (const rel of VB_AUTHORING_TEMPLATES) {
       expect(/Every artifact carries `size`, and every animal too/.test(read(rel)), path.basename(rel)).toBe(true);

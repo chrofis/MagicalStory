@@ -163,7 +163,7 @@ The `description` is copied verbatim into image prompts, so write it as image-pr
 
 Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
 
-Real-world landmarks get `isRealLandmark: true` and `landmarkQuery` set to the exact name from the available landmarks list.
+Only a place listed in an AVAILABLE LANDMARKS section above gets `isRealLandmark: true` and `landmarkQuery` set to its exact name as listed. Every other location — a town, a street, a square, a building, any place that exists in reality but is not on that list — stays `isRealLandmark: false` with `landmarkQuery: null`. No AVAILABLE LANDMARKS section means no landmarks are available: every location is `false` and `null`.
 
 A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Do not split for lighting, weather, time of day or a different cast. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (`wide|medium|close-up|wide-low|aerial`), a 2-3 sentence background-only `description` naming the empty foreground band for characters, and `pages`. Every page in the location's `pages` appears in exactly one vantage.
 
