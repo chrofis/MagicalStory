@@ -481,8 +481,9 @@ measurement, is lost).
       Verified in the BUILT prompt + unit tests only; no trial story has been generated against them. Re-measure the
       name-opening rate (baseline 45-48% trial vs 23% staging-full) and check EXACT POSES actually appears on trial
       pages. → `docs/decisions.md` 2026-09-13 "Trial gets four prompt-only ports from the full pipeline"
-- [ ] **`prompts/story-unified.txt` (pre-beats writer) never got the page-opening variety rule.** Out of scope for the
-      trial port; decide whether the legacy unified path still needs it or is dead. → `prompts/story-unified.txt`
+- [x] (2026-09-15) **`prompts/story-unified.txt` (pre-beats writer) never got the page-opening variety rule.** The rule reached
+      both unified variants as prose in 3bec4005a (2026-09-14); it is now one `PAGE_OPENING_VARIETY_RULE` constant filled into
+      all four writer templates → `server/lib/promptBuilders.js`, `tests/unit/writer-shared-rules-reach.test.ts`
 
 - [ ] **`vb_element_overflow` at birth is 5/5 pages, not ~0, after the assignment trim — the check counts the UNION of
       trimmed bible claims and the Art Director's `objects[]` citations (pirate p12: 3 + 3 = 6), and `briefFixable`
@@ -1300,3 +1301,4 @@ decisions → `docs/decisions.md` (ten entries dated 2026-09-15).
       `7e35c083a` prints SKIPPED for an unset `STAGING_DATABASE_URL` (only configured-but-unscannable
       is fatal); `fdf30adf1`'s drift guard iterates a frozen 18-key fixture so it catches removals but
       not ADDED page fields → `tasks/staging-story-review-2026-09-15.md`
+- [ ] **VB scale class + generic gate + large-element plate routing** — 3 phases approved in principle (scaleClass enum; AD marks generic objects → no VB entry/cell; vehicle-class and larger → plate only), 1 optional unapproved (mechanical scale finding). 4 open questions for the owner inside. → `tasks/vb-scale-class-plan-2026-09-15.md`
