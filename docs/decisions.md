@@ -40401,3 +40401,33 @@ whitelist per branch guarantees the next evidence field goes missing in most of 
 **Touched:** `server/lib/images.js`, `tests/unit/eval-evidence-whitelist.test.ts`,
 `tests/unit/eval-evidence-batch-record.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — The plate generator is told the geometry it is graded on (not the cast)
+
+**Context:** `validateEmptyScene`'s inline QC grades a background plate on three composition facts
+read out of `mainScenePrompt` (the page's scene description): path/perspective direction,
+vanishing point or opening position, and lighting direction. `buildEmptyScenePrompt` was handed
+only the brief's `emptyScenePrompt`, so the generator was structurally blind to all three and every
+geometry FAIL was a wasted plate regeneration. (The reserved-corner check was removed the same day
+in `1000bd484` for the same blindness; the owner's direction here is to fix the blindness and KEEP
+the three checks.)
+
+**Decision:** a new `server/lib/sceneGeometry.js` derives a geometry-ONLY block from the same
+`mainScenePrompt` the QC uses, and `buildEmptyScenePrompt` renders it into a new `{SCENE_GEOMETRY}`
+placeholder. `scene-expansion.txt` already tells the Art Director to mirror the geometry into the
+plate prose but the brief has no structured geometry FIELD, so there is nothing to forward
+verbatim: the derivation keeps a scene sentence only when it carries a geometry keyword AND names
+no cast member and no person/figure/animal word, capped at 3 sentences. The cast, the action and
+the props are never forwarded.
+
+**Rationale:** a plate that gains a figure is worse than a plate with a wrong path direction — the
+placement pass keeps the plate's pixels. Hence the conservative filter (a false negative costs one
+geometry fact; a false positive costs a painted character), plus the block's own closing
+people-free sentence and a strengthened people-free line in `prompts/empty-scene.txt`. The QC-side
+comment now records the coupling: a check added there that cannot be derived into this block
+re-creates the blind grade.
+
+**Touched:** `server/lib/sceneGeometry.js` (new), `server/services/prompts.js`,
+`prompts/empty-scene.txt`, `storyJobPipeline.js` (4 plate call sites: page + vantage, each with its
+QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geometry.test.ts`
+**Status:** ✅ active

@@ -546,11 +546,14 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           //
           // NO RESERVED CORNER (owner, 2026-09-15: "Why does the empty scene
           // need a reserved corner that is wrong. Change the judge."). The
-          // plate generator is never handed mainScenePrompt — buildEmptyScenePrompt
-          // receives the brief's emptyScenePrompt only — so a reserved-space
-          // requirement graded a plate against prose it could not read. The
           // page's text area is computed later from the calmness map
           // (server/lib/textRegion.js), so the plate reserves nothing.
+          //
+          // The three geometry checks below DO reach the generator since
+          // 2026-09-15: buildEmptyScenePrompt derives a geometry-only block
+          // from this same mainScenePrompt (server/lib/sceneGeometry.js), so
+          // the plate is graded on facts it was given. Adding a check here
+          // that is not derivable into that block re-creates the blind grade.
           const mainSceneBlock = mainScenePrompt
             ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
             : '';

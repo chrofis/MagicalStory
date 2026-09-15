@@ -4544,6 +4544,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 pageNumber: repPageData.pageNumber,
                 aboardId: repAboardId,
                 sceneObjects: repSceneObjects,
+                // The SAME prose validateEmptyScene grades this plate's geometry
+                // against, reduced to the geometry facts (no cast, no action).
+                mainScenePrompt: repPageData.scene?.sceneDescription || null,
+                castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
               });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -4626,6 +4630,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     pageNumber: repPageData.pageNumber,
                     aboardId: repAboardId,
                     sceneObjects: repSceneObjects,
+                    mainScenePrompt: repPageData.scene?.sceneDescription || null,
+                    castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -4873,6 +4879,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               pageNumber: pageData.pageNumber,
               aboardId: pageAboardId,
               sceneObjects: pageSceneObjects,
+              // The SAME prose validateEmptyScene grades this plate's geometry
+              // against, reduced to the geometry facts (no cast, no action).
+              mainScenePrompt: pageData.scene?.sceneDescription || null,
+              castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
             });
 
             try {
@@ -4955,6 +4965,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     pageNumber: pageData.pageNumber,
                     aboardId: pageAboardId,
                     sceneObjects: pageSceneObjects,
+                    mainScenePrompt: pageData.scene?.sceneDescription || null,
+                    castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,

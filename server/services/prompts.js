@@ -679,12 +679,28 @@ function buildEmptyScenePrompt(opts = {}) {
     description += `\n\n**REFERENCE:** The place or vessel in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
   }
 
+  // Geometry only, and only when the caller has the page's scene prose. Always
+  // a declared key below: fillTemplate drops an undeclared placeholder silently.
+  const { extractSceneGeometry } = require('../lib/sceneGeometry');
+  const geometryBlock = opts.sceneGeometry != null
+    ? String(opts.sceneGeometry)
+    : extractSceneGeometry({
+        mainScenePrompt: opts.mainScenePrompt || null,
+        castNames: opts.castNames || [],
+        shot: opts.shot || null,
+      });
+
   const filled = fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
     STYLE_DESCRIPTION: opts.style || '',
     EMPTY_SCENE_DESCRIPTION: description,
     CHARACTER_SPACE: opts.characterSpace || '',
     TEXT_AREA_INSTRUCTION: opts.textAreaInstruction || '',
     ERA_GUARD: opts.eraGuard || '',
+    // The plate is GRADED on the page's composition geometry (validateEmptyScene
+    // checks path direction, vanishing point and lighting direction against the
+    // scene prose). Derived here — never the raw prose — so the generator sees
+    // the same three facts it is judged on and none of the cast.
+    SCENE_GEOMETRY: geometryBlock,
     LANDMARK_FIDELITY: opts.landmarkFidelity || '',
   });
 

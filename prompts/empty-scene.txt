@@ -2,9 +2,11 @@
 
 Render every surface, material and light source in that art style. The style applies to the backdrop exactly as it applies to a page with characters — a location described in documentary terms is still drawn in this style, never as a photograph.
 
-Generate a SINGLE illustration of the background environment. Paint only what the description below names. Do not add people, crowds, or figures that the description does not mention.
+Generate a SINGLE illustration of the background environment. Paint only what the description below names. The page's characters are composited in later and none of them appear here: do not add people, crowds, or figures that the description does not mention, and never draw a figure named anywhere in this prompt.
 
 {EMPTY_SCENE_DESCRIPTION}
+
+{SCENE_GEOMETRY}
 
 {CHARACTER_SPACE}
 
