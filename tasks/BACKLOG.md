@@ -1285,11 +1285,21 @@ decisions → `docs/decisions.md` (ten entries dated 2026-09-15).
       reader or drop it together with its assertion — owner's call, tied to the pending owner-approved
       wide-view wording (which must NOT be edited meanwhile) → `server/lib/promptBuilders.js:748`
 - [ ] **`prompts/styled-costumed-avatar-2x4.txt` is a dead file** — on disk, not registered in
-      `server/services/prompts.js` (only `styled-costumed-avatar.txt` is). And pass-2
-      (`buildStyleTransferPrompt`, `character2x4Sheet.js:1003`) has **no footwear rule** while pass-1
-      does (`buildFootwearRule`). Neither is trivially safe: deleting a template is a removal,
-      registering it is inert, and adding a footwear rule changes a paid avatar prompt → owner call
-      → `server/services/prompts.js`, `server/lib/character2x4Sheet.js:1003`
+      `server/services/prompts.js` (only `styled-costumed-avatar.txt` is), yet
+      `scripts/test-costumed-2x4.js:78` reads it and `sheet-footwear-rule.test.ts` /
+      `sheet-row-garment-agreement.test.ts` pin its wording. Its footwear and row-1 garment clauses
+      duplicate `buildFootwearRule` / `buildGarmentRule` in JS — consolidate to one source (have the
+      script build via the real builder), do NOT delete → `server/services/prompts.js`,
+      `scripts/test-costumed-2x4.js:78`
+      **The pass-2 footwear gap was MEASURED on 2026-09-15 and does NOT bite — do not "fix" it.**
+      24 stored sheets pulled from staging R2 (`stories/*/styled-avatars/*`, plus the 5 character-level
+      `avatars.sheet2x4_*`) and looked at: 0 barefoot, 23 shod with feet inside the cell, 1 (a
+      long-skirt adult) with the hem reaching the cell edge — a framing miss, not a stripped shoe.
+      Pass 2 is a faithful copier: the barefoot case `sheet-footwear-rule.test.ts` documents
+      (job_1789296188291_thezv15y1) was pass 1 coming back barefoot and pass 2 *copying* it, which is
+      why the guard belongs at pass 1, where it now is. Adding footwear words to
+      `buildStyleTransferPrompt` would over-constrain a prompt that decisions.md 2026-08-09 (realism
+      backfire) and 2026-08-12 (anchor-people bleed) both record as deliberately minimal.
 - [ ] **Age-0 casts now yield `readerAge` 0 for the child critic** (side effect of `00f5ecda6`, which
       correctly stopped `youngestMainAge` filtering `n > 0`). `readerAge()` reads the same field, so an
       age-0-only cast previously fell back to 8. That is the intended "clamp to the youngest"
