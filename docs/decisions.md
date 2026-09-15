@@ -39439,3 +39439,383 @@ them drift, which is the failure mode `BAND_VIEW_DROPS` exists to prevent one le
 Verified statically: full unit suite 188 files / 2367 tests / 0 failures; the age-8 arc-create prompt
 renders the journey band whole with zero unfilled placeholders; ages 5/6/8/12/16/38/68 and a missing
 age each render their intended framing. No paid call and no story run was made.
+
+---
+
+## 2026-09-15 — `crowdExpected` must be declared by BOTH Art Director templates
+
+**Context:** staging story `job_1789420511893_zly5rcdej` (generated 2026-09-14 23:15 → 2026-09-15
+00:38 CH) shipped with a mean `finalScore` of **43**, against 62-69 on the three stories before it.
+The collapse was not a render regression. Nine of sixteen pages took an `extra_character` **CRITICAL**
+for harbour crowds that the brief had asked for and the renderer drew correctly (p1: 12 figures for a
+cast of 3; p2: 10/3; p4: 10/1; p8: 10/1).
+
+The crowd guard exists and is correct end to end: `sceneMetadata.js:883/921/1082` reads
+`metadata.crowdExpected === true`, `evalPipeline.js:1087` carries it into the cast roster, and
+`evalPipeline.js:1452` declines the finding (`decline('crowd_expected')`). It had simply never been
+handed a `true`. The field was declared in **`prompts/scene-expansion.txt`** only — the per-page
+FALLBACK Art Director template. The live beats path expands with **`prompts/scene-expansion-all.txt`**,
+which discusses crowds in five places and instructs the AD to populate backdrops, but carried no
+`crowdExpected` key in its metadata schema and no rule. An omitted key reads as `false`.
+
+**Measured:** `crowdExpected === false` on all 16 pages of the story; 11 of those briefs contain
+crowd / onlooker / quay / Hafen wording. `wasCharacterFixed === false` on all 16 — see the companion
+entry on `extra_character` having no repair route, which is why the false CRITICALs could only sit
+there and subtract.
+
+**Decision:** the field and its rule live in **both** Art Director templates, and the two templates
+are pinned to the same metadata key set by a test. A metadata field a guard reads is part of the
+contract of every template that can produce that metadata, not of the one it was written in.
+
+**Rationale:** this is the sibling-path failure class in its purest form — a correct guard, correct
+plumbing, a correct consumer, and a producer that was never asked for the value. Adding the key alone
+would fix this instance and nothing else; the parity test is what makes the next added key reach both
+sides. It would have caught `crowdExpected` on the day it was introduced.
+
+**Touched files:** `prompts/scene-expansion-all.txt` (metadata schema + rule, mirroring
+`scene-expansion.txt:175` verbatim), `tests/unit/scene-expansion-template-parity.test.ts` (new; also
+pins the shared rule set). Commit `f7979f824`.
+
+**Status:** ✅ active — committed on `staging`, NOT pushed. Verified against the stored briefs of
+`job_1789420511893_zly5rcdej`; no regeneration and no paid call was made.
+
+---
+
+## 2026-09-15 — MEASURED: the scores did not track picture quality on `job_1789420511893_zly5rcdej`
+
+**Context:** the same story was read end to end — full text plus all 19 images viewed — before any
+code was touched. The text is good (Swiss German clean, guillemets right, the moral turn dramatised,
+the chestnut payoff lands) and pages 1-7 are strong art. The scores say otherwise, and they say it in
+both directions:
+
+| Page | What the picture shows | Score |
+|---|---|---|
+| p10 | good page, no real defect | **35** |
+| p8 | a football-sized chestnut nearest to camera (a thumb-sized prop) | **68** |
+| p12 | an empty quay — the emotional climax, with no children in it | **33** |
+| p2 | a fine page | **-5** |
+
+An empty climax outscoring a correct page by 38 points, and a genuine scale defect outscoring a clean
+page by 33, is not a ranking anyone can act on. The cause of the depression is the `crowdExpected`
+gap above: nine pages were charged a CRITICAL each for drawing what they were asked to draw, and the
+charge landed on the pages with the most people in them — which on this book are the good ones.
+
+**Decision:** recorded as measured evidence, not as a behaviour change. It is the justification for
+the `crowdExpected` fix being treated as P0 rather than as a prompt tidy, and it is the reference case
+for any future claim that a score distribution means the art got worse.
+
+**Rationale:** a score that is depressed by a guard's missing input is worse than no score, because it
+routes repair effort at the wrong pages and it reads, at a glance, as a bad book. The first report of
+this run said exactly that from the numbers alone; the diagnosis inverted once the images were opened.
+
+**Real defects the read DID find on this story** (none of which the scores ranked highest):
+Captain Sarah wears a pirate tricorn instead of her navy cap with the golden anchor — the plot object
+— on p14, p15, the back cover and the initial page; Emma wears the tricorn on p13/p14 before she
+recovers it on p16; a red coat instead of her blouse on p16; the giant chestnut on p8; cloned faceless
+adults on p9; Kilian missing his tricorn on p11; p13 has Emma idle where the text has her pulling.
+
+**Touched files:** none (evidence). Written up per page in
+`tasks/staging-story-review-2026-09-15.md`.
+
+---
+
+## 2026-09-15 — `extra_character` has no repair route by design — and what that costs when the crowd flag is missing
+
+**Context:** while diagnosing the score collapse above, the obvious question was why nine CRITICALs
+produced zero repairs (`wasCharacterFixed === false` on all 16 pages). The answer is three
+independent, each individually deliberate, decisions that compose into a dead end:
+
+1. `extra_character` deliberately keeps **CRITICAL** severity (`server/lib/scoring.js` ~186) — a
+   phantom figure in a children's book is a serious defect and the severity reflects that.
+2. The inpaint route was **closed** for it on 2026-09-13 (`NOT_INPAINTABLE_TYPES`,
+   `server/lib/repairLogic.js` ~980, commit `0f25e7f25`) — removing a figure by inpainting reliably
+   damaged the figures around it.
+3. `selectCharRepairTasks` (`repairLogic.js:444`) keys its tasks on a **cast name**, and a surplus
+   figure is by definition nameless, so it can never be handed a task.
+
+**Decision:** the state is recorded as the documented state, not changed. Each of the three parts is
+right on its own terms; the composition means an `extra_character` CRITICAL is a pure score
+deduction with no path back into repair.
+
+**Rationale:** this is survivable exactly as long as the finding is rare and true. It stops being
+survivable the moment the finding fires falsely at scale, which is what the missing `crowdExpected`
+produced — nine unappealable CRITICALs on one book. The dependency runs the other way from how it
+looks: the crowd guard is not a nicety on top of the eval, it is the only thing standing between a
+correct crowd scene and an unrepairable CRITICAL. Anyone re-opening the inpaint route or the naming
+key should read this alongside the `crowdExpected` entry rather than re-deriving the mechanism.
+
+**Touched files:** none (documentation of existing behaviour at `scoring.js`, `repairLogic.js:444`,
+`repairLogic.js` `NOT_INPAINTABLE_TYPES`).
+
+---
+
+## 2026-09-15 — One owner for a missing limb; one schema for `items_held`
+
+**Context:** `prompts/image-evaluation.txt` contradicted itself three lines apart. D-09 classified
+"a missing hand, arm or leg" as `anatomy` → **CRITICAL**, while D-12 classified "a missing arm or leg
+inside the frame" as `figure_completeness` → **MAJOR**. Separately, the two-key
+`items_held: {left, right}` schema had landed in `prompts/image-inventory-unified.txt:10` but the
+evaluator still asked free-text for "every distinct object in that figure's hands" — and both
+inventories feed the same blind judge (`prompts/image-prompt-compliance.txt:5-6`).
+
+**Decision:** the completeness family owns the defect. "A missing hand, arm or leg inside the frame"
+is D-12 (`figure_completeness`, MAJOR); the clause is removed from D-09. The evaluator's JSON example
+and its prose both take the two-key `{left, right}` shape.
+
+**Rationale:** D-11 to D-13 carry the guard *"never fire for a figure cropped by the frame edge,
+occluded by scenery or another figure, shown from behind, or drawn in consistent loose brushwork"*.
+D-09 has no such guard, so filing a missing limb as `anatomy` routed it around the one safeguard
+written for exactly this false-positive class — and did so at CRITICAL. That is the wrong direction
+given the measured 0-precision of VLM anatomy checks (memory: anatomy-defect detection verdicts).
+D-09's "3+ distinct items in one figure's hands" test was unreachable once the schema has two keys,
+and is restated as "an object held by a hand the figure does not have". No code reads `items_held`
+(only a keyword list at `testlab.js:6368`), so no consumer changed.
+
+**Note for the owner:** this partially supersedes `675e1aa60` (2026-09-12), which introduced the
+D-09 clause. No `docs/SETTLED.md` line covers either half; nothing settled was reversed. Eval
+classification belongs to the prompt, which is where both halves landed.
+
+**Touched files:** `prompts/image-evaluation.txt`,
+`tests/unit/eval-taxonomy-consistency.test.ts`. Commit `da9b7cdb2`. NOT changed:
+`prompts/variants/image-evaluation-verbose-v1.txt:215,381` still escalates 3+ entries to
+`extra_limbs` CRITICAL — an inactive variant, stale but inert (backlog).
+
+---
+
+## 2026-09-15 — A bare `costumed` label must read the costumed MAP, not be mistaken for a sheet
+
+**Context:** `server/lib/compositeCastBuilder.js:245-247` built the costume cache key by hand with
+`slugifyCostume` only, and recognised the prefixed `costumed:<x>` form exclusively.
+`clothingResolve.js:237,457` collapse `costumed:<x>` to a bare `costumed` label, so on every story
+that took that path `costumeKey` came out `null`, and the lookup at `:265` read
+`styledForStyle['costumed']` — which is a **map** of costume slots — as if it were a sheet. The
+string test failed, a **paid** 2×4 sheet was regenerated, and the cache write at `:296-303` then
+stored a STRING over that map. After which every later `pickCostumed` returned `undefined` and the
+page fell through to the generic bbox fallback (`bboxDetection.js:1315-1329`); `:310` persisted it
+under the bare key, so `database.js:2708` was keyed wrong too. Live callers:
+`storyJobPipeline.js:5365`, `regeneration.js:1350`.
+
+**Decision:** one exported helper, `resolveStyledSheetSlot(styledForStyle, clothing, storyCostume)`,
+routes **both** label shapes through the shared `costumeSubKey` / `pickCostumed` utilities. The
+builder no longer knows how a costume key is spelled.
+
+**Rationale:** the label has two legitimate spellings produced by two legitimate resolvers; the fault
+was a second, private implementation of the key rule. A shared utility already existed
+(`server/utils/costumeKey.js`, 2026-09-13) — the builder simply did not use it. The cost of the bug
+was a paid regeneration per story plus a cache the run then corrupted for itself.
+
+**Touched files:** `server/lib/compositeCastBuilder.js`,
+`tests/unit/composite-costume-slot.test.ts`. Commit `3547bc1e3`.
+
+---
+
+## 2026-09-15 — The face-integrity gate is one module, guarding all three character-repair paths
+
+**Context:** the gate added at `repairPipeline.js:1513-1537` had never once acted. Three faults at
+the same time: (a) `MODEL_DEFAULTS.repairFaceCheck` did not exist in `server/config/models.js`, so it
+ran on a hardcoded `gemini-3.7-flash` fallback; (b) that model 400s on OpenRouter without a
+`reasoning` option — documented at `evalPipeline.js:255-261` — and the catch **accepted** the repair,
+so it failed open on every call; (c) it existed only inside `runUnifiedRepairPipeline`, while the
+single-page path (`entityConsistency.js:3214`) and the manual "Figur reparieren" button
+(`routes/regeneration.js:5842`) had no gate at all. The block's own comment still described a
+detector-count gate that had been deleted.
+
+**Decision:** a new `server/lib/faceIntegrityGate.js`, called from all three entry points. The model
+key names a proven vision tier — `repairFaceCheck: 'gemini-2.5-flash'`, the native Gemini path, which
+takes no reasoning option. **Fail-open is kept by design** (gates are guidelines; a gate must never
+kill a paid run), but every outcome is now counted: `repair_face_integrity_pass`,
+`repair_face_integrity_unavailable`, `repair_reject_face_integrity`.
+
+**Rationale:** a permanently-open gate that emits nothing is indistinguishable from a clean pass —
+the failure mode recorded in memory as "an absent counter is not a clean score". The counters are the
+part that makes the fail-open safe: it stays open, and it says so.
+
+**Touched files:** `server/lib/faceIntegrityGate.js` (new), `server/lib/repairPipeline.js`,
+`server/lib/entityConsistency.js`, `server/routes/regeneration.js`, `server/config/models.js`,
+`tests/unit/face-integrity-gate.test.ts`. Commit `79f1e3c44`.
+
+---
+
+## 2026-09-15 — The CALLER decides which book is final: the audit runs on every exit from the repair round loop
+
+**Context:** the repair round loop (`repairPipeline.js:1935`) breaks at `:2088`
+(`badPages.length === 0`) and at `:2189` (`repairableCount === 0`) — both **before** the book audit at
+`:2732`. A run that converged in round 2 of 3 therefore shipped a book that was never read as a whole.
+`planBookAuditRound` (`repairLogic.js:145`) derived finality from `round >= roundLimit`, which is
+false at an early exit, so the extra-round grant could not fire there. That grant is the only route
+back into repair for a CRITICAL the per-page judges missed — the symptom being a reader CRITICAL on a
+good-scoring page silently dropped.
+
+**Decision:** the audit tail is extracted to `runBookAuditRound()`, and both early exits call it with
+`finalRound: true`, continuing the loop instead of breaking when it grants a round.
+`planBookAuditRound` takes `finalRound` from the caller and keeps the old `round >= roundLimit`
+derivation when it is omitted.
+
+**Rationale:** finality is a property of the caller's situation, not of the round counter. The book in
+hand at an early exit IS the shipping book. The unit test could not see this because it called
+`planBookAuditRound` as a pure function — the fault was entirely in who calls it and when.
+
+**NOT changed:** `readerFindingsByPage` is still read at `:802`, for pages already in `badPages`. With
+the audit now running at convergence, a CRITICAL reader finding re-admits its page through
+`admitPagesFromAudit`, which is the intended route.
+
+**Touched files:** `server/lib/repairPipeline.js`, `server/lib/repairLogic.js`,
+`tests/unit/audit-runs-on-early-exit.test.ts`. Commit `82ea5db53`.
+
+---
+
+## 2026-09-15 — `account_created` fires when the account exists, not when an email is typed
+
+**Context:** `client/src/pages/TrialGenerationPage.tsx:562-563` emitted the funnel's terminal step
+`account_created` on a 200 from `POST /api/trial/link-email`. `server/routes/trial.js:1736-1743`
+leaves the user anonymous and unverified at that point — the account does not exist yet.
+
+**Decision:** `TrialGenerationPage` emits `email_submitted` only; `EmailVerified.tsx` emits
+`account_created` in the trial verification branch, after the auth token is stored.
+
+**Rationale:** a terminal funnel step must mean what it says, or every conversion number built on it
+is an upper bound of unknown looseness.
+
+**Consequence the next reader needs:** the measured trial conversion **will drop** on the email path,
+because it was counting typed addresses. This invalidates the comparison baseline in the memory note
+"trial funnel conversion is 50%" — that figure was measured on the old event and is not comparable to
+anything measured after this commit.
+
+**Touched files:** `client/src/pages/TrialGenerationPage.tsx`, `client/src/pages/EmailVerified.tsx`,
+`tests/unit/trial-funnel-account-created.test.ts`. Commit `38bab5a94`.
+
+---
+
+## 2026-09-15 — The sibling relationship becomes DATA: a registry, a pre-push gate, and a parity test
+
+**Context:** a verification sweep of the 173 behaviour commits from a 60-hour window (2026-09-13 to
+2026-09-15) found **27 PARTIAL fixes** — ~143 verified, 2 superseded, 0 broken. Every one of the 27
+had the same shape: the change landed on one code or prompt path and not on its sibling. The axes
+that recurred: per-page vs all-pages Art Director template, trial vs unified writer, lector vs diff
+pass, streaming vs non-streaming provider entry point, Gemini primary vs Grok fallback, production
+repair vs the regeneration route vs `entityConsistency`, Test Lab stage vs production call site,
+cover path vs page path.
+
+The story's root cause was one of them: `crowdExpected` declared only in
+`prompts/scene-expansion.txt` while the live beats path runs `prompts/scene-expansion-all.txt`, so
+the guard read `false` on all 16 pages and nine took an `extra_character` CRITICAL for
+correctly-drawn crowds (see the entry above).
+
+The `.claude/skills/fixing-sibling-paths` skill had described this exact failure class since
+2026-08-09 and prevented **none** of the 27.
+
+**Decision:** the sibling relationship stops being prose and becomes data with mechanical
+enforcement.
+
+1. `scripts/admin/sibling-registry.json` — 9 file sets plus 1 within-file set.
+2. `scripts/admin/check-sibling-paths.js`, wired as **gate 9** in `.githooks/pre-push`: a push whose
+   range touches some members of a set but not all is **blocked** for a `severity: "block"` set and
+   **warned** for a `severity: "warn"` set.
+3. `tests/unit/sibling-parity.test.ts` — registry-driven, so drift already in the tree is caught even
+   when no commit touches either side.
+4. Escape hatch: a line `Siblings-Checked: <reason>` anywhere in the commit message body,
+   case-insensitive. An empty marker is not accepted — the reason is the point. It is deliberately
+   **not** silenceable per-set: one marker excuses every set for that commit, because finer
+   granularity is a knob people learn to turn. The commonest honest use is a catch-up commit whose
+   sibling was fixed in an earlier, already-pushed commit, which the push range cannot see.
+5. The skill was rewritten to point at the registry first, and `CLAUDE.md` gained one paragraph.
+
+**Rationale:** prose is advisory and is read only by a session that chooses to invoke it; five weeks
+and 27 misses is the measurement. A registry is a control. The **block/warn split** exists because a
+gate that cries wolf gets bypassed, and a bypassed gate is worse than none — so one-to-many axes
+(the trial writer, the repair entry points, the cover builders, Lab-vs-prod) are `warn`, where a
+legitimate divergence is common, and the tight one-to-one pairs block. The parity test covers what a
+diff gate structurally cannot see: a field that only ever existed on one side.
+
+**Vouching (added the same day, `7a78e1d55`).** The marker is a **vouch**, not a dismissal: the
+author states, in the permanent commit message, that they read each sibling of the set and that the
+divergence is correct. Two forms:
+
+- `Siblings-Checked: <reason>` — excuses the commit that carries it.
+- `Siblings-Checked: <sha-prefix ≥ 7> — <reason>` — a **later commit in the same push vouches for an
+  earlier one by sha**. The gate prints `vouched by <sha>` beside the excused pair, so attribution is
+  never lost, and one `--allow-empty` commit can carry a line per blocked commit.
+
+The second form exists for the catch-up case, which gate 9 immediately produced: `1d418235a`
+(`story-text-diff.txt`, sibling fixed in the already-pushed `9a41a6c67`) and `da9b7cdb2`
+(`image-evaluation.txt`, sibling fixed in the already-pushed `62da2cdfa`) were both correctly blocked,
+and the push range cannot contain their counterparts. The only previous remedy was a rebase, which
+would have rewritten 33 unpushed hashes that three handoff notes cite. Vouching **adds** a commit
+instead of rewriting history. It fails closed on every loophole shape: a prefix resolving to nothing
+in the range, an ambiguous prefix, a self-vouch, and a missing reason are all errors, and a message
+carrying only vouches for other commits does not double as an excuse for its own siblings. The
+decision core is a pure exported `analyze(commits, sets)`, tested against synthetic history in
+`tests/unit/sibling-vouching.test.ts` (8 cases).
+
+What the mechanism cannot guard is an author who writes a reason without having read the siblings.
+That is deliberate: the reason is on the record and the next reader can hold it against the code.
+
+Additional touched files for the addendum: `scripts/admin/check-sibling-paths.js`,
+`tests/unit/sibling-vouching.test.ts` (new), `docs/sibling-paths.md`,
+`.claude/skills/fixing-sibling-paths/SKILL.md`. Commits `7a78e1d55`, `73b3ed7e8` (the vouch commit
+itself), `de49d0bfd`.
+
+**Touched files:** `scripts/admin/sibling-registry.json` (new),
+`scripts/admin/check-sibling-paths.js` (new), `scripts/admin/sibling-reminder-hook.js` (new),
+`.githooks/pre-push` (gate 9), `.claude/settings.json` (PostToolUse nudge),
+`tests/unit/sibling-parity.test.ts` (new), `tests/unit/test-include-guard.test.ts` (new),
+`docs/sibling-paths.md` (new), `CLAUDE.md`,
+`.claude/skills/fixing-sibling-paths/SKILL.md`. Commits `2f7f5dfde`, `4ae509b5f`, `336b246dd`.
+
+**Status:** ✅ active on `staging`, NOT pushed. Registry coverage is seeded from the 27 findings only
+— axes named in the sweep but not yet declared are the quality-eval Gemini-vs-Grok fallback branches
+inside `evalPipeline.js` and the `image-generation.txt`-vs-writer-prompt placement vocabulary
+(backlog). **Open owner decision:** whether every set should be `block`, dropping the warn tier.
+
+---
+
+## 2026-09-15 — People-free pages are a feature; interaction drama gets faces
+
+**Context.** Story `job_1789420511893_zly5rcdej` page 12 is the emotional climax: a ship pulls
+away, three children shout after it, Emma is in tears. The plan line read `wide — the Nebelmöwe
+sliding away from the stone edge, the slack stern line trailing toward the bollard, no one at the
+gangway place`. The Art Director expanded it to `characters: []`, the renderer drew an empty quay
+with a coil of rope, and the page shipped with no children. Nothing caught it:
+`NO_PEOPLELESS_PAGE` (planCounters.js) fires only when a book has ZERO people-free pages — so one
+is REQUIRED — and nothing constrained WHICH page; `NO_COMMISSIONED_ON_PAGE` filters `r.peopled`,
+so a zero-cast page is skipped by construction.
+
+**Decision.** People-free pages stay REQUIRED and are documented as a feature. A page with no
+characters is GOOD when the drama is environmental or spectacle — a ship tossed in a storm seen
+from far away, a landmark at dawn, an empty street after everyone has gone — and WRONG when the
+drama is interaction: dialogue, confrontation, tears, shouting, a promise, a handover. Two halves,
+per the mechanical-rules-and-fed-back-retries rule:
+1. A new plan counter `PEOPLELESS_ON_INTERACTION_PAGE` fires on a people-free page whose PLAN LINE
+   declares interpersonal drama, and travels structured to the re-plan naming the page.
+2. `prompts/story-beats.txt` item 2 now tells the planner at least one page earns a people-free
+   picture and which page qualifies.
+`NO_PEOPLELESS_PAGE` is unchanged; both counters carry a comment saying the empty page is by design.
+
+**Rationale.** The signal is read off the PLAN LINE because that is the only per-page text that
+exists at plan-check time — the beat prose was removed 2026-09-02 and a page IS its plan line. Two
+plan-declared clauses: (a) people named by their ABSENCE ("no one at the gangway", "nobody",
+"deserted", "after they have gone") — a page whose subject is a place describes the place; a page
+that has to say who is NOT there is a page about the people who left; (b) an interaction the line
+names outright (shouting, calling after, weeping, waving, a farewell, an embrace, a handover, a
+confrontation, a promise). Bare "empty" is deliberately NOT in the list: the same prompt allows an
+empty place as a page's subject. This is a plan-TIME check on the planner's own declaration, not a
+pattern match on the Art Director's prose after the fact.
+
+**Touched files.** `server/lib/planCounters.js` (INTERACTION_DRAMA_WORDS beside PERSON_WORDS,
+counter 4b, by-design comments on both counters), `prompts/story-beats.txt` (page-plan item 2),
+`tests/unit/plan-counters.test.ts`, `tests/unit/plan-replan-ranking.test.ts`. Commit `c7bd81263`
+(staging, NOT pushed).
+
+**Proposed SETTLED.md line (owner to confirm — NOT yet added to `docs/SETTLED.md`), under
+Prompts & evaluation:**
+
+> - **A people-free page is a FEATURE and stays required — but never on a page whose drama is between
+>   people** (owner, 2026-09-15). `NO_PEOPLELESS_PAGE` requires one; `PEOPLELESS_ON_INTERACTION_PAGE`
+>   constrains WHICH page. Do not propose deleting the requirement because one book spent it badly.
+>   See decisions.md 2026-09-15.
+
+**Open question for the owner — advisory or must-fix?** The new counter is ranked *"also noted"*, not
+must-fix: `REPLAN_MUST_FIX_CODES` (`promptBuilders.js:5925`) is currently reserved for "a commissioned
+character the division left out". This finding has the same shape — the climax has no faces — so
+promoting it is the plausible next step, and the owner is leaning that way. Deliberately NOT done,
+because it was outside the agreed scope of the change.

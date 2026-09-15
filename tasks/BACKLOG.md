@@ -984,7 +984,7 @@ Recorded so nobody re-proposes them as gaps.
 - [ ] **Three location canonicalisers, no reviewer check on vantage** (suspected 2026-09-13). `locationNameToDbKey`, `norm(landmarkQuery)`, bare `toLowerCase` → three keys for one place; nothing compares a `LOC001.1` plate against a `LOC001.2` page prompt. → `server/lib/promptBuilders.js:1183`, `visualBible.js:2246`, `landmarkPhotos.js:790`
 - [x] **DONE 2026-09-13 — Three `vb-object-states` tests fail on stale warning-text regexes, not logic** (found 2026-09-13). Regexes updated; 69/69. They assert the old clause order of the `[VB-STATE]` warning at `:663,701,709`. Update the regexes. → `tests/unit/vb-object-states.test.ts`
 - [ ] **VB label: Lab + real-story verification still owed** (2026-09-13). `beats_scenes` on job_1789301291267_ueh8h145m must show every artifact with `label`, zero `beats_vb_label_unresolved`, no two props sharing a REQUIRED OBJECTS lead; then one 4-page de-ch smoke story. `vbLabel.js` still carries a `LOCAL_GENERIC_TYPE` fallback that can be deleted now that `visualBible.js` exports `REF_GENERIC_TYPE`. → docs/decisions.md 2026-09-13 "One authored label"
-- [ ] **`prompts/adventure-guides.txt` is CRLF in the git working tree while every sibling guide file is LF** (found 2026-09-13). Harmless now that `parseTeachingGuideFile` splits on `/\r?\n/`, but the inconsistency is what hid the zero-topic parse; a `*.txt text=auto` line in `.gitattributes` would normalise it. → `.gitattributes`, `prompts/adventure-guides.txt`
+- [x] **DONE 2026-09-14 (`5bd9be71e`) — `prompts/adventure-guides.txt` is CRLF in the git working tree while every sibling guide file is LF** (found 2026-09-13). `.gitattributes` now carries `* text=auto` plus `*.txt`/`*.md text eol=lf`, which is what this item asked for. The working-tree copies still on disk are a separate line below (a `git add --renormalize .` needs a clean tree). Harmless now that `parseTeachingGuideFile` splits on `/\r?\n/`, but the inconsistency is what hid the zero-topic parse; a `*.txt text=auto` line in `.gitattributes` would normalise it. → `.gitattributes`, `prompts/adventure-guides.txt`
 - [x] **DONE 2026-09-13 (staging, not master) — `repairPipeline.js:1476` passes a numeric 400 as the max-tokens argument to `callTextModel`** (found 2026-09-13 by `tests/unit/no-output-caps.test.ts`, which fails on it; blamed to e61d2a78c4, 2026-09-12). Violates the owner's no-output-caps rule (null = model max). Not touched today — not this session's change. → `server/lib/repairPipeline.js:1476`
 - [ ] **The Art Director invents a prop in `sceneIntent` that no bible element or plan line carries** (measured 2026-09-13 on job_1789301291267_ueh8h145m p1: "Daniel stands nearby … an apple in his hand and a telescope on his belt" — no apple exists in the plan, the bible or the text; the render obeyed it). The evaluator did not flag it. `element_uncited` covers a bible element the brief drops, not a brief prop the bible lacks. Remedy shape: reviewer check that every held/carried object in `sceneIntent` resolves to an `objects[]` id or the plan line. → `prompts/scene-review.txt`, `server/lib/sceneBriefCheck.js`
 - [x] (2026-09-14) **The three bible templates disagree about whether an object's own light is a state** (found 2026-09-13 while fixing `vb-authoring-contract`). `scene-expansion-all.txt:136` carries B1+B2 (39fc0d0ff): the WORLD's light is not a state, the object's OWN light is. `story-unified.txt:603` and `story-trial.txt:163` still say "A change of light is not a state" — the pre-B1 rule. A lantern that lights up gets a state cell on the beats path and none on the legacy/trial paths. Align or record which is intended. → `prompts/story-unified.txt:603`, `prompts/story-trial.txt:163`, docs/decisions.md B1+B2 entry
@@ -1165,3 +1165,138 @@ rebuilt: `resolveEvalSceneHint` (3b3070dce), `resolveGeneratedOutfit` (e403345b1
       `resolvePacingBand` / `youngestMainAge` / `readerAge`,
       `tests/unit/creature-tone-youngest-main.test.ts` (the precedent)
 
+
+---
+
+## 2026-09-15 — from the staging verification-and-fix sweep (173 commits / 60 hours)
+
+Context: a full read of staging story `job_1789420511893_zly5rcdej` plus per-commit verification of
+173 behaviour commits (~143 verified, 27 PARTIAL, 2 superseded, 0 broken). 33 fix commits landed on
+`staging` and are **not pushed**. Per-page story review → `tasks/staging-story-review-2026-09-15.md`;
+decisions → `docs/decisions.md` (ten entries dated 2026-09-15).
+
+### Push / deploy state
+
+- [ ] **The whole batch is pending owner approval for a push.** 36 agent commits sit on local
+      `staging` (`f7979f824` … `de49d0bfd`), unpushed. Two earlier commits are on the branch but not
+      yet DEPLOYED to staging — `8473482ce` (age bands: ages 6+ had no plot-shape rules) and
+      `387cf67ee` (risk framing) — staging was serving `8c20d457`. And `master` head is `8f3a3ae9e`
+      (2026-07-10): **none** of the 224 commits in the window is in production. Nothing here may be
+      pushed to `master` without an explicit per-push yes → `tasks/staging-story-review-2026-09-15.md`,
+      `docs/compliance-and-todo.html:81` (the promotion line)
+- [x] **RESOLVED 2026-09-15 (`7a78e1d55` + `73b3ed7e8`) — gate 9 blocked two legitimate catch-up
+      commits in the unpushed range**, `1d418235a` (diff lector; sibling in the already-pushed
+      `9a41a6c67`) and `da9b7cdb2` (image-evaluation; sibling in `62da2cdfa`). Rather than rebase and
+      rewrite 33 hashes that three handoff notes cite, the gate learned sha-vouching
+      (`Siblings-Checked: <sha> — <reason>` from a later commit in the same push). Dry run over
+      `60d3cf097..HEAD` now reports "no unexplained partial fixes" → `docs/sibling-paths.md`
+- [ ] **`73b3ed7e8` is an EMPTY vouch commit and must travel in the same push as `1d418235a` and
+      `da9b7cdb2`** — split the push and gate 9 blocks again → `docs/sibling-paths.md`
+
+### Story defects still open (from the 2026-09-15 read)
+
+- [ ] **Captain Sarah is drawn in a pirate tricorn instead of her navy cap with the golden anchor —
+      the plot object — on p14, p15, the BACK COVER and the INITIAL PAGE** of
+      `job_1789420511893_zly5rcdej`. Four surfaces, three of them covers, which points at the cast
+      side rather than the page side. Needs its own investigation, not a patch: was the cap a VB
+      ARTIFACT entry with a holder (so it travelled with whoever holds it), or did the **cover cast
+      builder pick the costumed 2×4 sheet** instead of the standard one? Check
+      `resolveStyledSheetSlot` / `pickCostumed` on the cover path and the VB entry's `wornAs` /
+      holder fields before touching anything →
+      `tasks/staging-story-review-2026-09-15.md:2`, `server/lib/compositeCastBuilder.js`,
+      `server/lib/coverComposite.js`
+- [ ] **Emma headwear continuity and wardrobe on the closing pages of the same story** — she wears the
+      tricorn on p13/p14 *before* recovering it on p16, and wears a red coat instead of her blouse on
+      p16. Same story, likely the same wardrobe-resolution question as the item above; confirm from the
+      stored clothing requirements before treating it as a render fault →
+      `tasks/staging-story-review-2026-09-15.md:2`
+- [ ] **VB element scale — one reference cell for a ship or a walnut (ideas only, owner triage
+      pending).** p8 put a football-sized chestnut nearest to camera for a prop whose VB says "the size
+      of a thumb"; p12 drew a three-master as a small rowboat. Seven ideas written up, recommended
+      start #1 (a scale-class enum on every VB element) and #2 (hand-class props never get their own
+      reference cell). Not decided, not coded → `tasks/scale-ideas-2026-09-15.md`
+- [ ] **`PEOPLELESS_ON_INTERACTION_PAGE` is ranked "also noted", not must-fix** — decide whether to
+      promote it into `REPLAN_MUST_FIX_CODES`. The finding has the same shape as the one code already
+      there ("a commissioned character the division left out"): the climax has no faces. Owner is
+      leaning promote; deliberately not done, it was outside the agreed scope →
+      `server/lib/promptBuilders.js:5925`, `docs/decisions.md` 2026-09-15 "People-free pages are a
+      feature"
+
+### Design questions left for the owner (do NOT code)
+
+- [ ] **The cover rule "a cover stands where its cast can stand" is measured NOT working** (sweep
+      item 27). The back cover of the reference case is still LOC003 underwater; the props half works.
+      The stored cover hint says "stands" four times and the exception loses. Three framed options:
+      (a) the hint's exception wins over the repeated "stands", (b) the cast-standability check runs
+      on the back cover as it does on the front, (c) accept it. Needs an `AskUserQuestion`, not a patch
+      → `docs/decisions.md:38932` (`78837f599`), `docs/decisions.md:39303` (`701fa4058`),
+      commits `108ec1d2c` / `2958f8abc`
+- [ ] **Should every sibling-registry set be `severity: "block"`?** The warn tier exists for
+      one-to-many axes (trial writer, repair entry points, cover builders, Lab-vs-prod) on the
+      reasoning that a gate which cries wolf gets bypassed. Owner's call whether that trade is right
+      → `scripts/admin/sibling-registry.json`, `docs/sibling-paths.md`
+
+### Sibling-path enforcement (shipped 2026-09-15, `2f7f5dfde` / `4ae509b5f` / `336b246dd`)
+
+- [x] **DONE 2026-09-15 (`98a41f695`) — `tests/unit/test-include-guard.test.ts` failed until the three
+      `.test.js` files in `tests/unit` were converted.** They are now vitest `.test.ts` suites; 55
+      tests run that never ran before → `tests/unit/test-include-guard.test.ts`
+- [x] **DONE 2026-09-15 (`97564589c`) — `tests/unit/sibling-parity.test.ts` failed until
+      `callOpenRouterAPI` carried `guardPromptString`.** The delegation to the streaming entry meant
+      the guard already RAN; the repo's own contract requires the literal call at every provider entry
+      point, and it is now there with its own label → `server/lib/textModels.js:682`
+- [ ] **Registry coverage is seeded from the 27 findings only.** Axes named in the sweep but NOT yet
+      declared: the quality-eval Gemini-vs-Grok fallback branches inside `evalPipeline.js`, and the
+      `image-generation.txt`-vs-writer-prompt placement vocabulary →
+      `scripts/admin/sibling-registry.json`
+
+### Debt the fix agent documented rather than coded
+
+- [ ] **CRLF renormalise still needs a clean tree.** `.gitattributes` is correct (`5bd9be71e`) and
+      nothing new can be committed as CRLF, but working-tree copies including
+      `prompts/adventure-guides.txt` are still CRLF locally with `core.autocrlf=true`.
+      `git add --renormalize .` was NOT run: the tree carries ~1,178 modified/deleted paths from
+      another session's `dist/` rebuild, so it would stage every one of them. Do it from a clean tree
+      and verify the index diff is whitespace-only → `.gitattributes`
+- [ ] **`englishEntityRef` falls back to `type` when `label` is absent, and `type` is now an explicitly
+      SHARED category** — so two label-less entries can collide (sweep item 9b, deliberately skipped).
+      A uniqueness guard needs the entry's POOL, which `englishEntityRef(entry, generic, {language})`
+      does not receive; threading it touches 7 call sites for a collision nobody has measured. The
+      fallback only fires for a NON-English story, and the `visualBible.js:1468/1470` call sites pass
+      no language at all, so the one live path is `promptBuilders.js:4298` →
+      `server/lib/visualBible.js:1336`
+- [ ] **`prompts/variants/image-evaluation-verbose-v1.txt:215,381` still escalates 3+ `items_held`
+      entries to `extra_limbs` CRITICAL** under the old free-text schema. Inactive variant, so the rule
+      is inert — but stale, and it will mislead whoever activates the variant next →
+      `prompts/variants/image-evaluation-verbose-v1.txt:215`
+- [ ] **`photoDescription` is carried but read by nothing** (`promptBuilders.js:748`,
+      `storyHelpers.js:270`); `buildLandmarkFidelityBlock` uses only `photoType`. It is pinned by
+      `tests/unit/landmark-photo-kind-to-prompt.test.ts`, so it cannot just be deleted. Give it a
+      reader or drop it together with its assertion — owner's call, tied to the pending owner-approved
+      wide-view wording (which must NOT be edited meanwhile) → `server/lib/promptBuilders.js:748`
+- [ ] **`prompts/styled-costumed-avatar-2x4.txt` is a dead file** — on disk, not registered in
+      `server/services/prompts.js` (only `styled-costumed-avatar.txt` is). And pass-2
+      (`buildStyleTransferPrompt`, `character2x4Sheet.js:1003`) has **no footwear rule** while pass-1
+      does (`buildFootwearRule`). Neither is trivially safe: deleting a template is a removal,
+      registering it is inert, and adding a footwear rule changes a paid avatar prompt → owner call
+      → `server/services/prompts.js`, `server/lib/character2x4Sheet.js:1003`
+- [ ] **Age-0 casts now yield `readerAge` 0 for the child critic** (side effect of `00f5ecda6`, which
+      correctly stopped `youngestMainAge` filtering `n > 0`). `readerAge()` reads the same field, so an
+      age-0-only cast previously fell back to 8. That is the intended "clamp to the youngest"
+      direction, but it is a behaviour change nobody asked for explicitly — confirm it is wanted →
+      `server/lib/promptBuilders.js` `youngestMainAge` / `readerAge`
+- [ ] **Stale jsdoc on `runPlanCounters`** — it still documents `pages` as
+      `[{pageNumber, beat, planLine}]`; `beat` has not existed since 2026-09-02 →
+      `server/lib/planCounters.js`
+- [ ] **Eight stale agent worktrees under `.claude/worktrees/` carry pre-fix code shapes and poison
+      recursive greps** — a `grep -r` from the repo root returns the old shape of a file that was fixed
+      hours ago, which is exactly how a "fix didn't land" false report gets written. Prune the ones
+      whose sessions are over (other agents' working state — check before deleting) →
+      `.claude/worktrees/`
+- [ ] **Minor caveats recorded, deliberately not changed:** `beatsPipeline.js:2280` worn-state
+      sub-review calls `buildSceneReviewPrompt` without a visualBible (by design); `2638eae4f`'s
+      ambient counter rescue uses the styled-avatar scope `trial-<userId>` on trials rather than the
+      storyId `database.js:2012` flushes (scope semantics on the trial path is a design question);
+      `7e35c083a` prints SKIPPED for an unset `STAGING_DATABASE_URL` (only configured-but-unscannable
+      is fatal); `fdf30adf1`'s drift guard iterates a frozen 18-key fixture so it catches removals but
+      not ADDED page fields → `tasks/staging-story-review-2026-09-15.md`

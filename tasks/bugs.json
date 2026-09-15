@@ -2,6 +2,16 @@
   "_readme": "CLEAR-BUG REGISTRY. A bug the owner reported, or one confirmed from stored evidence, goes here the moment it is confirmed - and the pre-push gate (scripts/admin/check-open-bugs.js) BLOCKS every push while any entry is open. That is the point: a reported bug is fixed immediately, not backlogged. Only CLEAR bugs belong here (reproduced, or owner-reported with evidence); design questions and improvements go to the task list instead. Close an entry by setting status to 'fixed' with the commit hash IN THE SAME COMMIT as the fix. Emergency escape: PUSH_WITH_OPEN_BUGS=1 git push (documented, visible, deliberate).",
   "bugs": [
     {
+      "id": "crowd-expected-never-emitted-on-beats-path",
+      "title": "crowdExpected was declared only in the fallback Art Director template, so the crowd guard read false on every page and correct crowds took extra_character CRITICALs",
+      "reportedAt": "2026-09-15",
+      "source": "Staging story job_1789420511893_zly5rcdej (generated 2026-09-14 23:15 -> 2026-09-15 00:38 CH). Stored sceneMetadata has crowdExpected=false on all 16 pages while 11 of the 16 briefs contain crowd/onlooker/quay/Hafen wording; 9 pages took an extra_character CRITICAL for harbour crowds the brief asked for and the renderer drew correctly (p1: 12 figures for a cast of 3; p2: 10/3; p4: 10/1; p8: 10/1). Mean finalScore 43 against 62-69 on the three preceding stories, which carried 0-1 extra_character findings each. The guard is correct end to end - sceneMetadata.js:883/921/1082 reads metadata.crowdExpected === true, evalPipeline.js:1087 carries it into the cast roster, evalPipeline.js:1452 declines the finding - but the field was declared ONLY in prompts/scene-expansion.txt, the per-page FALLBACK template. The live beats path expands with prompts/scene-expansion-all.txt (beatsPipeline.js:1715 fallback log proves it), which discusses crowds in five places but had no crowdExpected key in its metadata schema and no rule; an omitted key reads as false. Compounding: extra_character keeps CRITICAL (scoring.js ~186), its inpaint route was closed 2026-09-13 (NOT_INPAINTABLE_TYPES, repairLogic.js ~980, commit 0f25e7f25) and selectCharRepairTasks (repairLogic.js:444) keys on a cast name a surplus figure does not have, so wasCharacterFixed=false on all 16 pages - the false CRITICALs could only subtract.",
+      "status": "fixed",
+      "fixedAt": "2026-09-15",
+      "fixedIn": "f7979f824",
+      "fix": "prompts/scene-expansion-all.txt declares \"crowdExpected\": false in its metadata schema and carries the rule, mirroring prompts/scene-expansion.txt:175 verbatim and generically. Pinned by tests/unit/scene-expansion-template-parity.test.ts, which asserts the two Art Director templates declare the SAME metadata key set - so the next field added to one reaches the other. Verified against the stored briefs of job_1789420511893_zly5rcdej; no regeneration and no paid call. See docs/decisions.md 2026-09-15 \"crowdExpected must be declared by BOTH Art Director templates\" and tasks/staging-story-review-2026-09-15.md."
+    },
+    {
       "id": "vb-sheet-merged-cell-stored-as-one-element-reference",
       "title": "On a grid mismatch a detected cell that merged several drawn panels was cropped and stored as ONE element's reference image",
       "reportedAt": "2026-09-11",
@@ -888,36 +898,36 @@
       "fixedAt": "2026-09-11",
       "fix": "secondaryCharacters + vehicles join the KEY STORY ELEMENTS loop when an allowed-id list is given (CHR first against the cap); coverIterate.hasEntityReference = visualBible.hasElementReference (state-aware). Test: tests/unit/cover-key-elements-secondary.test.ts"
     },
-  {
-     "id": "testlab-scene-review-16k-cap-silent-truncation",
-     "title": "Lab beats_scenes capped the scene reviewer at 16,000 output tokens (production passes null = model max); truncated or empty reviews were stored as reviewed with no error, and scene_hazard_count judged fromBeats as 'reviewed'",
-     "reportedAt": "2026-09-11",
-     "source": "Reproduced from stored Lab results. server/lib/testlab.js beats_scenes called callStream(srPrompt, 16000, ...) while beatsPipeline.js passes null (owner rule 'no output caps ever', 2026-08-29; textModels.js:1104/1172 comments name this exact class). 2026-09-10 AD redo, reviewer deepseek-v4-pro: 6 of 8 reviews (1107-1110, 1121-1124) report output_tokens exactly 16000; 1109 and 1121 returned 0 chars and rewrote nothing; 1122 and 1124 returned 17-18k chars cut mid-output; only 1110 (9391 tok) and 1123 (13809 tok) completed. Production on the same stories: 21,134 and 33,664 output tokens, 17/17 and 14/14 pages rewritten. August #920 (grok-4.6): 0 chars at 3,899 tokens, no cap hit, also stored as reviewed. #879: out 16,000, raw ''.",
-     "status": "fixed",
-     "fixedAt": "2026-09-11",
-     "fixedIn": "ee2d00c72",
-     "fix": "All five numeric maxTokens in testlab.js (scene review 16000, audit_replay 16000, scene_hazard_count 16000, review_writer 64000, outline_review 32000) now pass null = model max. New server/lib/sceneReviewGuard.js: assessSceneReview marks a review FAILED on empty text, provider stop_reason max_tokens/length, output_tokens >= the ceiling in force (model max), or a long response the SCENES parser cannot read; a failed reviewer stores ok:false + error, rewrotePages [], no reviewedBrief, and WARN-logs story/model/provider/tokens/cap. scene_hazard_count refuses artifact=reviewed on a failed review (assertReviewedArtifactUsable) and, with params.reviewer, refuses an absent or failed reviewer (pickReviewedBrief). Test: tests/unit/scene-review-guard.test.ts"
-  },
-  {
-   "id": "vb-element-cell-no-noun-scale-rendered-as-dish",
-   "title": "Visual Bible artifact cells were rendered from the description alone (name and type dropped), so an artifact whose description never names the object rendered as a different object",
-   "reportedAt": "2026-09-11",
-   "source": "job_1789078732136_622wecmhj (staging): ART001 'small dragon scale' and ART002 'large dragon scale' - description 'an oval, slightly convex scale...' - both stored VB cells (.../vb/ART001.jpg, ART002.jpg) are ceramic dishes; 'scale' with no noun for the object kind was read as a shape word. buildReferenceSheetPrompt (server/lib/referenceSheets.js) used el.description only, by design since a labelled 'Name (artifact) - ...' line once painted the name onto the object. Root-cause report: ~/Downloads/dragon-cover-scale-rootcause.html Q2.",
-   "status": "fixed",
-   "fixedAt": "2026-09-11",
-   "fixedIn": "31deb92ce",
-   "fix": "Every non-character cell line opens with a plain-prose kind sentence built from the entry's name and type ('This is the small dragon scale, a single reptile scale: <description>') - never a heading, bold line or quoted title; plus an element-cell gate (kind/match/style, one re-render on NO) and a state-cells consistency gate. Unit tests: tests/unit/vb-element-cell-prompt.test.ts."
-  },
-  {
-     "id": "numeric-output-caps-remained-after-no-caps-rule",
-     "title": "Numeric output-token caps remained at ~90 sites (39 on callTextModel*/callClaudeAPI incl. the entry points' own default maxTokens = 4096, ~50 on direct Gemini/Anthropic/xAI/OpenRouter bodies) after the 2026-08-29 no-caps rule, and no shared layer detected a truncated reply",
-     "reportedAt": "2026-09-11",
-     "source": "Owner order 2026-09-11 after ee2d00c72 (Lab scene review cut at exactly 16,000 tokens in 6 of 8 arms, stored as reviewed). Repo-wide ripgrep enumeration: storyJobPipeline.js unified_story 64000 / outline_review 32000 / scene_expansion 10000; feedbackConsolidator 6000 (its own comment records 3000 truncating busy pages); entityConsistency 8192 (comment: raised from 2048 after truncation); textRefine repair 'min(64000, model max)' (16000 truncated a 16-page run, job_1787423677246); bookAudit 16000 (4000 truncated 2 of 3 chunks); character2x4Sheet 8000 (2500/4000 truncated the JSON); evalPipeline P1 32000 (Lab #817 cut mid-figure). Provider finish reasons (stop_reason / finishReason / finish_reason) were not surfaced on any path except the Anthropic stream, so a cut reply parsed as a shorter one everywhere.",
-     "status": "fixed",
-     "fixedAt": "2026-09-11",
-     "fixedIn": "497890e1f",
-     "fix": "Every callTextModel*/callClaudeAPI site passes null (= model max) and the entry points default to null; every direct provider body drops its numeric literal (Anthropic bodies use the new maxOutputTokensFor()); two documented caps kept and allow-listed (diagnostics ping max_tokens 1, bboxDetection flash-lite loop valve 2500). New server/lib/textReplyGuard.js assessTextReply runs inside both entry points: result.truncation on every reply, ERROR log + /api/health/config textTruncation counter on a suspected cut; finish reasons captured on all six provider paths. Callers wired to fall back to their input: beats scene review r1/worn/r2, arc create/retell, outline review, text audits/repair/diff/lector, three-stage compliance (evalFailed with reason), P1 inventory MAX_TOKENS. Tests: tests/unit/text-reply-guard.test.ts, tests/unit/no-output-caps.test.ts (source scan, fails on any new numeric cap), tests/unit/truncation-caller-fallbacks.test.ts. See docs/decisions.md 2026-09-11 'No output caps anywhere'."
-  },
+    {
+      "id": "testlab-scene-review-16k-cap-silent-truncation",
+      "title": "Lab beats_scenes capped the scene reviewer at 16,000 output tokens (production passes null = model max); truncated or empty reviews were stored as reviewed with no error, and scene_hazard_count judged fromBeats as 'reviewed'",
+      "reportedAt": "2026-09-11",
+      "source": "Reproduced from stored Lab results. server/lib/testlab.js beats_scenes called callStream(srPrompt, 16000, ...) while beatsPipeline.js passes null (owner rule 'no output caps ever', 2026-08-29; textModels.js:1104/1172 comments name this exact class). 2026-09-10 AD redo, reviewer deepseek-v4-pro: 6 of 8 reviews (1107-1110, 1121-1124) report output_tokens exactly 16000; 1109 and 1121 returned 0 chars and rewrote nothing; 1122 and 1124 returned 17-18k chars cut mid-output; only 1110 (9391 tok) and 1123 (13809 tok) completed. Production on the same stories: 21,134 and 33,664 output tokens, 17/17 and 14/14 pages rewritten. August #920 (grok-4.6): 0 chars at 3,899 tokens, no cap hit, also stored as reviewed. #879: out 16,000, raw ''.",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "ee2d00c72",
+      "fix": "All five numeric maxTokens in testlab.js (scene review 16000, audit_replay 16000, scene_hazard_count 16000, review_writer 64000, outline_review 32000) now pass null = model max. New server/lib/sceneReviewGuard.js: assessSceneReview marks a review FAILED on empty text, provider stop_reason max_tokens/length, output_tokens >= the ceiling in force (model max), or a long response the SCENES parser cannot read; a failed reviewer stores ok:false + error, rewrotePages [], no reviewedBrief, and WARN-logs story/model/provider/tokens/cap. scene_hazard_count refuses artifact=reviewed on a failed review (assertReviewedArtifactUsable) and, with params.reviewer, refuses an absent or failed reviewer (pickReviewedBrief). Test: tests/unit/scene-review-guard.test.ts"
+    },
+    {
+      "id": "vb-element-cell-no-noun-scale-rendered-as-dish",
+      "title": "Visual Bible artifact cells were rendered from the description alone (name and type dropped), so an artifact whose description never names the object rendered as a different object",
+      "reportedAt": "2026-09-11",
+      "source": "job_1789078732136_622wecmhj (staging): ART001 'small dragon scale' and ART002 'large dragon scale' - description 'an oval, slightly convex scale...' - both stored VB cells (.../vb/ART001.jpg, ART002.jpg) are ceramic dishes; 'scale' with no noun for the object kind was read as a shape word. buildReferenceSheetPrompt (server/lib/referenceSheets.js) used el.description only, by design since a labelled 'Name (artifact) - ...' line once painted the name onto the object. Root-cause report: ~/Downloads/dragon-cover-scale-rootcause.html Q2.",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "31deb92ce",
+      "fix": "Every non-character cell line opens with a plain-prose kind sentence built from the entry's name and type ('This is the small dragon scale, a single reptile scale: <description>') - never a heading, bold line or quoted title; plus an element-cell gate (kind/match/style, one re-render on NO) and a state-cells consistency gate. Unit tests: tests/unit/vb-element-cell-prompt.test.ts."
+    },
+    {
+      "id": "numeric-output-caps-remained-after-no-caps-rule",
+      "title": "Numeric output-token caps remained at ~90 sites (39 on callTextModel*/callClaudeAPI incl. the entry points' own default maxTokens = 4096, ~50 on direct Gemini/Anthropic/xAI/OpenRouter bodies) after the 2026-08-29 no-caps rule, and no shared layer detected a truncated reply",
+      "reportedAt": "2026-09-11",
+      "source": "Owner order 2026-09-11 after ee2d00c72 (Lab scene review cut at exactly 16,000 tokens in 6 of 8 arms, stored as reviewed). Repo-wide ripgrep enumeration: storyJobPipeline.js unified_story 64000 / outline_review 32000 / scene_expansion 10000; feedbackConsolidator 6000 (its own comment records 3000 truncating busy pages); entityConsistency 8192 (comment: raised from 2048 after truncation); textRefine repair 'min(64000, model max)' (16000 truncated a 16-page run, job_1787423677246); bookAudit 16000 (4000 truncated 2 of 3 chunks); character2x4Sheet 8000 (2500/4000 truncated the JSON); evalPipeline P1 32000 (Lab #817 cut mid-figure). Provider finish reasons (stop_reason / finishReason / finish_reason) were not surfaced on any path except the Anthropic stream, so a cut reply parsed as a shorter one everywhere.",
+      "status": "fixed",
+      "fixedAt": "2026-09-11",
+      "fixedIn": "497890e1f",
+      "fix": "Every callTextModel*/callClaudeAPI site passes null (= model max) and the entry points default to null; every direct provider body drops its numeric literal (Anthropic bodies use the new maxOutputTokensFor()); two documented caps kept and allow-listed (diagnostics ping max_tokens 1, bboxDetection flash-lite loop valve 2500). New server/lib/textReplyGuard.js assessTextReply runs inside both entry points: result.truncation on every reply, ERROR log + /api/health/config textTruncation counter on a suspected cut; finish reasons captured on all six provider paths. Callers wired to fall back to their input: beats scene review r1/worn/r2, arc create/retell, outline review, text audits/repair/diff/lector, three-stage compliance (evalFailed with reason), P1 inventory MAX_TOKENS. Tests: tests/unit/text-reply-guard.test.ts, tests/unit/no-output-caps.test.ts (source scan, fails on any new numeric cap), tests/unit/truncation-caller-fallbacks.test.ts. See docs/decisions.md 2026-09-11 'No output caps anywhere'."
+    },
     {
       "id": "vb-trim-not-persisted-reparsed-from-outline",
       "title": "trimVbAssignments (a8e7c009c, 2026-09-08) trimmed only beatsPipeline's in-memory bible copy; storyJobPipeline re-parsed the untouched ---VISUAL BIBLE--- outline JSON, so the stored bible, every downstream stage, the resume path and the Lab all read the UNTRIMMED page assignment",
@@ -927,7 +937,7 @@
       "fixedAt": "2026-09-11",
       "fixedIn": "c16838db7",
       "fix": "One source of truth: beatsPipeline.syncVisualBibleSection writes the mutated fields (pages from appearsInPages, states[].pages with emptied states removed, a clamped secondary's age + secondaryAgeClamped) back into the transcript's ---VISUAL BIBLE--- JSON after the trim and the age clamp (same pattern as replaceClothingSection), so every later extractVisualBible() yields the trimmed bible by construction; generateStoryViaBeats returns visualBible and storyJobPipeline prefers it over the re-parse (fallback only); vbElementBudget.vbTrimLostPages asserts on the picked bible before the unified_story checkpoint and logs vb_trim_lost (ERROR + genLog), never a kill. Tests: tests/unit/vb-trim-persisted.test.ts. See docs/decisions.md 2026-09-11 'Visual Bible trim was never persisted'."
-  },
+    },
     {
       "id": "character-cell-gate-fails-non-human-characters",
       "title": "Character-cell render gate failed a correctly-rendered non-human secondary character for not having human skin, burning a paid re-render and shipping the original anyway",
@@ -1037,7 +1047,7 @@
       "fixedAt": "2026-09-14",
       "fixedIn": "see git log - commit titled 'fix(detect,review,cast): _gdinoMasks is redefinable; REMOVED CAST accepts the page-prefixed form; three resolver sites get the main cast'",
       "fix": "All three sites pass storyData: charRepairTarget and images.js forward the object already in scope; the Phase 5b-pre site passes { characters: inputData.characters || [], visualBible }, the shape compositeCastBuilder.js:168 already uses. Guarded by tests/unit/one-roster.test.ts ('the main cast reaches the resolver index')."
-        },
+    },
     {
       "id": "review-bible-correction-drops-a-state",
       "title": "The scene review's bible correction replaced states[] wholesale, so a returned list missing a paged state silently deleted it and re-pointed the pages already citing its handle",

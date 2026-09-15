@@ -844,3 +844,55 @@ and three findings filed with the wrong owner. Caught only because the owner pus
 **What happened:** I launched an 18-page dragon rerun (job_1789337754344_c6h7vz7mu, ~CHF 2) after checking `/api/health` (commit c83e8344, status ok) and `/api/health/busy` (idle). Four commits had been pushed by another session at 00:10-00:13; Railway's build landed at 00:16 and restarted the container 27 seconds into my job — "Server restarted during generation". The push gate was not violated (the push preceded my launch); the deploy was simply in flight and I did not look.
 **Rule:** Before launching anything paid on an environment, `git fetch` and require `live commit == origin/<branch> HEAD`. If they differ, a deploy is pending — wait for it to land (poll `/api/health` until the SHA matches), then launch. `busy:false` and `status:ok` say nothing about a build that has not finished yet.
 **Cost:** one full story's arc stage, one of the three runs the goal allowed.
+
+## 2026-09-15 — Pixels first, numbers second: read the story and look at every image before reporting on a run
+**What happened:** the first report on staging story `job_1789420511893_zly5rcdej` was written from
+metadata — mean `finalScore` 43 against 62-69 on the three predecessors, nine `extra_character`
+CRITICALs — and it said the book had come out badly. The owner had to say *"read the story yourself
+and look at the images"*. The text is good and pages 1-7 are strong; the nine CRITICALs were **false**,
+fired on correctly-drawn harbour crowds because `crowdExpected` was never emitted on the beats path.
+Opening the images inverted the diagnosis: p10 scores 35 on a clean page, p8 scores 68 with a
+football-sized chestnut in the foreground, and an empty climax (p12, 33) outscores a fine page
+(p2, -5) by 38 points.
+**Rule:** before reporting on any run, read the text and look at **every** image. Scores are a
+hypothesis about quality, not a measurement of it — a single missing guard input can invert the whole
+ranking. Report what the pictures show first, then use the numbers to explain it. (Third recurrence
+of the same lesson: [[feedback_evaluate_every_picture_after_run]],
+[[feedback_view_actual_pixels_not_metadata]].)
+**Cost:** one wrong verdict on a good book, delivered to the owner.
+
+## 2026-09-15 — A guard is only as good as its input: verify the field is POPULATED, not just consumed
+**What happened:** the crowd guard was wired end to end and correct at every hop —
+`sceneMetadata.js:883/921/1082` reads `metadata.crowdExpected === true`, `evalPipeline.js:1087`
+carries it into the cast roster, `evalPipeline.js:1452` declines the finding. It had never once been
+handed a `true`, because the field was declared only in `prompts/scene-expansion.txt` — the per-page
+FALLBACK template — and the live beats path expands with `prompts/scene-expansion-all.txt`, which
+never asks for it. An omitted key reads as `false`, silently, forever.
+**Rule:** when verifying a guard, trace the field back to its PRODUCER and check the stored data — is
+this field ever `true` in a real run? Reading the consuming code proves only that the guard would work
+if it were fed. One query against `stories.data` would have found `crowdExpected: false` on 16 of 16
+pages. Same shape as [[feedback_absent_counter_is_not_a_clean_score]] and
+[[feedback_guards_check_adjacent_property]].
+
+## 2026-09-15 — Sibling paths: when you find a new pair, add the SET, don't just fix both sides
+**What happened:** 27 of 173 verified fixes from one 60-hour window were PARTIAL — each had reached
+one path and not its sibling (per-page vs all-pages AD template, trial vs unified writer, lector vs
+diff pass, streaming vs non-streaming provider entry, Gemini vs Grok fallback, prod repair vs
+regeneration vs entityConsistency, Lab vs prod, cover vs page). The `fixing-sibling-paths` skill had
+described the class since 2026-08-09 and prevented none of them.
+**Rule:** the registry (`scripts/admin/sibling-registry.json`), pre-push **gate 9** and
+`tests/unit/sibling-parity.test.ts` now enforce it. When you discover a new sibling pair, the fix is
+to **add the set to the registry**, not merely to patch both sides — patching both sides fixes today
+and lets tomorrow's third path diverge. If gate 9 blocks you and the divergence is correct, vouch for
+it in the commit message with `Siblings-Checked: <reason>` — that is a statement on the record that
+you read each sibling, not a way past the gate.
+
+## 2026-09-15 — A variety requirement with no placement rule will land on the climax
+**What happened:** `NO_PEOPLELESS_PAGE` requires one people-free page per book — a good rule, it buys
+visual variety. Nothing constrained WHICH page, and `NO_COMMISSIONED_ON_PAGE` skips zero-cast pages by
+construction, so the planner spent the quota on the emotional climax: three children shouting after a
+departing ship, drawn as an empty quay with a coil of rope.
+**Rule:** a quota that says a book must contain N of something needs a companion rule about where it
+may NOT go. Whenever you add or review a plan counter of the form "at least one page must be X", ask
+what the worst page to spend it on would be, and write that constraint in the same change. The quota
+and its placement rule are one rule in two halves.
