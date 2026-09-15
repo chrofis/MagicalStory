@@ -5780,7 +5780,12 @@ function buildStoryContextFields(inputData) {
       ? '\nThis names real events, places and people. Every fact, date, name and sequence in the story comes from this guide. Invent none.'
       : '';
     const guide = getTeachingGuide(inputData.storyCategory, guideKey);
-    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})${factMandate}\n\n${String(guide).slice(0, 4000)}`;
+    // WHOLE GUIDE, as the unified writer's CATEGORY_GUIDELINES has always
+    // injected it. A 4000-char cut removed the last 175 characters of the
+    // Swiss guide mid-sentence — and a fact mandate ("every fact, date, name
+    // and sequence comes from this guide") over a guide that stops mid-sentence
+    // is the one shape that cannot be obeyed.
+    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})${factMandate}\n\n${String(guide)}`;
   } catch (err) {
     log.warn(`[PROMPT] topic guide unavailable for ${inputData.storyCategory}/${guideKey}: ${err.message}`);
   }
