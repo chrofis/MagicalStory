@@ -1,0 +1,124 @@
+{
+  "$comment": [
+    "SIBLING REGISTRY — files and templates that must move together.",
+    "",
+    "WHY THIS EXISTS — 2026-09-15. Of 173 behaviour commits in 60 hours, 27 were",
+    "PARTIAL and every one had the same shape: a fix landed on one code or prompt",
+    "path and not its sibling. The `fixing-sibling-paths` skill already described",
+    "the failure class in prose and did not prevent a single one of the 27 — prose",
+    "is advisory, and an agent that does not invoke the skill never reads it. This",
+    "file makes the sibling relationship DATA, so two mechanical consumers can use",
+    "it: scripts/admin/check-sibling-paths.js (pre-push gate) and",
+    "tests/unit/sibling-parity.test.ts (structural parity, runs in the normal suite).",
+    "",
+    "ADDING A SET is one entry. Keep `reason` to one line and name the axis — the",
+    "gate prints both, so the person it blocks learns what to look at.",
+    "",
+    "FIELDS",
+    "  id        stable slug, used in the gate output",
+    "  axis      the recurring split this set belongs to",
+    "  reason    one line: why these move together",
+    "  members   repo-relative paths; ALL must change together (see severity)",
+    "  severity  'block' (default) refuses the push; 'warn' prints and passes.",
+    "            'warn' is for one-to-many axes where most edits legitimately",
+    "            touch one side only — a gate that cries wolf gets bypassed.",
+    "  parity    optional structural assertions for tests/unit/sibling-parity.test.ts:",
+    "              metadataKeys: true  -> the ---METADATA--- JSON example in every",
+    "                                     member declares the same top-level keys",
+    "              anchors: [\"...\"]     -> every member contains each literal string",
+    "",
+    "ESCAPE HATCH — put `Siblings-Checked: <reason>` in the commit message when the",
+    "siblings genuinely need no change. It is a statement, not a silencer: write why.",
+    "A push whose FULL range covers every member passes without a marker, so a fix",
+    "split across two commits in one push is fine."
+  ],
+
+  "sets": [
+    {
+      "id": "art-director-templates",
+      "axis": "per-page vs all-pages Art Director",
+      "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-expansion-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
+      "members": ["prompts/scene-expansion.txt", "prompts/scene-expansion-all.txt"],
+      "severity": "block",
+      "parity": { "metadataKeys": true }
+    },
+    {
+      "id": "unified-writer-twins",
+      "axis": "text-first vs image-first unified writer",
+      "reason": "story-unified-imagefirst.txt is a near-copy of story-unified.txt with the beat order swapped; every shared rule must exist in both or one ordering ships without it.",
+      "members": ["prompts/story-unified.txt", "prompts/story-unified-imagefirst.txt"],
+      "severity": "block"
+    },
+    {
+      "id": "trial-vs-full-writer",
+      "axis": "trial writer vs full writer",
+      "reason": "story-trial.txt is the live writer for the /try funnel and carries its own copy of the shared story rules; the trial path has repeatedly lagged the full path by weeks.",
+      "members": ["prompts/story-trial.txt", "prompts/story-unified.txt"],
+      "severity": "warn"
+    },
+    {
+      "id": "lector-and-diff-pass",
+      "axis": "lector prompt vs diff-pass prompt",
+      "reason": "story-text-proofread.txt (the lector) and story-text-diff.txt (the diff pass) feed the SAME parser and applier (parseLectorFindings / applyLectorFindings, textRefine.js:996-999), so a change to the quoting or span contract on one breaks the other's output against the shared applier.",
+      "members": ["prompts/story-text-proofread.txt", "prompts/story-text-diff.txt"],
+      "severity": "block"
+    },
+    {
+      "id": "inventory-schema",
+      "axis": "quality-eval inventory vs unified inventory",
+      "reason": "image-evaluation.txt and image-inventory-unified.txt both describe the per-figure inventory the blind judge (image-prompt-compliance.txt) consumes; a schema change on one makes the two inventories incomparable.",
+      "members": ["prompts/image-evaluation.txt", "prompts/image-inventory-unified.txt"],
+      "severity": "block"
+    },
+    {
+      "id": "vb-authoring-sites",
+      "axis": "Art Director VB authoring vs writer VB authoring",
+      "reason": "the Visual Bible is authored in scene-expansion-all.txt on the beats path and in the writer prompts on the trial and legacy paths; a rule about what a VB entry must state has to exist at every site that writes one.",
+      "members": [
+        "prompts/scene-expansion-all.txt",
+        "prompts/story-unified.txt",
+        "prompts/story-trial.txt"
+      ],
+      "severity": "warn"
+    },
+    {
+      "id": "repair-entrypoints",
+      "axis": "production repair vs user regeneration vs entity char-fix",
+      "reason": "repairPipeline.js, routes/regeneration.js and entityConsistency.js each invoke character repair by their own assembly; a guard or gate added to one leaves the other two entry points unguarded.",
+      "members": [
+        "server/lib/repairPipeline.js",
+        "server/routes/regeneration.js",
+        "server/lib/entityConsistency.js"
+      ],
+      "severity": "warn"
+    },
+    {
+      "id": "cover-cast-builders",
+      "axis": "cover path vs page path cast assembly",
+      "reason": "coverComposite.js and compositeCastBuilder.js both resolve a hint-string name to a character and both hand-roll parts of it; a resolver or costume-key fix on one leaves the other resolving by raw name.",
+      "members": ["server/lib/coverComposite.js", "server/lib/compositeCastBuilder.js"],
+      "severity": "warn"
+    },
+    {
+      "id": "lab-vs-prod-eval",
+      "axis": "Test Lab stage vs production call site",
+      "reason": "testlab.js re-implements the call that evalPipeline.js makes in production; when they drift the Lab measures something production never runs (version pinning, cast lists, model ids).",
+      "members": ["server/lib/testlab.js", "server/lib/evalPipeline.js"],
+      "severity": "warn"
+    }
+  ],
+
+  "withinFile": [
+    {
+      "id": "textmodel-prompt-guard",
+      "axis": "streaming vs non-streaming provider entry points",
+      "reason": "every provider entry point in textModels.js must guard its prompt string; callOpenRouterAPI shipped without it while all seven siblings had it.",
+      "file": "server/lib/textModels.js",
+      "blockPattern": "(?:async\\s+)?function\\s+(call\\w*API)\\s*\\(",
+      "mustContain": "guardPromptString",
+      "exclude": ["callClaudeAPI"],
+      "excludeReason": "callClaudeAPI is a dispatcher over the provider entry points, not one itself — it guards nothing because the callee does.",
+      "severity": "block"
+    }
+  ]
+}

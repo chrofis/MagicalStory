@@ -1,0 +1,213 @@
+#!/usr/bin/env node
+/**
+ * Pre-push gate: a fix must reach every sibling of the path it fixes.
+ *
+ * WHY THIS EXISTS — 2026-09-15. A verification sweep of 173 behaviour commits
+ * from a 60-hour window found 27 PARTIAL fixes, and all 27 had one shape: the
+ * change landed on one code or prompt path and not its sibling. Among them the
+ * story's root cause — a `crowdExpected` metadata field added to the per-page
+ * Art Director template (prompts/scene-expansion.txt) and not to the all-pages
+ * one (prompts/scene-expansion-all.txt) that the live beats pipeline actually
+ * runs. The field was therefore false on all 16 pages, nine of which then took
+ * an `extra_character` CRITICAL for correctly-drawn crowds.
+ *
+ * A skill describing this failure class (.claude/skills/fixing-sibling-paths)
+ * had existed for five weeks and prevented none of the 27: a skill is advisory,
+ * read only by a session that chooses to invoke it. So the sibling relationship
+ * is now DATA (scripts/admin/sibling-registry.json) with two mechanical readers
+ * — this gate, and tests/unit/sibling-parity.test.ts.
+ *
+ * WHAT IT CHECKS — for each commit in the push range: if the commit touches some
+ * members of a declared sibling set but not all of them, that is a partial fix.
+ * Two things make it pass anyway, both deliberate:
+ *   1. The push's FULL range covers the missing members. A fix split across two
+ *      commits of one push is a complete fix; only the push ships.
+ *   2. The commit message carries `Siblings-Checked: <reason>`. The escape is a
+ *      statement, not a silencer — write why the sibling needs no change.
+ * Sets marked `severity: "warn"` print and pass (one-to-many axes where most
+ * edits legitimately touch one side; a gate that cries wolf gets bypassed).
+ *
+ * FAIL CLOSED. If the registry is missing or malformed, or git cannot be read,
+ * this exits non-zero. A gate that waves a push through on its own error is a
+ * gate nobody can rely on.
+ *
+ * Usage:
+ *   node scripts/admin/check-sibling-paths.js               # gate: the push range
+ *   node scripts/admin/check-sibling-paths.js --range A..B  # judge any range
+ *   node scripts/admin/check-sibling-paths.js --list        # print the registry
+ */
+
+const path = require('path');
+const fs = require('fs');
+const { execFileSync } = require('child_process');
+
+const ROOT = path.join(__dirname, '..', '..');
+const REGISTRY = path.join(__dirname, 'sibling-registry.json');
+const MARKER = /^\s*Siblings-Checked:\s*\S/mi;
+
+function die(msg) {
+  console.error('');
+  console.error(`check-sibling-paths: ${msg}`);
+  process.exit(1);
+}
+
+function git(args) {
+  return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+}
+
+function loadRegistry() {
+  let raw;
+  try {
+    raw = fs.readFileSync(REGISTRY, 'utf8');
+  } catch {
+    die(`registry not readable at ${path.relative(ROOT, REGISTRY)} — this gate fails closed rather than waving a push through.`);
+  }
+  let reg;
+  try {
+    reg = JSON.parse(raw);
+  } catch (e) {
+    die(`registry is not valid JSON (${e.message}) — fix it; the gate cannot judge a push without it.`);
+  }
+  if (!reg || !Array.isArray(reg.sets)) die('registry has no `sets` array.');
+  for (const s of reg.sets) {
+    if (!s.id || !Array.isArray(s.members) || s.members.length < 2) {
+      die(`registry set ${s && s.id ? `"${s.id}"` : '(unnamed)'} needs an id and at least two members.`);
+    }
+    for (const m of s.members) {
+      if (!fs.existsSync(path.join(ROOT, m))) {
+        die(`registry set "${s.id}" names a member that does not exist: ${m}. A stale member makes the set unenforceable — fix or remove it.`);
+      }
+    }
+  }
+  return reg;
+}
+
+/** Commits this push would send, oldest first. Falls back to the upstream branch. */
+function pushRange() {
+  const explicit = process.argv.indexOf('--range');
+  if (explicit !== -1) {
+    const r = process.argv[explicit + 1];
+    if (!r) die('--range needs an argument, e.g. --range origin/staging..HEAD');
+    return r;
+  }
+  const candidates = [];
+  try {
+    candidates.push(`${git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}'])}..HEAD`);
+  } catch { /* no upstream configured */ }
+  candidates.push('origin/staging..HEAD', 'origin/master..HEAD');
+  for (const range of candidates) {
+    try {
+      git(['rev-list', '--max-count=1', range]);
+      return range;
+    } catch { /* unresolvable — try the next */ }
+  }
+  die('no push range could be resolved (no upstream, no origin/staging, no origin/master).');
+}
+
+function commitsIn(range) {
+  let out;
+  try {
+    out = git(['rev-list', '--reverse', '--no-merges', range]);
+  } catch (e) {
+    die(`could not list commits for ${range}: ${e.message}`);
+  }
+  return out ? out.split('\n').map(s => s.trim()).filter(Boolean) : [];
+}
+
+function filesOf(sha) {
+  const out = git(['show', '--pretty=format:', '--name-only', '--diff-filter=ACMR', sha]);
+  return new Set(out.split('\n').map(s => s.trim().replace(/\\/g, '/')).filter(Boolean));
+}
+
+function messageOf(sha) {
+  return git(['log', '-1', '--format=%B', sha]);
+}
+
+function main() {
+  const reg = loadRegistry();
+
+  if (process.argv.includes('--list')) {
+    console.log(`sibling registry — ${reg.sets.length} file sets, ${(reg.withinFile || []).length} within-file sets\n`);
+    for (const s of reg.sets) {
+      console.log(`  ${s.id}  [${s.severity || 'block'}]  axis: ${s.axis}`);
+      for (const m of s.members) console.log(`      ${m}`);
+      console.log(`      ${s.reason}\n`);
+    }
+    for (const w of reg.withinFile || []) {
+      console.log(`  ${w.id}  [${w.severity || 'block'}]  within ${w.file} — every /${w.blockPattern}/ block must contain "${w.mustContain}"\n`);
+    }
+    return;
+  }
+
+  const range = pushRange();
+  const commits = commitsIn(range);
+  if (commits.length === 0) {
+    console.log(`check-sibling-paths: no commits in ${range} — nothing to check.`);
+    return;
+  }
+
+  // Everything the push touches, so a fix split across two commits passes.
+  const rangeFiles = new Set();
+  for (const sha of commits) for (const f of filesOf(sha)) rangeFiles.add(f);
+
+  const blocks = [];
+  const warns = [];
+
+  for (const sha of commits) {
+    const touched = filesOf(sha);
+    const msg = messageOf(sha);
+    const excused = MARKER.test(msg);
+    const subject = msg.split('\n')[0];
+
+    for (const set of reg.sets) {
+      const hit = set.members.filter(m => touched.has(m));
+      if (hit.length === 0 || hit.length === set.members.length) continue;
+      const missing = set.members.filter(m => !touched.has(m));
+      // Covered elsewhere in the same push? Then the push is complete.
+      if (missing.every(m => rangeFiles.has(m))) continue;
+      const entry = {
+        sha: sha.slice(0, 9), subject, set,
+        changed: hit, missing: missing.filter(m => !rangeFiles.has(m)),
+      };
+      if ((set.severity || 'block') === 'warn' || excused) warns.push({ ...entry, excused });
+      else blocks.push(entry);
+    }
+  }
+
+  const render = (e, prefix) => {
+    console.error(`${prefix} ${e.sha}  ${e.subject}`);
+    console.error(`    set:     ${e.set.id}   (axis: ${e.set.axis})`);
+    console.error(`    changed: ${e.changed.join(', ')}`);
+    console.error(`    MISSING: ${e.missing.join(', ')}`);
+    console.error(`    why they move together: ${e.set.reason}`);
+    console.error('');
+  };
+
+  for (const w of warns) {
+    render(w, w.excused ? 'check-sibling-paths: EXCUSED (Siblings-Checked)' : 'check-sibling-paths: WARN');
+  }
+
+  if (blocks.length === 0) {
+    console.log(`check-sibling-paths: ${commits.length} commit(s) in ${range} — no unexplained partial fixes.`);
+    return;
+  }
+
+  console.error('');
+  console.error(`check-sibling-paths: BLOCKED — ${blocks.length} commit/set pair(s) changed one sibling path and not the others.`);
+  console.error('');
+  for (const b of blocks) render(b, '  ✗');
+  console.error('Fix the missing sibling(s) in this push, or — if they genuinely need no');
+  console.error('change — say so in the commit message and amend:');
+  console.error('');
+  console.error('    Siblings-Checked: <why the sibling needs no change>');
+  console.error('');
+  console.error('Registry: scripts/admin/sibling-registry.json   Explainer: docs/sibling-paths.md');
+  process.exit(1);
+}
+
+try {
+  main();
+} catch (e) {
+  // Fail closed: an unexpected error is not permission to push.
+  die(`unexpected error, refusing the push rather than failing open: ${e && e.stack ? e.stack : e}`);
+}
