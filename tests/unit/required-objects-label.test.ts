@@ -239,7 +239,10 @@ describe('the Art Director is told a creature holds its size (D11)', () => {
     it(`${f} rule 8f covers creatures, not only vessels and buildings`, () => {
       const t = fs.readFileSync(path.join(process.cwd(), f), 'utf8');
       expect(t).toMatch(/A vessel, building, vehicle or creature holds its real size/);
-      expect(t).toMatch(/A creature or a secondary character keeps the size its entry states on every page it appears on/);
+      // 2026-09-15: rekeyed onto the scaleClass band when the free-text
+      // `size` field was retired. The obligation is unchanged — a creature
+      // holds its stated scale on EVERY page — only the field moved.
+      expect(t).toMatch(/A creature or a secondary character keeps the size its entry’s `scaleClass` band states on every page it appears on/);
     });
 
     it(`${f} tells the AD to write a stated height RELATION into the prose (D12)`, () => {
