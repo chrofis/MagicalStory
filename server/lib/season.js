@@ -93,7 +93,12 @@ function buildSeasonNote(inputData = {}, opts = {}) {
 }
 
 /**
- * The TEXT-side instruction: what the writer of the premise/story is told.
+ * The TEXT-side instruction: what the writer of the premise/story is told. It
+ * constrains DETAIL — light, weather, underfoot, wardrobe — never subject or
+ * plot. Stated as a hard fact next to softer neighbours it dominated the
+ * premise instead: 24 of 28 rated trial ideas came back as autumn-leaf stories
+ * on 2026-09-15, every cell having a distinct setting. Its image-side sibling
+ * `buildSeasonNote` still WANTS the visual detail and is unchanged.
  * `buildSeasonNote` is its image-side sibling. Kept here so the trial idea, the
  * trial story and the wizard's two idea endpoints cannot drift apart, and so
  * the season is never welded into another prompt block again (a fantasy idea
@@ -103,7 +108,7 @@ function buildSeasonNote(inputData = {}, opts = {}) {
 function buildSeasonInstruction(inputData = {}, opts = {}) {
   const label = seasonLabel(inputData, opts);
   if (!label) return '';
-  return `**SEASON**: The story takes place in ${label}. Include seasonal details like weather, activities, and atmosphere typical for this season — in an invented world too.`;
+  return `**SEASON**: It is ${label}. The season shows in the light, the weather, what is underfoot and what the cast wears — in an invented world too. It never decides what the story is about: any subject, any plot, any place can happen in ${label.toLowerCase()}.`;
 }
 
 /**
