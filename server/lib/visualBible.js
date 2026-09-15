@@ -3019,6 +3019,13 @@ function isPlateBorneElement(ref, sceneObjects = null) {
   // A location rides the plate on its `appearsInPages` membership alone — the
   // locations loop below is not AD-gated, so neither is the drop.
   if (ref.type === 'location') return true;
+  // A FIGURE IS NEVER PLATE-BORNE, at any scale. The plate prompt says verbatim
+  // "never draw a figure named anywhere in this prompt" (prompts/empty-scene.txt)
+  // and its STRUCTURES block calls what it lists a "vessel, vehicle or built
+  // structure". A house-band creature routed there loses its page cell, is
+  // forbidden on the plate and is mislabelled in the plate text: no cell, no
+  // plate, no consistency. It keeps its cell instead.
+  if (ref.type === 'character' || ref.type === 'animal') return false;
   if (!isLargeScaleClass(ref.scaleClass) && ref.type !== 'vehicle') return false;
   // THE TWO GATES MUST NOT DISAGREE (2026-09-15). Everything else reaches the
   // plate only when the Art Director's objects[] names it (AD IS THE AUTHORITY,
@@ -3103,10 +3110,12 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
   // setting exactly like a vehicle, and reaches the plate it belongs to instead
   // of competing for one of the page's four cells. Same AD-authority gate, same
   // aboard skip, same cap. Vehicles are already above and are not re-added.
+  // ARTIFACTS ONLY. secondaryCharacters and animals were fed here too until
+  // 2026-09-15 — a plate whose prompt forbids drawing any figure and whose
+  // STRUCTURES block calls its entries a "vessel, vehicle or built structure".
+  // A large creature belongs in a page cell, not on the backdrop.
   const seen = new Set(refs.map(r => String(r.id || '').toUpperCase()));
   for (const [entries, type] of [
-    [visualBible.secondaryCharacters, 'character'],
-    [visualBible.animals, 'animal'],
     [visualBible.artifacts, 'artifact'],
   ]) {
     for (const entry of entries || []) {

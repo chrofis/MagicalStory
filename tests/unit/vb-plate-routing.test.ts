@@ -254,3 +254,49 @@ describe('Phase 5a-pre-grid rebuilds the claim from the kept cells', () => {
     expect(src).not.toContain('vbRefElementIds: elementReferences.map(r => r.id).filter(Boolean)');
   });
 });
+
+/**
+ * A FIGURE IS NEVER PLATE-BORNE (fixed 2026-09-15). secondaryCharacters and
+ * animals were routed onto the empty-scene plate whenever the bible classed them
+ * large — a plate whose prompt says verbatim "never draw a figure named anywhere
+ * in this prompt" and whose STRUCTURES block calls its entries a "vessel,
+ * vehicle or built structure". The creature lost its page cell, the plate was
+ * forbidden to draw it and the plate text mislabelled it: no cell, no plate, no
+ * consistency. A creature must end up with one or the other, and it is the cell.
+ */
+describe('a large creature keeps its cell and never rides the plate', () => {
+  const DRAGON = {
+    id: 'ANI001', label: 'house dragon', name: 'house dragon', appearsInPages: [1],
+    scaleClass: 'building', description: 'a slate-scaled dragon the size of a barn', ...REF,
+  };
+  const GIANT = {
+    id: 'CHR002', label: 'the giant', name: 'the giant', appearsInPages: [1],
+    scaleClass: 'building', description: 'a moss-bearded giant', ...REF,
+  };
+  const VB2: any = { ...VB, animals: [DRAGON], secondaryCharacters: [GIANT] };
+
+  it('the plate refuses both', () => {
+    const ids = getEmptySceneElementReferences(VB2, 1, 9, null, ['ANI001', 'CHR002', 'VEH001']).map((r: any) => r.id);
+    expect(ids).not.toContain('ANI001');
+    expect(ids).not.toContain('CHR002');
+    expect(ids).toContain('VEH001');
+  });
+
+  it('the predicate refuses to drop a figure at any scale', () => {
+    expect(isPlateBorneElement({ id: 'ANI001', name: 'house dragon', type: 'animal', scaleClass: 'building' }, ['ANI001'])).toBe(false);
+    expect(isPlateBorneElement({ id: 'CHR002', name: 'the giant', type: 'character', scaleClass: 'landscape' }, ['CHR002'])).toBe(false);
+  });
+
+  it('the plate PROSE never lists a figure under STRUCTURES', () => {
+    const { buildEmptyScenePrompt } = require('../../server/services/prompts');
+    const text = String(buildEmptyScenePrompt({
+      template: '{EMPTY_SCENE_DESCRIPTION}',
+      description: 'A barn yard at dusk.',
+      visualBible: VB2, pageNumber: 1, sceneObjects: ['ANI001', 'CHR002', 'VEH001'],
+    }) || '');
+    expect(text).toContain('STRUCTURES');   // the vehicle still gets its line
+    const structures = text.split('**STRUCTURES:**')[1] || '';
+    expect(structures).not.toContain('house dragon');
+    expect(structures).not.toContain('the giant');
+  });
+});

@@ -667,8 +667,11 @@ function buildEmptyScenePrompt(opts = {}) {
     // whatever their class — stored bibles carry none.
     const pageVehicles = [
       ...(opts.visualBible.vehicles || []),
-      ...[...(opts.visualBible.artifacts || []), ...(opts.visualBible.animals || []), ...(opts.visualBible.secondaryCharacters || [])]
-        .filter(e => isLargeScaleClass(e.scaleClass)),
+      // Artifacts only: a creature or a person is a FIGURE, and this prompt
+      // forbids drawing one. Listing it under "vessel, vehicle or built
+      // structure" both mislabelled it and asked for something the same prompt
+      // refuses (2026-09-15).
+      ...(opts.visualBible.artifacts || []).filter(e => isLargeScaleClass(e.scaleClass)),
     ].filter(staged);
     if (pageVehicles.length > 0) {
       // The vehicle the camera stands ON gets a name-only mention, never its
