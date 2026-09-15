@@ -1725,6 +1725,9 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
 
     const result = await runScaleRepair(scene.imageData, sceneMetadata, {
       pageNumber,
+      // runScaleRepair re-runs the trigger internally; give it the same cast the
+      // gate above used, or the second check answers cast-blind.
+      castableCharacters: storyData.characters || [],
       sceneBackground: plate,
       backgroundCharacterRefs: [],  // intentionally empty — see comment above
       backgroundCharacterDescriptions: bgDescriptions,

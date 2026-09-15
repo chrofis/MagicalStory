@@ -4970,12 +4970,17 @@ async function runScaleRepairStage(ctx, { experimentId, params = {} }) {
   const { extractSceneMetadata } = require('./storyHelpers');
 
   const sceneMetadata = ctx.scene.sceneMetadata || extractSceneMetadata(ctx.scene.sceneDescription || '') || {};
-  if (!needsScaleRepair(sceneMetadata)) {
+  // THE CAST LIST, as both production sites pass it. Without it the trigger
+  // counts figures the composite cannot draw — a Visual Bible secondary the
+  // scene reviewer promoted into characters[] passes the count and then resolves
+  // to nothing — so the Lab answered a different question from production.
+  const castable = ctx.characters || [];
+  if (!needsScaleRepair(sceneMetadata, castable)) {
     throw new Error('Scene does not need scale repair (no depth=background characters in metadata)');
   }
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const t0 = Date.now();
-  const result = await runScaleRepair(imageData, sceneMetadata, { pageNumber: ctx.pageNumber });
+  const result = await runScaleRepair(imageData, sceneMetadata, { pageNumber: ctx.pageNumber, castableCharacters: castable });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('scale repair produced no image');
 
