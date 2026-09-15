@@ -41,12 +41,13 @@ const location = {
 };
 
 describe('resolveLandmarkPhotoForLocation — photo kind reaches the caller', () => {
-  it('carries the kind and description of the slot that was actually served', async () => {
+  it('carries the kind of the slot that was actually served', async () => {
     servedSlot = 2;
     const photo = await resolveLandmarkPhotoForLocation({}, location, { explicitVariant: 2 });
     expect(photo.variantNumber).toBe(2);
     expect(photo.photoType).toBe('distant');
-    expect(photo.photoDescription).toBe('the village seen from the hillside');
+    // The photo's own description is NOT carried: nothing downstream read it.
+    expect(photo).not.toHaveProperty('photoDescription');
   });
 
   it('reads the kind off the SERVED slot, not the requested one', async () => {

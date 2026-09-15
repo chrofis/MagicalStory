@@ -266,15 +266,12 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
       attribution: variant.attribution,
       source: 'swiss-variant',
       variantNumber: variant.variantNumber,
-      // CARRIED, NOT YET READ (audited 2026-09-15). `photoType` selects the
-      // fidelity block; `photoDescription` is the indexer's own words for THIS
-      // photo and no consumer reads it — the pending owner-approved wide-view
-      // wording is what would. Kept deliberately (and pinned by
-      // tests/unit/landmark-photo-kind-to-prompt.test.ts) rather than pruned,
-      // but do not diagnose a prompt as "having the photo's description": it
-      // does not.
+      // `photoType` is the ONLY thing read downstream: it selects which
+      // fidelity block buildLandmarkFidelityBlock emits. The photo's own
+      // description is deliberately NOT carried — nothing consumed it
+      // (removed 2026-09-15) — so do not diagnose a prompt as "having the
+      // photo's description": it does not.
       photoType: served?.kind || null,
-      photoDescription: served?.description || null,
     };
   }
 
