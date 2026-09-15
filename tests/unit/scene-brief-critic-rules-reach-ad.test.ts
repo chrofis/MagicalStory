@@ -57,3 +57,35 @@ describe('the scene-brief critics\' rules reach the Art Director', () => {
     }
   });
 });
+
+// Restorations after the dead-writer deletion (7cd9ffabb): both rules lived
+// only in the two unified writers and went with them.
+describe('rules the deleted unified writers were the last to carry', () => {
+  let all: string;
+  let one: string;
+  let trial: string;
+
+  beforeAll(async () => {
+    await require('../../server/services/prompts').loadPromptTemplates();
+    const B = require('../../server/lib/promptBuilders');
+    all = B.buildSceneExpansionAllPrompt(
+      { characters: [{ name: 'Mara', age: 7 }], language: 'de', layout: { textInImage: true } },
+      [{ pageNumber: 1, text: 'A page.' }],
+    );
+    one = B.buildSceneExpansionPrompt(1, 'A page.', [{ name: 'Mara', age: 7 }], 'de');
+    trial = B.buildTrialStoryPrompt({ characters: [{ name: 'Mara', age: 7 }], language: 'de' }, 5);
+  });
+
+  it('depth is distance, never a size', () => {
+    for (const p of [all, one]) {
+      expect(p).toContain('`depth` is distance from the camera and never states a size');
+    }
+    expect(trial).toContain('`depth` never states a size');
+  });
+
+  it('a story-given proper name lives in properName and nowhere else', () => {
+    for (const p of [all, trial]) {
+      expect(p).toContain('lives in `properName` and nowhere else');
+    }
+  });
+});

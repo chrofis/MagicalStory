@@ -141,7 +141,6 @@ If the brief named a garment and the figure is wearing something else, or too li
 ## Anatomy and completeness
 
 **D-09 `anatomy` → CRITICAL.** A limb or a face the body does not have: extra limbs (three arms, a third hand, extra legs), limbs detached or joined wrongly, merged or duplicated faces, features grossly misplaced; an object held by a hand the figure does not have. Set `rendering.extra_limbs: true` for a surplus limb.
-**D-10 `anatomy` → MAJOR.** Detail within a limb or a face that is whole: six or more fingers, fused or melted fingers, cross-eyes.
 **D-11 `figure_completeness` → CRITICAL.** Inside the frame: a floating head with no torso, a body with no head, a missing torso, see-through body parts, a body fused into the background. A named animal or creature counts as a figure here: headless or bodiless where it should be whole is CRITICAL.
 **D-12 `figure_completeness` → MAJOR.** A missing hand, arm or leg inside the frame; two stacked copies of one figure; a whole limb rendered as an unreadable smear; a whole figure noticeably blurrier than the rest of the page; a figure whose `clipped_by` is neither `none` nor `frame`.
 **D-13 `figure_completeness` → MINOR.** Slight smudging on a small region (fingers fused, soft fingertips) where the limb still reads. Normal stylised brushwork.

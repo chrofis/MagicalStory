@@ -40706,3 +40706,115 @@ was retargeted from `story-unified.txt` to the two live prose writers. 15 sets �
 `server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `server/lib/beatsPipeline.js`,
 `storyJobPipeline.js`, `server.js`, `scripts/admin/sibling-registry.json`,
 `docs/prompt-inventory.md`, `docs/SETTLED.md`, and 13 test files.
+
+## 2026-09-15 — The generator↔critic gap audit: 26 undelivered rules are delivered
+
+**Context:** An audit of every generator/critic pair found 38 rules a judge enforces that
+its generator was never told (31 distinct rows after the shared cover/page template was
+counted once). 26 of them were undisputed: the judge's rule is sound and the message
+simply never reached the author. Frequency was ESTIMATED, not measured — none of these
+critics' prose findings are stored under a queryable typed path.
+
+**Decision:** Deliver all 26 as wording syncs on the GENERATOR side. No severity, type,
+bucket or classification changed anywhere. Where a rule must hold on both sides it went
+into ONE constant injected into every consumer rather than hand-kept copies. By pair:
+
+- **beats/plan** (rows 1/7/10/11/25/29) → `story-beats.txt`: entrances, the picture a child
+  most wants per act, the plan line carrying its own justification for a third character,
+  the plant-without-payoff half, a named animal counting toward the cast cap, the last page.
+- **scene expansion** (rows 3/4/5/21/22/30) → `scene-expansion-all.txt` /
+  `scene-expansion.txt`: the text-zone top/bottom floors, the same-half streak limit and the
+  full-width quota (all-pages template ONLY — it is the one site that sees the whole book);
+  picking the text half against declared `depth` rather than the lateral side; who may
+  occupy an `interactions[]` actor slot; figures on one small shared surface at one depth.
+- **story text** (rows 2/13/14/15/16/17/18/26/27/28) → `story-text-from-beats.txt`,
+  `text-refine.txt`, and two shared constants. The audit named the systemic cause as the
+  ANALYSIS stub under `splitOutlineReview`; that is MOOT — both unified writers were
+  deleted the same day (`7cd9ffabb`), so the live writers are the beats text writer and the
+  trial writer, and the rules go to them directly. Rows 16 and 28 extend
+  `CAUSAL_COHERENCE_RULE` (`promptBuilders.js`) — the idle plan/warning/promise half, and
+  the closed-easier-option clause — so every consumer of the story shape gets both from one
+  string. Row 17's quotation nesting and closure became `QUOTE_HYGIENE_RULE`
+  (`languages.js`), appended by `getLanguageInstruction`, so it reaches every language and
+  every path instead of being written into 20-odd per-language instructions.
+- **empty scene** (rows 23/24/31) → `empty-scene.txt`: the artefact ban extended from the
+  EDGE to anywhere in frame, the doubled-prop clause generalised past vehicles plus one
+  material/perspective coherence line, and a luminance floor beside the existing lighting
+  rule. The floor sits in the template rather than `GEOMETRY_DIMENSIONS`: that constant
+  pairs author and VISION-judge sentences, and the brightness floor is a PIXEL check with
+  no vision-judge twin.
+- **avatar** (rows 19/20) → `avatar-main-prompt.txt`, `avatar-retry-prompt.txt`: glasses
+  follow the reference photo on the DEFAULT path (previously stated only when the user
+  declared them, while `faceMatch` — the lowest of seven — caps at 3 either way), and the
+  safety-retry template, judged by the full evaluator, gained face fidelity, glasses and
+  age proportions. The retry stays short on purpose: it exists to get past a safety block.
+
+Two further rows came from the dead-writer deletion, which was the last carrier of both:
+**depth is distance and never states a size** (restored to both Art Director templates and
+`story-trial.txt`, matching the render side's DEPTH AND SIZE rule from `2adea0dd9`), and
+**a story-given proper name lives in `properName` and nowhere else** (restored to
+`scene-expansion-all.txt` and `story-trial.txt`; the settled VB-label rule already said ids
+and proper nouns never reach an image model).
+
+**Rationale:** These were undelivered messages, not disputes, so the cheap fix is the right
+one. Every rule is pinned on the BUILT prompt through its real builder, never on template
+text, and every new placeholder is declared (`fillTemplate` drops undeclared keys silently).
+
+**Touched files:** `prompts/story-beats.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/story-text-from-beats.txt`,
+`prompts/text-refine.txt`, `prompts/empty-scene.txt`, `prompts/avatar-main-prompt.txt`,
+`prompts/avatar-retry-prompt.txt`, `prompts/story-trial.txt`,
+`server/lib/promptBuilders.js`, `server/lib/languages.js`,
+`tests/unit/plan-critic-rules-reach-planner.test.ts`,
+`tests/unit/scene-brief-critic-rules-reach-ad.test.ts`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`,
+`tests/unit/eval-critic-rules-reach-generators.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — The PULL question is scoped to the bands whose books are one arc
+
+**Context:** `story-text-audit.txt` Q10 requires something to remain open at the end of
+every page that the next page answers. The simple age bands are designed the opposite way:
+`routine` is n self-contained moments and `quest` repeats one call, so PULL fired on every
+page of a correctly built book (audit row 8, owner-scoring).
+
+**Decision:** Make the question band-aware. `buildTextAuditPrompt` resolves the band with
+`resolveAgeBand` and fills a new declared `{PULL_QUESTION}` placeholder: the bands in
+`SIMPLE_BANDS` (routine, quest, tries) get "skip this question — this book is built from
+self-contained moments, so a page that leaves nothing open is correct"; every other band
+gets the question unchanged. No severity, type or bucket moved.
+
+**Rationale:** The band is already resolved in code, so passing it beats having the judge
+infer the book's shape from the pages. `SIMPLE_BANDS` is the existing definition of exactly
+this set — the bands whose books carry no budgeted challenge — rather than a second list
+that can drift from it. Owner's ruling C, 2026-09-15.
+
+**Touched files:** `prompts/story-text-audit.txt`, `server/lib/promptBuilders.js`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — D-10 (finger count, cross-eyes) is removed from the image evaluator
+
+**Context:** `image-evaluation.txt` D-10 scored six-or-more fingers, fused or melted
+fingers and cross-eyes as MAJOR `anatomy`. `project_anatomy_detection_verdicts` measured
+these VLM checks at ZERO precision, and no prompt makes a diffusion model draw five
+fingers — so every finding cost score and a repair attempt for a defect that either was not
+there or could not be fixed.
+
+**Decision:** Delete D-10. Nothing else moves: `anatomy` stays a live type through D-09, so
+no scoring entry is dead, and `prompts/variants/` holds no copy of the rule.
+
+**Rationale:** Checked before deleting, as the ruling asked. **D-09** (`anatomy`, CRITICAL)
+covers a limb or face the body does NOT have — extra limbs, merged faces; **D-12**
+(`figure_completeness`, MAJOR) covers a limb that is MISSING. They are complements, not
+duplicates, and D-10 was the tier between them ("detail within a limb that is whole").
+Removing it orphans neither: fused fingers keep a route through **D-13**
+(`figure_completeness`, MINOR — "fingers fused, soft fingertips" where the limb still
+reads), which is the severity such a finding is worth. The list keeps a gap at D-10 rather
+than renumbering, since the surrounding text refers to "D-11 to D-13" by name. NOTE, not
+acted on: `image-prompt-compliance.txt` still lists `cross-eyes` as MAJOR — the same
+zero-precision check on a different critic, outside this ruling.
+
+**Touched files:** `prompts/image-evaluation.txt`,
+`tests/unit/eval-critic-rules-reach-generators.test.ts`
+**Status:** ✅ active — staging only, not on master

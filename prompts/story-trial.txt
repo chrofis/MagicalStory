@@ -86,7 +86,7 @@ It must be detailed enough to illustrate without additional context.
 - `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
 - Every person named in `imageSummary` also appears in that scene's `characters`: with their visual bible `CHR` id, or — when the visual bible has no entry for them — with a `description` field giving age, build, hair, face and clothing.
 {CLOTHING_RULE}
-- `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures.
+- `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures. `depth` never states a size: a stated size holds at every depth.
 - `characters.perspective` (optional, default `front`): camera angle on this character.
 - `setting.location`: use `"Name [LOC001]"` for the default photo. When the landmark in the LANDMARKS section lists PHOTO ANGLES, use `"Name [LOC001.N]"` where N is the variant whose description fits the scene framing (interior shots for "on/in the landmark" scenes, exterior shots for distant/establishing views).
 - `setting.camera`: shot type determines facial detail visibility. `close-up`/`medium` = expressions visible. `wide`/`ultra-wide` = body language only.
@@ -164,6 +164,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 - max **2 locations**
 - A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — broken, mended, opened, filled. How the world lights it is not a state; the scene decides that. Its own light is a state — a thing that glows and goes dark; the emission lives in `states[]`, never in `description`. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta, because each state is drawn as its own reference cell. A part added to an object is a state of it unless some page stages that part on its own, away from the thing it belongs to.
 - An artifact a character WEARS carries `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`), and that character's outfit describes the same item in that slot.
+- A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose.
 - max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
 - max **2 secondary characters** (only if they appear on 2+ pages — single-scene helpers can stay nameless in prose)
 - 3-5 backgrounds (one per scene if scenes change settings, fewer if scenes share a setting)
