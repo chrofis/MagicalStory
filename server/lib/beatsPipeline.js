@@ -1281,16 +1281,23 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // stands, so a round can only change what it was asked to change.
         const namedPages = new Set();
         for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
-        if (namedPages.size > 0) {
+        // When NO finding names a page — a whole-book finding, or a finding whose
+        // page reference could not be read — the re-plan is answering for the
+        // whole division, so every returned page is accepted. The merge still
+        // runs: a page the return omits is filled from the division that stands,
+        // which is what keeps a partial answer from failing the page-count guard
+        // below and having the round discarded without a word.
+        const scopeAll = namedPages.size === 0;
+        {
           const standing = new Map(beats.map(b => [b.pageNumber, b]));
           const kept = [];
           for (const pg of second.parsed.pages) {
-            if (namedPages.has(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
+            if (scopeAll || namedPages.has(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
             else kept.push(standing.get(pg.pageNumber));
           }
           for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
           kept.sort((a, b) => a.pageNumber - b.pageNumber);
-          const overridden = second.parsed.pages.filter(pg => !namedPages.has(pg.pageNumber) && standing.has(pg.pageNumber)).length;
+          const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !namedPages.has(pg.pageNumber) && standing.has(pg.pageNumber)).length;
           if (overridden > 0) {
             log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named - restored from the standing division`);
             gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) no finding named; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b) });
