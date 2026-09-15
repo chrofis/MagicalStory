@@ -215,10 +215,16 @@ function parseExplicitSequence(coverHint, characters) {
   };
   parsed.sort((a, b) => score(a) - score(b));
 
+  // RESOLVE: one resolver decides which character a hint name refers to. A raw
+  // lower-cased equality match saw neither a diacritic spelled differently nor
+  // a short form ("Rossa" for "Kapitänin Rossa"), and a miss is silent — the
+  // character simply drops out of the ordered cover sequence.
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  const castIdx = buildCastIndex({ characters }, null);
   const result = [];
   for (const p of parsed) {
-    const ch = characters.find(c => c.name?.toLowerCase() === p.name.toLowerCase());
-    if (ch) result.push(ch);
+    const hit = resolveEntity(p.name, castIdx);
+    if (hit && hit.kind === 'cast') result.push(hit.entry);
   }
   return result.length >= 2 ? result : null;
 }

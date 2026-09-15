@@ -71,7 +71,12 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
 
   if (evs.length === 0 || dets.length === 0) return null;
 
-  const detNames = new Set(dets.map(d => d.name.toLowerCase()));
+  // COMPARE: two produced name strings are compared through canonicalName,
+  // never raw lower-case — a title, a short form or a differently spelled
+  // diacritic otherwise reads as a conflict between the evaluator and the
+  // detector when both named the same person.
+  const { canonicalName } = require('./castResolver');
+  const detNames = new Set(dets.map(d => canonicalName(d.name)));
   const agreed = [];
   const conflicts = [];
   const unpaired = [];
@@ -79,7 +84,7 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
   for (const e of evs) {
     // A name the detector never assigned anywhere is not a conflict — it is a
     // subject the detector cannot see (a creature, or a figure it missed).
-    if (!detNames.has(e.name.toLowerCase())) { unpaired.push(e.name); continue; }
+    if (!detNames.has(canonicalName(e.name))) { unpaired.push(e.name); continue; }
     let best = null;
     let bestDist = Infinity;
     for (const d of dets) {
@@ -87,7 +92,7 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
       if (dist < bestDist) { bestDist = dist; best = d; }
     }
     if (!best || bestDist > maxCentreDistance) { unpaired.push(e.name); continue; }
-    if (best.name.toLowerCase() === e.name.toLowerCase()) {
+    if (canonicalName(best.name) === canonicalName(e.name)) {
       agreed.push(e.name);
     } else {
       conflicts.push({ evaluator: e.name, detector: best.name, centreDistance: Number(bestDist.toFixed(3)) });

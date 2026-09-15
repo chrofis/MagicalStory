@@ -592,13 +592,19 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   // Collect costumed avatars that need on-demand generation (to run in parallel)
   const pendingCostumedGenerations = []; // { charName, char, clothingCategory, cacheKey, costumeType, costumeConfig }
 
+  // RESOLVE: ONE cast index for this build — every name below resolves through
+  // it. Raw equality (even lower-cased) misses a diacritic spelled differently
+  // and a short form, and the miss is silent: the character simply gets no
+  // styled sheet for that page's clothing.
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  const castIdx = buildCastIndex({ characters }, null);
+
   for (const requirement of pageRequirements) {
     let { clothingCategory, characterNames } = requirement;
 
     for (const charName of characterNames || []) {
-      // Case-insensitive character lookup with exact match fallback
-      const char = characters.find(c => c.name === charName) ||
-                   characters.find(c => c.name.toLowerCase() === charName.toLowerCase());
+      const resolved = resolveEntity(charName, castIdx);
+      const char = (resolved && resolved.kind === 'cast') ? resolved.entry : null;
       if (!char) continue;
 
       const cacheKey = getAvatarCacheKey(charName, clothingCategory, artStyle);
