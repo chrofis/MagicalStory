@@ -473,6 +473,13 @@ measurement, is lost).
 
 ## Verification pending (code shipped, proof not taken)
 
+- [ ] **The unified writer's composition rules changed and no story has run through them** (2026-09-15,
+      `3d28c6e45`). `AD_COMPOSITION_RULE` replaced the unified twins' own two focal-point bullets with
+      the six-bullet block; beats and trial built prompts are byte-identical to before, so only the
+      unified path moved. Deployed on staging, never exercised. A 4-page run on the smoke account
+      covers it → `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+      `server/lib/promptBuilders.js` `AD_COMPOSITION_RULE`
+
 - [ ] **Seven 2026-09-13 commits have never been exercised by a live run** — footwear rule (`6643fef69`), trial plate vantage grouping (`bc8c55dd6`), `referenceKind` at all 8 plate sites (`286086573`), plate prompt/refs/vantageId persistence (`c936e1d06`), beats AD season block (`2548bcc36`), seasonal trial avatar sheet (`d3771bf2c`), landmark-spec fix (`3175f451b`). Today's date resolves to autumn — the reproduction case for the footwear and seasonal fixes — and one `/try` run (~$0.63) exercises most of them → `tasks/session-findings-2026-09-13.md:3`
 - [ ] **Five age bands unrun — ages 1, 2, 4, 5 and an 8-or-12 control.** Characters and photos exist (`demo-agebands@magicalstory.ch`, family `agebands`); only age 3 has a rotation entry (`tests/helpers/trial-rotation.json:84`, index 6, Omar). The trial flow cannot use saved characters, so each age needs its own rotation entry feeding that age's photo; ~$0.63/run → `tasks/session-findings-2026-09-13.md:4`
 - [ ] **`tests/trial-showcase-state.json` is uncommitted and this session's showcase overwrote another session's `nextIndex`/`lastEntry`** — the other session may need to restore its rotation position from its own side; nobody should commit the file blindly → `tasks/session-findings-2026-09-13.md:6`
