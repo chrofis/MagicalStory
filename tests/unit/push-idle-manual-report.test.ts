@@ -54,10 +54,11 @@ describe('hook-mode output is unchanged', () => {
     expect(text(r)).toContain('staging is idle');
   });
 
-  it('ungated warns but does not block — the fix can only ship by pushing', () => {
-    const r = renderVerdict(prod, { verdict: 'ungated', reasons: [], detail: 'not deployed' });
-    expect(r.blocked).toBe(false);
-    expect(text(r)).toContain('NOT CHECKED');
+  it('a missing route (404) blocks — there is no ungated verdict any more', () => {
+    const r = renderVerdict(prod, { verdict: 'unknown', reasons: [], detail: 'HTTP 404 from /api/health/busy — the route is missing, nothing was verified' });
+    expect(r.blocked).toBe(true);
+    expect(text(r)).toContain('PUSH BLOCKED');
+    expect(text(r)).toContain('HTTP 404');
   });
 
   it('busy blocks, on stderr, listing every reason', () => {

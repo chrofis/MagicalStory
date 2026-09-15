@@ -55,7 +55,7 @@ const json = (status, body) => (req, res) => {
   check('503 → idle', r.verdict, 'idle');
 
   r = await withServer(json(404, { error: 'not found' }), probe);
-  check('404 (gate not deployed) → ungated', r.verdict, 'ungated');
+  check('404 (route missing) → unknown, blocks', r.verdict, 'unknown');
 
   r = await withServer(json(500, { busy: true, reasons: ['busy check failed: db down'] }), probe);
   check('500 from the busy route → unknown, blocks', r.verdict, 'unknown');
@@ -73,7 +73,7 @@ const json = (status, body) => (req, res) => {
   check('connection refused → idle', r.verdict, 'idle');
 
   r = await probe('http://this-host-does-not-exist.invalid');
-  check('DNS failure → idle', r.verdict, 'idle');
+  check('DNS failure → unknown, blocks (not evidence, 2026-09-14)', r.verdict, 'unknown');
 
   console.log('\nparseRefs()');
   const refs = parseRefs('refs/heads/staging aaa refs/heads/staging bbb\n');

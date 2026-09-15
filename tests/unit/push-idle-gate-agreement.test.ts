@@ -189,11 +189,18 @@ describe('positive evidence of a stopped deployment still passes', () => {
     expect(r.verdict).toBe('idle');
   });
 
-  it('404 = the route is not deployed there yet — warns, never claims idle', async () => {
+  it('404 = the route is missing — unknown, blocks in both modes (the bootstrap allowance is gone, 2026-09-15)', async () => {
     stubFetch(() => jsonResponse(404, {}));
     const r = await probe(staging.base);
-    expect(r.verdict).toBe('ungated');
-    expect(renderVerdict(staging, r, { manual: true }).blocked).toBe(false);
+    expect(r.verdict).toBe('unknown');
+    expect(renderVerdict(staging, r, { manual: true }).blocked).toBe(true);
+    expect(renderVerdict(staging, r, { manual: false }).blocked).toBe(true);
+  });
+
+  it('no verdict other than idle can let a push through', () => {
+    for (const verdict of ['busy', 'unknown', 'ungated', 'anything-else']) {
+      expect(renderVerdict(staging, { verdict, reasons: [], detail: 'd' }, { manual: false }).blocked).toBe(true);
+    }
   });
 });
 
@@ -209,7 +216,7 @@ describe('WIRING GUARD: the divergence cannot come back', () => {
   });
 
   it('every verdict blocks identically in both modes', () => {
-    for (const verdict of ['idle', 'busy', 'unknown', 'ungated']) {
+    for (const verdict of ['idle', 'busy', 'unknown']) {
       const result = { verdict, reasons: ['x'], detail: 'd' };
       expect(
         renderVerdict(staging, result, { manual: false }).blocked,

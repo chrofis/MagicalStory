@@ -62,6 +62,7 @@ function parseRefs(raw) {
 /**
  * Ask the environment whether it is busy.
  * Returns { verdict: 'idle' | 'busy' | 'unknown', reasons, detail }.
+ * Only 'idle' lets a push through; there is no fail-open verdict.
  *
  * A stopped container is genuinely idle — nothing can be running inside it — so
  * it must not block. Railway serves 502/503 from its edge for a stopped
@@ -97,11 +98,15 @@ async function probe(base) {
     return { verdict: 'idle', reasons: [], detail: `container is stopped (HTTP ${res.status}) — nothing can be running` };
   }
 
-  // The environment predates this gate (or the route was lost). Blocking would
-  // deadlock: the fix can only ship by pushing. Allow, but say it loudly —
-  // silence here would read as "verified idle".
+  // 404 BLOCKS (2026-09-15). It used to return an 'ungated' verdict that let the
+  // push through: a bootstrap allowance for an environment that predated the
+  // route (2026-08-04), where blocking would have deadlocked the fix. The route
+  // has been live on both environments since; a 404 now means the route was
+  // lost or the wrong host answered, and neither says anything about what is
+  // running inside the container. Unknown is not idle. Blocking on a lost
+  // route cannot deadlock: `--no-verify` is the escape.
   if (res.status === 404) {
-    return { verdict: 'ungated', reasons: [], detail: '/api/health/busy is not deployed there yet — nothing was verified' };
+    return { verdict: 'unknown', reasons: [], detail: 'HTTP 404 from /api/health/busy — the route is missing, nothing was verified' };
   }
 
   let body;
@@ -135,10 +140,6 @@ function renderVerdict(target, { verdict, reasons = [], detail }, { manual = fal
   if (verdict === 'idle') {
     return { blocked: false, lines: [['log', `✓ ${target.name} is idle — ${detail}`]] };
   }
-  if (verdict === 'ungated') {
-    return { blocked: false, lines: [['warn', `⚠ ${target.name} NOT CHECKED — ${detail}`]] };
-  }
-
   if (manual) {
     // STDOUT, not stderr (2026-09-14). The ✓ lines go to stdout, so routing the
     // bad news to stderr meant a stdout-only capture — an agent, a pipe, a log —

@@ -39825,3 +39825,33 @@ must-fix: `REPLAN_MUST_FIX_CODES` (`promptBuilders.js:5925`) is currently reserv
 character the division left out". This finding has the same shape — the climax has no faces — so
 promoting it is the plausible next step, and the owner is leaning that way. Deliberately NOT done,
 because it was outside the agreed scope of the change.
+
+---
+
+## The push gate's 404 allowance is removed — a missing route blocks (2026-09-15)
+
+**Context:** `scripts/admin/check-push-idle.js` answered a 404 from `/api/health/busy`
+with verdict `ungated`, `blocked: false` — the push went through with a warning. That
+was a deliberate bootstrap allowance in the 2026-08-04 entry ("HTTP 404 means the
+environment predates the gate; blocking there would deadlock, the fix can only ship by
+pushing"). The route has been live on staging and production ever since (both answered
+200 on 2026-09-15), and the 2026-09-14 rework ("the two readers reach ONE verdict, and
+never fail open") left this branch in place while its own header comment claimed the
+gate may never fail open. A 404 today means the route was lost or the wrong host
+answered — it says nothing about what is running inside the container.
+
+**Decision:** 404 is treated like every other non-200: verdict `unknown`, blocked, in
+both hook and manual mode. The `ungated` verdict and its "NOT CHECKED" rendering are
+deleted; `renderVerdict` lets only `idle` through. The deadlock argument no longer
+applies: `git push --no-verify` is the documented escape for a run you are willing to
+destroy, and a lost route is exactly the case to look at before pushing, not around.
+
+**Rationale:** Unknown is not idle. A fail-open verdict that survives after its
+bootstrap purpose is gone is a way to push over a running generation, which is the one
+thing the gate exists to prevent.
+
+**Touched:** `scripts/admin/check-push-idle.js` (`probe` 404 branch, `renderVerdict`),
+`tests/unit/push-idle-gate-agreement.test.ts`, `tests/unit/push-idle-manual-report.test.ts`,
+`tests/manual/test-push-idle-gate.js` (404 case, plus the stale DNS-failure expectation
+left behind by the 2026-09-14 change).
+**Status:** ✅ active
