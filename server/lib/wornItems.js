@@ -221,6 +221,36 @@ function unlinkedWornCandidates(visualBible, outfitTexts = new Map()) {
 }
 
 /**
+ * Who wears the item on this page — and what an OFF-CAST wearer means.
+ *
+ * A `wearer` naming somebody who is not in this page's cast used to fall back
+ * to the OWNER, silently: introduced with the handover field on 2026-09-15 and
+ * caught the same night. The fallback ASSERTS the defect it was written to
+ * prevent — on a page where a correct row said `{ART001, owner: Emma, wearer:
+ * Kilian, state: worn}` and Kilian is off-page, the built clause reads "Emma IS
+ * wearing… black tricorn hat", which is precisely the hat the page must not
+ * draw on her.
+ *
+ * What the row actually MEANS is that the item is off its owner and in someone
+ * else's hands, off-page. That is `state: "off"` with the wearer as the place —
+ * the same shape the Art Director would have written by hand — so it is coerced
+ * to exactly that, loudly. Never silent: the coercion changes what the page
+ * draws.
+ *
+ * @returns {{wearer: string, state: string|null, location: string|null}}
+ */
+function resolveWearer({ id, owner, declaredWearer, state, location, castNames, pageLabel }) {
+  const wearer = String(declaredWearer || '').trim();
+  if (!wearer || sameName(wearer, owner)) return { wearer: owner, state, location };
+  if (castNames.some(n => sameName(n, wearer))) return { wearer, state, location };
+  const place = location || `held by ${wearer}, who is not in this page's cast`;
+  log.error(`[WORN] Page ${pageLabel}: ${id} names wearer "${wearer}", who is not in this page's cast `
+    + `(${castNames.join(', ') || 'no cast'}) — read as OFF ${owner}, ${place}. `
+    + 'It is NOT put back on the owner: that would draw the very item the row takes off them.');
+  return { wearer: owner, state: 'off', location: place };
+}
+
+/**
  * Per-page worn state for every worn element whose OWNER is in the page cast.
  *
  * TWO sources, and the second is why e403345b1 was inert in practice
@@ -277,15 +307,18 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     // page and is not the owner means the item changed hands; the owner is then
     // without it (their outfit text loses the clause, their reference is not
     // authoritative) and the wearer carries it.
-    const declaredWearer = (d && d.wearer) || null;
-    const wearer = (declaredWearer && castNames.some(n => sameName(n, declaredWearer)))
-      ? declaredWearer
-      : item.owner;
+    // An off-cast wearer is not a handover and is never the owner — see
+    // resolveWearer; the row is read as OFF, with that wearer as the place.
+    const w = resolveWearer({
+      id: item.id, owner: item.owner, declaredWearer: (d && d.wearer) || null,
+      state: stateDeclared || 'worn', location, castNames, pageLabel,
+    });
+    const wearer = w.wearer;
     const handedOver = !sameName(wearer, item.owner);
-    const state = stateDeclared || 'worn';
+    const state = w.state;
     // An `off` with no place is still unstated — except when the row named a
     // wearer, which IS the place.
-    const missing = !stateDeclared || (state === 'off' && !location && !handedOver);
+    const missing = !stateDeclared || (state === 'off' && !w.location && !handedOver);
     out.push({
       id: item.id,
       name: item.name,
@@ -298,7 +331,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       slot: item.slot,
       entry: item.entry,
       state,
-      location,
+      location: w.location,
       declared: !!stateDeclared,
       defaulted: !stateDeclared,
       missing,
@@ -328,20 +361,23 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       continue;
     }
     if (!castNames.some(n => sameName(n, owner))) continue;
-    const wearer2 = (d.wearer && castNames.some(n => sameName(n, d.wearer))) ? d.wearer : owner;
+    const w2 = resolveWearer({
+      id: d.id, owner, declaredWearer: d.wearer || null,
+      state: d.state, location: d.location || null, castNames, pageLabel,
+    });
     out.push({
       id: d.id,
       name: entry.name || entry.id,
       owner,
-      wearer: wearer2,
-      handedOver: !sameName(wearer2, owner),
+      wearer: w2.wearer,
+      handedOver: !sameName(w2.wearer, owner),
       // NO `wornAs` link: nothing promises this item is part of the wearer's
       // wardrobe, so no attached reference shows it on them.
       wornAsLinked: false,
       slot,
       entry,
-      state: d.state,
-      location: d.location || null,
+      state: w2.state,
+      location: w2.location,
       declared: true,
       defaulted: false,
       // Declared rows are outside the writer-linked set the `removal_unstated`
@@ -699,6 +735,7 @@ module.exports = {
   unlinkedWornCandidates,
   isOffForCharacter,
   referenceCarriesItem,
+  resolveWearer,
   resolveWornItemsForPage,
   wornStateById,
   wornItemLook,
