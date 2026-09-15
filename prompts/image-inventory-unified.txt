@@ -26,7 +26,7 @@ For EACH human figure:
 
 `lettering`: every visible letter, number, word or symbol painted anywhere — signs, walls, paper, garments, banners, captions or watermarks. Quote each exactly, name the surface and position, and say whether it spells real words or unreadable scribble. Empty when there is none.
 
-`rendering`: `extra_limbs` true only for a third arm, third hand or extra leg. `cross_eyes` true when a figure's eyes look in different directions. `physics_ok` false for floating figures, impossible poses or detached limbs. `composite_seam` true when a straight or jagged boundary crosses the picture and the background, lighting or brushwork does not continue across it. `issues` lists any other visible anatomy or physics fault. Hidden or occluded parts are not faults; minor finger problems are not faults.
+`rendering`: `extra_limbs` true only for a third arm, third hand or extra leg. `physics_ok` false for floating figures, impossible poses or detached limbs. `composite_seam` true when a straight or jagged boundary crosses the picture and the background, lighting or brushwork does not continue across it. `issues` lists any other visible anatomy or physics fault. Hidden or occluded parts are not faults; minor finger problems are not faults.
 
 `scene_summary`: ONE sentence, 25-40 words, referring to figures by label. Observable verbs only — `aims`, `points at`, `extends arms toward`, `holds out with palms up`, `grips`, `kneels`, `raises`, `faces`, `looks at`, `stands over`. Never intent words: `offers`, `hands over`, `gives`, `presents`, `surrenders`, `threatens`, `attacks`, `greets`, `comforts`, `protects`.
 
@@ -73,7 +73,7 @@ Return JSON only, no other text. Emit exactly these keys.
   "lettering": [
     { "text": "BAKERY", "surface": "a hanging wooden sign", "position": "left-midground", "readable": true }
   ],
-  "rendering": { "extra_limbs": false, "cross_eyes": false, "physics_ok": true, "composite_seam": false, "issues": [] },
+  "rendering": { "extra_limbs": false, "physics_ok": true, "composite_seam": false, "issues": [] },
   "scene_summary": "The young boy in green extends a lantern with arm raised toward the woman in the red coat, who stands with hands cupped to receive it, on a cobblestone street at dusk.",
   "main_action": "extending a lantern toward another figure"
 }

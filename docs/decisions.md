@@ -41011,3 +41011,29 @@ shares a clause, so the merge is deliberately narrow: "a red hoodie and a blue t
 
 **Touched files.** `server/lib/wornItems.js`,
 `tests/unit/worn-strip-semicolon-contract.test.ts`.
+
+## 2026-09-15 — The cross-eyes check is removed; D-13 fused fingers is deliberately kept
+
+**Context.** Measured across both databases: 267 stories, 21,099 `story_images`, 1,308 Lab
+experiments. The compliance judge's `cross-eyes` MAJOR has fired **zero** times ever. The
+`rendering.cross_eyes` inventory field is emitted in 69 of 138 staging stories, is `true` in
+**zero** rows in either environment, and has **zero** JS consumers — only prompt files
+mention it. Six-plus fingers was the same shape and is already gone with D-10.
+
+**Decision.** Remove the `cross-eyes` MAJOR line from `image-prompt-compliance.txt` and the
+`rendering.cross_eyes` field from both live inventory schemas
+(`image-inventory-unified.txt`, `image-visual-inventory.txt`) and from the Lab variant copy
+(`variants/image-evaluation-verbose-v1.txt`, including its `matches.eyes_ok` rider, whose
+only purpose was to flag cross-eyes). **D-13 fused fingers (`image-evaluation.txt`, MINOR)
+is kept exactly as it is** — measured ACCURATE, ~24 findings over 11 stories, 3/3
+eye-verified real, 0 false positives. It is the one anatomy check that works.
+
+**Rationale.** A schema field the describer fills in on every page and nothing ever reads is
+tokens spent on noise; a severity line that has never fired in 21k images is not a guard, it
+is a way for a judge to invent one. Removing a dead check needs no generator-side change,
+which is why the generator siblings are vouched for rather than edited.
+
+**Touched files.** `prompts/image-prompt-compliance.txt`,
+`prompts/image-inventory-unified.txt`, `prompts/image-visual-inventory.txt`,
+`prompts/variants/image-evaluation-verbose-v1.txt`,
+`tests/unit/anatomy-checks-scope.test.ts`.
