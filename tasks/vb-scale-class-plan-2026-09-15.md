@@ -1,6 +1,6 @@
 # VB scale class, generic gate, and plate routing for large elements — 2026-09-15
 
-Status: PLAN — awaiting owner review before implementation. Phases 1-3 approved in principle (owner, 2026-09-15); phase 4 NOT approved.
+Status: PLAN — owner reviewed 2026-09-15. Phases 1-3 APPROVED for implementation; phase 4 NOT NOW (owner). Open questions answered below.
 
 ## Goal
 
@@ -61,7 +61,7 @@ So: **`scaleClass` is added everywhere; `size` is kept where it exists (artifact
 - [ ] Add `scaleClass` to each whitelist (the parse is a WHITELIST — an unlisted field is dropped silently; that is documented at `:688`).
 - [ ] Normalise: lowercase, trim. **Unknown value → `null` + `log.warn`.** Never coerce to a nearest class; a guessed class routes an object to the wrong pipeline.
 - [ ] Missing value → `null` + `log.warn` naming the id. Not an error: old stored bibles have none (see Risks).
-- [ ] **Consistency check, warn-only:** when both `size` and `scaleClass` exist and the `size` text obviously contradicts the class, log it. This is the one place a text check is acceptable *because it decides nothing* — it emits a log line for a human, never a finding and never a route. Keep it to an exact-token list (`hand`/`palm`/`thumb`/`fist` vs `building`/`landscape`) or skip it entirely if that feels like the thin end of the pattern-matching wedge; the owner's call (open question 2).
+- [x] ~~Consistency check, warn-only~~ — CUT by owner 2026-09-15 (open question 2). Was: when both `size` and `scaleClass` exist and the `size` text obviously contradicts the class, log it. This is the one place a text check is acceptable *because it decides nothing* — it emits a log line for a human, never a finding and never a route. Keep it to an exact-token list (`hand`/`palm`/`thumb`/`fist` vs `building`/`landscape`) or skip it entirely if that feels like the thin end of the pattern-matching wedge; the owner's call (open question 2).
 - [ ] `scaleClass` is **never** concatenated into `description`, `label`, `sizeNote` or any prompt string.
 
 **Prompt-rule wording draft** (identical at every authoring site — one canonical wording):
@@ -188,12 +188,16 @@ Behaviour ships with tests in the same commit.
 
 Run `node scripts/admin/check-sibling-paths.js --list` before declaring any phase done.
 
-## Open questions for the owner
+## Open questions — ANSWERED by owner 2026-09-15
 
 1. **Does `locations` carry `scaleClass`?** A LOC is not an element and never gets a page cell, so the field would have exactly one consumer: phase 4 (which would never fire on it — `landscape` has no band). Adding it costs four prompt edits for nothing measurable; leaving it out makes the enum "every element except locations", which is a footnote future sessions will trip on. **Recommendation: add it, for uniformity.**
 2. **The `size`/`scaleClass` contradiction check** — warn-only log, or nothing at all? It is the only text inspection anywhere in this plan, and although it decides nothing, it is the shape the SETTLED rule warns about. Lean: build it; would not argue if cut.
 3. **Retro-classify stored bibles, or leave them `null` forever?** A one-off `scripts/admin/` backfill could set `scaleClass` on existing stories' artifacts/vehicles from their `size` text — but that is an LLM call per element (paid) or a text heuristic (the thing we just said not to do). See Risks; default is **no backfill**.
 4. **Phase 4: build it at all?** Not approved. If yes: stored-evidence validation run (free, ~10 stored pages) before any band reaches production, or straight to a Lab stage?
+   **→ Owner: ADD it, for uniformity.**
+   **→ Owner: CUT it. No text inspection anywhere in the plan.**
+   **→ Owner: NO backfill. `null` is a first-class route that falls back to today's type-based behaviour.**
+   **→ Owner: NOT NOW. Ship phases 1-3; revisit once the enum has data behind it.**
 
 ## Risks
 
