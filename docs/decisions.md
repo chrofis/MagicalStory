@@ -40104,3 +40104,37 @@ stage that warns is noise that trains readers to ignore it.
 **Touched:** `server/lib/vbIdGuard.js`, `server/lib/beatsPipeline.js` (header comment only),
 `tests/unit/vbid-allowlist-scene-review.test.ts`
 **Status:** ✅ active
+
+---
+
+## 2026-09-15 — The Lab's `beats_scenes` stage recovers from a truncated all-pages reply, and a partial run says so
+
+**Context:** Test Lab experiment 1275 (`beats_scenes`, story `job_1789420511893_zly5rcdej`,
+16 pages) had its Art Director all-pages call cut mid-JSON inside page 9 — the stored brief ends
+on an unterminated `"interactions":` — and pages 10-16 never arrived. The stage took every
+`## Page N` chunk verbatim (`parseRefinedText`), so it returned sixteen expansions: nine measured,
+one half a spec, seven carrying `error: 'page missing from the all-pages response'` — and the run
+still read as a success with `pageCount: 16`. Part of a verification run was drawn from it.
+Production never had that hole: `beatsPipeline.js` refuses a brief that fails the scene-brief
+contract, retries the batch once at full cap, and re-expands whatever is still missing page by page.
+
+**Decision:** give the Lab stage the same three guards, by CALLING production's helper rather than
+re-deriving it — `iterateBriefGuard.partitionSceneBriefs` decides which briefs count, in the Lab and
+in production alike. The loop itself could not be called from the stage (production's lives inside
+`processBeatsStory`, closed over a story, a DB and paid models), so it was EXTRACTED into
+`collectAllPagesBriefs` in `testlab.js` with the batch call, the parser and the per-page fallback
+injected — which is also what makes the recovery pinnable in a unit test with no story and no
+provider. A page with no brief after all of that is a NON-result (`ok:false`, no brief text), so the
+scene review and the comparison cannot mistake half a spec for a measurement, and the stage returns
+`sceneExpansionIncomplete` — "N of M pages measured", rendered as a red banner above everything else
+on the Test Lab card. The stage's own `ok` stays true: it is the runner's flag for "the stage ran",
+and forcing it false hides the very results the run did measure (`TestLab.tsx` gates the whole card
+on it).
+
+**Rationale:** an experiment that reports 16 and measured 9 produces conclusions nobody can trust,
+and the failure is invisible unless the reader opens each page. The retry costs money when it fires;
+that is the point, and it is production's number (two batch attempts), not a new speculative one.
+
+**Touched:** `server/lib/testlab.js`, `client/src/pages/TestLab.tsx`,
+`client/src/services/testlabService.ts`, `tests/unit/testlab-beats-scenes-recovery.test.ts`
+**Status:** ✅ active

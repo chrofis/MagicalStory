@@ -3584,6 +3584,108 @@ function applyReviewerPages(sceneExpansions, sceneReviews) {
   for (const r of sceneReviews) if (r) delete r._pages;
 }
 
+/**
+ * The all-pages scene expansion, with production's recovery.
+ *
+ * WHY THIS EXISTS - Test Lab experiment 1275 (`beats_scenes`, 16 pages): the Art
+ * Director's all-pages reply was cut mid-JSON inside page 9. The stage took every
+ * `## Page N` chunk verbatim, so it reported sixteen expansions of which seven
+ * were empty and one was half a spec - and the run still read as a success.
+ * An experiment that reports 16 and measured 9 produces conclusions nobody can
+ * trust. Production never had that hole: `beatsPipeline.js` refuses a brief that
+ * fails the scene-brief contract, retries the batch once, and re-expands whatever
+ * is still missing page by page. This is those three guards, calling the SAME
+ * contract helper (`iterateBriefGuard.partitionSceneBriefs`), not a second copy.
+ *
+ * It is dependency-injected - the batch call, the parser, the per-page fallback -
+ * because the stage around it needs a story, a DB and paid models, and the
+ * recovery decisions must be pinnable without any of those.
+ *
+ * @param {object} o
+ * @param {Array<{pageNumber:number}>} o.expected  pages the batch owes
+ * @param {function():Promise<object>} o.callBatch  one paid all-pages call
+ * @param {function(object):Array<{pageNumber:number,text:string}>} o.parsePages
+ * @param {function(object):Promise<object>} o.expandOnePage  per-page fallback
+ * @param {function(object):void} [o.onAttempt]  each reply, before parsing
+ * @param {function(object):number} [o.costOf]
+ * @param {number} [o.attempts=2]  batch attempts, production's number
+ * @returns {Promise<{byPage:Map, recovered:Array, cost:number, lastRes:object|null, attemptsMade:number}>}
+ */
+async function collectAllPagesBriefs(o) {
+  const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
+  const expected = o.expected || [];
+  const attempts = o.attempts || 2;
+  const costOfRes = o.costOf || (() => 0);
+  // First attempt's pages win, so a retry can only FILL gaps, never rewrite a
+  // page already parsed.
+  const byPage = new Map();
+  let lastRes = null;
+  let cost = 0;
+  let attemptsMade = 0;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    let res;
+    attemptsMade = attempt;
+    try {
+      res = await o.callBatch(attempt);
+    } catch (err) {
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages attempt ${attempt} failed (${err.message}) - falling back to per-page expansion`);
+      break;
+    }
+    lastRes = res;
+    cost += costOfRes(res) || 0;
+    if (o.onAttempt) o.onAttempt(res);
+    const { whole, cut, formatWide } = partitionSceneBriefs(o.parsePages(res) || []);
+    for (const p of (formatWide ? cut : whole)) {
+      if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, { text: p.text, res });
+    }
+    if (formatWide) {
+      // Not one page meets the contract: the reply is in a shape the parser does
+      // not know rather than a truncated one, and re-expanding a whole book page
+      // by page would spend a paid call each to get the same shape back.
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) - accepting them as written rather than re-expanding the whole book`);
+    } else if (cut.length > 0) {
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: incomplete brief(s) - ${cut.map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ')} - treating them as NOT delivered`);
+    }
+    if (byPage.size >= expected.length) break;
+    if (attempt < attempts) {
+      const missingNow = expected.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages call returned ${byPage.size}/${expected.length} briefs, missing page(s) ${missingNow.join(', ')} - retrying the batch ONCE at full cap`);
+    }
+  }
+
+  // Per-page fallback for whatever the batch still owes. A page that fails here
+  // too stays a NON-result: ok:false and no brief text, so neither the scene
+  // review nor the comparison can mistake half a spec for a measurement.
+  let recovered = [];
+  const stillMissing = expected.filter(b => !byPage.has(b.pageNumber));
+  if (stillMissing.length > 0) {
+    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: ${byPage.size}/${expected.length} briefs after ${attemptsMade} batch attempt(s) - re-expanding page(s) ${stillMissing.map(b => b.pageNumber).join(', ')} per-page`);
+    recovered = await Promise.all(stillMissing.map(b => o.expandOnePage(b)));
+    for (const r of recovered) r.recoveredBy = 'per-page fallback';
+    const okAgain = recovered.filter(r => r.ok).map(r => r.pageNumber);
+    const lost = recovered.filter(r => !r.ok).map(r => r.pageNumber);
+    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: per-page fallback recovered page(s) ${okAgain.length ? okAgain.join(', ') : 'none'}; still missing ${lost.length ? lost.join(', ') : 'none'}`);
+  }
+  return { byPage, recovered, cost, lastRes, attemptsMade };
+}
+
+/**
+ * "N of M pages measured" - the marker a partial beats_scenes run announces
+ * itself with. Null when every page has a brief.
+ */
+function summarizeSceneExpansions(sceneExpansions) {
+  const entries = (sceneExpansions || []).filter(Boolean);
+  const measured = entries.filter(x => x.ok).map(x => x.pageNumber);
+  const missingPages = entries.filter(x => !x.ok).map(x => x.pageNumber);
+  if (missingPages.length === 0) return null;
+  return {
+    measured: measured.length,
+    expected: entries.length,
+    missingPages,
+    message: `${measured.length} of ${entries.length} pages measured - no brief for page(s) ${missingPages.join(', ')} after the batch retry and the per-page fallback. Any conclusion from this run covers only the measured pages.`,
+  };
+}
+
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -3698,6 +3800,10 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let sceneReviews = null;
   let authoredBible = null;
   let timeToScenesMs = null;
+  // All-pages batch: dollars across BOTH attempts (a retry that fills no gap
+  // still costs money and must show up somewhere), and the model that answered.
+  let allPagesCost = null;
+  let allPagesModelId = null;
   if (params.expandScenes !== false) {
     const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
     const { callTextModelStreaming: callStream } = require('./textModels');
@@ -3749,40 +3855,65 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       );
       if (allPrompt) {
         const tAll = Date.now();
-        const res = await callStream(allPrompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
-          usageLabel: 'testlab_beats_scene_expansion_all',
-          ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+        // TRUNCATION RECOVERY - production's three guards, in the Lab.
+        const collected = await collectAllPagesBriefs({
+          expected: toExpand,
+          callBatch: () => callStream(allPrompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
+            usageLabel: 'testlab_beats_scene_expansion_all',
+            ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+          }),
+          parsePages: (res) => (parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES').pages || []),
+          costOf,
+          // The bible this call AUTHORS, kept on the result. Without it the stage
+          // measures page briefs written against a bible nobody can read back,
+          // and a bible fault in a Lab run is invisible. The first attempt that
+          // carries one wins, exactly as production's `adBible` does.
+          onAttempt: (res) => {
+            if (authoredBible) return;
+            try {
+              const { extractBibleSections, AD_BIBLE_MARKERS } = require('./beatsPipeline');
+              authoredBible = extractBibleSections(res.text || '', AD_BIBLE_MARKERS) || null;
+            } catch (err) {
+              log.warn(`[TESTLAB] beats_scenes: could not extract the authored bible (${err.message})`);
+            }
+          },
+          expandOnePage,
         });
-        const parsedAll = parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES');
-        const byPage = new Map((parsedAll.pages || []).map(x => [x.pageNumber, x.text]));
-        // The bible this call AUTHORS, kept on the result. Without it the stage
-        // measures page briefs written against a bible nobody can read back,
-        // and a bible fault in a Lab run is invisible.
-        try {
-          const { extractBibleSections, AD_BIBLE_MARKERS } = require('./beatsPipeline');
-          authoredBible = extractBibleSections(res.text || '', AD_BIBLE_MARKERS) || null;
-        } catch (err) {
-          log.warn(`[TESTLAB] beats_scenes: could not extract the authored bible (${err.message})`);
-        }
-        sceneExpansions = toExpand.map(b => ({
-          pageNumber: b.pageNumber,
-          ok: byPage.has(b.pageNumber),
-          elapsedMs: Date.now() - tAll,
-          modelId: res.modelId,
-          provider: res.provider || null,
-          usage: res.usage,
-          cost: costOf(res),
-          promptChars: allPrompt.length,
-          prompt: allPrompt,
-          fromBeats: String(byPage.get(b.pageNumber) || '').slice(0, 20000),
-          storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
-          ...(byPage.has(b.pageNumber) ? {} : { error: 'page missing from the all-pages response' }),
-        }));
+        sceneExpansions = toExpand
+          .filter(b => collected.byPage.has(b.pageNumber))
+          .map(b => {
+            const hit = collected.byPage.get(b.pageNumber);
+            return {
+              pageNumber: b.pageNumber,
+              ok: true,
+              elapsedMs: Date.now() - tAll,
+              modelId: hit.res.modelId,
+              provider: hit.res.provider || null,
+              usage: hit.res.usage,
+              cost: costOf(hit.res),
+              promptChars: allPrompt.length,
+              prompt: allPrompt,
+              fromBeats: String(hit.text || '').slice(0, 20000),
+              storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+            };
+          })
+          .concat(collected.recovered.map(r => ({
+            ...r,
+            storedProduction: (storedByPage.get(r.pageNumber) || '').slice(0, 20000),
+          })))
+          .sort((a, b) => a.pageNumber - b.pageNumber);
+        allPagesCost = collected.cost;
+        allPagesModelId = collected.lastRes?.modelId || null;
         timeToScenesMs = Date.now() - lockStart;
       }
     }
 
-    if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(async b => {
+    // Per-page expansion. TWO callers: the historical per-page comparison
+    // (params.perPageExpansion) and the all-pages RECOVERY above — production
+    // re-expands a missing page exactly this way (beatsPipeline.js
+    // `expandOnePage`), so the Lab's fallback is the same call, not a copy of a
+    // different one. A function DECLARATION so the block above can call it.
+    async function expandOnePage(b) {
       // BEAT + PLAN line stands in for page.text. No rawOutlineContext: in a
       // beats-first run there is no outline block yet, so this measures the
       // Art Director working from the plan alone.
@@ -3821,7 +3952,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       } catch (err) {
         return { pageNumber: b.pageNumber, ok: false, elapsedMs: Date.now() - t, error: err.message };
       }
-    }));
+    }
+
+    if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(expandOnePage));
     // ── Step 4: ONE review over ALL scene briefs ──────────────────────────
     // Repetition between pages, visual arc and continuity are invisible to a
     // per-scene reviewer — they only exist across the set — so every brief goes
@@ -3939,9 +4072,22 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     timeToScenesMs = timeToLockMs + (Date.now() - expStart);
   }
 
+  // "N of M pages measured", impossible to miss. The stage's own `ok` is set by
+  // the runner (a stage that returns is a stage that ran), so a partial result
+  // announces itself HERE instead - the panel renders it as a red banner above
+  // everything else. Silent partial success is the defect this closes:
+  // experiment 1275 reported 16 pages and had measured 9.
+  const sceneExpansionIncomplete = summarizeSceneExpansions(sceneExpansions);
+  if (sceneExpansionIncomplete) {
+    log.error(`\u{1F6A8} [TESTLAB] beats_scenes INCOMPLETE: ${sceneExpansionIncomplete.message}`);
+  }
+
   return {
     stageKind: 'beats_scenes',
     sceneExpansions,
+    sceneExpansionIncomplete,
+    allPagesCost,
+    allPagesModelId,
     sceneReview,
     sceneReviews,
     authoredBible,
@@ -8639,6 +8785,10 @@ async function checkRuleGenericity(ruleText, storyId) {
 module.exports = {
   pinnedVersionIndex,
   applyReviewerPages,
+  // beats_scenes truncation recovery — exported so the decisions can be pinned
+  // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
+  collectAllPagesBriefs,
+  summarizeSceneExpansions,
   // exported for tests/unit/idea-premise-grouping.test.js
   groupIdeasByPremise,
   ideaPremiseSkeleton,

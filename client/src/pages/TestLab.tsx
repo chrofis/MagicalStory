@@ -1471,6 +1471,12 @@ function BeatsScenesView({ result }: { result: ExperimentResult }) {
 
   return (
     <div className="mt-3 space-y-3">
+      {result.sceneExpansionIncomplete && (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+          <b>Incomplete — {result.sceneExpansionIncomplete.measured} of {result.sceneExpansionIncomplete.expected} pages measured.</b>{' '}
+          {result.sceneExpansionIncomplete.message}
+        </div>
+      )}
       <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
         <div className="text-sm">
           <b>Time to lock: {lockSec.toFixed(1)}s</b>{' '}

@@ -302,6 +302,14 @@ export interface ExperimentResult {
   sceneReviews?: SceneReviewArm[] | null;
   finalBeats?: { pageNumber: number; planLine: string }[];
   timeToScenesMs?: number | null;
+  // Set when the stage could not produce a brief for every page it was asked
+  // to expand, after the batch retry AND the per-page fallback. The card
+  // renders it as a banner: a partial run must never read as a whole one.
+  sceneExpansionIncomplete?: {
+    measured: number; expected: number; missingPages: number[]; message: string;
+  } | null;
+  allPagesCost?: number | null;
+  allPagesModelId?: string | null;
   sceneExpansions?: {
     pageNumber: number; ok: boolean; error?: string; elapsedMs?: number;
     modelId?: string; provider?: string | null; ttftMs?: number | null;
