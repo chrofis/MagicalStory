@@ -241,3 +241,26 @@ describe('iteratePageCore wiring', () => {
     expect(source).toMatch(/brief:\s*newSceneDescription/);
   });
 });
+
+describe('both rewrite entry points feed the plan line', () => {
+  const ROOT = require('path').resolve(__dirname, '../..');
+  const read = (rel: string) => require('fs').readFileSync(require('path').join(ROOT, rel), 'utf8');
+
+  it('neither iteratePageCore nor the regen-scene endpoint passes null for rawOutlineContext', () => {
+    for (const rel of ['server/lib/images.js', 'server/routes/regeneration.js']) {
+      const src = read(rel);
+      const calls = src.match(/buildSceneDescriptionPrompt\([^;]*?\);/gs) || [];
+      expect(calls.length, `${rel} calls buildSceneDescriptionPrompt`).toBeGreaterThan(0);
+      for (const call of calls) {
+        // `…, null, null, { clothingRequirements…` is the shape that passes no
+        // rawOutlineContext, which fills both beat slots from the previous brief.
+        expect(call, rel).not.toMatch(/,\s*null,\s*null,\s*\{\s*clothingRequirements/);
+      }
+    }
+  });
+
+  it('the regen-scene endpoint resolves it through resolvePlanLine', () => {
+    const src = read('server/routes/regeneration.js');
+    expect(src).toContain('resolvePlanLine(storedScene, storedImage)');
+  });
+});

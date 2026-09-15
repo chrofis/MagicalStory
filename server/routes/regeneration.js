@@ -379,7 +379,19 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
     // Generate new scene description (includes Visual Bible recurring elements) — iteration model for regen
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, null, null, { clothingRequirements: storyData.clothingRequirements || null });
+    // THE BEAT (sibling of the iterate path, 3d3da1817). Passing null here makes
+    // buildSceneDescriptionPrompt fill both beat-shaped slots from the previous
+    // brief's own one-line summary, so the rewriter is handed a self-summary of
+    // the artefact it is rewriting while the template tells it the outline is
+    // authoritative. The page's plan line is stored on the scene entry.
+    const { resolvePlanLine } = require('../lib/iterateBeat');
+    const storedScene = sceneDescriptions.find(sc => sc.pageNumber === pageNumber) || null;
+    const storedImage = (storyData.sceneImages || []).find(si => si.pageNumber === pageNumber) || null;
+    const planLine = resolvePlanLine(storedScene, storedImage);
+    if (!planLine) {
+      log.warn(`⚠️ [REGEN SCENE ${pageNumber}] no stored plan line (outlineExtract) — the rewrite runs on the previous brief alone`);
+    }
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, planLine ? { planLine } : null, null, { clothingRequirements: storyData.clothingRequirements || null });
     const sceneResult = await callClaudeAPI(scenePrompt, null, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_scene' });
     const newSceneDescription = sceneResult.text;
 
