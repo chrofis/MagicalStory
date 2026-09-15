@@ -2122,6 +2122,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         } catch { /* metrics are best-effort */ }
         return null;
       }
+    } else {
+      // NO references supplied at all. Same blindness as "supplied but none
+      // attached" and previously the only one of the two that said nothing:
+      // this branch recorded no notEvaluated entry, so an identity-blind eval
+      // and a clean one were the same signal in the stored story.
+      notEvaluated.record('identity', 'no_reference_photos',
+        'no reference photo was supplied - figure identity was not judged against the cast');
     }
 
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
