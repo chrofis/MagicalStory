@@ -56,6 +56,11 @@ const {
   PRESENCE_DERIVED_MARKER,
   PRESENCE_COUNT_TYPES,
 } = require('./evalPipeline');
+// Forwarded by CONSTRUCTION, not by a hand-written list — the rule the
+// storyHelpers facade settled on (docs/decisions.md, 2026-09-13). A name added
+// to evalPipeline.js is exported here the moment it exists; a hand-maintained
+// list silently binds `undefined` for whatever it forgets.
+const evalPipelineModule = require('./evalPipeline');
 
 // STR-6: image-prompt strings that used to be inline template literals in this
 // file (Gemini/Grok repair, edit, bbox-refine, iterative placement, style
@@ -135,6 +140,8 @@ const {
   countRealFigures,
   vbNonHumanNames,
 } = require('./bboxDetection');
+// Forwarded by construction — see the note above evalPipelineModule.
+const bboxDetectionModule = require('./bboxDetection');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // IMAGE_PROMPT for the judges = the string the model actually received.
 // Sibling of resolveEvalSceneHint; see its comment in sceneMetadata.js.
@@ -5227,6 +5234,12 @@ async function applyStyleTransfer(imageData, artStyle, options = {}) {
 }
 
 module.exports = {
+  // Everything the two domain modules export, forwarded by construction. The
+  // explicit list below keeps the documented surface and wins for any name this
+  // file defines locally.
+  ...evalPipelineModule,
+  ...bboxDetectionModule,
+
   // Gemini plumbing consumed by imageInpainting via lazy accessors (the
   // inpaint LLM-verify path); exported for that one consumer.
   withRetry,

@@ -40012,3 +40012,31 @@ composited into, and so is the structure standing in it.
 **Touched files:** `server/lib/visualBible.js`, `server/lib/referenceSheets.js`,
 `server/services/prompts.js`, `storyJobPipeline.js`, `docs/image-routing.md`,
 `docs/image-generation-methods.html`, `tests/unit/vb-plate-routing.test.ts` (new).
+
+## 2026-09-15 — The images.js facade forwards its two domain modules by construction, and shared client/server data lives in `shared/`
+**Context:** two loose ends from the 2026-09-15 review of the preceding three days' commits.
+(1) The 2026-09-13 ruling above ("The storyHelpers facade re-exports its domain modules by
+construction, never a hand-written list") was never applied to the other facade. `images.js`
+re-exports `evalPipeline.js` and `bboxDetection.js`, and CLAUDE.md documents it as re-exporting
+every name — but it listed them by hand, and had drifted 15 names behind. The first fix this
+session added the 15 by hand, which closes the instance and leaves the bug class: the next export
+added to either module binds `undefined` again for anyone who trusts the documented contract.
+(2) `TOPIC_AGE_WINDOWS` in `promptBuilders.js` was a 56-entry table typed by hand to mirror
+`suitableAges` in the client's `storyTypes.ts`, its comment calling itself a "GENERATED MIRROR"
+though nothing generated it.
+**Decision:** (1) `images.js` spreads `evalPipelineModule` and `bboxDetectionModule` into
+`module.exports` ahead of the explicit list, exactly as `storyHelpers.js` does; the explicit list
+stays after them as the documented surface and wins for any name this file defines locally.
+(2) the age windows move to `shared/topic-age-windows.json`, a new root-level `shared/` directory
+for plain data both runtimes read — the server `require()`s it, Vite bundles it, and neither side
+needs a build step. It is the first such directory; previous client/server sharing was done by
+hand-mirroring with "edit both" comments (`seoMeta.js`, `season.js`, `sceneComposite.js`), which is
+the practice this replaces for data of this shape.
+**Rationale:** both are the same move — delete the hand-maintained second copy rather than correct
+it. A parity test catches drift only after someone writes it and only for the table it names; a
+single source cannot drift at all. Verified for (1) by deleting one explicit entry and confirming
+the name still resolved through the spread, then restoring it.
+**Touched:** `server/lib/images.js`, `tests/unit/images-facade-complete.test.ts`,
+`shared/topic-age-windows.json`, `server/lib/promptBuilders.js`,
+`client/src/constants/storyTypes.ts`, `client/tsconfig.json`, `tests/unit/age-band.test.ts`
+**Status:** ✅ active
