@@ -5408,7 +5408,8 @@ function challengeCatalogueBands(inputData = {}) {
 const CAUSAL_COHERENCE_RULE =
   'Cause: what the main character does is what makes the outcome happen, and the step from the one to the other is visible. '
   + 'An object brought into the solution does real mechanical work — it holds, lifts, reaches, blocks or carries. '
-  + 'Never a prop that is set down and plays no part in what follows.';
+  + 'Never a prop that is set down and plays no part in what follows, and never an action, a plan, a warning or a promise no later page acts on. '
+  + 'No consequence falls while an easier option stands open: every barrier the story leans on has its way around closed on some page.';
 
 function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
   const pages = parseInt(pageCount, 10) || (inputData.sceneImages || []).length || 10;
@@ -6910,9 +6911,18 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '') {
   // was deliberately withheld from the generator at this stage, so showing it to
   // this judge would be spec drift. It was computed and passed here until
   // 2026-09-13; the template silently dropped it, so the argument is deleted.
+  // Owner ruling 2026-09-15: PULL is scoped to the bands whose books are built
+  // as one arc. SIMPLE_BANDS are built from self-contained moments, so a page
+  // that leaves nothing open is the spec, and the question fired on correct
+  // work for every page of those books. The band is resolved here rather than
+  // guessed by the judge.
+  const simpleBand = SIMPLE_BANDS.has(resolveAgeBand(inputData));
   return fillTemplate(template, {
     STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
     PLAN_LINES: planLines || '(no page plan was recorded)',
+    PULL_QUESTION: simpleBand
+      ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
+      : 'does anything remain open at the end of the page that the next page answers? The last page is exempt.',
     PAGES: body,
   });
 }

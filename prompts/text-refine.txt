@@ -83,6 +83,8 @@ Take the second way whenever the detail that caused the fault carries no plot: d
 
 A sentence naming what a character feels, notices, or almost does is never the sentence you cut to make room. Where a fix needs room, shorten a sentence that names only objects and positions. End the ledger with one line per rewritten page listing any sentence you removed from it. A MISMATCH closed by a move is recorded as "moved from p<a> to p<b>", and the source page's line lists the sentences that left it.
 
+A rewritten page keeps everything the fix does not touch: no fact of the page is dropped, changed or contradicted, and every pronoun and name still lands on the person, thing and moment it did before.
+
 Where a check tells you to emit a fix in FIXES REQUIRED, apply that fix directly in the rewritten page instead. A page also counts as flagged if it contradicts its scene outline or still carries a dash from the rule above.
 
 {ANALYSIS_INSTRUCTIONS}
