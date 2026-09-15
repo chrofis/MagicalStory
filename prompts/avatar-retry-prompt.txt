@@ -1,2 +1,5 @@
 Generate a photorealistic fashion photograph of this person wearing {OUTFIT_DESCRIPTION}. Full body shot, white background.
+The face is the reference photo's face, not an average of it: same features, same hair colour and length, same skin tone, sharp focus.
+Glasses follow the reference photo: the same frame shape, colour and style when the person wears them, and none at all when they do not.
+Body, limb length and head-to-body ratio follow the age the reference photo shows.
 Output must be photorealistic like a professional photo - not cartoon, not animated, not Pixar style.

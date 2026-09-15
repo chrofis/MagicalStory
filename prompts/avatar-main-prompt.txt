@@ -40,6 +40,7 @@ BODY TRANSFORMATION:
 IDENTITY PERSISTENCE:
 - The face must be fully visible — nothing over the eyes, no brim shadowing them. Headwear the outfit specifies is drawn; hair stays readable around it.
 - Biometric precision: the face must not be averaged or replaced.
+- Glasses follow the reference photo: the same frame shape, colour and style when the person wears them, and none at all when they do not.
 - Focus: Ultra-sharp focus on facial features.
 - Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the declared age (Reference: Infant=4, Child=6, Teen=7, Adult=8)
 

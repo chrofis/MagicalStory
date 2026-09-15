@@ -18,9 +18,9 @@ Generate a SINGLE illustration of the background environment. Paint only what th
 
 {LANDMARK_FIDELITY}
 
-Fill the entire frame edge-to-edge — no borders, no cropping, no black bars. Do not draw a comic-book panel border, inked keyline, or coloured frame around the artwork. Do not add any text, labels, signs, banners, posters, logos, or watermarks — no readable writing of any kind.
-Lighting must come from a consistent direction — all shadows point the same way.
-When the camera stands on a vehicle or inside a structure, paint the surfaces around it — the planking, rail, mast base, walls, floor — and the open water, ground or sky beyond. Never draw that vehicle or structure seen from outside, and never a second copy of it in the background.
+Fill the entire frame edge-to-edge — no borders, no cropping, no black bars, and no white or near-white rectangle, triangle, wedge, diagonal band, monochrome panel or blank patch anywhere in the frame. Do not draw a comic-book panel border, inked keyline, or coloured frame around the artwork. Do not add any text, labels, signs, banners, posters, logos, or watermarks — no readable writing of any kind.
+Lighting must come from a consistent direction — all shadows point the same way. A night, interior or storm scene still keeps enough light to read its surfaces, never a near-black frame.
+When the camera stands on a vehicle or inside a structure, paint the surfaces around it — the planking, rail, mast base, walls, floor — and the open water, ground or sky beyond. Never draw that vehicle or structure seen from outside. No prop appears twice in the frame, no shape melts, no surface changes material mid-stroke, and every perspective line agrees with the others.
 The ground, floor, or surface where characters would stand or sit must be clearly visible.
 The frame must leave enough physical space for characters to be composited into the scene naturally.
 For `over-the-shoulder` framing, keep the centre-back of the frame visually open.
