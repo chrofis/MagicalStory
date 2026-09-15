@@ -619,3 +619,52 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     ]);
   });
 });
+
+// ────────────────────────────────────────────────────────────────
+// PEOPLELESS_ON_INTERACTION_PAGE (owner decision, 2026-09-15).
+//
+// A people-free page is a FEATURE and stays required. What was missing was any
+// constraint on WHICH page. Measured on job_1789420511893_zly5rcdej: the
+// planner spent the mandatory people-free page on the emotional climax — three
+// children shouting after a departing ship — and the page shipped with no
+// faces. The signal is what the PLAN LINE itself declares, because the plan
+// line is the only per-page text that exists at plan-check time.
+describe('PEOPLELESS_ON_INTERACTION_PAGE', () => {
+  const codesFor = (pages: any[], things: string[] = []) =>
+    runPlanCounters({ roster: rosterFor(pages, things), pages, commissionedNames: CAST })
+      .findings.map((f: any) => f.code);
+
+  it('leaves an environmental people-free page alone', () => {
+    const pages = [
+      page(1, line('ultra-wide', 'the ship alone', 'the ship tossed far out in the storm', 'the storm has the ship')),
+      page(2, line('wide', 'Ana and Ben')),
+    ];
+    expect(codesFor(pages, ['ship'])).not.toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(codesFor(pages, ['ship'])).not.toContain('NO_PEOPLELESS_PAGE');
+  });
+
+  it('flags a people-free page whose plan line stages a moment between people, naming the page', () => {
+    // The real page-12 plan line from job_1789420511893_zly5rcdej.
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(12, 'wide — the ship sliding away from the stone edge, the slack stern line trailing toward the bollard, no one at the gangway place'),
+    ];
+    const r = runPlanCounters({ roster: rosterFor(pages, ['ship']), pages, commissionedNames: CAST });
+    const finding = r.findings.find((f: any) => f.code === 'PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(finding).toBeTruthy();
+    expect(finding.pages).toEqual([12]);
+  });
+
+  it('flags a people-free page that names the interaction outright', () => {
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(2, line('wide', 'the empty quay', 'the shouting and waving carry out over the water', 'the boat is gone')),
+    ];
+    expect(codesFor(pages, ['quay'])).toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+  });
+
+  it('still requires a people-free page somewhere in the book', () => {
+    const pages = [1, 2].map(n => page(n, line('wide', 'Ana and Ben')));
+    expect(codesFor(pages)).toContain('NO_PEOPLELESS_PAGE');
+  });
+});

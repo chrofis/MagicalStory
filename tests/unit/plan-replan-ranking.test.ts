@@ -113,4 +113,18 @@ describe('the planner prompt carries the injected budget', () => {
     expect(prompt).toContain('Up to three pages in the book may stage a high-action instant');
     expect(prompt).toContain('the reunion outranks the bystander');
   });
+
+  // Owner decision 2026-09-15: a people-free page is a feature, but not on a
+  // page whose drama is between people. The counter
+  // PEOPLELESS_ON_INTERACTION_PAGE is the mechanical half; this is the rule the
+  // planner is actually given. Asserted on the BUILT prompt, not the template.
+  it('tells the planner which page may be people-free', () => {
+    const prompt = buildBeatsPrompt(
+      { characters: [{ name: 'Mara', age: 7 }], language: 'de', pages: 18 },
+      18,
+      { finalArc: 'An arc.' },
+    );
+    expect(prompt).toContain('At least one page in the book earns this.');
+    expect(prompt).toContain('never a page whose drama is between people');
+  });
 });

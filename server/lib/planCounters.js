@@ -60,6 +60,40 @@ const PLACE_PREPOSITIONS = new Set([
 const PERSON_WORDS = /\b(?:crew|crewman|crewmen|sailor|sailors|man|men|woman|women|boy|boys|girl|girls|child|children|figure|figures|crowd|onlookers|guard|guards|villagers?|people)\b/i;
 
 /**
+ * A plan line that DECLARES interpersonal drama — the signal for
+ * `PEOPLELESS_ON_INTERACTION_PAGE`.
+ *
+ * A people-free page is a FEATURE (see `NO_PEOPLELESS_PAGE`): the drama can be
+ * a place, weather, a vessel or an object seen from afar. It is wrong only when
+ * the drama is BETWEEN PEOPLE, and the pictures that lose the most are exactly
+ * those — a parting, a confrontation, tears.
+ *
+ * The plan line is the only per-page text that exists at plan-check time (the
+ * beat prose was removed 2026-09-02; a page IS its plan line), so the signal is
+ * what the line itself says, never a pattern match on prose written later.
+ * Two clauses, both plan-DECLARED:
+ *   1. absence of people — the line stages the moment by naming who is NOT
+ *      there. A page whose subject is a place describes the place; a page that
+ *      has to say "no one is at X" is a page about the people who left.
+ *      Bare "empty" is deliberately absent: the prompt allows an empty place as
+ *      a page's subject.
+ *   2. an interaction the line names outright — shouting, waving, weeping, a
+ *      farewell, a handover, an embrace, a confrontation.
+ * Archetypal English only; it is read against the whole line, quotes stripped.
+ */
+const INTERACTION_DRAMA_WORDS = new RegExp([
+  // 1. people named by their absence
+  '\\bno one\\b', '\\bnobody\\b', '\\bnot a soul\\b', '\\bdeserted\\b', '\\babandoned\\b',
+  '\\bleft behind\\b', '\\b(?:they|everyone|the others) (?:have |has |had )?(?:gone|left|go)\\b',
+  // 2. an interaction the line names
+  '\\bshout(?:s|ing|ed)?\\b', '\\bcall(?:s|ing)? (?:out |back )?after\\b', '\\bcry(?:ing)?\\b', '\\bcries\\b',
+  '\\bweep(?:s|ing)?\\b', '\\btears\\b', '\\bwav(?:e|es|ing)\\b', '\\bcheer(?:s|ing)?\\b',
+  '\\bfarewell\\b', '\\bgoodbye\\b', '\\bparting\\b', '\\bembrac(?:e|es|ing)\\b', '\\bhug(?:s|ging)?\\b',
+  '\\bhand(?:s|ing)? (?:it |them )?over\\b', '\\bconfront(?:s|ing)?\\b', '\\bargu(?:e|es|ing|ment)\\b',
+  '\\bpromis(?:e|es|ing)\\b',
+].join('|'), 'i');
+
+/**
  * Strip «…» / "…" / '…' quoted spans — vessels, titles and speech, never cast.
  *
  * The single-quote clause is QUOTE-SHAPED: the opening ' sits at the start of
@@ -491,6 +525,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
     const present = namesIn(who, cast.all, cast.aliases);
     return {
       pageNumber: p.pageNumber,
+      planLine: String(p.planLine || ''),
       complete,
       segments: segs.length,
       shot: segs.length >= 1 ? classifyShot(segs[0]) : 'other',
@@ -544,8 +579,24 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   // 4. Solo pages and no-people pages both have to exist.
   const soloPages = rows.filter(r => r.present.length === 1).map(r => r.pageNumber);
   if (soloPages.length === 0) add('NO_SOLO_PAGE', [], 'no page puts a single character alone in frame');
+  // A people-free page is BY DESIGN and stays required: the drama of one page
+  // in the book is a place, weather, a vessel or an object seen from afar, and
+  // the picture is stronger for having no cast in it.
   const emptyPages = rows.filter(r => !r.peopled).map(r => r.pageNumber);
   if (emptyPages.length === 0) add('NO_PEOPLELESS_PAGE', [], 'no page shows only a thing or a place, with no people in frame');
+  // 4b. …but the book may not spend that page on its interpersonal drama.
+  //     Measured on job_1789420511893_zly5rcdej: the planner put the mandatory
+  //     people-free page on the emotional climax — the plan line said "no one
+  //     at the gangway" while the story had three children shouting after a
+  //     departing ship — and the page shipped with no faces. Nothing
+  //     constrained WHICH page was people-free, and `NO_COMMISSIONED_ON_PAGE`
+  //     below only inspects `peopled` rows, so a zero-cast page was skipped by
+  //     construction. This counter is the constraint on WHICH page.
+  const drama = rows.filter(r => !r.peopled && INTERACTION_DRAMA_WORDS.test(stripQuoted(r.planLine)));
+  if (drama.length) {
+    add('PEOPLELESS_ON_INTERACTION_PAGE', drama.map(r => r.pageNumber),
+      `${drama.length} page(s) put no one in frame while the plan line stages a moment between people — a people-free page belongs on drama that is a place, weather, a vessel or an object seen from afar, never on a parting, a confrontation or a moment of feeling between characters`);
+  }
 
   // 5. The main character carries the book: present in at least half the images.
   const mainName = cast.commissioned[0] || null;
@@ -595,6 +646,10 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
     }
   }
 
+  // PEOPLED pages only, by design: a page with nobody in frame is a legitimate
+  // picture (see NO_PEOPLELESS_PAGE), so it cannot owe the book a commissioned
+  // character. Whether it is the RIGHT page to leave empty is
+  // `PEOPLELESS_ON_INTERACTION_PAGE`'s question, not this one's.
   const noCommissioned = rows.filter(r => r.peopled && r.commissionedPresent.length === 0).map(r => r.pageNumber);
   if (noCommissioned.length) {
     add('NO_COMMISSIONED_ON_PAGE', noCommissioned,
