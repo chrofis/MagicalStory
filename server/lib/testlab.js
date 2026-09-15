@@ -201,6 +201,19 @@ async function loadEmptyScene(storyId, pageNumber) {
 let _lastPageLoad = null;
 function getLastPageLoad() { return _lastPageLoad; }
 
+/**
+ * Which stored version a target pins, or null for "the active one".
+ *
+ * ONE definition, because the obvious spelling is wrong: `Number(null)` is 0,
+ * so `Number.isFinite(Number(versionIndex))` turns the DEFAULT into a pin on
+ * v0. Every site that reads a pin goes through here.
+ */
+function pinnedVersionIndex(versionIndex) {
+  if (versionIndex === null || versionIndex === undefined || versionIndex === '') return null;
+  const n = Number(versionIndex);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function loadActivePageImage(storyId, pageNumber, versionIndex = null, imageType = null) {
   _lastPageLoad = null;
   const { getActiveVersion, getStoryImage } = require('../services/database');
@@ -210,8 +223,7 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   // every unpinned Lab load silently detected on v0, which is both the
   // loadedFrom={unrecorded} symptom AND the 2026-08-19 "detected on v0
   // although activeVersion=2" mystery (bug lab-unpinned-loads-v0).
-  const pinned = (versionIndex == null || versionIndex === '') ? null
-    : (Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null);
+  const pinned = pinnedVersionIndex(versionIndex);
   // A Lab step image is written with is_test = true, and getStoryImage filters
   // those out — so an intermediate has to come through loadTestImage, which
   // does not.
@@ -852,8 +864,7 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
 
   const repeats = Math.max(2, Math.min(5, parseInt(params.repeats, 10) || 3));
   const useConsolidator = params.consolidate !== false;
-  const versionIndex = Number.isFinite(Number(ctx.target?.versionIndex))
-    ? Number(ctx.target.versionIndex) : null;
+  const versionIndex = pinnedVersionIndex(ctx.target?.versionIndex);
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, versionIndex);
 
   // Frozen inputs, resolved ONCE and reused by every repeat — re-deriving them
@@ -1096,7 +1107,10 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   await loadPromptTemplates();
   const { evaluateSemanticFidelity } = require('./sceneValidator');
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // A pinned target evaluates THAT version, as quality_eval and inventory_ab
+  // already do — judging the active version instead makes an original-vs-repair
+  // comparison compare the repair with itself.
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const storyText = ctx.scene.text || null;
   if (!storyText) throw new Error('Scene has no story text — semantic eval needs it');
 
@@ -1239,9 +1253,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // Which bytes this run actually tested — exp #7/#9 could not answer that,
   // and 'null' must be impossible: an unrecorded load is itself a finding.
   const _load = getLastPageLoad();
-  // Same null-guard as the loader: Number(null)===0 must not read as "pinned 0".
-  const _pinnedParam = (params.versionIndex == null || params.versionIndex === '') ? null
-    : (Number.isFinite(Number(params.versionIndex)) ? Number(params.versionIndex) : null);
+  const _pinnedParam = pinnedVersionIndex(params.versionIndex);
   const loadedFrom = _pinnedParam !== null
     ? { pinned: _pinnedParam }
     : (_load && _load.storyId === ctx.storyId && String(_load.pageNumber) === String(ctx.pageNumber)
@@ -1484,8 +1496,7 @@ async function runCharRepairStage(ctx, opts) {
   // target.versionIndex pins a stored version — repairing the ORIGINAL render
   // rather than whatever is active is how a repair is re-run under the same
   // conditions production saw. Null keeps the active version (previous default).
-  const pinnedVersion = Number.isFinite(Number(ctx.target?.versionIndex))
-    ? Number(ctx.target.versionIndex) : null;
+  const pinnedVersion = pinnedVersionIndex(ctx.target?.versionIndex);
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, pinnedVersion);
   // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT character's
   // avatar while still targeting charName's box. If the repair returns the original
@@ -8539,7 +8550,7 @@ async function runStageOnTarget(stage, target, opts) {
       // nothing ever set it — so both silently judged whatever version was
       // active. That is how the p9 face bake-off (#1209-#1216) compared the
       // repaired render against itself while reporting one arm as the original.
-      ctx.versionIndex = Number.isFinite(Number(target.versionIndex)) ? Number(target.versionIndex) : null;
+      ctx.versionIndex = pinnedVersionIndex(target.versionIndex);
       return await runner(ctx, opts);
     });
     result = captureRun.result;
@@ -8621,6 +8632,7 @@ async function checkRuleGenericity(ruleText, storyId) {
 }
 
 module.exports = {
+  pinnedVersionIndex,
   applyReviewerPages,
   // exported for tests/unit/idea-premise-grouping.test.js
   groupIdeasByPremise,
