@@ -33,6 +33,10 @@ function build(opts: any = {}) {
   });
 }
 
+function geom() {
+  return require_('../../server/lib/sceneGeometry.js');
+}
+
 describe('empty-scene plate prompt carries the geometry it is graded on', () => {
   it('forwards path direction, opening position and light direction', () => {
     const p = build();
@@ -68,13 +72,99 @@ describe('empty-scene plate prompt carries the geometry it is graded on', () => 
       expect(p).not.toContain('{EMPTY_SCENE_DESCRIPTION}');
     }
   });
+});
 
-  it('the extractor drops a geometry sentence that also names a figure', () => {
-    const { extractSceneGeometry } = require_('../../server/lib/sceneGeometry.js');
-    const out = extractSceneGeometry({
-      mainScenePrompt: 'The path climbs to the upper-right, where a guard stands in the lamplight.',
+describe('lighting reaches the author (owner priority)', () => {
+  it('survives when the prose opens with three perspective sentences', () => {
+    const p = build({
+      mainScenePrompt: [
+        'The road runs diagonally to the upper-right.',
+        'The riverbank stretches toward the far horizon.',
+        'A stair climbs the slope on the left.',
+        'The lane recedes past the mill.',
+        'Low dawn light comes from the right and throws long shadows to the left.',
+      ].join(' '),
+      castNames: [],
+    });
+    expect(p).toContain('dawn light comes from the right');
+  });
+
+  it('is salvaged from a sentence that also names a character', () => {
+    const out = geom().extractSceneGeometry({
+      mainScenePrompt: 'Lamplight falls from the upper-left, while Mira leans on the rail.',
+      castNames: ['Mira'],
+    });
+    expect(out).toContain('Lamplight falls from the upper-left');
+    expect(out).not.toContain('Mira');
+    expect(out).not.toMatch(/\brail\b.*Mira/);
+  });
+
+  it('drops a geometry sentence whose only content is a figure clause', () => {
+    const out = geom().extractSceneGeometry({
+      mainScenePrompt: 'A guard stands in the lamplight.',
       castNames: [],
     });
     expect(out).toBe('');
+  });
+
+  it('the salvaged line never smuggles a person word through', () => {
+    const out = geom().extractSceneGeometry({
+      mainScenePrompt: 'The path climbs to the upper-right, where a guard stands in the lamplight holding a torch.',
+      castNames: [],
+    });
+    expect(out).toContain('The path climbs to the upper-right');
+    expect(out).not.toMatch(/\bguard\b/i);
+  });
+});
+
+describe('stored scene prose shapes', () => {
+  // Real pages store the brief prose with an Art Director METADATA tail and
+  // bracketed Visual Bible ids; both name the cast and neither may reach a plate.
+  const STORED = [
+    'A wide view from the wet quay beside the large sailing ship.',
+    'The heavy mooring rope lies taut [ART003.2] from the iron bollard in the lower foreground up to the ship’s railing.',
+    'Cool morning light falls from the left across the cobblestones.',
+    '---METADATA--- {"sceneIntent": "Emma refuses to board.", "emptyScenePrompt": "Preview: Emma grips the rail."}',
+  ].join(' ');
+
+  it('cuts the metadata tail and the VB ids, keeps the geometry', () => {
+    const p = build({ mainScenePrompt: STORED, castNames: ['Emma'] });
+    expect(p).toContain('Cool morning light falls from the left');
+    expect(p).toContain('A wide view from the wet quay');
+    expect(p).not.toContain('METADATA');
+    expect(p).not.toContain('sceneIntent');
+    expect(p).not.toContain('ART003.2');
+    expect(p).not.toContain('Emma');
+  });
+
+  it('keeps a lighting clause that shares its sentence with the crowd', () => {
+    const out = geom().extractSceneGeometry({
+      mainScenePrompt: "The stretch of stone stands open between the bollard and the distant crowd, its wet cobbles gleaming under the cool gloomy light.",
+      castNames: [],
+    });
+    expect(out).toContain('cool gloomy light');
+    expect(out).not.toMatch(/\bcrowd\b/i);
+  });
+});
+
+describe('author and judge describe the same three dimensions', () => {
+  it('one shared constant writes both sides', () => {
+    const { GEOMETRY_DIMENSIONS, buildGeometryJudgeChecks } = geom();
+    expect(GEOMETRY_DIMENSIONS.map((d: any) => d.key)).toEqual(['path', 'opening', 'lighting']);
+    const judge = buildGeometryJudgeChecks(5);
+    const author = build();
+    for (const d of GEOMETRY_DIMENSIONS) {
+      const dimension = d.author.split('—')[0].trim();   // e.g. "Lighting direction"
+      expect(author).toContain(dimension);
+      expect(judge).toContain(dimension);
+      expect(judge).toContain(d.judge);
+    }
+    expect(judge).toMatch(/^\n5\. Composition geometry/);
+  });
+
+  it('the judge asks about nothing the author was not told', () => {
+    const { GEOMETRY_DIMENSIONS, buildGeometryJudgeChecks } = geom();
+    const letters = buildGeometryJudgeChecks(5).match(/^ {3}[a-j]\. /gm) || [];
+    expect(letters.length).toBe(GEOMETRY_DIMENSIONS.length);
   });
 });

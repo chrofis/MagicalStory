@@ -40509,3 +40509,44 @@ representable. `tests/unit/worn-item-changes-hands.test.ts` pins both gaps.
 `prompts/story-unified-imagefirst.txt`, `tests/unit/costume-role-clothing.test.ts`,
 `tests/unit/worn-item-changes-hands.test.ts`
 **Status:** ✅ active — staging only, not on master; supersedes the "leave the slot empty" rule of the same day
+
+
+---
+
+## 2026-09-15 — The empty-scene judge and the plate author read one geometry source
+
+**Context:** `validateEmptyScene` (inline QC in `server/lib/evalPipeline.js`) grades a plate on
+three composition facts taken from the page's scene prose: path/perspective direction, vanishing
+point / opening position, and lighting direction. `f25a9f342` gave the plate AUTHOR a derived
+geometry block (`server/lib/sceneGeometry.js` → `{SCENE_GEOMETRY}` in `prompts/empty-scene.txt`),
+but the two sides still carried their own wording, and the extractor took the first three
+geometry sentences in prose order — so a lighting fact that sat fourth, or shared a sentence with
+a character, was silently dropped while the plate was still graded on it. Owner: "Align the empty
+scene judge, the author should know the lighting."
+
+**Decision:** `GEOMETRY_DIMENSIONS` in `sceneGeometry.js` is the single source for that pair. Each
+entry carries the author sentence rendered into the plate prompt and the judge sentence rendered
+into the QC prompt (`buildGeometryJudgeChecks`), so both sides name the same three dimensions in
+the same words; a fourth check is added there or not at all. Selection is per-dimension —
+lighting first, then path, then opening — before any remaining slot is filled in prose order. A
+sentence mixing geometry with a person is no longer discarded: its clauses are split and only the
+people-free geometry clauses survive, re-checked against the figure and cast-name filters. The
+stored `---METADATA---` tail and bracketed VB ids are cut before splitting (both name the cast;
+either would paint machine text onto a plate).
+
+**Rationale:** measured on the 16 pages of `job_1789420511893_zly5rcdej` (staging, read-only): a
+lighting fact now reaches the author on 14/16 pages (block or plate description); the remaining 2
+state no lighting anywhere in the brief, where the template's standing "consistent direction" line
+applies. Nothing is invented for a dimension the prose does not state. The people-free guarantee is
+pinned on the BUILT prompt, not on template text.
+
+**Sibling gate:** this is a generator↔critic pair with no registry set — the critic lives inline in
+`evalPipeline.js`, and `scripts/admin/sibling-registry.json` only covers prompt-file pairs plus
+`lab-vs-prod-eval`. The pair is currently unenforceable; proposed entry (registry file owned by
+another session): set `empty-scene-generator-vs-critic`, generator `prompts/empty-scene.txt`,
+critic `server/lib/evalPipeline.js`, axis generator-vs-critic. The Lab side needs no change —
+`testlab.js` calls the same `validateEmptyScene` and the same builder.
+
+**Touched:** `server/lib/sceneGeometry.js`, `server/lib/evalPipeline.js`,
+`tests/unit/empty-scene-geometry.test.ts`
+**Status:** ✅ active — staging only, not on master

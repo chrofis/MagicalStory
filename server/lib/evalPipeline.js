@@ -557,12 +557,13 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const mainSceneBlock = mainScenePrompt
             ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
             : '';
+          // The judge's three geometry questions come from the SAME constant
+          // that writes the plate author's geometry block
+          // (GEOMETRY_DIMENSIONS, server/lib/sceneGeometry.js), so the two
+          // sides name the same dimensions in the same words. A fourth check
+          // belongs in that constant, never inline here.
           const geometryCheck = mainScenePrompt
-            ? `\n5. Composition geometry — does this empty scene support the main scene's geometry? Check:
-   a. Any path, river, road, corridor, shoreline, horizon, or major perspective line — does it run in the same direction the main scene prose describes (e.g. "stretches to the right background", "diagonal from lower-left to upper-right")?
-   b. Vanishing point / opening location — is it at the frame position the main scene implies (e.g. main scene says "sliver of light at far right background" → empty scene must have that opening/light at the upper-right, not centered or on the left)?
-   c. Lighting direction — consistent with the main scene's time of day and declared light source.
-   FAIL with a specific fix instruction if any of (a)–(c) disagree. The issue description must name WHAT geometry is wrong AND the corrected direction/position. Example: "path runs front-to-center instead of diagonally to the upper-right; regenerate with the path angled toward the upper-right corner".`
+            ? require('./sceneGeometry').buildGeometryJudgeChecks(5)
             : '';
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
