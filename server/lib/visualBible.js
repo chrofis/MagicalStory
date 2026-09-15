@@ -3386,11 +3386,14 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
         for (let i = relevantRefs.length - 1; i >= 0; i--) {
           const r = byId.get(String(relevantRefs[i].id || '').toUpperCase());
           if (!r) continue;
-          if (r.state === 'worn') {
+          // Dropped only when the OWNER wears it: then their avatar reference
+          // already carries it. Handed to another character, no reference in
+          // the call shows it worn, so the plate is the only description left.
+          if (r.state === 'worn' && !r.handedOver) {
             wornDropped.push(`${r.name} (${r.id}, on ${r.owner})`);
             relevantRefs.splice(i, 1);
           } else {
-            wornKeptOff.push(`${r.name} (${r.id}, ${r.location || 'off-body'})`);
+            wornKeptOff.push(`${r.name} (${r.id}, ${r.handedOver ? `worn by ${r.wearer}` : (r.location || 'off-body')})`);
           }
         }
       }

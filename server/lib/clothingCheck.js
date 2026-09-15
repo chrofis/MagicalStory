@@ -20,6 +20,8 @@
  *   outfit_misattributed a garment of character A appears on character B
  *   removal_unstated     a wornAs item whose owner is on the page has no
  *                        `wornItems` state (or an "off" state with no place)
+ *   worn_link_missing    a Visual Bible element that is clearly a worn garment
+ *                        carries no `wornAs` link, so nothing above can see it
  *
  * Deliberately NOT a fixer. It reports; the review rewrites; the caller re-runs
  * it afterwards and logs whatever survived rather than shipping it silently.
@@ -28,7 +30,7 @@
 const { log } = require('../utils/logger');
 const { lookupByName } = require('./castResolver');
 const { resolveCharacterReqs } = require('./clothingCategories');
-const { resolveWornItemsForPage } = require('./wornItems');
+const { resolveWornItemsForPage, unlinkedWornCandidates } = require('./wornItems');
 
 // Slot labels the writer emits. A slot the character does not wear is OMITTED
 // (owner decision 2026-08-08) — `none` values are legacy and skipped below.
@@ -199,6 +201,24 @@ function checkPage(page, clothingRequirements, opts = {}) {
     }
   }
 
+  // The page's worn rows, resolved once: the misattribution rule below needs
+  // them (an item legitimately handed to another character must not read as
+  // borrowed clothing) and the removal check further down reads the same list.
+  const vbForWorn = opts.visualBible || { artifacts: opts.artifacts || [], clothing: opts.clothing || [] };
+  const wornRows = resolveWornItemsForPage(vbForWorn, cast, { wornItems: page.wornItems || [] }, { pageNumber: page.pageNumber });
+  // Words that belong to an item THIS character is declared to be wearing this
+  // page, even though the story-level outfit files it under its owner. Without
+  // this, the correct rendering of a handover is reported as a garment of A
+  // appearing on B — the one check that would fire on exactly the right page.
+  const licensedWords = new Map();   // wearer -> Set(words)
+  for (const r of wornRows) {
+    if (r.state !== 'worn' || !r.handedOver) continue;
+    const set = licensedWords.get(r.wearer) || new Set();
+    for (const w of tokens(`${r.name || ''} ${(r.entry && (r.entry.description || r.entry.extractedDescription)) || ''}`)) set.add(w);
+    for (const n of (SLOT_NOUNS[r.slot] || [])) if (new RegExp(`\\b${n}\\b`, 'i').test(String(r.name || ''))) set.add(n);
+    licensedWords.set(r.wearer, set);
+  }
+
   // 2. outfit_misattributed — a garment belonging to A is described on B.
   // Only slots distinctive enough to be identifiable are tested, and only when
   // the owner is NOT on this page or is not the one the prose attaches it to.
@@ -230,7 +250,8 @@ function checkPage(page, clothingRequirements, opts = {}) {
           if (new RegExp(`\\b${owner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(sentence)) continue;
           if (!ATTACHES.test(sentence)) continue;
           const st = tokens(sentence);
-          const matched = t.filter(w => st.has(w));
+          const licensed = licensedWords.get(other) || null;
+          const matched = t.filter(w => st.has(w) && !(licensed && licensed.has(w)));
           // At least one match must be a garment noun — otherwise the "evidence"
           // is colours and shapes that belong to no one in particular.
           if (!matched.some(w => GARMENT_NOUNS.has(w))) continue;
@@ -309,12 +330,7 @@ function checkPage(page, clothingRequirements, opts = {}) {
   // them — a finding no downstream code could act on, phrased as a request for
   // prose, is a finding that ships. The state is now a field, and the packing,
   // REQUIRED OBJECTS, clothing-text and prompt paths all branch on it.
-  for (const r of resolveWornItemsForPage(
-    opts.visualBible || { artifacts: opts.artifacts || [], clothing: opts.clothing || [] },
-    cast,
-    { wornItems: page.wornItems || [] },
-    { pageNumber: page.pageNumber },
-  )) {
+  for (const r of wornRows) {
     if (!r.missing) continue;
     const what = r.declared
       ? `declares it "off" but names no place for it`
@@ -324,8 +340,30 @@ function checkPage(page, clothingRequirements, opts = {}) {
       artifactId: r.id,
       detail: `"${r.name}" is ${r.owner}'s ${r.slot || 'costume'} AND a Visual Bible element; this page ${what}. `
         + `Add to this page's METADATA \`wornItems\`: {"id": "${r.id}", "owner": "${r.owner}", "state": "worn"} `
-        + `if ${r.owner} wears it here, or {"id": "${r.id}", "owner": "${r.owner}", "state": "off", "location": "<where it lies or who holds it>"} if not. `
+        + `if ${r.owner} wears it here, {"id": "${r.id}", "owner": "${r.owner}", "state": "worn", "wearer": "<the character on this page who wears it>"} `
+        + `if someone else wears it here, or {"id": "${r.id}", "owner": "${r.owner}", "state": "off", "location": "<where it lies or who holds it>"} if nobody does. `
         + `The prose must agree with whichever you choose.`,
+    });
+  }
+
+  // 4. worn_link_missing — the element IS a garment and nothing links it to an
+  // outfit. Everything above (and the whole per-page worn-state path) hangs off
+  // `wornAs`, and the writer emitted one on 9 of 482 entries across 59 staging
+  // stories: on job_1789420511893_zly5rcdej the cap the plot hands from one
+  // character to another was typed `headwear` and linked to nobody, so the
+  // off-state guard never saw it. Deterministic — the element's own `type` is
+  // an outfit slot, or exactly one character's outfit names the same garment.
+  const outfitTexts = new Map([...outfits].map(([name, o]) => [name, o.parts.map(x => x.text).join('; ')]));
+  for (const c of unlinkedWornCandidates(vbForWorn, outfitTexts)) {
+    if (c.owner ? !cast.includes(c.owner) : !(c.pages || []).includes(page.pageNumber)) continue;
+    findings.push({
+      pageNumber: page.pageNumber, type: 'worn_link_missing', character: c.owner || null, slot: c.slot,
+      artifactId: c.id,
+      detail: `"${c.name}" (${c.id}) is a ${c.slot} item but its Visual Bible entry has no \`wornAs\` link, `
+        + `so no page can state who wears it or take it off. `
+        + (c.owner
+          ? `Add \`"wornAs": "${c.owner}.${c.slot}"\` to ${c.id} — ${c.owner}'s outfit already describes it.`
+          : `Add \`"wornAs": "<CharacterName>.${c.slot}"\` to ${c.id}, naming the character whose outfit it belongs to, and describe the same item in that slot of their outfit.`),
     });
   }
 
@@ -344,6 +382,11 @@ function checkScenes(pages, clothingRequirements, opts = {}) {
     } catch (err) {
       log.warn(`[CLOTHING-CHECK] page ${page?.pageNumber}: ${err.message}`);
     }
+  }
+  const unlinked = new Map();
+  for (const f of all) if (f.type === 'worn_link_missing') unlinked.set(f.artifactId, f);
+  for (const f of unlinked.values()) {
+    log.warn(`[CLOTHING-CHECK] ${f.artifactId} "${f.slot}" has no wornAs link — the per-page worn-state path cannot see it. ${f.detail}`);
   }
   const byPage = new Map();
   for (const f of all) {
@@ -366,6 +409,10 @@ function checkScenes(pages, clothingRequirements, opts = {}) {
 //     normal and harmless while the canonical `wears:` line still carries it.
 //     Sending it would have the reviewer rewriting one page in five for nothing.
 //     Kept as a diagnostic, NOT sent.
+//   worn_link_missing    a Visual Bible fault, not a page fault: the scene
+//     review rewrites pages and cannot add a field to the bible, so sending it
+//     would ask for a fix the reviewer has no way to make. Reported and LOGGED
+//     (checkScenes) so the miss is on the record, NOT sent.
 const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
 
 /** Render findings as the {CLOTHING_FINDINGS} block for scene-review.txt. */

@@ -50,7 +50,7 @@ describe('wornItems — METADATA parser', () => {
   it('parses a wornItems block out of a prose+METADATA brief', () => {
     const m = extractSceneMetadata(brief('Lily stands in the square.', P8_META));
     expect(m.wornItems).toEqual([
-      { id: 'ART001', owner: 'Lily', state: 'off', location: 'lies on the cobbles beside the log pile' },
+      { id: 'ART001', owner: 'Lily', state: 'off', location: 'lies on the cobbles beside the log pile', wearer: null },
     ]);
     expect(m.fullData.wornItems).toEqual(m.wornItems);
   });
@@ -64,8 +64,8 @@ describe('wornItems — METADATA parser', () => {
       'nonsense',
     ]);
     expect(rows).toEqual([
-      { id: 'ART001', owner: 'Lily', state: 'worn', location: null },
-      { id: 'ART002', owner: 'Lily', state: null, location: null },
+      { id: 'ART001', owner: 'Lily', state: 'worn', location: null, wearer: null },
+      { id: 'ART002', owner: 'Lily', state: null, location: null, wearer: null },
     ]);
   });
 

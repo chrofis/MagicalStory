@@ -3562,7 +3562,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // dropped — this is not the rejected 2026-08-08 filterWornClothingAgainstScene,
   // which sieved every clause of every outfit against prose.
   let effectiveReferencePhotos = referencePhotos;
-  if (wornResolved.some(w => w.state === 'off') && Array.isArray(referencePhotos)) {
+  // `off`, or worn by someone else this page (handover) — either way the
+  // OWNER's outfit text must lose the clause.
+  if (wornResolved.some(w => w.state === 'off' || w.handedOver) && Array.isArray(referencePhotos)) {
     effectiveReferencePhotos = referencePhotos.map((photo) => {
       if (!photo || !photo.clothingDescription) return photo;
       const { text, removals } = stripOffItemsFromOutfit(photo.clothingDescription, wornResolved, photo.name);
@@ -3959,8 +3961,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // character, and the avatar reference already carries it. Listing it
         // here as an object is half of what made p3 of
         // job_1788641639919_mpjwlzkf1 render a second, free-standing hat.
+        // Handed to another character, no reference in the call shows it worn,
+        // so it stays a listed object: the prompt is the only place it is said.
         const wornState = wornById.get(String(obj.id || '').toUpperCase());
-        if (wornState && wornState.state === 'worn') {
+        if (wornState && wornState.state === 'worn' && !wornState.handedOver) {
           log.info(`[WORN] Page ${pageNumber}: ${obj.id} omitted from REQUIRED OBJECTS — ${wornState.owner} is wearing it`);
           continue;
         }

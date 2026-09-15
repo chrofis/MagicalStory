@@ -40550,3 +40550,71 @@ critic `server/lib/evalPipeline.js`, axis generator-vs-critic. The Lab side need
 **Touched:** `server/lib/sceneGeometry.js`, `server/lib/evalPipeline.js`,
 `tests/unit/empty-scene-geometry.test.ts`
 **Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — A worn Visual Bible element must carry `wornAs`, and a missing link is a reported fault
+
+**Context:** the whole removable-worn-item path (per-page `wornItems` state, the off-state prompt
+clause, the reference-plate dedupe, the outfit strip, the `removal_unstated` check) is entered only
+through a VB entry's `wornAs: "Name.slot"` link. Measured over 59 staging stories, **9 of 482**
+clothing/artifact/vehicle entries carried one. On `job_1789420511893_zly5rcdej` neither hat had it
+— both were typed `headwear` and linked to nobody — so the guard built for that exact story was
+inert on every page of it. Nothing required the link.
+
+**Decision:** `wornAs` is REQUIRED wherever a character wears the element, stated at every VB
+authoring site that still exists (`scene-expansion-all.txt`, `scene-expansion.txt`,
+`story-trial.txt`; the two `story-unified*` writers are being deleted by a concurrent pipeline
+change and were not re-edited). Backing it is a deterministic code check, `worn_link_missing`, in
+the module that already owns this family and is already handed `artifacts` — no new module. Two
+triggers, no prose inference: the element's own `type` IS an outfit slot, or exactly one character's
+outfit names the same garment through the closed `SLOT_NOUNS` vocabulary of a slot the element's
+NAME also lands in.
+
+**Rationale:** the finding is NOT sent to the scene review (`REVIEWABLE` unchanged). The review
+rewrites pages and cannot add a field to the bible, so sending it would ask for a fix the reviewer
+has no way to make — the 2026-09-06 lesson about findings phrased as requests nobody can act on.
+It is returned to callers and logged once per element, so the miss is on the record.
+
+**Touched:** `server/lib/wornItems.js` (`slotFromType`, `unlinkedWornCandidates`),
+`server/lib/clothingCheck.js`, `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`prompts/story-trial.txt`, `tests/unit/worn-item-handover.test.ts`,
+`tests/unit/worn-handover-built-prompt.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — A worn item that changes hands: `wornAs` is its home, the page row names its wearer
+
+**Context:** `wornAs` names ONE owner and ONE slot, and that is the only place the model said who
+wears an item. In `job_1789420511893_zly5rcdej` the captain's cap belongs to one character and is
+worn by another for most of the book (found in the square, worn to the quay, returned at the end).
+The second wearer got no worn state at all: no prompt clause, no plate, no outfit text — every page
+where she wore it had no mechanical record of it.
+
+**Decision:** the per-page `wornItems` row gains `wearer`. `wornAs` stays the item's HOME and never
+changes; `wearer` is who carries it on THIS page, and is honoured only when that character is in the
+page cast. A resolved row now carries `wearer` + `handedOver`, and four sites branch on it:
+the prompt clause names the wearer and denies the owner in one sentence; the owner's outfit text is
+stripped exactly as for an `off` item (`isOffForCharacter`); the reference-plate dedupe KEEPS the
+plate (no reference in the call shows the item worn); REQUIRED OBJECTS keeps the item listed for the
+same reason. An `off` with no `location` stays a fault, except when a wearer is named — the wearer
+IS the place. The avatar still wears the owner's full outfit including the item; that mismatch is
+intended and is what the prompt clause exists to override.
+
+**Rationale:** backward compatible by construction — a row with no `wearer` resolves to
+`wearer === owner`, `handedOver === false`. Verified against the DB: all 9 shipped `wornAs` entries
+across 60 staging stories resolve byte-identically under the old and new resolver, and 0 rows
+anywhere are `handedOver`. `clothingCheck` would otherwise have faulted the CORRECT render as
+`outfit_misattributed` (a garment of A on B), so words belonging to an item this page's row puts on
+this character are excluded from that rule's evidence — pinned both ways: it fires without the row,
+it is silent with it. On this story's own words it is silent either way (its garment noun, "cap", is
+below the rule's 4-character evidence threshold); that is pinned too, so a future widening of the
+vocabulary cannot start faulting correct renders unnoticed.
+
+**Touched:** `server/lib/wornItems.js`, `server/lib/clothingCheck.js`,
+`server/lib/promptBuilders.js`, `server/lib/visualBible.js`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`tests/unit/worn-item-handover.test.ts`, `tests/unit/worn-handover-built-prompt.test.ts`,
+`tests/unit/worn-item-changes-hands.test.ts`, `tests/unit/worn-items.test.ts`
+**Status:** ✅ active — staging only, not on master

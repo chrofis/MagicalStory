@@ -50,20 +50,22 @@ describe('a worn plot object that changes hands', () => {
     expect(f.filter((x: any) => x.type === 'removal_unstated')).toHaveLength(0);
   });
 
-  it('GAP: the guard needs a wornAs link — without one the same page is clean', () => {
+  it('the off-state guard still needs a wornAs link — the unlinked item is reported instead', () => {
     // Measured on staging job_1789420511893_zly5rcdej: the Art Director wrote
-    // neither hat's `wornAs`, so nothing guarded the cap on any page.
+    // neither hat's `wornAs`, so nothing guarded the cap on any page. The
+    // removal check's scope is unchanged (it governs linked items only); the
+    // missing link itself is now its own finding — worn-item-handover.test.ts.
     const unlinked = { ...CAP, wornAs: undefined };
     const f = checkPage(page(), reqs, { visualBible: { artifacts: [unlinked] } });
     expect(f.filter((x: any) => x.type === 'removal_unstated')).toHaveLength(0);
+    expect(f.filter((x: any) => x.type === 'worn_link_missing')).toHaveLength(1);
   });
 
-  it('GAP: the model is owner-keyed — the second wearer gets no worn state', () => {
+  it("`wornAs` stays the item's home — the page row names who wears it", () => {
     const rows = resolveWornItemsForPage(
       { artifacts: [CAP] }, [{ name: 'Sarah' }, { name: 'Emma' }],
-      { wornItems: [{ id: 'ART002', owner: 'Emma', state: 'worn' }] }, { pageNumber: 5 });
-    // One row, and it is Sarah's — the declared owner. Emma wearing it is not
-    // representable: `wornAs` names one owner and one slot.
+      { wornItems: [{ id: 'ART002', owner: 'Sarah', state: 'worn', wearer: 'Emma' }] }, { pageNumber: 5 });
     expect(rows.map((r: any) => r.owner)).toEqual(['Sarah']);
+    expect(rows.map((r: any) => r.wearer)).toEqual(['Emma']);
   });
 });

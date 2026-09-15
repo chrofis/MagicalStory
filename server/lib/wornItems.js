@@ -75,7 +75,10 @@ function parseWornItems(raw) {
     const stateRaw = String(row.state || '').trim().toLowerCase();
     const state = (stateRaw === 'worn' || stateRaw === 'off') ? stateRaw : null;
     const location = String(row.location || '').trim();
-    out.push({ id, owner: String(row.owner || '').trim(), state, location: location || null });
+    // `wearer` (2026-09-15) — who carries the item ON THIS PAGE. Absent on every
+    // row written before the field existed, and then the wearer is the owner.
+    const wearer = String(row.wearer || '').trim();
+    out.push({ id, owner: String(row.owner || '').trim(), state, location: location || null, wearer: wearer || null });
   }
   return out;
 }
@@ -141,6 +144,83 @@ function deriveSlotFromName(name) {
 }
 
 /**
+ * VB `type` values that ARE an outfit slot. The Art Director types an element
+ * freely ("headwear", "boots", "outerwear"), so this maps the ones that can
+ * only be a worn garment onto the canonical slot vocabulary. A type that could
+ * be anything ("clothing", "garment", "prop") maps to nothing.
+ */
+const TYPE_SLOTS = {
+  headwear: 'headwear', hat: 'headwear', cap: 'headwear', headgear: 'headwear', helmet: 'headwear',
+  footwear: 'footwear', shoes: 'footwear', boots: 'footwear',
+  outerwear: 'outer layer', 'outer layer': 'outer layer', coat: 'outer layer', cloak: 'outer layer', cape: 'outer layer',
+  top: 'top', shirt: 'top',
+  bottom: 'bottom', trousers: 'bottom', skirt: 'bottom',
+  belt: 'belt/waist', 'belt/waist': 'belt/waist', sash: 'belt/waist',
+  accessory: 'accessories', accessories: 'accessories', scarf: 'accessories', gloves: 'accessories',
+};
+
+/** The outfit slot a VB element's own `type` declares, or null. */
+function slotFromType(type) {
+  const t = String(type || '').trim().toLowerCase();
+  if (!t) return null;
+  if (TYPE_SLOTS[t]) return TYPE_SLOTS[t];
+  return WORN_SLOTS.includes(t) ? t : null;
+}
+
+/**
+ * Elements that are CLEARLY worn but carry no `wornAs` link — GAP 1.
+ *
+ * The whole removable-item path hangs off the writer emitting `wornAs`, and
+ * measured over 59 staging stories only 9 of 482 clothing/artifact/vehicle
+ * entries carried one. On staging job_1789420511893_zly5rcdej neither hat had
+ * it, so the off-state guard was inert for the story it was built for: the cap
+ * the plot hands from one character to another was `type: "headwear"` and
+ * linked to nobody.
+ *
+ * Two deterministic triggers, no prose inference:
+ *   'type'   — the element's own `type` IS an outfit slot.
+ *   'outfit' — exactly one character's outfit text names the same garment,
+ *              through the closed SLOT_NOUNS vocabulary of a slot the element's
+ *              NAME also lands in.
+ * `owner` is filled only by the second trigger, which actually identifies one.
+ */
+function unlinkedWornCandidates(visualBible, outfitTexts = new Map()) {
+  const out = [];
+  for (const pool of ['artifacts', 'clothing', 'vehicles']) {
+    const list = Array.isArray(visualBible && visualBible[pool]) ? visualBible[pool] : [];
+    for (const entry of list) {
+      if (!entry || !entry.id || parseWornAs(entry.wornAs)) continue;
+      const nameSlot = deriveSlotFromName(entry.name || '');
+      const typeSlot = slotFromType(entry.type);
+      const slot = typeSlot || nameSlot;
+      if (!slot) continue;
+      // Which characters' outfits name this same garment, by the element's own
+      // name — the same closed vocabulary, never free prose.
+      let owner = null;
+      if (nameSlot) {
+        const nouns = (SLOT_NOUNS[nameSlot] || []).filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(entry.name || '')));
+        if (nouns.length > 0) {
+          const re = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
+          const hits = [...outfitTexts.entries()].filter(([, text]) => re.test(String(text || ''))).map(([n]) => n);
+          if (hits.length === 1) [owner] = hits;
+        }
+      }
+      if (!typeSlot && !owner) continue;
+      out.push({
+        id: String(entry.id).toUpperCase(),
+        name: entry.name || entry.id,
+        pool,
+        slot,
+        owner,
+        pages: Array.isArray(entry.appearsInPages) ? entry.appearsInPages : null,
+        reason: owner ? 'outfit' : 'type',
+      });
+    }
+  }
+  return out;
+}
+
+/**
  * Per-page worn state for every worn element whose OWNER is in the page cast.
  *
  * TWO sources, and the second is why e403345b1 was inert in practice
@@ -191,14 +271,30 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     const d = declared.get(item.id) || null;
     const stateDeclared = d && d.state ? d.state : null;
     const location = (d && d.location) || null;
-    const missing = !stateDeclared || (stateDeclared === 'off' && !location);
+    // HANDOVER (2026-09-15). `wornAs` names the item's HOME — one owner, one
+    // slot — and that is all it ever named. Who wears it on THIS page is the
+    // per-page row's business: `wearer`. A row naming a wearer who is on the
+    // page and is not the owner means the item changed hands; the owner is then
+    // without it (their outfit text loses the clause, their reference is not
+    // authoritative) and the wearer carries it.
+    const declaredWearer = (d && d.wearer) || null;
+    const wearer = (declaredWearer && castNames.some(n => sameName(n, declaredWearer)))
+      ? declaredWearer
+      : item.owner;
+    const handedOver = !sameName(wearer, item.owner);
+    const state = stateDeclared || 'worn';
+    // An `off` with no place is still unstated — except when the row named a
+    // wearer, which IS the place.
+    const missing = !stateDeclared || (state === 'off' && !location && !handedOver);
     out.push({
       id: item.id,
       name: item.name,
       owner: item.owner,
+      wearer,
+      handedOver,
       slot: item.slot,
       entry: item.entry,
-      state: stateDeclared || 'worn',
+      state,
       location,
       declared: !!stateDeclared,
       defaulted: !stateDeclared,
@@ -229,10 +325,13 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       continue;
     }
     if (!castNames.some(n => sameName(n, owner))) continue;
+    const wearer2 = (d.wearer && castNames.some(n => sameName(n, d.wearer))) ? d.wearer : owner;
     out.push({
       id: d.id,
       name: entry.name || entry.id,
       owner,
+      wearer: wearer2,
+      handedOver: !sameName(wearer2, owner),
       slot,
       entry,
       state: d.state,
@@ -246,6 +345,19 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     });
   }
   return out;
+}
+
+/**
+ * Is this item OFF the named character on this page?
+ *
+ * Two ways, and the second is the handover: state `off` takes it off everyone,
+ * and a `worn` state whose wearer is someone else takes it off its owner. The
+ * owner's outfit text and reference must lose it in both cases.
+ */
+function isOffForCharacter(r, name) {
+  if (!r || !name) return false;
+  if (r.state === 'off') return sameName(r.owner, name) || sameName(r.wearer || r.owner, name);
+  return sameName(r.owner, name) && !sameName(r.wearer || r.owner, name);
 }
 
 /** Map id -> resolved entry, for the O(1) lookups the packing/prompt paths want. */
@@ -274,6 +386,11 @@ function buildWornStateLines(resolved) {
     if (r.state === 'off') {
       const where = r.location ? ` — ${r.location}.` : ' — it is elsewhere in the scene.';
       lines.push(`- ${r.owner} is NOT wearing this on this page: ${item}. Leave it off ${r.owner} even if the attached reference shows it worn${where}`);
+    } else if (r.handedOver) {
+      // The item is on the page, on the other character. Both halves are said
+      // in one clause: nobody but the wearer carries it.
+      lines.push(`- ${r.wearer} IS wearing this on this page, and ${r.owner} is NOT: ${item}. `
+        + `Draw it on ${r.wearer} only, and leave it off ${r.owner} even if the attached references show the opposite.`);
     } else {
       lines.push(`- ${r.owner} IS wearing this on this page: ${item}. Draw it on ${r.owner} even if the attached reference shows ${r.owner} without it.`);
     }
@@ -443,8 +560,7 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
   let text = String(description || '');
   const removals = [];
   for (const r of (resolved || [])) {
-    if (r.state !== 'off') continue;
-    if (!sameName(r.owner, characterName)) continue;
+    if (!isOffForCharacter(r, characterName)) continue;
     const res = removeWornItemFromOutfit(text, r.slot, r.name);
     removals.push({ id: r.id, slot: r.slot, removed: res.removed, reason: res.reason });
     if (res.removed) text = res.text;
@@ -496,7 +612,7 @@ function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sce
   for (const meta of metas) {
     if (!meta) continue;
     for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta, { pageNumber: pageNumber || undefined })) {
-      if (r.state !== 'off' || seen.has(r.id)) continue;
+      if (!isOffForCharacter(r, ownerName) || seen.has(r.id)) continue;
       seen.add(r.id);
       off.push(r);
     }
@@ -515,6 +631,9 @@ module.exports = {
   wornAsEntries,
   findVbEntryById,
   deriveSlotFromName,
+  slotFromType,
+  unlinkedWornCandidates,
+  isOffForCharacter,
   resolveWornItemsForPage,
   wornStateById,
   buildWornStateLines,
