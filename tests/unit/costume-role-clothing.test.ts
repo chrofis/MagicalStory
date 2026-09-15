@@ -54,13 +54,20 @@ describe('role clothing is not a costume', () => {
     }
   });
 
-  it('the BUILT wardrobe prompt keeps a plot-critical slot out of the outfit', () => {
+  it('the BUILT wardrobe prompt describes a plot object in full, in its slot', () => {
     const built = String(buildStoryBibleFromBeatsPrompt(inputData, beats) || '');
-    expect(built).toContain('A slot the PLOT turns on');
+    expect(built).toContain('described IN FULL in the outfit');
+    expect(built).toContain('Visual Bible copies those words');
+    // The earlier shape (reserve the slot) was reversed by the owner: the slot
+    // is FILLED so the bible can reuse the exact words.
+    expect(built).not.toContain('stays out of the outfit');
   });
 
-  it('every wardrobe-authoring site carries the plot-slot rule', () => {
-    for (const f of WARDROBE_SITES) expect(read(f), f).toContain('A slot the PLOT turns on');
+  it('every wardrobe-authoring site carries the full-description rule', () => {
+    for (const f of WARDROBE_SITES) {
+      expect(read(f), f).toContain('described IN FULL in the outfit');
+      expect(read(f), f).not.toContain('stays out of the outfit');
+    }
   });
 
   it('a costume is still required where the theme really is a costume', () => {

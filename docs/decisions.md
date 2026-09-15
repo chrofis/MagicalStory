@@ -40476,3 +40476,36 @@ NOT built: that is an eval classification change and the owner's call.
 `tests/unit/wardrobe-vs-bible.test.ts`, `tests/unit/cover-worn-held-slot-conflict.test.ts`,
 `tests/unit/costume-role-clothing.test.ts`
 **Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — A plot-critical worn object is described IN FULL in the outfit, not left out of it
+
+**Context:** supersedes the same-day rule that told the wardrobe writer to leave a plot-critical slot
+empty for the story's own object to fill. The owner's ruling: *"why leave it open, why not put what
+is in the story there, use the captain's cap. And explain it in detail in the costume. The visual
+bible can then copy that."*
+
+**Decision:** the object the story turns on is described in the character's outfit with colour,
+material and what makes that one recognisable, in the slot it occupies; the Visual Bible copies those
+words into its own `wornAs` entry — the direction `scene-expansion-all.txt:138` already demands ("the
+same item in that slot, in the same words"). The reconciliation built earlier
+(`clothingCheck` kind `reconcile`) stays as the mechanism that keeps the two sets of words identical.
+The slot is filled, not reserved, and the outfit stays complete even on pages the character is
+without the item.
+
+**Rationale:** the moving-object problem — the cap is the captain's at the start and the end and
+another character wears it in between — is solved by the existing per-page machinery, not by
+emptying the slot. `scene-expansion-all.txt` rule 10d has the page state that the character is
+WITHOUT it and name where it now lies, `wornItems: {state: "off", location}` carries that
+structurally, and `removal_unstated` reports it when it is missing. The avatar wearing the cap while
+a mid-book page shows the owner bare-headed is correct and intended (owner). VERIFIED by test:
+the fault fires when the owner is on the page with no declared state, and when an `off` state names
+no place; it is satisfied by `off` + a place. **Two gaps, measured, not closed here:** (1) the guard
+needs the Art Director to write `wornAs` — in `job_1789420511893_zly5rcdej` neither hat carried one,
+and only 9 of 482 entries over 59 stories do, so the whole off-state path was inert for that story;
+(2) the model is owner-keyed, so a second wearer gets no worn state — "Emma has the cap now" is not
+representable. `tests/unit/worn-item-changes-hands.test.ts` pins both gaps.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `tests/unit/costume-role-clothing.test.ts`,
+`tests/unit/worn-item-changes-hands.test.ts`
+**Status:** ✅ active — staging only, not on master; supersedes the "leave the slot empty" rule of the same day
