@@ -178,3 +178,28 @@ describe('artifact scale — authoring instruction contract', () => {
     });
   }
 });
+
+/**
+ * The Art Director's size-ratio rule (8f) lives at BOTH brief templates and was
+ * CONDITIONAL on the entry stating a size ("an element whose Visual Bible entry
+ * states a size"). With the free-text field retired, that condition would now
+ * read as never satisfied — so the obligation is unconditional, which is what
+ * decisions.md 2026-09-14 wanted and the enum finally makes true: every element
+ * carries a band.
+ */
+describe('the Art Director size-ratio rule survives the field swap', () => {
+  for (const file of ['scene-expansion.txt', 'scene-expansion-all.txt']) {
+    it(file + ' states the ratio obligation without a size-field condition', () => {
+      const text = read(file);
+      expect(text).toContain('Every page that cites an element and holds a figure too names');
+      expect(text).toContain('as a ratio against a figure in the prose');
+      // the retired condition must not linger — it would gate the rule off
+      expect(text).not.toContain('whose Visual Bible entry states a size');
+    });
+
+    it(file + ' keeps a creature\u2019s scale on every page, now keyed on the band', () => {
+      const text = read(file);
+      expect(text).toContain("keeps the size its entry\u2019s `scaleClass` band states on every page it appears on");
+    });
+  }
+});
