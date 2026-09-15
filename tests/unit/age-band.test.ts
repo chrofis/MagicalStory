@@ -438,24 +438,26 @@ describe('the simple bands ban the coda, not success', () => {
 });
 
 /**
- * `TOPIC_AGE_WINDOWS` is a hand-kept mirror of `suitableAges` in
- * client/src/constants/storyTypes.ts — the client filters the picker with it,
- * the server nudges the writer with it. A drift between the two shows a topic
- * in the trial that the writer is then told is off-age (or the reverse), so it
- * is pinned here rather than left to whoever edits one side next.
+ * The windows live in ONE file, shared/topic-age-windows.json; the server
+ * requires it and the client derives `suitableAges` from it. What can still
+ * break is the wiring — the client mapping dropped, a typo'd key in the JSON
+ * that applies to no topic, a window that is not a [min, max] pair — so that is
+ * what is pinned here. The old value-by-value mirror check is gone with the
+ * mirror.
  */
-describe('TOPIC_AGE_WINDOWS mirrors the client windows exactly', () => {
-  it('has the same window for every one of the 64 life challenges', async () => {
+describe('shared/topic-age-windows.json reaches both consumers', () => {
+  it('is the very object the server exports and every key names a real life challenge', async () => {
+    const shared = require_('../../shared/topic-age-windows.json');
+    expect(TOPIC_AGE_WINDOWS).toBe(shared);
     const { lifeChallenges } = await import('../../client/src/constants/storyTypes');
-    expect(lifeChallenges.length).toBe(64);
+    for (const [key, w] of Object.entries(shared) as [string, number[]][]) {
+      expect(lifeChallenges.some(c => c.id === key), `unknown topic '${key}' in shared/topic-age-windows.json`).toBe(true);
+      expect(w.length, `${key} window`).toBe(2);
+      expect(w[0]).toBeLessThanOrEqual(w[1]);
+    }
     for (const c of lifeChallenges) {
-      if (c.suitableAges) expect(TOPIC_AGE_WINDOWS[c.id]).toEqual(c.suitableAges);
-      else expect(TOPIC_AGE_WINDOWS[c.id]).toBeUndefined();
+      expect(c.suitableAges, c.id).toEqual(shared[c.id]);
     }
-    // …and nothing on the server that the client does not know about.
-    for (const key of Object.keys(TOPIC_AGE_WINDOWS)) {
-      expect(lifeChallenges.some(c => c.id === key)).toBe(true);
-    }
-    expect(Object.keys(TOPIC_AGE_WINDOWS).length).toBe(56);
+    expect(Object.keys(shared).length).toBe(56);
   });
 });
