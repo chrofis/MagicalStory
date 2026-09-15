@@ -40431,3 +40431,48 @@ re-creates the blind grade.
 `prompts/empty-scene.txt`, `storyJobPipeline.js` (4 plate call sites: page + vantage, each with its
 QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geometry.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — The Visual Bible outranks the wardrobe contract when they dress the same body slot
+
+**Context:** staging `job_1789420511893_zly5rcdej` drew Captain Sarah in a pirate tricorn on the back
+cover, the initial page and interior pages 14-15, while `ART002` — a navy captain's cap with a gold
+anchor, the object the whole plot turns on — was assigned to nine of her pages. Three causes, all
+verified from stored data. (1) `clothingRequirements.Sarah.costumed.description` ended "a black
+tricorn hat with yellow braid trim" and never named her cap, so the story carried a THIRD hat that
+existed only in the wardrobe layer; nothing in the pipeline had ever compared
+`clothingRequirements[*].description` against the bible's wearables, and the clothing reviewer,
+which only checks garments within one outfit, reported "no fault". (2) The bible-authoring rule
+("Costumed is PREFERRED — when in doubt, mark `costumed.used` true") forced a real ship's captain in
+present-day Zürich into a pirate costume. (3) `applyCoverWornHeldDedupe` suppressed `ART002` because
+its tokens overlapped her "captain's coat" segment, so the cap's reference cell never entered the
+cover grid — the covers scored 100/90/81 while the interiors, which DID carry both, scored 50/60.
+A crude scan of 25 recent staging stories found the same collision in `job_1788983823620_csjcyp1q9`
+and false-negatived Sarah herself, so two is a floor.
+
+**Decision:** the Visual Bible WINS a same-slot contradiction, at both sites.
+`clothingCheck.checkWardrobeAgainstBible` reports the conflict and
+`applyWardrobeBibleCorrections` rewrites the losing outfit clause; `beatsPipeline` runs it the moment
+both exist, logs every swap (character, slot, both items) and re-merges the corrected contract into
+the bible transcript later consumers re-parse. In the cover dedupe the token matcher is UNCHANGED —
+tightening it would re-admit the duplicates that function exists to remove — and the verdict is
+decided on slot identity instead: duplicate → suppress the artifact as before, different item in the
+same slot → conflict, logged, artifact kept and the contradicting segment dropped, different slots →
+neither side moves. The wardrobe rule is relaxed so a character the story already dresses for their
+role (a working captain, a uniformed officer) stays `standard`.
+
+**Rationale:** the bible entry has a rendered, gated reference cell that the page grid carries and
+the prose cites by id; the wardrobe line is text nobody drew. Ownership is taken from the writer's
+own `wornAs` link whenever there is one — but in the failing story NEITHER hat carried one (verified:
+both `wornAs: undefined`, only `type: "headwear"`), so a purely declarative check would have found
+zero conflicts; name attribution (two significant tokens of the entry's name inside that outfit) is
+the fallback, and silence in a slot is never a contradiction. Scope is headwear/footwear/outer layer:
+tops and bottoms collide with ordinary prose nouns. Deterministic throughout — no judge, no new
+finding type. Giving the cover judge a "contract and bible disagree" finding type was deliberately
+NOT built: that is an eval classification change and the owner's call.
+
+**Touched:** `server/lib/clothingCheck.js`, `server/lib/beatsPipeline.js`, `server/lib/coverIterate.js`,
+`prompts/story-bible-from-beats.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `scripts/admin/sibling-registry.json`,
+`tests/unit/wardrobe-vs-bible.test.ts`, `tests/unit/cover-worn-held-slot-conflict.test.ts`,
+`tests/unit/costume-role-clothing.test.ts`
+**Status:** ✅ active — staging only, not on master

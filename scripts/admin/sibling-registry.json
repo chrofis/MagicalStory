@@ -150,9 +150,10 @@
           "\"type\"",
           "\"isRealLandmark\"",
           "\"scaleClass\"",
-          "\"generic\""
+          "\"generic\"",
+          "\"states\""
         ],
-        "anchorsNote": "the VB entry keys all four authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` and `\"vantages\"` are deliberately NOT anchored: they are absent from story-unified-imagefirst.txt and from scene-expansion-all.txt respectively, which is a real divergence, not a parity target to assert into existence."
+        "anchorsNote": "the VB entry keys all four authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15: story-unified-imagefirst.txt was the one site that did not declare it, so a story on the image-first ordering could never give an altered object its own reference cell — owner ruling, all bible-authoring sites declare it. `\"vantages\"` stays deliberately NOT anchored: it is absent from scene-expansion-all.txt, which is a real divergence, not a parity target to assert into existence."
       }
     },
     {

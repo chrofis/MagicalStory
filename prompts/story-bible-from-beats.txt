@@ -33,7 +33,8 @@ Primary characters: {PRIMARY_CHARACTER_NAMES}
 Determine which clothing variants each character needs, based on the page plan.
 
 - Mark `used: true` only for variants that actually appear.{ERA_CLOTHING_RULE}
-- Set `costumed.used: true` whenever the theme, setting or era implies special clothing, and name it in `costumed.costume` (`medieval`, `wizard`, `pirate`, `firefighter`, `1920s`, …). Leave it false only for a present-day story in everyday clothes.
+- Set `costumed.used: true` whenever the theme, setting or era implies special clothing, and name it in `costumed.costume` (`medieval`, `wizard`, `pirate`, `firefighter`, `1920s`, …). Leave it false for a present-day story in everyday clothes, and for any character whose own role clothing the story keeps.
+- **A character the story already dresses for their role stays `standard`** — a working captain, a uniformed officer, a baker at their own oven. Their own outfit IS their clothing in this world, and the theme's costume puts a second set of clothes on someone who came dressed. Costume the characters the theme is a costume FOR.
 - If any character is costumed, every cover uses the costumed variant for every cover character.
 - `description` is the FULL final outfit for this story — top, bottom, footwear, accessories — as one self-contained sentence. Start from the character's stored clothing above; keep it, add a story-relevant accessory, or change a garment the story requires. The avatar generator uses it verbatim.
 - Costumed descriptions name every slot the character actually wears: headwear, top, bottom, footwear, belt/waist, outer layer. Each slot names colour and material. OMIT a slot they do not wear; never write it out as `none`. Clothing only — no pets, carried objects or bag contents.
