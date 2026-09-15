@@ -68,7 +68,14 @@
         "prompts/story-unified.txt",
         "prompts/story-unified-imagefirst.txt"
       ],
-      "severity": "block"
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{RISK_FRAMING}",
+          "{PAGE_OPENING_VARIETY}",
+          "{AD_COMPOSITION}"
+        ]
+      }
     },
     {
       "id": "trial-vs-full-writer",
@@ -78,7 +85,31 @@
         "prompts/story-trial.txt",
         "prompts/story-unified.txt"
       ],
-      "severity": "block"
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{RISK_FRAMING}",
+          "{PAGE_OPENING_VARIETY}",
+          "{AD_COMPOSITION}"
+        ]
+      }
+    },
+    {
+      "id": "story-prose-writers",
+      "axis": "beats text writer vs unified writer vs trial writer",
+      "reason": "story-text-from-beats.txt (live beats path), story-unified.txt / story-unified-imagefirst.txt (pre-beats unified) and story-trial.txt all write page prose under the same shared rules; a prose rule that becomes a promptBuilders constant reaches a path only through the placeholder that path declares, so a new one is declared at every site or it silently reads as absent there.",
+      "members": [
+        "prompts/story-text-from-beats.txt",
+        "prompts/story-unified.txt",
+        "prompts/story-unified-imagefirst.txt",
+        "prompts/story-trial.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{PAGE_OPENING_VARIETY}"
+        ]
+      }
     },
     {
       "id": "lector-and-diff-pass",

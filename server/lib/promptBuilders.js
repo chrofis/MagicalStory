@@ -6260,6 +6260,36 @@ function buildArcBudgetSection(inputData, pageCount) {
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
+ * The page-opening variety rule, one string for every stage that writes page
+ * prose. Four templates carried the same sentence as prose (beats text writer,
+ * both unified variants, trial); one constant, filled into the
+ * {PAGE_OPENING_VARIETY} placeholder each declares. The constant is the bare
+ * sentence: the bullet templates write `- {PAGE_OPENING_VARIETY}` and the
+ * beats template, whose rules are plain sentences, writes it bare with its
+ * full stop — the built prompts are byte-identical to the prose they replaced.
+ */
+const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way";
+
+/**
+ * The Art Director composition rules for a writer that authors its own scene
+ * hints without an Art Director stage: trial and both unified variants. The
+ * six bullets were reworded for a scene hint from scene-expansion(-all).txt
+ * rules 5, 5c, 11f, the close-up rule and the immersion/footing rules
+ * (2026-09-13) and lived only in story-trial.txt as prose; the unified
+ * templates carried their own two-bullet subset. One constant, filled into
+ * the {AD_COMPOSITION} placeholder. The beats path does not receive it — its
+ * text writer stages nothing, the Art Director does.
+ */
+const AD_COMPOSITION_RULE = [
+  '- One moment, one focal point. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.',
+  '- One instant, no history. Never ask the picture to show how many times something happened, what just finished or what comes next — no "again", no "already", no object both mid-motion and in its ended state.',
+  '- One level per frame. Two named figures on different levels — one on a deck, floor, bank, wall or roof, the other on the water, ground or stair below — cannot be drawn facing each other at equal size: the renderer flattens every figure onto one plane. Stage the page from one level; the figure on the other level is `depth: background`, small, and on a surface visibly above or below the edge.',
+  "- No partial immersion. A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage them at the water's edge or as swimming.",
+  '- Footing. Every standing character has something standable at their declared position and depth — a bank, path, floor, deck or walkway — never open water or air. A moment that puts a figure where nothing standable exists moves the figure or the camera.',
+  '- A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping or feet-on-ground contact, and nothing placed behind the character. A moment that needs below-waist action is a `medium` shot.',
+].join('\n');
+
+/**
  * # RULES OF THE TELLING for the arc prompts ({TELLING_RULES} in arc-create and
  * arc-retell). Interpolated rather than baked into the templates because four
  * of its lines demanded exactly what the simple bands forbid: escalation, a
@@ -7217,6 +7247,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
     AGE: readerAge(inputData),
     DO_NOT_WRITE_SECTION: buildDoNotWriteSection(inputData),
+    PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
   });
 }
 
@@ -7616,6 +7647,10 @@ ${adventureGuide}` : ''}`;
       // Same string the arc prompts get inside {TELLING_RULES}; these templates
       // never receive that block.
       RISK_FRAMING: RISK_FRAMING_RULE,
+      PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+      // The unified writer authors its own scene hints with no Art Director
+      // stage, so the composition rules reach it here or nowhere.
+      AD_COMPOSITION: AD_COMPOSITION_RULE,
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
       MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
       // Reader age for the title pick the writer makes in its ---TITLE---
@@ -7812,6 +7847,10 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // no review stage of any kind, so the writer prompt is the only place a
       // framing rule can reach a trial story.
       RISK_FRAMING: RISK_FRAMING_RULE,
+      PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+      // Trial has no Art Director either: the scene-hint composition rules
+      // reach a trial page only through the writer prompt.
+      AD_COMPOSITION: AD_COMPOSITION_RULE,
       // Same resolver the full pipeline's Art Director uses. Trial has no Art
       // Director, so without this the creature tone never reaches a trial page.
       CREATURE_TONE: buildCreatureToneSection(inputData),
@@ -8174,6 +8213,8 @@ module.exports = {
   buildArcBudgetSection,
   buildTellingRulesSection,
   RISK_FRAMING_RULE,
+  PAGE_OPENING_VARIETY_RULE,
+  AD_COMPOSITION_RULE,
   parseArcHints,
   parseArcCreate,
   parseArcRetell,

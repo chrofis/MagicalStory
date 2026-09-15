@@ -47,7 +47,7 @@ Never contradict a page's illustration, and never mention pages, plans or illust
 Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
 Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene.
 No rhetorical set-pieces: no paired negations, no coined sayings or incantations, no one-sentence paragraphs for drama. Plain narration carries the story.
-Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way.
+{PAGE_OPENING_VARIETY}.
 The story's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
 What the story establishes as load-bearing — a cause, a uniqueness, a limitation — appears in the text in its specific form, never genericized.
 The text gives each page its feeling and its suspense, and fills what the summary leaves out: feelings, dialogue, and the ordinary business between the story's turns — going somewhere and arriving, waiting, approaching people, asking, being answered, a greeting, names given and heard, a thing tried and let go. That is filler, not event, and the text invents it freely wherever the story jumps.
