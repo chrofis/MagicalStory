@@ -28,11 +28,41 @@
 
 const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 const { persistStyledAvatar } = require('../services/database');
-const { slugifyCostume } = require('../utils/costumeKey');
+const { costumeSubKey, pickCostumed } = require('../utils/costumeKey');
 const { stripDataUriPrefix } = require('./r2');
+
 const { parseHoldsId } = require('./coverHolds');
 const { resolveCellPose } = require('./storyAvatars');
 const { buildCastIndex, resolveEntity, canonicalName, lookupByName } = require('./castResolver');
+
+/**
+ * Which styled-avatar slot a clothing label reads, and under which key a freshly
+ * generated sheet is cached.
+ *
+ * A costume label arrives EITHER as `costumed:<x>` or already collapsed to bare
+ * `costumed` (clothingResolve.js does that). Both are costumes and both resolve
+ * through the shared costumeKey helpers, the same ones every writer uses. Reading
+ * a bare `costumed` label as a non-costume returned the whole `costumed` MAP as
+ * if it were a sheet: the cache missed, a fresh 2×4 sheet was paid for, and the
+ * map was then overwritten with a string so every later pickCostumed came back
+ * undefined and the page fell to the generic bbox fallback.
+ *
+ * @param {Object} styledForStyle - character.avatars.styledAvatars[artStyle]
+ * @param {string} clothing - lower-cased clothing label
+ * @param {string|null} storyCostume - the story's costume name, when the label is bare
+ * @returns {{isCostumed: boolean, costumeKey: string|null, cachedSheet: any}}
+ */
+function resolveStyledSheetSlot(styledForStyle, clothing, storyCostume = null) {
+  const label = String(clothing || '').toLowerCase();
+  const slots = styledForStyle && typeof styledForStyle === 'object' ? styledForStyle : {};
+  const isCostumed = label === 'costumed' || label.startsWith('costumed:');
+  if (!isCostumed) return { isCostumed: false, costumeKey: null, cachedSheet: slots[label] };
+  return {
+    isCostumed: true,
+    costumeKey: costumeSubKey(label, storyCostume),
+    cachedSheet: pickCostumed(slots.costumed, label, storyCostume),
+  };
+}
 
 /**
  * Split an interaction's `character` field into the names it actually refers
@@ -242,9 +272,10 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       throw new Error(`[COMPOSITE CAST] ${name}: no clothing category on the page or the scene character. Refusing to default to 'standard'.`);
     }
     const clothing = String(rawClothing).toLowerCase();
-    const costumeKey = clothing.startsWith('costumed:')
-      ? slugifyCostume(clothing.slice('costumed:'.length))
-      : null;
+    const storyCostume = inputData.clothingRequirements?.[name]?.costumed?.costume || null;
+    const styledForStyle = character.avatars?.styledAvatars?.[artStyleKey] || {};
+    const { isCostumed, costumeKey, cachedSheet } =
+      resolveStyledSheetSlot(styledForStyle, clothing, storyCostume);
 
     // Step 1: try the story-scoped sheet first (Phase 4 — the canonical
     // source). When the story already has a costumed/styled-<clothing>
@@ -261,10 +292,6 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         storySlot = entry[`styled-${clothing}`] || entry.costumed || null;
       }
     }
-    const styledForStyle = character.avatars?.styledAvatars?.[artStyleKey] || {};
-    const cachedSheet = costumeKey
-      ? styledForStyle.costumed?.[costumeKey]
-      : styledForStyle[clothing];
     let sheetUri = storySlot
       ? (typeof storySlot === 'string' ? storySlot : (storySlot.imageUrl || storySlot.imageData || storySlot.data || null))
       : (cachedSheet
@@ -613,4 +640,4 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
   return buildCompositeCast(fakePageData, fakeInputData, deps);
 }
 
-module.exports = { buildCompositeCast, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds, unreferencedSecondaryCreatures };
+module.exports = { buildCompositeCast, resolveStyledSheetSlot, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds, unreferencedSecondaryCreatures };
