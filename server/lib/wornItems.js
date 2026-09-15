@@ -409,11 +409,39 @@ function wornStateById(resolved) {
  * has one" — the reference image is not authoritative for a removable item, so
  * the prompt says which way to go in words the model cannot read past.
  */
+/**
+ * The bible's own description of a worn item, appended to its NAME in the worn
+ * clause (2026-09-15).
+ *
+ * The clause used to carry the name alone — "navy-blue captain's cap" — while
+ * the bible held "stiff black visor, flat crown, gold anchor emblem". A name is
+ * a label, and a label loses a silhouette fight against an attached picture:
+ * on staging job_1789420511893_zly5rcdej p13/p14 the words said cap, the
+ * attached cell showed the child's own tricorn, and the render took the colour
+ * and the anchor from the words and the SHAPE from the picture. The
+ * construction detail is the half that was missing.
+ *
+ * First sentence only, capped — this is a rider on an instruction line, not a
+ * second REQUIRED OBJECTS block.
+ */
+function wornItemLook(r) {
+  const entry = r && r.entry;
+  const raw = String((entry && (entry.extractedDescription || entry.description)) || '').trim();
+  if (!raw) return '';
+  const first = (raw.split(/(?<=[.!?])\s+/)[0] || raw).trim().replace(/[.\s]+$/, '');
+  if (!first) return '';
+  const capped = first.length > 220 ? `${first.slice(0, 217).trim()}…` : first;
+  // Never repeat the name back at itself when the description IS the name.
+  return sameName(capped, r.name) ? '' : capped;
+}
+
 function buildWornStateLines(resolved) {
   const lines = [];
   for (const r of (resolved || [])) {
-    const item = String(r.name || '').trim();
-    if (!item) continue;
+    const name = String(r.name || '').trim();
+    if (!name) continue;
+    const look = wornItemLook(r);
+    const item = look ? `${name} — ${look}` : name;
     // The item NAME sits at the end of its own clause on purpose: every VB name
     // in a prompt is substituted for an English description-derived ref by
     // sanitizeVbIdsInPrompt, and that ref can end mid-phrase. At a clause
@@ -673,6 +701,7 @@ module.exports = {
   referenceCarriesItem,
   resolveWornItemsForPage,
   wornStateById,
+  wornItemLook,
   buildWornStateLines,
   buildWornStateBlock,
   removeWornItemFromOutfit,

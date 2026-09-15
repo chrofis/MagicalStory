@@ -40894,3 +40894,29 @@ location, so nothing was displaced.
 sources, `referenceCarriesItem`), `server/lib/visualBible.js` (worn-item
 dedupe), `server/lib/promptBuilders.js` (REQUIRED OBJECTS omission + `worn on`
 rider), `tests/unit/worn-unlinked-reference.test.ts`.
+
+## 2026-09-15 — The worn-item clause carries the bible's description, not just the name
+
+**Context.** The WORN ITEMS block named the item and nothing else: "Emma IS
+wearing this on this page: navy-blue captain's cap". The bible entry held the
+construction — "stiff black visor, flat crown, gold anchor emblem pinned to the
+front centre". On staging `job_1789420511893_zly5rcdej` p13/p14 the attached
+character cell showed the child's OWN black tricorn, and the render split the
+difference: navy colour and gold anchor from the words, tricorn silhouette from
+the picture.
+
+**Decision.** `buildWornStateLines` appends the entry's own
+`extractedDescription || description` after the item name — first sentence only,
+capped at 220 chars, dropped when the entry has none or when it merely repeats
+the name. All three clause shapes (worn, off, handed over) carry it.
+
+**Rationale.** A name is a label; a label loses a silhouette fight against an
+attached picture. The construction detail is the half that decides shape, and it
+already exists — nothing new is generated or inferred. First sentence + cap
+keeps a one-line instruction from regrowing into a second REQUIRED OBJECTS
+block. Complementary to the plate-attachment fix logged above, not a substitute:
+that one supplies the picture, this one the words.
+
+**Touched files.** `server/lib/wornItems.js` (`wornItemLook`),
+`tests/unit/worn-clause-carries-description.test.ts`,
+`tests/unit/worn-items.test.ts` (two pinned lines updated).
