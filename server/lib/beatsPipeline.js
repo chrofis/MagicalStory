@@ -119,7 +119,7 @@ const {
   getHistoricalLocations,
   getHistoricalObjects,
 } = require('./storyHelpers');
-const { parseCastRemovals, diffCastRemovals } = require('./sceneReviewGuard');
+const { parseCastRemovals, diffCastRemovals, revertUndeclaredRemovals } = require('./sceneReviewGuard');
 const { UnifiedStoryParser } = require('./outlineParser/unified');
 const { stableCandidateIndex } = require('./outlineParser/shared');
 const { log } = require('../utils/logger');
@@ -2196,11 +2196,15 @@ ${bibleBody}` : bibleBody;
       // arithmetic over the brief metadata only — never an inference from
       // description prose.
       //
-      // Detection and loud reporting ONLY: an undeclared removal is NOT
-      // reverted here (owner, 2026-09-13 — a deterministic gate is its own
-      // decision). Evidence: job_1789207854566_l43qgl34w p7/p15, where five
-      // commissioned characters became "five soaked pirates: one in a blue
-      // tricorn…" with `characters: []` / `["Fiona"]` and nothing said.
+      // Detected AND REVERTED (2026-09-15, superseding the detect-only ruling
+      // of 2026-09-13). Evidence for the detection:
+      // job_1789207854566_l43qgl34w p7/p15, where five commissioned characters
+      // became "five soaked pirates: one in a blue tricorn…" with
+      // `characters: []` / `["Fiona"]` and nothing said. Evidence for the
+      // revert: job_1789420511893_zly5rcdej p16, where the error fired, the
+      // page rendered on the emptied cast anyway, and the corrupt contract
+      // produced a phantom CRITICAL against a child who IS in the prose — three
+      // repair rounds, and a correct original destroyed by the round-2 inpaint.
       const castRemovals = parseCastRemovals(sceneReviewAnalysis);
       const metaOf = (brief) => (extractSceneMetadata(brief) || {});
       castRemovalsDeclared = castRemovals;
@@ -2234,6 +2238,20 @@ ${bibleBody}` : bibleBody;
         log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
         gl.error('beats_scene_review_removal_undeclared',
           `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
+        // The page does NOT render on a cast the reviewer silently emptied: its
+        // whole brief goes back to the version that was sent for review, which
+        // is internally consistent by construction. That page's other review
+        // fixes are lost with it and are reported below through the ordinary
+        // faulted-but-not-rewritten channel — `changed` is trimmed here, before
+        // that check reads it.
+        const reverted = revertUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
+        if (reverted.length > 0) {
+          const pages = reverted.map(r => r.pageNumber).join(', ');
+          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — an undeclared cast removal must not render`);
+          gl.warn('beats_scene_review_removal_reverted',
+            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration, so that page's review fixes were discarded with it`,
+            null, reverted);
+        }
       }
 
       // BIBLE CORRECTIONS (2026-09-14). The review may return an optional

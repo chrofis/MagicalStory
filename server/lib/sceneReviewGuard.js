@@ -146,8 +146,9 @@ function castNameSet(names) {
  * inference from description text. A declared name is subtracted case-
  * insensitively; whatever is left vanished silently.
  *
- * Detection and reporting only (owner, 2026-09-13): the caller logs, it does
- * not revert. A deterministic gate is a separate decision.
+ * Detection feeds `revertUndeclaredRemovals` below (2026-09-15). The
+ * 2026-09-13 ruling — detect and report, do not revert — held for two days and
+ * was reversed by what an undeclared removal actually costs; see that function.
  *
  * SECONDARY ROUTING IS NOT A REMOVAL. A Visual Bible secondary is commissioned
  * through `objects[]` (its CHR id) rather than `characters[]`, so a rewrite that
@@ -188,4 +189,55 @@ function diffCastRemovals(pages, declared) {
   return out;
 }
 
-module.exports = { parseCastRemovals, castNameSet, diffCastRemovals, assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };
+
+/**
+ * Un-ship a page whose review rewrite removed cast without declaring it.
+ *
+ * Detected since 2026-09-13, reverted since 2026-09-15. What the detection
+ * alone cost, measured on staging job_1789420511893_zly5rcdej p16:
+ * `beats_scene_review_removal_undeclared` fired at ERROR ("emma, noah, daniel"),
+ * alongside `beats_brief_unfixed` and `cast_unlisted` — and the page rendered
+ * anyway, on the emptied cast. The corrupt contract then produced a phantom
+ * CRITICAL `extra_character` against a child who IS in the prose; that critical
+ * funded three repair rounds, and the round-2 inpaint destroyed a CORRECT
+ * original (v0 −45 correct → v2 −40 wrong, shipped) because all three versions
+ * were scored against the same corrupt cast.
+ *
+ * The revert is the WHOLE page brief, back to the version that was sent for
+ * review — not `characters[]` alone. The reviewer that drops a name usually
+ * rewrites the prose around it too ("five soaked pirates" for five named
+ * children), so restoring the cast list into the rewritten prose yields a brief
+ * whose roster and prose disagree, which is the same corrupt contract in a new
+ * shape. The pre-review brief is internally consistent by construction; the
+ * cost is that page's other review fixes, which the caller then reports as
+ * unfixed through the normal faulted-but-not-rewritten channel.
+ *
+ * Mutates `expansions` (the brief) and returns what it undid. Pure set/array
+ * work otherwise — no prose is read.
+ *
+ * @param {Array<{pageNumber:number, brief:string, reviewRewrote?:boolean}>} expansions
+ * @param {Array<{pageNumber:number, before:string, after:string}>} sceneDiffs - trimmed in place
+ * @param {number[]} changed - pages the review rewrote; trimmed in place
+ * @param {Array<{pageNumber:number, undeclared:string[]}>} audit - diffCastRemovals rows
+ * @returns {Array<{pageNumber:number, undeclared:string[]}>} pages reverted
+ */
+function revertUndeclaredRemovals(expansions, sceneDiffs, changed, audit) {
+  const reverted = [];
+  for (const row of (audit || [])) {
+    if (!row || !(row.undeclared || []).length) continue;
+    const diffAt = (sceneDiffs || []).findIndex(d => d && d.pageNumber === row.pageNumber);
+    const x = (expansions || []).find(e => e && e.pageNumber === row.pageNumber);
+    // No captured `before` means nothing to restore — the page was not one of
+    // the rewrites, so there is no corruption of ours to undo.
+    if (diffAt < 0 || !x) continue;
+    x.brief = sceneDiffs[diffAt].before;
+    x.reviewRewrote = false;
+    sceneDiffs.splice(diffAt, 1);
+    const ci = (changed || []).indexOf(row.pageNumber);
+    if (ci >= 0) changed.splice(ci, 1);
+    reverted.push({ pageNumber: row.pageNumber, undeclared: row.undeclared });
+  }
+  return reverted;
+}
+
+module.exports = { parseCastRemovals, castNameSet, diffCastRemovals, revertUndeclaredRemovals, assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };

@@ -40953,3 +40953,35 @@ still carries the instruction. Logged on the backlog rather than widened here.
 
 **Touched files.** `server/lib/wornItems.js`,
 `tests/unit/worn-offcast-wearer.test.ts`.
+
+## 2026-09-15 — An undeclared cast removal by the scene review is REVERTED, not merely reported
+
+**Context.** Since 2026-09-13 a review rewrite that drops names from a page's
+`characters[]` without a `REMOVED CAST:` declaration was detected and logged,
+deliberately without reverting ("a deterministic gate is its own decision").
+Measured cost on staging `job_1789420511893_zly5rcdej` p16:
+`beats_scene_review_removal_undeclared` fired at **error**
+("emma, noah, daniel"), with `beats_brief_unfixed` and `cast_unlisted` beside
+it — and the page rendered on the emptied cast anyway. The corrupt contract then
+produced a phantom CRITICAL `extra_character` against a child who IS in the
+prose; that critical funded three repair rounds, and the round-2 inpaint
+destroyed a correct original (v0 −45 correct → v2 −40 wrong, shipped) because
+all three versions were scored against the same corrupt cast.
+
+**Decision.** `revertUndeclaredRemovals()` restores that page's WHOLE brief to
+the version sent for review, clears `reviewRewrote`, and drops the page from
+`changed` and from `sceneDiffs` before the faulted-but-not-rewritten check reads
+them, so the page reports as unfixed — which it now is. Logged at error plus
+`beats_scene_review_removal_reverted`. A DECLARED removal is untouched.
+
+**Rationale.** The whole brief, not `characters[]` alone: a reviewer that drops
+a name usually rewrites the prose around it ("five soaked pirates" for five
+named children), so restoring the roster into the rewritten prose produces a
+brief whose roster and prose disagree — the same corrupt contract in a new
+shape. The pre-review brief is internally consistent by construction. The cost
+is that page's other review fixes; the trace shows what the alternative costs:
+one wrong cast, one phantom critical, three paid repair rounds and a destroyed
+correct page.
+
+**Touched files.** `server/lib/sceneReviewGuard.js`,
+`server/lib/beatsPipeline.js`, `tests/unit/scene-review-revert-undeclared.test.ts`.
