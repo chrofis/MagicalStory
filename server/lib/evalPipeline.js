@@ -420,6 +420,9 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // a registry set over two file paths. The conditional checks keep the
   // leading newline here; the section bodies are trimmed.
   const qc = promptSections(PROMPT_TEMPLATES.emptySceneQc);
+  // Loud, not empty: as a string literal a missing prompt was impossible; as a
+  // file it would hand the judge a blank page and every plate would "pass".
+  if (!qc.BODY) throw new Error('buildEmptySceneQcPrompt: empty-scene-qc template not loaded');
   const placementsCheck = placementsBlock ? `\n${qc.PLACEMENTS_CHECK}` : '';
   // Composition geometry fidelity — the main scene will composite
   // characters and aim lines onto this empty scene. If the path

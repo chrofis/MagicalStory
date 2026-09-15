@@ -36,6 +36,9 @@ const realFetch = global.fetch;
 const realKey = process.env.GEMINI_API_KEY;
 
 beforeAll(async () => {
+  // The QC prompt is a template file since 2026-09-15 (prompts/empty-scene-qc.txt),
+  // so the judge's text has to be loaded before the call under test.
+  await require('../../server/services/prompts.js').loadPromptTemplates();
   // A flat mid-grey plate: calm everywhere, so Phase 1 raises no pixel issue
   // and the vision phase (the one under test) actually runs.
   const buf = await sharp({
