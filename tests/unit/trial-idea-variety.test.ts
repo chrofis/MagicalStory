@@ -73,11 +73,15 @@ describe('the two idea arms differ by construction', () => {
     // plot mechanics: own-town arm only
     expect(local).toContain('Three tries, no more');
     expect(fantasy).not.toContain('Three tries, no more');
-    expect(fantasy).not.toContain('The third try comes from that noticing');
+    expect(fantasy).not.toContain('Small noticing, not cleverness');
     // tone rules: both arms
     for (const p of [local, fantasy]) {
       expect(p).toContain('A gentle obstacle, never a villain');
       expect(p).toContain('Kindness is the motive');
+      // the agency rule is untagged since 2026-09-15: six of the ten worst rated
+      // ideas were fantasy-arm cards an object or an adult solved.
+      expect(p).toContain("**The child's own doing.**");
+      expect(p).toContain('grown-up stepping in to do it for them');
     }
   });
 
