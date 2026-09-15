@@ -2041,10 +2041,20 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // (sections COVER_NOTE / TEXT_NOTE_APP_OVERLAY / TEXT_RULES) so the
       // cover generator/critic pair is a registry set over two file paths.
       const coverNotes = promptSections(PROMPT_TEMPLATES.coverEvaluationNotes);
+      // Loud, not "undefined": these are interpolated straight into the judge's
+      // prompt, so a missing template would put the literal string "undefined"
+      // in front of the evaluator. Same guard the plate judge carries.
+      if (!coverNotes.COVER_NOTE) throw new Error('evaluateImageQuality: cover-evaluation-notes template not loaded (COVER_NOTE)');
 
       // Cover portraits: viewer-gaze and a flat title are intended, not defects.
       promptForEval = `${coverNotes.COVER_NOTE}\n\n${promptForEval}`;
 
+      if (textMode === 'appOverlay' && !coverNotes.TEXT_NOTE_APP_OVERLAY) {
+        throw new Error('evaluateImageQuality: cover-evaluation-notes template has no TEXT_NOTE_APP_OVERLAY section');
+      }
+      if (textMode !== 'appOverlay' && expectedText && !coverNotes.TEXT_RULES) {
+        throw new Error('evaluateImageQuality: cover-evaluation-notes template has no TEXT_RULES section');
+      }
       if (textMode === 'appOverlay') {
         // Mode B: art is textless; title/dedication/branding composited by the
         // app after persistence. Was previously appended to the pseudo-page's
