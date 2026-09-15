@@ -41112,3 +41112,90 @@ instead of contradicting it.
 **Touched files.** `server/lib/wornItems.js`, `server/lib/promptBuilders.js`,
 `server/lib/entityConsistency.js`, `server/lib/repairPipeline.js`,
 `server/routes/regeneration.js`, `tests/unit/worn-one-resolved-outfit.test.ts`.
+
+
+## 2026-09-15 — The page-cell drop and the plate inclusion read the SAME brief
+
+**Context:** `8763eab30` routed large-scale elements to the empty-scene plate and dropped their
+page reference cells. The two halves disagreed. The DROP (`storyJobPipeline` Phase 5a-pre-grid,
+`referenceSheets.buildPageCompositeRefs`) filtered on `scaleClass`/`type` alone; the plate
+INCLUSION (`visualBible.getEmptySceneElementReferences`) additionally requires the Art Director
+brief's `objects[]` to name the entry (AD IS THE AUTHORITY, 2026-09-04).
+
+**Decision:** one predicate answers for both. `isPlateBorneElement(ref, sceneObjects)` returns
+false when a brief is supplied and does not name the element, so a cell is only ever withdrawn from
+an element the plate actually takes. Callers with no AD metadata (covers, trial plates built before
+briefs exist) pass nothing and keep the previous behaviour on both sides.
+
+**Rationale:** an element present via `appearsInPages` but absent from `objects[]` was dropped from
+the page grid, never added to the plate, and never named in STRUCTURES — rendered with zero
+reference AND zero description on a paid page. Every test passed on each side individually because
+neither side tested the other's gate. The earlier plateless fallback (a large element on a page with
+NO plate keeps its cell) was intact and is a different hole.
+
+**Blast radius (measured, read-only):** 123 stored staging stories, 1,122 plated pages carrying an
+AD brief — **0 instances**. `scaleClass` was introduced the same day, so no stored bible carries the
+field yet and the type-only fallback never met the asymmetry. The defect was live on staging and
+would have started producing instances with the first story generated under the new bible schema.
+
+**Touched files.** `server/lib/visualBible.js`, `server/lib/referenceSheets.js`,
+`storyJobPipeline.js`, `tests/unit/vb-plate-routing.test.ts`.
+
+## 2026-09-15 — The cover's HELD branch classifies by slot identity, like its sibling
+
+**Context:** `566042c10` replaced a loose token match with slot-identity classification in the
+worn/held dedupe — but only in the NOT-held branch. The HELD branch (`coverIterate.js`) still
+dropped outfit segments on the token match alone.
+
+**Decision:** a held artifact removes a worn segment only when `classifyOverlap` returns
+`duplicate`. `unrelated` is a cross-slot token near-miss; `conflict` is a different item in the same
+slot, which a held artifact does not contradict — one can hold a cap while wearing a hat.
+
+**Rationale:** on a cover where a character HOLDS a plot artifact, a held cap was deleting the coat,
+the trousers and the boots from that character's clothing text, and the model dressed them freely —
+the exact bug the classification was written to fix, surviving on the sibling branch. Both branches
+are now pinned so the pair cannot drift again.
+
+**Touched files.** `server/lib/coverIterate.js`, `tests/unit/cover-worn-held-slot-conflict.test.ts`.
+
+## 2026-09-15 — A wardrobe correction re-renders its avatar; the early kickoff stays early
+
+**Context:** `applyWardrobeBibleCorrections` needs the Visual Bible, so it can only run after the
+all-pages Art Director call. The styled-avatar kickoff fires several stages earlier, at the
+story-bible stage. Page prompts therefore carried the corrected garment while the avatar reference
+cell still wore the old one. This is long-standing ordering, not a regression: the correction has
+needed the bible since `19bab45d7`.
+
+**Decision:** the kickoff is NOT moved. The correction now reports which characters' outfit text
+actually changed (`onWardrobeCorrected`), and the caller invalidates and re-renders exactly those
+avatar buckets, chained into `streamingAvatarStylingPromise` so downstream awaits wait for the
+corrected avatar rather than racing it.
+
+**Rationale (trade-off accepted):** styled avatars are the long pole in front of every cover and page
+image; delaying the kickoff until the bible exists would add minutes to EVERY story to serve a rare
+conflict. Re-rendering costs one avatar render per corrected character and nothing at all when
+nothing moved. Also fixed here: `corrected: applied.includes(f)` was always false (the corrector
+re-derives findings after every rewrite), so every landed correction was logged as uncorrected and
+`unresolved` never reached the report.
+
+**Touched files.** `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
+`tests/unit/wardrobe-vs-bible.test.ts`.
+
+## 2026-09-15 — A figure is never routed onto the empty-scene plate
+
+**Context:** the large-element plate routing fed `secondaryCharacters` and `animals` to a plate whose
+prompt says verbatim "never draw a figure named anywhere in this prompt"
+(`prompts/empty-scene.txt`) and whose STRUCTURES block calls what it lists a "vessel, vehicle or
+built structure".
+
+**Decision:** a figure-bearing entry is never plate-borne at any scale. It keeps its page reference
+cell. Three sites move together: the predicate, the plate grid selection (artifacts only) and the
+STRUCTURES prose in `server/services/prompts.js`.
+
+**Rationale:** a house-band creature lost its page cell, was forbidden on the plate that was supposed
+to carry it, and was mislabelled in the plate text — no cell, no plate, no consistency. The
+alternative (widening the plate wording to permit figures) was rejected: a backdrop that may paint
+figures re-opens the doubling the "no figures" rule exists to prevent.
+
+**Touched files.** `server/lib/visualBible.js`, `server/services/prompts.js`,
+`tests/unit/vb-plate-routing.test.ts`.
