@@ -1173,7 +1173,12 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       sceneMetadata = extractSceneMetadata(desc);
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, null, sceneMetadata);
+        // Keep the grid in step with what the page prompt describes: the prompt is
+        // built from the scene brief's objects[], so a prop named there must bring its
+        // reference even if the Visual Bible filed it under other pages. Passing null
+        // here selected references from appearsInPages alone (referenceSheets.js:1567
+        // passes the page's ids).
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneMetadata?.objects || sceneMetadata?.fullData?.objects || null, sceneMetadata);
         const secLm = landmarkPhotos.slice(1);
         if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
@@ -2042,7 +2047,12 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       }
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, null, sceneMetadata);
+        // Keep the grid in step with what the page prompt describes: the prompt is
+        // built from the scene brief's objects[], so a prop named there must bring its
+        // reference even if the Visual Bible filed it under other pages. Passing null
+        // here selected references from appearsInPages alone (referenceSheets.js:1567
+        // passes the page's ids).
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneMetadata?.objects || sceneMetadata?.fullData?.objects || null, sceneMetadata);
         const secLm = landmarkPhotos.slice(1);
         if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
