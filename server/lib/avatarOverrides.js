@@ -19,6 +19,17 @@
  *
  * `hairDescription` is passed in rather than computed here so this module stays
  * free of prompt-builder imports (and testable on its own).
+ *
+ * DECLARED AGE (owner, 2026-09-15: "We should draw and evaluate against the age
+ * the user enters."). The avatar generator was told to build the body from "the
+ * apparent age visible in the reference photo" while the judge scored apparent
+ * age AND body proportions against that same photo — and a third instruction
+ * ordered the body slim and athletic regardless. Obeying the generator
+ * guaranteed a deduction. The user-entered age is now the single source for
+ * both sides: it renders once as a GENERATOR line (`ageLine`, appended to the
+ * trait corrections) and once as a JUDGE line (`ageFact`, filled into the
+ * evaluation template's {DECLARED_AGE}). Identity and face stay judged against
+ * the photo, unchanged.
  */
 
 function isSet(v) {
@@ -30,20 +41,54 @@ function isNone(v) {
 }
 
 /**
+ * The user-entered age in whole years, or null when nothing usable was entered.
+ * A free-text age ("7 Jahre") yields its leading number; anything outside a
+ * plausible human range is refused rather than guessed at.
+ */
+function normalizeDeclaredAge(age) {
+  if (age == null) return null;
+  const n = typeof age === 'number' ? age : parseFloat(String(age).trim());
+  if (!Number.isFinite(n)) return null;
+  const years = Math.round(n);
+  if (years < 0 || years > 120) return null;
+  return years;
+}
+
+/** The generator's wording for a declared age. */
+function declaredAgeGeneratorLine(years) {
+  return years === null || years === undefined
+    ? null
+    : `- Age: ${years} years old — build the body, limb length and head-to-body ratio for this declared age. The age the reference photo suggests does not set the body.`;
+}
+
+/** The judge's wording for the same declared age. */
+function declaredAgeJudgeLine(years) {
+  return years === null || years === undefined ? null : `${years} years old`;
+}
+
+/**
  * @param {object}  opts
  * @param {object=} opts.physicalTraits   user-edited traits (hairColor, eyeColor, build, …)
  * @param {object=} opts.clothing         user-specified clothing (fullBody | upperBody/lowerBody, shoes, accessories)
  * @param {string=} opts.hairDescription  pre-built hair sentence (buildHairDescription)
  * @param {string=} opts.category         avatar category; clothing is a declared override for 'standard' only,
  *                                        matching the generator, which appends the clothing section only there.
- * @returns {{traitLines: string[], clothingParts: string[], declaredFacts: string[], text: string|null}}
+ * @param {number|string=} opts.declaredAge  the age the USER entered for this character.
+ * @returns {{traitLines: string[], clothingParts: string[], declaredFacts: string[], text: string|null,
+ *            declaredAge: number|null, ageLine: string|null, ageFact: string|null}}
  *   traitLines/clothingParts keep the GENERATOR's existing wording;
  *   `text` is the neutral declaration block handed to the judge (null when nothing was declared).
  */
-function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null, hairDescription = null, category = null } = {}) {
+function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null, hairDescription = null, category = null, declaredAge = null } = {}) {
   const traitLines = [];
   const clothingParts = [];
   const declaredFacts = [];
+
+  // Declared age first: it governs the BODY, and the generator reads the trait
+  // block top-down.
+  const years = normalizeDeclaredAge(declaredAge);
+  const ageLine = declaredAgeGeneratorLine(years);
+  if (ageLine) traitLines.push(ageLine);
 
   const t = physicalTraits && typeof physicalTraits === 'object' ? physicalTraits : null;
   if (t && Object.keys(t).length > 0) {
@@ -94,7 +139,13 @@ function resolveDeclaredAvatarOverrides({ physicalTraits = null, clothing = null
     clothingParts,
     declaredFacts: facts,
     text: facts.length > 0 ? facts.map(f => `- ${f}`).join('\n') : null,
+    // The age is NOT folded into DECLARED OVERRIDES: it has its own task in the
+    // judge template ({DECLARED_AGE}, TASK 2), so listing it twice would give
+    // the judge two places to read one fact.
+    declaredAge: years,
+    ageLine,
+    ageFact: declaredAgeJudgeLine(years),
   };
 }
 
-module.exports = { resolveDeclaredAvatarOverrides };
+module.exports = { resolveDeclaredAvatarOverrides, normalizeDeclaredAge };

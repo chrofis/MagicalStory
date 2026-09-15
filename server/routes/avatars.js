@@ -504,7 +504,7 @@ function consensusTraits(photoTraits, avatarTraitsArray) {
  * Runs both Gemini LLM evaluation AND LPIPS perceptual comparison
  * Returns { score, details, physicalTraits, clothing, lpips } or null on error
  */
-async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey, requestedClothing = null, declaredOverrides = null) {
+async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey, requestedClothing = null, declaredOverrides = null, declaredAgeText = null) {
   try {
     // Both inputs may arrive as data: URIs, raw base64, or HTTPS R2 URLs (the
     // common case post-R2 migration). bytesFromAnyImage normalizes all three
@@ -550,6 +550,11 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         // correction into the same rejection. resolveDeclaredAvatarOverrides is
         // the single producer of the list the GENERATOR was given.
         DECLARED_OVERRIDES: declaredOverrides || '(none — the user declared no corrections; judge everything against IMAGE 1)',
+        // DRAW AND JUDGE AGAINST THE DECLARED AGE (owner, 2026-09-15). The
+        // generator builds the body for this age, so TASK 2 scores age against
+        // it and stops comparing body proportions to the photo. Same producer
+        // as the generator's own age line — resolveDeclaredAvatarOverrides.
+        DECLARED_AGE: declaredAgeText || '(not declared — score the apparent age against IMAGE 1)',
       }
     );
 
@@ -1057,9 +1062,19 @@ async function generateDynamicAvatar(character, category, config) {
     // Build the prompt
     const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
     const clothingPrompt = getDynamicClothingPrompt(category, config, isFemale);
-    const avatarPrompt = fillTemplate(promptPart, {
+    let avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingPrompt
     });
+    // DECLARED AGE (owner, 2026-09-15). Story-time avatars go through the same
+    // resolver as the two account paths, so the body is built for the age the
+    // user entered and the judge below scores against that same declaration.
+    const dynamicAge = resolveDeclaredAvatarOverrides({ declaredAge: character?.age });
+    if (dynamicAge.ageLine) {
+      avatarPrompt += `
+
+PHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):
+${dynamicAge.ageLine}`;
+    }
 
     // Prepare image data - keep 768px for quality, only convert format
     const photoSizeKB = Math.round(facePhoto.length / 1024);
@@ -1101,7 +1116,7 @@ async function generateDynamicAvatar(character, category, config) {
     // Evaluate face match to get clothing description (optional)
     let clothingDescription = null;
     if (ENABLE_AVATAR_EVALUATION) {
-      const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey);
+      const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey, null, null, dynamicAge.ageFact);
       if (faceMatchResult?.clothing) {
         clothingDescription = faceMatchResult.clothing;
         log.debug(`👕 [DYNAMIC AVATAR] ${logCategory} clothing: ${clothingDescription}`);
@@ -1701,13 +1716,18 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       physicalTraits,
       clothing,
       hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      declaredAge: age,
     });
     const declaredOverridesFor = (category) => resolveDeclaredAvatarOverrides({
       physicalTraits,
       clothing,
       hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
       category,
+      declaredAge: age,
     }).text;
+    // The judge's rendering of the SAME declared age the generator's trait
+    // block carries (overrides.ageLine) — one resolver, two wordings.
+    const declaredAgeText = overrides.ageFact;
 
     let userClothingSection = '';
     if (overrides.clothingParts.length > 0) {
@@ -2063,7 +2083,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         // at 7/10, which ArcFace scores worst-of-102.
         const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
           const [faceMatchResult, arcface] = await Promise.all([
-            evaluateAvatarFaceMatch(faceRef, imageData, geminiApiKey, null, declaredOverridesFor(category)),
+            evaluateAvatarFaceMatch(faceRef, imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText),
             scoreAvatarLikeness(faceRef, imageData),
           ]);
           return { category, faceMatchResult, arcface };
@@ -2248,7 +2268,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
 
             // Re-evaluate (use facePhoto for face match — see comment above)
-            const retryEval = await evaluateAvatarFaceMatch(faceRef, retryGen.imageData, geminiApiKey, null, declaredOverridesFor(category));
+            const retryEval = await evaluateAvatarFaceMatch(faceRef, retryGen.imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
             const retryScore = retryEval?.score ?? 0;
             log.debug(`🔄 [AVATAR JOB ${jobId}] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 
@@ -2844,13 +2864,18 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       physicalTraits,
       clothing,
       hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      declaredAge: age,
     });
     const declaredOverridesFor = (category) => resolveDeclaredAvatarOverrides({
       physicalTraits,
       clothing,
       hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
       category,
+      declaredAge: age,
     }).text;
+    // The judge's rendering of the SAME declared age the generator's trait
+    // block carries (overrides.ageLine) — one resolver, two wordings.
+    const declaredAgeText = overrides.ageFact;
 
     let userClothingSection = '';
     if (overrides.clothingParts.length > 0) {
@@ -3268,7 +3293,7 @@ These corrections OVERRIDE what is visible in the reference photo.
       // the async/job path above).
       const faceRefSync = faceRefPhoto || referencePhoto;
       const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-        const faceMatchResult = await evaluateAvatarFaceMatch(faceRefSync, imageData, geminiApiKey, null, declaredOverridesFor(category));
+        const faceMatchResult = await evaluateAvatarFaceMatch(faceRefSync, imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
         return { category, faceMatchResult };
       });
 
@@ -3404,7 +3429,7 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
 
           // Re-evaluate (use face crop for face match — see F2 comment above)
-          const retryEval = await evaluateAvatarFaceMatch(faceRefSync, retryResult.imageData, geminiApiKey, null, declaredOverridesFor(category));
+          const retryEval = await evaluateAvatarFaceMatch(faceRefSync, retryResult.imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
           const retryScore = retryEval?.score ?? 0;
           log.debug(`🔄 [CLOTHING AVATARS] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 

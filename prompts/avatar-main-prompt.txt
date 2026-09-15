@@ -25,7 +25,7 @@ GRID REQUIREMENTS:
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
 - Expression: Natural, friendly expression. The person should look approachable.
-- Body: Generate age-appropriate body proportions based on the apparent age visible in the reference photo.
+- Body: Generate age-appropriate body proportions for the declared age given below. Where no age is declared, use the apparent age in the reference photo.
 - Setting: Solid light grey studio background in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
 - Top quadrants: Face only - show from forehead to chin. No shoulders, no neck, no clothing visible. Face fills 90% of the quadrant. This is a tight crop on the face only.
@@ -41,7 +41,7 @@ IDENTITY PERSISTENCE:
 - The face must be fully visible — nothing over the eyes, no brim shadowing them. Headwear the outfit specifies is drawn; hair stays readable around it.
 - Biometric precision: the face must not be averaged or replaced.
 - Focus: Ultra-sharp focus on facial features.
-- Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the facial age (Reference: Infant=4, Child=6, Teen=7, Adult=8)
+- Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the declared age (Reference: Infant=4, Child=6, Teen=7, Adult=8)
 
 WARDROBE DETAILS:
 - Style Transfer Rule: copy the exact pattern and colors from the input image. Just change from short to long sleeves / legs, etc.

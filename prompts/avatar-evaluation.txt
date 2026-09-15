@@ -3,11 +3,14 @@ You are evaluating an AI-generated avatar against the original reference photo.
 IMAGE 1: Original reference photo of a real person
 IMAGE 2: AI-generated avatar based on that person
 
-Your job: decide whether IMAGE 2 is the same person as IMAGE 1, at the same age, wearing the requested clothing. The avatar is rejected and regenerated whenever any of those three checks fails — so be honest, do not award generous benefit-of-the-doubt scores.
+Your job: decide whether IMAGE 2 is the same person as IMAGE 1, at the declared age, wearing the requested clothing. The avatar is rejected and regenerated whenever any of those three checks fails — so be honest, do not award generous benefit-of-the-doubt scores.
+
+DECLARED AGE: {DECLARED_AGE}
+The generator was told to build the body for that age. Judge the age against the declaration, not against IMAGE 1.
 
 The `finalScore` field at the end MUST equal the LOWEST of these three checks:
   1. face match (same person)
-  2. age match (same apparent age + body proportions)
+  2. age match (the avatar reads as the declared age)
   3. clothing match (matches the requested clothing — only when REQUESTED_CLOTHING is provided below)
 
 Anything below 5/10 in any of those three forces the entire avatar to fail. Children rendered as adults, adults rendered as children, or completely wrong clothing must score ≤3 on the failing dimension.
@@ -30,12 +33,13 @@ DO NOT ignore: face geometry. A different forehead height, cheekbone prominence,
 Cross-style benefit-of-doubt is limited: when IMAGE 2 is illustration and IMAGE 1 is photo, a score of 8-10 requires faceShape AND foreheadCheekJawline AND eyes AND nose AND mouth to ALL agree. If any one is visibly different, cap at 6. If two are off, cap at 4.
 `faceMatch.score` = LOWEST of the seven feature scores. NOT average. One drift drags everything down.
 
-TASK 2: AGE & BODY PROPORTION MATCH
-Compare apparent age AND body proportions between IMAGE 1 and IMAGE 2.
+TASK 2: AGE MATCH
+Read the apparent age of the person in IMAGE 2 and score it against DECLARED AGE above. When no age is declared, score it against IMAGE 1 instead.
 - Children look like children: shorter limbs relative to head, rounder face, smaller build.
 - Adults look like adults: longer limbs, defined features, appropriate height.
-- Adult rendered as child = score 1-3. Child rendered as adult = score 1-3. Same age category but slightly off proportions = 6-8. Perfect = 9-10.
-`ageMatch.score` is a single 1-10 number combining age category + body proportions.
+- Wrong age category (an adult where a child is declared, or a child where an adult is declared) = score 1-3. Right category, visibly off by several years = 6-8. Reads as the declared age = 9-10.
+`ageMatch.score` is a single 1-10 number for age alone.
+Do NOT compare body proportions against IMAGE 1. Build, weight and physique in IMAGE 2 are set by the generator's instructions, not by the photo, and never deduct here.
 
 TASK 3: CLOTHING MATCH (only if REQUESTED_CLOTHING is given below)
 REQUESTED_CLOTHING: {REQUESTED_CLOTHING}
@@ -74,7 +78,7 @@ Return a JSON object with this EXACT structure:
   "ageCheck": {
     "referenceAge": "<estimated age group from IMAGE 1>",
     "avatarAge": "<estimated age group from IMAGE 2>",
-    "ageMatch": {"score": 8, "reason": "Both appear adult, body proportions correct"}
+    "ageMatch": {"score": 8, "reason": "Reads as the declared age"}
   },
   "clothingMatch": {
     "score": 8,

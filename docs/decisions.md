@@ -40301,3 +40301,43 @@ or drop the checks. This entry does not decide it.
 
 **Touched:** `server/lib/evalPipeline.js`, `tests/unit/empty-scene-qc-reserved-corner.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — Avatars are drawn AND judged against the DECLARED age, not the photo
+
+**Context.** A generator↔critic audit measured a contradiction that no retry could resolve.
+`prompts/avatar-main-prompt.txt` ordered the generator to change the body: "age-appropriate body
+proportions based on the apparent age visible in the reference photo", then "athletic, fit body type
+by default", "Don't preserve overweight or heavy body proportions from the reference photo",
+"transform the body to be slim and athletic". `prompts/avatar-evaluation.txt` TASK 2 then scored
+"apparent age AND body proportions between IMAGE 1 and IMAGE 2" into a single `ageMatch.score`, and
+`finalScore` is the lowest of three. A generator obeying its own instruction was guaranteed a
+deduction, and the retry regenerated the same deliberate deviation into the same rejection — the same
+failure shape the declared trait/clothing overrides fixed in `server/lib/avatarOverrides.js`.
+
+**Decision.** Owner ruling, verbatim: *"We should draw and evaluate against the age the user enters."*
+- The user-entered age is the single source for both sides. `resolveDeclaredAvatarOverrides` now takes
+  `declaredAge` and emits it twice from one normalisation: `ageLine` (the GENERATOR's trait line, which
+  the existing trait-corrections block already carries into the prompt) and `ageFact` (the JUDGE's
+  line, filled into the new `{DECLARED_AGE}` placeholder in `avatar-evaluation.txt`).
+- Generator: the body, limb length and head-to-body ratio are built for the declared age; the photo's
+  apparent age is the fallback only when no age was entered.
+- Judge: TASK 2 is now AGE MATCH. `ageMatch.score` is a 1-10 number **for age alone**, scored against
+  the declaration, and the template says explicitly not to compare body proportions against IMAGE 1.
+  There is no proportions term left in that score.
+- Identity, face geometry, glasses and clothing stay judged against the photo, unchanged.
+
+**Plumbing added.** The age was NOT previously in scope at the judge. `age` is destructured from the
+request body at both avatar routes already (`server/routes/avatars.js`), so both now pass
+`declaredAge: age` into the resolver; `evaluateAvatarFaceMatch` takes a sixth argument
+`declaredAgeText` and all four call sites hand it over. The story-time dynamic-avatar path had no
+declared block at all and now builds one from `character.age` through the same resolver.
+
+**Rationale.** Same principle the 2×4 identity sheet settled on 2026-09-14 (`declaredAgeBlock`,
+`tests/unit/avatar-sheet-declared-age.test.ts`): the stated age outranks any impression of age taken
+from the photo. This extends it to the 2×2 avatar pair so the sheet and the avatar no longer anchor on
+different ages, and it removes the one axis on which compliance cost points.
+
+**Touched:** `server/lib/avatarOverrides.js`, `server/routes/avatars.js`,
+`prompts/avatar-main-prompt.txt`, `prompts/avatar-evaluation.txt`,
+`tests/unit/avatar-declared-age.test.ts`
+**Status:** ✅ active
