@@ -18,6 +18,7 @@ const {
   buildLifeSkillGuidelines,
   buildTopicWindowSection,
   TOPIC_AGE_WINDOWS,
+  AGE_OWNS_PROPS_RULE,
 } = require_('../../server/lib/promptBuilders');
 
 const char = (id: number, name: string, age: number, isMain: boolean) =>
@@ -459,5 +460,57 @@ describe('shared/topic-age-windows.json reaches both consumers', () => {
       expect(c.suitableAges, c.id).toEqual(shared[c.id]);
     }
     expect(Object.keys(shared).length).toBe(56);
+  });
+});
+
+/**
+ * The two 2026-09-15 age-mode fixes, pinned at the chokepoint every reader goes
+ * through. Both were invisible on one arm before: the agency rule sat inside
+ * [[plot]], which the make-believe idea arm drops, and nothing at all governed
+ * props or subject.
+ */
+describe('every band view carries the age rules', () => {
+  const solo_ = (age: number) => ({ characters: [{ name: 'A', age, isMainCharacter: true }] });
+
+  it('the props-and-subject rule reaches all three views at every age', () => {
+    for (const age of [1, 2, 3, 4, 8, 12, 38]) {
+      for (const view of ['writer', 'premise', 'tone']) {
+        expect(buildAgeModeSection(solo_(age), { bandView: view }), `age ${age} / ${view}`)
+          .toContain(AGE_OWNS_PROPS_RULE);
+      }
+    }
+  });
+
+  it('the agency rule survives the tone view in every band that has one', () => {
+    const agency: Record<number, string> = {
+      2: 'The child does the finding',
+      3: "The child's own doing",
+      4: "The child's choice resolves it",
+      8: "The hero's own idea turns it",
+    };
+    for (const [age, rule] of Object.entries(agency)) {
+      const tone = buildAgeModeSection(solo_(Number(age)), { bandView: 'tone' });
+      expect(tone, `age ${age}`).toContain(rule);
+    }
+    // three of the four also name what may NOT resolve it; quest's "they look
+    // and they find" is the whole rule at that age.
+    for (const age of [3, 4, 8]) {
+      expect(buildAgeModeSection(solo_(age), { bandView: 'tone' }), `age ${age}`)
+        .toMatch(/grown-up/);
+    }
+  });
+
+  it('the tone view still drops the plot mechanics', () => {
+    expect(buildAgeModeSection(solo_(3), { bandView: 'tone' })).not.toContain('Three tries, no more');
+    expect(buildAgeModeSection(solo_(8), { bandView: 'tone' })).not.toContain('Ordinary world, then a call');
+  });
+
+  it('no band file offers an example menu the measured collapses came from', () => {
+    for (const age of [2, 3, 4]) {
+      const w = buildAgeModeSection(solo_(age));
+      for (const menu of ['there is a way in from another side', 'by two at once', 'A lost boot', 'The dark, the deep water']) {
+        expect(w, `age ${age}`).not.toContain(menu);
+      }
+    }
   });
 });

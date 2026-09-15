@@ -5270,13 +5270,28 @@ function fillBandTokens(text, inputData = {}) {
  * here (owner, 2026-08-25: tasks/toddler-mode-2026-08-25.md §0, still standing).
  * `bandView` slices the band for a reader that is not the writer.
  */
+/**
+ * The second age axis. The band files govern plot SHAPE; nothing governed the
+ * PROPS or the SUBJECT. Measured 2026-09-15 over 56 rated trial ideas: ages 8
+ * and 12 rated 2.75 and 3.00-3.25, every card resolving through a plush toy, a
+ * craft project or a talking object, and routing 6+ to the journey SHAPE did not
+ * move it.
+ *
+ * ONE constant rather than a line in each of the five band files — it is the same
+ * rule at every age, and five hand-kept copies drift. It carries no per-age
+ * examples: the same day measured that an illustrative list in a rule position
+ * is answered with one of its items. The band header states the age; this points
+ * at it, so it holds at 1, at 12 and at an adult reader.
+ */
+const AGE_OWNS_PROPS_RULE = "**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.";
+
 function buildAgeModeSection(inputData = {}, { bandView = 'writer' } = {}) {
   const key = AGE_BAND_TEMPLATE_KEYS[resolveAgeBand(inputData)];
   const band = key
     ? fillBandTokens(applyBandView(PROMPT_TEMPLATES[key] || '', bandView), inputData)
     : '';
   const window = buildTopicWindowSection(inputData);
-  return [band, window].filter(Boolean).join('\n\n');
+  return [band, AGE_OWNS_PROPS_RULE, window].filter(Boolean).join('\n\n');
 }
 
 /**
@@ -7974,6 +7989,7 @@ module.exports = {
   buildAvailableLandmarksSection,
   buildTrialIdeaCostumeInstructions,
   buildTrialIdeaPrompts,
+  AGE_OWNS_PROPS_RULE,
   nextIdeaVarietyAxis,
   applyBandView,
   buildPreviousScenesContext
