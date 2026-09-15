@@ -42,6 +42,19 @@ const {
   sanitizeForGemini,
   evaluateImageQuality,
   IMAGE_QUALITY_THRESHOLD,
+  // Forwarded only (facade): consumers import these from './images'.
+  presenceCounterName,
+  largestInteriorUniformFraction,
+  buildEvalClothingContract,
+  buildEvalRequiredObjects,
+  buildExpectedCastBlock,
+  resolveExpectedCastNames,
+  reconcileDetectorCast,
+  parseFixableIssues,
+  derivePresenceFinding,
+  supersedePresenceFindings,
+  PRESENCE_DERIVED_MARKER,
+  PRESENCE_COUNT_TYPES,
 } = require('./evalPipeline');
 
 // STR-6: image-prompt strings that used to be inline template literals in this
@@ -118,6 +131,9 @@ const {
   escapeXml,
   enrichWithBoundingBoxes,
   FIGURE_COLORS,
+  isMicroFigure,
+  countRealFigures,
+  vbNonHumanNames,
 } = require('./bboxDetection');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // IMAGE_PROMPT for the judges = the string the model actually received.
@@ -5286,6 +5302,9 @@ module.exports = {
   createCutoutSheetImage,      // The final cut-outs, full height, as their own image
   getBboxCacheStats, // Telemetry for the content-hashed bbox cache
   FIGURE_COLORS,  // Color palette for bbox overlay (shared with prompt building)
+  isMicroFigure,
+  countRealFigures,
+  vbNonHumanNames,
   callGrokVisionAPI,  // Grok vision API for bbox/quality eval
   callOpenRouterVisionAPI,  // OpenRouter vision judges for the blind inventory (Lab)
   GEMINI_SAFETY_SETTINGS,  // Safety settings for Gemini API calls
@@ -5304,6 +5323,21 @@ module.exports = {
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,
+
+  // Remaining evalPipeline exports, forwarded so the facade is complete
+  // (tests/unit/images-facade-complete.test.ts pins this).
+  presenceCounterName,
+  largestInteriorUniformFraction,
+  buildEvalClothingContract,
+  buildEvalRequiredObjects,
+  buildExpectedCastBlock,
+  resolveExpectedCastNames,
+  reconcileDetectorCast,
+  parseFixableIssues,
+  derivePresenceFinding,
+  supersedePresenceFindings,
+  PRESENCE_DERIVED_MARKER,
+  PRESENCE_COUNT_TYPES,
 
   // Pure dispatch helpers (exported for unit tests / reuse)
   resolveOutputAspect,
