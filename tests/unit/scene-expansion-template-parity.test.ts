@@ -27,6 +27,21 @@ describe('Art Director template parity', () => {
     expect(metadataKeys(ALL_PAGES)).toEqual(metadataKeys(PER_PAGE));
   });
 
+  // The per-page template is the beats fallback (beatsPipeline expandOnePage
+  // gap-fill and the all-pages fallback), so a rule that reaches only the
+  // all-pages template silently stops applying on the pages that fall back.
+  const SHARED_RULES = [
+    '- A NAME IS NOT A PRESENCE.',
+    'An object WITH states is always cited dotted',
+  ];
+  for (const rule of SHARED_RULES) {
+    it(`both templates carry: ${rule.slice(0, 48)}`, () => {
+      for (const file of [PER_PAGE, ALL_PAGES]) {
+        expect(fs.readFileSync(file, 'utf8').includes(rule), path.basename(file)).toBe(true);
+      }
+    });
+  }
+
   it('crowdExpected is declared and ruled in both templates', () => {
     for (const file of [PER_PAGE, ALL_PAGES]) {
       const text = fs.readFileSync(file, 'utf8');
