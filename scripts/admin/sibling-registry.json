@@ -134,13 +134,25 @@
     {
       "id": "vb-authoring-sites",
       "axis": "Art Director VB authoring vs writer VB authoring",
-      "reason": "the Visual Bible is authored in scene-expansion-all.txt on the beats path and in the writer prompts on the trial and legacy paths; a rule about what a VB entry must state has to exist at every site that writes one.",
+      "reason": "the Visual Bible is authored at four sites — the Art Director on the beats path and the three writer prompts — and a rule about what a VB entry must state has to exist at every site that writes one. story-unified-imagefirst.txt authors artifacts, vehicles and animals exactly like its twin and was missing from this set until 2026-09-15, so the set under-enforced by a quarter.",
       "members": [
         "prompts/scene-expansion-all.txt",
         "prompts/story-unified.txt",
+        "prompts/story-unified-imagefirst.txt",
         "prompts/story-trial.txt"
       ],
-      "severity": "block"
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "\"label\"",
+          "\"name\"",
+          "\"properName\"",
+          "\"type\"",
+          "\"size\"",
+          "\"isRealLandmark\""
+        ],
+        "anchorsNote": "the VB entry keys all four authoring sites genuinely declare today. `\"states\"` and `\"vantages\"` are deliberately NOT anchored: they are absent from story-unified-imagefirst.txt and from scene-expansion-all.txt respectively, which is a real divergence, not a parity target to assert into existence."
+      }
     },
     {
       "id": "repair-entrypoints",
@@ -185,7 +197,21 @@
         "prompts/image-semantic.txt",
         "prompts/image-prompt-compliance.txt"
       ],
-      "severity": "block"
+      "severity": "block",
+      "parity": {
+        "ruleAnchors": [
+          {
+            "critic": "D-24 `character_marking`",
+            "generator": "{NO_CHARACTER_MARKING}",
+            "note": "D-24 is CATASTROPHIC/CRITICAL for a mark painted on a figure, and the template forbade lettering only. The generator half is one exported constant (NO_CHARACTER_MARKING_RULE, promptBuilders.js) filled into this placeholder; that it reaches the BUILT prompt is pinned in tests/unit/generator-critic-rule-reach.test.ts, because a placeholder nobody fills is stripped silently."
+          },
+          {
+            "critic": "D-16b `action_interaction`",
+            "generator": "{HANDS_HOLD_ONLY_NAMED}",
+            "note": "D-16b is MAJOR when a hand holds something the scene never named while a named object is absent. The generator half is HANDS_HOLD_ONLY_NAMED_RULE, same mechanism and same reach test."
+          }
+        ]
+      }
     },
     {
       "id": "scene-brief-generator-vs-critic",

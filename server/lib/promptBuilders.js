@@ -4169,7 +4169,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // Season note, same shape as ERA_GUARD: a book-wide condition the
       // renderer must honour even when an attached landmark reference photo
       // was shot in a different season (decisions.md 2026-08-16).
-      SEASON_NOTE: buildSeasonNote(inputData || {})
+      SEASON_NOTE: buildSeasonNote(inputData || {}),
+      // See the declarations: one constant per rule, mirrored by the judge rule
+      // it answers (D-24, D-16b). The template places both at the very end, in
+      // the protected tail.
+      NO_CHARACTER_MARKING: NO_CHARACTER_MARKING_RULE,
+      HANDS_HOLD_ONLY_NAMED: HANDS_HOLD_ONLY_NAMED_RULE
     })));
   }
 
@@ -6257,6 +6262,27 @@ function buildArcBudgetSection(inputData, pageCount) {
  * story-unified-imagefirst.txt — the three templates the shared block never
  * reaches. Byte-identical everywhere by construction, not by discipline.
  */
+// Generator-side counterparts of two judge rules, kept as ONE constant each so
+// the instruction the illustrator receives and the rule the judge deducts on
+// cannot drift apart. Registry set `page-image-generator-vs-critics`
+// (scripts/admin/sibling-registry.json) pins the pairing; the anchors in that
+// set fail if either side loses its half.
+//
+// A judge may only deduct for a rule the generator was given. Both of these were
+// found by the 2026-09-15 generator-vs-critic audit penalising pages for
+// something nothing on the generator side ever asked for:
+//   - image-evaluation.txt D-24 `character_marking` is CATASTROPHIC/CRITICAL,
+//     and the template forbade LETTERING only — never a non-text mark.
+//   - image-evaluation.txt D-16b `action_interaction` is MAJOR when a hand holds
+//     something the scene never named while a named object is absent, and
+//     nothing told the renderer what a hand may hold.
+// Both live at the very END of the built prompt, i.e. inside the tail that
+// shrinkPromptForModel never hands to a compressor (images.js) — a rule in the
+// head can be compressed away.
+const NO_CHARACTER_MARKING_RULE = "**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.";
+
+const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests, gestures, or touches what the scene describes.";
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -8213,6 +8239,8 @@ module.exports = {
   buildArcBudgetSection,
   buildTellingRulesSection,
   RISK_FRAMING_RULE,
+  NO_CHARACTER_MARKING_RULE,
+  HANDS_HOLD_ONLY_NAMED_RULE,
   PAGE_OPENING_VARIETY_RULE,
   AD_COMPOSITION_RULE,
   parseArcHints,
