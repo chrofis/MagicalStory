@@ -505,10 +505,20 @@ function buildWornStateBlock(resolved) {
   return `\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n${lines.join('\n')}\n`;
 }
 
-/** Split an outfit description into top-level clauses. */
+/**
+ * Split an outfit description into top-level clauses.
+ *
+ * SEMICOLONS COUNT (2026-09-15). The stored contracts the outline writes are
+ * semicolon-delimited — "A black felt tricorn hat with a red cockade; a red
+ * long-sleeved cotton pirate shirt; …" is the real Emma contract of staging
+ * job_1789420511893_zly5rcdej. Splitting on commas alone read that whole
+ * six-garment outfit as ONE clause, so Route 2 bailed out with
+ * `single-clause-outfit` and nothing was ever stripped from a semicolon
+ * contract — the shape the current writer emits for every costumed character.
+ */
 function splitClauses(description) {
   return String(description || '')
-    .split(/,(?![^()]*\))/)
+    .split(/[;,](?![^()]*\))/)
     .map(s => s.trim())
     .filter(Boolean);
 }
@@ -529,17 +539,48 @@ const garmentNounsIn = (text, vocab) =>
  * clause looks layered.
  */
 function countGarments(text) {
+  const src = String(text || '');
   const re = new RegExp(`\\b(?:${ALL_GARMENT_NOUNS.join('|')})\\b`, 'gi');
   const spans = [];
   let m;
-  while ((m = re.exec(String(text || ''))) !== null) {
+  while ((m = re.exec(src)) !== null) {
     const start = m.index;
     const end = start + m[0].length;
     const prev = spans[spans.length - 1];
     if (prev && start < prev.end) prev.end = Math.max(prev.end, end);
+    else if (prev && adjacentSlotNounPair(src, prev, { start, end })) prev.end = end;
     else spans.push({ start, end });
   }
   return spans.length;
+}
+
+/**
+ * Two vocabulary hits that are ONE garment: a garment word qualified by its own
+ * slot noun — "tricorn hat", "cap … " in "captain's cap", "knee-high boots".
+ *
+ * Measured on staging job_1789420511893_zly5rcdej: the Emma contract opens with
+ * "A black felt tricorn hat with a red cockade". "tricorn" and "hat" are both
+ * headwear nouns, so the counter read two garments, found no layering
+ * connective between them, and refused the strip with
+ * `slot-clause-carries-another-garment` — on a clause that names exactly one
+ * hat.
+ *
+ * Deliberately narrow, because this counter is the guard that stops a strip
+ * from taking a second real garment out of a shared clause: the two hits must
+ * be separated by nothing but whitespace, a hyphen or a possessive, AND both
+ * must belong to one and the same slot. "a hoodie worn over a pullover" and
+ * "a red shirt and black trousers" keep counting as two, and stay refused.
+ */
+function adjacentSlotNounPair(src, prev, next) {
+  const gap = src.slice(prev.end, next.start);
+  if (!/^[\s\-]*(?:'s[\s\-]*)?$/.test(gap)) return false;
+  const a = src.slice(prev.start, prev.end);
+  const b = src.slice(next.start, next.end);
+  return WORN_SLOTS.some((slot) => {
+    const nouns = SLOT_NOUNS[slot] || [];
+    const has = (w) => nouns.some(n => n.toLowerCase() === w.toLowerCase());
+    return has(a) && has(b);
+  });
 }
 
 /**
@@ -645,7 +686,11 @@ function removeWornItemFromOutfit(description, slot, itemName = null) {
   }
   const kept = clauses.map((c, i) => (i === hits[0] ? survivor : c)).filter(c => c !== null && c !== '');
   if (kept.length === 0) return { text: raw, removed: false, reason: 'would-empty-outfit' };
-  let text = kept.join(', ').replace(/^\s*and\s+/i, '').trim();
+  // Rejoin with the delimiter the contract itself used: a semicolon contract
+  // that comes back comma-joined is a different string from the one every other
+  // reader holds, and item 3 compares those strings.
+  const joiner = /;(?![^()]*\))/.test(raw) ? '; ' : ', ';
+  let text = kept.join(joiner).replace(/^\s*and\s+/i, '').trim();
   // Restore sentence shape: the dropped clause may have carried the capital.
   text = text.charAt(0).toUpperCase() + text.slice(1);
   if (/[.!?]$/.test(raw) && !/[.!?]$/.test(text)) text += '.';

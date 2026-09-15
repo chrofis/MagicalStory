@@ -40985,3 +40985,29 @@ correct page.
 
 **Touched files.** `server/lib/sceneReviewGuard.js`,
 `server/lib/beatsPipeline.js`, `tests/unit/scene-review-revert-undeclared.test.ts`.
+
+## 2026-09-15 — The outfit strip could not read a semicolon contract, and read "tricorn hat" as two hats
+
+**Context.** `removeWornItemFromOutfit` is the only thing that takes a garment out of a
+character's outfit text when a page declares it off (or handed over). On the real stored
+contract of staging `job_1789420511893_zly5rcdej` — "A black felt tricorn hat with a red
+cockade; a red long-sleeved cotton pirate shirt; …" — it returned `{removed:false}` for
+every slot, so nothing was ever stripped and every judge kept demanding the garment the
+brief had removed.
+
+**Decision.** Two independent causes, both fixed:
+- `splitClauses` split on commas only. The outline writes semicolon-delimited contracts,
+  so a six-garment outfit was one clause and Route 2 bailed with `single-clause-outfit`.
+  It now splits on `;` as well, and the rejoin keeps whichever delimiter the contract used.
+- `countGarments` counted "tricorn" and "hat" as two garments. With no layering connective
+  between them the clause was refused as `slot-clause-carries-another-garment`. Two
+  vocabulary hits now collapse into one garment when nothing but whitespace, a hyphen or a
+  possessive separates them AND both nouns belong to the same slot ("tricorn hat",
+  "captain's cap", "knee-high boots").
+
+**Rationale.** The counter exists to stop a strip from deleting a second real garment that
+shares a clause, so the merge is deliberately narrow: "a red hoodie and a blue t-shirt" and
+"a woollen hat and a scarf" still count as two and are still refused, pinned by tests.
+
+**Touched files.** `server/lib/wornItems.js`,
+`tests/unit/worn-strip-semicolon-contract.test.ts`.
