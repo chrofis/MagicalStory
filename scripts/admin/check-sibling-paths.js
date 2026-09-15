@@ -24,8 +24,9 @@
  *      commits of one push is a complete fix; only the push ships.
  *   2. The commit message carries `Siblings-Checked: <reason>`. The escape is a
  *      statement, not a silencer — write why the sibling needs no change.
- * Sets marked `severity: "warn"` print and pass (one-to-many axes where most
- * edits legitimately touch one side; a gate that cries wolf gets bypassed).
+ * EVERY set blocks. A `severity: "warn"` tier existed for one day and the owner
+ * retired it on 2026-09-15 — the marker is the one escape, and it leaves a written
+ * reason behind where a warn tier left nothing.
  *
  * FAIL CLOSED. If the registry is missing or malformed, or git cannot be read,
  * this exits non-zero. A gate that waves a push through on its own error is a
@@ -82,6 +83,9 @@ function loadRegistry() {
   for (const s of reg.sets) {
     if (!s.id || !Array.isArray(s.members) || s.members.length < 2) {
       die(`registry set ${s && s.id ? `"${s.id}"` : '(unnamed)'} needs an id and at least two members.`);
+    }
+    if (s.severity && s.severity !== 'block') {
+      die(`registry set "${s.id}" declares severity "${s.severity}". The warn tier was retired by the owner on 2026-09-15 — every set blocks, and the Siblings-Checked marker (same-commit or vouching) is the one escape. Remove the field or set it to "block".`);
     }
     for (const m of s.members) {
       if (!fs.existsSync(path.join(ROOT, m))) {
@@ -194,8 +198,9 @@ function analyze(commits, sets) {
         sha: c.sha.slice(0, 9), subject, set,
         changed: hit, missing: missing.filter(m => !rangeFiles.has(m)),
       };
-      if ((set.severity || 'block') === 'warn') warns.push({ ...entry, excused: false });
-      else if (selfExcused) warns.push({ ...entry, excused: true });
+      // Every set blocks (owner, 2026-09-15). `warns` now holds only EXCUSED
+      // pairs, kept visible so an escape is never silent.
+      if (selfExcused) warns.push({ ...entry, excused: true });
       else if (vouch) warns.push({ ...entry, excused: true, vouch });
       else blocks.push(entry);
     }
@@ -220,12 +225,12 @@ function main() {
   if (process.argv.includes('--list')) {
     console.log(`sibling registry — ${reg.sets.length} file sets, ${(reg.withinFile || []).length} within-file sets\n`);
     for (const s of reg.sets) {
-      console.log(`  ${s.id}  [${s.severity || 'block'}]  axis: ${s.axis}`);
+      console.log(`  ${s.id}  [block]  axis: ${s.axis}`);
       for (const m of s.members) console.log(`      ${m}`);
       console.log(`      ${s.reason}\n`);
     }
     for (const w of reg.withinFile || []) {
-      console.log(`  ${w.id}  [${w.severity || 'block'}]  within ${w.file} — every /${w.blockPattern}/ block must contain "${w.mustContain}"\n`);
+      console.log(`  ${w.id}  [block]  within ${w.file} — every /${w.blockPattern}/ block must contain "${w.mustContain}"\n`);
     }
     return;
   }
@@ -263,7 +268,7 @@ function main() {
   };
 
   for (const w of warns) {
-    render(w, w.excused ? `check-sibling-paths: EXCUSED${w.vouch ? ` (vouched by ${w.vouch.by})` : ' (Siblings-Checked)'}` : 'check-sibling-paths: WARN');
+    render(w, `check-sibling-paths: EXCUSED${w.vouch ? ` (vouched by ${w.vouch.by})` : ' (Siblings-Checked)'}`);
   }
 
   if (blocks.length === 0) {

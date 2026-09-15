@@ -19,9 +19,10 @@
     "  axis      the recurring split this set belongs to",
     "  reason    one line: why these move together",
     "  members   repo-relative paths; ALL must change together (see severity)",
-    "  severity  'block' (default) refuses the push; 'warn' prints and passes.",
-    "            'warn' is for one-to-many axes where most edits legitimately",
-    "            touch one side only — a gate that cries wolf gets bypassed.",
+    "  severity  'block' — the only accepted value. A 'warn' tier existed for one",
+    "            day; the owner retired it on 2026-09-15: EVERY set blocks, and the",
+    "            Siblings-Checked marker (same-commit or vouching) is the one escape.",
+    "            The gate rejects any other value rather than reading it as block.",
     "  parity    optional structural assertions for tests/unit/sibling-parity.test.ts:",
     "              metadataKeys: true  -> the ---METADATA--- JSON example in every",
     "                                     member declares the same top-level keys",
@@ -54,7 +55,7 @@
       "axis": "trial writer vs full writer",
       "reason": "story-trial.txt is the live writer for the /try funnel and carries its own copy of the shared story rules; the trial path has repeatedly lagged the full path by weeks.",
       "members": ["prompts/story-trial.txt", "prompts/story-unified.txt"],
-      "severity": "warn"
+      "severity": "block"
     },
     {
       "id": "lector-and-diff-pass",
@@ -79,7 +80,7 @@
         "prompts/story-unified.txt",
         "prompts/story-trial.txt"
       ],
-      "severity": "warn"
+      "severity": "block"
     },
     {
       "id": "repair-entrypoints",
@@ -90,21 +91,21 @@
         "server/routes/regeneration.js",
         "server/lib/entityConsistency.js"
       ],
-      "severity": "warn"
+      "severity": "block"
     },
     {
       "id": "cover-cast-builders",
       "axis": "cover path vs page path cast assembly",
       "reason": "coverComposite.js and compositeCastBuilder.js both resolve a hint-string name to a character and both hand-roll parts of it; a resolver or costume-key fix on one leaves the other resolving by raw name.",
       "members": ["server/lib/coverComposite.js", "server/lib/compositeCastBuilder.js"],
-      "severity": "warn"
+      "severity": "block"
     },
     {
       "id": "lab-vs-prod-eval",
       "axis": "Test Lab stage vs production call site",
       "reason": "testlab.js re-implements the call that evalPipeline.js makes in production; when they drift the Lab measures something production never runs (version pinning, cast lists, model ids).",
       "members": ["server/lib/testlab.js", "server/lib/evalPipeline.js"],
-      "severity": "warn"
+      "severity": "block"
     }
   ],
 

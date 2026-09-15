@@ -55,6 +55,15 @@ describe('sibling registry', () => {
     expect(missing, 'a stale member makes its set unenforceable').toEqual([]);
   });
 
+  it('every set blocks — the warn tier was retired by the owner on 2026-09-15', () => {
+    // A warn tier let a partial fix through leaving nothing written down. The
+    // marker is the one escape now, and it always leaves a reason behind.
+    const soft = [...registry.sets, ...(registry.withinFile || [])]
+      .filter((s: any) => s.severity && s.severity !== 'block')
+      .map((s: any) => `${s.id}: ${s.severity}`);
+    expect(soft, 'set severity to "block" or omit the field').toEqual([]);
+  });
+
   it('the pre-push escape marker is recognised only when it carries a reason', () => {
     // Mirrors MARKER in scripts/admin/check-sibling-paths.js.
     const MARKER = /^\s*Siblings-Checked:\s*\S/mi;

@@ -46,8 +46,8 @@ advisory; the registry is a control. Use both, and trust the registry.
 
 ## Sibling axes (every one has shipped a one-sided fix before)
 
-Every axis below with a registry entry is enforced; the rest are still yours to
-walk by hand — and to add.
+Every axis below with a registry entry BLOCKS the push — there is no soft tier
+(owner, 2026-09-15). The rest are still yours to walk by hand — and to add.
 
 | Axis | Real example that stayed broken |
 |---|---|

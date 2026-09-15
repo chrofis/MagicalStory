@@ -39755,6 +39755,9 @@ Additional touched files for the addendum: `scripts/admin/check-sibling-paths.js
 `.claude/skills/fixing-sibling-paths/SKILL.md`. Commits `7a78e1d55`, `73b3ed7e8` (the vouch commit
 itself), `de49d0bfd`.
 
+2026-09-15 owner: every set blocks; warn tier removed (the gate now rejects any severity but
+`block`, and the Siblings-Checked marker — same-commit or vouching — is the one escape).
+
 **Touched files:** `scripts/admin/sibling-registry.json` (new),
 `scripts/admin/check-sibling-paths.js` (new), `scripts/admin/sibling-reminder-hook.js` (new),
 `.githooks/pre-push` (gate 9), `.claude/settings.json` (PostToolUse nudge),
@@ -39805,6 +39808,9 @@ pattern match on the Art Director's prose after the fact.
 counter 4b, by-design comments on both counters), `prompts/story-beats.txt` (page-plan item 2),
 `tests/unit/plan-counters.test.ts`, `tests/unit/plan-replan-ranking.test.ts`. Commit `c7bd81263`
 (staging, NOT pushed).
+
+**2026-09-15 owner: promoted to must-fix** — `PEOPLELESS_ON_INTERACTION_PAGE` was added to
+`REPLAN_MUST_FIX_CODES` (`server/lib/promptBuilders.js`); the re-plan must resolve it, not note it.
 
 **Proposed SETTLED.md line (owner to confirm — NOT yet added to `docs/SETTLED.md`), under
 Prompts & evaluation:**

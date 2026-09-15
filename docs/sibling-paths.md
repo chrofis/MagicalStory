@@ -24,7 +24,7 @@ Prose cannot be a control. So the sibling relationship is now **data**.
 | Piece | What it does |
 |---|---|
 | `scripts/admin/sibling-registry.json` | Declares sibling SETS: files that must move together, each with an axis and a one-line reason. |
-| `scripts/admin/check-sibling-paths.js` | Pre-push gate (gate 9 in `.githooks/pre-push`). Per commit in the push: touched some members of a set but not all → **blocked**. |
+| `scripts/admin/check-sibling-paths.js` | Pre-push gate (gate 9 in `.githooks/pre-push`). Per commit in the push: touched some members of a set but not all → **blocked**. Every set blocks; there is no soft tier. |
 | `tests/unit/sibling-parity.test.ts` | Runs in the normal suite. Asserts structural parity of the declared parts (metadata schema keys, rule anchors, within-file invariants) — catches drift that is already in the tree, which no diff will ever flag. |
 
 ## Adding a sibling set
@@ -42,9 +42,12 @@ One entry in `sets`:
 }
 ```
 
-- `severity: "block"` (default) refuses the push. `"warn"` prints and passes — for
-  one-to-many axes where most edits legitimately touch one side only. A gate that
-  cries wolf gets bypassed, and a bypassed gate is worse than none.
+- `severity` accepts only `"block"`, and may be omitted. A `"warn"` tier existed for
+  one day; the owner retired it on **2026-09-15** — every set blocks, including the
+  one-to-many axes (trial vs full writer, VB authoring sites, repair entry points,
+  cover cast builders, Lab vs prod). The gate rejects any other value rather than
+  quietly reading it as block. The reasoning: a warn let a partial fix through and
+  left nothing written down, where the marker always leaves a reason behind.
 - `parity.metadataKeys` — every member's `---METADATA---` JSON example declares the
   same top-level keys. This alone would have caught `crowdExpected`.
 - `parity.anchors` — literal strings every member must contain.
