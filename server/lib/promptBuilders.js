@@ -3551,6 +3551,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // now lies. Read structurally — nothing here infers a state from prose.
   const {
     resolveWornItemsForPage, wornStateById, stripOffItemsFromOutfit, buildWornStateBlock,
+    referenceCarriesItem,
   } = require('./wornItems');
   const wornResolved = (visualBible && metadata)
     ? resolveWornItemsForPage(visualBible, metadata.characters || [], metadata, { pageNumber })
@@ -3956,14 +3957,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       );
       const gridRefNames = [];
       for (const obj of promptObjects) {
-        // A worn removable item is not a prop on this page — it is on the
-        // character, and the avatar reference already carries it. Listing it
-        // here as an object is half of what made p3 of
-        // job_1788641639919_mpjwlzkf1 render a second, free-standing hat.
-        // Handed to another character, no reference in the call shows it worn,
-        // so it stays a listed object: the prompt is the only place it is said.
+        // A worn removable item is omitted here ONLY when an attached reference
+        // demonstrably shows it on its wearer — a `wornAs`-linked item on its
+        // own owner (referenceCarriesItem). That is the case p3 of
+        // job_1788641639919_mpjwlzkf1 needs: listing it as an object as well
+        // rendered a second, free-standing hat.
+        // Otherwise — a handover, or an Art-Director row against a bare bible
+        // element that is in nobody's wardrobe contract — nothing in the call
+        // shows it worn, and this line is the only place it is said. It is then
+        // listed WORN ON the character, never as a loose prop, so the entry
+        // cannot become that free-standing duplicate.
         const wornState = wornById.get(String(obj.id || '').toUpperCase());
-        if (wornState && wornState.state === 'worn' && !wornState.handedOver) {
+        if (wornState && wornState.state === 'worn' && referenceCarriesItem(wornState)) {
           log.info(`[WORN] Page ${pageNumber}: ${obj.id} omitted from REQUIRED OBJECTS — ${wornState.owner} is wearing it`);
           continue;
         }
@@ -4029,6 +4034,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const offWhere = (wornState && wornState.state === 'off' && wornState.location)
           ? ` — ${wornState.location}`
           : '';
+        // A kept WORN item says whose head/body it is on, in the same clause.
+        // The omission rule above exists to stop a listed object becoming a
+        // second, free-standing copy of a hat somebody is already wearing; an
+        // item that survives it must therefore never read as a loose prop.
+        // Pinned wording — the tests assert this string.
+        const wornOn = (wornState && wornState.state === 'worn')
+          ? ` — worn on ${wornState.wearer || wornState.owner}, not a separate free-standing copy`
+          : '';
         // The element's SCALE rides along: the one look-field that does, because
         // it is the anchor against the figure that nothing else in the prompt
         // states for a held or carried prop (a shoebox-sized chest rendered
@@ -4070,7 +4083,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // with no state clause and the scene description's placement stands
         // alone, which is what the header promises.
         const stateNote = (obj.state && obj.stateDelta) ? ` — ${trimStateClause(obj.stateDelta, obj.state)}` : '';
-        requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${offWhere}\n`;
+        requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${wornOn}${offWhere}\n`;
       }
       if (gridRefNames.length > 0) {
         // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry

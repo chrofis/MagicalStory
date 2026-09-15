@@ -3378,7 +3378,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   const wornKeptOff = [];
   if (sceneMetadata) {
     try {
-      const { resolveWornItemsForPage, wornStateById } = require('./wornItems');
+      const { resolveWornItemsForPage, wornStateById, referenceCarriesItem } = require('./wornItems');
       const castNames = (sceneMetadata.characters || [])
         .map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
       const byId = wornStateById(resolveWornItemsForPage(visualBible, castNames, sceneMetadata));
@@ -3386,14 +3386,19 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
         for (let i = relevantRefs.length - 1; i >= 0; i--) {
           const r = byId.get(String(relevantRefs[i].id || '').toUpperCase());
           if (!r) continue;
-          // Dropped only when the OWNER wears it: then their avatar reference
-          // already carries it. Handed to another character, no reference in
-          // the call shows it worn, so the plate is the only description left.
-          if (r.state === 'worn' && !r.handedOver) {
+          // Dropped only when an attached reference DEMONSTRABLY shows the item
+          // on its wearer — a `wornAs`-linked item on its own owner, whose
+          // avatar reference wears it (referenceCarriesItem). A handover, or a
+          // row the Art Director declared against a bare bible element with no
+          // link at all, leaves no reference in the call showing it worn: the
+          // plate is then the only picture of the item that exists, and
+          // dropping it is what made a found navy cap render as a navy TRICORN
+          // on staging job_1789420511893_zly5rcdej p13/p14.
+          if (r.state === 'worn' && referenceCarriesItem(r)) {
             wornDropped.push(`${r.name} (${r.id}, on ${r.owner})`);
             relevantRefs.splice(i, 1);
           } else {
-            wornKeptOff.push(`${r.name} (${r.id}, ${r.handedOver ? `worn by ${r.wearer}` : (r.location || 'off-body')})`);
+            wornKeptOff.push(`${r.name} (${r.id}, ${r.state === 'worn' ? `worn by ${r.wearer} — no reference shows it on them` : (r.location || 'off-body')})`);
           }
         }
       }
@@ -3405,7 +3410,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe DROPPED ${wornDropped.join(', ')} — the avatar reference already carries it`);
   }
   if (wornKeptOff.length > 0) {
-    log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — declared off-body, the plate is its only reference`);
+    log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — the plate is its only reference`);
   }
 
   // Sort by priority and limit. LOCATIONS ARE NOT ELEMENTS (owner ruling,

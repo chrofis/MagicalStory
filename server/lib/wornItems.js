@@ -292,6 +292,9 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       owner: item.owner,
       wearer,
       handedOver,
+      // The writer LINKED this item to an outfit (`wornAs`), so the owner's
+      // avatar reference demonstrably carries it — see referenceCarriesItem.
+      wornAsLinked: true,
       slot: item.slot,
       entry: item.entry,
       state,
@@ -332,6 +335,9 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       owner,
       wearer: wearer2,
       handedOver: !sameName(wearer2, owner),
+      // NO `wornAs` link: nothing promises this item is part of the wearer's
+      // wardrobe, so no attached reference shows it on them.
+      wornAsLinked: false,
       slot,
       entry,
       state: d.state,
@@ -345,6 +351,36 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     });
   }
   return out;
+}
+
+/**
+ * Does a reference already attached to this page's call show the item ON its
+ * wearer? Everything that used to test `!handedOver` asks THIS instead.
+ *
+ * `wornAs` is the item's HOME — one owner, one outfit slot — and it is the only
+ * promise anywhere in the pipeline that a character's avatar/outfit reference
+ * carries the item. Two things break that promise:
+ *   - a HANDOVER: the wearer is not the owner, so the owner's reference is the
+ *     wrong body and the wearer's reference does not have the item at all;
+ *   - NO LINK AT ALL: a row the Art Director declared against a bare Visual
+ *     Bible element. The item is in nobody's wardrobe contract, so the wearer's
+ *     reference shows whatever their outfit actually says.
+ *
+ * Measured on staging job_1789420511893_zly5rcdej: ART002, a navy captain's cap
+ * the plot has the child FIND, was declared `{id: ART002, owner: Emma, state:
+ * worn}` on nine pages and carried no `wornAs` link. The old `!handedOver` test
+ * read that as "her avatar already wears it", dropped the rendered ART002 plate
+ * from all nine pages and omitted the item from REQUIRED OBJECTS — while Emma's
+ * outfit text and her attached cell both still showed her OWN black tricorn.
+ * The call then held one text line naming a cap and one picture of a tricorn,
+ * and pages 13 and 14 rendered a navy TRICORN: the cap's colour and gold anchor
+ * from the words, the silhouette from the picture.
+ *
+ * The drop stays exactly where its precedent put it (job_1788641639919 p3, two
+ * red hats on one page): a LINKED item on its OWN owner, whose avatar wears it.
+ */
+function referenceCarriesItem(r) {
+  return !!(r && r.wornAsLinked && !r.handedOver);
 }
 
 /**
@@ -634,6 +670,7 @@ module.exports = {
   slotFromType,
   unlinkedWornCandidates,
   isOffForCharacter,
+  referenceCarriesItem,
   resolveWornItemsForPage,
   wornStateById,
   buildWornStateLines,

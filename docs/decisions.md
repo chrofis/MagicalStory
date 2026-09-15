@@ -40857,3 +40857,40 @@ the template would have re-created the blind grade that source was built to end.
 `tests/unit/cover-eval-notes-extraction.test.ts`,
 `tests/unit/empty-scene-qc-extraction.test.ts`
 **Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — A worn item keeps its reference plate unless a reference actually shows it on the wearer
+
+**Context.** Staging `job_1789420511893_zly5rcdej`: ART002, a navy captain's cap
+the child FINDS mid-story, was declared by the Art Director as
+`{id: "ART002", owner: "Emma", state: "worn"}` on nine pages and carried no
+`wornAs` link anywhere in the bible. Two sites read that row as "her avatar
+reference already carries it" and (a) dropped ART002's rendered, cell-gated
+plate from the element grid on all nine pages, (b) omitted it from REQUIRED
+OBJECTS. Emma's `clothingDescription` meanwhile still opened with her OWN black
+tricorn, and her attached cell showed her wearing it. The call therefore held
+one text line naming a cap and one picture of a tricorn; pages 13 and 14
+rendered a navy TRICORN — cap colour and gold anchor from the words, silhouette
+from the picture. Pages 5, 6 and 9 happened to come out right.
+
+**Decision.** The exemption is no longer `!handedOver` but
+`referenceCarriesItem(r)` = the item is `wornAs`-LINKED **and** its wearer is its
+owner. `wornAs` is the only promise in the pipeline that a character's avatar or
+outfit reference carries an item; a handover breaks it, and an Art-Director row
+against a bare bible element never made it. When the exemption does not hold,
+the plate stays in the grid and the item stays in REQUIRED OBJECTS — worded
+`— worn on <wearer>, not a separate free-standing copy`, never as a loose prop.
+
+**Rationale.** The omission rule exists for `job_1788641639919` p3, where a
+linked hat on its own owner was both worn by the avatar reference and listed as
+an object, and Grok painted two hats. That case is untouched: linked + own owner
+still drops. Everything else had no reference at all, which is the worse of the
+two failures — an unreferenced item is invented from the prompt's words against
+whatever the attached avatar happens to show. Cost is one grid CELL (not a Grok
+slot: the whole grid shares one slot, cap `VB_SLOT_MAX_ELEMENTS` = 4 elements +
+1 location). On the measured pages the widest, p14, claimed 3 elements + 1
+location, so nothing was displaced.
+
+**Touched files.** `server/lib/wornItems.js` (`wornAsLinked` on both resolver
+sources, `referenceCarriesItem`), `server/lib/visualBible.js` (worn-item
+dedupe), `server/lib/promptBuilders.js` (REQUIRED OBJECTS omission + `worn on`
+rider), `tests/unit/worn-unlinked-reference.test.ts`.
