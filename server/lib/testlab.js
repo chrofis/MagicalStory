@@ -690,6 +690,12 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
     // AD objects[] gates which vehicles enter the plate prompt + grid — same
     // gate production runs (AD is the authority on vehicle presence).
     sceneObjects: meta.objects || null,
+    // The geometry facts the plate is GRADED on (validateEmptyScene reads the
+    // same scene prose). Production passes these at every page/vantage plate
+    // call site; without them the Lab renders a plate blind to the geometry and
+    // measures a different prompt than production runs.
+    mainScenePrompt: ctx.scene.sceneDescription || null,
+    castNames: (meta.fullData?.characters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
   });
 
   const t0 = Date.now();
