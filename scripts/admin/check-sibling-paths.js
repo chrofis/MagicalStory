@@ -43,7 +43,17 @@ const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..', '..');
 const REGISTRY = path.join(__dirname, 'sibling-registry.json');
+// Same-commit marker: "Siblings-Checked: <reason>" on the commit itself.
 const MARKER = /^\s*Siblings-Checked:\s*\S/mi;
+// Vouching marker: "Siblings-Checked: <sha-prefix> — <reason>". A LATER commit in
+// the same push range vouches for an EARLIER one. This exists because the honest
+// catch-up case cannot use the same-commit marker without a rebase: the sibling
+// was fixed in a commit that has already been pushed, so the range cannot cover
+// it, and rewording the blocked commit rewrites every hash after it — hashes that
+// handoff notes cite. A vouch is an added commit, so history is preserved.
+// Separator is an em dash or a plain hyphen; the reason is mandatory.
+const NL = String.fromCharCode(10);
+const VOUCH = /^[ 	]*Siblings-Checked:[ 	]*([0-9a-fA-F]{7,40})[ 	]*(?:—|--?)[ 	]*(\S.*)$/gmi;
 
 function die(msg) {
   console.error('');
@@ -123,6 +133,87 @@ function messageOf(sha) {
   return git(['log', '-1', '--format=%B', sha]);
 }
 
+
+/**
+ * Pure decision core — no git, no filesystem. Exported so the vouching rules can
+ * be tested against synthetic history instead of a scratch repository.
+ *
+ * @param commits [{ sha, message, files: string[] }] oldest first, the push range
+ * @param sets    registry sets
+ * @returns { blocks, warns, vouchErrors } — vouchErrors is fatal (fail closed)
+ */
+function analyze(commits, sets) {
+  const inRange = commits.map(c => c.sha);
+  const rangeFiles = new Set();
+  for (const c of commits) for (const f of c.files) rangeFiles.add(f);
+
+  // Collect vouches from every commit in the range, resolving each sha prefix
+  // against the range itself. A prefix that is ambiguous or names a commit
+  // outside the push is an ERROR, never a silent pass: a vouch nobody can
+  // attribute is exactly the loophole this marker must not become.
+  const vouchedBy = new Map(); // full sha -> { by, reason }
+  const vouchErrors = [];
+  for (const c of commits) {
+    VOUCH.lastIndex = 0;
+    let m;
+    while ((m = VOUCH.exec(c.message)) !== null) {
+      const prefix = m[1].toLowerCase();
+      const reason = m[2].trim();
+      const hits = inRange.filter(sha => sha.toLowerCase().startsWith(prefix));
+      if (hits.length === 0) {
+        vouchErrors.push(`${c.sha.slice(0, 9)} vouches for "${prefix}", which is not a commit in this push range. A vouch may only excuse a commit being pushed.`);
+        continue;
+      }
+      if (hits.length > 1) {
+        vouchErrors.push(`${c.sha.slice(0, 9)} vouches for "${prefix}", which is ambiguous in this range (${hits.map(h => h.slice(0, 9)).join(', ')}). Use a longer prefix.`);
+        continue;
+      }
+      if (hits[0] === c.sha) {
+        vouchErrors.push(`${c.sha.slice(0, 9)} vouches for itself. Use the plain "Siblings-Checked: <reason>" form for the commit's own siblings.`);
+        continue;
+      }
+      vouchedBy.set(hits[0], { by: c.sha.slice(0, 9), reason });
+    }
+  }
+
+  const blocks = [];
+  const warns = [];
+  for (const c of commits) {
+    const touched = new Set(c.files);
+    const selfExcused = MARKER.test(c.message) && !hasOnlyVouches(c.message);
+    const vouch = vouchedBy.get(c.sha) || null;
+    const subject = c.message.split(NL)[0];
+
+    for (const set of sets) {
+      const hit = set.members.filter(m => touched.has(m));
+      if (hit.length === 0 || hit.length === set.members.length) continue;
+      const missing = set.members.filter(m => !touched.has(m));
+      // Covered elsewhere in the same push? Then the push is complete.
+      if (missing.every(m => rangeFiles.has(m))) continue;
+      const entry = {
+        sha: c.sha.slice(0, 9), subject, set,
+        changed: hit, missing: missing.filter(m => !rangeFiles.has(m)),
+      };
+      if ((set.severity || 'block') === 'warn') warns.push({ ...entry, excused: false });
+      else if (selfExcused) warns.push({ ...entry, excused: true });
+      else if (vouch) warns.push({ ...entry, excused: true, vouch });
+      else blocks.push(entry);
+    }
+  }
+  return { blocks, warns, vouchErrors };
+}
+
+/** True when every Siblings-Checked line in the message is a vouch for ANOTHER
+ *  commit — such a line must not also excuse the vouching commit's own siblings. */
+function hasOnlyVouches(message) {
+  const all = message.split(NL).filter(l => /^[ 	]*Siblings-Checked:/i.test(l));
+  if (all.length === 0) return false;
+  return all.every(l => {
+    VOUCH.lastIndex = 0;
+    return VOUCH.test(l);
+  });
+}
+
 function main() {
   const reg = loadRegistry();
 
@@ -146,32 +237,19 @@ function main() {
     return;
   }
 
-  // Everything the push touches, so a fix split across two commits passes.
-  const rangeFiles = new Set();
-  for (const sha of commits) for (const f of filesOf(sha)) rangeFiles.add(f);
+  const { blocks, warns, vouchErrors } = analyze(
+    commits.map(sha => ({ sha, message: messageOf(sha), files: [...filesOf(sha)] })),
+    reg.sets
+  );
 
-  const blocks = [];
-  const warns = [];
-
-  for (const sha of commits) {
-    const touched = filesOf(sha);
-    const msg = messageOf(sha);
-    const excused = MARKER.test(msg);
-    const subject = msg.split('\n')[0];
-
-    for (const set of reg.sets) {
-      const hit = set.members.filter(m => touched.has(m));
-      if (hit.length === 0 || hit.length === set.members.length) continue;
-      const missing = set.members.filter(m => !touched.has(m));
-      // Covered elsewhere in the same push? Then the push is complete.
-      if (missing.every(m => rangeFiles.has(m))) continue;
-      const entry = {
-        sha: sha.slice(0, 9), subject, set,
-        changed: hit, missing: missing.filter(m => !rangeFiles.has(m)),
-      };
-      if ((set.severity || 'block') === 'warn' || excused) warns.push({ ...entry, excused });
-      else blocks.push(entry);
-    }
+  if (vouchErrors.length) {
+    console.error('');
+    console.error('check-sibling-paths: BLOCKED — a Siblings-Checked vouch could not be attributed.');
+    console.error('');
+    for (const e of vouchErrors) console.error(`  ✗ ${e}`);
+    console.error('');
+    console.error('Syntax: Siblings-Checked: <sha-prefix ≥7> — <why the sibling needs no change>');
+    process.exit(1);
   }
 
   const render = (e, prefix) => {
@@ -179,12 +257,13 @@ function main() {
     console.error(`    set:     ${e.set.id}   (axis: ${e.set.axis})`);
     console.error(`    changed: ${e.changed.join(', ')}`);
     console.error(`    MISSING: ${e.missing.join(', ')}`);
+    if (e.vouch) console.error(`    vouched by ${e.vouch.by}: ${e.vouch.reason}`);
     console.error(`    why they move together: ${e.set.reason}`);
     console.error('');
   };
 
   for (const w of warns) {
-    render(w, w.excused ? 'check-sibling-paths: EXCUSED (Siblings-Checked)' : 'check-sibling-paths: WARN');
+    render(w, w.excused ? `check-sibling-paths: EXCUSED${w.vouch ? ` (vouched by ${w.vouch.by})` : ' (Siblings-Checked)'}` : 'check-sibling-paths: WARN');
   }
 
   if (blocks.length === 0) {
@@ -201,9 +280,18 @@ function main() {
   console.error('');
   console.error('    Siblings-Checked: <why the sibling needs no change>');
   console.error('');
+  console.error('Or, without rewriting history, add ONE later commit to the same push');
+  console.error('that vouches for it — attribution stays visible in the gate output:');
+  console.error('');
+  console.error('    Siblings-Checked: <sha-prefix ≥7> — <why the sibling needs no change>');
+  console.error('');
   console.error('Registry: scripts/admin/sibling-registry.json   Explainer: docs/sibling-paths.md');
   process.exit(1);
 }
+
+module.exports = { analyze, MARKER, VOUCH };
+
+if (require.main !== module) return;
 
 try {
   main();
