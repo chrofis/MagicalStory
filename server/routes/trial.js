@@ -22,6 +22,10 @@ const { trialSourceWhereClause } = require('../lib/trialSource');
 // failure it alarms and lets the write proceed (see its JSDoc).
 const { offloadCharacterImages } = require('../services/database');
 const { assertPromptFilled } = require('../services/prompts');
+// The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
+// every entry point below. See server/lib/trialAge.js for the range and why
+// the field became load-bearing (de8753cc1).
+const { parseTrialAge } = require('../lib/trialAge');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -1136,8 +1140,14 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     if (gender && !['male', 'female'].includes(gender)) {
       return res.status(400).json({ error: 'Invalid gender' });
     }
-    if (age && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
-      return res.status(400).json({ error: 'Invalid age' });
+    // Age is required, not merely valid-if-present: the declared age is the
+    // single source the avatar generator builds the body from and the avatar
+    // judge scores against (resolveDeclaredAvatarOverrides, de8753cc1), and it
+    // picks the age band and the topic window. A client-side guard is not a
+    // guarantee — this is the one that counts.
+    const parsedAge = parseTrialAge(age);
+    if (!parsedAge.ok) {
+      return res.status(400).json({ error: parsedAge.error });
     }
 
     const safeName = name.replace(/[\r\n]/g, '');
@@ -1189,7 +1199,9 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 
     const characterData = {
       name: safeName,
-      age: age || '',
+      // The normalised whole-year age — never the raw string, so every reader
+      // downstream (phantom tier, age band, avatar resolver) sees one shape.
+      age: String(parsedAge.years),
       gender: gender || '',
       traits: traits || [],
       customTraits: customTraits || '',
@@ -1294,8 +1306,16 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     if (gender && !['male', 'female'].includes(gender)) {
       return res.status(400).json({ error: 'Invalid gender' });
     }
-    if (age != null && age !== '' && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
-      return res.status(400).json({ error: 'Invalid age' });
+    // A PATCH that carries the age must carry a VALID one — including for an
+    // in-flight trial started before the age became mandatory, whose row this
+    // call is what finally fills. Omitting the key entirely still means "leave
+    // it alone"; sending an empty one does not, or the sync could clear an age
+    // the story pipeline now depends on.
+    let patchedAge = null;
+    if (age !== undefined) {
+      const parsed = parseTrialAge(age);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      patchedAge = String(parsed.years);
     }
     if (traits && !Array.isArray(traits)) {
       return res.status(400).json({ error: 'Invalid traits' });
@@ -1328,7 +1348,9 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
 
     const c = charData.characters[0];
     c.name = name.replace(/[\r\n]/g, '').trim();
-    c.age = age || '';
+    // An omitted age leaves the stored one intact; a supplied one is the
+    // normalised whole-year value parsed above.
+    if (patchedAge !== null) c.age = patchedAge;
     c.gender = gender || '';
     c.traits = structuredTraits;
     if (customTraits != null) c.customTraits = customTraits;

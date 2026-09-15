@@ -24,6 +24,7 @@ const strings: Record<string, {
   namePlaceholder: string;
   ageLabel: string;
   agePlaceholder: string;
+  ageRequired: string;
   genderLabel: string;
   boy: string;
   girl: string;
@@ -72,6 +73,7 @@ const strings: Record<string, {
     next: 'Next',
     nextNoPhoto: 'Add photo and details to continue',
     nextNoDetails: 'Add details to continue',
+    ageRequired: 'Please enter an age between 1 and 18',
     continueLabel: 'Continue',
     back: 'Back',
     consentBefore: "I'm the child's guardian (or have their consent), and I accept the ",
@@ -111,6 +113,7 @@ const strings: Record<string, {
     next: 'Weiter',
     nextNoPhoto: 'Foto und Details hinzufügen, um fortzufahren',
     nextNoDetails: 'Details hinzufügen, um fortzufahren',
+    ageRequired: 'Bitte ein Alter zwischen 1 und 18 eingeben',
     continueLabel: 'Weiter',
     back: 'Zurück',
     consentBefore: 'Ich bin erziehungsberechtigt (oder habe die Zustimmung) und akzeptiere die ',
@@ -150,6 +153,7 @@ const strings: Record<string, {
     next: 'Suivant',
     nextNoPhoto: 'Ajoute photo et détails pour continuer',
     nextNoDetails: 'Ajoute les détails pour continuer',
+    ageRequired: 'Merci d’indiquer un âge entre 1 et 18 ans',
     continueLabel: 'Continuer',
     back: 'Retour',
     consentBefore: "Je suis le tuteur de l'enfant (ou j'ai son consentement) et j'accepte les ",
@@ -189,6 +193,7 @@ const strings: Record<string, {
     next: 'Avanti',
     nextNoPhoto: 'Aggiungi foto e dettagli per continuare',
     nextNoDetails: 'Aggiungi i dettagli per continuare',
+    ageRequired: 'Inserisci un’età tra 1 e 18 anni',
     continueLabel: 'Continua',
     back: 'Indietro',
     consentBefore: 'Sono il tutore del bambino (o ho il suo consenso) e accetto i ',
@@ -316,7 +321,19 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   );
 
   const hasPhoto = !!characterData.photos.face;
-  const canProceed = characterData.name.trim() && characterData.gender && hasPhoto;
+
+  // The declared age is MANDATORY (owner, 2026-09-15). It is the single source
+  // the avatar generator builds the body from and the avatar judge scores
+  // against (de8753cc1), and it picks the age band and the topic window — with
+  // no age, that chain silently falls back to the behaviour the ruling removed.
+  // Whole years 1-18, matching the server's parseTrialAge; the server rejects
+  // the same values independently, this is only the fast feedback.
+  const ageRaw = String(characterData.age || '').trim();
+  const ageIsValid = /^\d{1,3}$/.test(ageRaw) && Number(ageRaw) >= 1 && Number(ageRaw) <= 18;
+  // Shown once the user has a photo (i.e. is actually in the details phase) and
+  // has either typed something wrong or left the field behind.
+  const showAgeError = hasPhoto && !ageIsValid && ageRaw !== '';
+  const canProceed = characterData.name.trim() && characterData.gender && ageIsValid && hasPhoto;
 
   // Track which face photo the current avatar was generated for
   const facePhotoKey = characterData.photos.face ? characterData.photos.face.slice(-40) : '';
@@ -454,12 +471,52 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canProceed, sessionToken]);
 
+  // Push the current user-facing fields onto the character row. Called on both
+  // advance paths — the freshly-created account (the prewarm sent a body that
+  // may predate later edits) AND a RESTORED session. The restored one matters
+  // now that the age is mandatory: a trial started before this change has no
+  // age on its row, its sentSnapshotRef is null after the remount, and without
+  // this call the age the user has just been forced to enter would never reach
+  // the DB — the story would generate ageless anyway. A null snapshot
+  // therefore means "always sync", not "nothing to sync".
+  const syncDetails = async (token: string) => {
+    const currentSnapshot = buildDetailsSnapshot(characterDataRef.current);
+    if (sentSnapshotRef.current && !detailsDiffer(currentSnapshot, sentSnapshotRef.current)) return;
+    try {
+      const patchResp = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/update-character-details`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: currentSnapshot.name,
+          age: currentSnapshot.age,
+          gender: currentSnapshot.gender,
+          traits: characterDataRef.current.traits,
+          customTraits: currentSnapshot.customTraits,
+        }),
+      });
+      if (patchResp.ok) {
+        sentSnapshotRef.current = currentSnapshot;
+      } else {
+        // Don't block advance on the sync — log + continue. Topic step
+        // re-reads from local state, so the user still sees their edits.
+        console.warn('[TRIAL] update-character-details failed:', patchResp.status);
+      }
+    } catch (patchErr) {
+      console.warn('[TRIAL] update-character-details network error:', patchErr);
+    }
+  };
+
   // Create anonymous account (if not already done in background) and advance.
   const handleNext = async () => {
     if (!canProceed || !characterData.photos.face) return;
 
-    // If user already has a session (navigated back and forward), skip account creation
+    // If user already has a session (navigated back and forward), skip account
+    // creation — but still sync the details, see syncDetails.
     if (sessionToken) {
+      await syncDetails(sessionToken);
       onNext();
       return;
     }
@@ -486,34 +543,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       // Sync any field edits made after the prewarm fired. The prewarm sent
       // a fixed body; later name/gender/age/traits/customTraits edits
       // wouldn't reach the DB without this PATCH.
-      const currentSnapshot = buildDetailsSnapshot(characterDataRef.current);
-      if (sentSnapshotRef.current && detailsDiffer(currentSnapshot, sentSnapshotRef.current)) {
-        try {
-          const patchResp = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/update-character-details`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${activeSession!.sessionToken}`,
-            },
-            body: JSON.stringify({
-              name: currentSnapshot.name,
-              age: currentSnapshot.age,
-              gender: currentSnapshot.gender,
-              traits: characterDataRef.current.traits,
-              customTraits: currentSnapshot.customTraits,
-            }),
-          });
-          if (patchResp.ok) {
-            sentSnapshotRef.current = currentSnapshot;
-          } else {
-            // Don't block advance on the sync — log + continue. Topic step
-            // re-reads from local state, so the user still sees their edits.
-            console.warn('[TRIAL] update-character-details failed:', patchResp.status);
-          }
-        } catch (patchErr) {
-          console.warn('[TRIAL] update-character-details network error:', patchErr);
-        }
-      }
+      await syncDetails(activeSession!.sessionToken);
 
       if (onAccountCreated && activeSession) {
         onAccountCreated(activeSession.sessionToken, activeSession.characterId);
@@ -868,7 +898,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           {/* Age + Gender row */}
           <div className="grid grid-cols-2 gap-4 mb-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.ageLabel}</label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.ageLabel} <span className="text-red-400">*</span></label>
               <input
                 type="number"
                 min={1}
@@ -876,8 +906,14 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                 value={characterData.age}
                 onChange={(e) => updateField('age', e.target.value)}
                 placeholder={t.agePlaceholder}
-                className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-gray-900 placeholder-gray-400"
+                aria-invalid={hasPhoto && !ageIsValid}
+                className={`w-full px-4 py-2.5 rounded-lg border outline-none transition-all text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 ${
+                  hasPhoto && !ageIsValid ? 'border-red-300 bg-red-50/30' : 'border-gray-300'
+                }`}
               />
+              {showAgeError && (
+                <p className="mt-1 text-xs text-red-600">{t.ageRequired}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.genderLabel} <span className="text-red-400">*</span></label>

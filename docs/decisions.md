@@ -41037,3 +41037,39 @@ which is why the generator siblings are vouched for rather than edited.
 `prompts/image-inventory-unified.txt`, `prompts/image-visual-inventory.txt`,
 `prompts/variants/image-evaluation-verbose-v1.txt`,
 `tests/unit/anatomy-checks-scope.test.ts`.
+
+## 2026-09-15 — The trial's declared age is MANDATORY (client and server)
+
+**Context.** Owner ruling: *"The age must be made mandatory in the trial run, otherwise this
+will not work."* Earlier the same day, `de8753cc1` made the USER-ENTERED age the single source
+for both halves of the avatar loop — `resolveDeclaredAvatarOverrides`
+(`server/lib/avatarOverrides.js`) emits `ageLine` to the generator and `ageFact` to the judge —
+and `character2x4Sheet.declaredAgeBlock()` states that age in every sheet prompt. The trial
+collected age as an OPTIONAL field: the client's `canProceed` asked only for name, gender and a
+photo; `create-anonymous-account` validated it only `if (age && …)` and stored `age: age || ''`.
+An ageless trial row therefore emits no `ageLine`, no `ageFact` and no `declaredAgeBlock` — it
+silently reverts to exactly the behaviour the ruling removed, and additionally loses the age band
+(`AGE_BANDS` / `focusAge`) and the topic age window.
+
+**Decision.** Age is required on both sides, whole years **1–18**, parsed by one module
+(`server/lib/trialAge.js`, `parseTrialAge`). The client blocks the Next button and shows a
+translated inline message (en/de/fr/it); the server rejects a missing or out-of-range age with
+400 *before* the anonymous account row is created, and stores the normalised whole-year value.
+The PATCH sync (`/api/trial/update-character-details`) now also rejects an invalid supplied age
+and never clears a stored one — and it is called on the RESTORED-session path too, so a trial
+already in progress without an age gets prompted for one and that age actually reaches the row.
+
+**Rationale / deliberate edges.**
+- Range 1–18 is the trial's own pre-existing bound; making the field mandatory is not the moment
+  to widen what is accepted. Age **0** stays rejected in the trial even though the band machinery
+  supports it (`youngestMainAge` filters `n >= 0`, `AGE_BANDS[0] = 'routine'`) — a newborn hero in
+  the /try funnel is a separate product decision.
+- `POST /api/trial/generate-preview-avatar` keeps its valid-if-present guard: it fires during the
+  photo phase, before the user has reached the age field, so it cannot require one. The
+  load-bearing consumer is the 2×4 sheet built later by `prepare-title` from the stored row.
+- **No new funnel event.** `character_saved` already fires exactly when the users row is created,
+  which is now impossible without an age, so the existing `trial_funnel` vocabulary reflects the
+  new gate without a step. A separate "age entered" step would measure a field, not a stage.
+
+**Touched files.** `server/lib/trialAge.js` (new), `server/routes/trial.js`,
+`client/src/pages/trial/TrialCharacterStep.tsx`, `tests/unit/trial-age-mandatory.test.ts` (new).
