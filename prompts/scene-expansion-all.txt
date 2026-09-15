@@ -132,6 +132,7 @@ Work from the plan lines: an element a plan line only implies still needs an ent
 {CHILD_AGE_BAND}
 - An entry shaped like a person — an invented figure, a small winged being, a doll, a figurine, a statue, a puppet — states its HAIR in `description`: colour, length and how it is worn, or plainly that it has none. Such an entry reaches the image model as its description and nothing else, and a head described only by its eyes is drawn bald. State the head the same way a face is stated: hair, then whatever else the figure's head carries.
 - Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
+- Every Visual Bible element carries `scaleClass`. It is never omitted, and an adjective is not a class — massive, tiny, huge name no band.
 - Every artifact carries `size`, and every animal too. The field is never omitted.
 - English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
 - Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`); that character's outfit above describes the same item in that slot, in the same words.
@@ -206,6 +207,7 @@ First, exactly:
       "id": "CHR001",
       "name": "[Name]",
       "pages": [1],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "age": [age in years as a number],
       "peer": "[yes|no — yes only for an invented child who plays, competes or shares a group with the commissioned children]",
       "build": "[height, body type]",
@@ -221,6 +223,7 @@ First, exactly:
       "id": "ANI001",
       "name": "[Name]",
       "pages": [1],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "species": "[type and breed]",
       "coloring": "[exact colours and full pattern]",
       "size": "[relative size]",
@@ -235,6 +238,7 @@ First, exactly:
       "name": "[plain English noun phrase for the thing, e.g. 'brass telescope', 'oak sea chest' — English even for a non-English story; never a proper noun, and never a bare category]",
       "properName": "[OMIT unless the story gives this object a name of its own]",
       "pages": [1],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']",
       "size": "[how big this object is beside a person: the body part it reaches on a character standing next to it, or the part of a hand or arm it spans. Measure THIS object — never reuse a wording from these instructions. No metric or imperial units. English, whatever the story language.]",
       "text": "[OMIT unless words on this object must be readable in the picture (a sign, a plaque, a banner); then the exact words, at most three]",
@@ -248,6 +252,7 @@ First, exactly:
       "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]",
       "name": "[Name]",
       "pages": [1],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "setting": "[indoor/outdoor, type]",
       "colors": "[specific colours]",
       "features": "[distinctive visual elements]",
@@ -263,6 +268,7 @@ First, exactly:
       "name": "[plain English noun phrase; a name the story gives it goes in properName]",
       "properName": "[OMIT unless the story names it]",
       "pages": [1],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "colorAndDetails": "[appearance: shape, colour, material, size, distinctive features]",
       "signatureElement": "[one unique detail]"
     }

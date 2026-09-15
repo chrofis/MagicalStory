@@ -662,6 +662,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 - **A prop's, vehicle's or garment's `name` is a plain description of the thing, never a proper noun or a label** ("toy treasure chest", "hand-drawn treasure map", "two-masted sailing ship"). A name the story gives an object goes in `properName` and nowhere else.
 - **An entry shaped like a person states its hair.** An invented figure, a small winged being, a doll, a figurine, a statue or a puppet states its HAIR in `description`: colour, length and how it is worn, or plainly that it has none. Such an entry reaches the image model as its description and nothing else, and a head described only by its eyes is drawn bald. State the head the same way a face is stated: hair, then whatever else the figure's head carries.
 - **Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry** — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
+- **Every Visual Bible element carries `scaleClass`.** It is never omitted, and an adjective is not a class — massive, tiny, huge name no band.
 - **`pages` is earned** — only the pages whose draft scene actually contains the element, never a blanket 1-{PAGES} range. An element the story leaves behind ends its range there.
 - Add at least {PAGES} entries. Even if an element appears only once, add it for visual consistency
 - Use empty arrays `[]` for categories with no elements
@@ -707,6 +708,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "id": "CHR001",
       "name": "[Name]",
       "pages": [X, Y, Z],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "age": "[sex and apparent age, e.g. 'a woman in her thirties', 'a boy of about eight']",
       "build": "[height, body type]",
       "hair": "[color, style, length]",
@@ -720,6 +722,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "id": "ANI001",
       "name": "[Name]",
       "pages": [X, Y, Z],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "species": "[type and breed, e.g., 'Golden Retriever' not just 'dog']",
       "coloring": "[exact colors and patterns - for breeds with distinctive patterns like Siamese cats, tabbies, dalmatians, describe the FULL pattern, not just base color]",
       "size": "[relative size]",
@@ -733,6 +736,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "name": "[plain English description of the thing, e.g. 'toy treasure chest' — never a proper noun]",
       "properName": "[OMIT unless the story names this object; then that name]",
       "pages": [X, Y, Z],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']",
       "size": "[how big this object is beside a person: the body part it reaches on a character standing next to it, or the part of a hand or arm it spans. Measure THIS object — never reuse a wording from these instructions. No metric or imperial units. English, whatever the story language.]",
       "wornAs": "[OMIT unless this prop becomes part of a character's costume. Then: \"<CharacterName>.<slot>\", e.g. \"Emma.headwear\" — the slot in that character's clothingRequirements this same item fills once worn.]",
@@ -744,6 +748,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "id": "LOC001",
       "name": "[Name]",
       "pages": [X, Y, Z],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "setting": "[indoor/outdoor, type]",
       "colors": "[specific colors]",
       "features": "[distinctive visual elements]",
@@ -755,6 +760,7 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "id": "LOC002",
       "name": "[real-landmark example]",
       "pages": [A, B, C],
+      "scaleClass": "[one of: hand, arm, person, vehicle, building, landscape — how tall this element is beside a standing adult. hand: fits in one hand. arm: spans a forearm to an arm. person: knee-height to head-height. vehicle: taller or longer than a person, boardable or pushable. building: several people high, fixed to the ground. landscape: the horizon rather than an object. Never omitted. Judge the element itself, not how the story feels about it.]",
       "setting": "[indoor/outdoor, type]",
       "colors": "[specific colors]",
       "features": "[distinctive visual elements]",

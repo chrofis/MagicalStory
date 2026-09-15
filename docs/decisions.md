@@ -39894,3 +39894,41 @@ prompt and to the owner, never to a quiet edit.
 `.claude/skills/syncing-generator-and-critic/SKILL.md` (new),
 `.claude/skills/fixing-sibling-paths/SKILL.md`, `docs/sibling-paths.md`, `CLAUDE.md`.
 Commits `f4976b408`, `002b5d2a2`, `3e40b75a5`.
+
+## 2026-09-15 — `scaleClass`: an authored, machine-facing scale band on every Visual Bible element
+
+**Context:** on staging `job_1789420511893_zly5rcdej`, ART004 "roasted chestnut" carried a correct
+free-text `size` ("the size of a thumb") and still rendered football-sized as the nearest object to
+camera; VEH001 "wooden sailing ship" had no `size` slot at all (the vehicle parse never had one) and
+rendered as a small open rowboat. A correct size sentence changed nothing, because nothing in CODE
+reads a sentence — every routing decision was keyed on the VB collection an entry happened to sit in.
+
+**Decision:** one new authored key on `artifacts`, `vehicles`, `animals`, `secondaryCharacters` and
+`locations` — `scaleClass`, a closed enum of `hand | arm | person | vehicle | building | landscape`,
+stated in the prompt as height against a standing adult. `size` STAYS: the two fields have different
+consumers, `size` is prose a model reads (`sizeNote` on REQUIRED OBJECTS) and `scaleClass` is a token
+only code reads. The parser normalises (lowercase, trim) and warns; an unknown token and a missing
+one both become `null`, never a nearest-band guess. `null` is a first-class route — every consumer
+falls back to its pre-2026-09-15 `type`-based behaviour — and there is NO backfill of stored bibles
+(owner, 2026-09-15): repair, iterate and cover paths re-read months-old bibles, and a guessed class
+would change a shipped book's routing on a repair.
+
+**Rationale:** the p8/p12 evidence says free text was *insufficient*, not wrong, so deleting `size`
+would reverse `e476ca314` and the 2026-09-11 animal extension with no case. Merging the two is worse
+than either: the enum stops being closed and `sizeNote` starts emitting a bare category into a page
+prompt, which the one-authored-label rule forbids. `scaleClass` is machine-facing and is never
+concatenated into `description`, `label`, `sizeNote` or any prompt string — pinned by a test that
+builds a real page prompt and asserts the token is absent while `size` is still present. A size/class
+contradiction check was proposed and CUT by the owner: no text inspection anywhere in this work.
+
+All four VB-authoring prompts move together and the sibling gate enforces it via a new
+`parity.anchors` entry (`"scaleClass"`) on the `vb-authoring-sites` set; the parity test was
+confirmed FAILING on all four members before the prompts were edited. `prompts/scene-expansion.txt`
+(consumes a VB, authors none) and `prompts/story-bible-from-beats.txt` (wardrobe contract only) are
+deliberately NOT authoring sites — recorded here so it is not re-derived.
+
+**Touched files:** `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`,
+`scripts/admin/sibling-registry.json`, `server/lib/visualBible.js`,
+`tests/unit/vb-scale-class.test.ts` (new), `tests/unit/artifact-size.test.ts`,
+`tasks/vb-scale-class-plan-2026-09-15.md`.

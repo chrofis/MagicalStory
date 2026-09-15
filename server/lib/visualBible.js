@@ -597,6 +597,39 @@ function parseVisualBible(outline) {
  * Try to parse Visual Bible from JSON code block
  * Returns null if JSON not found or invalid
  */
+/**
+ * `scaleClass` — the authored, machine-facing scale band of a Visual Bible
+ * element (2026-09-15). A closed enum, read by CODE only: routing decides
+ * whether an element's reference belongs on the plate or in a page cell from
+ * this field, never from prose. It is NEVER concatenated into `description`,
+ * `label`, `sizeNote` or any string an image model sees — the free-text
+ * `size` sentence remains the only scale wording a model reads.
+ *
+ * `null` is a first-class value, not an error: every bible stored before this
+ * field existed has none, and every consumer falls back to its pre-2026-09-15
+ * `type`-based behaviour when it is null. An unknown token is NEVER coerced to
+ * the nearest band — a guessed class routes an object to the wrong pipeline.
+ */
+const SCALE_CLASSES = ['hand', 'arm', 'person', 'vehicle', 'building', 'landscape'];
+
+function normaliseScaleClass(raw, id) {
+  const who = id ? String(id) : 'entry';
+  if (raw === undefined || raw === null || (typeof raw === 'string' && !raw.trim())) {
+    log.warn(`[VISUAL BIBLE] ${who}: no scaleClass authored — scale routing falls back to the entry type`);
+    return null;
+  }
+  if (typeof raw !== 'string') {
+    log.warn(`[VISUAL BIBLE] ${who}: scaleClass is not a string (${typeof raw}) — dropped, not guessed`);
+    return null;
+  }
+  const value = raw.trim().toLowerCase();
+  if (!SCALE_CLASSES.includes(value)) {
+    log.warn(`[VISUAL BIBLE] ${who}: unknown scaleClass "${raw}" — dropped, not coerced to a nearest band`);
+    return null;
+  }
+  return value;
+}
+
 function tryParseVisualBibleJSON(outline) {
   // Look for JSON code block in the Visual Bible section
   // Match ```json ... ``` after "Visual Bible" header
@@ -635,6 +668,7 @@ function tryParseVisualBibleJSON(outline) {
         label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
         appearsInPages: char.pages || [],
+        scaleClass: normaliseScaleClass(char.scaleClass, char.id),
         description: buildCharacterDescription(char),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -652,6 +686,7 @@ function tryParseVisualBibleJSON(outline) {
         label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
         appearsInPages: animal.pages || [],
+        scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
         description: buildAnimalDescription(animal),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -678,6 +713,9 @@ function tryParseVisualBibleJSON(outline) {
         // Scale anchor against a person ("fits in one hand", "carried in both
         // arms"); the REQUIRED OBJECTS line carries it verbatim.
         size: artifact.size || null,
+        // Machine-facing scale band (normaliseScaleClass). `size` above is the
+        // prose a model reads; this is the token code routes on. Never printed.
+        scaleClass: normaliseScaleClass(artifact.scaleClass, id),
         appearsInPages: artifact.pages || [],
         description: buildArtifactDescription(artifact),
         type: artifact.type,
@@ -715,6 +753,7 @@ function tryParseVisualBibleJSON(outline) {
         label: typeof loc.label === 'string' && loc.label.trim() ? loc.label.trim() : null,
         name: loc.name,
         appearsInPages: loc.pages || [],
+        scaleClass: normaliseScaleClass(loc.scaleClass, loc.id),
         description: buildLocationDescription(loc),
         setting: loc.setting,
         signatureElement: loc.signatureElement,
@@ -740,6 +779,7 @@ function tryParseVisualBibleJSON(outline) {
         label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
         appearsInPages: veh.pages || [],
+        scaleClass: normaliseScaleClass(veh.scaleClass, veh.id),
         description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
         signatureElement: veh.signatureElement,
         extractedDescription: null,
@@ -1876,6 +1916,7 @@ function tryParseNewEntriesJSON(section) {
         label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
         description: buildCharacterDescription(char),
+        scaleClass: normaliseScaleClass(char.scaleClass, char.id),
         pages: char.pages || [],
         source: 'story_text'
       }));
@@ -1887,6 +1928,7 @@ function tryParseNewEntriesJSON(section) {
         label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
         description: buildAnimalDescription(animal),
+        scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
         pages: animal.pages || [],
         source: 'story_text'
       }));
@@ -1899,6 +1941,7 @@ function tryParseNewEntriesJSON(section) {
         name: artifact.name,
         description: buildArtifactDescription(artifact),
         size: artifact.size || null,
+        scaleClass: normaliseScaleClass(artifact.scaleClass, artifact.id),
         type: artifact.type,
         pages: artifact.pages || [],
         source: 'story_text'
@@ -1913,6 +1956,7 @@ function tryParseNewEntriesJSON(section) {
         description: buildLocationDescription(loc),
         setting: loc.setting,
         signatureElement: loc.signatureElement,
+        scaleClass: normaliseScaleClass(loc.scaleClass, loc.id),
         pages: loc.pages || [],
         source: 'story_text'
       }));
@@ -1925,6 +1969,7 @@ function tryParseNewEntriesJSON(section) {
         name: veh.name,
         description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
         signatureElement: veh.signatureElement,
+        scaleClass: normaliseScaleClass(veh.scaleClass, veh.id),
         pages: veh.pages || [],
         source: 'story_text'
       }));
@@ -3284,6 +3329,8 @@ function recordElementCellGate(visualBible, elementId, verdict) {
 
 module.exports = {
   recordElementCellGate,
+  SCALE_CLASSES,
+  normaliseScaleClass,
   // Parsing
   parseVisualBible,
   filterMainCharactersFromVisualBible,

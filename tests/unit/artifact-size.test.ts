@@ -6,7 +6,10 @@ import path from 'path';
 const { buildArtifactDescription, parseVisualBible } = require('../../server/lib/visualBible');
 // @ts-ignore
 const { buildTextFromJson } = require('../../server/lib/sceneMetadata');
+// @ts-ignore
+const PB = require('../../server/lib/promptBuilders');
 
+const NL = String.fromCharCode(10);
 const PROMPTS = path.join(__dirname, '..', '..', 'prompts');
 const read = (f: string) => fs.readFileSync(path.join(PROMPTS, f), 'utf-8');
 
@@ -40,6 +43,33 @@ describe('artifact size — builder contract', () => {
 
   it('never emits the "undefined" fallback the old inline expression produced', () => {
     expect(buildArtifactDescription({ type: 'hand tool' })).not.toContain('undefined');
+  });
+
+  // 2026-09-15: `scaleClass` was added beside `size`, not instead of it. The
+  // two have different consumers — `size` is the prose a model reads, the class
+  // is the token code routes on — and folding `size` away would reverse
+  // e476ca314 and the 2026-09-11 animal extension with no evidence it harms.
+  it('keeps the free-text size on the REQUIRED OBJECTS line once a class is authored too', () => {
+    const outline = ['---VISUAL BIBLE---', '```json', JSON.stringify({
+      artifacts: [{
+        id: 'ART001', label: 'wooden pail', name: 'wooden pail', pages: [1],
+        type: 'hand tool', size: 'spans a child forearm', scaleClass: 'arm',
+        description: 'a squat pail with two iron bands'
+      }]
+    }), '```'].join(NL);
+    const vb = parseVisualBible(outline);
+    const brief = ['The main character carries a wooden pail across the yard.', '', '---METADATA---', JSON.stringify({
+        sceneIntent: 'the pail is carried',
+        characters: [{ name: 'Mira', position: 'center', depth: 'midground' }],
+        shot: 'wide', objects: ['ART001'], textPosition: 'bottom-left',
+      })].join(NL);
+    const prompt = String(PB.buildImagePrompt(brief, {
+      title: 'The Yard', characters: [{ id: 'c1', name: 'Mira', age: 8, gender: 'girl' }],
+      mainCharacters: ['c1'], language: 'en', languageLevel: 'medium', pages: 4,
+      artStyle: 'watercolor', relationships: {}, relationshipTexts: {},
+    } as any, null, vb, 1, null, {}));
+    expect(prompt).toContain('spans a child forearm');
+    expect(prompt).not.toMatch(/scaleClass/i);
   });
 
   it('survives the real Visual Bible parser', () => {

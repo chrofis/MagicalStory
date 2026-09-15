@@ -149,7 +149,8 @@
           "\"properName\"",
           "\"type\"",
           "\"size\"",
-          "\"isRealLandmark\""
+          "\"isRealLandmark\"",
+          "\"scaleClass\""
         ],
         "anchorsNote": "the VB entry keys all four authoring sites genuinely declare today. `\"states\"` and `\"vantages\"` are deliberately NOT anchored: they are absent from story-unified-imagefirst.txt and from scene-expansion-all.txt respectively, which is a real divergence, not a parity target to assert into existence."
       }
