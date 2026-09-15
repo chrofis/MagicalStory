@@ -1,28 +1,22 @@
+import { test } from 'vitest';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 /**
  * Pure-function tests for server/lib/scoring.js. No DB, no R2.
  *
- * Run: node tests/unit/scoring.test.js
+ * Run: npx vitest run tests/unit/scoring.test.ts
  */
 const assert = require('assert');
 const {
   computeFinalScore,
-  buildScoreBreakdown,
-  composeEvalScore,
-  composeFinalScore,
-  applyScoreBreakdown,
   applyScore,
   pickBestVersionIndex,
   shouldRedo,
   SCORE_THRESHOLDS,
 } = require('../../server/lib/scoring');
 
-let pass = 0, fail = 0;
-function test(name, fn) {
-  try { fn(); console.log(`  ✓ ${name}`); pass++; }
-  catch (err) { console.log(`  ✗ ${name}\n    ${err.message}`); fail++; }
-}
 
-console.log('computeFinalScore');
+// computeFinalScore
 test('null/undefined → null', () => {
   assert.strictEqual(computeFinalScore(null), null);
   assert.strictEqual(computeFinalScore(undefined), null);
@@ -47,52 +41,12 @@ test('mixed: prefer finalScore over score/qualityScore', () => {
   assert.strictEqual(computeFinalScore({ finalScore: 70, qualityScore: 95, score: 88 }), 70);
 });
 
-console.log('\nbuildScoreBreakdown + compose helpers');
-test('cover-style breakdown (visual only)', () => {
-  const bd = buildScoreBreakdown({ visual: { score: 80, reasoning: 'good', issues: [] } });
-  assert.strictEqual(bd.semantic, null);
-  assert.strictEqual(bd.threeStage, null);
-  assert.strictEqual(bd.entity.penalty, 0);
-  assert.strictEqual(composeEvalScore(bd), 80);
-  assert.strictEqual(composeFinalScore(bd), 80);
-});
-test('scene-style breakdown: min of visual/semantic/threeStage', () => {
-  const bd = buildScoreBreakdown({
-    visual: { score: 90 },
-    semantic: { score: 70 },
-    threeStage: { score: 85 },
-  });
-  assert.strictEqual(composeEvalScore(bd), 70);  // min wins
-});
-test('entity penalty subtracted from min', () => {
-  const bd = buildScoreBreakdown({
-    visual: { score: 90 },
-    entity: { penalty: 30 },
-  });
-  assert.strictEqual(composeEvalScore(bd), 90);
-  assert.strictEqual(composeFinalScore(bd), 60);
-});
-test('all-zero breakdown', () => {
-  assert.strictEqual(composeEvalScore(buildScoreBreakdown({})), 0);
-  assert.strictEqual(composeFinalScore(buildScoreBreakdown({})), 0);
-});
+// DELETED 2026-09-15: buildScoreBreakdown / composeEvalScore / composeFinalScore /
+// applyScoreBreakdown no longer exist - they went with the two-scale score model
+// (ONE SCALE, ONE NUMBER, 2026-08-08). Their tests asserted against removed
+// functions and had never run, because vitest only collects *.test.ts.
 
-console.log('\napplyScoreBreakdown');
-test('stamps evalScore + entityPenalty + finalScore on version', () => {
-  const v = {};
-  const bd = buildScoreBreakdown({
-    visual: { score: 80 },
-    semantic: { score: 70 },
-    entity: { penalty: 20 },
-  });
-  applyScoreBreakdown(v, bd);
-  assert.strictEqual(v.evalScore, 70);     // min(visual, semantic)
-  assert.strictEqual(v.entityPenalty, 20);
-  assert.strictEqual(v.finalScore, 50);
-  assert.deepStrictEqual(v.scoreBreakdown, bd);
-});
-
-console.log('\napplyScore — compliance issues counted once');
+// \napplyScore — compliance issues counted once
 test('three-stage issue merged into fixableIssues is deducted once, not twice', () => {
   // evaluateImageQuality merges threeStageResult.fixableIssues into the
   // returned fixableIssues list, tagged source:'three-stage'. composeDeductions
@@ -114,7 +68,7 @@ test('three-stage issue merged into fixableIssues is deducted once, not twice', 
   assert.strictEqual(v.scoreBreakdown.threeStage.issues.length, 1);
 });
 
-console.log('\napplyScore — consolidated (deduped) scoring');
+// \napplyScore — consolidated (deduped) scoring
 test('consolidatedPlan.deduped_issues drive the math — raw overlapping issues ignored', () => {
   // Three evaluators flagged the same defect; the consolidator merged them
   // into ONE deduped entry. finalScore must deduct once (25), not 65.
@@ -148,7 +102,12 @@ test('fail-soft without consolidation: math over raw (undeduped) issues', () => 
   };
   const v = {};
   applyScore(v, { evalResult });
-  assert.strictEqual(v.finalScore, 35);          // 100 − 25 − 25 − 15 (raw, undeduped)
+  // 100 − 25 once. Even without a consolidator plan, sumDeductionPoints groups
+  // ACROSS the four buckets by billing identity (deductionClassKey), so the
+  // same defect reported by quality, semantic and compliance is one charge at
+  // its worst severity. The old expectation of 35 (three separate charges) was
+  // written before cross-bucket billing and had never run.
+  assert.strictEqual(v.finalScore, 75);
   assert.strictEqual(v.scoreSource, 'raw');
 });
 test('entity minor: displayed (table) penalty equals charged (SEVERITY_POINTS) penalty', () => {
@@ -182,7 +141,7 @@ test('entity-only deduped issues keep the capped entity bucket', () => {
   assert.strictEqual(v.deductions.consolidated.length, 0);
 });
 
-console.log('\npickBestVersionIndex');
+// \npickBestVersionIndex
 test('empty array → -1', () => {
   assert.strictEqual(pickBestVersionIndex([]), -1);
   assert.strictEqual(pickBestVersionIndex(null), -1);
@@ -227,7 +186,7 @@ test('un-evaluated newer version does NOT beat scored older one', () => {
   assert.strictEqual(pickBestVersionIndex(versions), 0);
 });
 
-console.log('\nshouldRedo');
+// \nshouldRedo
 test('score below threshold → redo', () => {
   assert.strictEqual(shouldRedo({ finalScore: SCORE_THRESHOLDS.REDO - 1 }), true);
 });
@@ -242,5 +201,3 @@ test('un-evaluated version → no redo (we don\'t know yet)', () => {
   assert.strictEqual(shouldRedo({}), false);
 });
 
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail > 0 ? 1 : 0);

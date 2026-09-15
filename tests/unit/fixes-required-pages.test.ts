@@ -1,18 +1,16 @@
+import { test } from 'vitest';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 /**
  * Pure tests for ProgressiveUnifiedParser._ensurePatchedPageNumbers —
  * FIXES REQUIRED page-list parsing incl. defensive range handling.
  * No DB, no LLM.
  *
- * Run: node tests/unit/fixes-required-pages.test.js
+ * Run: npx vitest run tests/unit/fixes-required-pages.test.ts
  */
 const assert = require('assert');
 const { ProgressiveUnifiedParser } = require('../../server/lib/outlineParser/progressive');
 
-let pass = 0, fail = 0;
-function test(name, fn) {
-  try { fn(); console.log(`  ✓ ${name}`); pass++; }
-  catch (err) { console.log(`  ✗ ${name}\n    ${err.message}`); fail++; }
-}
 
 function parse(fixesBody) {
   const p = new ProgressiveUnifiedParser({});
@@ -21,7 +19,7 @@ function parse(fixesBody) {
 }
 const sorted = (set) => [...set].sort((a, b) => a - b);
 
-console.log('_ensurePatchedPageNumbers — FIXES REQUIRED page lists');
+// _ensurePatchedPageNumbers — FIXES REQUIRED page lists
 test('explicit enumeration unchanged: "Pages 2,3,5,6:"', () => {
   assert.deepStrictEqual(sorted(parse('- Pages 2,3,5,6: TEXT: tighten dialogue')), [2, 3, 5, 6]);
 });
@@ -52,5 +50,3 @@ test('no FIXES REQUIRED block → null (do not lock in)', () => {
   assert.strictEqual(p._ensurePatchedPageNumbers(), null);
 });
 
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail > 0 ? 1 : 0);

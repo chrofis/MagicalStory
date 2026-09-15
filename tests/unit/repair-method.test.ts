@@ -1,19 +1,17 @@
+import { test } from 'vitest';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 /**
  * Pure-function tests for decideRepairMethod (server/lib/repairLogic.js).
  * No DB, no LLM calls.
  *
- * Run: node tests/unit/repair-method.test.js
+ * Run: npx vitest run tests/unit/repair-method.test.ts
  */
 const assert = require('assert');
 const { decideRepairMethod } = require('../../server/lib/repairLogic');
 
-let pass = 0, fail = 0;
-function test(name, fn) {
-  try { fn(); console.log(`  ✓ ${name}`); pass++; }
-  catch (err) { console.log(`  ✗ ${name}\n    ${err.message}`); fail++; }
-}
 
-console.log('decideRepairMethod — catastrophic severity routing');
+// decideRepairMethod — catastrophic severity routing
 test('lone CATASTROPHIC issue with survivable subscores → iterate, NOT inpaint', () => {
   const decision = decideRepairMethod(3, {
     scoreBreakdown: { visual: { score: 70 }, semantic: { score: 80 } },
@@ -71,7 +69,7 @@ test('no issues at all → skip', () => {
   assert.strictEqual(decision.method, 'skip');
 });
 
-console.log('\ndecideRepairMethod — reframe (requires_regeneration) routing');
+// \ndecideRepairMethod — reframe (requires_regeneration) routing
 test('reframe flag with survivable subscores → iterate, NOT inpaint (overrides salvage floor)', () => {
   const decision = decideRepairMethod(3, {
     scoreBreakdown: { visual: { score: 60 }, semantic: { score: 60 } },
@@ -98,7 +96,7 @@ test('reframe gate is strict === true — a truthy string does not force iterate
   assert.strictEqual(decision.method, 'inpaint');
 });
 
-console.log('\ndecideRepairMethod — entity severity routing (owner ruling 2026-09-01: CRITICAL only, case-insensitive)');
+// \ndecideRepairMethod — entity severity routing (owner ruling 2026-09-01: CRITICAL only, case-insensitive)
 const entityReportWith = (severity) => ({
   characters: {
     Lorena: {
@@ -139,7 +137,7 @@ test('CRITICAL entity issue on a different page does not claim this page', () =>
 });
 
 
-console.log('\ndecideRepairMethod — clothing vs CRITICAL severity precedence (2026-09-06)');
+// \ndecideRepairMethod — clothing vs CRITICAL severity precedence (2026-09-06)
 // Evidence: staging job_1788641639919_mpjwlzkf1 page 5 v0.
 const clothingMajor = (char) => ({
   type: 'clothing', severity: 'MAJOR', character: char,
@@ -195,7 +193,7 @@ test('CRITICAL entity + MAJOR clothing → char-fix on the entity issue, unchang
   assert.ok(/^entity critical/.test(decision.reason), `entity gate must win, got: ${decision.reason}`);
 });
 
-console.log('\nconsolidator — rule 7 scene_fix guard');
+// \nconsolidator — rule 7 scene_fix guard
 const { applyRule7SceneFixGuard } = require('../../server/lib/feedbackConsolidator');
 test('clothing-typed scene_fix moves to dropped_issues and is cleared', () => {
   const plan = {
@@ -246,5 +244,3 @@ test('a non-array scene_fix.types is ignored, not crashed on', () => {
   assert.strictEqual(plan.dropped_issues.length, 0);
 });
 
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail > 0 ? 1 : 0);
