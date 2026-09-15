@@ -345,3 +345,73 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
     expect(stored.animals[0].description).toContain('as long as a city bus');
   });
 });
+
+/**
+ * THE PERMANENT FALLBACK, pinned against REAL stored data.
+ *
+ * The three cases above use the test fixture with `scaleClass` deleted. This
+ * one uses entries copied verbatim out of stored staging bibles (74 pre-enum
+ * sized entries across the recent corpus, job_1789420511893_zly5rcdej among
+ * them) — the exact shape repair, iterate, regeneration and cover repaint
+ * re-read months after a story ships: `size` present, `scaleClass` absent, and
+ * the enrichment fields (`states`, `cellGates`, `referenceImageUrl`) that a
+ * finished bible carries alongside them.
+ *
+ * DELETING the `entry.size` read in `elementScaleNote` (visualBible.js) makes
+ * this file fail. That is the whole point: the free-text field is gone from
+ * NEWLY authored bibles, so the read path looks like leftover cleanup, and
+ * removing it would silently strip the scale anchor from every finished story
+ * with no other test failure and no log line.
+ */
+describe('the stored-`size` fallback is permanent — real pre-enum bibles', () => {
+  // verbatim from stories.data->visualBible on staging (read-only pull)
+  const STORED_ARTIFACT = {
+    id: 'ART004',
+    name: 'hot roasted chestnut',
+    size: 'the size of a thumb',
+    type: 'food',
+    label: 'roasted chestnut',
+    pages: [7, 8],
+    cellGates: [{ at: '2026-09-14T21:54:01.553Z', ok: true, gate: 'element_cell', cellId: 'ART004', reason: 'matches', rerendered: false }],
+    description: 'a small, round, dark brown roasted chestnut with a slightly split, textured shell.',
+    appearsInPages: [7, 8],
+    referenceImageUrl: 'https://images-staging.magicalstory.ch/stories/x/vb/ART004.jpg',
+    referenceImageGenerated: true,
+  };
+  const STORED_ROPE = {
+    id: 'ART003',
+    name: 'heavy mooring rope',
+    size: "as thick as a child's wrist and several metres long",
+    type: 'nautical rope',
+    label: 'stern line',
+    pages: [12],
+    states: [{ id: 'ART003.1', name: 'unaltered', delta: 'lies slack in loose curling loops', pages: [12] }],
+    description: 'a thick, heavily textured beige hemp rope, composed of three thick twisted strands.',
+    appearsInPages: [12],
+  };
+
+  it('yields the stored size text from an untouched stored entry', () => {
+    expect(STORED_ARTIFACT).not.toHaveProperty('scaleClass');
+    expect(elementScaleNote(STORED_ARTIFACT)).toBe('the size of a thumb');
+    expect(elementScaleNote(STORED_ROPE)).toBe("as thick as a child's wrist and several metres long");
+  });
+
+  it('carries that stored text into the BUILT page prompt', () => {
+    const vb = parseVisualBible(bible({ artifacts: [STORED_ARTIFACT] }));
+    expect(vb.artifacts[0].scaleClass).toBeNull();
+    expect(vb.artifacts[0].size).toBe('the size of a thumb');
+    const prompt = String(PB.buildImagePrompt(
+      'The main character stands on the quay holding a roasted chestnut.'
+      + '\n\n---METADATA---\n' + JSON.stringify({
+        sceneIntent: 'the chestnut is offered',
+        characters: [{ name: 'Mira', position: 'center', depth: 'midground' }],
+        shot: 'wide', objects: ['ART004'], textPosition: 'bottom-left',
+      }),
+      {
+        title: 'The Quay', characters: [{ id: 'c1', name: 'Mira', age: 8, gender: 'girl' }],
+        mainCharacters: ['c1'], language: 'en', languageLevel: 'medium', pages: 4,
+        artStyle: 'watercolor', relationships: {}, relationshipTexts: {},
+      } as any, null, vb, 1, null, {}));
+    expect(prompt).toContain('the size of a thumb');
+  });
+});

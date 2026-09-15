@@ -40276,7 +40276,10 @@ across languages and units, and a *correct* value changed nothing because nothin
    preserves the capability the five superseded entries measured — above all the 2026-09-11 dragon
    (`job_1789147573901_m3uam0nxi` ANI002, knee-high on two pages and house-sized on a fourth): a
    repair, iterate or cover repaint re-reading that bible months from now still states the scale the
-   book shipped with.
+   book shipped with. **DO NOT DELETE the `entry.size` read in `elementScaleNote`** — it is permanent,
+   not leftover cleanup from the enum migration; removing it silently strips the scale anchor from
+   every already-finished story with no log line. Guarded by the real-stored-bible cases in
+   `tests/unit/vb-scale-class.test.ts`.
 5. **The retired six-value tokens resolve** onto the granular list (`LEGACY_SCALE_CLASSES`:
    person→hip, vehicle→double, building→house, landscape→landmark), so bibles authored during the
    few hours the morning enum was live stay routable.

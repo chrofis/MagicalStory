@@ -693,6 +693,12 @@ function scalePhrase(raw) {
  * capability decisions.md 2026-09-06 / 09-09 / 09-11 / 09-14 measured — a
  * dragon that rendered knee-high on two pages and house-sized on a fourth — and
  * it may not be lost by switching fields.
+ *
+ * The `entry.size` read below is PERMANENT, not leftover cleanup: newly authored
+ * bibles no longer carry the field, but every stored one does, and deleting the
+ * read fails no test and logs nothing — it just makes repaints worse.
+ * Pinned by `tests/unit/vb-scale-class.test.ts` ("the stored-`size` fallback is
+ * permanent — real pre-enum bibles"). decisions.md 2026-09-15, point 4.
  */
 function elementScaleNote(entry) {
   if (!entry) return null;
