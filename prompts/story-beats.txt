@@ -28,8 +28,9 @@ Before dividing, plan the pictures — simple pages first:
 1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?
 2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces.
 3. Where does the whole cast share one simple action — boarding, hauling one line together, all turned toward one thing ahead of them, or seen from behind moving off? Never a row of figures facing the viewer, never everyone present doing nothing.
-4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it.
+4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the plan line itself carries what the third character does that the page cannot show without them — repeating the action, naming the place, or asserting the characters are needed does not hold.
 5. Where does each close-up land, where does each ultra-wide?
+6. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.
 Rough distribution: about two close-ups and two ultra-wides, the rest medium or wide — more close-ups when a moment earns one, but never just two shot types across the book.
 Then one line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.
 A complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page.
@@ -38,7 +39,7 @@ The plan line's instant is a single drawable moment:
 - One moment — no montage, no before-and-after, no "then", no passage of time inside one picture, no sequence of actions by one character; when a beat contains a change, pick the single moment that shows it.
 - Two consecutive actions by one character give the picture one of them: plan the dominant moment and leave the other out, rather than joining both into one instant with "and then", "before turning to", or a trailing clause carrying the second action.
 - One action: one thing is being done, and everyone else watches it or does that same thing in the same place. Two characters given different actions at one instant lose one of them.
-- At most three named characters in frame, and two carry a page better than three. The book has at most one whole-cast page, holding up to {MAX_CHARACTERS_PER_SCENE} named characters, wide or distant, all sharing one simple action or seen from behind moving off — never a row of figures facing the viewer. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
+- At most three named characters in frame, and two carry a page better than three; a named animal that acts in the story counts as one of them. The book has at most one whole-cast page, holding up to {MAX_CHARACTERS_PER_SCENE} named characters, wide or distant, all sharing one simple action or seen from behind moving off — never a row of figures facing the viewer. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
 - One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
 - One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.
 - One level per picture. Two named characters at different heights — deck and water, ledge and ground, roof and street — do not share a frame. Stage it from one level with the other character out of frame, or give each level its own page. A whole cast carried together on one back or one boat is one level.
@@ -70,7 +71,9 @@ Requirements:
 - A page may put the subject alone in frame — the creature, the artifact, the place — when the story has been driving toward it: hatching, breaking, glowing, arriving, the sought place found, with the characters just outside the frame. A place the story has not sought never fills a page alone.
 - A race or deadline the story runs on is scored mid-book at least twice — a page shows who is ahead or how much remains.
 - The stake the arc has a character say aloud lands on an early page, spoken.
-- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work.
+- A character's first page stages their arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming, and a character in frame before anyone says who they are is unplaced.
+- A prop, pet or skill that solves a problem appears on an earlier page with its owner before it does the work, and nothing a page plants is left without a later page that pays it off.
+- When the story's ending has an event of its own, the last page stages that event as its instant.
 - Stage a page with two people rather than three when two carry it.
 - No plan line states what anyone learned, realised or now understands.
 
