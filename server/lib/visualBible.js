@@ -2876,6 +2876,49 @@ function sceneObjectsNameEntry(sceneObjects, entry) {
   return false;
 }
 
+/**
+ * LARGE ELEMENTS BELONG TO THE PLATE (owner, 2026-09-15).
+ *
+ * A page reference cell has exactly one size — its own — and nothing in the cell
+ * says whether it depicts a thumb or a three-master. The PLATE sizes a
+ * structure against bollards, cobbles and quay height, which is the only place
+ * scale can be stated at all. On job_1789420511893_zly5rcdej p12 the ship rode
+ * as a page cell and rendered as a small open rowboat although the plate prompt
+ * named it: the cell won over the plate.
+ *
+ * Selection is by the AUTHORED `scaleClass`, not by VB collection, so a
+ * building-scale ARTIFACT (a monument, a mill, a bridge, a pole-with-banner)
+ * routes to the plate exactly like a vehicle does.
+ *
+ * A scale referent INSIDE the cell is REJECTED and is not the alternative
+ * (feedback_no_scale_referent_in_vb_cell): anything sharing the cell leaks onto
+ * the page.
+ */
+const LARGE_SCALE_CLASSES = new Set(['vehicle', 'building', 'landscape']);
+
+function isLargeScaleClass(value) {
+  return typeof value === 'string' && LARGE_SCALE_CLASSES.has(value.trim().toLowerCase());
+}
+
+/**
+ * Does this page reference belong to the plate rather than to a page cell?
+ *
+ * The `type` half is the pre-2026-09-15 rule and stays as the `scaleClass ===
+ * null` FALLBACK: every stored bible predates the field, and repair, iterate
+ * and cover paths re-read those bibles months later.
+ *
+ * CONDITIONAL ON A PLATE (owner, 2026-09-15). Callers ask this question only
+ * when a plate is actually SENT for the page. A large element on a plateless
+ * page KEEPS its cell rather than travelling on nothing — the precedent is
+ * page 1 of job_1788295892348_l028ggiq7a, a cast-0 ship exterior that attached
+ * zero references while a finished plate of the ship existed and was discarded.
+ */
+function isPlateBorneElement(ref) {
+  if (!ref) return false;
+  if (isLargeScaleClass(ref.scaleClass)) return true;
+  return ref.type === 'vehicle' || ref.type === 'location';
+}
+
 function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null, sceneObjects = null) {
   if (!visualBible) return [];
 
@@ -2916,6 +2959,7 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
       id: entry.id,
       name: entry.name,
       type: 'vehicle',
+      scaleClass: entry.scaleClass || null,
       description: entry.extractedDescription || entry.description,
       referenceImageData: cell.referenceImageData,
       referenceImageUrl: cell.referenceImageUrl,
@@ -2934,11 +2978,46 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
       id: entry.id,
       name: entry.name,
       type: 'location',
+      scaleClass: entry.scaleClass || null,
       description: entry.extractedDescription || entry.description,
       referenceImageData: cell.referenceImageData,
       referenceImageUrl: cell.referenceImageUrl,
       priority: 2,
     });
+  }
+
+  // LARGE ELEMENTS FROM ANY COLLECTION (2026-09-15). A building-scale artifact
+  // — a monument, a mill, a bridge, a pole-with-banner — is part of the
+  // setting exactly like a vehicle, and reaches the plate it belongs to instead
+  // of competing for one of the page's four cells. Same AD-authority gate, same
+  // aboard skip, same cap. Vehicles are already above and are not re-added.
+  const seen = new Set(refs.map(r => String(r.id || '').toUpperCase()));
+  for (const [entries, type] of [
+    [visualBible.secondaryCharacters, 'character'],
+    [visualBible.animals, 'animal'],
+    [visualBible.artifacts, 'artifact'],
+  ]) {
+    for (const entry of entries || []) {
+      if (skip(entry)) continue;
+      if (!isLargeScaleClass(entry.scaleClass)) continue;
+      if (!hasRef(entry)) continue;
+      if (seen.has(String(entry.id || '').toUpperCase())) continue;
+      if (adAuthored) {
+        if (!sceneObjectsNameEntry(sceneObjects, entry)) continue;
+      } else if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+      const { cell } = elementRefCell(entry);
+      refs.push({
+        id: entry.id,
+        name: entry.name,
+        type,
+        scaleClass: entry.scaleClass,
+        description: entry.extractedDescription || entry.description,
+        referenceImageData: cell.referenceImageData,
+        referenceImageUrl: cell.referenceImageUrl,
+        priority: 3,
+      });
+      log.info(`[EMPTY-SCENE-GRID] Page ${pageNumber}: ${entry.id} (${entry.scaleClass}) routed to the PLATE — too large for a page cell`);
+    }
   }
 
   refs.sort((a, b) => a.priority - b.priority);
@@ -3140,6 +3219,11 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
         stateName: state ? state.name : null,
         name: entry.name,
         type,
+        // The authored scale band rides on the reference so the two filter
+        // sites (buildPageCompositeRefs and Phase 5a-pre-grid) can route a
+        // large element to the plate. Null on every stored bible — then
+        // `isPlateBorneElement` falls back to the type rule.
+        scaleClass: entry.scaleClass || null,
         description: entry.extractedDescription || entry.description,
         referenceImageData: cell.referenceImageData,
         referenceImageUrl: cell.referenceImageUrl,
@@ -3172,6 +3256,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       id: entry.id,
       name: entry.name,
       type: 'location',
+      scaleClass: entry.scaleClass || null,
       description: entry.extractedDescription || entry.description,
       referenceImageData: locCell.referenceImageData,
       referenceImageUrl: locCell.referenceImageUrl,
@@ -3424,6 +3509,9 @@ module.exports = {
   SCALE_CLASSES,
   normaliseScaleClass,
   isGenericEntry,
+  LARGE_SCALE_CLASSES,
+  isLargeScaleClass,
+  isPlateBorneElement,
   splitGenericEntries,
   genericCitationTokens,
   // Parsing

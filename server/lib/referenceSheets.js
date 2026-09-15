@@ -1575,7 +1575,13 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
   // plate is set it is already painted into the plate.
   let finalLandmarkPhotos = landmarkPhotos || [];
   if (hasBackground) {
-    elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
+    // A plate IS sent, so everything plate-borne drops: vehicles and locations
+    // by type (the pre-2026-09-15 rule, and the `scaleClass === null` fallback
+    // for every stored bible), plus any element the bible classed at vehicle,
+    // building or landscape scale — a building-scale ARTIFACT belongs to the
+    // plate for exactly the same reason a ship does (owner, 2026-09-15).
+    const { isPlateBorneElement } = require('./visualBible');
+    elementReferences = elementReferences.filter(e => !isPlateBorneElement(e));
     finalLandmarkPhotos = [];
     log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
   } else if (hasOtherRefs || (landmarkPhotos || []).length > 0) {

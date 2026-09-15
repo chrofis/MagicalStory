@@ -4305,14 +4305,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
         const imageModelConfig = IMAGE_MODELS[pageImageModel];
         const isGrokImage = imageModelConfig?.backend === 'grok';
-        const imagePrompt = buildImagePrompt(
+        // ORDERING BUG, fixed 2026-09-15. `vbRefElementIds` decides whether the
+        // prompt says "the attached reference images include a rough image of
+        // <X>" (promptBuilders REQUIRED OBJECTS). It used to be computed HERE,
+        // from the UNFILTERED selection, while Phase 5a-pre-grid drops cells
+        // afterwards — so a page could be told to match a reference it was
+        // never given. The prompt is now built through this closure and rebuilt
+        // in 5a-pre-grid from the cells actually sent, which is what the trial
+        // path (`trialVbGrid.rawElements`) and the iterate path (images.js)
+        // already do.
+        const makeImagePrompt = (vbRefElementIds) => buildImagePrompt(
           scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, {
             skipVisualBible: isGrokImage,
             // Elements whose reference render rides with this call: grid cells,
             // or (for a plate-filtered vehicle in 5a-pre-grid) the plate itself.
-            vbRefElementIds: elementReferences.map(r => r.id).filter(Boolean),
+            vbRefElementIds,
           }
         );
+        const imagePrompt = makeImagePrompt(elementReferences.map(r => r.id).filter(Boolean));
         // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
         // Falls back to scene expansion's emptyScenePrompt via sceneMetadata
         let outlineEmptyScenePrompt = null;
@@ -4329,6 +4339,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           index,
           scene,
           prompt: imagePrompt,
+          // Rebuilt in Phase 5a-pre-grid from the cells actually sent.
+          makeImagePrompt,
           characterPhotos: pagePhotos,
           landmarkPhotos: pageLandmarkPhotos,
           // Landmarks this page cited but renders without (photo unavailable) —
@@ -5067,8 +5079,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // sent this is already covered by the location/vehicle drop below —
           // it matters on the plateless cast-0 pages this phase now feeds.
           const aboardId = pageData.sceneMetadata?.aboard || null;
+          // LARGE ELEMENTS BELONG TO THE PLATE (owner, 2026-09-15). Same
+          // question as buildPageCompositeRefs asks: vehicles and locations by
+          // TYPE (the pre-2026-09-15 rule and the `scaleClass === null`
+          // fallback for stored bibles), plus anything the bible classed at
+          // vehicle, building or landscape scale — a building-scale ARTIFACT
+          // belongs to the plate for the same reason a ship does.
+          //
+          // CONDITIONAL ON hasPlate, deliberately. A large element on a
+          // plateless page KEEPS its cell rather than travelling on nothing:
+          // page 1 of job_1788295892348_l028ggiq7a was a cast-0 ship exterior
+          // that attached zero references while a finished plate of the ship
+          // existed and was discarded.
+          const { isPlateBorneElement } = require('./server/lib/visualBible');
           const kept = (hasPlate
-            ? refs.filter(e => e.type !== 'location' && e.type !== 'vehicle')
+            ? refs.filter(e => !isPlateBorneElement(e))
             : refs
           ).filter(e => !aboardId || e.id !== aboardId);
           if (kept.length < refs.length) {
@@ -5083,6 +5108,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageData.visualBibleGrid = kept.length > 0
             ? await buildVisualBibleGrid(kept, [])
             : null;
+          // Recompute the reference claim from the cells actually sent — the
+          // prompt must never promise an image the call does not carry.
+          if (typeof pageData.makeImagePrompt === 'function') {
+            pageData.prompt = pageData.makeImagePrompt(kept.map(e => e.id).filter(Boolean));
+          }
           log.info(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length}/${refs.length} cell(s) — ${hasPlate ? `plate sent, dropped location/vehicle` : `no plate sent, location/vehicle kept`}${aboardId ? ` (aboard ${aboardId} withheld)` : ''}`);
         }
         if (filteredPages > 0) {

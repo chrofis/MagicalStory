@@ -627,14 +627,26 @@ function buildEmptyScenePrompt(opts = {}) {
     const gateAboardId = opts.aboardId || null;
     const adAuthored = Array.isArray(opts.sceneObjects);
     const { sceneObjectsNameEntry } = require('../lib/visualBible');
-    const pageVehicles = (opts.visualBible.vehicles || []).filter(v => {
+    const { isLargeScaleClass } = require('../lib/visualBible');
+    const staged = (v) => {
       if (!v.description) return false;
       if (adAuthored) {
         return (gateAboardId && v.id === gateAboardId) || sceneObjectsNameEntry(opts.sceneObjects, v);
       }
       const pages = v.pages || v.appearsInPages;
       return Array.isArray(pages) && pages.includes(opts.pageNumber);
-    });
+    };
+    // STRUCTURES, not just vehicles (owner, 2026-09-15). A built structure the
+    // bible classed at vehicle, building or landscape scale is part of the
+    // backdrop exactly like a vessel, and the plate is the only place its size
+    // can be stated against bollards, cobbles and quay height. Same AD-authority
+    // gate, same aboard exception. Vehicles keep the pre-2026-09-15 behaviour
+    // whatever their class — stored bibles carry none.
+    const pageVehicles = [
+      ...(opts.visualBible.vehicles || []),
+      ...[...(opts.visualBible.artifacts || []), ...(opts.visualBible.animals || []), ...(opts.visualBible.secondaryCharacters || [])]
+        .filter(e => isLargeScaleClass(e.scaleClass)),
+    ].filter(staged);
     if (pageVehicles.length > 0) {
       // The vehicle the camera stands ON gets a name-only mention, never its
       // full exterior description. The plate prose for such a page is already
@@ -647,13 +659,13 @@ function buildEmptyScenePrompt(opts = {}) {
       // without it, and a genuine exterior shot still needs the construction).
       const aboardId = opts.aboardId || null;
       const lines = pageVehicles.map(v => (aboardId && v.id === aboardId)
-        ? `- ${v.name || v.type || 'vehicle'}: the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.`
-        : `- ${v.name || v.type || 'vehicle'}: ${v.description}`);
+        ? `- ${v.name || v.type || 'structure'}: the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.`
+        : `- ${v.name || v.type || 'structure'}: ${v.description}`);
       // Render only the visible PART, not the whole vessel. The old wording
       // ("render it exactly to its description") demanded the full vehicle even
       // when the camera stands on its deck, which shipped duplicate ships, a
       // ship inside a cave, and wheels on dry land (audit 2026-08-29).
-      description += `\n\n**VEHICLES:** Any boat, ship, wagon, carriage, or other vehicle in this backdrop is one of the vessels described below — match its colour, construction and named parts, never a generic substitute:\n${lines.join('\n')}\nRender only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.`;
+      description += `\n\n**STRUCTURES:** Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute:\n${lines.join('\n')}\nRender only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.`;
     }
   }
 

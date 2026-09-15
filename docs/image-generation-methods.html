@@ -292,7 +292,15 @@
   <td>Generate empty scene background</td>
   <td><code>generateImageOnly</code> with <code>emptyScenePrompt</code></td>
   <td>Grok edit (no character refs)</td>
-  <td>Skipped entirely when <code>singlePassScene</code> is true and scene-composite is off.</td>
+  <td>Skipped entirely when <code>singlePassScene</code> is true and scene-composite is off.
+      <strong>The plate carries the STRUCTURES</strong> (owner, 2026-09-15): <code>buildEmptyScenePrompt</code>&rsquo;s
+      <code>**STRUCTURES:**</code> block (formerly <code>**VEHICLES:**</code>) describes every vessel, vehicle or built
+      structure the Art Director staged on the page, and <code>buildEmptySceneVbGrid</code> &rarr;
+      <code>getEmptySceneElementReferences</code> attaches their renders &mdash; now widened from
+      &ldquo;vehicles + non-landmark locations&rdquo; to any element whose authored <code>scaleClass</code> is
+      <code>vehicle</code>, <code>building</code> or <code>landscape</code>, whatever VB collection it sits in.
+      Same AD-<code>objects[]</code> authority gate, same <code>aboardId</code> exception, same cap of 9. See &sect;5b
+      for the page side of the same rule.</td>
 </tr>
 
 <tr>
@@ -448,6 +456,23 @@ from 3 to 5"). Test Lab can override with <code>params.maxRefSlots</code>.</p>
 (<code>buildPageCompositeRefs</code>, owner 2026-08-29) because the whole grid shares
 ONE slot and cell size scales as 1/n. The empty-scene grid is a different grid with
 its own cap of 9.</p>
+
+<p><strong>Large elements never take a page cell when a plate is sent</strong> (owner,
+2026-09-15). Every Visual Bible element carries an authored <code>scaleClass</code>
+(<code>hand | arm | person | vehicle | building | landscape</code>); anything at
+<code>vehicle</code>, <code>building</code> or <code>landscape</code> scale is
+<em>plate-borne</em> and is dropped from the page grid by both filter sites
+(<code>buildPageCompositeRefs</code> and Phase 5a-pre-grid in
+<code>storyJobPipeline.js</code>) through the shared <code>isPlateBorneElement</code>.
+Routing is by the CLASS, not by the VB collection, so a building-scale <em>artifact</em>
+(a monument, a mill, a bridge) routes like a ship does. A cell has exactly one size
+&mdash; its own &mdash; and nothing in it says whether it depicts a thumb or a
+three-master; the plate is where a structure can be sized against bollards, cobbles and
+quay height. <strong>The drop is conditional on a plate actually being sent:</strong>
+with no plate the large element keeps its cell rather than travelling on nothing.
+<code>scaleClass === null</code> (every stored bible) falls back to the older
+<code>type</code> rule. The prompt claim &ldquo;the attached reference images include a
+rough image of X&rdquo; is rebuilt from the cells actually sent, AFTER the filter.</p>
 
 <p><strong>Worn-item dedupe (owner, 2026-09-06).</strong> A Visual Bible element that is
 also part of a character&rsquo;s outfit (<code>wornAs: "Name.slot"</code>) is

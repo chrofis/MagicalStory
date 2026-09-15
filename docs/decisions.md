@@ -39970,3 +39970,45 @@ have kept its id and its cell. Caught by the phase-2 test, fixed in the same com
 `server/lib/outlineParser/unified.js`, `server/lib/referenceSheets.js`,
 `server/lib/vbElementBudget.js`, `tests/unit/vb-generic-gate.test.ts` (new),
 `tests/unit/vb-scale-class.test.ts`, `tests/unit/ad-authored-bible.test.ts`.
+
+## 2026-09-15 — Vehicle-class and larger belong to the PLATE, never to a page reference cell
+
+**Context:** on `job_1789420511893_zly5rcdej` p12, VEH001 "wooden sailing ship" was cited as a page
+reference cell and rendered as a small open rowboat although the plate prompt named the three-master
+— the cell won over the plate. A reference cell has exactly one size, its own, and nothing inside the
+cell says whether it depicts a thumb or a three-master; the plate sizes a structure against bollards,
+cobbles and quay height. A filter for this existed but was keyed on the VB collection, so a
+building-scale *artifact* (a monument, a mill, a bridge, a pole-with-banner) still competed for one
+of the page's four cells.
+
+**Decision:** routing is by the authored `scaleClass`, not by collection. `vehicle`, `building` and
+`landscape` are **plate-borne**: `getEmptySceneElementReferences` widens from "vehicles + non-landmark
+locations" to include any element in those bands from any collection, `buildEmptyScenePrompt`'s
+`**VEHICLES:**` block becomes `**STRUCTURES:**` on the same AD-`objects[]` authority gate and the same
+`aboardId` exception, and both page-side filter sites (`buildPageCompositeRefs` and Phase 5a-pre-grid)
+drop plate-borne elements through one shared predicate, `isPlateBorneElement`.
+
+**The drop is CONDITIONAL on a plate actually being sent** — not unconditional at selection time.
+A large element on a plateless page keeps its cell rather than travelling on nothing; the precedent is
+page 1 of `job_1788295892348_l028ggiq7a`, a cast-0 ship exterior that attached zero references while a
+finished plate of the ship existed and was discarded. `scaleClass === null` — every stored bible —
+falls back to the pre-2026-09-15 `type !== 'vehicle' && type !== 'location'` rule, which is kept
+inside the same predicate so the two can never disagree.
+
+**Ordering bug fixed in the same commit:** `storyJobPipeline.js` computed `vbRefElementIds` from the
+UNFILTERED selection while Phase 5a-pre-grid dropped cells afterwards, so a page prompt could tell the
+model "the attached reference images include a rough image of <X>" when that cell had been dropped —
+the model was told to match a reference it was never given. The page prompt is now built through a
+closure and rebuilt from the kept set after the filter, which is what the trial path
+(`trialVbGrid.rawElements`) and the iterate path (`images.js:4307`) already did.
+
+**Rationale:** a scale referent INSIDE the cell is REJECTED and is not the alternative
+(`feedback_no_scale_referent_in_vb_cell`) — anything sharing the cell leaks onto the page. This
+change only ever FREES page cells: `VB_SLOT_MAX_ELEMENTS` stays 4 and `VB_ELEMENT_BUDGET` stays 3;
+large elements leave the page grid, they never join it. It extends the settled
+"LOCATIONS ARE NOT ELEMENTS" logic rather than reversing it — the location is the plate the cast is
+composited into, and so is the structure standing in it.
+
+**Touched files:** `server/lib/visualBible.js`, `server/lib/referenceSheets.js`,
+`server/services/prompts.js`, `storyJobPipeline.js`, `docs/image-routing.md`,
+`docs/image-generation-methods.html`, `tests/unit/vb-plate-routing.test.ts` (new).
