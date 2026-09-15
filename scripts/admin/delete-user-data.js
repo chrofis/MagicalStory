@@ -679,17 +679,25 @@ async function main() {
 
     // ── Phase G — R2, only after the commit ────────────────────────────────
     section('R2 DELETION (post-commit)');
+    // Through the failed-prune ledger (server/lib/r2Pending.js), never the raw
+    // r2 helpers: a prune that does not finish is written to r2_pending_deletions
+    // and retried by the daily housekeeping, so an outage here cannot turn into
+    // a permanent orphan. The verification below is IN ADDITION — the ledger
+    // defers, it does not prove.
     let r2Deleted = 0;
+    const pruneReason = `GDPR erasure of user ${user.id}`;
     for (const [prefix] of prefixes) {
-      r2Deleted += await r2.deleteByPrefix(prefix);
+      r2Deleted += await r2Pending.prunePrefix(prefix, pruneReason);
     }
     for (const key of pdfKeys) {
-      if (await r2.deleteObject(key)) r2Deleted++;
-      else throw new Error(`R2 deleteObject failed for order PDF "${key}" — the file still exists.`);
+      // pruneObject returns 1 on success, 0 otherwise (and has already recorded
+      // the key for retry). Stricter policy here: a failed erasure is an error.
+      if (await r2Pending.pruneObject(key, pruneReason) === 1) r2Deleted++;
+      else throw new Error(`R2 delete failed for order PDF "${key}" — the file still exists (recorded for retry).`);
     }
     console.log(`  deleted ${r2Deleted} object(s)`);
 
-    // deleteByPrefix logs failures and returns a count rather than throwing, so
+    // prunePrefix logs failures and returns a count rather than throwing, so
     // verify independently: anything still listed under these prefixes is a
     // FAILED erasure and must be reported as one.
     const leftovers = [];

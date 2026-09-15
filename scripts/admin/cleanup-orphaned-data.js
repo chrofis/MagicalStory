@@ -64,17 +64,23 @@ async function cleanupOrphanedData() {
       );
       console.log(`✓ Deleted ${deleteStoriesResult.rowCount} orphaned stories`);
 
-      // Prune R2 prefixes for the orphans we just dropped.
-      try {
-        const r2 = require('../../server/lib/r2');
-        let totalR2 = 0;
-        for (const row of deleteStoriesResult.rows) {
-          totalR2 += await r2.deleteStoryArtefacts(row.id);
+      // Prune R2 prefixes for the orphans we just dropped — through the
+      // failed-prune ledger (server/lib/r2Pending.js), so a prune that does not
+      // finish is recorded in r2_pending_deletions and retried daily. pruneStory
+      // records its own failures and does not throw; anything that reaches the
+      // catch means the prune could not even be RECORDED, which is an error,
+      // not a partial cleanup.
+      const r2Pending = require('../../server/lib/r2Pending');
+      let totalR2 = 0;
+      for (const row of deleteStoriesResult.rows) {
+        try {
+          totalR2 += await r2Pending.pruneStory(row.id, 'orphan cleanup');
+        } catch (r2Err) {
+          console.error(`✗ R2 prune for orphaned story ${row.id} failed and could NOT be recorded for retry: ${r2Err.message}`);
+          process.exitCode = 1;
         }
-        if (totalR2 > 0) console.log(`☁️  Pruned ${totalR2} R2 objects for orphaned stories`);
-      } catch (r2Err) {
-        console.warn(`⚠️  R2 cleanup partial: ${r2Err.message}`);
       }
+      if (totalR2 > 0) console.log(`☁️  Pruned ${totalR2} R2 objects for orphaned stories`);
     }
 
     console.log('\n✅ Cleanup complete!');
@@ -89,7 +95,7 @@ async function cleanupOrphanedData() {
 }
 
 cleanupOrphanedData()
-  .then(() => process.exit(0))
+  .then(() => process.exit(process.exitCode || 0))
   .catch(err => {
     console.error(err);
     process.exit(1);
