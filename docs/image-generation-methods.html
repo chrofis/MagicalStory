@@ -237,7 +237,7 @@
   <td><code>storyJobPipeline.js</code> ~3960 → <code>generateSceneComposite</code> (<code>server/lib/sceneComposite.js</code>)</td>
   <td>Grok generate ×1 (plate) + edit ×1 (depopulate) + edit ×1 (blend). Detection is local (GroundingDINO), not a paid call.</td>
   <td>2×4 character sheets, scene metadata (depths, expressions, interactions), clothingRequirements, optional VB grid.</td>
-  <td>Replaces <code>runScaleRepair</code> on the <code>needsScaleRepair</code> trigger — <strong>only</strong> pages declaring ≥1 foreground AND ≥1 background, outdoor, no shared vessel. Steps: coloured-silhouette plate → depopulate → <code>findSilhouettesWithDino</code> (DINO person+face boxes; palette hue names each box; head measured from the pale tint INSIDE the face box) → <code>sizeFigure</code> (painted height, unless the head says scenery hides part of them, the frame cuts them, or <code>buildAgeTargets</code> says a child is drawn adult-sized) → paste with figure-figure occlusion → <code>blendPastedCanvas</code>. <strong>Two aborts keep the original render:</strong> a box that cannot be a person, or a depth spread under 2×. <strong>Never send the page prompt to the blend</strong> — its staging sections relocate characters (measured 9 variants, Lab 695–705); it gets a census + metadata emotions/interactions instead (<code>buildBlendEditPrompt</code>). Outcome per page in <code>sceneImages[].compositeOutcome</code>. Needs DINO reachable or it aborts by design. See <code>docs/decisions.md</code> 2026-08-15 (8 entries) and <code>docs/image-routing.md</code>.</td>
+  <td>Replaces <code>runScaleRepair</code> on the <code>needsScaleRepair</code> trigger — <strong>only</strong> pages declaring ≥1 foreground AND ≥1 background, outdoor, no shared vessel. Steps: coloured-silhouette plate → depopulate → <code>findSilhouettesWithDino</code> (DINO person+face boxes; palette hue names each box; head measured from the pale tint INSIDE the face box) → <code>sizeFigure</code> (painted height, unless the head says scenery hides part of them, the frame cuts them, or <code>buildAgeTargets</code> says a child is drawn adult-sized) → paste with figure-figure occlusion → <code>blendPastedCanvas</code>. <strong>Two aborts keep the original render:</strong> a box that cannot be a person, or a depth spread under 2×. <strong>Never send the page prompt to the blend</strong> — its staging sections relocate characters (measured 9 variants, Lab 695–705); it gets a census + metadata emotions/interactions instead (<code>buildBlendEditPrompt</code>). Outcome per page in <code>sceneImages[].compositeOutcome</code>. Needs DINO reachable or it aborts by design. <strong><code>figureMethod: 'inPlace'</code> (2026-09-10, Lab-only, unvalidated):</strong> after detection, one <code>editWithGrok</code> per figure with [original plate, reference sheet] (<code>padInput</code>, <code>skipOutputCrop</code>; render re-registered to the plate canvas), <code>buildInPlaceRenderPrompt</code> → DINO person boxes on the render, best-IoU match to the silhouette box (<code>matchRenderedFigureBox</code>, floor 0.30) → <code>_mobilesamMaskFull</code> cut-out at canvas coordinates → pasted onto the depopulated plate back-to-front, no blend. Silhouette-mask fallback (dilated 6%) when nothing matches. Debug: <code>inPlaceRenders</code>, <code>cutouts</code>, <code>inPlaceLog</code>. See <code>docs/decisions.md</code> 2026-08-15 (8 entries) and <code>docs/image-routing.md</code>.</td>
 </tr>
 
 <tr>
@@ -292,7 +292,15 @@
   <td>Generate empty scene background</td>
   <td><code>generateImageOnly</code> with <code>emptyScenePrompt</code></td>
   <td>Grok edit (no character refs)</td>
-  <td>Skipped entirely when <code>singlePassScene</code> is true and scene-composite is off.</td>
+  <td>Skipped entirely when <code>singlePassScene</code> is true and scene-composite is off.
+      <strong>The plate carries the STRUCTURES</strong> (owner, 2026-09-15): <code>buildEmptyScenePrompt</code>&rsquo;s
+      <code>**STRUCTURES:**</code> block (formerly <code>**VEHICLES:**</code>) describes every vessel, vehicle or built
+      structure the Art Director staged on the page, and <code>buildEmptySceneVbGrid</code> &rarr;
+      <code>getEmptySceneElementReferences</code> attaches their renders &mdash; now widened from
+      &ldquo;vehicles + non-landmark locations&rdquo; to any element whose authored <code>scaleClass</code> is
+      <code>vehicle</code>, <code>building</code> or <code>landscape</code>, whatever VB collection it sits in.
+      Same AD-<code>objects[]</code> authority gate, same <code>aboardId</code> exception, same cap of 9. See &sect;5b
+      for the page side of the same rule.</td>
 </tr>
 
 <tr>
@@ -448,6 +456,23 @@ from 3 to 5"). Test Lab can override with <code>params.maxRefSlots</code>.</p>
 (<code>buildPageCompositeRefs</code>, owner 2026-08-29) because the whole grid shares
 ONE slot and cell size scales as 1/n. The empty-scene grid is a different grid with
 its own cap of 9.</p>
+
+<p><strong>Large elements never take a page cell when a plate is sent</strong> (owner,
+2026-09-15). Every Visual Bible element carries an authored <code>scaleClass</code>
+(<code>hand | arm | person | vehicle | building | landscape</code>); anything at
+<code>vehicle</code>, <code>building</code> or <code>landscape</code> scale is
+<em>plate-borne</em> and is dropped from the page grid by both filter sites
+(<code>buildPageCompositeRefs</code> and Phase 5a-pre-grid in
+<code>storyJobPipeline.js</code>) through the shared <code>isPlateBorneElement</code>.
+Routing is by the CLASS, not by the VB collection, so a building-scale <em>artifact</em>
+(a monument, a mill, a bridge) routes like a ship does. A cell has exactly one size
+&mdash; its own &mdash; and nothing in it says whether it depicts a thumb or a
+three-master; the plate is where a structure can be sized against bollards, cobbles and
+quay height. <strong>The drop is conditional on a plate actually being sent:</strong>
+with no plate the large element keeps its cell rather than travelling on nothing.
+<code>scaleClass === null</code> (every stored bible) falls back to the older
+<code>type</code> rule. The prompt claim &ldquo;the attached reference images include a
+rough image of X&rdquo; is rebuilt from the cells actually sent, AFTER the filter.</p>
 
 <p><strong>Worn-item dedupe (owner, 2026-09-06).</strong> A Visual Bible element that is
 also part of a character&rsquo;s outfit (<code>wornAs: "Name.slot"</code>) is

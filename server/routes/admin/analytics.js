@@ -13,6 +13,8 @@ const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { MODEL_PRICING } = require('../../config/models');
 const { getTrialStats, getTrialStatsHistory, getTrialFunnel, getTrialStepFunnel } = require('../trial');
+const { TRIAL_SOURCES } = require('../../lib/trialSource');
+const { sentinelExclusion } = require('../../lib/gdprSentinel');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -55,7 +57,8 @@ router.get('/stats', authenticateToken, requireAdmin, async (req, res) => {
       imageFilesResult,
       dbSizeResult
     ] = await Promise.all([
-      pool.query('SELECT COUNT(*) as count FROM users'),
+      // The GDPR erasure sentinel is not a person (server/lib/gdprSentinel.js).
+      pool.query(`SELECT COUNT(*) as count FROM users WHERE ${sentinelExclusion()}`),
       pool.query('SELECT COUNT(*) as count FROM stories'),
       pool.query('SELECT COUNT(*) as count FROM files'),
       // Get orphaned files count (fast query with EXISTS)
@@ -178,6 +181,7 @@ router.get('/user-storage', authenticateToken, requireAdmin, async (req, res) =>
         LEFT JOIN stories s ON u.id = s.user_id
         LEFT JOIN files f ON u.id = f.user_id
         LEFT JOIN characters c ON u.id = c.user_id
+        WHERE ${sentinelExclusion('u')}
         GROUP BY u.id, u.username, u.email, u.role, u.created_at
       )
       SELECT
@@ -796,9 +800,11 @@ router.get('/trial-step-funnel', authenticateToken, requireAdmin, async (req, re
     if (!isDatabaseMode()) {
       return res.status(400).json({ error: 'Trial step funnel requires database mode' });
     }
-    const days = parseInt(req.query.days) || 30;
-    const source = ['all', 'paid', 'organic', 'direct'].includes(req.query.source) ? req.query.source : 'all';
-    const funnel = await getTrialStepFunnel(days, source);
+    // `range` is the current knob: '<N>d' rolling, or 'today'/'yesterday' on CH
+    // calendar boundaries. `days` stays accepted so an old bookmark still works.
+    const range = req.query.range || `${parseInt(req.query.days) || 30}d`;
+    const source = TRIAL_SOURCES.includes(req.query.source) ? req.query.source : 'all';
+    const funnel = await getTrialStepFunnel(range, source);
     res.json(funnel);
   } catch (err) {
     console.error('❌ [ADMIN] Error fetching trial step funnel:', err);

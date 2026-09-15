@@ -28,9 +28,10 @@ const path = require('path');
 const sharp = require('sharp');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, promptSections } = require('../services/prompts');
+const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
-const { TEXT_MODELS, REPAIR_DEFAULTS } = require('../config/models');
+const { TEXT_MODELS } = require('../config/models');
 const r2Lib = require('./r2');
 
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
@@ -40,6 +41,20 @@ function getStoryHelpers() {
     storyHelpersModule = require('./storyHelpers');
   }
   return storyHelpersModule;
+}
+
+// ONE NAME-MATCHING RULE (2026-09-13). Five competing rules used to decide
+// whether two cast tokens meant the same person; `castResolver` is the single
+// one. Every consumer here states which of the two categories it is:
+//   RESOLVE — a brief/roster token → an entity (resolveEntity/sameEntity)
+//   COMPARE — two stored names from the SAME run (canonicalName equality only)
+// Lazy for the same circular-dependency reason as storyHelpers.
+let castResolverModule = null;
+function getCastResolver() {
+  if (!castResolverModule) {
+    castResolverModule = require('./castResolver');
+  }
+  return castResolverModule;
 }
 
 // Quality-eval sampling knobs (env-overridable for A/B). Defaults chosen from
@@ -53,10 +68,17 @@ function getStoryHelpers() {
 // condemns good images). Semantic / three-stage evals are unaffected — they
 // keep their own calls and can keep thinking where reasoning genuinely helps.
 const { EVAL_TEMPERATURE } = require('../config/models');
+const { FINDING_SOURCES, stampFindingSource } = require('./findingSources');
 const EVAL_THINKING_BUDGET = process.env.EVAL_THINKING_BUDGET != null ? Number(process.env.EVAL_THINKING_BUDGET) : 0;
 
 // Quality threshold from environment or default
-const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || REPAIR_DEFAULTS.scoreThreshold;
+// MANUAL admin repair workflow STOP condition -- PINNED at 50, deliberately NOT
+// REPAIR_DEFAULTS.scoreThreshold (owner, 2026-09-09). The pipeline floor moved
+// 50 -> 60 for AUTOMATIC repair rounds; deriving this from it would silently make
+// operator-driven "repair until good" grind every page up to 60 and multiply the
+// cost of a manual session. Operator behaviour is unchanged.
+const MANUAL_REPAIR_STOP_SCORE = 50;
+const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || MANUAL_REPAIR_STOP_SCORE;
 
 /**
  * Run P1 Visual Inventory — honest figure/age detection without seeing the original prompt.
@@ -82,11 +104,36 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     const inventoryPrompt = opts.promptOverride || PROMPT_TEMPLATES.imageInventoryUnified;
     const inventoryParts = [...parts];
     inventoryParts.push({ text: inventoryPrompt });
+    assertPromptFilled(inventoryParts, 'runVisualInventory');
 
     // Route to Grok vision API for xAI models
-    const modelConfig = TEXT_MODELS[modelId];
-    let p1Response;
-    if (modelConfig?.provider === 'xai') {
+    let modelConfig = TEXT_MODELS[modelId];
+    let p1Response = null;
+    if (modelConfig?.provider === 'openrouter') {
+      // OpenRouter vision judge (Qwen3-VL on staging — runtime.js
+      // `inventoryModel`). Same response shape as the Grok path. A failed,
+      // stalled or errored call FALLS BACK TO GEMINI 2.5 FLASH (owner,
+      // 2026-09-07): the inventory is on every page's critical path and the
+      // single upstream provider stalled 3 of 20 Lab pages (experiment 1053).
+      const pageLabel = pageContext ? `[${pageContext}] ` : '';
+      try {
+        p1Response = await require('./images').callOpenRouterVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt, { reasoning: opts.reasoning || null });
+      } catch (e) {
+        log.warn(`⚠️ [QUALITY P1] ${pageLabel}${modelId} threw (${e.message}) — falling back to gemini-2.5-flash`);
+        p1Response = null;
+      }
+      if (p1Response && !p1Response.ok) {
+        log.warn(`⚠️ [QUALITY P1] ${pageLabel}${modelId} returned HTTP ${p1Response.status} — falling back to gemini-2.5-flash`);
+        p1Response = null;
+      }
+      if (!p1Response) {
+        modelId = 'gemini-2.5-flash';
+        modelConfig = TEXT_MODELS[modelId];
+      }
+    }
+    if (p1Response) {
+      // OpenRouter answered — nothing more to fetch.
+    } else if (modelConfig?.provider === 'xai') {
       p1Response = await require('./images').callGrokVisionAPI(modelId, modelConfig.modelId || modelId, inventoryParts, inventoryPrompt);
     } else {
       p1Response = await withRetry(async () => {
@@ -104,8 +151,9 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
             // there, emitting truncated JSON: measured on a 12-figure page in
             // Lab #817, where the inventory ended mid-figure at `"id": 5` after
             // only 1,280 visible output tokens and parsed to zero figures.
+            // No maxOutputTokens (owner rule: no output caps) — Gemini's default
+            // is the model's own ceiling; finishReason MAX_TOKENS is checked below.
             generationConfig: {
-              maxOutputTokens: 32000,
               temperature: EVAL_TEMPERATURE,
               thinkingConfig: { thinkingBudget: EVAL_THINKING_BUDGET },
             },
@@ -131,6 +179,11 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
             const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, inventoryPrompt);
             if (grokResp.ok) {
               p1Response = grokResp;
+              // `modelId` is what the caller is told ACTUALLY answered
+              // (servedByModel, recorded by the Lab at testlab.js:6546). Leaving
+              // it on the requested id makes an A/B compare a model with itself.
+              modelId = grokFallbackId;
+              modelConfig = grokFallbackModel;
             } else {
               return null;
             }
@@ -169,6 +222,10 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
             const grokResp = await require('./images').callGrokVisionAPI(grokFallbackId, grokFallbackModel.modelId || grokFallbackId, inventoryParts, inventoryPrompt);
             if (grokResp.ok) {
               p1Data = await grokResp.json();
+              // Same reason as the HTTP-error fallback above: report the model
+              // that answered, not the one that was asked.
+              modelId = grokFallbackId;
+              modelConfig = grokFallbackModel;
               inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
               outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
               if (p1Data?.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -197,8 +254,20 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       log.warn(`⚠️ [QUALITY P1] No text response`);
       return null;
     }
+    // A MAX_TOKENS inventory is a cut figure list — it parsed to zero figures
+    // on Lab #817 and read as "no figures". Fail with the reason, not silently.
+    if (p1Data.candidates[0]?.finishReason === 'MAX_TOKENS') {
+      log.warn(`⚠️ [QUALITY P1] ${pageContext ? `[${pageContext}] ` : ''}evalFailed: inventory TRUNCATED (finishReason=MAX_TOKENS at ${outputTokens} output tokens) — figures unusable`);
+      return null;
+    }
 
-    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens };
+    // `modelId` is reassigned by the fallbacks above, so it is the model that
+    // ACTUALLY answered — which the caller has no other way to learn. Lab #1241
+    // requested gemini-3.7-flash, every call 400'd ("reasoning is mandatory"),
+    // the documented 2.5-flash fallback served all 10 pages, and the experiment
+    // row still said 3.7: an A/B comparing a model with itself, caught only
+    // because the token counts came back byte-identical to the 2.5 arm.
+    if (opts.raw) return { rawText: p1Text, inputTokens, outputTokens, servedByModel: modelId };
 
     let inventoryJson;
     try {
@@ -212,6 +281,14 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       return null;
     }
 
+    // Boxes on the inventory's own scale contract (0-1). Qwen3-VL mixes
+    // 0-1000 pixel values into the same array; every provider passes through
+    // here so the pairing downstream never sees a mixed box.
+    const boxStats = require('./inventoryBoxes').normaliseInventoryBoxes(inventoryJson);
+    if (boxStats.fixed || boxStats.dropped) {
+      log.info(`📊 [EVAL P1] ${modelId}: normalised ${boxStats.fixed} box(es) from 0-1000 scale, dropped ${boxStats.dropped} malformed`);
+    }
+
     const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
     log.verbose(`📊 [EVAL P1] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
 
@@ -222,6 +299,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
 
     return {
       figures,
+      servedByModel: modelId,
       // Everything the unified template produces travels with it. The narrowed
       // return is what made P1's scene_summary generated-and-discarded on every
       // page since February, and it would have silently dropped interactions,
@@ -242,6 +320,145 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     log.warn(`⚠️ [QUALITY P1] Figure check failed: ${err.message}`);
     return null;
   }
+}
+
+/**
+ * Largest contiguous INTERIOR uniform patch, as a fraction of all blocks.
+ *
+ * Why not a bare count (the 2026-09-14 fix): the old check summed uniform
+ * blocks ANYWHERE and compared that to the threshold, so a watercolour paper
+ * border — a thin uniform band hugging the perimeter, an intended part of the
+ * art style — accumulated enough blocks to trip it even though no rectangular
+ * glitch existed in the picture. A real AI box artifact is a CONTIGUOUS patch
+ * sitting in the interior; a border, vignette or deckle edge is a band on the
+ * rim. So we discriminate on shape and position.
+ *
+ * Two steps, in this order:
+ *  1. Peel a perimeter band. From each of the four sides inward, a line is
+ *     peeled only while it is uniform ACROSS ITS WHOLE SPAN. That is the
+ *     deliberately conservative part: a border runs edge to edge, a glitch
+ *     does not — so an artifact that merely touches an edge is never peeled
+ *     (this is why we do not just ignore all edge blocks). Peeling is capped at
+ *     15% of the dimension so an entirely uniform frame — blank or broken —
+ *     still leaves a large interior and is still flagged.
+ *  2. Take the largest 4-connected component of what survives. Scattered
+ *     uniform blocks summing past the threshold are not a box and no longer
+ *     fire; a genuine box is one component and is unaffected.
+ *
+ * The denominator stays the full block count, so the 0.08 threshold keeps its
+ * original meaning for an interior patch.
+ */
+function largestInteriorUniformFraction(mask, rows, cols) {
+  const total = rows * cols;
+  if (total === 0) return 0;
+  const frame = new Uint8Array(total);
+  const maxR = Math.max(1, Math.floor(rows * 0.15));
+  const maxC = Math.max(1, Math.floor(cols * 0.15));
+
+  const rowUniform = (r) => { for (let c = 0; c < cols; c++) if (!mask[r * cols + c]) return false; return true; };
+  const colUniform = (c) => { for (let r = 0; r < rows; r++) if (!mask[r * cols + c]) return false; return true; };
+  const markRow = (r) => { for (let c = 0; c < cols; c++) frame[r * cols + c] = 1; };
+  const markCol = (c) => { for (let r = 0; r < rows; r++) frame[r * cols + c] = 1; };
+
+  for (let t = 0; t < maxR && rowUniform(t); t++) markRow(t);
+  for (let t = 0; t < maxR && rowUniform(rows - 1 - t); t++) markRow(rows - 1 - t);
+  for (let t = 0; t < maxC && colUniform(t); t++) markCol(t);
+  for (let t = 0; t < maxC && colUniform(cols - 1 - t); t++) markCol(cols - 1 - t);
+
+  // Largest 4-connected component of the un-peeled uniform blocks.
+  const seen = new Uint8Array(total);
+  const stack = [];
+  let best = 0;
+  for (let start = 0; start < total; start++) {
+    if (!mask[start] || frame[start] || seen[start]) continue;
+    seen[start] = 1;
+    stack.length = 0;
+    stack.push(start);
+    let size = 0;
+    while (stack.length) {
+      const i = stack.pop();
+      size++;
+      const r = Math.floor(i / cols);
+      const c = i - r * cols;
+      const nbrs = [r > 0 ? i - cols : -1, r < rows - 1 ? i + cols : -1, c > 0 ? i - 1 : -1, c < cols - 1 ? i + 1 : -1];
+      for (const n of nbrs) {
+        if (n < 0 || seen[n] || !mask[n] || frame[n]) continue;
+        seen[n] = 1;
+        stack.push(n);
+      }
+    }
+    if (size > best) best = size;
+  }
+  return best / total;
+}
+
+/**
+ * Build the empty-scene QC prompt (prompts/empty-scene-qc.txt).
+ *
+ * Extracted from validateEmptyScene 2026-09-15 so the built prompt can be
+ * asserted without a paid vision call, and so the plate generator/critic pair
+ * names two file paths instead of this module.
+ */
+function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, characterPlacements = null, mainScenePrompt = '' } = {}) {
+  const sceneCtx = sceneDescription
+    ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
+    : '';
+  // Era context — explicit period so the vision model doesn't have to
+  // infer it. Caller derives this from storyType + costumed clothing.
+  // "present-day" (or null) disables the anachronism check.
+  const eraBlock = storyEra
+    ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; any modern elements visible in the photo must NOT appear in the output.`
+    : '';
+  // If the outline already declared where each character will land, ask
+  // the vision model to verify the empty scene has flat usable space at
+  // each of those spots — not blocked by walls, props, or scene edges.
+  const placementsBlock = Array.isArray(characterPlacements) && characterPlacements.length > 0
+    ? `\n\nCHARACTER PLACEMENTS TO BE COMPOSITED LATER:\n${characterPlacements.map(p => `- ${p.name || 'character'} at ${p.position || 'unspecified'}${p.depth ? ` (depth: ${p.depth})` : ''}`).join('\n')}`
+    : '';
+  // The judge's own text is prompts/empty-scene-qc.txt (sections BODY /
+  // ERA_CHECK / PLACEMENTS_CHECK), so the plate generator/critic pair is
+  // a registry set over two file paths. The conditional checks keep the
+  // leading newline here; the section bodies are trimmed.
+  const qc = promptSections(PROMPT_TEMPLATES.emptySceneQc);
+  // Loud, not empty: as a string literal a missing prompt was impossible; as a
+  // file it would hand the judge a blank page and every plate would "pass".
+  if (!qc.BODY) throw new Error('buildEmptySceneQcPrompt: empty-scene-qc template not loaded');
+  const placementsCheck = placementsBlock ? `\n${qc.PLACEMENTS_CHECK}` : '';
+  // Composition geometry fidelity — the main scene will composite
+  // characters and aim lines onto this empty scene. If the path
+  // direction or vanishing point in the empty scene doesn't match what
+  // the main scene prose describes, the composite will be broken.
+  //
+  // NO RESERVED CORNER (owner, 2026-09-15: "Why does the empty scene
+  // need a reserved corner that is wrong. Change the judge."). The
+  // page's text area is computed later from the calmness map
+  // (server/lib/textRegion.js), so the plate reserves nothing.
+  //
+  // The three geometry checks below DO reach the generator since
+  // 2026-09-15: buildEmptyScenePrompt derives a geometry-only block
+  // from this same mainScenePrompt (server/lib/sceneGeometry.js), so
+  // the plate is graded on facts it was given. Adding a check here
+  // that is not derivable into that block re-creates the blind grade.
+  const mainSceneBlock = mainScenePrompt
+    ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
+    : '';
+  // The judge's three geometry questions come from the SAME constant
+  // that writes the plate author's geometry block
+  // (GEOMETRY_DIMENSIONS, server/lib/sceneGeometry.js), so the two
+  // sides name the same dimensions in the same words. A fourth check
+  // belongs in that constant, never inline here.
+  const geometryCheck = mainScenePrompt
+    ? require('./sceneGeometry').buildGeometryJudgeChecks(5)
+    : '';
+  return fillTemplate(qc.BODY, {
+    SCENE_CTX: sceneCtx,
+    ERA_BLOCK: eraBlock,
+    PLACEMENTS_BLOCK: placementsBlock,
+    MAIN_SCENE_BLOCK: mainSceneBlock,
+    ERA_CHECK: storyEra ? `\n${qc.ERA_CHECK}` : '',
+    PLACEMENTS_CHECK: placementsCheck,
+    GEOMETRY_CHECK: geometryCheck,
+  });
 }
 
 /**
@@ -306,14 +523,18 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
     // Check 1: uniform-patch artifact detection — a flat white OR a flat
     // black rectangle is an AI glitch regardless of the expected tone. Flag
     // either if it exceeds the artifact threshold.
-    let whiteBoxBlocks = 0;
-    let blackBoxBlocks = 0;
+    const whiteMask = new Uint8Array(rows * cols);
+    const blackMask = new Uint8Array(rows * cols);
     for (let i = 0; i < rows * cols; i++) {
-      if (blockBrightness[i] > 240 && blockVariance[i] < 5) whiteBoxBlocks++;
-      if (blockBrightness[i] < 15 && blockVariance[i] < 5) blackBoxBlocks++;
+      if (blockBrightness[i] > 240 && blockVariance[i] < 5) whiteMask[i] = 1;
+      if (blockBrightness[i] < 15 && blockVariance[i] < 5) blackMask[i] = 1;
     }
-    const whiteBoxPct = whiteBoxBlocks / (rows * cols);
-    const blackBoxPct = blackBoxBlocks / (rows * cols);
+    // Shape and position, not a bare count: the fraction is the LARGEST
+    // 4-connected uniform patch left after a full-width/height perimeter band
+    // is peeled off. Both twins get it — a dark deckle edge false-positives the
+    // black check exactly as a watercolour paper border did the white one.
+    const whiteBoxPct = largestInteriorUniformFraction(whiteMask, rows, cols);
+    const blackBoxPct = largestInteriorUniformFraction(blackMask, rows, cols);
     if (whiteBoxPct > 0.08) {
       issues.push(`white box artifact: ${(whiteBoxPct * 100).toFixed(0)}% of image is uniform white`);
     }
@@ -369,41 +590,7 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const base64ForVision = r2Lib.stripDataUriPrefix(imageData);
           const mimeType = imageData.match(/^data:(image\/\w+);/)?.[1] || 'image/jpeg';
 
-          const sceneCtx = sceneDescription
-            ? `\nEXPECTED SCENE: "${sceneDescription.substring(0, 300)}"`
-            : '';
-          // Era context — explicit period so the vision model doesn't have to
-          // infer it. Caller derives this from storyType + costumed clothing.
-          // "present-day" (or null) disables the anachronism check.
-          const eraBlock = storyEra
-            ? `\n\nSTORY ERA: ${storyEra} — render accordingly. Landmark reference photos are present-day; any modern elements visible in the photo must NOT appear in the output.`
-            : '';
-          // If the outline already declared where each character will land, ask
-          // the vision model to verify the empty scene has flat usable space at
-          // each of those spots — not blocked by walls, props, or scene edges.
-          const placementsBlock = Array.isArray(characterPlacements) && characterPlacements.length > 0
-            ? `\n\nCHARACTER PLACEMENTS TO BE COMPOSITED LATER:\n${characterPlacements.map(p => `- ${p.name || 'character'} at ${p.position || 'unspecified'}${p.depth ? ` (depth: ${p.depth})` : ''}`).join('\n')}`
-            : '';
-          const placementsCheck = placementsBlock
-            ? `\n4. Given the character placements above, does the empty scene have open, flat, usable ground at EACH of those frame positions? FAIL if a character position (e.g. "far-left background") maps to a frame region that is blocked by a wall, a building facade, a large prop, or the very edge of a receding corridor. Name the blocked position in the issue.`
-            : '';
-          // Composition geometry fidelity — the main scene will composite characters,
-          // aim lines, and distant targets onto this empty scene. If the path
-          // direction, vanishing point, or reserved distant-target spot in the
-          // empty scene doesn't match what the main scene prose describes, the
-          // composite will be broken (e.g. character aims toward a target corner
-          // where the empty scene has a wall instead of an opening).
-          const mainSceneBlock = mainScenePrompt
-            ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
-            : '';
-          const geometryCheck = mainScenePrompt
-            ? `\n5. Composition geometry — does this empty scene support the main scene's geometry? Check:
-   a. Any path, river, road, corridor, shoreline, horizon, or major perspective line — does it run in the same direction the main scene prose describes (e.g. "stretches to the right background", "diagonal from lower-left to upper-right")?
-   b. Vanishing point / opening location — is it at the frame position the main scene implies (e.g. main scene says "sliver of light at far right background" → empty scene must have that opening/light at the upper-right, not centered or on the left)?
-   c. Reserved open space for distant composited targets — if the main scene places a "tiny figure" or small object at a specific corner, the empty scene must have open, uncluttered sky/ground/path there, not a wall or tree trunk.
-   d. Lighting direction — consistent with the main scene's time of day and declared light source.
-   FAIL with a specific fix instruction if any of (a)–(d) disagree. The issue description must name WHAT geometry is wrong AND the corrected direction/position. Example: "path runs front-to-center instead of diagonally to the upper-right; regenerate with the path angled toward the upper-right corner where the target will be composited".`
-            : '';
+          const qcPrompt = buildEmptySceneQcPrompt({ sceneDescription, storyEra, characterPlacements, mainScenePrompt });
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
           const visionResp = await fetch(visionUrl, {
@@ -412,19 +599,9 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             body: JSON.stringify({
               contents: [{ parts: [
                 { inline_data: { mime_type: mimeType, data: base64ForVision } },
-                { text: `This is a background scene for a children's book illustration. Small background figures, animals, and distant people are fine — they add life to the scene.${sceneCtx}${eraBlock}${placementsBlock}${mainSceneBlock}
-
-Check:
-- Setting / location: does it roughly match the expected scene? (FAIL if completely wrong location — e.g. expected a forest but got a city)
-- Naturalness: does the image look like a natural, plausible illustration of the scene? Or are there strange artefacts, geometry that doesn't make sense, doubled props, melted shapes, surfaces that change material mid-stroke, perspective lines that contradict each other, or anything that looks "off" for a competent painter? (FAIL — describe what looks unnatural)
-- Geometric artefact patches: are there large artificial-looking patches — white or near-white **rectangles, triangles, diagonals, wedges, or any solid geometric shape**, monochrome panels, blank patches, or obvious AI glitches that cover a meaningful portion of the frame? Pay special attention to bright triangular or diagonal cutouts that don't belong to the scene's geometry. (FAIL — name the shape and where it is)
-- Foreground space: is there visible open space in the foreground where main characters could be placed later? (FAIL if the entire foreground is filled with objects or walls)
-- Unrequested text or signage: does the image contain readable text, letters, numbers, shop signs, banners, posters, logos, labels, or written inscriptions that are NOT named in the expected scene? (FAIL — name where the text appears. A pub sign, street sign, poster text, or any inscription not explicitly requested counts. Distant painted banners with no readable text are OK.)${storyEra ? `
-- Anachronistic elements for the stated STORY ERA above: are there objects that don't fit the period? (FAIL — name them. Cars, parked vehicles, modern street lights, traffic signs, billboards, power lines, utility poles, satellite dishes, air conditioners, modern shopfront windows with price stickers, commercial ads, plastic bins, painted crosswalks, road markings, telephone poles, fire hydrants. Skip this check only if the story era is "present-day" or "modern".)` : ''}${placementsCheck}${geometryCheck}
-
-Reply JSON only: {"pass": true/false, "issues": ["short issue"], "feedback": "one sentence naming WHAT to remove or fix — e.g. 'remove the pub sign at upper-left and the parked car at lower-right'. Be specific enough that a regeneration prompt can target the named elements."}` }
+                { text: guardPromptString(qcPrompt, 'validateEmptyScene') }
               ]}],
-              generationConfig: { maxOutputTokens: 350, temperature: 0.1, responseMimeType: 'application/json' },
+              generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
               safetySettings: require('./images').GEMINI_SAFETY_SETTINGS
             }),
             signal: AbortSignal.timeout(15000),
@@ -544,6 +721,13 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     compliancePromptOverride = null,  // Stage-2 template A/B
     artStyle = null,                  // resolved style — same value the quality eval gets
     clothingContract = null,          // per-character outfit block — same value the quality eval gets
+    // THE ROSTER, FOR A BLIND JUDGE (2026-09-14). `buildExpectedCastBlock`'s
+    // block, kind labels and all — the same string the quality evaluator gets.
+    // Without it this judge had no cast list at all and improvised a label for
+    // any orphan it could not pair, which is how one animal drew
+    // `missing_character`, `extra_character` and `duplicate_identity` on one
+    // story. '' keeps the pre-roster behaviour: judge membership from the prompt.
+    expectedCast = '',
     // Era-aware landmark protection (2026-09-05). A page rendered from a real
     // landmark photo in a present-day story must not have that landmark's
     // structures classified as unrequested/modern; a historical page keeps the
@@ -557,6 +741,9 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   const { computeLandmarkProtection, buildLandmarkComplianceBlock, filterProtectedRemovals } = require('./landmarkProtection');
   const landmarkProtection = computeLandmarkProtection({ landmarkPhotos, era });
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
+  // A dimension this judge could not look at is part of its RESULT, not only a
+  // log line (2026-09-14). Recording only — never a deduction. See notEvaluated.js.
+  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
 
   // No vision template here any more: Stage 1 is the shared blind inventory,
   // produced by the single call in evaluateImageQuality and handed in.
@@ -579,7 +766,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     const meta = extractSceneMetadata(sceneHint || imagePrompt);
     const interactions = meta?.interactions
       || (Array.isArray(meta?.fullData?.interactions) ? meta.fullData.interactions : null);
-    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible);
+    interactionsBlock = require('./vbIdGuard').formatInteractionsBlock(interactions, visualBible, meta?.characters || meta?.fullData?.characters || null);
   } catch { /* silent */ }
 
   // --- Stage 1: the SHARED blind inventory ---
@@ -638,18 +825,33 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         log.debug(`[THREE-STAGE] ${pageLabel}quality figures unavailable: ${e.message}`);
       }
     }
+    if (qualityFiguresBlock === '(not available)') {
+      // The canonical "judge ran with an empty input": Stage 2 falls back to
+      // vision-only reasoning, so named-figure -> description pairing is never
+      // judged. Previously indistinguishable from "paired, no fault found".
+      notEvaluated.record('identity_attribution', 'quality_figures_unavailable',
+        'Stage 2 received no figures/matches - named-figure to description pairing was not judged');
+    }
 
     const complianceInput = fillTemplate(complianceTemplate, {
-      ORIGINAL_PROMPT: (imagePrompt || '').substring(0, 3000),
-      // Passed separately: ORIGINAL_PROMPT is truncated at 3000 chars and the
-      // ART STYLE and CLOTHING blocks can sit past the cut, so the compliance
-      // judge never saw them and treated required style/costume elements as
-      // unrequested additions (a steampunk cover's goggles drew a CRITICAL).
+      // THE WHOLE PROMPT (2026-09-14). This was `.substring(0, 3000)`. Real page
+      // prompts run 5,400-8,000 chars and a cast member introduced late in the
+      // prose sat past the cut — measured on one 18-page story, the animal's own
+      // block landed at chars 3,914-5,565 on five of its six pages, so the judge
+      // read a prompt that never named it and filed the figure it could not
+      // place as extra/absent. An arbitrary input cut on a judge is the same
+      // species of bug as an output cap: removed, not enlarged.
+      ORIGINAL_PROMPT: imagePrompt || '',
+      // Passed separately as well: the ART STYLE and CLOTHING blocks are spec,
+      // not prose, and each judge receives them explicitly rather than hoping to
+      // find them inside the prompt (a steampunk cover's goggles drew a CRITICAL
+      // when the truncation hid them).
       ART_STYLE: artStyle || require('../services/prompts').extractArtStyle(imagePrompt),
       CLOTHING_CONTRACT: clothingContract || '',
       EXPECTED_AGES: expectedAges || '',
       VISUAL_INVENTORY: visionText,
       QUALITY_FIGURES: qualityFiguresBlock,
+      EXPECTED_CAST: expectedCast || '',
       INTERACTIONS_BLOCK: interactionsBlock,
       STORY_TEXT: (storyText || '(not provided)').substring(0, 2000),
       LANDMARK_CONTEXT: buildLandmarkComplianceBlock(landmarkProtection) || '(none)'
@@ -662,13 +864,21 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // Now configurable (resolveEvalModel, key-guarded to sonnet). NOTE: this is
     // quality-critical and NOT yet A/B-validated on Qwen — watch repair churn.
     const complianceModel = complianceModelOverride || require('../config/models').resolveComplianceModel();
-    const sonnetResult = await callTextModel(complianceInput, 8192, complianceModel, { usageLabel: 'semantic_compliance', temperature: EVAL_TEMPERATURE });
+    const sonnetResult = await callTextModel(complianceInput, null, complianceModel, { usageLabel: 'semantic_compliance', temperature: EVAL_TEMPERATURE });
 
     stage2Usage = {
       input_tokens: sonnetResult.usage?.input_tokens || 0,
       output_tokens: sonnetResult.usage?.output_tokens || 0
     };
 
+    // A reply cut at the ceiling is a truncated finding list, not a verdict:
+    // record it as a FAILED eval with the reason (textReplyGuard.js), never
+    // as "no findings".
+    if (sonnetResult.truncation?.suspected) {
+      const reason = require('./textModels').describeTruncation(sonnetResult.truncation);
+      log.warn(`[THREE-STAGE] ${pageLabel}Stage 2 evalFailed: compliance reply ${reason}`);
+      return { evalFailed: true, evalError: `compliance reply ${reason}`, notEvaluated: notEvaluated.list(), usage: { threeStage_input_tokens: stage2Usage.input_tokens, threeStage_output_tokens: stage2Usage.output_tokens } };
+    }
     // Parse JSON from compliance response
     const parsed = getStoryHelpers().extractJsonFromText(sonnetResult.text);
     // Gate on the STRUCTURE, not on a score — the prompt no longer returns
@@ -714,7 +924,11 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         // also matches `issue.character` to a figure to aim a repair, so the
         // loss cost targeted repairs too.
         character: i.character || i.name || null,
-        source: 'three-stage'
+        // Legacy DISPLAY tag; the Lab groups on it. Provenance is `sources`.
+        source: 'three-stage',
+        // PROVENANCE (2026-09-14): the one field every emitter stamps, the one
+        // the consolidator re-emits, routing reads and scoring passes through.
+        sources: [FINDING_SOURCES.COMPLIANCE],
       }));
     // Never-CRITICAL gate on identity-absence findings (see helper above):
     // presence is an INPUT to this blind judge, never its judgment.
@@ -746,6 +960,9 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   return {
     score: score100,
     verdict: complianceResult.verdict || 'UNKNOWN',
+    // Dimensions this compliance judge could NOT look at. Recording only: it
+    // never touches score100 above.
+    notEvaluated: notEvaluated.list(),
     issuesSummary,
     fixableIssues,
     visionInventory: visionText,
@@ -819,6 +1036,668 @@ const isBlockedResponse = (responseData) => {
   return false;
 };
 
+/**
+ * EXPECTED CAST — the roster the quality evaluator judges figure COUNT against
+ * (owner, 2026-09-10). The judge used to receive only ORIGINAL_PROMPT prose and
+ * reference photos: on the front cover of job_1788903616404_iqvhj4l8m it saw
+ * five children for a four-boy cast, matched the fifth to a name it read in the
+ * prose at 0.9, and returned PASS / 100. Nothing in its inputs said "four".
+ *
+ * Computed in code, injected into the critique, classified by the prompt: the
+ * page's photo-backed cast (`sceneCharacters`) plus the Visual Bible secondary
+ * characters AND animals the page metadata names — the same helper the
+ * char-repair targeting uses (`buildSecondaryExpectedCharacters`), so there is
+ * ONE cast builder. Covers add every VB person/animal the cover description
+ * names (`matchVbEntitiesInText`, the cover NAME invariant's own matcher). The
+ * detector's figure count rides along when the caller has one.
+ *
+ * Returns { block, names, count } — `block` is '' when no cast is known, and
+ * the template then tells the judge not to judge the count at all.
+ */
+function buildExpectedCastBlock({
+  sceneCharacters = null,
+  sceneHint = null,
+  originalPrompt = '',
+  visualBible = null,
+  evaluationType = 'scene',
+  detectedFigureCount = null,
+  pageLabel = '',
+  sceneMetadata = null,
+  pageNumber = null,
+  extraNames = [],
+  storyData = null,
+  excludedCastNames = null,
+} = {}) {
+  // RESOLVE. One index for every name question this builder asks.
+  const { buildCastIndex, resolveEntity, kindLabel, dedupeByEntity, canonicalName, isNonHuman, flushResolverStats } = getCastResolver();
+  const idx = buildCastIndex(storyData, visualBible);
+  const names = [];
+  const labels = [];
+  const seen = new Set();
+  // Each roster line says WHAT the entry is. A dog named in the prose is an
+  // animal entry; a fifth human child can never satisfy it — which is exactly
+  // the substitution the cover evaluator accepted at 0.9 confidence.
+  const add = (n, kind = null) => {
+    const name = String(n || '').trim();
+    if (!name || seen.has(canonicalName(name))) return;
+    seen.add(canonicalName(name));
+    names.push(name);
+    labels.push(kind ? `${name} (${kind})` : name);
+  };
+  // RESOLVE. Exact name-or-id matching lost the tag on every short-form token
+  // ("Rossa" for the Bible's "Kapitänin Rossa"), and an untagged animal is
+  // counted as a person by derivePresenceFinding — a false extra_character
+  // CRITICAL. The resolver answers the same question for every consumer.
+  const vbKind = (nameOrId) => {
+    const e = resolveEntity(nameOrId, idx, { pageLabel });
+    return e ? kindLabel(e) : null;
+  };
+  // AN EMPTY CAST IS A NUMBER, NOT A BLANK (2026-09-11). `sceneCharacters: []`
+  // is the brief SAYING this frame holds nobody — a creature-only page, a
+  // landscape. It used to return an empty block, and an empty EXPECTED CAST
+  // tells the evaluator not to judge the figure count at all, so a page written
+  // for no people rendered three and no `extra_character` was ever emitted
+  // (job_1789147573901_m3uam0nxi p4). `null`/undefined still means UNKNOWN — no
+  // roster was supplied — and keeps the blank block.
+  const castDeclared = Array.isArray(sceneCharacters);
+  for (const c of (castDeclared ? sceneCharacters : [])) add(typeof c === 'string' ? c : c?.name);
+  if (!castDeclared) return { block: '', names: [], count: 0, declared: false, crowdExpected: false, nonHumanNames: [] };
+
+  const sh = getStoryHelpers();
+  // CROWD FLAG (2026-09-13). Carried on the roster so the presence derivation
+  // can skip its surplus branch on a page the brief wrote as populated —
+  // arithmetic has no equivalent of the evaluator's N-09. Never inferred from
+  // prose: either the brief set the flag or this page has no crowd.
+  let crowdExpected = false;
+  try {
+    // THE HINT IS NOT ALWAYS THE BRIEF (2026-09-12). The repair pipeline hands
+    // the eval `scene.outlineExtract` — the PLAN line — which carries no
+    // `---METADATA---` block and therefore no `objects[]`, so every Visual
+    // Bible figure filed there vanished from the roster and the page's own
+    // secondary character came back as an `extra_character` CRITICAL
+    // (job_1789207854566_l43qgl34w p13/p15, a museum conservator the brief
+    // cites as CHR001). The parsed metadata is passed in where the caller
+    // holds it; parsing a hint stays the fallback.
+    const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
+    crowdExpected = sceneMeta?.crowdExpected === true || sceneMeta?.fullData?.crowdExpected === true;
+    for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, extraNames, includeAnimals: true })) add(e.name, vbKind(e.name));
+    // A SECONDARY THAT DECLARES THIS PAGE IS ON THIS PAGE (2026-09-13). The
+    // detector-side roster in storyJobPipeline has always read the VB
+    // secondary's own `pages[]` and this one never did — the single input the
+    // two rosters could not agree on. Evidence for the rule itself:
+    // job_1786743927715_kcx0p939w p3, where the scene metadata named [Emma,
+    // Noah] and Lira (pages [3,5,9]) was in the prose and the image prompt.
+    // Requires the caller to say which page this is; without it, nothing.
+    if (pageNumber !== null && pageNumber !== undefined && Number.isFinite(Number(pageNumber))) {
+      for (const e of sh.buildSecondaryExpectedForPage(visualBible, pageNumber, [...names])) add(e.name, vbKind(e.name));
+    }
+    // A FIGURE FILED AS AN OBJECT IS STILL A FIGURE (2026-09-12). The Art
+    // Director puts animals and secondary characters in `objects[]` by id, and
+    // the cast collector above reads only `characters` / `characterPositions` /
+    // `characterClothing` — so `includeAnimals`, added two days earlier, was
+    // dead for every animal. On job_1789163494908_kc2joi4ax the grey tomcat was
+    // commissioned on pages 12, 15 and 16 as `ANI001` in `objects[]`, never
+    // reached this roster, and each page took an `extra_character` CRITICAL for
+    // drawing it. Animals and secondaries only — a location or an artifact
+    // never joins a cast roster.
+    for (const n of require('./sceneMetadata').collectSceneObjectFigureNames(sceneMeta, visualBible)) add(n, vbKind(n));
+  } catch { /* a page without parseable metadata keeps its photo-backed cast */ }
+  if (evaluationType === 'cover' && visualBible) {
+    try {
+      const { matchVbEntitiesInText } = require('./coverIterate');
+      // THE JUDGE GETS THE GENERATOR'S TRIM (owner, 2026-09-15: "Cover the
+      // author is correct max 5"). The cover cast is capped at
+      // MAX_COVER_CHARACTERS and every other story character is handed to the
+      // model as an explicit exclusion — but the cover PROSE still names them,
+      // which is why the restriction block exists at all. Reading the prose
+      // back into the roster held the cover to a cast the generator was
+      // ordered to violate, and the gap scored CRITICAL. One resolver produces
+      // both lists: server/lib/coverCastRoster.js.
+      const { MAX_COVER_CHARACTERS } = require('./coverCastRoster');
+      const excluded = new Set((Array.isArray(excludedCastNames) ? excludedCastNames : [])
+        .map(n => canonicalName(String(n || ''))).filter(Boolean));
+      // People count against the cap; an animal the prose names is not a
+      // character the cap ever governed.
+      let people = names.filter(n => !isNonHuman(resolveEntity(n, idx))).length;
+      for (const hit of matchVbEntitiesInText(sceneHint || originalPrompt, visualBible)) {
+        if (hit.type !== 'character' && hit.type !== 'animal') continue;
+        if (excluded.has(canonicalName(String(hit.name || '')))) continue;
+        const before = names.length;
+        if (hit.type === 'character') {
+          if (people >= MAX_COVER_CHARACTERS) continue;
+          add(hit.name, vbKind(hit.name));
+          if (names.length > before) people++;
+        } else {
+          add(hit.name, vbKind(hit.name));
+        }
+      }
+    } catch { /* cover keeps its commissioned cast */ }
+  }
+
+  // RESOLVE. A roster never carries two spellings of one entity: the p9 shape
+  // of job_1789163494908_kc2joi4ax put "Vendor" and "Marroni Vendor" on the
+  // same list, and every downstream count then read one person as two.
+  const kept = new Set(dedupeByEntity(names, idx));
+  for (let i = names.length - 1; i >= 0; i--) {
+    if (kept.has(names[i])) continue;
+    names.splice(i, 1);
+    labels.splice(i, 1);
+  }
+
+  const lines = [names.length === 0
+    // Spelled out, not an empty list: the count is the instruction, and "none"
+    // has to read as a roster of zero rather than as a missing roster.
+    ? 'EXPECTED CAST (0): none — this frame was written with no people and no animals in it'
+    : `EXPECTED CAST (${names.length}): ${labels.join(', ')}`];
+  const det = Number(detectedFigureCount);
+  if (detectedFigureCount !== null && detectedFigureCount !== undefined && Number.isFinite(det)) {
+    lines.push(`Detector figure count (GroundingDINO): ${det}`);
+  }
+  // COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18). The roster the EVALUATOR
+  // reads keeps everyone — the fairies are on the page and it must account for
+  // them. The roster ARITHMETIC reads is people-only, and this is which entries
+  // are not. One source with the detector call (`vbNonHumanNames`), never a
+  // second guess about what is non-human.
+  // RESOLVE, tolerant: the resolver catches the short-form token the exact-name
+  // list cannot ("Rossa" for the Bible's "Kapitänin Rossa"), and `vbNonHumanNames`
+  // stays the authority for everything it does name.
+  const nonHumanSet = new Set(require('./bboxDetection').vbNonHumanNames(visualBible).map(n => canonicalName(n)));
+  const nonHumanNames = names.filter(n =>
+    nonHumanSet.has(canonicalName(n)) || isNonHuman(resolveEntity(n, idx, { pageLabel })));
+  if (pageLabel) flushResolverStats(idx, log, pageLabel);
+  return { block: lines.join('\n'), names, count: names.length, declared: true, crowdExpected, nonHumanNames };
+}
+
+/**
+ * ONE ROSTER (2026-09-13). `buildExpectedCastBlock` is authoritative for
+ * MEMBERSHIP — who is on this page — and every other cast builder in the
+ * pipeline resolves its NAME SET through here.
+ *
+ * There used to be four builders and they disagreed. On
+ * job_1789207854566_l43qgl34w p7 the detector was told to look for
+ * Sarah/Saira/Facundo/Fiona while the evaluator judged the same image against
+ * Sarah/Facundo/Frau Amrein — three names, four names, zero overlap on two of
+ * them, and a CRITICAL `extra_character` out of the gap. The detector-side
+ * builders keep producing their own description-bearing entries (the detector
+ * needs identity prose this roster does not carry); only the membership
+ * question is answered in one place.
+ *
+ * Returns a lowercase-keyed Map name → canonical spelling, plus the ordered
+ * `names` array, so a caller can both test membership and append what it lacks.
+ */
+function resolveExpectedCastNames(opts = {}) {
+  const cast = buildExpectedCastBlock(opts);
+  // COMPARE. Still a lowercase-keyed Map — keyed through `canonicalName` so
+  // every membership test in the pipeline normalises the same way.
+  const { canonicalName } = getCastResolver();
+  const byLower = new Map();
+  for (const n of cast.names) byLower.set(canonicalName(n), n);
+  return { names: cast.names, byLower, declared: cast.declared };
+}
+
+/**
+ * Bring a detector-side cast list onto the authoritative roster.
+ *
+ * The detector's entries carry identity PROSE the eval roster does not have
+ * ("silver hair in a tight bun, rectangular reading glasses") and that prose is
+ * what lets Set-of-Mark tell two figures apart — so those entries are never
+ * rewritten or dropped here. What is reconciled is MEMBERSHIP: any name the
+ * authoritative roster holds and this list lacks is appended, described from
+ * the Visual Bible when the Bible knows it and name-only when it does not.
+ *
+ * "Lacks" is ENTITY-EQUAL, not case-insensitive string equality: a detector
+ * entry and a roster name that resolve to the same Visual Bible entry are the
+ * same person however each of them spells it.
+ *
+ * Appending only. A detector list is allowed to be richer than the roster in
+ * one direction (a VB secondary resolved by a path the roster has not been
+ * given yet); deleting from it on that basis would blind the identity call —
+ * measured on job_1789207854566_l43qgl34w p15, where the detector's six names
+ * were correct and the page roster's `[Fiona]` was the stale one.
+ *
+ * @returns {{entries: Array, names: Array<string>, added: Array<string>}}
+ */
+function reconcileDetectorCast(entries, authoritative, { visualBible = null, pageLabel = '', storyData = null } = {}) {
+  const list = Array.isArray(entries) ? entries.slice() : [];
+  const auth = authoritative && authoritative.byLower instanceof Map ? authoritative : null;
+  if (!auth || auth.names.length === 0) {
+    return { entries: list, names: list.map(e => e?.name).filter(Boolean), added: [] };
+  }
+  // RESOLVE. `have` used to hold the DETECTOR spellings lowercased and
+  // `missing` compared the ROSTER names to it by string, so a short form and a
+  // long form of one person never met and the same person was appended twice —
+  // job_1789163494908_kc2joi4ax p9 stored ["Julian","Max","Kiaan","Vendor",
+  // "Marroni Vendor"]. Membership is an ENTITY question, asked of the resolver.
+  const { buildCastIndex, sameEntity, canonicalName } = getCastResolver();
+  const idx = buildCastIndex(storyData, visualBible);
+  const have = new Set(list.map(e => canonicalName(String(e?.name || ''))).filter(Boolean));
+  const missing = auth.names.filter(n => !list.some(e => sameEntity(e?.name, n, idx)));
+  const added = [];
+  if (missing.length > 0) {
+    let described = {};
+    try {
+      described = getStoryHelpers().buildSecondaryCharacterDescriptions(
+        visualBible, missing, [...have], pageLabel, { includeAnimals: true }) || {};
+    } catch { /* a roster name the Bible cannot describe still joins, name-only */ }
+    for (const n of missing) {
+      // COMPARE: two spellings produced by this same run.
+      const hit = Object.keys(described).find(k => canonicalName(k) === canonicalName(n));
+      list.push({ name: hit || n, description: hit ? (described[hit].richDescription || '') : '' });
+      added.push(hit || n);
+    }
+    log.debug(`👥 [ONE ROSTER] ${pageLabel}detector cast gained ${added.length} roster name(s): ${added.join(', ')}`);
+  }
+  return { entries: list, names: list.map(e => e?.name).filter(Boolean), added };
+}
+
+/**
+ * The evaluator's `fixable_issues[]` in the pipeline's finding shape. Pure —
+ * split out so the parse+score path can be exercised without a model call.
+ */
+function parseFixableIssues(parsedJson) {
+  if (!parsedJson || !Array.isArray(parsedJson.fixable_issues)) return [];
+  return parsedJson.fixable_issues
+    .filter(i => i && i.description)
+    .map(i => ({
+      description: i.description,
+      severity: i.severity || 'MODERATE',
+      type: i.type || 'default',
+      character: i.character || null,  // Preserved for bbox matching (incl. STEP 2C proportion issues)
+      fix: i.fix || `Fix: ${i.description}`
+    }));
+}
+
+/** Stamped on every finding this file's arithmetic authored (see derivePresenceFinding). */
+const PRESENCE_DERIVED_MARKER = 'presence-arithmetic';
+
+/** The presence types the derivation owns outright once it has spoken. */
+const PRESENCE_COUNT_TYPES = new Set(['missing_character', 'extra_character']);
+
+/**
+ * Drop the compliance judge's presence findings from the RECORD once the
+ * arithmetic has spoken (2026-09-14).
+ *
+ * The merge used to filter a local copy on its way into the page's merged
+ * `fixableIssues`, and the finding lived on untouched inside `threeStageResult`
+ * — which is the object `scoring.js` reads for the compliance bucket
+ * (`evalResult.threeStageResult.fixableIssues`) and again for
+ * `scoreBreakdown.threeStage.issues`. From there it reached
+ * `consolidatedPlan.deduped_issues` and the repair pipeline, so a finding the
+ * derivation had superseded was still repaired against. Both lists — the mapped
+ * one and the judge's own `complianceResult.fixable_issues` — are pruned here.
+ *
+ * Mutates in place, by design: the stored record and the merged list must be
+ * the same answer. Returns how many entries went.
+ */
+function supersedePresenceFindings(threeStageResult) {
+  if (!threeStageResult || typeof threeStageResult !== 'object') return 0;
+  const isPresenceType = (t) => PRESENCE_COUNT_TYPES.has(String(t || '').toLowerCase());
+  let dropped = 0;
+  if (Array.isArray(threeStageResult.fixableIssues)) {
+    const before = threeStageResult.fixableIssues.length;
+    threeStageResult.fixableIssues = threeStageResult.fixableIssues.filter(i => !isPresenceType(i?.type));
+    dropped = before - threeStageResult.fixableIssues.length;
+  }
+  if (Array.isArray(threeStageResult.complianceResult?.fixable_issues)) {
+    threeStageResult.complianceResult.fixable_issues =
+      threeStageResult.complianceResult.fixable_issues.filter(i => !isPresenceType(i?.type));
+  }
+  return dropped;
+}
+
+/**
+ * THE PRESENCE SIGNAL (owner, 2026-09-13). One page, one outcome, mutually
+ * exclusive by construction.
+ *
+ * Four layers used to argue about "is this figure really extra?" — D-04, D-04b
+ * and D-04c in the evaluator prompt, an exception clause in the consolidator,
+ * two log-only diagnostics here, and a two-witness absence filter in
+ * identityAgreement. They disagreed, and their disagreement was destructive:
+ * an `extra_character` routed to inpaint erased a commissioned child from a
+ * cover, while the same page also carried a `missing_character` for the child
+ * it had just erased.
+ *
+ * The evaluator keeps the job it can do — OBSERVATION. It reports `figures[]`
+ * and `matches[]`, one match per figure, same ids and order. This function does
+ * the arithmetic, which is mechanical: a count and a list the model declared.
+ * No prose is read; no finding's description is interpreted.
+ *
+ *   figures <  cast                      -> missing_character
+ *   figures >  cast                      -> extra_character  (unless the brief declared a crowd)
+ *   figures == cast, an unmatched figure -> character_identity, naming who it should be
+ *   figures == cast, all matched         -> nothing
+ *
+ * And four reasons to say nothing at all rather than guess:
+ *   - the roster was never declared (`declared: false`) — no cast, no arithmetic;
+ *   - no detector count reached this call (~4 sites genuinely cannot supply one);
+ *   - `matches[]` is not the per-figure list its contract promises;
+ *   - THE WITNESSES DISAGREE. The detector's real-figure count and the
+ *     evaluator's own enumeration are two independent readings of the same
+ *     picture; when they differ, the count is not trustworthy for this page and
+ *     nothing is derived. This is the two-witness rule (owner, 2026-08-27),
+ *     folded in from identityAgreement — it used to run afterwards, deleting
+ *     absence claims one at a time; here it gates the claim being made at all.
+ *
+ * Pure. Never mutates its inputs.
+ *
+ * @param {object} args
+ * @param {Array} args.figures - the evaluator's `figures[]`
+ * @param {Array} args.matches - the evaluator's `matches[]`, one per figure
+ * @param {{names: string[], count: number, declared: boolean, crowdExpected: boolean,
+ *          nonHumanNames: string[]}} args.cast
+ *        the roster from buildExpectedCastBlock. `nonHumanNames` are the entries
+ *        a "person" detector can never satisfy (the VB's `animals` pool);
+ *        every count below is taken with those removed from BOTH sides.
+ * @param {number|null} args.detectedFigureCount - countRealFigures(detector figures),
+ *        with the figures the detector itself named as non-human removed — a
+ *        PEOPLE count, because that is what the derivation compares against
+ * @param {string[]|null} args.referenceNames - the names the evaluator was actually
+ *        HANDED a labelled `Reference: <name>` image for on this call. An array
+ *        (empty included) gates the identity branch; `undefined` means the caller
+ *        could not say, and the branch behaves as before.
+ * @returns {{outcome: string, reason: string|null, finding: object|null}}
+ */
+/**
+ * The runMetrics counter name for one presence derivation.
+ *
+ * `spoke` is true when the arithmetic actually decided (outcome + optional
+ * reason); false when it DECLINED, which is the interesting case — it is how
+ * often the detector and the evaluator disagree badly enough that presence
+ * refuses to rule. Kept here, next to the derivation, so the counter vocabulary
+ * and the derivation cannot drift apart, and so it is testable without an
+ * evaluator call.
+ */
+function presenceCounterName(presence, spoke) {
+  const reason = presence?.reason ? `_${presence.reason}` : '';
+  return spoke ? `presence_${presence?.outcome}${reason}` : `presence_declined${reason}`;
+}
+
+function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, referenceNames, castIndex = null } = {}) {
+  // RESOLVE (castIndex, when the caller has one) + COMPARE (everything else:
+  // both sides of every name test below are strings this same run produced).
+  const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
+  const decline = (reason) => ({ outcome: 'declined', reason, finding: null });
+
+  if (!cast || cast.declared !== true) return decline('roster_not_declared');
+  const det = Number(detectedFigureCount);
+  if (detectedFigureCount === null || detectedFigureCount === undefined || !Number.isFinite(det)) {
+    return decline('no_detector_count');
+  }
+  const figs = Array.isArray(figures) ? figures : null;
+  const mts = Array.isArray(matches) ? matches : null;
+  // `matches` carries exactly one entry per figure, same ids and order
+  // (image-evaluation D — OUTPUT). A reply that broke that contract has no
+  // second witness, so there is nothing to reconcile against.
+  if (!figs || !mts || figs.length !== mts.length) return decline('matches_contract_broken');
+  // COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18; applied at this layer
+  // 2026-09-13). The detector's prompt is "person", so its count is a count of
+  // PEOPLE. Comparing it to a roster that holds the story's dog, dragon or
+  // fairies makes every such page report a shortfall; `figureDetection` learned
+  // that in August and this derivation, one layer up, repeated it in both
+  // directions at once. Measured on job_1789304198359_y3n0euk3z (four fairies
+  // in `visualBible.animals`): 4 of 23 page-versions declined
+  // `witnesses_disagree`, every one a fairy page, the evaluator counting the
+  // fairies and the detector not.
+  //
+  // So both sides are reduced to people before anything is compared. The
+  // evaluator's side needs it too: it DOES see the fairies, so `figures.length`
+  // is an everything-count. Only a figure it NAMED as a non-human roster entry
+  // can be subtracted — a figure it left `unmatched` is of unknown kind and
+  // stays counted, which keeps the disagreement honest rather than explaining
+  // it away.
+  //
+  // There is deliberately no non-human presence check to replace this: a
+  // missing fairy simply stops being arithmetic evidence (owner).
+  const nonHumanSet = new Set((Array.isArray(cast.nonHumanNames) ? cast.nonHumanNames : [])
+    .map(n => canonicalName(n)).filter(Boolean));
+  // Tolerant: the roster's own list first, then the resolver for a short-form
+  // token the list spells out in full. Without an index the canonical match is
+  // the whole answer, exactly as before.
+  const isNonHumanName = (n) => {
+    const k = canonicalName(n);
+    if (!k) return false;
+    if (nonHumanSet.has(k)) return true;
+    return castIndex ? isNonHuman(resolveEntity(n, castIndex)) : false;
+  };
+  const refOf = (m) => canonicalName(m?.reference || '');
+  const isUnnamed = (r) => !r || r === 'unmatched' || r === 'unknown';
+  const evaluatorPeople = figs.length - mts.filter(m => isNonHumanName(m?.reference)).length;
+  if (det !== evaluatorPeople) return decline('witnesses_disagree');
+
+  const castNames = (Array.isArray(cast.names) ? cast.names : [])
+    .filter(n => !isNonHumanName(n));
+  const castCount = castNames.length;
+  // Who did the evaluator place in the picture? Names only, lowercased.
+  const claimed = new Set();
+  for (const m of mts) {
+    const r = refOf(m);
+    if (!isUnnamed(r)) claimed.add(r);
+  }
+  const unclaimedCast = castNames.filter(n => !claimed.has(canonicalName(n)));
+  const unmatchedFigures = mts.filter(m => isUnnamed(refOf(m)));
+
+  // PROVENANCE (2026-09-14). This finding is authored by THIS FILE's arithmetic,
+  // not by the quality judge whose list it joins — `final_checks` is the
+  // vocabulary's entry for a code-authored mechanical check. Stamped here so the
+  // quality stamp at the merge chokepoint, which never overwrites, leaves it be;
+  // without it the derivation would read back as a judge's opinion.
+  const mark = (finding) => ({ ...finding, severity: 'CRITICAL', derivedBy: PRESENCE_DERIVED_MARKER, sources: [FINDING_SOURCES.FINAL_CHECKS] });
+
+  if (det < castCount) {
+    const who = unclaimedCast[0] || null;
+    return {
+      outcome: 'missing_character',
+      reason: null,
+      finding: mark({
+        type: 'missing_character',
+        // `character` for every per-figure reader; `item` because the inpaint
+        // reference attach reads `missing.item` to find the VB cell to show.
+        character: who,
+        item: who,
+        description: `${det} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
+          + (who ? `; ${who} is absent.` : '.'),
+        fix: who
+          ? `Add ${who} to the scene, matching that entry's reference and CLOTHING CONTRACT.`
+          : `Add the missing EXPECTED CAST member, matching that entry's reference and CLOTHING CONTRACT.`,
+      }),
+    };
+  }
+
+  if (det > castCount) {
+    // N-09 in arithmetic form. A page the brief wrote as populated has unnamed
+    // background people on purpose; the surplus is the crowd, not a defect.
+    if (cast.crowdExpected === true) return decline('crowd_expected');
+    const fig = unmatchedFigures[0];
+    const figId = fig && (fig.figure ?? fig.id);
+    return {
+      outcome: 'extra_character',
+      reason: null,
+      finding: mark({
+        type: 'extra_character',
+        character: figId !== undefined && figId !== null ? `figure ${figId}` : null,
+        description: `${det} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
+          + ` — ${det - castCount} more figure(s) than the page was written to hold.`,
+        fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
+      }),
+    };
+  }
+
+  // Counts reconcile. An unmatched figure alongside an unclaimed cast name is
+  // ONE recognition failure, not an absence plus a surplus — the old D-04c,
+  // now arithmetic.
+  if (unmatchedFigures.length === 0) return { outcome: 'reconciled', reason: null, finding: null };
+
+  // UNMATCHED IS ONLY EVIDENCE WHEN THERE WAS SOMETHING TO MATCH AGAINST
+  // (2026-09-13). `matches[]` is produced by comparing each figure to the
+  // labelled `Reference: <name>` images attached to the critique — the page's
+  // photo-backed cast. A Visual Bible secondary joins this roster from the
+  // brief and carries NO such image, so the only answer the evaluator can give
+  // for the figure that is her is `unmatched`, whether she was drawn right or
+  // wrong. Billing a CRITICAL on that is a false positive by construction:
+  // job_1789207854566_l43qgl34w p3 (one figure, roster [Frau Amrein], zero
+  // references attached) and p4/p13 (roster [Fiona, Frau Amrein], Fiona
+  // matched, the second figure unmatched because she is the secondary).
+  //
+  // So the branch needs a reference-backed cast entry to name. Not a decline:
+  // the counts DID reconcile, which is a real outcome — the derivation still
+  // owns the pair and still drops the evaluator's arithmetically impossible
+  // surplus on those pages. It just has no identity claim to make.
+  const refs = Array.isArray(referenceNames)
+    ? new Set(referenceNames.map(n => canonicalName(n || '')).filter(Boolean))
+    : null;
+  const referenced = refs ? unclaimedCast.filter(n => refs.has(canonicalName(n))) : unclaimedCast;
+  // At equal counts an unmatched figure always leaves a cast name unclaimed
+  // (distinct claims <= figures - unmatched < castCount), so this is exactly
+  // the question "is the entry it should be one the evaluator had an image of".
+  // A page that got no reference at all (`refs.size === 0`) is the same answer.
+  if (refs && referenced.length === 0) {
+    return { outcome: 'reconciled', reason: 'unclaimed_cast_has_no_reference', finding: null };
+  }
+
+  const fig = unmatchedFigures[0];
+  const figId = fig && (fig.figure ?? fig.id);
+  const who = referenced[0] || null;
+  const figLabel = figId !== undefined && figId !== null ? `figure ${figId}` : 'the unmatched figure';
+  return {
+    outcome: 'character_identity',
+    reason: null,
+    finding: mark({
+      type: 'character_identity',
+      // The cast member is what a repair has to paint; the figure is named in
+      // the description so the target is unambiguous either way.
+      character: who || (figId !== undefined && figId !== null ? `figure ${figId}` : null),
+      description: `${figLabel} matches no EXPECTED CAST entry while the frame holds exactly the cast (${castCount})`
+        + (who ? `; it should be ${who}.` : '.'),
+      fix: who
+        ? `Redraw ${figLabel} as ${who}, matching that entry's reference and CLOTHING CONTRACT.`
+        : `Redraw ${figLabel} as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.`,
+    }),
+  };
+}
+
+/**
+ * THE CLOTHING CONTRACT every evaluator is handed — one builder.
+ *
+ * Extracted verbatim from evaluateImageQuality (2026-09-14) so the Test Lab's
+ * standalone `semantic_eval` stage can pass the SAME block production's
+ * semantic judge gets. Production builds it once and hands it to the quality,
+ * semantic and compliance judges alike; the Lab stage called
+ * evaluateSemanticFidelity with no options at all, so its judge ran with no
+ * contract, no art style and no cast roster and its verdicts were never
+ * comparable to production's.
+ *
+ * Two sources, one block. The reference photos already carry the resolved
+ * per-page outfit (`clothingDescription`, set by the prompt builder) and that
+ * is what every call site has in scope; `clothingRequirements` is the explicit
+ * override for callers that resolved it themselves.
+ *
+ * @returns {{block: string, error: string|null}} `block` empty means no
+ *          contract could be built — the caller decides how loudly to say so.
+ */
+/**
+ * REQUIRED OBJECTS as its own evaluator input (2026-09-14).
+ *
+ * Third member of the ART_STYLE / CLOTHING_CONTRACT family, and it exists for
+ * the identical reason: the batch evaluator's ORIGINAL_PROMPT is the scene
+ * DESCRIPTION, never the built prompt (`resolveEvalSceneDescription` keeps it
+ * that way so `resolveEvalArtStyle`'s "no **ART STYLE block" invariant holds),
+ * and the REQUIRED OBJECTS checklist is emitted into that same prompt tail. A
+ * rule reading the checklist out of ORIGINAL_PROMPT therefore never fires on
+ * the production path — which is what happened to D-16b (the held-object swap)
+ * from the day it was written.
+ *
+ * Two sources, in fidelity order:
+ *  1. the page's BUILT prompt — `parseVisualBibleObjects` returns the exact
+ *     bold leads the checklist emitted (locations already excluded);
+ *  2. the parsed scene metadata's `objects[]`, which in stored data is VB ids
+ *     ("ART001", "ANI001", "LOC001") — resolved through the same
+ *     `elementLeadLabel` the checklist uses, with locations dropped to match.
+ *
+ * @returns {{block: string, source: string|null}} `block` empty means nothing
+ *          could be resolved; the template then tells the judge to skip.
+ */
+function buildEvalRequiredObjects({ pagePrompt = null, sceneMetadata = null, visualBible = null, language = 'en' } = {}) {
+  const dedupe = (names) => {
+    const seen = new Set();
+    const out = [];
+    for (const n of names) {
+      const s = String(n || '').trim();
+      if (!s) continue;
+      const k = s.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(s);
+    }
+    return out;
+  };
+  try {
+    const { parseVisualBibleObjects, resolveExpectedObjectLabels } = require('./bboxDetection');
+    if (pagePrompt && typeof pagePrompt === 'string') {
+      const fromPrompt = dedupe(parseVisualBibleObjects(pagePrompt));
+      if (fromPrompt.length) return { block: fromPrompt.join(', '), source: 'prompt' };
+    }
+    const ids = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+    if (!ids.length) return { block: '', source: null };
+    // Locations are not props: the checklist skips them and so does the
+    // prompt parser, so the fallback must too or the judge is handed a place
+    // name as something a hand could be holding.
+    const isLocationId = (raw) => /^LOC\d{3}(?:\.\d+)?$/i.test(String(raw || '').trim());
+    const labels = dedupe(resolveExpectedObjectLabels(ids.filter(id => !isLocationId(id)), visualBible, language));
+    return labels.length ? { block: labels.join(', '), source: 'sceneMetadata' } : { block: '', source: null };
+  } catch {
+    return { block: '', source: null };
+  }
+}
+
+function buildEvalClothingContract({
+  sceneCharacters = null,
+  referenceImages = null,
+  artStyle = null,
+  visualBible = null,
+  clothingRequirements = null,
+  sceneMetadata = null,
+  sceneHint = null,
+  originalPrompt = null,
+} = {}) {
+  try {
+    const lines = [];
+    // WORN ITEMS. A page can declare a garment OFF (`wornItems[]`), and the
+    // generator honours it — the judge must be handed the SAME stripped
+    // outfit or it scores the render against a garment the brief removed and
+    // orders a paid repair round to repaint it. One resolver, shared with the
+    // generator's own strip. See wornItems.resolveGeneratedOutfit — which
+    // returns the outfit UNCHANGED when `visualBible` is falsy, so a caller
+    // that omits the bible gets the unstripped story-level outfit and no
+    // warning whatsoever.
+    const { resolveGeneratedOutfit } = require('./wornItems');
+    const wornMeta = sceneMetadata
+      || (() => { try { return getStoryHelpers().extractSceneMetadata(sceneHint || originalPrompt); } catch { return null; } })();
+    const wornCtx = { visualBible: visualBible || null, sceneMetadata: wornMeta };
+    const asWorn = (name, outfit) => resolveGeneratedOutfit(outfit, name, wornCtx);
+    const reqs = clothingRequirements || null;
+    if (reqs) {
+      const { buildClothingDescription } = require('./entityConsistency');
+      for (const c of (sceneCharacters || [])) {
+        if (!c?.name) continue;
+        const category = reqs[c.name]?._currentClothing;
+        if (!category) continue;
+        const outfit = asWorn(c.name, buildClothingDescription(c, category, artStyle, reqs));
+        if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
+      }
+    }
+    if (lines.length === 0) {
+      for (const p of (referenceImages || [])) {
+        if (!p?.name || !p?.clothingDescription) continue;
+        const outfit = asWorn(p.name, p.clothingDescription);
+        if (outfit && String(outfit).trim()) lines.push(`- ${p.name}: ${String(outfit).trim()}`);
+      }
+    }
+    return { block: lines.join('\n'), error: null };
+  } catch (err) {
+    return { block: '', error: err.message };
+  }
+}
+
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null, sceneCharacters = null, evalOptions = {}) {
   // evalOptions.evalTemplateOverride / .semanticTemplateOverride: Test Lab A/B
   // variants — full replacement template strings used instead of the loaded
@@ -832,6 +1711,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
   let qualityFiguresPromise = null;
   let qualityFiguresResolve = null;
   let p1Promise = null;
+  // NOT-EVALUATED RECORD (2026-09-14). Silence from a check that ran clean and
+  // silence from a check that could not run used to be the same signal; this
+  // makes the second one a field on the result. Recording only — no entry here
+  // is ever a deduction, a severity, or a repair trigger. See notEvaluated.js.
+  const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext });
   try {
     // Guard against undefined/invalid imageData
     if (!imageData || typeof imageData !== 'string') {
@@ -897,41 +1781,123 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // per-page outfit (`clothingDescription`, set by the prompt builder) and
     // that is what every call site has in scope; evalOptions.clothingRequirements
     // is the explicit override for callers that resolved it themselves.
-    let clothingContractBlock = '';
-    try {
-      const lines = [];
-      const reqs = evalOptions.clothingRequirements || null;
-      if (reqs) {
-        const { buildClothingDescription } = require('./entityConsistency');
-        for (const c of (sceneCharacters || [])) {
-          if (!c?.name) continue;
-          const category = reqs[c.name]?._currentClothing;
-          if (!category) continue;
-          const outfit = buildClothingDescription(c, category, artStyleForEval, reqs);
-          if (outfit && String(outfit).trim()) lines.push(`- ${c.name}: ${String(outfit).trim()}`);
-        }
-      }
-      if (lines.length === 0) {
-        for (const p of (referenceImages || [])) {
-          if (p?.name && p?.clothingDescription) lines.push(`- ${p.name}: ${String(p.clothingDescription).trim()}`);
-        }
-      }
-      clothingContractBlock = lines.join('\n');
-      if (!clothingContractBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
-        // Loud, because an empty contract is what let the judge invent one.
-        // Covers included: the 'scene'-only gate hid exactly the cover case
-        // where an empty contract let the judge strip a requested costume.
-        log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
-      }
-    } catch (err) { log.debug(`[EVAL] clothing contract block skipped: ${err.message}`); }
+    const contract = buildEvalClothingContract({
+      sceneCharacters,
+      referenceImages,
+      artStyle: artStyleForEval,
+      visualBible: evalOptions.visualBible || null,
+      clothingRequirements: evalOptions.clothingRequirements || null,
+      sceneMetadata: evalOptions.sceneMetadata || null,
+      sceneHint,
+      originalPrompt,
+    });
+    const clothingContractBlock = contract.block;
+    if (contract.error) {
+      log.debug(`[EVAL] clothing contract block skipped: ${contract.error}`);
+      notEvaluated.record('clothing', 'clothing_contract_build_failed', contract.error);
+    } else if (!clothingContractBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
+      // Loud, because an empty contract is what let the judge invent one.
+      // Covers included: the 'scene'-only gate hid exactly the cover case
+      // where an empty contract let the judge strip a requested costume.
+      log.warn(`👕 [EVAL] ${pageContext || 'page'}: no clothing contract available — clothing findings suppressed (N-16)`);
+      // The log line above existed and did not help: the eval went on to
+      // return a normal score with nothing saying clothing went unjudged.
+      notEvaluated.record('clothing', 'no_clothing_contract',
+        'No per-character outfit block could be built - clothing findings are suppressed (N-16)');
+    }
+
+    // REQUIRED OBJECTS, same family as the two blocks above and for the same
+    // reason (see buildEvalRequiredObjects). Empty is the honest default:
+    // D-16b skips rather than inventing a checklist.
+    const requiredObjects = buildEvalRequiredObjects({
+      pagePrompt: evalOptions.pagePrompt || null,
+      sceneMetadata: evalOptions.sceneMetadata || null,
+      visualBible: evalOptions.visualBible || null,
+      // The label must match the lead the page prompt actually emitted, which
+      // is language-dependent (elementLeadLabel).
+      language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
+    });
+    const requiredObjectsBlock = requiredObjects.block;
+    if (!requiredObjectsBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
+      notEvaluated.record('held_objects', 'no_required_objects',
+        'No REQUIRED OBJECTS list could be resolved - held-object swaps (D-16b) were not judged');
+    }
+
+    // EXPECTED CAST roster + count (see buildExpectedCastBlock). Built once,
+    // read by the quality prompt, the semantic judge, the compliance judge and
+    // the post-parse count diagnostic. ONE ROSTER means all four, so this block
+    // sits ABOVE the semantic launch below — nothing between here and the two
+    // parallel eval launches may move above it.
+    // COUNT ONLY REAL FIGURES. A caller that hands over the figures array
+    // gets them filtered here (see isMicroFigure); a caller that only has a
+    // number is trusted to have filtered already — images.js does. Hoisted:
+    // the prompt hint and the presence derivation read the SAME number.
+    const realFigureCount = Array.isArray(evalOptions.detectedFigures)
+      ? require('./bboxDetection').countRealFigures(evalOptions.detectedFigures)
+      : (evalOptions.detectedFigureCount ?? null);
+    // ...AND THE SAME COUNT WITH THE NON-HUMANS TAKEN OUT. The detector's
+    // prompt is "person", but a humanoid non-human (a hand-sized fairy) does
+    // get boxed sometimes, and the identity pass then NAMES it from the same
+    // roster — job_1789304198359_y3n0euk3z p12/p15 carry a detector figure
+    // called "Yellow Fairy". So the people count is the real-figure list minus
+    // the figures the detector itself named as a VB animal or creature. This,
+    // not `realFigureCount`, is what the presence arithmetic compares against
+    // (COUNT PEOPLE AGAINST PEOPLE, owner 2026-08-18). The EXPECTED CAST block
+    // keeps printing `realFigureCount`: the roster it prints holds the fairies
+    // too, so that pair still matches.
+    // RESOLVE. One index for this page's name questions — the detector's own
+    // figure labels are brief/roster tokens and may be short forms.
+    const castIdx = getCastResolver().buildCastIndex(evalOptions.storyData || null, evalOptions.visualBible || null);
+    const detectedPeopleCount = (() => {
+      if (!Array.isArray(evalOptions.detectedFigures)) return realFigureCount;
+      const { countRealFigures, vbNonHumanNames } = require('./bboxDetection');
+      const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
+      const nh = new Set(vbNonHumanNames(evalOptions.visualBible || null).map(n => canonicalName(n)));
+      if (nh.size === 0) return realFigureCount;
+      const nonHumanFigure = (name) =>
+        nh.has(canonicalName(name || '')) || isNonHuman(resolveEntity(name, castIdx));
+      return countRealFigures(evalOptions.detectedFigures.filter(f => !nonHumanFigure(f?.name)));
+    })();
+    // WHO THE EVALUATOR CAN ACTUALLY MATCH AGAINST. Filled by the reference
+    // attach loop below with the names that reached the critique as a labelled
+    // `Reference: <name>` image — not what was requested, what was attached.
+    // The presence derivation gates its identity branch on this.
+    const attachedReferenceNames = [];
+    const expectedCast = buildExpectedCastBlock({
+      sceneCharacters,
+      sceneHint,
+      originalPrompt,
+      visualBible: evalOptions.visualBible || null,
+      evaluationType,
+      detectedFigureCount: realFigureCount,
+      pageLabel: pageContext ? `${pageContext} ` : '',
+      sceneMetadata: evalOptions.sceneMetadata || null,
+      storyData: evalOptions.storyData || null,
+      // The cover generator's exclusion list (cap + excluded names) — see the
+      // cover branch of buildExpectedCastBlock.
+      excludedCastNames: evalOptions.excludedCastNames || null,
+      // ONE ROSTER: the two inputs only the detector-side builder used to have.
+      pageNumber: evalOptions.pageNumber ?? null,
+      extraNames: evalOptions.outlineCharacters || [],
+    });
+    if (expectedCast.count > 0) {
+      log.debug(`👥 [EVAL] ${pageContext}: expected cast (${expectedCast.count}) ${expectedCast.names.join(', ')}`);
+    }
 
     // Start semantic evaluation in parallel when we have a reference (page prose
     // or cover brief).
+    if (!runFidelity && (evaluationType === 'scene' || isCover)) {
+      notEvaluated.record('semantic_fidelity', 'no_fidelity_reference',
+        'Neither page prose nor a cover brief was supplied - semantic fidelity did not run');
+    }
     if (runFidelity) {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
       semanticPromise = evaluateSemanticFidelity(imageData, fidelityRef, originalPrompt, sceneHint, evalOptions.semanticTemplateOverride || null, {
         artStyle: artStyleForEval,
         clothingContract: clothingContractBlock,
+        // ONE ROSTER for the blind judges too (2026-09-14): the kind labels are
+        // what keep an `(animal)` entry out of the named-character count.
+        expectedCast: expectedCast.block,
       });
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
@@ -966,6 +1932,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (lines.length > 0) expectedAgesBlock = lines.join(String.fromCharCode(10));
     } catch { /* silent — the judge tolerates an empty block */ }
 
+
     // Start three-stage eval in parallel for scene evaluations.
     // Stage 2 (compliance) needs the quality eval's named figures[] + matches[] so it
     // can pair each named character with the blind vision inventory by zone. We expose
@@ -981,7 +1948,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         const invMime = imageData.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
         p1Promise = runVisualInventory(
           [{ inline_data: { mime_type: invMime, data: invB64 } }],
-          qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
+          // The inventory has its own judge key since 2026-09-07 (runtime.js
+          // `inventoryModel`: Qwen3-VL on staging, 2.5 Flash elsewhere). A
+          // Lab quality-model override still wins so an A/B measures one model.
+          qualityModelOverride || MODEL_DEFAULTS.inventoryModel || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
           process.env.GEMINI_API_KEY, pageContext
         );
         log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
@@ -997,6 +1967,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         compliancePromptOverride: evalOptions.compliancePromptOverride || null,
         artStyle: artStyleForEval,
         clothingContract: clothingContractBlock,
+        // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
+        expectedCast: expectedCast.block,
         // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
         // caller has a bible; without one they still become generic nouns.
         visualBible: evalOptions.visualBible || null,
@@ -1065,16 +2037,31 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // Strip art style description (noise for evaluator)
       promptForEval = promptForEval.replace(/\*\*ART STYLE[^*]*\*\*[^*]*(?=\*\*|$)/s, '');
 
-      // Cover portraits: viewer-gaze and a flat title are intended, not defects.
-      promptForEval = `COVER NOTE: a book-cover portrait. Do not deduct for characters facing or looking at the viewer, or for the title being flat 2D rather than three-dimensional.\n\n${promptForEval}`;
+      // The three cover notes live in prompts/cover-evaluation-notes.txt
+      // (sections COVER_NOTE / TEXT_NOTE_APP_OVERLAY / TEXT_RULES) so the
+      // cover generator/critic pair is a registry set over two file paths.
+      const coverNotes = promptSections(PROMPT_TEMPLATES.coverEvaluationNotes);
+      // Loud, not "undefined": these are interpolated straight into the judge's
+      // prompt, so a missing template would put the literal string "undefined"
+      // in front of the evaluator. Same guard the plate judge carries.
+      if (!coverNotes.COVER_NOTE) throw new Error('evaluateImageQuality: cover-evaluation-notes template not loaded (COVER_NOTE)');
 
+      // Cover portraits: viewer-gaze and a flat title are intended, not defects.
+      promptForEval = `${coverNotes.COVER_NOTE}\n\n${promptForEval}`;
+
+      if (textMode === 'appOverlay' && !coverNotes.TEXT_NOTE_APP_OVERLAY) {
+        throw new Error('evaluateImageQuality: cover-evaluation-notes template has no TEXT_NOTE_APP_OVERLAY section');
+      }
+      if (textMode !== 'appOverlay' && expectedText && !coverNotes.TEXT_RULES) {
+        throw new Error('evaluateImageQuality: cover-evaluation-notes template has no TEXT_RULES section');
+      }
       if (textMode === 'appOverlay') {
         // Mode B: art is textless; title/dedication/branding composited by the
         // app after persistence. Was previously appended to the pseudo-page's
         // sceneDescription as string surgery (server.js pipeline entry).
-        promptForEval = `TEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.\n\n${promptForEval}`;
+        promptForEval = `${coverNotes.TEXT_NOTE_APP_OVERLAY}\n\n${promptForEval}`;
       } else if (expectedText) {
-        promptForEval = `⚠️ TEXT RULES FOR THIS IMAGE:\nAllowed text: "${expectedText}" — and nothing else prominent.\nSeverities for text issues:\n- Allowed text missing or misspelled (any character difference) → severity: CATASTROPHIC.\n- Other prominent unrequested text on the cover (labels, captions, watermarks, extra words) → severity: MAJOR.\n- Small incidental in-world signage in the background → do not flag; if garbled → severity: MINOR.\nIf the only text on the image is exactly the allowed text, evaluate normally.\n\nBefore reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.\n\n${promptForEval}`;
+        promptForEval = `${fillTemplate(coverNotes.TEXT_RULES, { EXPECTED_TEXT: expectedText })}\n\n${promptForEval}`;
       }
     }
 
@@ -1090,7 +2077,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       const interactions = sceneMeta?.interactions
         || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
       interactionsBlock = require('./vbIdGuard')
-        .formatInteractionsBlock(interactions, evalOptions.visualBible || null);
+        .formatInteractionsBlock(interactions, evalOptions.visualBible || null, sceneMeta?.characters || sceneMeta?.fullData?.characters || null);
       const intent = sceneMeta?.sceneIntent || sceneMeta?.fullData?.sceneIntent;
       if (intent && String(intent).trim()) sceneIntentBlock = String(intent).trim();
     } catch { /* silent — evaluator defaults to "(none declared)" */ }
@@ -1113,6 +2100,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           interactionsBlock,
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
+          requiredObjects: requiredObjectsBlock,
+          expectedCast: expectedCast.block,
           template: evalOptions.evalTemplateOverride || undefined,
         })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
@@ -1180,6 +2169,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             }
           });
           addedCount++;
+          if (charName) attachedReferenceNames.push(String(charName));
         } catch (refErr) {
           skippedCount++;
           log.warn(`⚠️ [EVAL] Reference photo${charName ? ` "${charName}"` : ''} failed to load (${refErr.message}) — skipping`);
@@ -1188,6 +2178,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`📊 [EVAL] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
       if (skippedCount > 0) {
         log.warn(`⚠️ [EVAL] ${skippedCount}/${referenceImages.length} reference photos unusable — figure-identity matching will be degraded${addedCount === 0 ? ' (NO references: matches[] will be empty)' : ''}`);
+        // Blind check #51 in the shape it actually shipped: the judge received
+        // fewer reference photos than the cast and graded identity anyway.
+        notEvaluated.record('identity', 'reference_photos_unusable',
+          `${skippedCount}/${referenceImages.length} reference photo(s) could not be attached - figure-identity matching is degraded`);
       }
       // References requested but NONE attached → the eval is identity-blind and
       // its score is not countable. On job_1786571353564 p4/p9 the recolour
@@ -1199,11 +2193,17 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         log.error(`❌ [EVAL] ${pageContext}: ${referenceImages.length} reference photo(s) supplied, 0 attached — refusing to grade identity-blind; eval fails instead of returning an unanchored score`);
         // Countable, not just scrollback: shows up in story_metrics counters.
         try {
-          const sid = evalOptions?.storyMeta?.storyId;
-          if (sid) require('./runMetrics').forJob(sid).count('eval_refs_attach_failed');
+          require('./runMetrics').forJob(evalOptions?.storyMeta?.storyId).count('eval_refs_attach_failed');
         } catch { /* metrics are best-effort */ }
         return null;
       }
+    } else {
+      // NO references supplied at all. Same blindness as "supplied but none
+      // attached" and previously the only one of the two that said nothing:
+      // this branch recorded no notEvaluated entry, so an identity-blind eval
+      // and a clean one were the same signal in the stored story.
+      notEvaluated.record('identity', 'no_reference_photos',
+        'no reference photo was supplied - figure identity was not judged against the cast');
     }
 
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
@@ -1223,10 +2223,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // hidden reasoning. Without a cap, 2.5 Flash has been observed burning the
     // entire budget on thinking (30k+) and emitting truncated JSON → MAX_TOKENS.
     const callQualityAPI = async (model, thinkingBudget = EVAL_THINKING_BUDGET) => {
+      assertPromptFilled(parts, 'evaluateImageQuality');
       // Route to Grok vision API for xAI models
       const modelConfig = TEXT_MODELS[model];
       if (modelConfig?.provider === 'xai') {
         return require('./images').callGrokVisionAPI(model, modelConfig.modelId || model, parts, evaluationPrompt);
+      }
+      // OpenRouter vision judge (Qwen3-VL etc.): same Gemini-shaped response
+      // as the Grok path, so the parsing below is provider-blind. Lab A/B of
+      // the quality judge (2026-09-08); no fallback here — a failed call
+      // returns non-2xx and the eval is skipped like any other API error.
+      if (modelConfig?.provider === 'openrouter') {
+        return require('./images').callOpenRouterVisionAPI(model, modelConfig.modelId || model, parts, evaluationPrompt);
       }
       return withRetry(async () => {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -1235,8 +2243,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts }],
+            // No maxOutputTokens (owner rule: no output caps) — Gemini's default
+            // is the model's own ceiling; finishReason MAX_TOKENS is checked below.
             generationConfig: {
-              maxOutputTokens: 32000,
               // Evaluation is a judgment task — temperature 0 minimises the
               // run-to-run severity/detection swing (same image scored 0 vs 60
               // on consecutive runs at 0.3). thinkingBudget: 0 disables the
@@ -1298,8 +2307,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             originalPrompt: fullSanitized,
             artStyle: artStyleForEval,
             interactionsBlock,
-              sceneIntent: sceneIntentBlock,
+            sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
+            requiredObjects: requiredObjectsBlock,
+            expectedCast: expectedCast.block,
             template: evalOptions.evalTemplateOverride || undefined,
           })
         : evaluationPrompt;
@@ -1467,17 +2478,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
       // Parse fixable_issues from JSON (new two-stage format - no bboxes)
       // These will be enriched with bounding boxes in a separate detection step
-      let fixableIssues = [];
-      if (parsedJson.fixable_issues && Array.isArray(parsedJson.fixable_issues)) {
-        fixableIssues = parsedJson.fixable_issues
-          .filter(i => i.description)
-          .map(i => ({
-            description: i.description,
-            severity: i.severity || 'MODERATE',
-            type: i.type || 'default',
-            character: i.character || null,  // Preserved for bbox matching (incl. STEP 2C proportion issues)
-            fix: i.fix || `Fix: ${i.description}`
-          }));
+      let fixableIssues = parseFixableIssues(parsedJson);
+      {
         if (fixableIssues.length > 0) {
           const proportionCount = fixableIssues.filter(f => f.type === 'proportion').length;
           if (proportionCount > 0) {
@@ -1616,6 +2618,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         }
       } catch (juryErr) {
         log.warn(`[EVAL] multi-judge merge skipped (${juryErr.message}) — using primary judge only`);
+        // The returned result still carries `agreement` fields as if the jury
+        // ran; without this entry a 1-judge run reads like a 3-judge consensus.
+        notEvaluated.record('judge_jury', 'jury_merge_failed', juryErr.message);
       }
 
       // STATS: record the (merged) buckets to eval_findings for per-style/genre
@@ -1634,7 +2639,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             art_style: sm.artStyle || null, genre: sm.genre || null, language: sm.language || null,
             char_count: sm.charCount ?? null, judges: process.env.EVAL_JUDGES || 'gemini',
           }));
-          if (rows.length && typeof db.recordEvalFindings === 'function') db.recordEvalFindings(rows).catch(() => {});
+          // Fire-and-forget, but NEVER silent: a bare `.catch(() => {})` here is
+          // half of why this sink recorded nothing for its whole lifetime.
+          // recordEvalFindings swallows its own DB errors loudly; this catch is
+          // only for a rejection it could not handle. Log, never throw.
+          if (rows.length && typeof db.recordEvalFindings === 'function') {
+            db.recordEvalFindings(rows).catch(err =>
+              log.error(`[EVAL] eval_finding_stats write rejected: ${err && err.message}`));
+          }
         }
       } catch (recErr) {
         log.warn(`[EVAL] eval_findings record skipped (${recErr.message})`);
@@ -1724,8 +2736,56 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // matches: [{figure, reference (char name), confidence, face_bbox, issues}]
       let figures = parsedJson.figures || [];
       let matches = parsedJson.matches || [];
+      // Boxes on both lists go through the same normaliser as the inventory:
+      // a 0-1 box passes unchanged, Qwen's mixed 0-1000 values are rescaled.
+      {
+        const { normaliseInventoryBoxes } = require('./inventoryBoxes');
+        const bs = normaliseInventoryBoxes({ figures: [...figures, ...matches] });
+        if (bs.fixed || bs.dropped) log.info(`📊 [EVAL] ${modelId}: normalised ${bs.fixed} box(es) from 0-1000 scale, dropped ${bs.dropped} malformed`);
+      }
       if (matches.length > 0) {
         log.info(`📊 [EVAL] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
+      }
+      // THE PRESENCE SIGNAL (owner, 2026-09-13). Code does the arithmetic and
+      // emits at most one outcome — see derivePresenceFinding. When it speaks,
+      // it OWNS the pair: the evaluator's own missing/extra findings are
+      // dropped first, so a page can never carry both at once. When it declines
+      // (no detector count — covers today; witnesses disagreeing) the
+      // evaluator's findings stand untouched, which is what keeps the surplus
+      // detectable on the ~4 call sites that have no detector.
+      // Hoisted: the three-stage and semantic lists merge in further down, and
+      // they carry absence claims of their own. The two-witness filter this
+      // replaced covered all four lists; so does this.
+      let presenceDerived = false;
+      {
+        const presence = derivePresenceFinding({
+          figures, matches, cast: expectedCast, detectedFigureCount: detectedPeopleCount,
+          referenceNames: attachedReferenceNames,
+          castIndex: castIdx,
+        });
+        const spoke = presence.outcome !== 'declined';
+        presenceDerived = spoke;
+        if (spoke) {
+          const before = fixableIssues.length;
+          fixableIssues = fixableIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || '').toLowerCase()));
+          const dropped = before - fixableIssues.length;
+          if (presence.finding) fixableIssues.push(presence.finding);
+          log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${detectedPeopleCount} person-figure(s) vs EXPECTED CAST ${expectedCast.count}`
+            + `${expectedCast.nonHumanNames?.length ? ` (minus non-human ${expectedCast.nonHumanNames.join(', ')})` : ''}`
+            + ` → ${presence.outcome}${presence.reason ? ` [${presence.reason}]` : ''}${presence.finding?.character ? ` (${presence.finding.character})` : ''}`
+            + `${dropped ? `; dropped ${dropped} evaluator presence finding(s)` : ''}`);
+        } else {
+          log.info(`👥 [PRESENCE] ${pageContext || 'page'}: declined (${presence.reason})`
+            + ` — detector people ${detectedPeopleCount ?? 'n/a'} (all figures ${realFigureCount ?? 'n/a'}),`
+            + ` evaluator ${Array.isArray(figures) ? figures.length : 'n/a'}, roster ${expectedCast.count}`
+            + `${expectedCast.nonHumanNames?.length ? ` incl. non-human ${expectedCast.nonHumanNames.join(', ')}` : ''}`);
+        }
+        try {
+          // The id may be absent at an unthreaded call site; forJob() now rescues
+          // it from the ambient run scope and warns rather than dropping it.
+          require('./runMetrics').forJob(evalOptions?.storyMeta?.storyId)
+            .count(presenceCounterName(presence, spoke));
+        } catch { /* metrics are best-effort */ }
       }
 
       // Merge P1 figure data if available (better age detection — P1 doesn't see the prompt)
@@ -1773,8 +2833,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (figures.length > 0 && matches.length === 0) {
         log.warn(`⚠️ [EVAL] ${pageContext}: ${figures.length} figure(s) and ZERO matches — no per-character finding can name anyone on this page`);
         try {
-          const sid = evalOptions?.storyMeta?.storyId;
-          if (sid) require('./runMetrics').forJob(sid).count('eval_matches_missing');
+          require('./runMetrics').forJob(evalOptions?.storyMeta?.storyId).count('eval_matches_missing');
         } catch { /* metrics are best-effort */ }
       }
 
@@ -1790,6 +2849,17 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (semanticPromise) {
         try {
           semanticResult = await semanticPromise;
+          // ONE PRESENCE SIGNAL PER PAGE — same rule as the three-stage merge
+          // below. The semantic judge's vocabulary includes missing_character
+          // and it is scored on its own table, so an unfiltered absence here
+          // would rebuild the very pair the derivation exists to prevent.
+          if (presenceDerived && Array.isArray(semanticResult?.semanticIssues)) {
+            const kept = semanticResult.semanticIssues.filter(i => !PRESENCE_COUNT_TYPES.has(String(i?.type || i?.subType || '').toLowerCase()));
+            if (kept.length !== semanticResult.semanticIssues.length) {
+              log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${semanticResult.semanticIssues.length - kept.length} semantic presence finding(s) superseded by the derivation`);
+              semanticResult.semanticIssues = kept;
+            }
+          }
           if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
             // Semantic surcharge via the ONE shared table (scoring.js
             // SEMANTIC_ISSUE_PENALTY): the hand-copied chain here billed
@@ -1824,23 +2894,33 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (threeStagePromise) {
         try {
           threeStageResult = await threeStagePromise;
-          if (threeStageResult?.fixableIssues?.length) {
+          if (threeStageResult?.evalFailed) {
+            // Truncated compliance reply (evaluateThreeStage): no findings are
+            // merged, the quality verdict stands, and the failure rides along
+            // in `threeStageResult` so it never reads as "compliance found nothing".
+            log.warn(`⚠️ [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}${threeStageResult.evalError}`);
+          } else if (threeStageResult?.fixableIssues?.length) {
+            // ONE PRESENCE SIGNAL PER PAGE. When the arithmetic has spoken it
+            // owns the pair across every judge, not just the quality one — the
+            // blind compliance judge's "not identified in matches[]" absence is
+            // exactly the inference the detector count already answered.
+            //
+            // FILTER THE RECORD, NOT A COPY (2026-09-14). This used to prune a
+            // local `incoming` array on its way into the merged list, and the
+            // finding survived verbatim on `threeStageResult` — which is the
+            // object scoring.js reads for the compliance bucket
+            // (`evalResult.threeStageResult.fixableIssues`, and again for
+            // `scoreBreakdown.threeStage.issues`), so the superseded finding
+            // still reached `consolidatedPlan.deduped_issues` and the repair
+            // pipeline. Measured: a page whose `missing_character` WAS dropped
+            // from the version's own fixableIssues and still appeared in its
+            // consolidated plan. Both the mapped list and the judge's raw
+            // `complianceResult.fixable_issues` are pruned in place.
+            if (presenceDerived) {
+              const skipped = supersedePresenceFindings(threeStageResult);
+              if (skipped) log.info(`👥 [PRESENCE] ${pageContext || 'page'}: ${skipped} three-stage presence finding(s) superseded by the derivation`);
+            }
             fixableIssues = [...fixableIssues, ...threeStageResult.fixableIssues];
-            // Recompute visual score from merged fixable_issues (same rubric
-            // as main eval). Then re-apply semantic penalty on top.
-            const mergedPenalty = fixableIssues.reduce(
-              (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
-              0
-            );
-            const mergedRawScore = Math.max(0, Math.min(10, 10 - mergedPenalty));
-            visualScore = mergedRawScore * 10;
-            // Re-derive semantic penalty so finalScore = visualScore − semantic.
-            // (Was applied to `score` above; recomputed here against visualScore.)
-            // Shared table (scoring.js semanticPenaltyPoints) — same reason as
-            // the first chain: the hand-copy billed CATASTROPHIC 10.
-            const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult?.semanticIssues);
-            finalScore = visualScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
-            log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Merged ${threeStageResult.fixableIssues.length} issue(s); recomputed visual ${score}→${visualScore}, final ${finalScore} (semantic −${semanticPenalty})`);
           }
           if (threeStageResult?.issuesSummary) {
             combinedIssuesSummary = combinedIssuesSummary
@@ -1850,6 +2930,28 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         } catch (tsErr) {
           log.warn(`[THREE-STAGE] Parallel evaluation failed: ${tsErr.message}`);
         }
+      }
+
+      // THE SCORE DERIVES FROM THE CURRENT ISSUE LIST — recomputed here, once,
+      // over whatever `fixableIssues` finally holds. It used to be recomputed
+      // only inside the three-stage merge branch, which was fine while that
+      // branch was the only thing that could change the list after the first
+      // computation at `score`. The presence derivation now also adds and
+      // removes entries, so a page with no three-stage findings would have
+      // carried a derived CRITICAL that cost nothing. Same rubric, same shared
+      // semantic table; with nothing added this reproduces `score` exactly.
+      {
+        const mergedPenalty = fixableIssues.reduce(
+          (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1),
+          0
+        );
+        const recomputed = Math.max(0, Math.min(10, 10 - mergedPenalty)) * 10;
+        const semanticPenalty = require('./scoring').semanticPenaltyPoints(semanticResult?.semanticIssues);
+        if (recomputed !== visualScore) {
+          log.info(`📊 [EVAL] ${pageContext ? `[${pageContext}] ` : ''}Recomputed visual ${visualScore}→${recomputed} from ${fixableIssues.length} finding(s), final ${recomputed - semanticPenalty} (semantic −${semanticPenalty})`);
+        }
+        visualScore = recomputed;
+        finalScore = visualScore - semanticPenalty;  // no 0-floor: see scoring.js computeMathFinalScore
       }
 
       // Aggregate usage from quality + P1 + semantic + three-stage evaluations
@@ -1874,6 +2976,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       // - threeStageScore: Separate three-stage compliance score (0-100, null if not evaluated).
       // When writing to scene.qualityScore in DB, use evaluation.qualityScore (NOT evaluation.score).
       return {
+        // Dimensions that went UNJUDGED on this image, own + the compliance
+        // judge's. Never a deduction: `score` above is computed exactly as it
+        // was before this field existed (owner decision 2026-09-14 — scoring
+        // left as-is). `[]` means everything the check offers was judged.
+        notEvaluated: [...notEvaluated.list(), ...(threeStageResult?.notEvaluated || [])],
         score: finalScore,                    // Combined final score (visual − semantic)
         qualityScore: visualScore,            // Visual quality score AFTER three-stage merge
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
@@ -1886,7 +2993,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
-        fixableIssues: Array.isArray(fixableIssues) ? fixableIssues : [],  // always an array — eliminates downstream null-checks
+        // PROVENANCE (2026-09-14). ONE stamp, at the point the page's merged
+        // list is finalised, so it covers every branch that reached it: the
+        // evaluator's own `fixable_issues`, the coherence and style gates
+        // authored above, and the multi-judge jury rebuild (which reconstructs
+        // the list from bucket vectors and would have dropped a stamp made
+        // earlier). `stampFindingSource` never overwrites, so the three-stage
+        // compliance findings merged in above keep `compliance` and the
+        // presence derivation keeps `final_checks`; only the quality judge's
+        // own findings are filled in here.
+        fixableIssues: stampFindingSource(Array.isArray(fixableIssues) ? fixableIssues : [], FINDING_SOURCES.QUALITY),  // always an array — eliminates downstream null-checks
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         coherenceGate,                    // STEP 0 gate {applied, reason} — drives the forced redo above
@@ -1941,7 +3057,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (threeStagePromise) {
         try {
           threeStageResult = await threeStagePromise;
-          if (threeStageResult && threeStageResult.score < finalScore) {
+          if (threeStageResult && threeStageResult.evalFailed) {
+            // Truncated compliance reply (see evaluateThreeStage): the quality
+            // verdict stands, but the page is stamped so the failure is visible
+            // and never reads as "compliance found nothing".
+            log.warn(`⚠️ [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}${threeStageResult.evalError}`);
+          } else if (threeStageResult && threeStageResult.score < finalScore) {
             log.info(`📊 [THREE-STAGE] ${pageContext ? `[${pageContext}] ` : ''}Score ${threeStageResult.score} < quality ${finalScore} — using three-stage score`);
             finalScore = threeStageResult.score;
             issuesSummary = threeStageResult.issuesSummary
@@ -1971,6 +3092,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       };
 
       return {
+        // Dimensions that went UNJUDGED on this image, own + the compliance
+        // judge's. Never a deduction: `score` above is computed exactly as it
+        // was before this field existed (owner decision 2026-09-14 — scoring
+        // left as-is). `[]` means everything the check offers was judged.
+        notEvaluated: [...notEvaluated.list(), ...(threeStageResult?.notEvaluated || [])],
         score: finalScore,                    // Combined final score
         qualityScore: qualityScore,           // Visual quality score only
         semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
@@ -2032,11 +3158,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 }
 
 module.exports = {
+  presenceCounterName,
   runVisualInventory,
   validateEmptyScene,
+  buildEmptySceneQcPrompt,
+  largestInteriorUniformFraction,
   capComplianceIdentitySeverity,
   evaluateThreeStage,
   sanitizeForGemini,
   evaluateImageQuality,
+  buildEvalClothingContract,
+  buildEvalRequiredObjects,
+  buildExpectedCastBlock,
+  resolveExpectedCastNames,
+  reconcileDetectorCast,
+  parseFixableIssues,
+  derivePresenceFinding,
+  supersedePresenceFindings,
+  PRESENCE_DERIVED_MARKER,
+  PRESENCE_COUNT_TYPES,
   IMAGE_QUALITY_THRESHOLD,
 };

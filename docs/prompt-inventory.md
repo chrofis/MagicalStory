@@ -20,10 +20,7 @@ Three loading mechanisms feed these templates:
 
 | Template | Consumer | Stage |
 |---|---|---|
-| story-unified.txt | storyHelpers.js `buildUnifiedStoryPrompt` | Unified story call (outline + VB + text + hints) |
-| story-unified-imagefirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` (when `inputData.storyPromptVariant === 'imageFirst'`) | Image-first variant of the unified call — authoring order arc → scene designs → ALL scene authoring (`---SCENE PAGES---`: SCENE prose + METADATA per page) → text-only STORY DRAFT. Parsers detect the `---SCENE PAGES---` marker (scene-first format); original format parses byte-identically (2026-07-31 restructure) |
-| outline-analysis-textfirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` + `buildOutlineReviewPrompt` | ANALYSIS instruction body for story-unified.txt (`{ANALYSIS_INSTRUCTIONS}` placeholder). Single-call mode injects it into the writer prompt; split mode injects it into the reviewer prompt instead |
-| outline-analysis-imagefirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` + `buildOutlineReviewPrompt` | ANALYSIS instruction body for story-unified-imagefirst.txt — same dual use as above |
+| outline-analysis-imagefirst.txt | promptBuilders.js `buildOutlineReviewPrompt` + `buildTextRefinePrompt` | Shared ANALYSIS instruction body. LIVE on the beats path: `buildTextRefinePrompt` slices its review CRITERIA out of it on every beats run. Fed the deleted unified writers too until 2026-09-15 |
 | outline-review.txt | storyHelpers.js `buildOutlineReviewPrompt`; server.js split-review seam | External outline review (split mode, default ON): Opus receives the writer's full output + the same analysis instructions + REVIEW HINTS (deterministic scene-consistency findings) and emits ANALYSIS + FIXES REQUIRED + STORY PAGES patches; owns all SEMANTIC scene-consistency judgment (decisions.md 2026-07-31) |
 | story-beats.txt | storyHelpers.js `buildBeatsPrompt` | Beats-first pipeline step 1 (`pipelineMode: 'beats'`) + Test Lab `beats_scenes`: the PAGE PLAN, one plan line per page (no beat prose since 2026-09-02) |
 | plan-check.txt | storyHelpers.js `buildPlanCheckPrompt` | Beats-first step 2: the ONE model call over a page division — emotional highlights, entrances, 3+-cast justifications. Counters (server/lib/planCounters.js) do the arithmetic |
@@ -39,11 +36,15 @@ Three loading mechanisms feed these templates:
 | story-child-critic.txt | storyHelpers.js `buildChildCriticPrompt` | Child critic of the arc, in PARALLEL with story-arc-audit: role-plays the youngest main character's age, retells the arc, then emits `FAULT[CHILD]:` lines for comprehension/boredom/fear only. Lab only since 2026-08-30 — the production arc stage is the arc machine |
 | scene-review.txt | storyHelpers.js `buildSceneReviewPrompt` | Beats-first step 4: ONE review over ALL scene briefs (repetition, arc, continuity) |
 | scene-hazard-audit.txt | testlab.js `runSceneHazardCountStage` (via `PROMPT_TEMPLATES.sceneHazardAudit`) | Lab-only measurement for the hazard-reduction loop: counts render hazards per page across a book's briefs (or beat SCENE lines) in 12 stable classes (CROWD, MULTIACT, GAZE, CONTACT, FORCE, ELEV, UNHELD, NEG, SCALE, TEMPORAL, LOC, SHOT); emits `HAZARD[<CLASS>]: p<N>` lines + `HAZARDS: <count>`. Report-only, nothing in the pipeline consumes it |
+| story-bible-from-beats.txt | promptBuilders.js `buildStoryBibleFromBeatsPrompt` | Beats-first step 3: the WARDROBE contract and nothing else. Emits `---CLOTHING REQUIREMENTS---`. The Visual Bible and the cover scene hints moved OUT to scene-expansion-all.txt on 2026-09-11 (owner); clothing stayed because the styled avatars start the moment this call returns |
+| scene-expansion-all.txt | promptBuilders.js `buildSceneExpansionAllPrompt` | Beats-first step 4, ONE call over ALL pages: `---VISUAL BIBLE---` + `---COVER SCENE HINTS---` ahead of page 1, then a brief per page. One author owns what is in each picture and what each thing looks like, so no page can cite an id nobody declared. Parsed by `extractBibleSections(raw, AD_BIBLE_MARKERS)` + `parseRefinedText(raw, pages, 'SCENES')` |
 | clothing-review.txt | storyHelpers.js `buildClothingReviewPrompt` | Beats-first step 3b: wardrobe review over the bible's clothing contract, BEFORE the styled-avatar kickoff. Emits `---ANALYSIS---` + `---CLOTHING---`, parsed by `parseClothingReview` |
 | story-text-from-beats.txt | storyHelpers.js `buildStoryTextFromBeatsPrompt` | Beats-first step 5: page TEXT written from the FINAL ARC + the locked plan lines. Emits `---TITLE---` + `---ANALYSIS---` + `---STORY TEXT---` so `parseRefinedText` reads it |
 | text-refine.txt | storyHelpers.js `buildTextRefinePrompt` | Post-image text refinement (both pipelines) |
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
+| vb-label-repair.txt | (new) Visual Bible label repair | One fed-back round to fix Visual Bible label faults |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
+| — | — | **Bible `label` field (2026-09-13):** story-trial.txt and scene-expansion-all.txt both author a `label` beside each element's `id` — the one English name every prompt uses for that element |
 | age-band-routine.txt | promptBuilders.js `buildAgeModeSection` → `{AGE_MODE}` in arc-create, arc-retell, story-arc-review, story-beats, story-trial, trial-idea, generate-story-idea(s) | Plot shape when the oldest MAIN character is 0–1: a day's rhythm, no plot, naming and repetition |
 | age-band-quest.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 2: one tiny goal, one search place per page, a repeated phrase, cosy close |
 | age-band-tries.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 3: one problem, try-fail / try-fail / try-succeed by the child's own doing |
@@ -113,6 +114,9 @@ Sizes measured 2026-08-09.
 | image-semantic.txt | 16,061 | 151 | images.js `evaluateThreeStage`; sceneValidator.js `evaluateSemanticFidelity` | Semantic fidelity eval |
 | image-vision-inventory.txt | 2,039 | 32 | images.js `evaluateThreeStage` | Three-stage eval: vision inventory |
 | image-prompt-compliance.txt | 15,268 | 155 | images.js `evaluateThreeStage` | Three-stage eval: prompt compliance (never sees the image) |
+| image-inventory-unified.txt | 6,644 | 81 | evalPipeline.js (unified visual inventory) | Per-figure inventory the blind compliance judge consumes |
+| cover-evaluation-notes.txt | 1,353 | 17 | evalPipeline.js `evaluateImageQuality` (cover path) | Cover-only preamble: COVER_NOTE / TEXT_NOTE_APP_OVERLAY / TEXT_RULES. Extracted from JS string literals 2026-09-15 |
+| empty-scene-qc.txt | 2,889 | 18 | evalPipeline.js `buildEmptySceneQcPrompt` | Plate judge: BODY / ERA_CHECK / PLACEMENTS_CHECK. Extracted from JS string literals 2026-09-15 |
 | image-visual-inventory.txt | 5,377 | 138 | images.js `runVisualInventory`; regeneration.js | Visual inventory pass |
 | image-inspection.txt | 2,457 | 52 | images.js `inspectImageForErrors` | Image error inspection |
 | generated-image-analysis.txt | 1,106 | 39 | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |
@@ -140,7 +144,7 @@ Sizes measured 2026-08-09.
 | incremental-consistency-check.txt | images.js `evaluateIncrementalConsistency` | Incremental consistency |
 | ~~final-consistency-check.txt~~ | — | **DELETED 2026-07-26** — `runFinalConsistencyChecks`/`evaluateSingleBatch` chain was dead (imported, never called); removed in the Pt 10 cleanup (decisions.md) |
 | visual-bible-analysis.txt | visualBible.js `analyzeVisualBibleElements` | VB element analysis |
-| reference-sheet.txt | images.js `buildReferenceSheetPrompt` | Element reference sheet generation |
+| reference-sheet.txt | referenceSheets.js `buildReferenceSheetPrompt` | Element reference sheet generation. Cell lines open with a kind sentence (`elementKindSentence`, name + type as prose); `{TEXT_RULE}` is the blanket no-lettering line, swapped for a quoted-words-only line on a solo cell whose entry carries `text` (rendered on `MODEL_DEFAULTS.vbTextCellModel`) |
 | sheet-cell-identification.txt | referenceSheets.js `identifySheetCells` | Maps labelled sheet cells to requested elements when the model's drawn grid does not match the requested cell count |
 
 ## Repair (image)
@@ -150,6 +154,7 @@ Sizes measured 2026-08-09.
 | character-repair-cutout.txt | images.js `repairCharacterMismatchWithGrok` | Grok cutout repair |
 | character-repair-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok blended repair |
 | `repair-naturalness.txt` | faceRepair.js checkRepairNaturalness | post-repair figure-integrity check: MATCH/EDGES observations -> enum; clearly off rejects the repaint |
+| `repair-face-check.txt` | repairPipeline.js char-fix gate | post-repair comparative face check: original + repaired in, {intact,confidence,reason} out; not intact refuses the repair |
 | character-repair-body-blended.txt | images.js `repairCharacterMismatchWithGrok` | Grok body-blended repair |
 | character-repair-inpaint.txt | faceRepair.js `buildPrompt` (crosshatch + box) | Full-scene (box-mode) char repair |
 | inpainting.txt | images.js `inpaintWithMask` | Mask inpainting (Runware) — **DEAD CHAIN**, no live caller |
@@ -198,3 +203,6 @@ These act like templates but can only be edited in code:
 | `sceneComposite.js` `buildDepopulatePrompt` | Removes the silhouettes to leave a clean background plate (hardcoded) |
 | `sceneComposite.js` `buildBlendEditPrompt` | The composite BLEND prompt: goal + scene overview + cast (clothing/action) + interactions + emotions from metadata. **Never the page prompt** — that relocates characters (decisions.md 2026-08-15). Built from `buildBlendMetadata` (hardcoded) |
 | `premiseWorld.js` `detectPremiseNamedWorld()` | YES/NO utility-model classification: does the premise name its own world/location (other than the reader's home town)? Fallback rung only — structured wizard signals (`ideaWorld`, `selectedIndex`) are consulted first (decisions.md 2026-08-31, named location binding) |
+
+
+**Deleted 2026-09-15** (unreachable — beats replaced the unified writer for every full story, and the trial writes its own single call): `story-unified.txt`, `story-unified-imagefirst.txt`, `outline-analysis-textfirst.txt`, and the `buildUnifiedStoryPrompt` builder. See `docs/decisions.md`.

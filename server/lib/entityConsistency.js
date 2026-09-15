@@ -24,6 +24,7 @@ const { getCurrentLogger } = require('./generationLogger');
 const { COVER_PAGE_NUMBERS } = require('./coverKeys');
 const r2 = require('./r2');
 const geminiPad = require('./geminiPad');
+const { canonicalName } = require('./castResolver');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -785,6 +786,21 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     // artStyle = ...` line above it.
     const artStyle = storyData.artStyle || 'pixar';
 
+    // PER-PAGE WORN STATE. A page's brief can declare one of a character's
+    // garments OFF (`wornItems[]`); the generator strips it out of the outfit
+    // the image model was given, so the grid judge must not go on demanding
+    // it. Parsed once here, consumed by `expectedClothing` below through the
+    // generator's own stripper (wornItems.resolveGeneratedOutfit).
+    const wornMetaByPage = new Map();
+    for (const sd of sceneDescriptions) {
+      const desc = sd && (sd.description || sd.sceneDescription);
+      if (!desc || sd.pageNumber == null) continue;
+      try {
+        const meta = extractSceneMetadata(desc);
+        if (meta) wornMetaByPage.set(sd.pageNumber, meta);
+      } catch { /* unparsable brief → no worn state, unchanged behaviour */ }
+    }
+
     // Story-invented characters are checked too, when they appear more than
     // once. They are not in `characters` (the photo-backed roster) but they do
     // drift, and until now nothing watched them: on job_1786780194082_s980g4s9a
@@ -907,10 +923,20 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           // The grid prompt judges clothing against this description, not against
           // the reference avatar's pixels — style transfer can mutate the avatar's
           // outfit, and avatars.clothing can be stale across stories.
+          // The grid spans every page of this character×clothing group, so the
+          // worn state is the UNION over those pages: a garment declared off on
+          // any of them is dropped from the expected text rather than demanded
+          // on all of them. One resolver, shared with the generator's strip.
+          const groupWornMetas = [...new Set(groupAppearances.map(a => a.pageNumber))]
+            .map(pn => wornMetaByPage.get(pn) || null).filter(Boolean);
           const expectedClothing = character.__vbSecondary
             ? character.__vbDescription
-            : buildClothingDescription(
-              character, clothingCategory, artStyle, storyData.clothingRequirements || null
+            : require('./wornItems').resolveGeneratedOutfit(
+              buildClothingDescription(
+                character, clothingCategory, artStyle, storyData.clothingRequirements || null
+              ),
+              charName,
+              { visualBible: storyData.visualBible || storyData.wornItemsVisualBible || null, sceneMetadatas: groupWornMetas }
             );
           const gridLabel = `${charName} (${clothingCategory})`;
 
@@ -1286,7 +1312,14 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             fixInstruction: annotateCells(issue.fix || issue.fixInstruction, cellToPage),
           };
           delete annotated._gridCellToPage; // internal-only; don't persist
-          report.characters[charName].issues.push(annotated);
+          // PROVENANCE (2026-09-14). `['entity']` is what the consolidator has
+          // always written for these and what `repairLogic` routes on
+          // (`sources.every(s => s === 'entity')` → no automatic repair, owner
+          // 2026-09-04); stamping it at the emitter makes the raw path agree
+          // with the consolidated one instead of leaving it blank.
+          report.characters[charName].issues.push(
+            require('./findingSources').stampFindingSource([annotated], require('./findingSources').FINDING_SOURCES.ENTITY)[0]
+          );
         }
 
         for (const m of (evalResult.garmentColourMismatches || [])) {
@@ -1491,7 +1524,8 @@ function collectSecondaryEntities(visualBible, sceneImages = []) {
     const detected = new Set();
     for (const img of sceneImages) {
       const figs = img?.bboxDetection?.figures || [];
-      if (figs.some(f => (f?.name || '').toLowerCase() === String(e.name).toLowerCase())) {
+      // COMPARE: two stored names from the same run — one normaliser.
+      if (figs.some(f => canonicalName(f?.name) === canonicalName(e.name))) {
         detected.add(img.pageNumber);
       }
     }
@@ -1652,7 +1686,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
       if (pageCharNames.length > 0) {
         // Build expected characters with physical descriptions + clothing for Gemini
-        const { extractSceneMetadata } = require('./storyHelpers');
+        const { extractSceneMetadata, resolveSceneCastEntries } = require('./storyHelpers');
         const sceneMetadata = sceneDesc ? extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription) : null;
         const charClothing = sceneMetadata?.characterClothing || {};
 
@@ -1685,8 +1719,10 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           // Case-insensitive lookup — scene metadata can key characterClothing
           // with different casing than the canonical character name, and an
           // exact-key miss silently degraded the eval to the fallback category.
+          // COMPARE: one normaliser (canonicalName) instead of a local
+          // lowercase rule that missed diacritics and trailing parentheticals.
           const charClothingKey = Object.keys(charClothing)
-            .find(k => k.toLowerCase() === name.toLowerCase());
+            .find(k => canonicalName(k) === canonicalName(name));
           const clothingCategory = (charClothingKey && charClothing[charClothingKey]) || fallbackCategory;
           // Resolve category to actual clothing description.
           // buildClothingDescription prefers this story's clothingRequirements
@@ -1710,7 +1746,12 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         let sceneContext = null;
         if (sceneMetadata?.imageSummary) {
           const contextParts = [`**SCENE:** ${sanitizeForGemini(sceneMetadata.imageSummary, 'full')}`];
-          const sceneChars = sceneMetadata.characters || [];
+          // The cast OBJECTS (fullData.characters), never the flat name list:
+          // `metadata.characters` is string[], so `c.position` / `c.action` off
+          // it were `undefined` and this block emitted "- undefined:" per figure
+          // into a prompt headed "use to identify characters by position and
+          // action". One resolver, and a string entry now fails loudly.
+          const sceneChars = resolveSceneCastEntries(sceneMetadata, `bbox scene context p${pageNumber}`);
           if (sceneChars.length > 0) {
             contextParts.push(sceneChars.map(c => {
               const parts = [`- ${c.name}:`];
@@ -1816,7 +1857,8 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
         }
         const clothing = normalizeClothingCategory(rawClothing);
         // Determine confidence based on how we matched
-        const confidence = (matchingFigure.name || '').toLowerCase() === charNameLower
+        // COMPARE: stored figure name vs stored character name.
+        const confidence = canonicalName(matchingFigure.name) === canonicalName(charName)
           ? (matchingFigure.confidence === 'high' ? 0.95 : matchingFigure.confidence === 'medium' ? 0.8 : 0.65)
           : 0.5;  // Lower confidence for label-based match
 
@@ -2589,8 +2631,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
   const model = genAI.getGenerativeModel({
     model: ENTITY_CHECK_MODEL,
     generationConfig: {
-      temperature: 0.2,
-      maxOutputTokens: 8192  // Increased from 2048 to handle complex responses with many issues
+      temperature: 0.2  // no maxOutputTokens (owner rule: no output caps); 2048 and 8192 both truncated busy pages
     }
   });
 
@@ -2935,11 +2976,15 @@ function buildClothingDescription(character, clothingCategory, artStyle, clothin
     const colonSub = clothingCategory.startsWith('costumed:') ? clothingCategory.replace('costumed:', '') : null;
     if (charReqs?.costumed?.signature && charReqs.costumed.signature !== 'none') return charReqs.costumed.signature;
     if (charReqs?.costumed?.description) return charReqs.costumed.description;
-    // Nested-by-subtype legacy shape: prefer the matching key, else first entry.
+    // Nested-by-subtype shape. One resolver for the key (utils/costumeKey.js):
+    // the colon part arrives in either casing and this lookup was
+    // case-sensitive, so a costume written as "Zauberlehrling" was missed by
+    // "zauberlehrling" and the prompt fell back to the generic line below while
+    // a different styled sheet was attached.
     if (avatars?.costumed && typeof avatars.costumed === 'object') {
-      if (colonSub && avatars.costumed[colonSub]?.clothing) return avatars.costumed[colonSub].clothing;
-      const firstEntry = Object.values(avatars.costumed)[0];
-      if (firstEntry?.clothing) return firstEntry.clothing;
+      const { pickCostumed } = require('../utils/costumeKey');
+      const hit = pickCostumed(avatars.costumed, clothingCategory, charReqs?.costumed?.costume);
+      if (hit?.clothing) return hit.clothing;
     }
     return `${colonSub || 'costume'} as shown in reference`;
   }
@@ -3072,8 +3117,27 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     const hairStyle = builtHair || 'as shown in reference';
 
     // Build clothing description for this scene — pass clothingRequirements
-    // so the current-story signature wins over stale avatars.clothing.
-    const clothingDescription = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements);
+    // so the current-story signature wins over stale avatars.clothing, then
+    // resolve THIS PAGE's worn state on top of it (2026-09-15). A repaint is a
+    // page path like any other: without this it repaints the story-level
+    // contract back onto a character the page took a garment off, or dressed in
+    // a different one.
+    const pageWornMeta = (() => {
+      try {
+        const sd = (storyData?.sceneImages || []).find(s => s && s.pageNumber === pageNumber);
+        const desc = sd && (sd.sceneDescription || sd.description);
+        return desc ? extractSceneMetadata(desc) : null;
+      } catch { return null; }
+    })();
+    const clothingDescription = require('./wornItems').resolveGeneratedOutfit(
+      buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements),
+      charName,
+      {
+        visualBible: storyData?.visualBible || storyData?.wornItemsVisualBible || null,
+        sceneMetadata: pageWornMeta,
+        pageNumber,
+      }
+    );
 
     // Format issues found for this page (if provided in options)
     let issuesFoundText = '';
@@ -3213,6 +3277,25 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         error: why ? `Repair rejected — ${why}` : 'Grok repair returned no image (no reason reported)',
         rejectedReason: grokResult?.rejectedReason || null,
         gateMessage: grokResult?.gateMessage || null,
+      };
+    }
+
+    // FACE-INTEGRITY GATE — the same gate the unified pipeline applies. A char
+    // fix is a maskless whole-frame edit and can smear the face it was meant to
+    // correct; this entry point shipped those unchecked until 2026-09-15.
+    const faceGate = await require('./faceIntegrityGate').checkFaceIntegrity(
+      pageImage,
+      grokResult.imageData,
+      charName,
+      { log, jobKey: storyData?.id || null, context: `SINGLE-PAGE-REPAIR p${pageNumber} ${charName}` }
+    );
+    if (!faceGate.ok) {
+      log.warn(`🚫 [SINGLE-PAGE-REPAIR] ${charName} p${pageNumber}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
+      return {
+        success: false,
+        error: `Repair rejected — face not intact after repair (${faceGate.reason})`,
+        rejectedReason: 'face_integrity',
+        gateMessage: faceGate.reason,
       };
     }
 

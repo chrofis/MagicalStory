@@ -8,11 +8,12 @@
  */
 
 const { log } = require('../utils/logger');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
 const { getPhysical } = require('./characterPhysical');
 const { stripDataUriPrefix } = require('./r2');
 const { baseVbId, vbIdFacet } = require('./vbIdGuard');
+const vbLabel = require('./vbLabel');
 
 /**
  * OBJECT STATES. One physical thing is ONE artifact entry however the story
@@ -62,6 +63,12 @@ function normaliseObjectStates(raw, parentId) {
       name: String(s.name || `state ${n}`).trim(),
       delta,
       pages: Array.isArray(s.pages) ? s.pages.filter(p => Number.isFinite(Number(p))).map(Number) : [],
+      // STRUCTURED contact flag: true when a character's hands are on the
+      // object in this look, false when nothing touches it. It is what lets
+      // `resolveObjectState` detect a state that contradicts the page's own
+      // declared interactions WITHOUT reading the delta prose. Absent on every
+      // bible authored before the field existed — null, never a guess.
+      held: typeof s.held === 'boolean' ? s.held : null,
       referenceImageData: null,
       referenceImageUrl: null,
     });
@@ -87,6 +94,21 @@ function objectStateFor(entry, handle) {
 }
 
 /**
+ * The state whose own `pages[]` covers this page, or null.
+ *
+ * The bible declares WHERE each state is worn, and the authoring templates
+ * require every page of the entry to fall in exactly one state's pages. That
+ * declaration is the deterministic channel: a brief that cites the bare parent
+ * id (`ART001`, which is what the Art Director writes unless it repeats the
+ * dotted handle) still lands on the right cell for the page.
+ */
+function objectStateForPage(entry, pageNumber) {
+  if (!Number.isFinite(Number(pageNumber))) return null;
+  const n = Number(pageNumber);
+  return objectStates(entry).find(st => Array.isArray(st.pages) && st.pages.map(Number).includes(n)) || null;
+}
+
+/**
  * The DEFAULT state of an object: the FIRST row of `states[]`.
  *
  * The states ARE the rendered pictures (there is no separate base cell), so a
@@ -102,6 +124,379 @@ function defaultObjectState(entry) {
 }
 
 const hasRefImage = (o) => !!(o?.referenceImageData || o?.referenceImageUrl);
+
+// Function words only. Size and colour words ("large", "blue") are DELIBERATELY
+// kept: they are exactly what tells "the large blue scale" from "the scale chip"
+// when both are on the page. (The two other stopword lists in the repo —
+// ENTITY_MATCH_STOPWORDS here and TRIM_STOPWORDS in vbElementBudget — drop
+// "large"/"small" on purpose for their own jobs, so they are not shared.)
+const ROW_MATCH_STOPWORDS = new Set([
+  'with', 'from', 'that', 'this', 'into', 'onto', 'over', 'under', 'them', 'their', 'there',
+  'where', 'when', 'what', 'which', 'than', 'then', 'some', 'same', 'each', 'also', 'very',
+  'upon', 'near', 'beside', 'behind', 'inside', 'outside', 'between', 'across', 'against',
+  'through', 'along', 'around', 'above', 'below', 'about', 'still', 'just', 'only',
+  'eine', 'einen', 'einem', 'einer', 'sein', 'seine', 'seinen', 'ihre', 'ihren', 'dass',
+  'dans', 'avec', 'pour', 'sous', 'leur', 'leurs', 'elle', 'elles', 'cette', 'cela',
+]);
+
+/** Lower-cased letter tokens (>= 4 letters, function words dropped) of a name or row. */
+function rowMatchTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^\p{L}]+/u)
+      .filter(t => t.length >= 4 && !ROW_MATCH_STOPWORDS.has(t))
+  );
+}
+
+/** The bible entries a brief's `objects[]` cites (any collection), by base id. */
+function citedEntries(visualBible, sceneMetadata) {
+  const ids = new Set(
+    (Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [])
+      .map(o => baseVbId(typeof o === 'string' ? o : o?.id))
+      .filter(Boolean)
+  );
+  if (ids.size === 0 || !visualBible) return [];
+  const out = [];
+  for (const key of ['mainCharacters', 'secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing']) {
+    for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      if (e && ids.has(baseVbId(e.id))) out.push(e);
+    }
+  }
+  return out;
+}
+
+/**
+ * THE ONE matcher from an interactions[] row's `object` (or `character`)
+ * string to a bible entry. Deterministic, no prose classification.
+ *
+ * Rules, in order:
+ *   1. A VB id in the row → the candidate with that base id (strongest).
+ *   2. Token overlap. The Art Director paraphrases names ("the large blue
+ *      scale" for "Large dragon scale"), so a substring test fails on the very
+ *      rows that matter. A candidate is named when the row shares with it at
+ *      least one token that NO OTHER candidate carries: "the large blue scale"
+ *      shares scale with both the scale and the chip but large with the scale
+ *      alone → the scale; "the chip" → the chip; "the dragon scale" → shared
+ *      tokens only → ambiguous → null, never a guess. With a single candidate
+ *      every one of its tokens is unique, so any overlap names it.
+ *
+ * Matching runs over the entry's `label`, `name` and `properName` tokens.
+ *
+ * @param {string} rowField   the row's `object` (or `character`) string
+ * @param {Array} candidates  every entry the row could mean — the entry under
+ *   test plus the brief's cited entries (`citedEntries`)
+ * @returns {Object|null} the ONE entry named, or null (none / ambiguous)
+ */
+function entryNamedByRow(rowField, candidates) {
+  const raw = String(rowField || '').trim();
+  if (!raw || !Array.isArray(candidates) || candidates.length === 0) return null;
+  const seen = new Set();
+  const cands = candidates.filter(c => {
+    const b = baseVbId(c?.id);
+    if (!b || seen.has(b)) return false;
+    seen.add(b);
+    return true;
+  });
+  const idInRow = raw.match(/[A-Z]{3}\d{3}(?:\.\d+)?/);
+  if (idInRow) {
+    const base = baseVbId(idInRow[0]);
+    return cands.find(c => baseVbId(c.id) === base) || null;
+  }
+  const rowTokens = rowMatchTokens(raw);
+  if (rowTokens.size === 0) return null;
+  const tokensOf = new Map(cands.map(c => [c, rowMatchTokens(`${c.name || ''} ${c.properName || ''} ${c.label || ''}`)]));
+  const named = cands.filter(c => {
+    const mine = tokensOf.get(c);
+    for (const t of rowTokens) {
+      if (!mine.has(t)) continue;
+      if (![...tokensOf].some(([o, toks]) => o !== c && toks.has(t))) return true;
+    }
+    return false;
+  });
+  return named.length === 1 ? named[0] : null;
+}
+
+/**
+ * THE POSITION THE PAGE'S OWN BRIEF GIVES THIS OBJECT, or null.
+ *
+ * Read from the brief's structured `objects[]` records (`{id, name, position}`)
+ * kept on `fullData` — the same records `buildTextFromJson` turns into the
+ * prompt's `Objects: <name>: <position>` line. A brief whose `objects[]` is a
+ * plain id list (the beats/full scene format) places nothing structurally and
+ * yields null here.
+ *
+ * @returns {string|null} the trimmed position phrase, or null
+ */
+function scenePlacesObject(entry, sceneMetadata) {
+  const records = sceneMetadata?.fullData?.objects;
+  if (!Array.isArray(records) || records.length === 0) return null;
+  const base = baseVbId(entry?.id);
+  const names = new Set([entry?.name, entry?.properName, entry?.label]
+    .map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
+  for (const rec of records) {
+    if (!rec || typeof rec !== 'object') continue;
+    const recBase = baseVbId(rec.id);
+    const recName = String(rec.name || '').trim().toLowerCase();
+    const mine = (base && recBase && base === recBase) || (recName && names.has(recName));
+    if (!mine) continue;
+    const position = String(rec.position || '').trim();
+    if (position) return position;
+  }
+  return null;
+}
+
+// A PLACEMENT clause inside a state delta — where the object is, not what it
+// looks like. Either the segment opens with a locative preposition ("in a small
+// hand") or it pairs a locative verb with one ("resting in the grass", "wedged
+// between roots"). An appearance delta names no such pair: "shell split open",
+// "chestnut hidden inside", "fully visible", "cream patch facing upward".
+const PLACEMENT_PREP = '(?:in|into|inside|within|on|onto|atop|at|under|underneath|beneath|below|between|among|amongst|against|beside|alongside|behind|above|over|across|near|by|around|through|from)';
+const PLACEMENT_VERB = '(?:rest|rests|resting|lying|lies|laid|sitting|sits|standing|stands|held|holding|hold|cupped|clutched|cradled|gripped|grasped|clasped|carried|carrying|tucked|wedged|lodged|jammed|propped|perched|balanced|hanging|hung|dangling|leaning|placed|nestled|buried|floating)';
+const PLACEMENT_LEAD_RE = new RegExp(`^\\s*${PLACEMENT_PREP}\\b`, 'i');
+const PLACEMENT_PAIR_RE = new RegExp(`\\b${PLACEMENT_VERB}\\b[^,;]*?\\b${PLACEMENT_PREP}\\b`, 'i');
+
+/**
+ * Split a state delta into the part that describes the object's LOOK and the
+ * part that asserts WHERE it is.
+ *
+ * ONE OBJECT, ONE POSITION PER PAGE PROMPT. The REQUIRED OBJECTS block promises
+ * in its own header that each element "appears exactly as the scene description
+ * places it"; a state delta that also states a placement breaks that promise
+ * whenever the two disagree (staging job_1789337873076_qf2at21ui pages 2-4:
+ * "cupped in a small hand" against the brief's "wedged between roots at ground
+ * level"). The caller drops the placement half ONLY where the page places the
+ * object itself; the look half is never dropped, because a state's whole job is
+ * to say which variant of the object this page shows.
+ *
+ * @returns {{kept: string, dropped: string[]}}
+ */
+function splitStatePlacement(delta) {
+  const raw = String(delta || '').trim();
+  if (!raw) return { kept: '', dropped: [] };
+  const segments = raw.split(/\s*[,;]\s*/).filter(Boolean);
+  const dropped = segments.filter(s => PLACEMENT_LEAD_RE.test(s) || PLACEMENT_PAIR_RE.test(s));
+  if (dropped.length === 0) return { kept: raw, dropped: [] };
+  return { kept: segments.filter(s => !dropped.includes(s)).join(', '), dropped };
+}
+
+/**
+ * Does the page's brief put a character's HANDS on this object?
+ *
+ * Read from the brief's structured `interactions[]` (character → object rows
+ * with an explicit `hands: true`), never from prose. A row is tied to the
+ * entry by `entryNamedByRow`, disambiguated against the other entries the
+ * brief's `objects[]` cites (`visualBible` is needed for that; without it the
+ * entry is the only candidate).
+ *
+ * @returns {boolean|null} true — a row has hands on it; false — the brief
+ *   declared its interactions and none touches this object; null — no
+ *   interactions declared at all, or the object is named in a row that does
+ *   not say whether hands are on it (no verdict either way).
+ */
+function pageHoldsObject(entry, sceneMetadata, visualBible = null) {
+  const rows = Array.isArray(sceneMetadata?.interactions) ? sceneMetadata.interactions : [];
+  if (rows.length === 0) return null;
+  const entryBase = baseVbId(entry?.id);
+  if (!entryBase) return null;
+  const candidates = [entry, ...citedEntries(visualBible, sceneMetadata).filter(e => baseVbId(e.id) !== entryBase)];
+  const naming = rows.filter(r => entryNamedByRow(r?.object, candidates) === entry);
+  if (naming.some(r => r.hands === true)) return true;
+  if (naming.length > 0) return null;
+  return false;
+}
+
+// Relational and structural nouns on top of the row stopwords. A state's delta
+// routinely names a PART of the object ("the top of the shell"), and those
+// words turn up in staging prose for reasons that have nothing to do with the
+// object's look ("the cat lies on top of it") — they carry no appearance
+// evidence and must not vote.
+const APPEARANCE_STOPWORDS = new Set([
+  ...ROW_MATCH_STOPWORDS,
+  'top', 'bottom', 'side', 'sides', 'front', 'back', 'edge', 'edges', 'end', 'ends',
+  'middle', 'centre', 'center', 'part', 'parts', 'half', 'left', 'right', 'again',
+  'look', 'looks', 'shape', 'size', 'onto', 'into',
+  // Three-letter function words. ROW_MATCH_STOPWORDS never needed them (that
+  // matcher takes tokens of 4+); this one reads three so "egg", "cat", "cup"
+  // can name their entry, which lets "the" or "its" into the vote otherwise —
+  // measured: "the" alone made every sibling delta a rival on every page.
+  'the', 'and', 'its', 'his', 'her', 'out', 'for', 'are', 'was', 'not', 'but',
+  'has', 'had', 'one', 'two', 'all', 'any', 'own', 'off', 'she', 'him', 'you',
+  'who', 'how', 'why', 'yet', 'per', 'via', 'now', 'new', 'old', 'own',
+  'der', 'die', 'das', 'und', 'ein', 'ist', 'sie', 'ihr', 'den', 'dem', 'des',
+  'mit', 'auf', 'aus', 'les', 'des', 'une', 'est', 'son', 'sur', 'par', 'pas',
+]);
+
+/**
+ * Crude suffix stem, so the bible's "glowing" meets the brief's "glows" and
+ * "bright" meets "brightly". Only ever compared against other stems of the
+ * same helper — it is a matcher, never a display string.
+ */
+function appearanceStem(token) {
+  for (const suf of ['ing', 'edly', 'ed', 'ly', 'es', 's']) {
+    if (token.length - suf.length >= 4 && token.endsWith(suf)) return token.slice(0, -suf.length);
+  }
+  return token;
+}
+
+/** Stemmed content tokens of a string, for the appearance matcher only. */
+function appearanceTokens(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .split(/[^\p{L}]+/u)
+      .filter(t => t.length >= 3 && !APPEARANCE_STOPWORDS.has(t))
+      .map(appearanceStem)
+  );
+}
+
+/**
+ * Does the page's own instant assert a look the chosen state DENIES?
+ *
+ * The same doctrine as the `held` contradiction, on the appearance axis: a
+ * state is the bible's table talking about a range of pages, and the page's
+ * instant outranks it. What makes this decidable without reading prose
+ * semantically is that the states of one object are MUTUALLY EXCLUSIVE by
+ * construction — the authoring template requires the complete set of looks and
+ * exactly one state per page — so if the instant speaks another state's
+ * vocabulary and none of the chosen state's, the chosen delta is wrong here.
+ *
+ * Deliberately narrow, because a false positive silently strips a legitimate
+ * delta:
+ *   - only the AUTHOR's own words vote (state names and deltas); there is no
+ *     hand-written vocabulary of appearance concepts anywhere in here,
+ *   - only tokens DISTINCTIVE to one state vote; a word two states share says
+ *     nothing,
+ *   - only the sentences of `sceneIntent` that NAME this object are read, so
+ *     the intent's closing "…, warm lamplight, hopeful mood" clause — scene
+ *     lighting, present on nearly every page — cannot vote,
+ *   - the rival must be a single state, and the chosen state must be entirely
+ *     absent from those sentences.
+ *
+ * Known limits: it sees nothing when the object's competing look was filed in
+ * `description` instead of a sibling state, when the instant does not name the
+ * object, or when the prose paraphrases the delta in words the bible never
+ * used. It under-fires by design — the wrong delta shipping is the same
+ * failure we already had, a stripped good delta is a new one.
+ *
+ * @returns {{rival: Object, evidence: string}|null}
+ */
+function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
+  if (!state || !state.delta) return null;
+  const siblings = objectStates(entry).filter(s => s !== state);
+  if (siblings.length === 0) return null;
+  const intent = String(sceneMetadata?.sceneIntent || '').trim();
+  if (!intent) return null;
+
+  const vocab = new Map([[state, appearanceTokens(`${state.name || ''} ${state.delta}`)]]);
+  for (const s of siblings) vocab.set(s, appearanceTokens(`${s.name || ''} ${s.delta || ''}`));
+  const distinctive = (s) => [...vocab.get(s)].filter(t => ![...vocab].some(([o, toks]) => o !== s && toks.has(t)));
+  const mine = distinctive(state);
+  if (mine.length === 0) return null;
+
+  // Tokens that name THIS object and no other element the page cites.
+  const nameTokens = (e) => appearanceTokens(`${e?.name || ''} ${e?.properName || ''} ${e?.type || ''}`);
+  const others = citedEntries(visualBible, sceneMetadata).filter(e => baseVbId(e.id) !== baseVbId(entry?.id));
+  const taken = new Set(others.flatMap(e => [...nameTokens(e)]));
+  const naming = [...nameTokens(entry)].filter(t => !taken.has(t));
+  if (naming.length === 0) return null;
+  // The naming tokens of the OTHER cited elements, each kept only where it
+  // names that element alone.
+  const namingOther = new Map(others.map(e => [e, [...nameTokens(e)].filter(t => {
+    if (nameTokens(entry).has(t)) return false;
+    return !others.some(o => o !== e && nameTokens(o).has(t));
+  })]));
+
+  // Attribution, from the brief's structure, not from the prose's meaning: a
+  // sentence votes only when the page's cited elements put exactly ONE of them
+  // in it. A sentence naming two stated objects ("she clutches the muddy egg
+  // against her jacket") cannot say which of them "muddy" belongs to, and
+  // guessing charges an arbitrary element — Lab #1266 p12 charged the jacket
+  // with the egg's mud. So an ambiguous clause EMITS NOTHING: a false finding
+  // costs a reviewer round, and silence costs nothing here, because the state
+  // guard is not the only protection on the page.
+  const sentences = intent.split(/(?<=[.!?])\s+/)
+    .map(text => ({ text, toks: appearanceTokens(text) }))
+    .filter(s => naming.some(t => s.toks.has(t))
+      && ![...namingOther.values()].some(toks => toks.some(t => s.toks.has(t))));
+  if (sentences.length === 0) return null;
+  const said = new Set(sentences.flatMap(s => [...s.toks]));
+
+  if (mine.some(t => said.has(t))) return null; // the instant agrees with the chosen state
+  const rivals = siblings.filter(s => distinctive(s).some(t => said.has(t)));
+  if (rivals.length !== 1) return null;
+  return { rival: rivals[0], evidence: sentences.map(s => s.text).join(' ') };
+}
+
+/**
+ * THE ONE PLACE a page's state of an object is decided.
+ *
+ * Three channels can disagree: the dotted handle the brief cited, the state
+ * the bible's own page table declares for this page, and the page's declared
+ * contact with the object. Measured on staging job_1788816451791_25b31uqlp
+ * neither of the first two is reliably right — p2's brief cited the held state
+ * against a bible table that (wrongly) declared "on the ground" for p2, while
+ * p12's brief cited "on the horns" against a table that (rightly) declared it
+ * resting. What IS reliable is the page's own instant: a state whose `held`
+ * flag disagrees with the brief's `interactions[]` is wrong for this page.
+ *
+ * Rules, in order:
+ *   1. Cited and declared agree, or only one exists → that state.
+ *   2. They disagree → the one whose `held` matches the page's contact; on no
+ *      verdict, the bible's table (the brief has already been shown to cite a
+ *      neighbouring page's state), with a WARN naming both.
+ *   3. Neither → the default (first) state.
+ * `contradicted` is set when the page's own instant disagrees with the chosen
+ * state — the caller drops the state's delta from the prompt (the instant
+ * outranks the state) but keeps the cell (identity is right either way). Two
+ * axes reach it by the same road: `held`, when the state's contact flag
+ * disagrees with the brief's `interactions[]`, and `appearance`, when the
+ * instant asserts a sibling state's look (`appearanceContradiction`).
+ * `contradictedBy` says which.
+ *
+ * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean, contradictedBy:('held'|'appearance'|null), rival:Object|null, evidence:string|null}}
+ */
+function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetadata = null, { silent = false, visualBible = null } = {}) {
+  const cited = handle ? objectStateFor(entry, handle) : null;
+  const declared = objectStateForPage(entry, pageNumber);
+  const held = pageHoldsObject(entry, sceneMetadata, visualBible);
+  const agrees = (st) => typeof held === 'boolean' && typeof st?.held === 'boolean' && st.held === held;
+  let state;
+  if (cited && declared && cited !== declared) {
+    let why;
+    if (agrees(cited) && !agrees(declared)) { state = cited; why = "the brief's interactions match the cited state"; }
+    else if (agrees(declared) && !agrees(cited)) { state = declared; why = "the brief's interactions match the bible's state"; }
+    else { state = declared; why = "no contact verdict — the bible's page table stands"; }
+    if (!silent) {
+      log.warn(`[VB-STATE] Page ${pageNumber}: brief cites ${cited.id} ("${cited.name}", pages ${JSON.stringify(cited.pages)}) but the bible assigns ${declared.id} ("${declared.name}") to this page — using ${state.id}: ${why}`);
+    }
+  } else if (cited && !declared && !silent && objectStates(entry).length > 0) {
+    log.warn(`[VB-STATE] Page ${pageNumber}: brief cites ${cited.id} ("${cited.name}") on a page that none of ${baseVbId(entry.id)}'s states declares — using it as cited`);
+    state = cited;
+  } else {
+    state = cited || declared || defaultObjectState(entry);
+  }
+  const heldContradicted = !!(state && typeof held === 'boolean' && typeof state.held === 'boolean' && state.held !== held);
+  const appearance = heldContradicted ? null : appearanceContradiction(entry, state, sceneMetadata, visualBible);
+  // ONE OBJECT, ONE POSITION. Where the page's own brief places the object, the
+  // state's placement half is not asserted a second time; its appearance half
+  // always survives. Both existing contradiction axes need the state's `held`
+  // flag or a rival state's distinctive look to fire, and a brief that places
+  // the object somewhere BOTH states deny (the chestnut "between roots" against
+  // an "on ground" and a "held" state, both with `held: null`) trips neither.
+  const scenePlacement = scenePlacesObject(entry, sceneMetadata);
+  const split = splitStatePlacement(state?.delta);
+  return {
+    state, cited, declared, held,
+    contradicted: heldContradicted || !!appearance,
+    contradictedBy: heldContradicted ? 'held' : (appearance ? 'appearance' : null),
+    rival: appearance?.rival || null,
+    evidence: appearance?.evidence || null,
+    scenePlacement,
+    promptDelta: scenePlacement ? split.kept : String(state?.delta || '').trim(),
+    placementDropped: scenePlacement ? split.dropped : [],
+  };
+}
 
 /**
  * Does this entry have a reference render anywhere?
@@ -121,12 +516,24 @@ function hasElementReference(entry) {
  * at all, takes the DEFAULT state's. A state with no cell of its own falls
  * back to the entry itself (an old stored bible, where the entry IS the cell).
  *
- * @returns {{cell: Object, state: Object|null, cited: Object|null}}
+ * @param {number|null} pageNumber - the page being rendered, so a bare citation
+ *   resolves to the state the bible declares for that page
+ * @returns {{cell: Object, state: Object|null, cited: Object|null, substituted: Object|null}}
  */
-function elementRefCell(entry, handle = null) {
-  const cited = handle ? objectStateFor(entry, handle) : null;
-  const state = cited || defaultObjectState(entry);
-  return { cell: (state && hasRefImage(state)) ? state : entry, state, cited };
+function elementRefCell(entry, handle = null, pageNumber = null, sceneMetadata = null, visualBible = null) {
+  // One resolver for the cell and for the REQUIRED OBJECTS clause, so the
+  // reference picture and the prompt text can never name different states.
+  // The prompt path is the logging site; this one is silent.
+  const { state, cited } = resolveObjectState(entry, handle, pageNumber, sceneMetadata, { silent: true, visualBible });
+  if (state && hasRefImage(state)) return { cell: state, state, cited, substituted: null };
+  if (hasRefImage(entry)) return { cell: entry, state, cited, substituted: null };
+  // The wanted state has no cell and there is no base render (a stated object
+  // never gets one). Ship SOME cell of the same object rather than none: its
+  // identity is right either way, and an object rendered in the wrong state
+  // beats an object the model invents from scratch.
+  const substituted = objectStates(entry).find(hasRefImage) || null;
+  if (substituted) return { cell: substituted, state, cited, substituted };
+  return { cell: entry, state, cited, substituted: null };
 }
 
 // Lazy-load storyHelpers to break circular dependency
@@ -190,6 +597,193 @@ function parseVisualBible(outline) {
  * Try to parse Visual Bible from JSON code block
  * Returns null if JSON not found or invalid
  */
+/**
+ * `scaleClass` — the authored scale band of a Visual Bible element, and THE
+ * SINGLE SOURCE OF SCALE TRUTH (owner, 2026-09-15, reversing the same day's
+ * machine-facing-only design).
+ *
+ * The enum both routes (plate vs page cell) AND renders: `scalePhrase()` turns
+ * the token into one canonical sentence that goes to the image model. The token
+ * itself is never printed — code reads the token, the model reads the phrase,
+ * never both.
+ *
+ * WHY THE FREE-TEXT `size` WENT AWAY. Measured over every stored bible on
+ * staging and production (168 sized entries, 151 distinct strings): 14 stated
+ * metric units the prompt banned, 12 were written in German or Italian when the
+ * prompt asked for English, and ~10 were bare adjectives ("gross", "klein",
+ * "mittelgross, elegant") that state no scale at all. A sentence cannot be
+ * checked, is optional in practice and drifts; a closed band is always present,
+ * always checkable, and renders the same phrase every time.
+ *
+ * The bands are RELATIVE, never metric — an illustration has no absolute
+ * scale — and every one is a phrase about a standing adult. The band names are
+ * the same body-part vocabulary the quality evaluator's D-21 `scale` rule
+ * already reasons in (apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ head,
+ * sword ≈ arm), so generator and critic speak one language.
+ *
+ * `null` is a first-class value: a bible stored before the field existed has
+ * none, and every consumer falls back to its pre-2026-09-15 behaviour — for
+ * the prompt renderer, to that bible's stored free-text `size`. An unknown
+ * token is NEVER coerced to the nearest band; a guessed class routes an object
+ * to the wrong pipeline.
+ */
+const SCALE_PHRASES = Object.freeze({
+  fingertip: 'small enough to sit on a fingertip',
+  palm: 'small enough to close one hand around',
+  hand: 'fills an open hand',
+  forearm: "about as big as an adult's forearm",
+  arm: "about as big as an adult's whole arm",
+  knee: "reaches an adult's knee",
+  hip: "reaches an adult's hip",
+  chest: "reaches an adult's chest",
+  head: 'as big as a standing adult',
+  double: 'twice the size of a standing adult',
+  house: 'several adults high, the size of a house',
+  landmark: 'fills the horizon behind everything'
+});
+
+/** Ascending. The order IS the contract — a reader must be able to tell any two apart. */
+const SCALE_CLASSES = Object.keys(SCALE_PHRASES);
+
+/**
+ * The 2026-09-15 morning enum, mapped onto the granular one that replaced it
+ * the same afternoon. Bibles authored between the two carry these tokens, and
+ * repair, iterate, regeneration and cover paths re-read stored bibles months
+ * later — an unmapped token would make a stored element unroutable.
+ *
+ * `person` was defined as "knee-height to head-height" (a chest, a dog, a
+ * barrel, a chair, a child); `hip` is the centre of that span. The three large
+ * bands map so that `isLargeScaleClass` is unchanged in behaviour.
+ */
+const LEGACY_SCALE_CLASSES = Object.freeze({
+  person: 'hip',
+  vehicle: 'double',
+  building: 'house',
+  landscape: 'landmark'
+});
+
+/**
+ * Canonicalise an authored token: trim, lowercase, resolve a legacy alias.
+ * Pure and silent — the parser wraps it to log, every other consumer just asks.
+ */
+function resolveScaleClass(raw) {
+  if (typeof raw !== 'string') return null;
+  const value = raw.trim().toLowerCase();
+  if (!value) return null;
+  if (Object.prototype.hasOwnProperty.call(LEGACY_SCALE_CLASSES, value)) return LEGACY_SCALE_CLASSES[value];
+  return Object.prototype.hasOwnProperty.call(SCALE_PHRASES, value) ? value : null;
+}
+
+/**
+ * The one token -> phrase lookup. Every prompt that states an element's scale
+ * goes through here, so there is exactly one wording per band in the codebase.
+ */
+function scalePhrase(raw) {
+  const token = resolveScaleClass(raw);
+  return token ? SCALE_PHRASES[token] : null;
+}
+
+/**
+ * The scale sentence an element contributes to a prompt: the enum phrase when
+ * a class is authored, and otherwise the bible's stored free-text `size`.
+ *
+ * THE FALLBACK IS LOAD-BEARING, not politeness. Every finished story's bible
+ * predates the enum and carries only `size`; a repair or a cover repaint months
+ * from now must still state the scale it stated the day it shipped. That is the
+ * capability decisions.md 2026-09-06 / 09-09 / 09-11 / 09-14 measured — a
+ * dragon that rendered knee-high on two pages and house-sized on a fourth — and
+ * it may not be lost by switching fields.
+ */
+function elementScaleNote(entry) {
+  if (!entry) return null;
+  const phrase = scalePhrase(entry.scaleClass);
+  if (phrase) return phrase;
+  const size = typeof entry.size === 'string' ? entry.size.trim() : '';
+  return size || null;
+}
+
+function normaliseScaleClass(raw, id) {
+  const who = id ? String(id) : 'entry';
+  if (raw === undefined || raw === null || (typeof raw === 'string' && !raw.trim())) {
+    log.warn(`[VISUAL BIBLE] ${who}: no scaleClass authored — scale routing falls back to the entry type and the prompt to any stored size text`);
+    return null;
+  }
+  if (typeof raw !== 'string') {
+    log.warn(`[VISUAL BIBLE] ${who}: scaleClass is not a string (${typeof raw}) — dropped, not guessed`);
+    return null;
+  }
+  const value = resolveScaleClass(raw);
+  if (!value) {
+    log.warn(`[VISUAL BIBLE] ${who}: unknown scaleClass "${raw}" — dropped, not coerced to a nearest band`);
+    return null;
+  }
+  return value;
+}
+
+/**
+ * GENERIC vs SPECIFIC (owner, 2026-09-15) — the authoring-time gate.
+ *
+ * An everyday instance of a thing — a cup, a broom, a crate that any other
+ * crate could stand in for — must not buy a Visual Bible id, an entry, a paid
+ * reference render or one of the page's four reference cells. Its look belongs
+ * in the page's scene prose, which is where an everyday object's look belongs.
+ *
+ * The gate is an AUTHORED `generic: true` that the parser DROPS, not an
+ * instruction to omit the entry: an omitted entry is indistinguishable from a
+ * forgotten one (the `crowdExpected` failure class), so it leaves no log line
+ * and no counter and there is no way to audit whether the gate is applied at
+ * all. A dropped `generic: true` leaves exactly one artefact per object.
+ *
+ * Dropped entries land in `visualBible.genericObjects[]` with NO id, which is
+ * what makes them invisible to every consumer at once: reference selection,
+ * reference-sheet batching, the element budget, entity consistency and bbox
+ * grounding are all keyed on the collection arrays or on an id.
+ */
+function isGenericEntry(raw) {
+  if (!raw) return false;
+  if (raw.generic === true) return true;
+  return typeof raw.generic === 'string' && raw.generic.trim().toLowerCase() === 'true';
+}
+
+/**
+ * Split an authored collection into the entries that keep their id and the
+ * generic ones. `describe` renders the dropped entry's prose so the log (and
+ * anyone auditing a story later) can see what was given up.
+ */
+function splitGenericEntries(list, collection, describe, bucket) {
+  const keep = [];
+  for (const raw of Array.isArray(list) ? list : []) {
+    if (!isGenericEntry(raw)) { keep.push(raw); continue; }
+    bucket.push({
+      // NO id, deliberately: an id is what a page cites to buy a cell.
+      collection,
+      label: typeof raw.label === 'string' && raw.label.trim() ? raw.label.trim() : null,
+      name: raw.name || null,
+      description: describe(raw),
+      scaleClass: normaliseScaleClass(raw.scaleClass, raw.id || raw.name),
+      pages: raw.pages || []
+    });
+  }
+  return keep;
+}
+
+/**
+ * Every name a generic object answers to — its `name`, its `label`, and any
+ * id the author wrote on it before the entry was dropped. A page brief that
+ * cites one of these is citing an element that no longer exists; the citation
+ * is stripped and logged loudly rather than resurrecting the entry.
+ */
+function genericCitationTokens(visualBible) {
+  const tokens = new Map();
+  for (const g of (visualBible && visualBible.genericObjects) || []) {
+    for (const raw of [g.name, g.label]) {
+      const s = String(raw || '').trim().toLowerCase();
+      if (s) tokens.set(s, g);
+    }
+  }
+  return tokens;
+}
+
 function tryParseVisualBibleJSON(outline) {
   // Look for JSON code block in the Visual Bible section
   // Match ```json ... ``` after "Visual Bible" header
@@ -217,6 +811,10 @@ function tryParseVisualBibleJSON(outline) {
       locations: [],
       vehicles: [],
       clothing: [],
+      // Entries the author marked `generic: true`. They carry no id and are
+      // invisible to every reference, budget and grounding consumer; they exist
+      // so the drop is auditable (see splitGenericEntries).
+      genericObjects: [],
       changeLog: []
     };
 
@@ -225,8 +823,10 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.secondaryCharacters && Array.isArray(jsonData.secondaryCharacters)) {
       visualBible.secondaryCharacters = jsonData.secondaryCharacters.map(char => ({
         id: char.id || generateId('CHR', visualBible.secondaryCharacters.length),
+        label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
         appearsInPages: char.pages || [],
+        scaleClass: normaliseScaleClass(char.scaleClass, char.id),
         description: buildCharacterDescription(char),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -239,10 +839,13 @@ function tryParseVisualBibleJSON(outline) {
 
     // Animals
     if (jsonData.animals && Array.isArray(jsonData.animals)) {
-      visualBible.animals = jsonData.animals.map(animal => ({
+      const animalsKept = splitGenericEntries(jsonData.animals, 'animals', buildAnimalDescription, visualBible.genericObjects);
+      visualBible.animals = animalsKept.map(animal => ({
         id: animal.id || generateId('ANI', visualBible.animals.length),
+        label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
         appearsInPages: animal.pages || [],
+        scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
         description: buildAnimalDescription(animal),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
@@ -255,20 +858,31 @@ function tryParseVisualBibleJSON(outline) {
 
     // Artifacts
     if (jsonData.artifacts && Array.isArray(jsonData.artifacts)) {
-      visualBible.artifacts = jsonData.artifacts.map(artifact => {
+      const artifactsKept = splitGenericEntries(jsonData.artifacts, 'artifacts', buildArtifactDescription, visualBible.genericObjects);
+      visualBible.artifacts = artifactsKept.map(artifact => {
         const id = artifact.id || generateId('ART', visualBible.artifacts.length);
         return {
         id,
         name: artifact.name,
+        // The one authored English name every prompt uses for this element.
+        // This parse is a WHITELIST — without this line the label is dropped.
+        label: typeof artifact.label === 'string' && artifact.label.trim() ? artifact.label.trim() : null,
         // A name the STORY gives the object. Kept for the text side only;
         // image prompts carry the descriptive `name`, never this.
         properName: artifact.properName || null,
         // Scale anchor against a person ("fits in one hand", "carried in both
         // arms"); the REQUIRED OBJECTS line carries it verbatim.
         size: artifact.size || null,
+        // Machine-facing scale band (normaliseScaleClass). `size` above is the
+        // prose a model reads; this is the token code routes on. Never printed.
+        scaleClass: normaliseScaleClass(artifact.scaleClass, id),
         appearsInPages: artifact.pages || [],
-        description: artifact.description || `${artifact.type}: ${artifact.description}`,
+        description: buildArtifactDescription(artifact),
         type: artifact.type,
+        // Words that must be READABLE on the object (a sign, a plaque). Its
+        // cell renders solo on the typography-aware tier with the words
+        // quoted in a sentence (referenceSheets.elementTextSentence).
+        text: typeof artifact.text === 'string' && artifact.text.trim() ? artifact.text.trim() : null,
         // NOTE: this parse is a WHITELIST — a field not listed here is dropped
         // silently. A `referenceView` field lived here briefly (2026-08-24/26);
         // a face-prop now gets two entries instead, one per side, so the side
@@ -296,8 +910,10 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.locations && Array.isArray(jsonData.locations)) {
       visualBible.locations = jsonData.locations.map(loc => ({
         id: loc.id || generateId('LOC', visualBible.locations.length),
+        label: typeof loc.label === 'string' && loc.label.trim() ? loc.label.trim() : null,
         name: loc.name,
         appearsInPages: loc.pages || [],
+        scaleClass: normaliseScaleClass(loc.scaleClass, loc.id),
         description: buildLocationDescription(loc),
         setting: loc.setting,
         signatureElement: loc.signatureElement,
@@ -318,10 +934,14 @@ function tryParseVisualBibleJSON(outline) {
 
     // Vehicles
     if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
-      visualBible.vehicles = jsonData.vehicles.map(veh => ({
+      const vehiclesKept = splitGenericEntries(jsonData.vehicles, 'vehicles',
+        veh => `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`, visualBible.genericObjects);
+      visualBible.vehicles = vehiclesKept.map(veh => ({
         id: veh.id || generateId('VEH', visualBible.vehicles.length),
+        label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
         appearsInPages: veh.pages || [],
+        scaleClass: normaliseScaleClass(veh.scaleClass, veh.id),
         description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
         signatureElement: veh.signatureElement,
         extractedDescription: null,
@@ -337,6 +957,7 @@ function tryParseVisualBibleJSON(outline) {
     if (jsonData.clothing && Array.isArray(jsonData.clothing)) {
       visualBible.clothing = jsonData.clothing.map(item => ({
         id: item.id || generateId('CLO', visualBible.clothing.length),
+        label: typeof item.label === 'string' && item.label.trim() ? item.label.trim() : null,
         name: item.name,
         appearsInPages: item.pages || [],
         description: `${item.description}. ${item.howWorn}`,
@@ -350,6 +971,11 @@ function tryParseVisualBibleJSON(outline) {
         referenceImageGenerated: false
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.clothing.length} clothing items from JSON`);
+    }
+
+    if (visualBible.genericObjects.length > 0) {
+      log.info(`[VISUAL BIBLE] ${visualBible.genericObjects.length} entr(ies) dropped as GENERIC — no id, no entry, no reference render, no page cell: `
+        + visualBible.genericObjects.map(g => `${g.name || g.label || '(unnamed)'} (${g.collection})`).join(', '));
     }
 
     const totalEntries = visualBible.secondaryCharacters.length +
@@ -405,9 +1031,35 @@ function buildAnimalDescription(animal) {
   const parts = [];
   if (animal.species) parts.push(animal.species);
   if (animal.coloring) parts.push(animal.coloring);
-  if (animal.size) parts.push(animal.size);
+  // The scale note is the enum phrase when a class is authored and the stored
+  // free-text `size` otherwise. A creature is the element whose scale drifts
+  // most and the one nothing else anchors (decisions.md 2026-09-11).
+  const animalScale = elementScaleNote(animal);
+  if (animalScale) parts.push(animalScale);
   if (animal.features) parts.push(animal.features);
   return parts.join('. ');
+}
+
+/**
+ * Build description string from artifact JSON
+ *
+ * The artifact twin of buildAnimalDescription. Artifacts used to take their
+ * `description` verbatim, so `size` reached only the REQUIRED OBJECTS rider
+ * (promptBuilders: `sizeNote`) and never the blocks built from the description
+ * — the full Visual Bible block and the cover's KEY STORY ELEMENTS. A held
+ * prop therefore had no scale anchor on the cover at all.
+ *
+ * The size sentence is appended, not merged: `description` is authored as
+ * appearance prose and a state delta is layered onto it downstream.
+ */
+function buildArtifactDescription(artifact) {
+  const parts = [];
+  const desc = typeof artifact.description === 'string' ? artifact.description.trim() : '';
+  if (desc) parts.push(desc.replace(/\.\s*$/, ''));
+  else if (artifact.type) parts.push(String(artifact.type).trim());
+  const size = elementScaleNote(artifact);
+  if (size) parts.push(`Size: ${size.replace(/\.\s*$/, '')}`);
+  return parts.filter(Boolean).join('. ');
 }
 
 /**
@@ -870,7 +1522,10 @@ function clauseRef(text, opts = {}) {
 }
 
 /**
- * Short ENGLISH image-facing reference for a VB entity. The entity NAME
+ * Short ENGLISH image-facing reference for a VB entity. The entry's authored
+ * English `label` is the answer whenever it exists — one name per element,
+ * used by every prompt. Everything below is the fallback for entries that
+ * predate the label. The entity NAME
  * follows the story language (a German "Roter Umhang" must never reach the
  * English image prompt as the thing to draw), so build the reference from the
  * entry's English `type` or description instead. Falls back to the
@@ -879,6 +1534,8 @@ function clauseRef(text, opts = {}) {
  * it, storyHelpers' page-prompt emission sites use it directly.
  */
 function englishEntityRef(entry, genericNoun = 'object', opts = {}) {
+  // The authored English label is the one name every prompt uses — it wins.
+  if (entry && typeof entry.label === 'string' && entry.label.trim()) return entry.label.trim();
   // The entry's own `type` is English by construction and is already a clean
   // noun phrase ("children's knitted hat"), where any description cut is a
   // guess at where the noun phrase ends. For a NON-English story — the only
@@ -1101,20 +1758,30 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
     }
   }
 
-  // Add only 2-3 key story elements (prioritize animals and important artifacts)
+  // Add only 2-3 key story elements. Secondary characters and vehicles are
+  // included ONLY when the caller filters by id (a cover hint's objects) —
+  // a hint-less legacy cover keeps the animals + artifacts it always had
+  // instead of dumping every CHR in the bible. Secondary characters go first:
+  // a creature the cast rides or stands beside is the one element the model
+  // cannot invent from context. job_1789078732136_622wecmhj front cover:
+  // the hint named CHR001 (a dragon, only state-cell renders) and every
+  // position said "on <name>'s back", but this block only read animals and
+  // artifacts, so the name reached the model with no species and the four
+  // riders were painted on the dog — the only creature defined.
+  const KEY_ELEMENT_CAP = 3;
   const keyElements = [];
-
-  // First add animals (pets, companions - usually most important)
-  for (const entry of visualBible.animals || []) {
-    if (keyElements.length < 3 && elementAllowed(entry)) {
-      keyElements.push({ ...entry, type: 'animal' });
-    }
-  }
-
-  // Then add artifacts if we have room
-  for (const entry of visualBible.artifacts || []) {
-    if (keyElements.length < 3 && elementAllowed(entry)) {
-      keyElements.push({ ...entry, type: 'artifact' });
+  const pools = [
+    ['secondaryCharacters', 'character', !!allowedIds],
+    ['animals', 'animal', true],
+    ['artifacts', 'artifact', true],
+    ['vehicles', 'vehicle', !!allowedIds],
+  ];
+  for (const [pool, type, enabled] of pools) {
+    if (!enabled) continue;
+    for (const entry of visualBible[pool] || []) {
+      if (keyElements.length < KEY_ELEMENT_CAP && elementAllowed(entry)) {
+        keyElements.push({ ...entry, type });
+      }
     }
   }
 
@@ -1126,9 +1793,14 @@ function buildFullVisualBiblePrompt(visualBible, options = {}) {
       // language (a German artifact name would leak into the English prompt
       // and can even get painted as lettering), so artifacts/vehicles lead
       // with a generic English label + their description. Animals keep their
-      // proper name (a pet's name is an identity anchor, like a character's).
-      const lead = entry.type === 'animal' && entry.name
-        ? `**${entry.name}** (animal)`
+      // proper name (a pet's name is an identity anchor, like a character's),
+      // and so does a secondary character: the cover description places the
+      // cast relative to that name, and the description itself opens with
+      // what the creature is ("a dragon, …"), which is the species the model
+      // needs.
+      const named = (entry.type === 'animal' || entry.type === 'character') && entry.name;
+      const lead = named
+        ? `**${entry.name}** (${entry.type})`
         : `**${entry.type.charAt(0).toUpperCase()}${entry.type.slice(1)}**`;
       prompt += `${lead}: ${description}\n`;
     }
@@ -1182,6 +1854,8 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
       { text: analysisPrompt }
     ];
 
+    assertPromptFilled(parts, 'analyzeVisualBibleElements');
+
     // Use utility model for fast photo analysis
     const modelId = MODEL_DEFAULTS.utility;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
@@ -1193,7 +1867,6 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
-          maxOutputTokens: 2000,
           temperature: 0.3
         }
       })
@@ -1411,8 +2084,10 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.secondaryCharacters && Array.isArray(jsonData.secondaryCharacters)) {
       newEntries.secondaryCharacters = jsonData.secondaryCharacters.map(char => ({
         id: char.id || generateId('CHR', idCounter.CHR++),
+        label: typeof char.label === 'string' && char.label.trim() ? char.label.trim() : null,
         name: char.name,
         description: buildCharacterDescription(char),
+        scaleClass: normaliseScaleClass(char.scaleClass, char.id),
         pages: char.pages || [],
         source: 'story_text'
       }));
@@ -1421,8 +2096,10 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.animals && Array.isArray(jsonData.animals)) {
       newEntries.animals = jsonData.animals.map(animal => ({
         id: animal.id || generateId('ANI', idCounter.ANI++),
+        label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
         description: buildAnimalDescription(animal),
+        scaleClass: normaliseScaleClass(animal.scaleClass, animal.id),
         pages: animal.pages || [],
         source: 'story_text'
       }));
@@ -1431,8 +2108,11 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.artifacts && Array.isArray(jsonData.artifacts)) {
       newEntries.artifacts = jsonData.artifacts.map(artifact => ({
         id: artifact.id || generateId('ART', idCounter.ART++),
+        label: typeof artifact.label === 'string' && artifact.label.trim() ? artifact.label.trim() : null,
         name: artifact.name,
-        description: artifact.description || `${artifact.type}: ${artifact.description}`,
+        description: buildArtifactDescription(artifact),
+        size: artifact.size || null,
+        scaleClass: normaliseScaleClass(artifact.scaleClass, artifact.id),
         type: artifact.type,
         pages: artifact.pages || [],
         source: 'story_text'
@@ -1442,10 +2122,12 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.locations && Array.isArray(jsonData.locations)) {
       newEntries.locations = jsonData.locations.map(loc => ({
         id: loc.id || generateId('LOC', idCounter.LOC++),
+        label: typeof loc.label === 'string' && loc.label.trim() ? loc.label.trim() : null,
         name: loc.name,
         description: buildLocationDescription(loc),
         setting: loc.setting,
         signatureElement: loc.signatureElement,
+        scaleClass: normaliseScaleClass(loc.scaleClass, loc.id),
         pages: loc.pages || [],
         source: 'story_text'
       }));
@@ -1454,9 +2136,11 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
       newEntries.vehicles = jsonData.vehicles.map(veh => ({
         id: veh.id || generateId('VEH', idCounter.VEH++),
+        label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
         description: `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`,
         signatureElement: veh.signatureElement,
+        scaleClass: normaliseScaleClass(veh.scaleClass, veh.id),
         pages: veh.pages || [],
         source: 'story_text'
       }));
@@ -1465,6 +2149,7 @@ function tryParseNewEntriesJSON(section) {
     if (jsonData.clothing && Array.isArray(jsonData.clothing)) {
       newEntries.clothing = jsonData.clothing.map(item => ({
         id: item.id || generateId('CLO', idCounter.CLO++),
+        label: typeof item.label === 'string' && item.label.trim() ? item.label.trim() : null,
         name: item.name,
         description: `${item.description}. ${item.howWorn || ''}`.trim(),
         wornBy: item.wornBy,
@@ -2110,6 +2795,10 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
 
       needsReference.push({
         ...entry,
+        // `type` is the POOL here (character/artifact/…); the bible's own
+        // free-text type ("single reptile scale") survives as `kind` — the
+        // reference-sheet kind sentence and the cell gate read it.
+        kind: typeof entry.type === 'string' && entry.type.trim() ? entry.type.trim() : null,
         type,
         pageCount: entry.appearsInPages.length
       });
@@ -2138,6 +2827,7 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
 
       needsReference.push({
         ...loc,
+        kind: typeof loc.type === 'string' && loc.type.trim() ? loc.type.trim() : null,
         type: 'location',
         pageCount: loc.appearsInPages.length
       });
@@ -2157,7 +2847,13 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2, char
  * @param {string} referenceImageData - Base64 image data
  */
 function updateElementReferenceImage(visualBible, elementId, referenceImageData, referenceImageUrl = null) {
-  if (!visualBible || !elementId || !referenceImageData) return;
+  if (!visualBible || !referenceImageData) return;
+  if (!elementId) {
+    // A rendered cell with no id cannot be written anywhere: the paid render
+    // is discarded and the element ships with no reference. Never silent.
+    log.error('[VISUAL BIBLE] A rendered reference cell arrived with no element id — the render is discarded and its element will have no reference');
+    return;
+  }
 
   // A dotted handle addresses one STATE of an object, and its cell is written
   // onto the state row, not onto the entry. The entry keeps the base cell, so
@@ -2274,6 +2970,74 @@ function sceneObjectsNameEntry(sceneObjects, entry) {
   return false;
 }
 
+/**
+ * LARGE ELEMENTS BELONG TO THE PLATE (owner, 2026-09-15).
+ *
+ * A page reference cell has exactly one size — its own — and nothing in the cell
+ * says whether it depicts a thumb or a three-master. The PLATE sizes a
+ * structure against bollards, cobbles and quay height, which is the only place
+ * scale can be stated at all. On job_1789420511893_zly5rcdej p12 the ship rode
+ * as a page cell and rendered as a small open rowboat although the plate prompt
+ * named it: the cell won over the plate.
+ *
+ * Selection is by the AUTHORED `scaleClass`, not by VB collection, so a
+ * building-scale ARTIFACT (a monument, a mill, a bridge, a pole-with-banner)
+ * routes to the plate exactly like a vehicle does.
+ *
+ * A scale referent INSIDE the cell is REJECTED and is not the alternative
+ * (feedback_no_scale_referent_in_vb_cell): anything sharing the cell leaks onto
+ * the page.
+ */
+/**
+ * The large bands of SCALE_CLASSES — everything at or above twice a standing
+ * adult. Re-derived from the granular enum 2026-09-15 so plate routing is
+ * UNCHANGED in behaviour: the morning enum's `vehicle`/`building`/`landscape`
+ * resolve to `double`/`house`/`landmark`, which is exactly this set.
+ */
+const LARGE_SCALE_CLASSES = new Set(['double', 'house', 'landmark']);
+
+function isLargeScaleClass(value) {
+  const token = resolveScaleClass(value);
+  return token !== null && LARGE_SCALE_CLASSES.has(token);
+}
+
+/**
+ * Does this page reference belong to the plate rather than to a page cell?
+ *
+ * The `type` half is the pre-2026-09-15 rule and stays as the `scaleClass ===
+ * null` FALLBACK: every stored bible predates the field, and repair, iterate
+ * and cover paths re-read those bibles months later.
+ *
+ * CONDITIONAL ON A PLATE (owner, 2026-09-15). Callers ask this question only
+ * when a plate is actually SENT for the page. A large element on a plateless
+ * page KEEPS its cell rather than travelling on nothing — the precedent is
+ * page 1 of job_1788295892348_l028ggiq7a, a cast-0 ship exterior that attached
+ * zero references while a finished plate of the ship existed and was discarded.
+ */
+function isPlateBorneElement(ref, sceneObjects = null) {
+  if (!ref) return false;
+  // A location rides the plate on its `appearsInPages` membership alone — the
+  // locations loop below is not AD-gated, so neither is the drop.
+  if (ref.type === 'location') return true;
+  // A FIGURE IS NEVER PLATE-BORNE, at any scale. The plate prompt says verbatim
+  // "never draw a figure named anywhere in this prompt" (prompts/empty-scene.txt)
+  // and its STRUCTURES block calls what it lists a "vessel, vehicle or built
+  // structure". A house-band creature routed there loses its page cell, is
+  // forbidden on the plate and is mislabelled in the plate text: no cell, no
+  // plate, no consistency. It keeps its cell instead.
+  if (ref.type === 'character' || ref.type === 'animal') return false;
+  if (!isLargeScaleClass(ref.scaleClass) && ref.type !== 'vehicle') return false;
+  // THE TWO GATES MUST NOT DISAGREE (2026-09-15). Everything else reaches the
+  // plate only when the Art Director's objects[] names it (AD IS THE AUTHORITY,
+  // owner 2026-09-04). Dropping the cell on scale alone, while the plate refuses
+  // the same element for want of an objects[] mention, renders it with zero
+  // reference AND zero description. Callers that know the brief pass it here;
+  // callers with no AD metadata (covers, trial plates built before briefs exist)
+  // pass nothing and keep the pre-existing behaviour on both sides.
+  if (Array.isArray(sceneObjects) && !sceneObjectsNameEntry(sceneObjects, ref)) return false;
+  return true;
+}
+
 function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, aboardId = null, sceneObjects = null) {
   if (!visualBible) return [];
 
@@ -2306,13 +3070,18 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
     if (adAuthored) {
       if (!sceneObjectsNameEntry(sceneObjects, entry)) continue;
     } else if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+    // hasRef admits a stated element whose render lives on a state row, so the
+    // cell has to be resolved here too — reading the entry's own fields would
+    // push an undefined image onto the plate call.
+    const { cell } = elementRefCell(entry);
     refs.push({
       id: entry.id,
       name: entry.name,
       type: 'vehicle',
+      scaleClass: entry.scaleClass || null,
       description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
+      referenceImageData: cell.referenceImageData,
+      referenceImageUrl: cell.referenceImageUrl,
       priority: 1,
     });
   }
@@ -2323,15 +3092,53 @@ function getEmptySceneElementReferences(visualBible, pageNumber, maxRefs = 9, ab
     if (entry.isRealLandmark) continue;
     if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+    const { cell } = elementRefCell(entry);
     refs.push({
       id: entry.id,
       name: entry.name,
       type: 'location',
+      scaleClass: entry.scaleClass || null,
       description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
+      referenceImageData: cell.referenceImageData,
+      referenceImageUrl: cell.referenceImageUrl,
       priority: 2,
     });
+  }
+
+  // LARGE ELEMENTS FROM ANY COLLECTION (2026-09-15). A building-scale artifact
+  // — a monument, a mill, a bridge, a pole-with-banner — is part of the
+  // setting exactly like a vehicle, and reaches the plate it belongs to instead
+  // of competing for one of the page's four cells. Same AD-authority gate, same
+  // aboard skip, same cap. Vehicles are already above and are not re-added.
+  // ARTIFACTS ONLY. secondaryCharacters and animals were fed here too until
+  // 2026-09-15 — a plate whose prompt forbids drawing any figure and whose
+  // STRUCTURES block calls its entries a "vessel, vehicle or built structure".
+  // A large creature belongs in a page cell, not on the backdrop.
+  const seen = new Set(refs.map(r => String(r.id || '').toUpperCase()));
+  for (const [entries, type] of [
+    [visualBible.artifacts, 'artifact'],
+  ]) {
+    for (const entry of entries || []) {
+      if (skip(entry)) continue;
+      if (!isLargeScaleClass(entry.scaleClass)) continue;
+      if (!hasRef(entry)) continue;
+      if (seen.has(String(entry.id || '').toUpperCase())) continue;
+      if (adAuthored) {
+        if (!sceneObjectsNameEntry(sceneObjects, entry)) continue;
+      } else if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+      const { cell } = elementRefCell(entry);
+      refs.push({
+        id: entry.id,
+        name: entry.name,
+        type,
+        scaleClass: entry.scaleClass,
+        description: entry.extractedDescription || entry.description,
+        referenceImageData: cell.referenceImageData,
+        referenceImageUrl: cell.referenceImageUrl,
+        priority: 3,
+      });
+      log.info(`[EMPTY-SCENE-GRID] Page ${pageNumber}: ${entry.id} (${entry.scaleClass}) routed to the PLATE — too large for a page cell`);
+    }
   }
 
   refs.sort((a, b) => a.priority - b.priority);
@@ -2432,9 +3239,41 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   // page's own prop lost its reference image without a word in the log. The
   // handle itself is kept as the value so the state's own cell can be picked
   // below.
+  //
+  // The cited list is the UNION of the brief's `objects[]` and any VB-OBJECT id
+  // the brief filed under `characters[]` (2026-09-14). 41cde02d0 established
+  // that union for the REQUIRED OBJECTS text block; it did NOT reach here, so a
+  // repair rewrite that reclassified an animal from `objects[]` into
+  // `characters[]` kept the entity's name and size clause in the prompt while
+  // its reference-CELL claim was silently dropped — and an element with no cell
+  // is drawn from the model's imagination, drifting page to page (backlog #65,
+  // the egg that rendered stone, then glossy red, then speckled).
+  // `collectVbObjectCitations` takes ONLY ANI/ART/CLO/LOC/VEH-shaped ids from
+  // `characters[]`; a human cast member is a name or a CHR id and resolves to
+  // null, so the cast path is untouched and no cell is ever gained by a name.
+  const { collectVbObjectCitations } = require('./promptBuilders');
+  // GENERIC CITATION GUARD (2026-09-15). A generic entry was dropped at parse
+  // time and has no id, but a brief can still name it. Strip the citation here,
+  // loudly: the `askedFor` map below is exactly the path that would hand a
+  // resurrected entry a reference cell, and a generic object's look belongs in
+  // the page prose and nowhere else.
+  const genericTokens = genericCitationTokens(visualBible);
+  const stripGeneric = (raw) => {
+    if (genericTokens.size === 0) return true;
+    const asText = String((raw && typeof raw === 'object' ? (raw.name || raw.id) : raw) || '').trim().toLowerCase();
+    const hit = genericTokens.get(asText);
+    if (!hit) return true;
+    log.error(`[VB-REF] Page ${pageNumber}: the brief cites "${asText}", which the bible marked GENERIC`
+      + ' — citation stripped, the object stays in the scene prose and gets no reference cell');
+    return false;
+  };
+  const citedHandles = [
+    ...(Array.isArray(sceneObjectIds) ? sceneObjectIds : []),
+    ...collectVbObjectCitations(sceneMetadata ? { characters: sceneMetadata.characters, fullData: sceneMetadata.fullData } : null)
+  ].filter(stripGeneric);
   const askedFor = new Map();
-  for (const raw of (Array.isArray(sceneObjectIds) ? sceneObjectIds : [])) {
-    const handle = String(raw || '').trim().toUpperCase();
+  for (const raw of citedHandles) {
+    const handle = String((raw && typeof raw === 'object' ? raw.id : raw) || '').trim().toUpperCase();
     if (!handle) continue;
     const parent = baseVbId(handle) || handle;
     // A bare id never overwrites a dotted one: a brief that names both takes
@@ -2447,12 +3286,25 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
 
   const checkEntries = (entries, type, priority) => {
     for (const entry of entries || []) {
-      if (!hasRef(entry)) continue;
       const parentId = baseVbId(entry.id) || String(entry.id || '').trim().toUpperCase();
       const onPage = entry.appearsInPages && entry.appearsInPages.includes(pageNumber);
       const handle = entry.id ? askedFor.get(parentId) : undefined;
       const named = !!handle;
       if (!onPage && !named) continue;
+      if (!hasRef(entry)) {
+        // An element the page needs and that WAS rendered (or is a stated
+        // object, which is always rendered) but resolves to no cell is a
+        // silent quality failure: the model invents the thing on every page it
+        // appears on. Never degrade quietly here — this is exactly how a
+        // stated object shipped un-referenced through a whole book
+        // (job_1788763045123_z8so79ngb, d473434ed).
+        if (entry.referenceImageGenerated || objectStates(entry).length > 0) {
+          log.error(`[VB-REF] Page ${pageNumber}: ${parentId} ("${entry.name}") has a reference sheet but NO usable cell`
+            + `${objectStates(entry).length ? ` (${objectStates(entry).length} state(s), none carrying a render)` : ''}`
+            + ' — the page will render it unreferenced');
+        }
+        continue;
+      }
 
       // OBJECT STATE. When the brief cites a state (`ART001.2`), hand the page
       // that state's CELL out of the object's one reference grid — the same
@@ -2464,9 +3316,18 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
       // none: the object's identity is right either way.
       // A BARE citation (or none at all) resolves to the DEFAULT state — the
       // first row — because a stated object has no base cell to hand over.
-      const { cell, state, cited } = elementRefCell(entry, handle);
+      const { cell, state, cited, substituted } = elementRefCell(entry, handle, pageNumber, sceneMetadata, visualBible);
       if (cited && cell === entry) {
         log.warn(`[VB-REF] Page ${pageNumber}: ${handle} ("${state.name}") has no state cell — using ${parentId}'s base render`);
+      } else if (state && !cited && onPage && !objectStateForPage(entry, pageNumber)) {
+        // The bible declares a state's pages; a page of the entry that falls in
+        // none of them is a gap in the bible's own declaration, and the object
+        // silently renders in its default look there.
+        log.warn(`[VB-REF] Page ${pageNumber}: ${parentId} appears on this page but no state declares it — using the default "${state.name}" cell`);
+      }
+      if (substituted && state) {
+        log.error(`[VB-REF] Page ${pageNumber}: ${parentId} state "${state.name}" has no cell and the object has no base render`
+          + ` — substituting the "${substituted.name}" cell so the page keeps the object's identity`);
       }
 
       const recurring = recurringIds.has(parentId);
@@ -2479,6 +3340,11 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
         stateName: state ? state.name : null,
         name: entry.name,
         type,
+        // The authored scale band rides on the reference so the two filter
+        // sites (buildPageCompositeRefs and Phase 5a-pre-grid) can route a
+        // large element to the plate. Null on every stored bible — then
+        // `isPlateBorneElement` falls back to the type rule.
+        scaleClass: entry.scaleClass || null,
         description: entry.extractedDescription || entry.description,
         referenceImageData: cell.referenceImageData,
         referenceImageUrl: cell.referenceImageUrl,
@@ -2506,13 +3372,15 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     if (!hasRef(entry)) continue;
     if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
 
+    const { cell: locCell } = elementRefCell(entry);
     relevantRefs.push({
       id: entry.id,
       name: entry.name,
       type: 'location',
+      scaleClass: entry.scaleClass || null,
       description: entry.extractedDescription || entry.description,
-      referenceImageData: entry.referenceImageData,
-      referenceImageUrl: entry.referenceImageUrl,
+      referenceImageData: locCell.referenceImageData,
+      referenceImageUrl: locCell.referenceImageUrl,
       priority: 5 // Lower priority than objects/characters
     });
   }
@@ -2530,7 +3398,7 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   const wornKeptOff = [];
   if (sceneMetadata) {
     try {
-      const { resolveWornItemsForPage, wornStateById } = require('./wornItems');
+      const { resolveWornItemsForPage, wornStateById, referenceCarriesItem } = require('./wornItems');
       const castNames = (sceneMetadata.characters || [])
         .map(c => (typeof c === 'string' ? c : c && c.name)).filter(Boolean);
       const byId = wornStateById(resolveWornItemsForPage(visualBible, castNames, sceneMetadata));
@@ -2538,11 +3406,19 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
         for (let i = relevantRefs.length - 1; i >= 0; i--) {
           const r = byId.get(String(relevantRefs[i].id || '').toUpperCase());
           if (!r) continue;
-          if (r.state === 'worn') {
+          // Dropped only when an attached reference DEMONSTRABLY shows the item
+          // on its wearer — a `wornAs`-linked item on its own owner, whose
+          // avatar reference wears it (referenceCarriesItem). A handover, or a
+          // row the Art Director declared against a bare bible element with no
+          // link at all, leaves no reference in the call showing it worn: the
+          // plate is then the only picture of the item that exists, and
+          // dropping it is what made a found navy cap render as a navy TRICORN
+          // on staging job_1789420511893_zly5rcdej p13/p14.
+          if (r.state === 'worn' && referenceCarriesItem(r)) {
             wornDropped.push(`${r.name} (${r.id}, on ${r.owner})`);
             relevantRefs.splice(i, 1);
           } else {
-            wornKeptOff.push(`${r.name} (${r.id}, ${r.location || 'off-body'})`);
+            wornKeptOff.push(`${r.name} (${r.id}, ${r.state === 'worn' ? `worn by ${r.wearer} — no reference shows it on them` : (r.location || 'off-body')})`);
           }
         }
       }
@@ -2554,12 +3430,22 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
     log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe DROPPED ${wornDropped.join(', ')} — the avatar reference already carries it`);
   }
   if (wornKeptOff.length > 0) {
-    log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — declared off-body, the plate is its only reference`);
+    log.info(`[VB-REFS] Page ${pageNumber}: worn-item dedupe KEPT ${wornKeptOff.join(', ')} — the plate is its only reference`);
   }
 
-  // Sort by priority and limit
+  // Sort by priority and limit. LOCATIONS ARE NOT ELEMENTS (owner ruling,
+  // 2026-09-08: "Do not count it as it is the empty scene not an artifact") —
+  // an invented location is the plate the cast is composited into, so it is
+  // not one of the `maxRefs` elements; it rides along LAST, at most one, so
+  // the page holds at most maxRefs + 1 cells (3 + 1 = 4 = VB_SLOT_MAX_ELEMENTS
+  // on the page path). Real landmarks never reached this list at all.
   relevantRefs.sort((a, b) => a.priority - b.priority);
-  const kept = relevantRefs.slice(0, maxRefs);
+  const elements = relevantRefs.filter(r => r.type !== 'location');
+  const locations = relevantRefs.filter(r => r.type === 'location');
+  if (locations.length > 1) {
+    log.warn(`[VB-REFS] Page ${pageNumber}: ${locations.length} invented locations claim this page (${locations.map(l => l.id).join(', ')}) — only ${locations[0].id} rides as the location cell`);
+  }
+  const kept = [...elements.slice(0, maxRefs), ...locations.slice(0, 1)];
   const pinned = kept.filter(r => r.recurring).map(r => `${r.name} (${r.id})`);
   if (pinned.length > 0) {
     log.info(`🔲 [VB-REFS] Page ${pageNumber}: recurring creature pinned to the element refs — ${pinned.join(', ')}`);
@@ -2698,7 +3584,7 @@ async function dedupeSecondaryCharacterIds(visualBible, addUsage = null) {
           `Entry B:\n  name: ${other.name || '(none)'}\n  description: ${other.description || '(none)'}\n  pages: ${(other.appearsInPages || []).join(',')}\n\n` +
           `Question: are these two entries the same person (one character referenced in two different ways — e.g. by relation and by attribute) or two genuinely distinct characters?\n\n` +
           `Answer with exactly one word on the first line: SAME or DIFFERENT. Optionally add a short one-sentence reason on the next line.`;
-        const resp = await callClaudeAPI(prompt, 80, 'claude-haiku-4-5', { usageLabel: 'vb_chr_dedup' });
+        const resp = await callClaudeAPI(prompt, null, 'claude-haiku-4-5', { usageLabel: 'vb_chr_dedup' });
         const text = (resp?.text || '').trim();
         if (/^\s*SAME\b/i.test(text)) decision = 'merge';
         else if (/^\s*DIFFERENT\b/i.test(text)) decision = 'split';
@@ -2724,7 +3610,44 @@ async function dedupeSecondaryCharacterIds(visualBible, addUsage = null) {
   return visualBible;
 }
 
+/**
+ * Record a reference-cell gate verdict on the bible entry it judged, so a
+ * story analysis can read what the gate said without the Railway log. A
+ * dotted id (state cell) records on the parent. Appends; never overwrites.
+ *
+ * @param {Object} visualBible
+ * @param {string} elementId - bare or dotted id
+ * @param {Object} verdict - {gate, ok, reason, rerendered, recheckOk, recheckReason, cellId}
+ */
+function recordElementCellGate(visualBible, elementId, verdict) {
+  if (!visualBible || !elementId || !verdict) return;
+  const parentId = baseVbId(elementId) || elementId;
+  const pools = ['secondaryCharacters', 'artifacts', 'animals', 'vehicles', 'locations', 'clothing'];
+  for (const pool of pools) {
+    for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
+      if (baseVbId(entry.id) !== parentId && entry.id !== parentId) continue;
+      if (!Array.isArray(entry.cellGates)) entry.cellGates = [];
+      entry.cellGates.push({ cellId: elementId, at: new Date().toISOString(), ...verdict });
+      return;
+    }
+  }
+}
+
 module.exports = {
+  recordElementCellGate,
+  SCALE_CLASSES,
+  SCALE_PHRASES,
+  LEGACY_SCALE_CLASSES,
+  resolveScaleClass,
+  scalePhrase,
+  elementScaleNote,
+  normaliseScaleClass,
+  isGenericEntry,
+  LARGE_SCALE_CLASSES,
+  isLargeScaleClass,
+  isPlateBorneElement,
+  splitGenericEntries,
+  genericCitationTokens,
   // Parsing
   parseVisualBible,
   filterMainCharactersFromVisualBible,
@@ -2745,7 +3668,10 @@ module.exports = {
   buildVisualBiblePrompt,
   buildFullVisualBiblePrompt,
   englishEntityRef,
+  labelOf: vbLabel.labelOf,
+  stateLabelOf: vbLabel.stateLabelOf,
   clauseRef,
+  REF_GENERIC_TYPE,
   englishLocationRef,
   resolveSceneCreatures,
   significantEntityTokens,
@@ -2770,12 +3696,22 @@ module.exports = {
   getElementsNeedingReferenceImages,
   updateElementReferenceImage,
   buildCharacterDescription,
+  buildArtifactDescription,
   getElementReferenceImagesForPage,
   MAX_OBJECT_STATES,
   normaliseObjectStates,
   objectStates,
   objectStateFor,
+  objectStateForPage,
   defaultObjectState,
+  pageHoldsObject,
+  entryNamedByRow,
+  citedEntries,
+  resolveObjectState,
+  appearanceContradiction,
+  scenePlacesObject,
+  splitStatePlacement,
+  appearanceTokens,
   hasElementReference,
   elementRefCell,
   getEmptySceneElementReferences,

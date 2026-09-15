@@ -141,7 +141,11 @@ t('call sites wired (source-level — images.js hangs if required)', () => {
   const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf-8');
   const pipeline = read('storyJobPipeline.js');
   const images = read('server/lib/images.js');
-  const repair = read('server/lib/repairPipeline.js');
+  // The repair round's expected-character list moved out of repairPipeline.js
+  // into charRepairTarget.js (e3301202d, "one roster, and it is not stale").
+  // Read both: the assertion is that the repair round appends secondaries at
+  // all, not which module currently owns the roster.
+  const repair = read('server/lib/repairPipeline.js') + read('server/lib/charRepairTarget.js');
   // The three sites that build expectedCharacters straight from sceneCharacters
   // and hand it to detectAllBoundingBoxes — the shared pre-detection is the one
   // whose list actually reached SoM on the measured pages (its result is reused
@@ -152,7 +156,7 @@ t('call sites wired (source-level — images.js hangs if required)', () => {
   // hoisted local alias (`sh`). What matters is that the site appends
   // secondaries at all, not how it names the module.
   check('repair round re-detect appends secondaries',
-    /expectedCharacters\.push\(\.\.\.(?:getStoryHelpers\(\)|sh|shBbox)\.buildSecondaryExpectedCharacters\(/.test(repair));
+    /(?:expectedCharacters|expected)\.push\(\.\.\.(?:getStoryHelpers\(\)|sh|shBbox)\.buildSecondaryExpectedCharacters\(/.test(repair));
   check('iterate path appends secondaries',
     /iterExpectedCharacters\.push\(\.\.\.(?:getStoryHelpers\(\)|sh|shBbox)\.buildSecondaryExpectedCharacters\(/.test(images));
   check('batch eval merges secondaries into characterDescriptions',

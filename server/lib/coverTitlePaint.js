@@ -24,6 +24,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { guardPromptString } = require('../services/prompts');
 
 // `lines` carries the title as TEXT, not only as pixels. Without it the model
 // has to read the words off the guide image, and the moment it is told to stop
@@ -57,7 +58,7 @@ async function verifyTitleRender(imageDataUri, expectedTitle) {
       body: JSON.stringify({
         contents: [{ parts: [
           { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(imageDataUri) } },
-          { text: `This is a children's book cover. The title is supposed to read exactly:
+          { text: guardPromptString(`This is a children's book cover. The title is supposed to read exactly:
 
 "${expectedTitle}"
 
@@ -66,9 +67,9 @@ Look at the title lettering in the image and answer:
 2. Is every letter fully drawn and legible (not cut off, smeared or replaced by a shape)?
 Decorative styling, texture, colour, letter case and hand-painted irregularity are FINE and must not count as problems. Accents and umlauts must be present where the expected title has them.
 The lettering sits ON TOP of the illustration, so artwork visible behind or beside a letter can never obscure it — never report a letter as hidden, covered or obscured by the picture. Judge ONLY whether the words and letters themselves are there and legible. Normal spacing between words is not a spelling error.
-Return JSON: {"matches": true|false, "problem": "<short description, or empty if it matches>"}` },
+Return JSON: {"matches": true|false, "problem": "<short description, or empty if it matches>"}`, 'verifyTitleRender') },
         ] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       }),
       signal: AbortSignal.timeout(45_000),
     });

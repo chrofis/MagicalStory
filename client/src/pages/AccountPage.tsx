@@ -131,6 +131,47 @@ const texts = {
     cashoutNoneRefundable: 'Aucun remboursement carte possible pour le moment. Utilisez votre solde comme rabais ou convertissez-le en crédits.',
     insufficientBalance: 'Solde disponible insuffisant.',
   },
+  it: {
+    title: 'Il mio account',
+    referralTitle: 'Invita un amico',
+    referralDesc: 'Condividi il tuo codice — il tuo amico ottiene CHF 10 di sconto sul primo libro, e tu ricevi CHF 10 di cashback da usare come sconto su un libro, convertire in crediti Story o farti accreditare sulla carta.',
+    yourCode: 'Il tuo codice di invito',
+    copied: 'Copiato!',
+    copy: 'Copia',
+    totalReferrals: 'Inviti riusciti',
+    balanceTitle: 'Saldo inviti',
+    available: 'Disponibile',
+    pending: 'riservato nel checkout',
+    convertBtn: 'Converti in crediti',
+    cashoutBtn: 'Accredita sulla carta',
+    historyTitle: 'Attività recente',
+    historyEmpty: 'Ancora nessuna attività — condividi il tuo codice per iniziare.',
+    credits: 'Crediti Story',
+    buyMore: 'Acquista altri crediti',
+    accountInfo: 'Informazioni account',
+    username: 'Nome utente',
+    email: 'E-mail',
+    verified: 'Verificato',
+    notVerified: 'Non verificato',
+    myOrders: 'Ordini & crediti',
+    viewOrders: 'Visualizza cronologia ordini',
+    convertTitle: 'Converti saldo in crediti',
+    convertDesc: 'CHF 1 = {credits} crediti. Usa i crediti per creare altre storie.',
+    cashoutTitle: 'Accredita sulla carta',
+    cashoutDesc: 'I rimborsi vanno sulla carta originale usata. Limitato alla tua spesa totale.',
+    cashoutMin: 'Accredito minimo: CHF {min}.',
+    convertMin: 'Minimo: CHF {min}.',
+    amountLabel: 'Importo in CHF',
+    creditsPreview: '→ {credits} crediti',
+    confirm: 'Conferma',
+    cancel: 'Annulla',
+    processing: 'Elaborazione…',
+    convertSuccess: '{credits} crediti aggiunti al tuo account.',
+    cashoutSuccess: 'CHF {amount} rimborsati sulla tua carta.',
+    cashoutPartial: 'CHF {amount} rimborsati. Alcuni rimborsi non sono riusciti — vedi sotto.',
+    cashoutNoneRefundable: 'Al momento nessun rimborso su carta disponibile. Usa il tuo saldo come sconto sul prossimo libro o convertilo in crediti.',
+    insufficientBalance: 'Saldo disponibile insufficiente.',
+  },
 };
 
 type ReferralBalance = Awaited<ReturnType<typeof storyService.getReferralBalance>>;
@@ -167,6 +208,15 @@ function fmtType(type: string, lang: string): string {
       spent_refund: 'Viré sur la carte',
       restored: 'Réservation libérée',
       admin_adjust: 'Ajustement',
+    },
+    it: {
+      earned: 'Cashback ricevuto',
+      pending_checkout: 'Riservato per checkout',
+      spent_discount: 'Sconto applicato',
+      spent_credits: 'Convertito in crediti',
+      spent_refund: 'Accreditato sulla carta',
+      restored: 'Riserva rilasciata',
+      admin_adjust: 'Rettifica',
     },
   };
   return labels[lang]?.[type] || labels.en[type] || type;
@@ -313,7 +363,7 @@ export default function AccountPage() {
                         <div className="flex-1 min-w-0">
                           <div className="font-medium text-gray-700 truncate">{fmtType(h.type, language)}</div>
                           <div className="text-xs text-gray-400">
-                            {new Date(h.createdAt).toLocaleDateString(language === 'de' ? 'de-CH' : language === 'fr' ? 'fr-CH' : 'en-CH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                            {new Date(h.createdAt).toLocaleDateString(language === 'de' ? 'de-CH' : language === 'fr' ? 'fr-CH' : language === 'it' ? 'it-CH' : 'en-CH', { year: 'numeric', month: 'short', day: 'numeric' })}
                           </div>
                         </div>
                         <span className={`font-mono font-semibold ml-2 ${h.amountCents > 0 ? 'text-emerald-600' : 'text-gray-700'}`}>

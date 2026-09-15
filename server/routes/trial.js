@@ -16,10 +16,16 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { lookupIpLocation } = require('../lib/ipLocation');
+const { trialSourceWhereClause } = require('../lib/trialSource');
 // Every full-blob characters.data write in this file goes through this —
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
 // failure it alarms and lets the write proceed (see its JSDoc).
 const { offloadCharacterImages } = require('../services/database');
+const { assertPromptFilled } = require('../services/prompts');
+// The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
+// every entry point below. See server/lib/trialAge.js for the range and why
+// the field became load-bearing (de8753cc1).
+const { parseTrialAge } = require('../lib/trialAge');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -398,7 +404,16 @@ const TRIAL_FUNNEL_STEPS = [
   'create_clicked',       // pressed create — navigates to /trial-generation
   'generation_started',   // the job was accepted
   'generation_completed', // the story finished
+  // A LEAD, not a conversion, and optional: the Google path never passes through
+  // it. Reported like any other step but it can't be the baseline for the one
+  // after it — see OPTIONAL_TRIAL_STEPS.
   'email_submitted',      // gave an email (the lead)
+  // The terminal step, and the only honest conversion number: a real account
+  // exists, reached by EITHER auth method (meta.method is email or google).
+  // Until 2026-09-13 the funnel ended at email_submitted, so the 4 conversions
+  // that came in through Google were invisible and the panel read 12.5% where
+  // the truth was 50%.
+  'account_created',
 ];
 const TRIAL_FUNNEL_STEP_SET = new Set(TRIAL_FUNNEL_STEPS);
 
@@ -407,7 +422,7 @@ const TRIAL_FUNNEL_STEP_SET = new Set(TRIAL_FUNNEL_STEPS);
 // face-selection modal appears only when a photo has 2+ faces, so a run of
 // single-face photos would otherwise read as "everyone was lost at face_picked"
 // and drive the next step's rate to 0%.
-const OPTIONAL_TRIAL_STEPS = new Set(['face_picked']);
+const OPTIONAL_TRIAL_STEPS = new Set(['face_picked', 'email_submitted']);
 
 // Crawlers hit /try and would otherwise inflate `landing`. Not a security
 // control — a bot that wants in can lie — just noise reduction so the top of
@@ -422,6 +437,54 @@ function _trim(value, max) {
   const s = String(value).trim();
   if (!s) return null;
   return s.slice(0, max);
+}
+
+// Every key a funnel event may carry in `meta`, with the shape it must have.
+// The endpoint used to store whatever JSON object the client sent; an allowlist
+// keeps arbitrary client-supplied data (and anything a visitor typed) out of the
+// table, and keeps the row small enough that the 2000-char truncation in
+// recordTrialEvent can never fire and produce unparseable JSONB.
+//
+// `slug` is deliberately the catalogue-id shape (lowercase, hyphens, no spaces):
+// a topic/theme/category id passes, and free text a parent typed cannot.
+const TRIAL_META_SCHEMA = {
+  multipleFaces: 'bool',   // photo_analyzed: did the face modal appear
+  method: 'slug',          // account_created: 'email' | 'google'
+  // topic_selected + landing: WHAT was chosen, and whether it was already fixed
+  // by a /try?category=…&topic=… deep link before the visitor saw the grid.
+  category: 'slug',
+  topic: 'slug',
+  theme: 'slug',
+  preselected: 'bool',
+  deepLink: 'bool',
+  age: 'age',              // the child's declared age — decides which tiles were shown
+};
+
+const TRIAL_META_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/**
+ * Keep only the allowlisted keys, each only in its declared shape. Anything
+ * else — an unknown key, a wrong type, an over-long or free-text value — is
+ * dropped silently rather than rejecting the event: a mis-shaped meta must
+ * never cost us the funnel step itself.
+ *
+ * @returns {object|null} the surviving fields, or null if nothing survived.
+ */
+function sanitizeTrialEventMeta(meta) {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return null;
+  const clean = {};
+  for (const [key, kind] of Object.entries(TRIAL_META_SCHEMA)) {
+    const value = meta[key];
+    if (value === undefined || value === null) continue;
+    if (kind === 'bool') {
+      if (typeof value === 'boolean') clean[key] = value;
+    } else if (kind === 'slug') {
+      if (typeof value === 'string' && TRIAL_META_SLUG_RE.test(value)) clean[key] = value;
+    } else if (kind === 'age') {
+      if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 18) clean[key] = value;
+    }
+  }
+  return Object.keys(clean).length ? clean : null;
 }
 
 /**
@@ -495,13 +558,19 @@ router.post('/event', trialEventLimiter, async (req, res) => {
     if (BOT_UA_RE.test(ua)) return;
 
     // user_id from the session token only — never from the body.
+    // Accept the trial session token AND a full account token: after the Google
+    // link the trial session token is gone and only `auth_token` remains, so an
+    // anonymous-only check left every post-signup event with user_id = NULL
+    // (measured on prod 2026-09-13: the converted visit's generation_completed
+    // row had no user). Either token proves the user server-side; a client-
+    // supplied id is still never trusted.
     let userId = null;
     const token = (req.headers['authorization'] || '').split(' ')[1];
     if (token) {
       try {
         const decoded = verifyToken(token);
-        if (decoded?.anonymous && decoded.userId) userId = decoded.userId;
-      } catch { /* expired or not a session token — stays anonymous */ }
+        if (decoded?.userId) userId = decoded.userId;
+      } catch { /* expired or not one of ours — stays anonymous */ }
     }
 
     await recordTrialEvent({
@@ -516,12 +585,89 @@ router.post('/event', trialEventLimiter, async (req, res) => {
       language: req.body.language,
       device: /mobile|android|iphone|ipad/i.test(ua) ? 'mobile' : 'desktop',
       userId,
-      meta: req.body.meta && typeof req.body.meta === 'object' ? req.body.meta : null,
+      meta: sanitizeTrialEventMeta(req.body.meta),
     });
   } catch (err) {
     log.warn(`[TRIAL FUNNEL] Failed to record event: ${err.message}`);
   }
 });
+
+/**
+ * The per-step rows, given a step → distinct-visit count map. Pure, so the
+ * optional-step rule is pinned by a unit test rather than by a live funnel.
+ *
+ * An OPTIONAL step (the multi-face modal; the email lead, which the Google
+ * signup path skips entirely) is reported but never becomes the baseline for
+ * the step after it — otherwise a run of single-face photos, or a week of
+ * Google-only conversions, reads as "everyone was lost here" and drives the
+ * next step's rate to 0%.
+ *
+ * @param {Map<string, number>} byStep
+ */
+function buildTrialFunnelRows(byStep) {
+  const first = byStep.get(TRIAL_FUNNEL_STEPS[0]) || 0;
+  let prev = null;
+  return TRIAL_FUNNEL_STEPS.map((step) => {
+    const visits = byStep.get(step) || 0;
+    const optional = OPTIONAL_TRIAL_STEPS.has(step);
+    // A step can legitimately exceed its predecessor (an event lost to a
+    // closed tab, a resumed visit), so clamp the rate rather than report >100%.
+    const fromPrev = prev === null ? 100 : prev === 0 ? 0 : Math.min(100, Math.round((visits / prev) * 1000) / 10);
+    const entry = {
+      step,
+      optional,
+      visits,
+      pctOfFirst: first === 0 ? 0 : Math.min(100, Math.round((visits / first) * 1000) / 10),
+      pctOfPrev: fromPrev,
+      // Skipping an optional step is not a loss — only mandatory steps can lose people.
+      droppedFromPrev: prev === null || optional ? 0 : Math.max(0, prev - visits),
+    };
+    if (!optional) prev = visits;
+    return entry;
+  });
+}
+
+/**
+ * Turn a panel range token into a SQL window over trial_events.created_at.
+ *
+ * Two shapes, deliberately:
+ *  - '<N>d'  — the original rolling interval ("the last 30 days"), which is what
+ *              a trend wants and what every earlier caller asked for.
+ *  - 'today' / 'yesterday' — EUROPE/ZURICH CALENDAR days, which is what the owner
+ *              means by "today" and which a rolling interval can never express.
+ *              The bounds come from scripts/lib/chTime.js (Intl-derived, DST-safe);
+ *              never compute them with setHours() — the container's local time is
+ *              UTC, so that would silently start the day an hour or two early.
+ *
+ * Labels are Swiss local, marked CH, per docs/SETTLED.md.
+ *
+ * @param {string} range
+ * @param {Date} [now] - injectable for tests
+ */
+function resolveTrialWindow(range = '30d', now = new Date()) {
+  const { chDayRange, ch } = require('../../scripts/lib/chTime');
+  const token = String(range || '30d').trim().toLowerCase();
+
+  if (token === 'today' || token === 'yesterday') {
+    const { start, end } = chDayRange(token === 'today' ? 0 : -1, now);
+    return {
+      range: token,
+      days: 1,
+      clause: 'created_at >= $1 AND created_at < $2',
+      params: [start, end],
+      label: `${ch(start)} – ${ch(end)}`,
+    };
+  }
+
+  const days = Math.max(1, Math.min(365, parseInt(token, 10) || 30));
+  return {
+    range: `${days}d`,
+    days,
+    clause: "created_at >= NOW() - ($1 || ' days')::INTERVAL",
+    params: [String(days)],
+    label: `${ch(new Date(now.getTime() - days * 86400000))} – ${ch(now)}`,
+  };
+}
 
 /**
  * Per-step trial funnel: how many distinct visits reached each step.
@@ -534,57 +680,50 @@ router.post('/event', trialEventLimiter, async (req, res) => {
  * Drop-off is expressed against the PREVIOUS step, not against landing, because
  * the question is "which click loses them", not "what fraction of the top".
  *
- * @param {number} days - lookback window
+ * @param {string} range - '<N>d' rolling window, or 'today' | 'yesterday' (CH calendar days)
  * @param {string} source - all | paid | organic | direct
  */
-async function getTrialStepFunnel(days = 30, source = 'all') {
-  const empty = { days, source, steps: [], totalVisits: 0 };
+async function getTrialStepFunnel(range = '30d', source = 'all') {
+  const window = resolveTrialWindow(range);
+  const empty = { range: window.range, rangeLabel: window.label, days: window.days, source, steps: [], totalVisits: 0, allSourcesVisits: 0 };
   try {
     const { getPool } = require('../services/database');
     const pool = getPool();
     if (!pool) return empty;
 
-    const clauses = ["created_at >= NOW() - ($1 || ' days')::INTERVAL"];
-    if (source === 'paid') {
-      clauses.push("(utm_medium IN ('cpc','ppc','paid','search') OR utm_source IN ('google','bing','meta','facebook'))");
-    } else if (source === 'organic') {
-      clauses.push("utm_source IS NOT NULL AND utm_medium IS DISTINCT FROM 'cpc' AND utm_source NOT IN ('google','bing','meta','facebook')");
-    } else if (source === 'direct') {
-      clauses.push('utm_source IS NULL');
-    }
+    const windowClause = window.clause;
+    const windowParams = window.params;
+    const sourceClause = trialSourceWhereClause(source);
+    const clauses = sourceClause ? [windowClause, sourceClause] : [windowClause];
 
     const { rows } = await pool.query(
       `SELECT step, COUNT(DISTINCT visit_id)::int AS visits
          FROM trial_events
         WHERE ${clauses.join(' AND ')}
         GROUP BY step`,
-      [String(days)]
+      windowParams
     );
 
     const byStep = new Map(rows.map((r) => [r.step, r.visits]));
     const first = byStep.get(TRIAL_FUNNEL_STEPS[0]) || 0;
 
-    let prev = null;
-    const steps = TRIAL_FUNNEL_STEPS.map((step) => {
-      const visits = byStep.get(step) || 0;
-      const optional = OPTIONAL_TRIAL_STEPS.has(step);
-      // A step can legitimately exceed its predecessor (an event lost to a
-      // closed tab, a resumed visit), so clamp the rate rather than report >100%.
-      const fromPrev = prev === null ? 100 : prev === 0 ? 0 : Math.min(100, Math.round((visits / prev) * 1000) / 10);
-      const entry = {
-        step,
-        optional,
-        visits,
-        pctOfFirst: first === 0 ? 0 : Math.min(100, Math.round((visits / first) * 1000) / 10),
-        pctOfPrev: fromPrev,
-        // Skipping an optional step is not a loss — only mandatory steps can lose people.
-        droppedFromPrev: prev === null || optional ? 0 : Math.max(0, prev - visits),
-      };
-      if (!optional) prev = visits;
-      return entry;
-    });
+    // Visits in the window regardless of source, so the admin card can tell
+    // "no visits at all" from "no visits from THIS source" — with a filter
+    // active, an empty table used to read as if nothing had been recorded.
+    let allSourcesVisits = first;
+    if (sourceClause) {
+      const all = await pool.query(
+        `SELECT COUNT(DISTINCT visit_id)::int AS visits
+           FROM trial_events
+          WHERE ${windowClause} AND step = $${windowParams.length + 1}`,
+        [...windowParams, TRIAL_FUNNEL_STEPS[0]]
+      );
+      allSourcesVisits = all.rows[0]?.visits || 0;
+    }
 
-    return { days, source, steps, totalVisits: first };
+    const steps = buildTrialFunnelRows(byStep);
+
+    return { range: window.range, rangeLabel: window.label, days: window.days, source, steps, totalVisits: first, allSourcesVisits };
   } catch (err) {
     log.warn(`[TRIAL FUNNEL] Failed to compute step funnel: ${err.message}`);
     return empty;
@@ -838,6 +977,8 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
       ]
     };
 
+    assertPromptFilled(requestBody.contents[0].parts, 'trial:generate-preview-avatar');
+
     // Try Gemini with one retry on 503, then fall back to Grok
     let avatarImage = null;
     let safetyBlocked = false;
@@ -999,8 +1140,14 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     if (gender && !['male', 'female'].includes(gender)) {
       return res.status(400).json({ error: 'Invalid gender' });
     }
-    if (age && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
-      return res.status(400).json({ error: 'Invalid age' });
+    // Age is required, not merely valid-if-present: the declared age is the
+    // single source the avatar generator builds the body from and the avatar
+    // judge scores against (resolveDeclaredAvatarOverrides, de8753cc1), and it
+    // picks the age band and the topic window. A client-side guard is not a
+    // guarantee — this is the one that counts.
+    const parsedAge = parseTrialAge(age);
+    if (!parsedAge.ok) {
+      return res.status(400).json({ error: parsedAge.error });
     }
 
     const safeName = name.replace(/[\r\n]/g, '');
@@ -1052,7 +1199,9 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 
     const characterData = {
       name: safeName,
-      age: age || '',
+      // The normalised whole-year age — never the raw string, so every reader
+      // downstream (phantom tier, age band, avatar resolver) sees one shape.
+      age: String(parsedAge.years),
       gender: gender || '',
       traits: traits || [],
       customTraits: customTraits || '',
@@ -1157,8 +1306,16 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
     if (gender && !['male', 'female'].includes(gender)) {
       return res.status(400).json({ error: 'Invalid gender' });
     }
-    if (age != null && age !== '' && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
-      return res.status(400).json({ error: 'Invalid age' });
+    // A PATCH that carries the age must carry a VALID one — including for an
+    // in-flight trial started before the age became mandatory, whose row this
+    // call is what finally fills. Omitting the key entirely still means "leave
+    // it alone"; sending an empty one does not, or the sync could clear an age
+    // the story pipeline now depends on.
+    let patchedAge = null;
+    if (age !== undefined) {
+      const parsed = parseTrialAge(age);
+      if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+      patchedAge = String(parsed.years);
     }
     if (traits && !Array.isArray(traits)) {
       return res.status(400).json({ error: 'Invalid traits' });
@@ -1191,7 +1348,9 @@ router.patch('/update-character-details', verifySessionToken, async (req, res) =
 
     const c = charData.characters[0];
     c.name = name.replace(/[\r\n]/g, '').trim();
-    c.age = age || '';
+    // An omitted age leaves the stored one intact; a supplied one is the
+    // normalised whole-year value parsed above.
+    if (patchedAge !== null) c.age = patchedAge;
     c.gender = gender || '';
     c.traits = structuredTraits;
     if (customTraits != null) c.customTraits = customTraits;
@@ -1775,32 +1934,44 @@ setInterval(async () => {
     const client = await pool.connect();
 
     try {
+      // Pick the accounts BEFORE opening the transaction: an account holding a
+      // story marked as evidence is held back, and the hold has to be visible.
+      // This used to be one inline `anonymous AND older than 48h` subquery
+      // reused by five DELETEs, which made "what did it skip, and why"
+      // unobservable — and it deleted the stories that are the measured basis
+      // for this week's findings, R2 objects included, 48h after the trial.
+      const {
+        ANON_SWEEP_CANDIDATES_SQL, selectAnonSweepTargets, logSkipped,
+      } = require('../lib/evidenceStories');
+      const candidates = await client.query(ANON_SWEEP_CANDIDATES_SQL);
+      const { deleteUserIds, skipped } = selectAnonSweepTargets(candidates.rows);
+      logSkipped(skipped, log, 'TRIAL CLEANUP');
+      if (!deleteUserIds.length) return; // the outer `finally` releases the client
+
       await client.query('BEGIN');
 
-      // Same anon-and-older-than-48h filter for every table.
-      const anonFilter = `
-        WHERE user_id IN (
-          SELECT id FROM users
-          WHERE anonymous = true
-            AND created_at < NOW() - INTERVAL '48 hours'
-        )`;
+      // Same set of account ids for every table — including `users` itself, so
+      // a held-back account keeps its characters and jobs too. A story row
+      // without its owner is unreadable evidence AND an orphan, which the
+      // orphan cleanup would then delete anyway.
+      const anonFilter = 'WHERE user_id = ANY($1::varchar[])';
+      const anonParams = [deleteUserIds];
 
-      const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter}`);
-      const charsResult = await client.query(`DELETE FROM characters ${anonFilter}`);
-      const filesResult = await client.query(`DELETE FROM files ${anonFilter}`);
+      const jobsResult = await client.query(`DELETE FROM story_jobs ${anonFilter}`, anonParams);
+      const charsResult = await client.query(`DELETE FROM characters ${anonFilter}`, anonParams);
+      // RETURNING file_url: the files row is the only reference to the PDF's
+      // R2 key (orders/{files.id}.pdf), which lives outside both prefixes
+      // pruned below.
+      const filesResult = await client.query(`DELETE FROM files ${anonFilter} RETURNING id, file_url`, anonParams);
       // Delete stories too — previously orphaned. stories.user_id has no
       // cascading FK, so a purged anonymous child's story (title, dedication,
       // likeness-derived illustrations) + its story_images survived forever.
       // story_images DOES cascade from stories, so deleting stories cleans it.
-      const storiesResult = await client.query(`DELETE FROM stories ${anonFilter} RETURNING id`);
+      const storiesResult = await client.query(`DELETE FROM stories ${anonFilter} RETURNING id`, anonParams);
 
-      // Delete the anonymous users themselves
-      const usersResult = await client.query(`
-        DELETE FROM users
-        WHERE anonymous = true
-          AND created_at < NOW() - INTERVAL '48 hours'
-        RETURNING id
-      `);
+      // Delete the anonymous users themselves — the same held-back set.
+      const usersResult = await client.query(
+        `DELETE FROM users WHERE id = ANY($1::varchar[]) RETURNING id`, anonParams);
 
       await client.query('COMMIT');
 
@@ -1809,16 +1980,19 @@ setInterval(async () => {
       }
 
       // Prune R2 artefacts (external storage — after commit, best-effort).
-      if (storiesResult.rowCount > 0 || usersResult.rowCount > 0) {
+      if (storiesResult.rowCount > 0 || usersResult.rowCount > 0 || filesResult.rowCount > 0) {
         try {
-          const r2 = require('../lib/r2');
+          const r2Pending = require('../lib/r2Pending');
           let totalR2 = 0;
           for (const row of storiesResult.rows) {
-            totalR2 += await r2.deleteStoryArtefacts(row.id);
+            totalR2 += await r2Pending.pruneStory(row.id, 'abandoned anon account');
           }
           for (const row of usersResult.rows) {
-            totalR2 += await r2.deleteByPrefix(`characters/${row.id}/`);
+            totalR2 += await r2Pending.prunePrefix(`characters/${row.id}/`, 'abandoned anon account');
+            // The JSONB offload's sibling prefix: stories/{userId}/{storyId}/migrated/…
+            totalR2 += await r2Pending.prunePrefix(`stories/${row.id}/`, 'abandoned anon account (migrated subtree)');
           }
+          totalR2 += await r2Pending.pruneFileRows(filesResult.rows, 'abandoned anon account');
           if (totalR2 > 0) log.info(`[TRIAL CLEANUP] Pruned ${totalR2} R2 objects for abandoned anon accounts`);
         } catch (r2Err) {
           log.warn(`[TRIAL CLEANUP] R2 prune failed (rows already deleted): ${r2Err.message}`);
@@ -2041,7 +2215,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       // story prompt gets).
       const { getTeachingGuide } = require('../lib/promptBuilders');
       const guide = getTeachingGuide('life-challenge', storyTopic);
-      categoryContext = `This is a life skills story about "${storyTopic}". The idea names one outside event that forces the child to use this skill — something lost, broken, blocked, run out or wanted by two at once — and what it costs them.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
+      categoryContext = `This is a life skills story about "${storyTopic}". The idea names one outside event that forces the child to use this skill — something that happens in the world, never a feeling on its own — and what it costs them.${storyTheme && storyTheme !== 'realistic' ? ` The child plays at being a ${storyTheme}; that play is where the struggle happens.` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
     } else if (storyCategory === 'historical') {
       categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
     } else if (storyCategory === 'swiss-stories') {
@@ -2076,19 +2250,24 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     const mainGender = mainChar?.gender || 'male';
     const trialTitle = getTrialTitle(storyTopic, storyCategory, mainGender, language);
 
-    // Load prompt template from prompts/trial-idea.txt
-    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+    // A trial's clothing does not come from the writer — it comes from the
+    // static costume table, and a theme with no entry gets no costumed avatar
+    // sheet. An idea that has the child put a costume ON is then unrenderable:
+    // the pipeline can only paint the garment as scenery (prod
+    // job_1788698812047_q5b1vuds7). The generator is told which of the two it
+    // is, so the premise never asks for what cannot be worn.
+    const { getTrialCostumeForStory } = require('../config/trialCostumes');
+    const ideaCostume = getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender: mainGender });
+    if (!ideaCostume) log.debug(`  [COSTUME] none configured for ${storyCategory}/${storyTheme || storyTopic} — ideas stay costume-free`);
 
-    const { buildAgeModeSection } = require('../lib/promptBuilders');
+    // /try asks the visitor nothing about the season, so it resolves from the
+    // date — the same default resolveSeason() already gives the trial's IMAGES
+    // (buildSeasonNote), which is what the premise has to agree with. Without
+    // this the pictures were autumn and the words were whatever the model felt
+    // like.
+    const { buildSeasonInstruction } = require('../lib/season');
+    const seasonInstruction = storyCategory === 'historical' ? '' : buildSeasonInstruction({});
 
-    const prompt1 = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
-      CHARACTER: charDesc,
-      CATEGORY_CONTEXT: categoryContext,
-      TITLE: trialTitle || '',
-      LANDMARKS: '',
-      LANG_INSTRUCTION: langInstruction,
-      AGE_MODE: buildAgeModeSection({ characters }),
-    });
     // The two ideas exist to offer a real choice, so they differ in KIND, not
     // just in detail (owner, 2026-08-25): one grounded in the child's own town
     // at its real landmarks, one in a make-believe world entered from home.
@@ -2096,10 +2275,32 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // mandate nothing to attach to, and the writer bolted one onto the last page.
     // The landmark mandate belongs to the own-town idea only; in the shared
     // base it dragged the make-believe idea to the real lake as well.
-    const localIdea = `\n${landmarksText}\nSet this idea in the child's own town, at the real local places named above. A costume or theme shows in what they wear and how they play — the play is the story, never a trip somewhere else.`;
-    const fantasyIdea = `\nGenerate a DIFFERENT idea than the first one, set in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — dressing up, or starting to play — and the make-believe follows from that; the world it enters has no real place names.`;
-    const prompt1Local = prompt1 + localIdea;
-    const prompt2 = prompt1 + fantasyIdea;
+    // Both branch instructions used to invite dressing up unconditionally, which
+    // is what asked a costume-less theme for a worn costume.
+    // The town was never NAMED in the prompt - only its landmarks were listed, as
+    // bare names. A model that recognises one of those landmarks but not the town
+    // around it fills the rest of the geography in from general knowledge, and
+    // gets it wrong (a real trial put a town on the wrong river). Name the town,
+    // and let no other place be invented beside the ones supplied.
+    // The arms fire in parallel, so neither can be told to differ from the
+    // other — the difference is built in: the own-town arm carries the band's
+    // plot mechanics, the make-believe arm only its tone, and each arm draws its
+    // own rotated variety axis (Lab 1273, docs/decisions.md 2026-09-14).
+    // Assembly lives in buildTrialIdeaPrompts so the Lab's variety stage
+    // measures the prompt production actually sends.
+    const { buildTrialIdeaPrompts } = require('../lib/promptBuilders');
+    const { local: prompt1Local, fantasy: prompt2 } = buildTrialIdeaPrompts({
+      characters,
+      charDesc,
+      categoryContext,
+      landmarksText,
+      townName: userLocation?.city || '',
+      storyTheme,
+      trialTitle,
+      langInstruction,
+      seasonInstruction,
+      ideaCostume,
+    });
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);
@@ -2115,7 +2316,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     log.debug('  Starting parallel story generation...');
 
     // Stream Story 1 (800 max tokens — 2-3 sentence idea)
-    const streamStory1 = callTextModelStreaming(prompt1Local, 800, (delta, fullText) => {
+    const streamStory1 = callTextModelStreaming(prompt1Local, null, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
         res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
@@ -2137,7 +2338,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     });
 
     // Stream Story 2 (800 max tokens — 2-3 sentence idea)
-    const streamStory2 = callTextModelStreaming(prompt2, 800, (delta, fullText) => {
+    const streamStory2 = callTextModelStreaming(prompt2, null, (delta, fullText) => {
       fullResponse2 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
         res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
@@ -2213,12 +2414,10 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       return res.status(400).json({ error: 'storyCategory and storyTopic or storyTheme are required' });
     }
 
-    // Resolve which topic/category to look up costumes from:
-    // - adventure: storyTheme has the theme (pirate, knight, etc.), storyTopic is empty
-    // - life-challenge: storyTopic has the challenge, storyTheme has the adventure theme → use storyTheme
-    // - historical: storyTopic has the event ID → use storyTopic
-    const lookupTopic = storyCategory === 'historical' ? storyTopic : (storyTheme || storyTopic);
-    const lookupCategory = storyCategory === 'historical' ? 'historical' : 'adventure';
+    // Resolve which topic/category to look up costumes from (trialCostumes.js
+    // owns the mapping — see resolveTrialCostumeLookup).
+    const { resolveTrialCostumeLookup } = require('../config/trialCostumes');
+    const { topic: lookupTopic, category: lookupCategory } = resolveTrialCostumeLookup({ storyCategory, storyTheme, storyTopic });
 
     log.info(`[TRIAL AVATARS] Preparing styled avatars for user ${userId} (topic: ${storyTopic}, category: ${storyCategory}, theme: ${storyTheme || 'none'}, lookup: ${lookupCategory}/${lookupTopic})`);
 
@@ -2298,7 +2497,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     }
 
     // Lazy require the styled avatar module
-    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence, _styledAvatarCacheForTrial } = require('../lib/styledAvatars');
+    const { runInCacheScope, prepareStyledAvatars, clearStyledAvatarCache, retainCacheScopeForHandoff, exportStyledAvatarsForPersistence, _styledAvatarCacheForTrial } = require('../lib/styledAvatars');
 
     // Run avatar styling inside the trial user's cache scope. Same scope key
     // the trial story job uses (see processStoryJob → `trial-${userId}`) so:
@@ -2325,8 +2524,18 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         }
       }
 
-      // Prepare styled avatars (costumed only for trial — see decision above)
-      await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null);
+      // Prepare styled avatars (costumed only for trial — see decision above).
+      //
+      // The season rides along for the same reason the premise takes one at
+      // :2194: /try asks the visitor nothing, so it resolves from the date —
+      // the same default the trial job's own `resolveSeason` lands on minutes
+      // later, so the prewarmed sheet and the job agree. It only bites on the
+      // no-costume branch below, where a `standard` sheet IS generated here and
+      // nothing else in a trial ever states an outfit; a costumed sheet ignores
+      // it (the costume is the outfit).
+      const { seasonOutfitGuidance } = require('../lib/season');
+      const seasonOutfit = seasonOutfitGuidance({ storyCategory });
+      await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null, null, { seasonOutfit });
       log.info(`[TRIAL AVATARS] Avatar styling complete for "${character.name}"`);
 
       // Export styled avatars so the pipeline can reuse them (avoid regenerating)
@@ -2336,7 +2545,18 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         styledAvatarsData[charName] = avatars;
       }
 
-      // Clear this scoped cache to free memory
+      // Hand the scope over to the story job instead of wiping it. The job
+      // enters `trial-${userId}` a moment after this handler's generation
+      // finishes (prod job_1788698812047_q5b1vuds7: 220 ms), and the refcount
+      // guard inside clearStyledAvatarCache only covers an OVERLAP - with no
+      // overlap the clear below ran and the job regenerated the identical sheet
+      // (a second Grok 2x4 + style transfer, ~58 s and real money). The DB
+      // handoff below cannot be relied on either: /start waits at most 60 s for
+      // this handler and the character row is written AFTER this point.
+      // The retention expires on its own if no job ever arrives (abandoned
+      // trial), so nothing leaks; clearStyledAvatarCache is still called so the
+      // scope IS freed here whenever there is no pending consumer.
+      retainCacheScopeForHandoff(`trial-${userId}`);
       clearStyledAvatarCache();
 
       // Split styled avatars into individual full-body images for the
@@ -2583,6 +2803,14 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     titlePageOnly: true, // legacy flag — coverTypes above is what decides
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
+    // This commission is built here, from scratch — no part of it comes from
+    // the request body. The pipeline strips developer-mode fields
+    // (enableFullRepair, skipImages, modelOverrides, …) from any NON-admin
+    // job, and trial users are not admins: without this marker the
+    // deliberate `enableFullRepair: false` above was deleted and the run fell
+    // back to the default ON, which is what every trial story then recorded
+    // in analytics.pipelineConfig (prod job_1789292742265_mgxmrkfpd).
+    serverAuthoredInput: true,
     trialMode: true, // Trial prompt with visual bible backgrounds for early empty scene streaming
     ...(userLocation?.city ? { userLocation } : {}), // IP-based location for landmark personalization
   };
@@ -2999,6 +3227,10 @@ module.exports.getTrialStatsHistory = getTrialStatsHistory;
 module.exports.getTrialFunnel = getTrialFunnel;
 module.exports.getTrialStepFunnel = getTrialStepFunnel;
 module.exports.TRIAL_FUNNEL_STEPS = TRIAL_FUNNEL_STEPS;
+module.exports.OPTIONAL_TRIAL_STEPS = OPTIONAL_TRIAL_STEPS;
+module.exports.sanitizeTrialEventMeta = sanitizeTrialEventMeta;
+module.exports.buildTrialFunnelRows = buildTrialFunnelRows;
+module.exports.resolveTrialWindow = resolveTrialWindow;
 module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;

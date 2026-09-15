@@ -54,7 +54,7 @@ const { Pool } = require('pg');
       { inline_data: { mime_type: 'image/jpeg', data: b64 } },
       { text: visionPrompt }
     ] }],
-    generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+    generationConfig: { temperature: 0.1 }
   };
   console.log('Stage 1: vision inventory (gemini-flash-lite)...');
   const t1 = Date.now();
@@ -67,13 +67,15 @@ const { Pool } = require('pg');
   // --- Stage 2: compliance (CLAUDE-SONNET, text only) ---
   const complianceTemplate = PROMPT_TEMPLATES.imagePromptCompliance;
   const complianceInput = complianceTemplate
-    .replace('{ORIGINAL_PROMPT}', (storedPrompt || '').substring(0, 3000))
+    // No cut — evalPipeline stopped truncating ORIGINAL_PROMPT (2026-09-14) and
+    // this replay has to send the judge the same prompt production does.
+    .replace('{ORIGINAL_PROMPT}', storedPrompt || '')
     .replace('{VISUAL_INVENTORY}', visionText)
     .replace('{INTERACTIONS_BLOCK}', interactionsBlock);
 
   console.log('Stage 2: compliance (claude-sonnet)...');
   const t2 = Date.now();
-  const sonnetResult = await callTextModel(complianceInput, 4096, 'claude-sonnet');
+  const sonnetResult = await callTextModel(complianceInput, null, 'claude-sonnet');
   console.log(`Stage 2 done in ${((Date.now()-t2)/1000).toFixed(1)}s — input ${sonnetResult.usage?.input_tokens} / output ${sonnetResult.usage?.output_tokens} tokens`);
 
   const parsed = extractJsonFromText(sonnetResult.text);

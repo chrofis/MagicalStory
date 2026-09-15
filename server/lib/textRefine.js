@@ -40,6 +40,17 @@
  * `runRepairPass` call — nothing here loops, and nothing here is dormant
  * machinery waiting for one.
  *
+ * The one such second pass that exists (2026-09-10): a $0 cross-page
+ * REPETITION check runs on the repair pass's output (findRepeatedPassages —
+ * shared 5-word shingles, string equality, no model). If two pages carry the
+ * same passage, ONE corrective `runRepairPass` carries the duplicated words and
+ * both plan lines back to the repairer; the check re-runs once and a still-
+ * tripping result ships with a WARN. Measured origin: job_1788983823620 p12/p13
+ * shipped one paragraph twice (11 shared shingles) after the repair copied a
+ * scene onto the page whose picture shows it instead of moving it, and
+ * self-reported the copy as a split. The re-audit stays deleted; this is the
+ * mechanical replacement for that one failure class.
+ *
  * Scene outlines and the arc are read-only, which is what makes the production
  * parallelism safe: illustrations are already rendering from those scenes, and
  * this stage may only change prose, never events.
@@ -169,11 +180,14 @@ function mergeAuditFindings(lists = []) {
 // ──────────── WORD-BUDGET COUNTER: THE DETERMINISTIC THIRD AUDITOR ────────────
 
 /**
- * Grace band around the reading level's word budget, applied to both bounds.
+ * Grace band around the reading level's word budget — ASYMMETRIC (2026-09-07).
  * A rewrite is never worth its risk for a few words: only a page more than this
- * far outside the band is reported as a fault.
+ * far outside the band is reported as a fault. The two directions do not carry
+ * the same risk, so they do not share a number: cutting is destructive, padding
+ * is not. See buildWordBudgetFindings for the evidence.
  */
-const WORD_BUDGET_TOLERANCE = 0.2;
+const WORD_BUDGET_TOLERANCE_OVER = 0.5;
+const WORD_BUDGET_TOLERANCE_UNDER = 0.2;
 
 /** Whitespace-token word count — deterministic, no model involved. */
 function countPageWords(text) {
@@ -193,12 +207,23 @@ function countPageWords(text) {
  * averaged 71 words/page, 14/18 pages over budget, finale at 149 — and neither
  * AI auditor flagged length.
  *
- * A page only counts as a violation when it is more than WORD_BUDGET_TOLERANCE
- * outside the band (2026-09-06): job_1788681313413_xqmtk2gcs was 157 words
- * against a 150 ceiling — a 4.7% overage — and the forced rewrite corrupted a
- * verb collocation. The finding text still names the TRUE budget, so a page
- * that does trip the band is rewritten toward the real target, not the
- * tolerated one.
+ * A page only counts as a violation when it is more than the tolerance outside
+ * the band (2026-09-06): job_1788681313413_xqmtk2gcs was 157 words against a
+ * 150 ceiling — a 4.7% overage — and the forced rewrite corrupted a verb
+ * collocation. The finding text still names the TRUE budget, so a page that
+ * does trip the band is rewritten toward the real target, not the tolerated
+ * one.
+ *
+ * The tolerance is ASYMMETRIC — 0.5 over, 0.2 under (2026-09-07, superseding
+ * the single 0.2 of 2026-09-06). Meaning outranks word count: a page that runs
+ * a few words long costs nothing, while forcing a 60% cut costs an action, a
+ * line of dialogue or the causal link a later page depends on. Evidence:
+ * job_1788727233899_1dpnym94p (18 pages, 1st-grade, budget 25-50) carried 66
+ * action clauses against a 6-event budget it did meet; 13 of 18 pages ran
+ * 61-128 words, 11 drew a LENGTH fault, and the refiner obeyed by deleting
+ * causality. The real fix is upstream — the arc's action budget
+ * (buildArcBudgetSection) — so this stage no longer forces the impossible cut;
+ * it may overrun by a few words rather than delete an action.
  *
  * @param {Array<{pageNumber:number,text:string}>} pages
  * @param {string} languageLevel
@@ -209,13 +234,13 @@ function buildWordBudgetFindings(pages = [], languageLevel) {
   const level = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
   const min = level.wordsPerPageMin;
   const max = level.wordsPerPageMax;
-  const hi = max * (1 + WORD_BUDGET_TOLERANCE);
-  const lo = min * (1 - WORD_BUDGET_TOLERANCE);
+  const hi = max * (1 + WORD_BUDGET_TOLERANCE_OVER);
+  const lo = min * (1 - WORD_BUDGET_TOLERANCE_UNDER);
   const lines = [];
   for (const p of pages) {
     const n = countPageWords(p.text);
     if (n > hi) {
-      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — shorten without losing content`);
+      lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — tighten the wording; keep every action, line of dialogue and feeling. Losing one is a fault.`);
     } else if (n < lo) {
       lines.push(`FAULT[LENGTH]: p${p.pageNumber} — page has ${n} words, budget ${min}-${max} — expand without padding`);
     }
@@ -334,10 +359,22 @@ function normalizeWithMap(s) {
  * replacement lands on the real characters — a plain `includes` check could
  * verify a quote but not replace it.
  *
- * The FIRST occurrence wins when a page repeats the quoted span: the lector
- * quotes "the shortest span that contains the fault", so a repeat is the same
- * fault twice and a second finding for it will be dropped as overlapping or
- * applied on the next pass over the text.
+ * The FIRST occurrence wins when a page repeats the quoted span. The lector
+ * quotes the WHOLE SENTENCE the fault stands in (2026-09-13), so a repeat means
+ * the page carries that sentence twice and a second finding for it will be
+ * dropped as overlapping or applied on the next pass over the text.
+ *
+ * WHY THE SENTENCE AND NOT THE FAULT (prod job_1789227389389_z18dmvnt6 p15):
+ * the contract used to ask for "the shortest span that contains the fault",
+ * with agreement corrected only INSIDE that span. The lector quoted
+ * `la doudou toute degoulinante` -> `le doudou tout degoulinant`, a correct
+ * gender fix, and the preposition one word to its LEFT was outside the span:
+ * `de la doudou` became `de le doudou`, which French contracts to `du`. The
+ * substitution was applied exactly as asked and shipped a NEW error. A span
+ * that stops short of the words agreement reaches cannot be applied safely,
+ * so the span is now the sentence. One line per sentence, all its faults in
+ * one correction -- several findings inside one sentence would collide on the
+ * overlap guard below and all but the first would be dropped.
  */
 function locateQuote(pageText, quote) {
   const { norm, map } = normalizeWithMap(pageText);
@@ -400,6 +437,87 @@ function applyLectorFindings(pages = [], findings = []) {
   return { pages: next, applied, dropped };
 }
 
+// ─────────────────────── CROSS-PAGE REPETITION (mechanical) ───────────────────
+
+const SHINGLE_WORDS = 5;
+
+/**
+ * Words of a page for shingling: lowercase, punctuation and quote marks
+ * (including «» and every dash) stripped, whitespace collapsed. Letters and
+ * digits of any script survive, so German umlauts and ß compare as themselves.
+ */
+function normalizeForShingles(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** Ordered list of 5-word shingles for one page (positions matter for passage rebuild). */
+function shinglesOf(text, n = SHINGLE_WORDS) {
+  const words = normalizeForShingles(text);
+  const out = [];
+  for (let i = 0; i + n <= words.length; i++) out.push(words.slice(i, i + n).join(' '));
+  return out;
+}
+
+/**
+ * Every pair of pages sharing at least `minShared` identical 5-word shingles.
+ * String equality on the pages' own words — no interpretation. Each hit carries
+ * the shared shingles and the duplicated passages rebuilt from consecutive
+ * shared shingles on the first page, so a prompt or a log can quote them.
+ *
+ * @param {Array<{pageNumber:number,text:string}>} pages
+ * @param {number} minShared
+ * @returns {Array<{pages:[number,number], sharedCount:number, shingles:string[], passages:string[]}>}
+ */
+function findRepeatedPassages(pages, minShared) {
+  const list = (pages || []).map(p => ({ pageNumber: p.pageNumber, shingles: shinglesOf(p.text) }));
+  const hits = [];
+  for (let i = 0; i < list.length; i++) {
+    const setI = new Set(list[i].shingles);
+    for (let j = i + 1; j < list.length; j++) {
+      const shared = new Set(list[j].shingles.filter(sh => setI.has(sh)));
+      if (shared.size < minShared) continue;
+      // Rebuild passages: a run of consecutive shared shingles on page i is one
+      // copied stretch; each further shingle in the run appends its last word.
+      const passages = [];
+      let run = null;
+      for (const sh of list[i].shingles) {
+        if (!shared.has(sh)) { if (run) passages.push(run.join(' ')); run = null; continue; }
+        const words = sh.split(' ');
+        if (run) run.push(words[words.length - 1]); else run = words.slice();
+      }
+      if (run) passages.push(run.join(' '));
+      hits.push({
+        pages: [list[i].pageNumber, list[j].pageNumber],
+        sharedCount: shared.size,
+        shingles: Array.from(shared),
+        passages,
+      });
+    }
+  }
+  return hits;
+}
+
+/**
+ * The corrective pass's findings, in the FAULT-line contract the repair prompt
+ * already reads — so the fed-back retry carries the failure itself: the exact
+ * duplicated words, both page numbers and both pages' plan lines.
+ */
+function buildRepetitionFindings(hits, pages) {
+  const byPage = new Map((pages || []).map(p => [p.pageNumber, p]));
+  const plan = n => (byPage.get(n)?.planLine || '').trim() || '(no plan line)';
+  return hits.map(h => {
+    const [a, b] = h.pages;
+    const quoted = h.passages.map(x => `"${x}"`).join('; ');
+    return `FAULT[REPETITION]: p${a} — pages ${a} and ${b} carry the same passage (${h.sharedCount} shared 5-word sequences): ${quoted}. `
+      + `Plan p${a}: ${plan(a)} Plan p${b}: ${plan(b)} `
+      + 'Keep the passage on the one page whose plan line and picture it belongs to, rewrite the other page without it, change nothing else.';
+  }).join('\n');
+}
+
 // ───────────────────────────────── THE CHAIN ──────────────────────────────────
 
 /**
@@ -419,11 +537,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const {
-    buildTextRefinePrompt, parseRefinedText, buildTextAuditPrompt,
+    buildTextRefinePrompt, parseRefinedText, stripTrailingSeparator, buildTextAuditPrompt,
     buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt,
     countFaults, faultsByCategory,
   } = require('./storyHelpers');
-  const { callTextModelStreaming } = require('./textModels');
+  const { callTextModelStreaming, describeTruncation } = require('./textModels');
   const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
 
   if (!Array.isArray(pages) || pages.length === 0) {
@@ -462,6 +580,8 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let diffFindings = [];
   let diffApplied = [];
   let diffDropped = [];
+  let repetition = null;
+  let wordBudget = null;
 
   // PUBLISH AS WE GO (2026-08-24). This function used to return all-or-nothing,
   // and its caller races it against a join deadline — so finished audits and a
@@ -488,9 +608,28 @@ async function refineStoryText(storyData, pages, opts = {}) {
     diffFindings: diffFindings.slice(),
     diffApplied: diffApplied.slice(),
     diffDropped: diffDropped.slice(),
+    repetition,
+    wordBudget,
     partial: true,
+    // IN FLIGHT (2026-09-14). Whether a model step is RUNNING right now.
+    // `beginStep()` publishes the state so far with this set; the publish()
+    // after the step clears it. The join no longer has a deadline to grace, so
+    // this is now diagnostic: it says whether a slow join is waiting on a call
+    // or on nothing.
+    inFlight: stepInFlight,
   });
+  // Set by beginStep(), cleared by every publish() that follows a completed step.
+  let stepInFlight = false;
   const publish = () => {
+    stepInFlight = false;
+    if (typeof opts.onProgress !== 'function') return;
+    try { opts.onProgress(snapshot()); } catch (e) {
+      log.warn(`⚠️ [TEXT-REFINE] onProgress threw (${e.message}) — ignored`);
+    }
+  };
+  // Announce that a model step is starting: same snapshot, flagged in flight.
+  const beginStep = () => {
+    stepInFlight = true;
     if (typeof opts.onProgress !== 'function') return;
     try { opts.onProgress(snapshot()); } catch (e) {
       log.warn(`⚠️ [TEXT-REFINE] onProgress threw (${e.message}) — ignored`);
@@ -505,23 +644,30 @@ async function refineStoryText(storyData, pages, opts = {}) {
     if (!prompt) return { source, modelKey, ok: false, error: 'template unavailable' };
     if (!TEXT_MODELS[modelKey]) return { source, modelKey, ok: false, error: `unknown model "${modelKey}"` };
     const t0 = Date.now();
-    // The model's OWN limit, never a hand-picked number (owner rule: no output
-    // caps). A reasoning model spends the budget on reasoning tokens first, so
-    // an undersized cap does not truncate the fault list, it returns ZERO
-    // visible text — the measured failure of deepseek-v4-pro and qwen3.8-max as
-    // auditors at 16384 (models.js, 2026-08-27), and the trap a fixed 12000
-    // would have set for the blind grok auditor.
-    const MAX_OUT = TEXT_MODELS[modelKey].maxOutputTokens || 32000;
+    // null = the model's OWN limit, never a hand-picked number (owner rule: no
+    // output caps). A reasoning model spends the budget on reasoning tokens
+    // first, so an undersized cap does not truncate the fault list, it returns
+    // ZERO visible text — the measured failure of deepseek-v4-pro and
+    // qwen3.8-max as auditors at 16384 (models.js, 2026-08-27), and the trap a
+    // fixed 12000 would have set for the blind grok auditor.
     try {
       // gemini-3.1-pro occasionally returns an empty body (see models.js) — one
       // retry, same call; a second empty is reported as a failed audit.
-      let r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel: label });
+      let r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label });
       if (!String(r.text || '').trim()) {
         log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey} returned empty output — retrying once`);
-        r = await callTextModelStreaming(prompt, MAX_OUT, null, modelKey, { usageLabel: label });
+        r = await callTextModelStreaming(prompt, null, null, modelKey, { usageLabel: label });
       }
       const raw = String(r.text || '').trim();
       const elapsedMs = Date.now() - t0;
+      // A cut fault list is not a shorter fault list: a truncated audit is
+      // FAILED and its findings stay out of the merge (textReplyGuard.js).
+      if (r.truncation?.suspected) {
+        const error = `audit reply ${describeTruncation(r.truncation)} — findings unusable`;
+        log.warn(`⚠️ [TEXT-AUDIT/${source}] ${modelKey}: ${error}`);
+        return { source, modelKey, ok: false, error, modelId: r.modelId || TEXT_MODELS[modelKey].modelId, raw, elapsedMs, truncation: r.truncation,
+          usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 } };
+      }
       log.info(`🔎 [TEXT-AUDIT/${source}] ${modelKey}: ${countFaults(raw)} fault(s) ${JSON.stringify(faultsByCategory(raw))} in ${(elapsedMs / 1000).toFixed(0)}s`);
       return {
         source, modelKey, ok: raw.length > 0,
@@ -562,6 +708,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // audit is simply absent from the merge, exactly like a failed one. The
   // abandoned call keeps streaming until the provider ends it — its tokens are
   // spent either way, and waiting for them costs the whole stage instead.
+  beginStep();   // the audits are the first model step — see the join's grace period
   const AUDIT_DEADLINE_MS = Number(opts.auditTimeoutMs) || 900000;
   const withDeadline = (p, source) => {
     let timer = null;
@@ -607,7 +754,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
    * decides whether to adopt it. Invoked exactly ONCE below; a second bounded
    * pass after a re-audit would be one more call here, never a loop.
    */
-  const runRepairPass = async (findingsText, base) => {
+  const runRepairPass = async (findingsText, base, kind = 'repair') => {
     let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc);
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
@@ -619,17 +766,19 @@ async function refineStoryText(storyData, pages, opts = {}) {
     // (job_1787423677246 p1/p12). It was then clamped to 64000, which is the
     // same hand-picked cap one size up; the real bound is the model. The
     // throw below still turns any cap hit into a loud failure rather than a
-    // silent "nothing to do".
-    const MAX_OUT = TEXT_MODELS[repairModel].maxOutputTokens || 64000;
-    const r = await callTextModelStreaming(prompt, MAX_OUT, null, repairModel, { usageLabel });
+    // silent "nothing to do" — the caller keeps the text it was given.
+    const r = await callTextModelStreaming(prompt, null, null, repairModel, { usageLabel: kind === 'repair' ? usageLabel : `${usageLabel}_${kind}` });
     const elapsedMs = Date.now() - t0;
-    if ((r.usage?.output_tokens || 0) >= MAX_OUT) {
-      throw new Error(`output hit the ${MAX_OUT}-token cap — reply truncated, rewrites unusable`);
+    if (r.truncation?.suspected) {
+      throw new Error(`reply ${describeTruncation(r.truncation)} — rewrites unusable`);
     }
     const parsed = parseRefinedText(r.text || '', expected);
     // Omission is the CONTRACT: only rewritten pages come back, everything else
     // keeps its current text.
-    const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
+    // Same delimiter leak as the beats writer: a rewritten page can come back
+    // with the model's "---" page rule glued to its last line, and that ships
+    // under the illustration. See stripTrailingSeparator (sceneMetadata.js).
+    const byPage = new Map(parsed.pages.map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
     const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
     const next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== base[idx].text).map(p => p.pageNumber);
@@ -637,7 +786,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       next,
       entry: {
         round: rounds.length + 1,
-        kind: 'repair',
+        kind,
         ok: true,
         modelKey: repairModel,
         modelId: r.modelId || TEXT_MODELS[repairModel].modelId,
@@ -669,6 +818,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
 
   let repairEntry = null;
   try {
+    beginStep();
     const { next, entry } = await runRepairPass(merged.text, current);
     rounds.push(entry);
     repairEntry = entry;
@@ -680,6 +830,111 @@ async function refineStoryText(storyData, pages, opts = {}) {
     rounds.push({ round: rounds.length + 1, kind: 'repair', ok: false, modelKey: repairModel, error: err.message });
     log.warn(`⚠️ [TEXT-REPAIR] failed (${err.message}) — the audits' findings are unclosed`);
     publish();
+  }
+
+  // ── CROSS-PAGE REPETITION — right after the repair, before the diff ──────────
+  //
+  // The repair pass is the only step that writes whole pages, so it is the only
+  // step that can put one passage on two pages (the diff and the lector
+  // substitute quoted spans inside a page). Checked here, mechanically, and
+  // fixed by EXACTLY ONE fed-back corrective pass — never a loop. Sitting
+  // before the diff means the diff reviews the corrective rewrite as well and
+  // the lector proofs its result. A still-tripping result ships with a WARN:
+  // gates are guidelines, a paid run is never killed for this.
+  const REP_MIN = MODEL_DEFAULTS.textRepetitionMinShingles;
+  const summarize = hits => hits.map(h => ({ pages: h.pages, sharedCount: h.sharedCount, shingles: h.shingles.slice(0, 40), passages: h.passages }));
+  let repetitionEntry = null;
+  {
+    const hits = findRepeatedPassages(current, REP_MIN);
+    repetition = { minShingles: REP_MIN, pairs: summarize(hits), correctivePassRan: false, resolved: hits.length === 0, remaining: [], cost: 0 };
+    if (hits.length) {
+      log.warn(`🔁 [TEXT-REPETITION] ${hits.map(h => `p${h.pages[0]}/p${h.pages[1]} (${h.sharedCount} shared)`).join(', ')} — one corrective pass`);
+      try {
+        beginStep();
+        const { next, entry } = await runRepairPass(buildRepetitionFindings(hits, current), current, 'repetition_fix');
+        rounds.push(entry);
+        repetitionEntry = entry;
+        current = next;
+        repetition.correctivePassRan = true;
+        repetition.cost = entry.cost || 0;
+        log.info(`🔁 [TEXT-REPETITION] corrective pass rewrote page(s) ${entry.changedPages.join(', ') || 'none'} — $${(entry.cost || 0).toFixed(4)}`);
+      } catch (err) {
+        rounds.push({ round: rounds.length + 1, kind: 'repetition_fix', ok: false, modelKey: repairModel, error: err.message });
+        log.warn(`⚠️ [TEXT-REPETITION] corrective pass failed (${err.message})`);
+      }
+      const after = findRepeatedPassages(current, REP_MIN);
+      repetition.remaining = summarize(after);
+      repetition.resolved = after.length === 0;
+      if (!repetition.resolved) {
+        for (const h of after) {
+          log.warn(`⚠️ [TEXT-REPETITION] STILL DUPLICATED after the corrective pass: pages ${h.pages[0]} and ${h.pages[1]} share ${h.sharedCount} 5-word sequences: ${h.passages.map(x => `"${x}"`).join('; ')} — shipping as is`);
+        }
+      }
+      publish();
+    }
+  }
+
+  // ── WORD BUDGET, RE-MEASURED (2026-09-11) ──────────────────────────────────
+  //
+  // The counter above runs ONCE, on the writer's text, BEFORE the repair pass —
+  // and nothing measured the result. Two failures followed on
+  // job_1789147573901_m3uam0nxi, both invisible in the stored report:
+  //
+  //   1. The repairer reported closures it had not made. Its own ledger says
+  //      "fixed on p10 — 65 words" (the shipped page is 126) and "fixed on p18
+  //      — 82 words" (125). A self-report was taken as the outcome.
+  //   2. A page INSIDE the budget was pushed outside it by the rewriting. p12
+  //      went 82 → 112 words, past the tolerance, and drew no finding because
+  //      it was inside the budget when the only measurement ran.
+  //
+  // So: measure again on the text as the whole-page passes left it, and give a
+  // page that is still out ONE fed-back corrective pass — never a loop, the
+  // same shape as the repetition check above, and placed before the diff so the
+  // diff reviews this rewrite too.
+  //
+  // The findings are the counter's own, so the asymmetric tolerance and the
+  // "keep every action, line of dialogue and feeling. Losing one is a fault"
+  // wording travel with them: this re-measures, it does not tighten. A page
+  // that is still over after the corrective pass SHIPS with a WARN — a paid run
+  // is never killed for length, and forcing the cut is what deleted causality
+  // before (2026-09-07).
+  {
+    const countWords = pages => pages.map(p => ({ pageNumber: p.pageNumber, words: countPageWords(p.text) }));
+    const stillRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
+    wordBudget = {
+      before: parseFaultLines(counterRaw || '').length,
+      after: parseFaultLines(stillRaw || '').length,
+      correctivePassRan: false,
+      resolved: !stillRaw,
+      remaining: [],
+      counts: countWords(current),
+      cost: 0,
+    };
+    if (stillRaw) {
+      const lines = stillRaw.split(/\n/);
+      log.warn(`🔢 [TEXT-COUNTER] ${lines.length} page(s) still outside the word budget after the whole-page passes — one corrective pass`);
+      try {
+        beginStep();
+        const { next, entry } = await runRepairPass(stillRaw, current, 'length_fix');
+        rounds.push(entry);
+        current = next;
+        wordBudget.correctivePassRan = true;
+        wordBudget.cost = entry.cost || 0;
+        log.info(`🔢 [TEXT-COUNTER] corrective pass rewrote page(s) ${entry.changedPages.join(', ') || 'none'} — $${(entry.cost || 0).toFixed(4)}`);
+      } catch (err) {
+        rounds.push({ round: rounds.length + 1, kind: 'length_fix', ok: false, modelKey: repairModel, error: err.message });
+        log.warn(`⚠️ [TEXT-COUNTER] corrective pass failed (${err.message})`);
+      }
+      const afterRaw = buildWordBudgetFindings(current, storyData?.languageLevel);
+      wordBudget.after = parseFaultLines(afterRaw || '').length;
+      wordBudget.remaining = afterRaw ? afterRaw.split(/\n/) : [];
+      wordBudget.resolved = !afterRaw;
+      wordBudget.counts = countWords(current);
+      for (const line of wordBudget.remaining) {
+        log.warn(`⚠️ [TEXT-COUNTER] STILL OUTSIDE the budget after the corrective pass: ${line} — shipping as is`);
+      }
+      publish();
+    }
   }
 
   // ── THE DIFF PASS — between the repair and the lector (2026-09-06) ──────────
@@ -716,21 +971,27 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // the session found. (The lector's own catch below logs at warn only; left as
   // it is rather than changed unasked — noted in the report.)
   try {
-    const changedPages = repairEntry?.changedPages || [];
-    const pairs = (repairEntry?.pages || [])
+    // Every page either whole-page pass rewrote. BEFORE = the writer's text
+    // (nothing changes a page before the repair), AFTER = the text as the
+    // corrective pass left it.
+    const changedPages = [...new Set([...(repairEntry?.changedPages || []), ...(repetitionEntry?.changedPages || [])])];
+    const pairs = current
       .filter(p => changedPages.includes(p.pageNumber))
-      .map(p => ({ pageNumber: p.pageNumber, before: p.before, after: p.after }));
+      .map(p => ({ pageNumber: p.pageNumber, before: original.find(o => o.pageNumber === p.pageNumber)?.text, after: p.text }));
     const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
     if (diffPrompt && TEXT_MODELS[diffModel]) {
+      beginStep();
       const t0 = Date.now();
-      // The model's own limit (owner rule: no output caps).
-      const MAX_OUT = TEXT_MODELS[diffModel].maxOutputTokens || 16000;
+      // null = the model's own limit (owner rule: no output caps).
       // temperature 0, same reason as the lector: it must quote, not paraphrase.
-      let dr = await callTextModelStreaming(diffPrompt, MAX_OUT, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
+      let dr = await callTextModelStreaming(diffPrompt, null, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
       if (!String(dr.text || '').trim()) {
         log.warn(`⚠️ [TEXT-DIFF] ${diffModel} returned empty output — retrying once`);
-        dr = await callTextModelStreaming(diffPrompt, MAX_OUT, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
+        dr = await callTextModelStreaming(diffPrompt, null, null, diffModel, { temperature: 0, usageLabel: 'text_diff' });
       }
+      // A cut finding list would apply only the findings that fit — throw into
+      // the catch below, which keeps the text as the repair pass left it.
+      if (dr.truncation?.suspected) throw new Error(`diff reply ${describeTruncation(dr.truncation)} — findings unusable`);
       diffReview = String(dr.text || '').trim();
       // The SAME parser and the SAME applier as the lector — the output contract
       // is identical by design, so there is no parallel apply path.
@@ -805,11 +1066,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
   try {
     const lectorPrompt = buildTextProofreadPrompt(storyData, current);
     if (lectorPrompt && TEXT_MODELS[lectorModel]) {
+      beginStep();
       const t0 = Date.now();
-      // The model's own limit (owner rule: no output caps). A finding list is a
-      // few hundred tokens — the cost of this call is decided by the output
-      // CONTRACT, not by the ceiling.
-      const MAX_OUT = TEXT_MODELS[lectorModel].maxOutputTokens || 16000;
+      // null = the model's own limit (owner rule: no output caps). A finding
+      // list is a few hundred tokens — the cost of this call is decided by the
+      // output CONTRACT, not by the ceiling.
       // temperature 0: the A/B measured this prompt at 0, and a lector must not
       // paraphrase the page it quotes.
       // reasoning effort 'medium': measured 2026-09-06 on job_1788380714660_4p9mr11xszu
@@ -818,11 +1079,14 @@ async function refineStoryText(storyData, pages, opts = {}) {
       // catch. 'low' (1,696 / $0.0281) collapsed to 0/4 CORE and 3-4 false positives,
       // so recall is a direct function of reasoning budget — do NOT lower this further.
       const LECTOR_OPTS = { temperature: 0, usageLabel: 'text_lector', reasoning: { effort: 'medium' } };
-      let lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, LECTOR_OPTS);
+      let lr = await callTextModelStreaming(lectorPrompt, null, null, lectorModel, LECTOR_OPTS);
       if (!String(lr.text || '').trim()) {
         log.warn(`⚠️ [LECTOR] ${lectorModel} returned empty output — retrying once`);
-        lr = await callTextModelStreaming(lectorPrompt, MAX_OUT, null, lectorModel, LECTOR_OPTS);
+        lr = await callTextModelStreaming(lectorPrompt, null, null, lectorModel, LECTOR_OPTS);
       }
+      // Same rule as the diff: a cut finding list is not applied — the catch
+      // below keeps the text as the repair pass left it.
+      if (lr.truncation?.suspected) throw new Error(`lector reply ${describeTruncation(lr.truncation)} — findings unusable`);
       proofread = String(lr.text || '').trim();
       lectorFindings = parseLectorFindings(proofread);
       const result = applyLectorFindings(current, lectorFindings);
@@ -869,6 +1133,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     }
   } catch (le) {
     log.warn(`⚠️ [LECTOR] failed (${le.message}) — text kept as the repair pass left it`);
+    publish();   // clears the in-flight flag the join's grace period reads
   }
 
   const changed = current
@@ -880,6 +1145,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     audits, mergedFindings, mergeStats,
     proofread, lectorFindings, lectorApplied, lectorDropped,
     diffReview, diffFindings, diffApplied, diffDropped,
+    repetition, wordBudget,
     partial: false,
   };
 }
@@ -949,6 +1215,118 @@ function startBackgroundRefine(storyData, pages, opts = {}) {
     });
 }
 
+// ── THE PIPELINE'S JOIN ──────────────────────────────────────────────────────
+//
+// Extracted here (2026-09-14) because the join lives deep inside
+// storyJobPipeline's generation function and could not be tested there.
+//
+// NO DEADLINE (owner, 2026-09-14). The join used to race the refine chain
+// against a budget and take whatever had been published when the timer fired.
+// Nothing cancels the refine when that race is lost, so the chain runs to
+// completion and bills in full either way (staging job_1789348171785_9oxos7dwv
+// billed $1.01 of text_refine AFTER its join had given up) — the deadline only
+// ever discarded paid work, and with it the text audit's checks, the
+// text/picture alignment one among them. The join now WAITS: the chain is
+// never truncated, and every downstream consumer — the book audit inside the
+// repair pipeline first among them — reads the FINAL refined text.
+//
+// It cannot wait forever: every model call in the chain is bounded by
+// textModels' own streaming ceiling (>=1500s) plus its 120s inactivity abort,
+// each audit additionally by AUDIT_DEADLINE_MS (900s), and every step catches
+// its own failure, so the chain always settles. What is left is a LATENCY
+// question, and that is answered with a warning, not a kill (a gate ships with
+// a warning; it never destroys a paid run): once the wait passes the budget
+// below, the join logs how long it has been waiting and keeps waiting.
+const TEXT_REFINE_JOIN_BASE_MS = 600000;
+const TEXT_REFINE_JOIN_PER_PAGE_MS = 10000;
+const TEXT_REFINE_JOIN_FREE_PAGES = 10;
+
+/**
+ * After how long an unfinished refine chain is worth a warning. Measured
+ * chains run 400-600s, with 743/770/841/878s all seen in one month, so this is
+ * "slower than usual", not "too slow to keep".
+ * @param {number} pageCount      pages in the book
+ * @param {string|number} [envOverride]  TEXT_REFINE_JOIN_WARN_MS, wins outright
+ * @returns {number} ms
+ */
+function computeTextRefineJoinWarnMs(pageCount, envOverride) {
+  const override = Number(envOverride);
+  if (override) return override;
+  const pages = Number(pageCount) || 0;
+  return TEXT_REFINE_JOIN_BASE_MS
+    + Math.max(0, pages - TEXT_REFINE_JOIN_FREE_PAGES) * TEXT_REFINE_JOIN_PER_PAGE_MS;
+}
+
+/**
+ * What the join ships. Pure.
+ * @param {object|null} refined  the refiner's own result — null if the chain failed
+ * @param {object|null} partial  the last snapshot the refiner published
+ * @param {boolean} salvage      true when no complete result is available
+ * @returns {{usable: object|null, source: 'complete'|'failed'|'partial'|'original'}}
+ */
+function selectJoinResult(refined, partial, salvage) {
+  if (!salvage) return { usable: refined || null, source: refined ? 'complete' : 'failed' };
+  if (partial?.changed?.length) return { usable: partial, source: 'partial' };
+  return { usable: partial || null, source: 'original' };
+}
+
+/**
+ * THE JOIN ITSELF — await the chain, never truncate it.
+ *
+ * Resolves only once the refiner has settled. A chain that outlives
+ * `warnAfterMs` is reported through `onSlow` and then still awaited in full,
+ * so the result is the COMPLETE run and never an intermediate snapshot. A
+ * chain that fails (or, defensively, rejects) salvages the last published
+ * snapshot instead of throwing the stage away.
+ *
+ * @param {Promise<object|null>} promise  startBackgroundRefine's promise
+ * @param {function|object|null} getPartial  latest published snapshot, or a getter for it
+ * @param {{warnAfterMs?: number, onSlow?: function}} [opts]
+ * @returns {Promise<{usable: object|null, source: string, waitedMs: number, slow: boolean}>}
+ */
+async function awaitTextRefineJoin(promise, getPartial, opts = {}) {
+  const t0 = Date.now();
+  const warnAfterMs = Number(opts.warnAfterMs) || 0;
+  let slow = false;
+  let timer = null;
+  if (warnAfterMs > 0) {
+    // NOT unref'd: an unref'd timer does not keep the loop alive. clearTimeout
+    // in the finally is what stops it leaking, and that runs on every branch.
+    timer = setTimeout(() => {
+      slow = true;
+      if (typeof opts.onSlow === 'function') {
+        try { opts.onSlow(warnAfterMs); } catch { /* a logging failure never breaks the join */ }
+      }
+    }, warnAfterMs);
+  }
+  let refined = null;
+  try {
+    refined = await promise;
+  } catch (e) {
+    // startBackgroundRefine already swallows; this is belt-and-braces so a
+    // future caller cannot make a polish pass throw a paid story away.
+    log.warn(`⚠️ [TEXT-REFINE] join saw a rejected chain (${e.message}) — salvaging the last published snapshot`);
+    refined = null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+  const partial = typeof getPartial === 'function' ? getPartial() : getPartial;
+  const sel = selectJoinResult(refined, partial, !refined);
+  return { ...sel, waitedMs: Date.now() - t0, slow };
+}
+
+/**
+ * Did the join lose the WHOLE text-quality gate? Pure — and it decides the log
+ * LEVEL, not just the wording (owner, 2026-09-14): nothing published means the
+ * two audits, the repair and the lector all failed to apply, including the
+ * text/picture MISMATCH check, which ranks as an error the way a lost styled
+ * avatar does. A snapshot with rewritten pages is a partial loss — a warning.
+ * @param {object|null} partial  the last snapshot the refiner published
+ */
+function isTotalTextAuditLoss(partial) {
+  return !partial?.changed?.length;
+}
+
 module.exports = {
   refineStoryText,
   extractRefinablePages,
@@ -962,4 +1340,15 @@ module.exports = {
   applyLectorFindings,
   locateQuote,
   DUPLICATE_OVERLAP,
+  normalizeForShingles,
+  shinglesOf,
+  findRepeatedPassages,
+  buildRepetitionFindings,
+  SHINGLE_WORDS,
+  computeTextRefineJoinWarnMs,
+  awaitTextRefineJoin,
+  selectJoinResult,
+  isTotalTextAuditLoss,
+  TEXT_REFINE_JOIN_BASE_MS,
+  TEXT_REFINE_JOIN_PER_PAGE_MS,
 };

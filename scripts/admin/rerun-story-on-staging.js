@@ -23,7 +23,18 @@
  * pipeline's single resolver (server/lib/season.js) derives it from this job's
  * own creation date. `--season=` overrides that, for tests that need a fixed one.
  *
- *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--yes]
+ * The source job is looked up in PRODUCTION by default. A story that was born
+ * on staging (a rerun of a rerun, a Lab-launched run) never existed in prod, so
+ * `--source=staging` reads its inputs from the staging database instead. The
+ * characters are read from staging either way.
+ *
+ * The premise is replayed verbatim by default — same brief in, pipeline out.
+ * `--regenerate-idea` instead asks the live idea generator for a fresh pair and
+ * keeps the one set in the reader's real city (`=fantasy` keeps the other), so
+ * the run also exercises today's idea prompt. The pair is sent along, so the
+ * story records the premise as ours rather than user-written.
+ *
+ *   node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=S] [--source=prod|staging] [--regenerate-idea[=location|fantasy]] [--yes]
  */
 'use strict';
 
@@ -40,7 +51,16 @@ const pagesOverride = args.find((a) => a.startsWith('--pages='));
 const seasonFlag = args.find((a) => a.startsWith('--season='));
 const BASE = 'https://staging.magicalstory.ch';
 
-const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--yes]';
+const sourceFlag = args.find((a) => a.startsWith('--source='));
+const SOURCE = sourceFlag ? sourceFlag.split('=')[1] : 'prod';
+const ideaFlag = args.find((a) => a.startsWith('--regenerate-idea'));
+const IDEA_WORLD_WANTED = ideaFlag && ideaFlag.includes('=') ? ideaFlag.split('=')[1] : 'location';
+const USAGE = 'Usage: node scripts/admin/rerun-story-on-staging.js <storyId> [--pages=N] [--season=spring|summer|autumn|winter] [--source=prod|staging] [--regenerate-idea[=location|fantasy]] [--yes]';
+if (ideaFlag && !['location', 'fantasy'].includes(IDEA_WORLD_WANTED)) {
+  console.error(`--regenerate-idea="${IDEA_WORLD_WANTED}" is not a world. Use location (the reader's real city) or fantasy.`);
+  process.exit(1);
+}
+if (!['prod', 'staging'].includes(SOURCE)) { console.error(`--source="${SOURCE}" is not a database. Use prod or staging.`); process.exit(1); }
 if (!storyId || args.includes('--help') || args.includes('-h')) { console.error(USAGE); process.exit(storyId ? 0 : 1); }
 
 let seasonOverride = null;
@@ -89,11 +109,46 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
   const prod = new Pool({ connectionString: process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
   const stg = new Pool({ connectionString: process.env.STAGING_DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
-  // 1) Original inputs, straight from the production job.
-  const j = await prod.query('SELECT input_data, user_id FROM story_jobs WHERE id = $1', [storyId]);
-  if (!j.rows.length) { console.error(`No story_jobs row for ${storyId} — inputs are not replayable.`); process.exit(1); }
-  const src = typeof j.rows[0].input_data === 'string' ? JSON.parse(j.rows[0].input_data) : j.rows[0].input_data;
-  const prodUser = j.rows[0].user_id;
+  // 1) Original inputs, straight from the source job.
+  const from = SOURCE === 'staging' ? stg : prod;
+  const j = await from.query('SELECT input_data, user_id FROM story_jobs WHERE id = $1', [storyId]);
+  let src, prodUser;
+  if (j.rows.length) {
+    src = typeof j.rows[0].input_data === 'string' ? JSON.parse(j.rows[0].input_data) : j.rows[0].input_data;
+    prodUser = j.rows[0].user_id;
+  } else {
+    // Job rows are purged by housekeeping; the finished story keeps every
+    // wizard input it was born from. Rebuild the create-story body from it.
+    const s = await from.query('SELECT user_id, data FROM stories WHERE id = $1', [storyId]);
+    if (!s.rows.length) { console.error(`Neither a story_jobs row nor a stories row for ${storyId} in ${SOURCE} — inputs are not replayable.`); process.exit(1); }
+    const d = typeof s.rows[0].data === 'string' ? JSON.parse(s.rows[0].data) : s.rows[0].data;
+    prodUser = s.rows[0].user_id;
+    const pageCount = Array.isArray(d.pages) ? d.pages.length : Number(d.pages) || (Array.isArray(d.sceneImages) ? d.sceneImages.length : 0);
+    src = {
+      pages: pageCount,
+      artStyle: d.artStyle,
+      language: d.language,
+      languageLevel: d.languageLevel,
+      storyType: d.storyType,
+      storyTypeName: d.storyTypeName,
+      storyCategory: d.storyCategory,
+      storyTheme: d.storyTheme,
+      storyTopic: d.storyTopic || '',
+      storyDetails: d.storyDetails || '',
+      dedication: d.dedication || '',
+      ideaWorld: d.ideaWorld || undefined,
+      userLocation: d.userLocation || undefined,
+      relationships: d.relationships || {},
+      relationshipTexts: d.relationshipTexts || {},
+      mainCharacters: d.mainCharacters || [],
+      characters: (d.characters || []).map((c) => ({ id: c.id, name: c.name })),
+      layout: d.layout || undefined,
+      skipText: false, skipImages: false, skipCovers: false, skipOutline: false, skipSceneDescriptions: false,
+      enableFullRepair: true, adminDraft: false,
+    };
+    for (const k of Object.keys(src)) if (src[k] === undefined) delete src[k];
+    console.log(`No story_jobs row for ${storyId} — inputs rebuilt from the stored story (${pageCount}p, ${src.characters.length} characters)`);
+  }
 
   // 2) FULL characters, from the row copy-story-to-staging.js brought over.
   const ch = await stg.query('SELECT data FROM characters WHERE id = $1', [`characters_${prodUser}`]);
@@ -129,8 +184,60 @@ const token = () => execFileSync('node', [path.join(__dirname, 'get-admin-token.
   if (seasonOverride) inputs.season = seasonOverride;
   const season = seasonOverride || resolveSeason({}, { now: new Date() });
 
+  // Optional: throw away the stored premise and let the current idea generator
+  // write a new one. The endpoint always returns TWO ideas — by default one set
+  // in the reader's real city, one in the theme's fantasy world (see
+  // resolveIdeaWorlds in server/routes/storyIdeas.js) — and we keep the one
+  // whose world matches the flag. The offered pair travels on `ideaGeneration`
+  // so idea provenance records this as OUR idea, not a user-written one.
+  if (ideaFlag) {
+    const ideaBody = {
+      storyType: inputs.storyType, storyTypeName: inputs.storyTypeName,
+      storyCategory: inputs.storyCategory, storyTopic: inputs.storyTopic || '',
+      storyTheme: inputs.storyTheme, language: inputs.language,
+      languageLevel: inputs.languageLevel, pages: inputs.pages,
+      userLocation: inputs.userLocation,
+      ...(seasonOverride ? { season: seasonOverride } : {}),
+      // The idea endpoint takes the wizard's shapes, not the stored ones:
+      // characters carry `isMain`, and relationships arrive as a flat list of
+      // {character1, relationship, character2} rather than the "id1-id2" map
+      // create-story persists. Traits and names only — the prompt never reads
+      // avatars or photos, and a full row would push megabytes of base64
+      // through the request.
+      characters: characters.map((c) => ({
+        id: c.id, name: c.name, age: c.age, gender: c.gender, traits: c.traits,
+        isMain: (inputs.mainCharacters || []).map(String).includes(String(c.id)),
+      })),
+      relationships: Object.entries(inputs.relationships || {}).map(([key, relationship]) => {
+        const [id1, id2] = key.split('-');
+        const name = (id) => characters.find((c) => String(c.id) === String(id))?.name || '';
+        return { character1: name(id1), character2: name(id2), relationship };
+      }).filter((r) => r.character1 && r.character2),
+    };
+    const ir = await fetch(`${BASE}/api/generate-story-ideas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+      body: JSON.stringify(ideaBody),
+      signal: AbortSignal.timeout(180000),
+    });
+    const ib = await ir.json().catch(() => null);
+    if (!ir.ok) { console.error(`generate-story-ideas failed ${ir.status}: ${JSON.stringify(ib).slice(0, 400)}`); process.exit(1); }
+    const ideas = ib?.storyIdeas || [];
+    const worlds = ib?.ideaWorlds || null;
+    if (!ideas.length) { console.error('generate-story-ideas returned no idea — refusing to launch with the stale premise.'); process.exit(1); }
+    const pick = worlds ? worlds.findIndex((w) => w.world === IDEA_WORLD_WANTED) : -1;
+    if (pick < 0) {
+      console.error(`No "${IDEA_WORLD_WANTED}" idea among the ${ideas.length} returned (worlds: ${JSON.stringify(worlds)}). Refusing to guess.`);
+      process.exit(1);
+    }
+    inputs.storyDetails = ideas[pick];
+    inputs.ideaWorld = worlds[pick];
+    inputs.ideaGeneration = { output: ideas, selectedIndex: pick, model: ib.model };
+    console.log(`\nIdea regenerated (${ib.model}) — keeping idea ${pick + 1} of ${ideas.length}, world "${IDEA_WORLD_WANTED}":\n${inputs.storyDetails}\n`);
+  }
+
   const withAvatars = characters.filter((c) => c.avatars?.standardUrl || c.avatars?.summerUrl || c.avatars?.winterUrl).length;
-  console.log(`Story    : ${storyId}`);
+  console.log(`Story    : ${storyId} (inputs from ${SOURCE})`);
   console.log(`Inputs   : ${inputs.pages}p, ${inputs.language}, ${inputs.artStyle}, ${inputs.storyCategory}/${inputs.storyType}`);
   console.log(`Characters: ${characters.map((c) => c.name).join(', ')} (${withAvatars}/${characters.length} carry avatar sheets)`);
   console.log(`Season   : ${season}${seasonOverride ? ' (--season override)' : " (derived from today's date by the pipeline)"}`);

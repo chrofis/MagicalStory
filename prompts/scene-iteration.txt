@@ -4,9 +4,10 @@
 
 ## Rules
 
-1. **Simplify, don't elaborate.** The scene hint and outline are authoritative. Fix only what the preview/evaluator flagged. Same setting, same beat, same characters; change poses, positions, facing, framing, or shot type only as needed to resolve the specific mismatches.
+1. **Simplify, don't elaborate.** The page plan line is authoritative for what happens on this page and who is staged in it; the previous brief is your starting point for everything the plan line does not settle. Fix only what the preview/evaluator flagged. Same setting, same beat; change poses, positions, facing, framing, or shot type only as needed to resolve the specific mismatches.
 2. **Plain concrete words.** Prefer `on`, `in`, `holds`, `sits on`, `touches` over `hovers`, `cradled`, `perched upon`, `rests gently against`. Skip aesthetic buzzwords: `dramatic`, `ethereal`, `cinematic`, `breathtaking`, `stunning`.
-3. **Cast is locked.** The provided characters list is exactly the cast — every character listed must appear; no character outside the list may be added. If the scene seems crowded, simplify staging (depth, framing, pose), not the cast.
+3. **Cast is locked.** The characters list plus the staged-figures list is exactly the cast — every entry must appear; nothing outside those two lists may be added. If the scene seems crowded, simplify staging (depth, framing, pose), not the cast.
+3a. **Whatever is in the picture is declared.** Every figure the prose puts in the frame appears in the metadata: a person in `characters[]` by name, a staged animal or secondary figure in `objects[]` by its id. A figure the plan line stages that the previous brief had dropped may be brought back — only together with its declaration.
 4. **Character count (hard cap: {MAX_CHARACTERS_PER_SCENE}).** 1-3 is ideal. Preserve every character the hint lists.
 5. **One moment, one focal point.** Single instant; one main action draws the eye. When the page text chains physical actions, depict the one with the most motion.
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
@@ -55,7 +56,7 @@ Clothing rules:
 
 **Main characters:**
 {CHARACTERS}
-
+{STAGED_FIGURES}
 **Recurring visual elements (copy IDs exactly):**
 {RECURRING_ELEMENTS}
 {CORRECTION_NOTES}
@@ -74,6 +75,7 @@ Clothing rules:
 <!-- TEXT_OVERLAY_BEGIN -->
 - Calm zone: scan the prose — no named character, weapon, or crowd in the textPosition corner.
 <!-- TEXT_OVERLAY_END -->
+- Declaration: every figure the prose puts in the frame is in `characters[]` or cited in `objects[]`; every entry there is in the prose.
 - Face count: count visible faces; reduce via depth/back-view/object/cropping if over the cap.
 - One focal point: one main action draws the eye; if the prose has two equally weighted moments, cut one.
 

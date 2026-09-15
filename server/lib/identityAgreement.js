@@ -71,7 +71,12 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
 
   if (evs.length === 0 || dets.length === 0) return null;
 
-  const detNames = new Set(dets.map(d => d.name.toLowerCase()));
+  // COMPARE: two produced name strings are compared through canonicalName,
+  // never raw lower-case — a title, a short form or a differently spelled
+  // diacritic otherwise reads as a conflict between the evaluator and the
+  // detector when both named the same person.
+  const { canonicalName } = require('./castResolver');
+  const detNames = new Set(dets.map(d => canonicalName(d.name)));
   const agreed = [];
   const conflicts = [];
   const unpaired = [];
@@ -79,7 +84,7 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
   for (const e of evs) {
     // A name the detector never assigned anywhere is not a conflict — it is a
     // subject the detector cannot see (a creature, or a figure it missed).
-    if (!detNames.has(e.name.toLowerCase())) { unpaired.push(e.name); continue; }
+    if (!detNames.has(canonicalName(e.name))) { unpaired.push(e.name); continue; }
     let best = null;
     let bestDist = Infinity;
     for (const d of dets) {
@@ -87,7 +92,7 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
       if (dist < bestDist) { bestDist = dist; best = d; }
     }
     if (!best || bestDist > maxCentreDistance) { unpaired.push(e.name); continue; }
-    if (best.name.toLowerCase() === e.name.toLowerCase()) {
+    if (canonicalName(best.name) === canonicalName(e.name)) {
       agreed.push(e.name);
     } else {
       conflicts.push({ evaluator: e.name, detector: best.name, centreDistance: Number(bestDist.toFixed(3)) });
@@ -103,6 +108,10 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
     pairedOn: evs.every(e => e.on === 'body') ? 'body' : 'face',
     compared,
     agreed: agreed.length,
+    // The names both sides already landed on the same figure. A rename may
+    // never target one of these: that name is taken, and handing it to a
+    // second figure fabricates a duplicate (see buildRenameMap).
+    agreedNames: agreed.slice(),
     conflicts,
     unpaired: unpaired.length > 0 ? unpaired : undefined,
     // The names the two sides disagree about. A per-character finding naming one
@@ -135,9 +144,22 @@ function describeIdentityAgreement(report, pageLabel = '') {
  * the same way twice over, and renaming would fabricate a duplicate. Those stay
  * flagged and uncorrected.
  *
+ * A name is equally taken when an AGREED match already holds it. The pairing
+ * above is greedy nearest-centre with no mutual exclusion, so two evaluator
+ * figures can both land on one detector figure: one agrees, the other becomes a
+ * conflict pointing at the name the first already owns. Applying that rename
+ * writes the same name onto two matches and erases the evaluator's other name
+ * from the page — and every finding about the erased character is then
+ * relabelled onto a character the spec never cast in that role. Measured on
+ * staging job_1789348171785_9oxos7dwv p7: one evaluator name was renamed onto a
+ * name an agreed match already held, the original name vanished from `matches[]`
+ * entirely, and its CRITICAL finding shipped attributed to the wrong child.
+ *
+ * @param {Array} conflicts
+ * @param {Array<string>} [agreedNames] names already assigned by agreeing matches
  * @returns {Map<string,string>|null} lowercased evaluator name → detector name
  */
-function buildRenameMap(conflicts) {
+function buildRenameMap(conflicts, agreedNames = []) {
   const map = new Map();
   for (const c of conflicts) {
     const from = String(c.evaluator).toLowerCase();
@@ -146,6 +168,14 @@ function buildRenameMap(conflicts) {
   }
   const targets = new Set([...map.values()].map(v => v.toLowerCase()));
   if (targets.size !== map.size) return null;                       // two names, one verdict
+
+  // A target already held by an agreeing match is taken. The only way that is
+  // still a clean permutation is if that holder is itself being renamed away in
+  // the same map — a true swap. Otherwise the rename would duplicate it.
+  for (const held of agreedNames) {
+    const lower = String(held).toLowerCase();
+    if (targets.has(lower) && !map.has(lower)) return null;         // target already taken
+  }
   return map;
 }
 
@@ -175,7 +205,7 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
   const report = checkIdentityAgreement(evalLike?.matches, detFigures, opts);
   if (!report || report.conflicts.length === 0) return report;
 
-  const map = buildRenameMap(report.conflicts);
+  const map = buildRenameMap(report.conflicts, report.agreedNames || []);
   if (!map) {
     report.uncorrectable = true;   // not a clean swap — flag it, touch nothing
     report.renamed = 0;
@@ -208,75 +238,14 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
   return report;
 }
 
-/**
- * TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27: "If both say a figure is
- * missing it is missing. If only one sees the figure it is there.").
- *
- * `missing_character` is the one finding that rests on NOT seeing something,
- * which makes it the one finding a single blind spot can fabricate. Two
- * independent enumerations of the same image exist by this point:
- *
- *   the DETECTOR  — GroundingDINO figures, each carrying a resolved name
- *   the EVALUATOR — qualityResult.matches[], a complete figure list with a
- *                   `reference` name per figure, emitted whether or not the
- *                   evaluator has any finding about that figure
- *
- * The compliance step already cross-checks matches[] against the vision
- * inventory, but it never sees the detector. So a character the detector found
- * and the evaluator overlooked could still be billed as absent. Measured case:
- * on one page a child carrying another child on his shoulders was missed by the
- * detector (the rider occludes him) — the mirror of this, and the reason a
- * single witness must not convict.
- *
- * Returns the names of characters at least ONE witness placed in the image.
- * A caller uses it to drop an absence claim; it never creates one.
+/*
+ * TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27) lived here as
+ * charactersSeenByAnyWitness + dropContradictedAbsences: an after-the-fact
+ * filter that deleted absence claims a witness contradicted, then rescored
+ * behind them. Folded into evalPipeline.derivePresenceFinding on 2026-09-13 —
+ * the two enumerations are now reconciled BEFORE a presence claim is made, and
+ * a disagreement means no claim rather than a claim withdrawn.
  */
-function charactersSeenByAnyWitness(evalLike, detFigures) {
-  const seen = new Set();
-  for (const f of (detFigures || [])) {
-    const n = String(f?.name || '').trim().toLowerCase();
-    if (n && n !== 'unknown') seen.add(n);
-  }
-  const matches = Array.isArray(evalLike?.matches) ? evalLike.matches
-    : Array.isArray(evalLike?.qualityResult?.matches) ? evalLike.qualityResult.matches : [];
-  for (const m of matches) {
-    const n = String(m?.reference || m?.name || '').trim().toLowerCase();
-    if (n && n !== 'unknown') seen.add(n);
-  }
-  return seen;
-}
-
-/**
- * Drop `missing_character` claims about someone a witness actually saw.
- *
- * Type-driven, not text-driven: the bucket map owns which types are absence
- * claims, and the character comes from the finding's own `character` field —
- * no prose is read (scoring.js: NO TEXT MATCHING IN SCORING). A claim naming
- * nobody is left alone, since there is nothing to check it against.
- *
- * Mutates the issue arrays in place and returns what it dropped, so the caller
- * can log it and the Lab can show it.
- */
-function dropContradictedAbsences(issueArrays, seenNames, { pageLabel = '' } = {}) {
-  const dropped = [];
-  const isAbsenceClaim = (i) => String(i?.type || i?.subType || '').toLowerCase() === 'missing_character';
-  for (const arr of issueArrays) {
-    if (!Array.isArray(arr)) continue;
-    for (let i = arr.length - 1; i >= 0; i--) {
-      const issue = arr[i];
-      if (!isAbsenceClaim(issue)) continue;
-      const who = String(issue.character || issue.affectedCharacter || '').trim().toLowerCase();
-      if (!who || !seenNames.has(who)) continue;
-      dropped.push({ character: issue.character || issue.affectedCharacter, severity: issue.severity, source: issue.source || null });
-      arr.splice(i, 1);
-    }
-  }
-  if (dropped.length) {
-    log.warn(`👥 [PRESENCE] ${pageLabel}dropped ${dropped.length} missing_character claim(s) contradicted by a witness: ${dropped.map(d => d.character).join(', ')}`);
-  }
-  return dropped;
-}
 
 module.exports = {
-  charactersSeenByAnyWitness,
-  dropContradictedAbsences, checkIdentityAgreement, describeIdentityAgreement, reconcileIdentity };
+  checkIdentityAgreement, describeIdentityAgreement, reconcileIdentity };

@@ -18,6 +18,9 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
+const { canonicalName } = require('./castResolver');
+const { assertPromptFilled } = require('../services/prompts');
+const { baseVbId } = require('./vbIdGuard');
 const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
 const { getCurrentLogger } = require('./generationLogger');
 
@@ -1212,6 +1215,7 @@ ${lines}${elimHint}
 Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   const fullPrompt = mkPrompt(fullLines);
   const sanitizedPrompt = mkPrompt(sanitizedLines);
+  assertPromptFilled([fullPrompt, sanitizedPrompt], '_somIdentifyFigures');
   const markedB64 = marked.toString('base64');
 
   // ── Vendor callers — each returns { text } or { fail: reason } ───────────
@@ -1220,7 +1224,7 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ inlineData: { mimeType: 'image/jpeg', data: markedB64 } }, { text: promptText }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -1239,7 +1243,7 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     if (!key) return { fail: 'OPENROUTER_API_KEY not set' };
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0, max_tokens: 1500,
+      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0,
         messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${markedB64}` } }, { type: 'text', text: promptText }] }] }),
       signal: AbortSignal.timeout(45_000),
     });
@@ -1255,7 +1259,7 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     if (!key) return { fail: 'ANTHROPIC_API_KEY not set' };
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, temperature: 0,
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: require('../config/models').maxOutputTokensFor('claude-haiku-4-5-20251001'), temperature: 0,
         messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: markedB64 } }, { type: 'text', text: promptText }] }] }),
       signal: AbortSignal.timeout(45_000),
     });
@@ -1283,7 +1287,10 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     for (const b of badges) {
       const raw = String(answers[b.letter] || '').trim();
       if (!raw || /^unknown$/i.test(raw)) continue;
-      const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
+      // COMPARE: the SoM answer against the roster we sent it. Exact first
+      // (fast path), then the one normaliser.
+      const name = [...validNames].find(n => n === raw)
+        || [...validNames].find(n => canonicalName(n) === canonicalName(raw));
       if (!name) continue;
       if (!claims.has(name)) claims.set(name, []);
       claims.get(name).push(b.detIdx);
@@ -1918,8 +1925,10 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     _boxIouXyxy([bodyBox[1], bodyBox[0], bodyBox[3], bodyBox[2]], [f.bodyBox[1], f.bodyBox[0], f.bodyBox[3], f.bodyBox[2]])));
   for (const raw of (groundObjects ? expectedObjects : [])) {
     const cleaned = String(raw || '').trim();
-    if (!cleaned || /^[A-Z]{3}\d{3}(\.\d+)?$/.test(cleaned)) continue; // opaque VB id — nothing to ground
-    const hint = objectGroundingHints?.[cleaned.toLowerCase()];
+    // COMPARE: the VB-id grammar has ONE definition (vbIdGuard) — the local
+    // copy here did not know the pools and matched any 3-letter+3-digit token.
+    if (!cleaned || baseVbId(cleaned)) continue; // opaque VB id — nothing to ground
+    const hint = objectGroundingHints?.[canonicalName(cleaned)];
     if (hint?.kind === 'location') { diag.objects.push({ name: cleaned, skipped: 'location' }); continue; }
     const src = (hint?.text || cleaned);
     let text = src.split(/[—,;(.]/)[0].trim().toLowerCase();
@@ -2024,6 +2033,7 @@ module.exports = {
   detectPersonBoxInCrop,
   recoverFaceBox,
   attachSamMasksToFigures,
+  _mobilesamMaskFull,   // raw box→mask; the scene composite's in-place cut-out
   _cleanMaskAndCheck,
   _boxAreaPx,
   _boxContainment,

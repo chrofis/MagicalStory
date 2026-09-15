@@ -389,4 +389,34 @@ function getTrialCostume(storyTopic, storyCategory, gender) {
   };
 }
 
-module.exports = { TRIAL_COSTUMES, getTrialCostume };
+/**
+ * Resolve which topic/category a trial's costume lookup uses.
+ * - adventure: storyTheme has the theme (pirate, knight, ...), storyTopic is empty
+ * - life-challenge: storyTopic has the challenge, storyTheme has the adventure theme -> use storyTheme
+ * - historical: storyTopic has the event ID
+ * @param {{storyCategory?: string, storyTheme?: string, storyTopic?: string}} inputs
+ * @returns {{ topic: string, category: string }}
+ */
+function resolveTrialCostumeLookup({ storyCategory, storyTheme, storyTopic } = {}) {
+  const isHistorical = storyCategory === 'historical';
+  return {
+    topic: isHistorical ? (storyTopic || '') : (storyTheme || storyTopic || ''),
+    category: isHistorical ? 'historical' : 'adventure'
+  };
+}
+
+/**
+ * getTrialCostume for a set of story inputs — the single place the wizard's
+ * category/theme/topic triple is mapped onto the costume table. Every trial
+ * consumer (avatar prewarm, story job, idea generation) resolves it the same
+ * way, so the premise, the clothing requirements and the avatar sheets cannot
+ * disagree about whether a costume exists.
+ * @param {{storyCategory?: string, storyTheme?: string, storyTopic?: string, gender?: string}} inputs
+ * @returns {{ costumeType: string, description: string } | null}
+ */
+function getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender } = {}) {
+  const { topic, category } = resolveTrialCostumeLookup({ storyCategory, storyTheme, storyTopic });
+  return getTrialCostume(topic, category, gender || '');
+}
+
+module.exports = { TRIAL_COSTUMES, getTrialCostume, resolveTrialCostumeLookup, getTrialCostumeForStory };

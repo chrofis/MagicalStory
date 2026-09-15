@@ -38,7 +38,9 @@ const crypto = require('crypto');
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../services/prompts');
+const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
+const { canonicalName } = require('./castResolver');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
@@ -89,14 +91,26 @@ function parseVisualBibleObjects(prompt) {
 
   const objects = [];
 
-  // Look for REQUIRED OBJECTS section
-  const requiredSection = prompt.match(/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\n\n|\*\*[A-Z]|$)/i);
+  // Look for REQUIRED OBJECTS section.
+  // TERMINATOR: a blank line, or the next bold HEADING — a `**` at the START
+  // of a line. It must never be "any bold token", because EVERY entry in this
+  // block opens with `* **Name**`: the previous form `(?=\n\n|\*\*[A-Z]|$)`
+  // ended the capture two characters in (the `/i` flag made `[A-Z]` match the
+  // lowercase `d` of `**dragon egg**`), so this parser returned `[]` for every
+  // real prompt ever built. Dropping `/i` alone does not fix it — `\*\*[A-Z]`
+  // then stops at the second entry's `**Mother Dragon**`. Entry names are
+  // arbitrary, so nothing about their first letter may be load-bearing; the
+  // line-start anchor is what separates a heading from an entry.
+  const requiredSection = prompt.match(/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\r?\n[ \t]*\r?\n|\r?\n\*\*|$)/i);
   if (requiredSection) {
     // Match entries like: * **ObjectName** (type): Description
     // Trailing colon optional: the block is a NAME-ONLY checklist since
     // 2026-09-02 (descriptions moved into the Art Director prose). Stored
     // prompts from before that still carry "(type): description".
-    const entryPattern = /\*\s*\*\*([^*]+)\*\*\s*\((\w+)\)\s*:?/g;
+    // Anchored to line start (/m): the block's trailing plain lines (the
+    // "attached reference images" line, the markings line) are deliberately
+    // written WITHOUT a `* **` prefix and must not parse as objects.
+    const entryPattern = /^[ \t]*\*\s+\*\*([^*]+)\*\*\s*\((\w+)\)\s*:?/gm;
     let match;
     while ((match = entryPattern.exec(requiredSection[1])) !== null) {
       const name = match[1].trim();
@@ -121,20 +135,54 @@ function parseVisualBibleObjects(prompt) {
  *
  * @param {string[]} entries - Mix of VB IDs and plain names (order preserved)
  * @param {Object|null} visualBible - Story visual bible
+ * @param {string} [language] - story language, so the label matches the lead
+ *                              the page prompt actually emitted
  * @returns {string[]} Array of names, deduplicated case-insensitively
  */
-function resolveExpectedObjectLabels(entries, visualBible) {
+function resolveExpectedObjectLabels(entries, visualBible, language = 'en') {
   if (!Array.isArray(entries) || entries.length === 0) return [];
+  // Byte-identical to what promptBuilders' REQUIRED OBJECTS lead emits: the
+  // same `elementLeadLabel` (authored label, else the pre-label derivation).
+  // The bold lead is the GroundingDINO grounding key and the
+  // entity-consistency key, so the two must never diverge. Lazy require —
+  // promptBuilders is the heavier module. A dotted id resolves to the BASE
+  // entry: the lead is state-free.
+  const { elementLeadLabel } = require('./promptBuilders');
   const vb = visualBible || {};
   const byId = new Map();
-  const addPool = (list) => {
+  // DEDUPE KEY = THE RESOLVED ENTITY, NOT THE STRING. The two sources of this
+  // list spell one element differently: scene metadata gives the VB id, while
+  // the page prompt's REQUIRED OBJECTS lead gives a bold name that (a) carries
+  // a two-sided prop's trailing `(qualifier)` inside the bold, and (b) for an
+  // ANIMAL is `entry.name` verbatim rather than the lead label (deliberate —
+  // an animal's proper name is its identity anchor; promptBuilders says so and
+  // it is NOT changed here). Either divergence used to let both spellings
+  // through, and the detector was asked for one object twice; the second ask
+  // comes back found:false, which manufactures a fake absence and buys a
+  // repair round on a correct page. This index maps every spelling an entry
+  // can be named by back to that entry's single lead label, so the collapse
+  // happens on identity. Only the KEY changes — the string emitted is still
+  // the first spelling to arrive, so this can only shrink the list.
+  const keyByAlias = new Map();
+  const stripQualifier = (s) => String(s || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const addPool = (list, type) => {
     for (const e of (list || [])) {
-      if (e && e.id && e.name) byId.set(String(e.id).toUpperCase(), e.name);
+      if (!e || !e.id) continue;
+      const label = elementLeadLabel(e, { language, type });
+      if (label) byId.set(String(e.id).toUpperCase(), label);
+      if (!label) continue;
+      const canonical = label.toLowerCase();
+      for (const alias of [label, e.label, e.name, stripQualifier(e.name), stripQualifier(label)]) {
+        const a = String(alias || '').trim().toLowerCase();
+        if (a) keyByAlias.set(a, canonical);
+      }
     }
   };
-  addPool(vb.artifacts);
+  addPool(vb.artifacts, 'object');
+  // Animals and secondary characters lead with their NAME in the prompt, which
+  // is what their entry already resolves to.
   addPool(vb.animals);
-  addPool(vb.vehicles);
+  addPool(vb.vehicles, 'vehicle');
   addPool(vb.secondaryCharacters);
   // Locations are skipped downstream in parseVisualBibleObjects, but LOC IDs
   // still appear in scene metadata objects[] — translate them too so the
@@ -159,7 +207,15 @@ function resolveExpectedObjectLabels(entries, visualBible) {
         continue;
       }
     }
-    const key = name.toLowerCase();
+    // Identity key: the entry's lead label when this spelling names a known
+    // entry (bare or with a trailing qualifier stripped), else the literal
+    // string — an unknown name is its own entity and must not merge with
+    // anything (a mother creature and its young share words but are two
+    // entries, and over-merging would hide a genuinely missing object).
+    const lower = name.toLowerCase();
+    const key = keyByAlias.get(lower)
+      || keyByAlias.get(stripQualifier(name).toLowerCase())
+      || stripQualifier(lower) || lower;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(name);
@@ -182,7 +238,9 @@ function buildObjectGroundingHints(entries, visualBible) {
   const byName = new Map();
   const addPool = (list, kind) => {
     for (const e of (list || [])) {
-      if (e && e.name) byName.set(String(e.name).toLowerCase(), { text: String(e.description || ''), kind });
+      // COMPARE: keys are canonicalised so the reader's canonicalName(label)
+      // hits the same key regardless of diacritics/spacing.
+      if (e && e.name) byName.set(canonicalName(e.name), { text: String(e.description || ''), kind });
     }
   };
   addPool(vb.artifacts, 'artifact');
@@ -192,8 +250,9 @@ function buildObjectGroundingHints(entries, visualBible) {
   addPool(vb.locations, 'location');
   const hints = {};
   for (const label of (entries || [])) {
-    const h = byName.get(String(label).toLowerCase());
-    if (h) hints[String(label).toLowerCase()] = h;
+    const key = canonicalName(label);
+    const h = byName.get(key);
+    if (h) hints[key] = h;
   }
   return hints;
 }
@@ -425,8 +484,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
         };
         // Per-figure mask PNGs ride along non-enumerably: the overlay renderer
         // uses them for the cutout strip, JSON persistence (stories.data JSONB)
-        // and the raw API response never see them.
-        Object.defineProperty(result, '_gdinoMasks', { value: gd.masks || [], enumerable: false });
+        // and the raw API response never see them. configurable so a later
+        // merge (Gemini extras below) can redefine the list instead of throwing.
+        Object.defineProperty(result, '_gdinoMasks', { value: gd.masks || [], enumerable: false, configurable: true });
         if (gd.diag?.undercount) {
           // Don't trust-or-discard yet — stash and fall through to the Gemini
           // detection below, which acts as the second opinion. Not cached: the
@@ -506,6 +566,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       },
       { text: prompt }
     ];
+    assertPromptFilled(parts, '_detectAllBoundingBoxesImpl');
 
     // Bbox needs spatial precision — use dedicated bbox model
     const modelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
@@ -520,7 +581,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
       log.info(`🔲 [BBOX-DETECT] ${pageLabel}Using Claude vision: ${modelId}`);
       const { callTextModel } = require('./textModels');
       const imageDataUri = `data:${mimeType};base64,${base64Data}`;
-      const claudeResult = await callTextModel(prompt, 16000, modelId, { images: [imageDataUri], usageLabel: 'bbox_detect' });
+      const claudeResult = await callTextModel(prompt, null, modelId, { images: [imageDataUri], usageLabel: 'bbox_detect' });
       if (!claudeResult?.text) {
         log.warn('⚠️  [BBOX-DETECT] Claude returned no text response');
         return dinoUndercountResult || null;
@@ -848,9 +909,9 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
             return `  ${i + 1}. "${f.name}" (${f.confidence}) — ${fb}, ${bb}`;
           }).join('\n');
 
-          const refinePrompt = fillTemplate(LOCAL_PROMPTS.bboxRefineOverlay, {
+          const refinePrompt = guardPromptString(fillTemplate(LOCAL_PROMPTS.bboxRefineOverlay, {
             FIGURES_SUMMARY: figuresSummary,
-          });
+          }), 'bboxDetection._detectAllBoundingBoxesImpl.refine');
 
           const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
           const refineModelConfig = TEXT_MODELS[refineModelId];
@@ -876,9 +937,8 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
                     { text: refinePrompt }
                   ] }],
                   generationConfig: {
-                    // Refine pass: smaller response (just refined main character boxes),
-                    // so a tight cap is fine and prevents repetition loops.
-                    maxOutputTokens: 2500,
+                    // No output cap (owner rule 2026-09-11): the refine pass returns a
+                    // short JSON, and a ceiling is not a length instruction.
                     temperature: 0.5,
                     responseMimeType: 'application/json',
                     ...(require('./images').modelSupportsThinking(refineModelId) /* lazy back-edge into images.js (see module header) */ && { thinkingConfig: { thinkingBudget: 0 } })
@@ -1024,7 +1084,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
           const extraMasks = await attachSamMasksToFigures(imageData, extras, { pageLabel });
           const dinoMasks = dinoUndercountResult._gdinoMasks || [];
           Object.defineProperty(dinoUndercountResult, '_gdinoMasks',
-            { value: [...dinoMasks, ...extraMasks], enumerable: false });
+            { value: [...dinoMasks, ...extraMasks], enumerable: false, configurable: true });
         } catch (maskErr) {
           log.warn(`⚠️ [BBOX-DETECT] ${pageLabel}SAM mask attach on Gemini extras failed (${maskErr.message}) — extras stay maskless`);
         }
@@ -1119,6 +1179,7 @@ async function detectSubRegion(characterCrop, targetElement) {
       },
       { text: prompt }
     ];
+    assertPromptFilled(parts, 'detectSubRegion');
 
     // Bbox needs spatial precision — use dedicated bbox model (gemini-2.5-flash)
     const modelId = MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
@@ -1131,7 +1192,6 @@ async function detectSubRegion(characterCrop, targetElement) {
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            maxOutputTokens: 2000,
             temperature: 0.1,
             responseMimeType: 'application/json'
           },
@@ -1256,11 +1316,11 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       const costumed = clothingDescriptions.costumed;
       if (typeof costumed === 'string') return costumed;
       if (costumed && typeof costumed === 'object') {
-        // If legacy subtype-keyed, prefer the matching key; else first entry.
-        if (category.startsWith('costumed:')) {
-          const type = category.split(':')[1];
-          if (costumed[type]) return costumed[type];
-        }
+        // One resolver for the key (utils/costumeKey.js): slug, then the raw
+        // colon part an older run may have written, then the first entry.
+        const { pickCostumed } = require('../utils/costumeKey');
+        const hit = pickCostumed(costumed, category);
+        if (typeof hit === 'string' && hit) return hit;
         const firstCostume = Object.values(costumed).find(v => typeof v === 'string');
         if (firstCostume) return firstCostume;
       }
@@ -1782,6 +1842,42 @@ function escapeXml(str) {
   return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/**
+ * THE NON-HUMAN ROSTER — one source (2026-09-13).
+ *
+ * COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18) needs to know which cast
+ * names a "person" prompt can never be expected to satisfy. The Visual Bible's
+ * `animals` pool is that list and the only non-fuzzy one; a story's fairies and
+ * dragons live in `animals`, the same place its dog does. Extracted from
+ * `enrichWithBoundingBoxes`, which had it inline, so the detector call and
+ * every consumer of the detector's count read the SAME set rather than each
+ * deciding for itself what is non-human.
+ *
+ * @param {object|null} visualBible
+ * @returns {string[]} lowercased names, possibly empty — never null
+ */
+function vbNonHumanNames(visualBible) {
+  const out = [];
+  // `animals` ONLY (2026-09-14). This used to also read `visualBible.creatures`,
+  // a pool nothing in the pipeline writes: the Visual Bible's collections are
+  // mainCharacters / secondaryCharacters / animals / artifacts / vehicles /
+  // locations / clothing (visualBible.js), no prompt asks the Art Director for
+  // `creatures`, and 0 of 122 staging stories carry the key. Even
+  // `resolveSceneCreatures`, which paints "creatures" into the composite plate,
+  // reads `animals`. A dead read that looks like coverage is worse than none.
+  for (const e of ((visualBible?.animals) || [])) {
+    // BOTH SPELLINGS. A roster entry is sometimes the VB id, not the name — the
+    // Art Director files a page's animals in `objects[]` as `ANI001` and the
+    // cast collector carries that id through verbatim. Matching on the name
+    // alone let `ANI001` count as a person. An id can never collide with a
+    // human character's name.
+    for (const k of [e?.name, e?.id]) {
+      const v = String(k || '').trim().toLowerCase();
+      if (v) out.push(v);
+    }
+  }
+  return out;
+}
 
 /**
  * Detect all bounding boxes in image and match to fixable issues
@@ -1799,10 +1895,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   // cannot match them — so the undercount check must not count them. The Visual
   // Bible is the only non-fuzzy source for which is which; callers that pass no
   // VB behave exactly as before.
-  const nonHumanNames = [
-    ...((visualBible?.animals) || []),
-    ...((visualBible?.creatures) || []),
-  ].map(a => String(a?.name || '').toLowerCase()).filter(Boolean);
+  const nonHumanNames = vbNonHumanNames(visualBible);
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
@@ -1926,7 +2019,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   // Carry the in-process SAM mask PNGs across to the overlay renderer
   // (non-enumerable — never serialized into stories.data).
   if (allDetections._gdinoMasks) {
-    Object.defineProperty(detectionHistory, '_gdinoMasks', { value: allDetections._gdinoMasks, enumerable: false });
+    Object.defineProperty(detectionHistory, '_gdinoMasks', { value: allDetections._gdinoMasks, enumerable: false, configurable: true });
   }
 
   // If no issues to fix, just return the detections
@@ -2115,6 +2208,54 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   return { targets: enrichedTargets, detectionHistory };
 }
 
+/**
+ * A MICRO-FIGURE IS NOT A CAST MEMBER (2026-09-13).
+ *
+ * The expected-cast roster decides one CRITICAL presence finding per page by
+ * arithmetic — figures vs cast — so the count has to mean "people the picture
+ * is actually about". GroundingDINO also returns sub-1%-of-frame smudges:
+ * background silhouettes, a statue, a wet blur on paving stones.
+ *
+ * figureDetection.js has its own prune, but it requires no-face AND area < 0.8%
+ * AND score < 0.45, and both offending boxes on job_1789207854566_l43qgl34w
+ * scored ~0.52 and survived it. That module is not to be modified, so the
+ * filter lives here, at the consumption site, and filters FOR COUNTING only —
+ * the stored figures array is never mutated.
+ *
+ * The predicate is deliberately NOT "has no face". p5 of that job is a
+ * five-figure back-view page where four GENUINE cast members have faceBox null,
+ * facePoint null and samPoints empty; they survive on AREA, at 8-11% of frame.
+ * The margin is 6.5x — the largest micro-figure measured 0.64% of frame, the
+ * smallest genuine cast figure 4.14%.
+ *
+ * All four conjuncts must hold. `confidence === 'low'` is redundant against the
+ * other three on every figure measured, and costs nothing to require.
+ */
+function isMicroFigure(figure) {
+  if (!figure || typeof figure !== 'object') return false;
+  if (figure.faceBox) return false;
+  if (figure.facePoint) return false;
+  if (Array.isArray(figure.samPoints) && figure.samPoints.length > 0) return false;
+  if (figure.confidence !== 'low') return false;
+  const box = figure.gdinoBox || figure.box;
+  if (!Array.isArray(box) || box.length < 4) return false;
+  const [x1, y1, x2, y2] = box.map(Number);
+  if (![x1, y1, x2, y2].every(Number.isFinite)) return false;
+  // Normalised coordinates only. A pixel-space box would read as an enormous
+  // area and never match, which is the safe direction to fail.
+  if (Math.max(x1, y1, x2, y2) > 1.0001) return false;
+  const area = Math.abs(x2 - x1) * Math.abs(y2 - y1);
+  return area < 0.01;
+}
+
+/**
+ * The figure list as the presence arithmetic should read it. Never mutates.
+ */
+function countRealFigures(figures) {
+  if (!Array.isArray(figures)) return null;
+  return figures.filter(f => !isMicroFigure(f)).length;
+}
+
 module.exports = {
   parseVisualBibleObjects,
   resolveExpectedObjectLabels,
@@ -2128,6 +2269,9 @@ module.exports = {
   restampDetectionForCoverText,
   detectionForVersion,
   detectAllBoundingBoxes,
+  isMicroFigure,
+  countRealFigures,
+  vbNonHumanNames,
   // _detectAllBoundingBoxesImpl deliberately NOT exported — the stamping
   // wrapper above is the only entry (sourceImageFp invariant, 2026-07-19).
   detectSubRegion,

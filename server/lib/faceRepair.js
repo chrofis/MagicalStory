@@ -31,6 +31,7 @@
 // ============================================================================
 
 const { log } = require('../utils/logger');
+const { guardPromptString } = require('../services/prompts');
 
 // Run counters, keyed to the current job's cache scope. Module-level so every
 // function here shares ONE definition (it used to be a closure-local const in
@@ -574,7 +575,9 @@ function buildActionContext(sceneDescription, charName, visualBible = null) {
   try {
     const { extractSceneMetadata } = require('./storyHelpers');
     const md = extractSceneMetadata(sceneDescription);
-    const charData = md?.fullData?.characters?.find(c => c.name?.toLowerCase() === charName.toLowerCase());
+    // COMPARE: stored scene-metadata name vs the stored target name.
+    const { canonicalName } = require('./castResolver');
+    const charData = md?.fullData?.characters?.find(c => canonicalName(c.name) === canonicalName(charName));
     if (charData) {
       const parts = [];
       if (charData.expression) parts.push(`Expression: ${charData.expression}`);
@@ -803,7 +806,7 @@ async function checkRepairNaturalness(imageData, opts = {}) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) return { skipped: 'no GEMINI_API_KEY' };
     const desc = `the figure wearing ${clothing.split(/[.;]/)[0].slice(0, 140)}`;
-    const prompt = fillTemplate(PROMPT_TEMPLATES.repairNaturalness, { CHARACTER_DESC: desc });
+    const prompt = guardPromptString(fillTemplate(PROMPT_TEMPLATES.repairNaturalness, { CHARACTER_DESC: desc }), 'checkRepairNaturalness');
     const r2Lib = require('./r2');
     const base64 = r2Lib.stripDataUriPrefix(imageData);
     const body = {
@@ -1326,7 +1329,11 @@ function applyGeometryGuards(axes, { faceBbox, bodyBbox } = {}) {
 // patch that works even on busy multi-figure pages where every full-figure
 // draw is gate-refused (p16, 12/12). FULL-FIGURE repair is for STRUCTURAL /
 // POSITIONAL defects and clothing (garment = body scale).
-const FACE_DEFECT_TYPES = new Set(['age_shift', 'face_drift', 'face_mismatch', 'facial_hair', 'skin_tone']);
+const FACE_DEFECT_TYPES = new Set(['age_shift', 'face_drift', 'face_mismatch', 'facial_hair', 'skin_tone',
+  // face_destroyed (2026-09-12): a featureless or smeared face in the page. A
+  // face-only patch is exactly the repair — the head size and tilt survive, so
+  // the features come back from the reference avatar without a full redraw.
+  'face_destroyed']);
 const BODY_DEFECT_TYPES = new Set(['clothing_inconsistent', 'color_change', 'shape_change', 'missing', 'unexpected', 'garment']);
 
 function resolveRepairAxes(issueDescription, { hasFaceBbox = false, model = 'grok', forceTarget = null, issueTypes = null } = {}) {

@@ -228,8 +228,7 @@ Return ONLY valid JSON (no markdown):
           // a 300-token cap left 12 tokens for the answer and truncated it.
           // This call needs no reasoning chain.
           thinkingConfig: { thinkingBudget: 0 },
-          maxOutputTokens: 600,
-            temperature: 0.3
+            temperature: 0.3  // no maxOutputTokens (owner rule: no output caps)
           }
         }),
         signal: AbortSignal.timeout(30000)

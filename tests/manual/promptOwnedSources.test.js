@@ -4,7 +4,7 @@
  * WHY THIS EXISTS
  * Two lists the beats chain enforces used to be SLICED out of the "legacy"
  * unified templates at runtime (rule-survival audit 2026-09-03, items M1+M2):
- *   - the DO-NOT-WRITE list, cut out of story-unified-imagefirst.txt by
+ *   - the DO-NOT-WRITE list, read from prompts/do-not-write-list.txt by
  *     buildDoNotWriteSection() for the beats text writer AND the refiner;
  *   - the text review CRITERIA, cut out of outline-analysis-imagefirst.txt by
  *     buildTextRefinePrompt().
@@ -63,23 +63,11 @@ const readPrompt = f => fs.readFileSync(path.join(ROOT, 'prompts', f), 'utf8');
     ok('buildDoNotWriteSection returns the file under its own heading', () =>
       assert.strictEqual(norm(PB.buildDoNotWriteSection()), `# DO-NOT-WRITE LIST\n\n${list}`));
 
-    for (const f of ['story-unified.txt', 'story-unified-imagefirst.txt']) {
-      ok(`${f} reads the list through the placeholder — no second copy`, () => {
-        const tpl = norm(readPrompt(f));
-        assert.ok(tpl.includes('{DO_NOT_WRITE_LIST}'), 'placeholder missing');
-        // The body is not duplicated back into the template.
-        assert.ok(!tpl.includes('**Gesture re-use cap:**'), 'the list body is still inlined');
-      });
-    }
-    ok('the unified writer prompt renders the list under its heading', () => {
-      const prompt = norm(PB.buildUnifiedStoryPrompt({
-        characters: [{ name: 'A', gender: 'female', age: 8 }],
-        language: 'de', languageLevel: '1st-grade', pages: 12,
-        layout: { textInImage: true, imageAspect: '3:4', mode: 'a4-overlay' },
-      }));
-      assert.ok(prompt.includes(`## DO-NOT-WRITE LIST (canonical)\n\n${list}`), 'list not rendered in place');
-      assert.ok(!prompt.includes('{DO_NOT_WRITE_LIST}'), 'placeholder left unfilled');
-    });
+    // story-unified.txt / story-unified-imagefirst.txt read the list through
+    // {DO_NOT_WRITE_LIST} and were pinned here until 2026-09-15, when both were
+    // deleted as unreachable (docs/decisions.md). The live consumers are
+    // buildDoNotWriteSection (beats writer + refiner, pinned above) and the
+    // split-review reviewer prompt.
   }
 
   console.log('\n── M1: the text slice carries section D\'s TEXT-fix checks ──');

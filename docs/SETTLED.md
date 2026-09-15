@@ -31,6 +31,8 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
   the next book. The sanctioned shape: the evaluator emits a **type** from the closed list, and code adjusts
   what that type may **cost** (`ZERO_POINT_TYPES`, `MAX_SEVERITY_TYPES` in `scoring.js`). A left/right regex
   guard was built and removed the same day, 2026-08-09; the prompt-side fix alone produced zero mirror findings.
+- **The page TEXT is not a checklist for the image — semantic eval judges image-vs-BRIEF, by design** (owner, 2026-09-13). A page's prose may narrate two actions while the scene depicts one; the brief picks the moment. `image-semantic.txt` states this at lines 3/5/13/94 and it is correct — a page scoring 100/100 while the text mentions something absent is NOT a bug. Do not propose "compare the image against the page text" in the per-page evaluator, and do not re-open cast findings from text ("AD trims cast by design"). The reader's-eye text-vs-image comparison exists ONCE, at the end, in the book audit. See decisions.md 2026-09-13.
+- **An object's OWN light is a state; the world's lighting of it is not** (owner, 2026-09-14). A thing that glows and goes dark, lights up and goes out, gets a `states[]` entry — a state is drawn as its own reference cell, and that cell is the only way a glowing look reaches the page; an emission held in `description` alone is on every page or none. The exclusion stays: a lamp falling on it, a shadow crossing it, dusk are the scene's, page by page, never a state. Stated three different ways across `scene-expansion-all.txt`, `story-unified.txt` and `story-trial.txt` before this; all three were brought into agreement, and `story-unified.txt` was deleted 2026-09-15 as unreachable, leaving the two live sites. *(guarded)* See decisions.md 2026-09-14.
 - **Ask before coding an eval rule.** Prompt-vs-code is the owner's call, not an implementation detail —
   propose the shape first, then build.
 
@@ -48,10 +50,21 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
   `server/config/runtime.js`, no longer a `PIPELINE_MODE` env var (2026-08-17). It decides which
   prompt file is live. Trials are always `unified` (speed); `inputData.pipelineMode` still overrides per job.
 - **Grok inpaint handles structural changes** (pose, gaze, body rotation) — don't route facing-direction issues to iterate.
+- **Page inpaint and iterate paint on the PAGE RENDER tier; char repair stays on Imagine 1.x** (owner, 2026-09-07, reversing 2026-09-06). The inpaint is a whole-frame edit with no mask — a Standard-tier edit of a 2.0 render erased a named animal's head and wiped real landmarks (decisions.md 2026-09-07). The Grok API has no region/mask parameter (measured). Pinning inpaint back to the edit tier is a reversal and needs the full protocol.
 - **Repaired versions are evaluated against their OWN scene contract; finalScore is the one score everywhere.**
 - **Cover gaze is code-owned: always at the viewer**; `gazes at:` is banned from cover hints.
 - **Cover title text: model-baked EVERYWHERE — `coverTitleMode` = 'baked' (2026-09-06, supersedes the 2026-08-29 per-environment split).** The front cover renders the title INTO the artwork in ONE call on `coverTitleBakedModel` (`grok-imagine-2`); back and initial covers stay textless art. The flag reads through ONE resolver (`resolveCoverTitleMode`) so first generation, trials and every later repaint agree. Promotion to production was the owner's reversal call under the rule "production equals staging except repair rounds", with evidence: the 2026-08-29 5-story/5-style sample and the nine 2026-09-06 staging trial covers, all spelled correctly incl. umlauts and possessives (decisions.md 2026-09-06). `composited` (app-painted from a real font, spelling safe by construction) remains available as the fallback mode; returning production to it is a reversal and needs the full protocol.
 - **Test Lab sets are generic, never per-stage** (a parallel title_sets mechanism was reverted).
+- **Three Visual Bible elements per page — and LOCATIONS ARE NOT ELEMENTS** (owner, 2026-09-08, superseding the
+  2026-09-06 count that included invented locations: "Do not count it as it is the empty scene not an artifact").
+  `VB_ELEMENT_BUDGET` counts secondary characters, animals, artifacts and vehicles; a LOC, real or invented, never
+  counts — the location is the plate the cast is composited into. The page's location cell rides LAST, at most one,
+  3 + 1 = Grok's `VB_SLOT_MAX_ELEMENTS` of 4. The budget is enforced where the BRIEFS exist — the scene review's
+  `rankPageElements` / `truncateBriefToBudget`, then the page-gen reference selection; do not re-add locations to
+  `ELEMENT_COLLECTIONS` or to the AD's "all count" line. (The bible-time `trimVbAssignments` enforcer was removed
+  2026-09-11: it decided from plan-line prose before any brief existed and emptied a story's central prop — see
+  decisions.md "Visual Bible page assignment comes from the FINAL scene briefs". The COUNT and the
+  locations-don't-count rule are unchanged and stay settled.)
 
 ## Data & infrastructure
 
@@ -63,3 +76,5 @@ Machine-checkable lines are enforced by `scripts/admin/check-settled.js` (runs i
 - **Prod deploys: staging-first, per-push approval, pushes gated on an idle target environment.**
 - **Timestamps shown to the owner: Swiss local (`… CH`) ONLY, via `scripts/lib/chTime.js` — UTC never shown, no hand arithmetic.** Settled 2026-08-09; supersedes UTC-only (May 2026), which superseded dual-labeling. Naive pg TIMESTAMP columns must be rehomed with `fromPgNaive()` before formatting.
 - **Prop names are never rewritten in prompts; they are descriptive at the source.** `sanitizeVbIdsInPrompt` resolves Visual Bible IDS only. The name-for-type substitution (2026-08-24) and its exceptions were removed 2026-09-06 after four stories where it deleted the object or corrupted the cover title; a proper noun a story gives an object lives in `properName` and never reaches an image model. Reintroducing prose rewriting of prop names is a reversal.
+- **One authored `label` per Visual Bible element is the only element string an image model sees; ids stay internal.** Settled 2026-09-13. `server/lib/vbLabel.js` is the single source; consumers read it through `elementLeadLabel` (image-facing) / `elementDisplayLabel` (judge-facing). Never add a new per-consumer naming rule; never emit a VB id to an image model (they get painted). Reversing needs the full protocol.
+- **A character string becomes an entry only through `castResolver.resolveEntity`; two stored names compare only through `canonicalName`; ambiguity refuses, never guesses.** Settled 2026-09-13. Never add a per-consumer name matcher (equality, containment, subset, first-match) or a local VB-id regex — measured 32 double-listed rosters across 60 stories before this. Reversing needs the full protocol.

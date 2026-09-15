@@ -42,10 +42,13 @@ const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
  * @param {string} [params.availableLandmarksSection] - pre-built landmarks section (empty for trial)
  * @returns {Promise<Object>} { promptReplacements, storyRequirements1, storyRequirements2, singlePromptTemplate }
  */
+const { buildSeasonInstruction } = require('../lib/season');
+
 async function buildIdeasPromptContext({
   storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
   language, languageLevel = 'standard', characters, relationships,
-  pages = 10, userLocationInstruction = '', availableLandmarksSection = ''
+  pages = 10, userLocationInstruction = '', availableLandmarksSection = '',
+  seasonInstruction = ''
 }) {
   const { getLanguageInstruction } = require('../lib/languages');
 
@@ -303,6 +306,12 @@ ${adventureGuideContent}`
     TOPIC_GUIDE: topicGuideText,
     ADVENTURE_SETTING_GUIDE: adventureSettingGuide,
     USER_LOCATION_INSTRUCTION: userLocationInstruction,
+    // Season is its OWN placeholder, never part of the location block. A
+    // fantasy idea blanks USER_LOCATION_INSTRUCTION so the real city cannot
+    // leak into a made-up world — and while the season lived inside that
+    // block it was blanked too, so a story set in Herbst came back as
+    // "in einem Sommer vor langer Zeit".
+    SEASON_INSTRUCTION: seasonInstruction,
     AVAILABLE_LANDMARKS: availableLandmarksSection,
     STORY_LENGTH_CATEGORY: storyLengthCategory,
     CHALLENGE_CATALOGUE: challengeCatalogueSection,
@@ -417,19 +426,23 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
 
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
     const effectiveCategory_loc = storyCategory || 'adventure';
-    const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
-    const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
     const locationForPrompt = effectiveLocation || userLocation;
     if (locationForPrompt?.city && effectiveCategory_loc !== 'historical') {
       const locationParts = [locationForPrompt.city, locationForPrompt.region, locationForPrompt.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
-      const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
-      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel && effectiveCategory_loc !== 'historical') {
-      userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
+    // The season holds for BOTH ideas, the made-up world included — it is what
+    // the reader picked. Keeping it out of the location block is what lets it
+    // survive the fantasy blanking below.
+    // One builder for every path (trial idea, trial story, both idea endpoints),
+    // so the wording cannot drift and an absent season resolves to the date the
+    // way season.js documents rather than dropping the line.
+    const seasonInstruction = effectiveCategory_loc === 'historical'
+      ? ''
+      : buildSeasonInstruction({ season });
 
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
@@ -456,7 +469,7 @@ ${landmarkEntries}`;
     const ctx = await buildIdeasPromptContext({
       storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
       language, languageLevel, characters, relationships, pages,
-      userLocationInstruction, availableLandmarksSection
+      userLocationInstruction, availableLandmarksSection, seasonInstruction
     });
 
     // Resolve which world each idea plays in (null = legacy split, no labels)
@@ -482,7 +495,7 @@ ${landmarkEntries}`;
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-    const result = await callTextModel(prompt, 6000, modelToUse, { usageLabel: 'story_ideas' });
+    const result = await callTextModel(prompt, null, modelToUse, { usageLabel: 'story_ideas' });
 
     // Parse the response to extract 2 ideas
     // Support multiple formats: [FINAL_1], ## STORY 1, STORY 1:, etc.
@@ -586,19 +599,23 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
 
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
     const effectiveCategory_loc = storyCategory || 'adventure';
-    const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
-    const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
     const locationForPrompt = effectiveLocation || userLocation;
     if (locationForPrompt?.city && effectiveCategory_loc !== 'historical') {
       const locationParts = [locationForPrompt.city, locationForPrompt.region, locationForPrompt.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
-      const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
-      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel && effectiveCategory_loc !== 'historical') {
-      userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
+      userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.`;
     }
+    // The season holds for BOTH ideas, the made-up world included — it is what
+    // the reader picked. Keeping it out of the location block is what lets it
+    // survive the fantasy blanking below.
+    // One builder for every path (trial idea, trial story, both idea endpoints),
+    // so the wording cannot drift and an absent season resolves to the date the
+    // way season.js documents rather than dropping the line.
+    const seasonInstruction = effectiveCategory_loc === 'historical'
+      ? ''
+      : buildSeasonInstruction({ season });
 
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
@@ -625,7 +642,7 @@ ${landmarkEntries}`;
     const ctx = await buildIdeasPromptContext({
       storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
       language, languageLevel, characters, relationships, pages,
-      userLocationInstruction, availableLandmarksSection
+      userLocationInstruction, availableLandmarksSection, seasonInstruction
     });
 
     // Get model to use
@@ -702,7 +719,7 @@ ${landmarkEntries}`;
     log.debug('  Starting parallel story generation...');
 
     // Stream Story 1 - progressively send raw content as it arrives
-    const streamStory1 = callTextModelStreaming(prompt1, 3000, (delta, fullText) => {
+    const streamStory1 = callTextModelStreaming(prompt1, null, (delta, fullText) => {
       fullResponse1 = fullText;
       // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
       if (fullText.length > 50 && fullText.length > lastStory1Length + 50) {
@@ -729,7 +746,7 @@ ${landmarkEntries}`;
     });
 
     // Stream Story 2 - progressively send raw content as it arrives
-    const streamStory2 = callTextModelStreaming(prompt2, 3000, (delta, fullText) => {
+    const streamStory2 = callTextModelStreaming(prompt2, null, (delta, fullText) => {
       fullResponse2 = fullText;
       // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
       if (fullText.length > 50 && fullText.length > lastStory2Length + 50) {

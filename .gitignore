@@ -193,6 +193,11 @@ drafts/
 # will outlive whichever session finishes it.
 !tasks/analyzer-service-split-2026-09-04.md
 
+# A release plan the owner has to act on, not a session plan: it enumerates the
+# landmark commits that sit on staging and not on master, and BACKLOG.md points
+# at it. It outlives the session that wrote it.
+!tasks/landmark-master-push-2026-09-14.md
+
 # ─── Credentials: never commit ────────────────────────────────────────────────
 # Google OAuth client secret + Search Console refresh token, minted by
 # scripts/seo/get-refresh-token.js and read by scripts/seo/report.js.

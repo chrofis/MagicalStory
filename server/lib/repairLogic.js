@@ -60,13 +60,329 @@ function findBadPages(evalPages, options = {}) {
       log.info(`[FIND-BAD] page ${pageNum}: score ${score} clears threshold ${scoreThreshold} but carries a CRITICAL finding — marking bad for repair`);
     }
 
-    if (score < scoreThreshold || issueCount >= issueThreshold || critical) {
-      bad.push({ pageNum, critical });
+    // TYPE RESCUE (owner, 2026-09-09). A page above the floor still gets one
+    // round of work when it carries a MAJOR-or-worse finding whose DECLARED type
+    // is one local repair reliably fixes — an absent object, a missing prop, a
+    // wrong count, a wrong expression. Those are additive, local edits with a
+    // known-good route; leaving them because the arithmetic landed at 62 is how
+    // job_1788903616404_iqvhj4l8m p3 shipped with three MAJOR findings and zero
+    // repair attempts. Declared `type` only — never the description prose.
+    const rescue = !critical && score >= scoreThreshold && issueCount < issueThreshold
+      ? findSafeRepairableFinding(result) : null;
+    if (rescue) {
+      log.info(`[FIND-BAD] page ${pageNum}: score ${score} clears threshold ${scoreThreshold} but carries a ${rescue.severity.toUpperCase()} ${rescue.type} finding (${rescue.pool}) — type rescue, marking bad for repair`);
+    }
+
+    if (score < scoreThreshold || issueCount >= issueThreshold || critical || rescue) {
+      bad.push({ pageNum, critical, score });
     }
   }
-  // CRITICAL-carrying pages first, then by page number within each group.
-  bad.sort((a, b) => (b.critical - a.critical) || (a.pageNum - b.pageNum));
+  // CRITICAL-carrying pages first (owner ruling 2026-09-04, item 15 — a CRITICAL
+  // finding outranks a merely low score), then WORST-FIRST by ascending score
+  // within each group, then page number. Ordering matters because the per-round
+  // cap below consumes this list from the front.
+  bad.sort((a, b) => (b.critical - a.critical)
+    || ((a.score ?? 0) - (b.score ?? 0))
+    || (a.pageNum - b.pageNum));
   return bad.map(b => b.pageNum);
+}
+
+/**
+ * The first MAJOR-or-worse finding on this eval whose declared type is in
+ * SAFE_REPAIRABLE_TYPES, or null.
+ *
+ * ENTITY-SOURCED FINDINGS ARE NEVER ADMITTED HERE. The 2026-09-04 owner ruling
+ * stands: a MAJOR entity (character) finding gets no automatic repair — not
+ * char-fix, not inpaint. This path must not become a back door around it.
+ */
+function findSafeRepairableFinding(result) {
+  const pools = [
+    ['quality', result?.fixableIssues],
+    ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
+    ['consolidated', result?.consolidatedPlan?.deduped_issues],
+  ];
+  for (const [pool, list] of pools) {
+    if (!Array.isArray(list)) continue;
+    for (const i of list) {
+      const severity = String(i?.severity || '').toLowerCase();
+      if (!/^(major|critical|catastrophic)$/.test(severity)) continue;
+      const type = String(i?.type || i?.category || '').toLowerCase();
+      if (!SAFE_REPAIRABLE_TYPES.has(type)) continue;
+      // Entity-sourced → refused (2026-09-04). Same source read as the
+      // clothing-precedence gate in decideRepairMethod.
+      const sources = Array.isArray(i?.sources) ? i.sources.map(s => String(s).toLowerCase()) : [];
+      if (pool === 'entity' || (sources.length && sources.every(s => s === 'entity'))) continue;
+      return { type, severity, pool };
+    }
+  }
+  return null;
+}
+
+/**
+ * FINAL-BOOK AUDIT → ONE EXTRA REPAIR ROUND (owner, 2026-09-13).
+ *
+ * Two decisions the round loop needs, kept pure so they can be pinned by tests.
+ *
+ * 1) `runAudit` — the book audit used to be skipped on the LAST round, so the
+ *    book that actually SHIPS was never read by anything. It now runs on every
+ *    round the spend guard allows (`bookUnchanged` still suppresses a re-audit
+ *    of a byte-identical book).
+ * 2) `mayGrantExtraRound` — the final round's audit may buy exactly ONE more
+ *    repair round, and only if it has not already done so. Bounded by
+ *    construction: no loop, no recursion, one grant per story.
+ *
+ * @param {Object} o
+ * @param {number} o.round             1-based round just finished
+ * @param {number} o.roundLimit        current last round
+ * @param {boolean} o.bookUnchanged    every repair in this round failed → same book
+ * @param {boolean} o.extraRoundUsed   an extra round has already been granted
+ * @returns {{ runAudit: boolean, mayGrantExtraRound: boolean }}
+ */
+function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed, finalRound = null }) {
+  const runAudit = !bookUnchanged;
+  // `finalRound` is the CALLER's answer to "is this the book that ships". The
+  // round loop also exits early — no bad pages left, or nothing actionable —
+  // and on those exits `round >= roundLimit` is false while the book in hand is
+  // nevertheless final, so deriving it here could never grant the extra round
+  // to a run that converged ahead of its limit. Omitted, the old derivation
+  // still applies.
+  const isFinal = finalRound === null ? round >= roundLimit : finalRound === true;
+  return {
+    runAudit,
+    mayGrantExtraRound: runAudit && !extraRoundUsed && isFinal,
+  };
+}
+
+/** Severities that may re-admit a page to repair. Admission ONLY — never a fix. */
+const AUDIT_ADMIT_SEVERITIES = new Set(['CRITICAL', 'CATASTROPHIC']);
+
+/**
+ * How many audit-admitted pages one round may repair OVER its normal cap
+ * (owner, 2026-09-14). The allowance is reserved, not shared: admitted pages
+ * are appended after `applyRoundCap` so a low-scoring page cannot displace a
+ * page the reader's-eye audit called CATASTROPHIC. Bounded so a noisy audit
+ * cannot turn one extra round into a whole-book regeneration.
+ */
+const AUDIT_ADMIT_MAX = 5;
+
+/**
+ * Which pages a final book audit re-admits to repair.
+ *
+ * Severity is the ONLY thing code reads here, and it decides ONE thing: whether
+ * the page re-enters repair. WHAT to fix on that page stays entirely the
+ * consolidator's decision from the prompt (the fault lines are handed to it via
+ * `readerFindingsByPage`, unread by code). Never pattern-match the fault text.
+ *
+ * @param {Array<{page:number, severity:string}>} imgFaults
+ * @returns {number[]} page numbers, first-seen order
+ */
+function admitPagesFromAudit(imgFaults) {
+  const pages = [];
+  for (const f of imgFaults || []) {
+    if (!f || f.page == null) continue;
+    if (!AUDIT_ADMIT_SEVERITIES.has(String(f.severity || '').trim().toUpperCase())) continue;
+    if (!pages.includes(f.page)) pages.push(f.page);
+  }
+  return pages;
+}
+
+/**
+ * PER-ROUND REPAIR CAP (owner, 2026-09-09).
+ *
+ * Limits how many of a story's pages a single repair round may work on: round 1
+ * gets `maxRepairShareRound1` of the page count, later rounds
+ * `maxRepairShareLaterRounds` — 20 pages → 10, then 6. A short story still gets
+ * `minRepairPagesPerRound` (or all its bad pages, if fewer), so the cap can never
+ * stop a small story repairing at all.
+ *
+ * Pages over the cap are DEFERRED, not dropped: they are still bad next round and
+ * findBadPages returns them again. The cap never fails a job — it only bounds the
+ * work (and the spend) per round.
+ *
+ * @param {number[]} orderedPageNums - Bad pages, WORST FIRST (findBadPages order)
+ * @param {Object} opts
+ * @param {number} opts.round - 1-based round number
+ * @param {number} opts.totalPages - Pages in the story
+ * @returns {{ admitted: number[], deferred: number[], cap: number }}
+ */
+function applyRoundCap(orderedPageNums, opts = {}) {
+  const pages = Array.isArray(orderedPageNums) ? orderedPageNums : [];
+  const round = opts.round || 1;
+  const totalPages = opts.totalPages || pages.length;
+  const share = round <= 1
+    ? (REPAIR_DEFAULTS.maxRepairShareRound1 ?? 0.5)
+    : (REPAIR_DEFAULTS.maxRepairShareLaterRounds ?? 0.3);
+  const minPages = REPAIR_DEFAULTS.minRepairPagesPerRound ?? 3;
+  const cap = Math.max(Math.round(totalPages * share), Math.min(minPages, pages.length));
+
+  if (pages.length <= cap) return { admitted: pages, deferred: [], cap };
+
+  const admitted = pages.slice(0, cap);
+  const deferred = pages.slice(cap);
+  log.warn(`🚧 [REPAIR-CAP] Round ${round}: ${pages.length} page(s) eligible for repair on a ${totalPages}-page story — cap is ${cap} (${Math.round(share * 100)}%). Admitting ${admitted.length} worst-first: ${admitted.join(', ')}. DEFERRED to a later round: ${deferred.join(', ')}`);
+  return { admitted, deferred, cap };
+}
+
+/**
+ * THE SCENE-CAST CONTRACT (2026-09-11). One reader for every site that has to
+ * pick between a version's cast and the page's.
+ *
+ *   an ARRAY — including an EMPTY one — is a DECLARATION: this is the cast.
+ *   null / undefined / anything else is UNKNOWN: fall through to the next source.
+ *
+ * The distinction is load-bearing since `buildExpectedCastBlock` started reading
+ * it (D6): a declared empty roster now means "this frame was written with no
+ * people in it, every person present is a surplus figure", while an absent one
+ * means "no roster supplied, do not judge the figure count". Getting the two
+ * confused turns every commissioned child on a page into a CRITICAL
+ * `extra_character`.
+ *
+ * It was expressed as `entry.sceneCharacters || orig.sceneCharacters`, which is
+ * the one JS idiom that cannot express it: `[]` is TRUTHY, so an empty array
+ * silently won — and `v.sceneCharacters || null` at the version write site does
+ * NOT normalise an empty array away either, for the same reason. Nothing writes
+ * `[]` today, so the trap was unsprung; it was one careless writer from firing.
+ *
+ * @param {...any} candidates  most specific first
+ * @returns {Array|null} the first declared cast, or null when none was declared
+ */
+function resolveDeclaredCast(...candidates) {
+  for (const c of candidates) if (Array.isArray(c)) return c;
+  return null;
+}
+
+/**
+ * The pages that SHIP KNOWN-BROKEN, worst first (D7, 2026-09-11).
+ *
+ * A page qualifies when the repair budget is spent and it is still below the
+ * loop's own `regenThreshold`, or still carries a CRITICAL that repair could
+ * not clear. Measured on job_1789147573901_m3uam0nxi: p6 shipped as the ACTIVE
+ * version at finalScore 0 (six CRITICAL `action_interaction`) and p9 at 5, and
+ * the only trace was a log line — nothing in the stored run, the job status or
+ * the story said either page was known-bad.
+ *
+ * The threshold is passed in rather than re-derived: a second number here could
+ * disagree with the one `findBadPages` used, and then this list would describe a
+ * different set of pages from the one the loop tried to repair.
+ *
+ * @param {Array} results   the pipeline's per-page results (finalScore, unrepairedCritical)
+ * @param {number} regenThreshold  the score at or above which a page is acceptable
+ * @returns {Array<{pageNumber:number, finalScore:number|null, unrepairedCritical:Array}>}
+ */
+function collectShippedDefective(results, regenThreshold) {
+  // `Number(null)` is 0, not NaN — an UNSCORED page would otherwise read as a
+  // zero and be reported as the worst page in the book.
+  const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  const below = (v) => num(v) !== null && num(v) < Number(regenThreshold);
+  return (Array.isArray(results) ? results : [])
+    .filter(r => r && (below(r.finalScore) || (r.unrepairedCritical && r.unrepairedCritical.length)))
+    .map(r => ({
+      pageNumber: r.pageNumber,
+      finalScore: num(r.finalScore),
+      unrepairedCritical: (r.unrepairedCritical || []).map(f => ({
+        type: f.type || 'untyped',
+        severity: f.severity || null,
+        description: String(f.description || '').slice(0, 300),
+      })),
+    }))
+    // Worst first: an unscored page sorts last rather than pretending to be a 0.
+    .sort((a, b) => (a.finalScore ?? Number.POSITIVE_INFINITY) - (b.finalScore ?? Number.POSITIVE_INFINITY));
+}
+
+/**
+ * THE CRITICALS THAT SURVIVED REPAIR, with the methods that were tried on them
+ * (owner, 2026-09-14 — REPORT ONLY, deliberately not a routing change).
+ *
+ * `collectShippedDefective` is the sibling record and the two OVERLAP but are
+ * not the same set. Its qualifying condition is "below the loop's threshold OR
+ * carrying a CRITICAL", so a page that ships ABOVE the threshold with a
+ * CRITICAL still on it is inside that list — but nothing in the run says which
+ * methods were spent on it, and the above-threshold case is exactly the one the
+ * threshold reading hides. Measured on job_1789337998754_apslnsq1z p8: a
+ * CRITICAL `missing_character` routed to `iterate` (any critical does), the
+ * re-roll scored -82, an inpaint round recovered the page to 53, and the page
+ * shipped with the CRITICAL still recorded. Iterate is a re-roll and inpaint
+ * cannot add an absent person, so nothing about that route was verified.
+ *
+ * The owner chose to keep the routing and record the evidence instead: the
+ * question "is rerouting a surviving CRITICAL worth it" needs per-page
+ * method-vs-outcome data across many stories, and that is what this gap was
+ * losing. Nothing here decides anything — no method, no severity, no score.
+ *
+ * Methods come from the round summaries `summarizeRepairRound` already
+ * produces (`pages[].method`, e.g. 'iterate-round-1'), never from a second
+ * derivation of the same fact.
+ *
+ * @param {Array} results        per-page pipeline results (pageNumber, finalScore, unrepairedCritical)
+ * @param {Array} repairRounds   `summarizeRepairRound` output, one per round
+ * @param {number} regenThreshold the SAME score floor the round loop used
+ * @returns {{recordedAt:string, pageCount:number, findingCount:number, aboveThresholdCount:number, byType:Object, byMethod:Object, pages:Array}|null}
+ *   null when no CRITICAL survived — never an empty husk.
+ */
+function collectSurvivingCriticals(results, repairRounds, regenThreshold) {
+  // Which methods touched which page, in round order, from the round record.
+  const methodsByPage = new Map();
+  for (const round of (Array.isArray(repairRounds) ? repairRounds : [])) {
+    for (const row of (Array.isArray(round?.pages) ? round.pages : [])) {
+      if (!row || row.page == null) continue;
+      if (!methodsByPage.has(row.page)) methodsByPage.set(row.page, []);
+      methodsByPage.get(row.page).push({
+        method: row.method || 'unknown',
+        outcome: row.outcome ?? null,
+        delta: row.delta ?? null,
+      });
+    }
+  }
+
+  // `Number(null)` is 0, not NaN — an UNSCORED page must not read as a zero.
+  const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  const floor = num(regenThreshold);
+
+  const pages = [];
+  const byType = {};
+  const byMethod = {};
+  for (const r of (Array.isArray(results) ? results : [])) {
+    const findings = Array.isArray(r?.unrepairedCritical) ? r.unrepairedCritical : [];
+    if (!findings.length) continue;
+    const finalScore = num(r.finalScore);
+    const attempts = methodsByPage.get(r.pageNumber) || [];
+    for (const f of findings) {
+      const t = String(f?.type || 'untyped').toLowerCase();
+      byType[t] = (byType[t] || 0) + 1;
+    }
+    // A page nothing was tried on is its own bucket: "no method reached it" and
+    // "every method failed" are different findings.
+    const bases = attempts.length ? [...new Set(attempts.map(a => baseRepairMethod(a.method)))] : ['none'];
+    for (const b of bases) byMethod[b] = (byMethod[b] || 0) + 1;
+    pages.push({
+      pageNumber: r.pageNumber ?? null,
+      finalScore,
+      // The case this record exists for: the score cleared the bar and the page
+      // is still known-broken.
+      aboveThreshold: floor !== null && finalScore !== null && finalScore >= floor,
+      findings: findings.map(f => ({
+        type: f?.type || 'untyped',
+        severity: f?.severity || null,
+        description: String(f?.description || '').slice(0, 300),
+      })),
+      methodsAttempted: attempts.map(a => a.method),
+      attempts,
+      roundsAttempted: attempts.length,
+    });
+  }
+  if (!pages.length) return null;
+  // Worst first; an unscored page sorts last rather than pretending to be a 0.
+  pages.sort((a, b) => (a.finalScore ?? Number.POSITIVE_INFINITY) - (b.finalScore ?? Number.POSITIVE_INFINITY)
+    || ((a.pageNumber ?? 0) - (b.pageNumber ?? 0)));
+  return {
+    recordedAt: new Date().toISOString(),
+    pageCount: pages.length,
+    findingCount: pages.reduce((n, p) => n + p.findings.length, 0),
+    aboveThresholdCount: pages.filter(p => p.aboveThreshold).length,
+    byType,
+    byMethod,
+    pages,
+  };
 }
 
 /**
@@ -87,11 +403,21 @@ function hasCriticalSeverityFinding(result) {
  * @returns {Array<{type: string|null, severity: string, description: string, pool: string}>}
  */
 function collectCriticalFindings(result) {
-  const pools = [
-    ['quality', result?.fixableIssues],
-    ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
-    ['consolidated', result?.consolidatedPlan?.deduped_issues],
-  ];
+  // ONE SOURCE OF TRUTH WITH THE SCORE (2026-09-11). `composeDeductions`
+  // (scoring.js) empties the raw quality/semantic/compliance buckets whenever a
+  // consolidated plan exists, so a defect three evaluators reported is charged
+  // once, at its MERGED severity. This function used to read the raw pools the
+  // scorer had just emptied, so the same finding on the same version could be
+  // CRITICAL here and MAJOR there: job_1789147573901_m3uam0nxi p13 and p17 each
+  // reported an unrepaired CRITICAL `object_presence` and a finalScore of 85.
+  // When the page has been consolidated, that merged list is the only list.
+  const deduped = result?.consolidatedPlan?.deduped_issues;
+  const pools = Array.isArray(deduped) && deduped.length > 0
+    ? [['consolidated', deduped]]
+    : [
+      ['quality', result?.fixableIssues],
+      ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
+    ];
   const out = [];
   for (const [pool, list] of pools) {
     if (!Array.isArray(list)) continue;
@@ -502,6 +828,122 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   return { method: 'skip', reason: 'no repair needed' };
 }
 
+/**
+ * PER-ROUND, PER-METHOD REPAIR EFFECTIVENESS (owner, 2026-09-13).
+ *
+ * The pipeline runs up to N rounds and each page picks ONE method (iterate /
+ * inpaint / char-fix). Which method actually earned its money was invisible:
+ * the data existed on every version (`method`, `score`) and on retryHistory
+ * (`round_repair_failed`), but nothing aggregated it, so "round 2 was worth
+ * running" could never be answered without hand-querying JSONB.
+ *
+ * A REGRESSION is the finding this exists to surface: the pipeline keeps the
+ * best version per page, so a repair that scored WORSE costs money and changes
+ * nothing — invisible in every other report.
+ *
+ * Pure function, no I/O: `attempts` are what the round tried, `beforeScores`
+ * the finalScore findBadPages ranked on, `afterScores` the finalScore stamped
+ * on the new version. A page with either score missing is `unknown`, never
+ * silently counted as unchanged.
+ *
+ * @param {{round:number, attempts:Array<{pageNumber:number, method:string|null, ok:boolean, error?:string|null}>, beforeScores:Object<number,number|null>, afterScores:Object<number,number|null>}} args
+ */
+/**
+ * One repair result → one attempt row for summarizeRepairRound.
+ *
+ * A repair result names its method in `source` ('iterate-round-1',
+ * 'inpaint-round-2', 'char-fix-round-1'); only the composite path also sets
+ * `method`. Reading `method` alone summarised EVERY page of
+ * job_1789337998754_apslnsq1z as "unknown" — the exact blindness 278e408ae was
+ * written to end.
+ */
+function repairAttemptFromResult(r) {
+  return {
+    pageNumber: r?.pageNumber,
+    method: r?.method || r?.source || null,
+    ok: !!r?.imageData,
+    error: r?.imageData ? null : (r?.error || 'no result'),
+  };
+}
+
+/**
+ * The bucket key is the BARE method.
+ *
+ * Measured on staging `job_1789348171785_9oxos7dwv`: a SUCCESSFUL result carries
+ * the round-suffixed source string (`inpaint-round-1`, `char-fix-round-2`) while
+ * a FAILED one carries the bare method (`char-fix`). Bucketing on the raw value
+ * split one method's successes from its own failures — `char-fix` read
+ * `failed: 1, repaired: 0` beside `char-fix-round-1` reading `repaired: 3` — and
+ * split every method per round, so nothing could be compared across the book.
+ * That is precisely the number this record exists to produce.
+ *
+ * The raw value stays on the per-page row, where the round it came from is
+ * still readable.
+ */
+function baseRepairMethod(method) {
+  const m = String(method || '').trim();
+  if (!m) return 'unknown';
+  return m.replace(/-round-\d+$/i, '') || 'unknown';
+}
+
+function summarizeRepairRound({ round, attempts = [], beforeScores = {}, afterScores = {} }) {
+  const byMethod = {};
+  const pages = [];
+
+  for (const a of attempts) {
+    if (!a || a.pageNumber == null) continue;
+    const method = baseRepairMethod(a.method);
+    // The bucket is the bare method; the row keeps what the round actually said.
+    const rawMethod = a.method || method;
+    const m = byMethod[method] || (byMethod[method] = {
+      attempted: 0, repaired: 0, failed: 0,
+      improved: 0, unchanged: 0, regressed: 0, unknown: 0,
+      totalDelta: 0, scoredPages: 0, avgDelta: null,
+    });
+    m.attempted++;
+
+    if (!a.ok) {
+      m.failed++;
+      pages.push({ page: a.pageNumber, method: rawMethod, before: beforeScores[a.pageNumber] ?? null, after: null, delta: null, outcome: 'failed', error: a.error || null });
+      continue;
+    }
+
+    m.repaired++;
+    const before = beforeScores[a.pageNumber];
+    const after = afterScores[a.pageNumber];
+    let outcome, delta = null;
+    if (typeof before !== 'number' || typeof after !== 'number') {
+      outcome = 'unknown';
+      m.unknown++;
+    } else {
+      delta = Math.round((after - before) * 10) / 10;
+      outcome = delta > 0 ? 'improved' : (delta < 0 ? 'regressed' : 'unchanged');
+      m[outcome]++;
+      m.totalDelta += delta;
+      m.scoredPages++;
+    }
+    pages.push({ page: a.pageNumber, method: rawMethod, before: before ?? null, after: after ?? null, delta, outcome });
+  }
+
+  for (const m of Object.values(byMethod)) {
+    m.avgDelta = m.scoredPages > 0 ? Math.round((m.totalDelta / m.scoredPages) * 10) / 10 : null;
+    delete m.totalDelta;
+    delete m.scoredPages;
+  }
+
+  const repaired = pages.filter(p => p.outcome !== 'failed').length;
+  return {
+    round,
+    attempted: pages.length,
+    repaired,
+    failed: pages.length - repaired,
+    improved: pages.filter(p => p.outcome === 'improved').length,
+    regressed: pages.filter(p => p.outcome === 'regressed').length,
+    byMethod,
+    pages,
+  };
+}
+
 function mapStrategyToMethod(s) {
   if (!s) return { method: 'skip', reason: 'no strategy' };
   return { method: s.strategy || 'skip', reason: s.reason || '' };
@@ -528,12 +970,37 @@ function mapStrategyToMethod(s) {
 const NOT_INPAINTABLE_TYPES = new Set([
   // identity / face
   'character_identity', 'face_mismatch', 'face_drift', 'age_shift', 'skin_tone',
+  // face_destroyed: inpaint repaints the whole figure and the identity drifts;
+  // a featureless face must go to character repair, anchored to the avatar.
+  'face_destroyed',
   // hair
   'hair', 'hair_change', 'hair_nuance',
   // clothing (garment_colour has its own mechanical recolour path)
   'clothing', 'clothing_inconsistent', 'clothing_detail', 'garment_colour', 'garment_color',
   // body form
   'scale',
+  // extra_character: the finding is an identity reconciliation, not a deletion
+  // (owner, 2026-09-13). Inpaint was the removal route — a Grok whole-frame
+  // edit executing "remove this figure" erased a commissioned child from a
+  // cover. The finding stays scored and stays in the shippedDefective report;
+  // only its ROUTE is closed, like every other entry here.
+  'extra_character',
 ]);
 
-module.exports = { findBadPages, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+/**
+ * Types local repair (inpaint) handles well: additive or local edits to objects,
+ * props, counts and expression. Deliberately NARROW — anything in
+ * NOT_INPAINTABLE_TYPES is excluded by construction below, and composition /
+ * camera / staging defects are absent because no local repair can fix them.
+ */
+const SAFE_REPAIRABLE_TYPES = new Set([
+  'object_presence',
+  'missing_element',
+  'accessory_missing',
+  'object_count',
+  'emotion',
+  'viewer_address',
+].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
+
+module.exports = {
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

@@ -73,6 +73,13 @@ const texts: Record<string, {
     ctaButton: 'Commencer',
     create: 'Créer',
   },
+  it: {
+    breadcrumbRoot: 'Temi',
+    ctaTitle: 'Pronto a creare?',
+    ctaSubtitle: 'Scegli un tema qui sopra e crea una storia personalizzata per tuo figlio in pochi minuti.',
+    ctaButton: 'Inizia ora',
+    create: 'Crea',
+  },
 };
 
 function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
@@ -80,11 +87,12 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
     case 'adventure':
       return {
         emoji: '\u{1F5E1}\u{FE0F}',
-        name: { en: 'Adventure Themes', de: 'Abenteuer-Themen', fr: 'Thèmes d\'aventure' },
+        name: { en: 'Adventure Themes', de: 'Abenteuer-Themen', fr: 'Thèmes d\'aventure', it: 'Temi di avventura' },
         description: {
           en: 'From pirates and knights to wizards and space explorers — choose the perfect adventure setting for your child\'s personalized story.',
           de: 'Von Piraten und Rittern bis zu Zauberern und Weltraum-Entdeckern — wähle das perfekte Abenteuer-Setting für die personalisierte Geschichte deines Kindes.',
           fr: 'Des pirates et chevaliers aux sorciers et explorateurs de l\'espace — choisissez le cadre d\'aventure parfait pour l\'histoire personnalisée de votre enfant.',
+          it: 'Da pirati e cavalieri a maghi ed esploratori spaziali — scegli l\'ambientazione perfetta per la storia personalizzata di tuo figlio.',
         },
         groups: adventureThemeGroups
           .filter(g => g.id !== 'popular' && g.id !== 'custom')
@@ -96,11 +104,12 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
     case 'life-challenges':
       return {
         emoji: '\u{1F4AA}',
-        name: { en: 'Life Skills Themes', de: 'Lebenskompetenz-Themen', fr: 'Thèmes compétences de vie' },
+        name: { en: 'Life Skills Themes', de: 'Lebenskompetenz-Themen', fr: 'Thèmes compétences de vie', it: 'Temi di competenze di vita' },
         description: {
           en: 'Help your child navigate everyday challenges — from potty training and first school days to dealing with emotions and family changes.',
           de: 'Hilf deinem Kind, alltägliche Herausforderungen zu meistern — vom Töpfchentraining und ersten Schultag bis zum Umgang mit Emotionen und familiären Veränderungen.',
           fr: 'Aidez votre enfant à surmonter les défis quotidiens — de l\'apprentissage du pot aux premiers jours d\'école, en passant par la gestion des émotions.',
+          it: 'Aiuta tuo figlio ad affrontare le sfide quotidiane — dal vasino ai primi giorni di scuola, fino alla gestione delle emozioni e dei cambiamenti familiari.',
         },
         groups: lifeChallengeGroups
           .filter(g => g.id !== 'popular')
@@ -111,11 +120,12 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
     case 'educational':
       return {
         emoji: '\u{1F4DA}',
-        name: { en: 'Learning Themes', de: 'Lern-Themen', fr: 'Thèmes d\'apprentissage' },
+        name: { en: 'Learning Themes', de: 'Lern-Themen', fr: 'Thèmes d\'apprentissage', it: 'Temi di apprendimento' },
         description: {
           en: 'Make learning fun with personalized stories about letters, numbers, science, animals, and more. Your child discovers new concepts on every page.',
           de: 'Mach Lernen zum Spass mit personalisierten Geschichten über Buchstaben, Zahlen, Wissenschaft, Tiere und mehr. Dein Kind entdeckt auf jeder Seite neue Konzepte.',
           fr: 'Rendez l\'apprentissage amusant avec des histoires personnalisées sur les lettres, les nombres, les sciences, les animaux et plus. Votre enfant découvre de nouveaux concepts à chaque page.',
+          it: 'Rendi l\'apprendimento divertente con storie personalizzate su lettere, numeri, scienze, animali e altro. Tuo figlio scopre nuovi concetti a ogni pagina.',
         },
         groups: educationalGroups
           .filter(g => g.id !== 'popular')
@@ -126,11 +136,12 @@ function getCategoryConfig(category: CategorySlug): CategoryConfig | null {
     case 'historical':
       return {
         emoji: '\u{1F3DB}\u{FE0F}',
-        name: { en: 'History Themes', de: 'Geschichts-Themen', fr: 'Thèmes historiques' },
+        name: { en: 'History Themes', de: 'Geschichts-Themen', fr: 'Thèmes historiques', it: 'Temi storici' },
         description: {
           en: 'Travel through time! Your child witnesses real historical events — from ancient pyramids to the moon landing and beyond.',
           de: 'Reise durch die Zeit! Dein Kind erlebt echte historische Ereignisse — von den Pyramiden bis zur Mondlandung und darüber hinaus.',
           fr: 'Voyagez dans le temps ! Votre enfant est témoin de vrais événements historiques — des pyramides à l\'alunissage et au-delà.',
+          it: 'Viaggia nel tempo! Tuo figlio è testimone di eventi storici reali — dalle antiche piramidi allo sbarco sulla luna e oltre.',
         },
         groups: historicalEventGroups
           .filter(g => g.id !== 'popular')

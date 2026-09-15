@@ -7,17 +7,23 @@
  * The analyzer left the web container on 2026-09-04 (see docs/decisions.md and
  * start.sh): staging's `start.sh` is Node-ONLY and reaches Python over private
  * networking via PHOTO_ANALYZER_URL. That took the web container from ~2,000 MB
- * to 74 MB idle. Production was never wired for it — it has no analyzer service
- * instance and no PHOTO_ANALYZER_URL — so fast-forwarding master to staging
- * WITHOUT running this first silently breaks /remove-bg, /extract-face,
- * face embeddings, the 2x4 avatar sheet and GroundingDINO figure detection.
- * They break by TIMEOUT, not by error (photoAnalyzerUrl() falls back to
- * http://127.0.0.1:5000), degrading to a Gemini fallback with no alarm.
+ * to 74 MB idle.
+ *
+ * PRODUCTION IS NOW WIRED (2026-09-06): both the production web service and the
+ * production analyzer service were deployed from commit a79c8bee, and the prod
+ * analyzer has been healthy since. This script is therefore a HISTORY of how that
+ * was done plus a read-only `--status` check — the phases below are not pending
+ * work. The failure mode they were written against still matters if the analyzer
+ * service or PHOTO_ANALYZER_URL is ever lost: the calls break by TIMEOUT, not by
+ * error (photoAnalyzerUrl() falls back to http://127.0.0.1:5000), degrading
+ * /remove-bg, /extract-face, face embeddings, the 2x4 avatar sheet and
+ * GroundingDINO figure detection to a Gemini fallback with no alarm.
  *
  * ORDERING MATTERS
  * ----------------
- * master does not yet contain Dockerfile.analyzer or start-analyzer.sh — they
- * exist only on staging. So phase 1 deploys the analyzer from an explicit
+ * (Historical, and no longer true: master now contains Dockerfile.analyzer and
+ * start-analyzer.sh as of a79c8bee.) At the time, master did not — they
+ * existed only on staging. So phase 1 deploys the analyzer from an explicit
  * commit SHA (staging's HEAD) even though the service's branch is `master`.
  * After master is fast-forwarded to that same SHA, the master trigger simply
  * redeploys identical code.

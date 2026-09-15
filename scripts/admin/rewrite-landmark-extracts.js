@@ -66,7 +66,7 @@ async function rewriteBatch(texts) {
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 4000,
+      max_tokens: require('../../server/config/models').maxOutputTokensFor(MODEL),  // model ceiling (owner rule: no output caps)
       messages: [{ role: 'user', content: `${PROMPT}\n\n${JSON.stringify(texts, null, 1)}` }],
     }),
   });

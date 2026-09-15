@@ -190,6 +190,37 @@ export default function Pricing() {
       backToStories: 'Retour à Mes histoires',
       createStory: 'Créer une histoire',
     },
+    it: {
+      title: 'Prezzi',
+      subtitle: 'Acquista crediti per creare storie. Stampa il tuo libro e ricevi crediti indietro.',
+      creditsTitle: 'Crediti — per creare le tue storie',
+      creditsIntro: `Le storie si pagano con i crediti. ${creditsPerPage} crediti = 1 pagina. Una tipica storia di 10 pagine = ${creditsPerPage * 10} crediti.`,
+      creditsTableCredits: 'Crediti',
+      creditsTablePrice: 'Prezzo',
+      creditsNote: 'I nuovi account iniziano con crediti gratuiti — sufficienti per provare una storia completa.',
+      bookTitle: 'Stampa il tuo libro',
+      bookSubtitle: `Per libro — più CHF ${SHIPPING_COST_CHF} di spedizione forfettaria per ordine (Svizzera)`,
+      internationalNote: 'Ordina più libri e paga la spedizione una sola volta',
+      softcover: 'Copertina morbida',
+      hardcover: 'Copertina rigida',
+      softcoverSize: '21 × 28 cm',
+      hardcoverSize: '21 × 28 cm',
+      pages: 'Pagine',
+      rewardTitle: bookCreditMultiplier > 1
+        ? `Ricevi ${bookCreditMultiplier}× crediti quando ordini il libro`
+        : 'Ricevi crediti quando ordini il libro',
+      rewardBody: bookCreditMultiplier > 1
+        ? `Ogni pagina stampata ti ricompensa con ${creditsBackPerPage} crediti — un libro di ${exampleStoryPages} pagine restituisce ${exampleCreditsBack} crediti, sufficienti per un'altra storia completa.`
+        : `Ogni pagina stampata ti ricompensa con ${creditsBackPerPage} crediti — un libro di ${exampleStoryPages} pagine restituisce ${exampleCreditsBack} crediti.`,
+      features: 'Cosa è incluso',
+      feature1: 'Stampa di alta qualità',
+      feature2: 'Rilegatura duratura',
+      feature3: 'Colori vivaci',
+      feature4: 'Pagina di dedica personale',
+      combineNote: 'Puoi combinare più storie in un unico libro!',
+      backToStories: 'Torna a Le mie storie',
+      createStory: 'Crea una storia',
+    },
   };
 
   const t = translations[language as keyof typeof translations] || translations.en;

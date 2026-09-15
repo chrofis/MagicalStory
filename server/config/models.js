@@ -17,10 +17,17 @@ const IMAGE_ASPECTS = {
 
 // Available text models
 const TEXT_MODELS = {
+  // Ceilings below were read from the vendor on 2026-09-11: OpenRouter
+  // GET /v1/models -> top_provider.max_completion_tokens; Anthropic
+  // GET /v1/models -> max_tokens; Google v1beta/models -> outputTokenLimit.
+  // 28 of 38 entries were UNDERSTATED (nothing was overstated) — since the
+  // 2026-09-11 no-caps change these numbers ARE the ceiling every call runs
+  // at AND what textReplyGuard measures against, so an understated one both
+  // truncated real replies and reported a false cap_hit.
   'claude-sonnet': {
     provider: 'anthropic',
     modelId: 'claude-sonnet-4-6',
-    maxOutputTokens: 64000,
+    maxOutputTokens: 128000,
     description: 'Claude Sonnet 4.6 - Best narrative quality'
   },
   'claude-opus': {
@@ -32,7 +39,7 @@ const TEXT_MODELS = {
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 64000,
     description: 'Claude Haiku 4.5 - Fast and affordable'
   },
   'gemini-2.5-pro': {
@@ -56,7 +63,7 @@ const TEXT_MODELS = {
   'gemini-2.0-flash': {
     provider: 'google',
     modelId: 'gemini-2.0-flash',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 8192, // NOT SERVED 2026-09-11 — listed under "Previous models (Shut down)" on ai.google.dev and absent from v1beta/models. This ceiling is unverifiable; the id 404s rather than caps.
     description: 'Gemini 2.0 Flash - Very fast'
   },
   'gemini-pro-latest': {
@@ -68,19 +75,19 @@ const TEXT_MODELS = {
   'grok-3-mini': {
     provider: 'xai',
     modelId: 'grok-3-mini',
-    maxOutputTokens: 32768,
+    maxOutputTokens: 32768, // NOT SERVED 2026-09-11 — xAI lists only grok-4.20-*/4.3/4.5/4.6. xAI also publishes NO output ceiling anywhere, so any xai entry is unverifiable in principle.
     description: 'Grok 3 Mini - Fast and cheap ($0.30/$0.50 per 1M tokens)'
   },
   'grok-3': {
     provider: 'xai',
     modelId: 'grok-3',
-    maxOutputTokens: 32768,
+    maxOutputTokens: 32768, // NOT SERVED 2026-09-11 — see grok-3-mini.
     description: 'Grok 3 - Good quality ($3.00/$15.00 per 1M tokens)'
   },
   'grok-4-fast': {
     provider: 'xai',
     modelId: 'grok-4-1-fast-non-reasoning',
-    maxOutputTokens: 65536,
+    maxOutputTokens: 65536, // NOT SERVED 2026-09-11 — see grok-3-mini.
     description: 'Grok 4 Fast - Very cheap, 2M context ($0.20/$0.50 per 1M tokens)'
   },
   // Latest Grok (2026-08-12) via OpenRouter. No separate 4.x "flash" exists —
@@ -88,7 +95,7 @@ const TEXT_MODELS = {
   'grok-4.6': {
     provider: 'openrouter',
     modelId: 'x-ai/grok-4.6',
-    maxOutputTokens: 32768,
+    maxOutputTokens: 450000,
     description: 'Grok 4.6 (xAI, latest) via OpenRouter (~$2.00/$6.00 per 1M)'
   },
   // OpenRouter-hosted models (OpenAI-compatible) for A/B testing cheap
@@ -98,25 +105,25 @@ const TEXT_MODELS = {
   'qwen-max': {
     provider: 'openrouter',
     modelId: 'qwen/qwen-max',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 8192, // NOT IN THE OPENROUTER CATALOGUE 2026-09-11 — this ceiling is unverifiable.
     description: 'Qwen-Max (Alibaba) via OpenRouter - strongest Qwen, ~$1.6/$6.4 per 1M'
   },
   'qwen-plus': {
     provider: 'openrouter',
     modelId: 'qwen/qwen-plus',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen-Plus (Alibaba) via OpenRouter - cheap reasoning, ~$0.26/$0.78 per 1M'
   },
   // Compliance-eval candidates (A/B 2026-07-18). Stronger reasoners than
   // qwen-plus for severity discipline, still far cheaper than Sonnet.
-  'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 8192, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
-  'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 8192, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
-  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 8192, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.5/$2.0)' },
-  'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 8192, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
+  'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 65536, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
+  'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 65536, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
+  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 16384, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.5/$2.0)' },
+  'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 100352, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
   'qwen-vl': {
     provider: 'openrouter',
     modelId: 'qwen/qwen2.5-vl-72b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 115200,
     description: 'Qwen2.5-VL 72B (vision) via OpenRouter - for image-eval A/B vs Gemini'
   },
   // Qwen3-VL (2026): strong bbox/spatial grounding, cheap. Candidate to A/B
@@ -125,29 +132,37 @@ const TEXT_MODELS = {
   'qwen3-vl': {
     provider: 'openrouter',
     modelId: 'qwen/qwen3-vl-32b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen3-VL 32B (vision) via OpenRouter - spatial/bbox leader, ~$0.10/$0.42 per 1M'
   },
   'qwen3-vl-235b': {
     provider: 'openrouter',
     modelId: 'qwen/qwen3-vl-235b-a22b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.21/$1.90 per 1M'
   },
   'gpt-4o-mini': {
     provider: 'openrouter',
     modelId: 'openai/gpt-4o-mini',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16384,
     description: 'GPT-4o mini (vision) via OpenRouter - cheap image-eval A/B (~$0.15/$0.60 per 1M)'
   },
   // GPT-5.6 family (2026-07-09) via OpenRouter. Luna = cheap tier, Sol = strong
   // tier. Pricing from the OpenRouter catalogue. For scoring/writer A/B in the Lab.
-  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 16384, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 128000, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
   // Cheap reviewer candidates (2026-08-15 beats-reviewer bake-off; see docs/decisions.md)
-  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 16384, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter (~$0.38/$1.88 per 1M)' },
-  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 16384, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
-  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 16384, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
-  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 16384, description: 'MiniMax M3 via OpenRouter (~$0.30/$1.20 per 1M)' },
+  // Price verified 2026-09-07 on openrouter.ai and ai.google.dev: $0.75/$3.75
+  // per 1M (Flex route, Google list through 2026), $1.50/$7.50 on the standard
+  // route and Google list from 2027. The earlier "$0.38/$1.88" here matched no
+  // vendor page and led to a wrong cost-neutral claim.
+  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 65536, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M Flex; $1.50/$7.50 standard)' },
+  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 384000, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
+  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 182476, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
+  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 512000, description: 'MiniMax M3 (text+image+video in) via OpenRouter ($0.23/$0.96 per 1M, verified 2026-09-07)' },
+  // Vision-judge candidates for the blind inventory (Lab sets 25/27, 2026-09-07).
+  // Prices from openrouter.ai the same day.
+  'qwen3.6-plus': { provider: 'openrouter', modelId: 'qwen/qwen3.6-plus', maxOutputTokens: 65536, description: 'Qwen3.6 Plus (text+image+video in) via OpenRouter ($0.325/$1.95 per 1M)' },
+  'kimi-k2.6': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.6', maxOutputTokens: 235929, description: 'Kimi K2.6 (text+image in) via OpenRouter ($0.56/$3.39 per 1M)' },
   // Neutral judge for reviewer bake-offs: third vendor, so it has no
   // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
   // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.
@@ -168,15 +183,16 @@ const TEXT_MODELS = {
   // confound". This is a reasoning model whose thinking tokens count against the
   // output budget, so the old caps could exhaust the budget before any visible
   // text. Untested at this new limit — no paid call has been run against it yet.
+  // NOT IN THE OPENROUTER CATALOGUE 2026-09-11. The catalogue has qwen3.8-max-0902 (131072) but NOT this bare id; per the no-inference rule they are not treated as the same model. The docs/decisions.md note about retesting qwen3.8-max at its true limit cannot run against this id. description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
   'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 131072, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
-  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 16384, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
-  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
-  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 16384, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
-  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter (~$5.00/$30.00 per 1M)' },
+  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 131072, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
+  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 128000, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
+  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter (~$5.00/$30.00 per 1M)' },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16000,
     description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.26/$1.03 per 1M'
   },
   // DeepSeek V4 (GA 2026-07-20) via OpenRouter. 1M context, up to 384K output —
@@ -186,13 +202,13 @@ const TEXT_MODELS = {
   'deepseek-v4-pro': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-pro',
-    maxOutputTokens: 64000,
+    maxOutputTokens: 384000,
     description: 'DeepSeek V4 Pro via OpenRouter - top reasoning, 1M context (~$0.44/$0.87 per 1M)'
   },
   'deepseek-v4-flash': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-flash',
-    maxOutputTokens: 64000,
+    maxOutputTokens: 384000,
     description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context (~$0.14/$0.28 per 1M)'
   }
 };
@@ -296,6 +312,15 @@ const MODEL_DEFAULTS = {
   // holds nothing above MINOR, or once a re-telling's Fixing line addressed
   // only MINOR faults. ARC_ROUNDS for staging A/B.
   arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 1),
+  // The hard ceiling on arc rounds, forced ones included (owner cap
+  // 2026-08-30 — the iteration study regressed at round 4).
+  arcRoundsMax: 3,
+  // ONE extra round when the arc's own invented-figure list overruns the
+  // allowance (2026-09-09, job_1788903616404_iqvhj4l8m). A re-telling rewrites
+  // the whole story and is the only mechanism that can remove a figure
+  // spanning several pages; the re-plan cannot. At most one forced round per
+  // story, never past arcRoundsMax. Set false to turn the forcing off.
+  arcForceRoundOnInventedOvercount: process.env.ARC_FORCE_ROUND_ON_INVENTED_OVERCOUNT !== 'false',
   // The lean flow's hint pass (owner, 2026-09-01): after the final re-telling,
   // one outside model names the top remaining issues as ISSUE → CHANGE hints.
   // The hints ride into the beats and text-writer prompts; nothing re-tells.
@@ -347,6 +372,16 @@ const MODEL_DEFAULTS = {
   // cost the step still running. The old "90s cap" note here described a
   // budget that no longer exists.
   textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-opus',
+  // Cross-page REPETITION gate after the repair pass (2026-09-10): two pages
+  // trip when they share at least this many identical 5-word shingles
+  // (lowercased, punctuation stripped). Why 4: a recurring proper noun or a
+  // stock phrase ("the ship's name", "said the main character") yields one or
+  // two shared 5-grams across a book; a copied passage yields a RUN of them
+  // — the measured case (job_1788983823620_csjcyp1q9 p12/p13, one paragraph
+  // duplicated verbatim) shared 11. Four is above the noise of repeated names
+  // and below any duplicated sentence pair of ordinary length (two adjacent
+  // ~9-word sentences copied whole share 5+).
+  textRepetitionMinShingles: 4,
   // The LECTOR: dedicated grammar proofreader of the FINAL text, after the last
   // corrective round (owner ruling 2026-09-03). A sixth question on the
   // causality audit catches a different 1-2 of 4 known defects each run
@@ -414,12 +449,12 @@ const MODEL_DEFAULTS = {
   // promptBuilders. It stays on Standard in every environment: doubling it
   // would double every inpaint. The final page render reads pageRenderImage.
   //
-  // Routing repair inpaint to follow pageRenderImage was tried and REVERTED by
-  // the owner on 2026-09-06 (docs/decisions.md). Repairs stay on the cheap edit
-  // tier in every environment; only the page/cover RENDER follows the tier
-  // split. Don't re-propose the "a repair should be painted by the model that
-  // rendered the page" consistency argument — it has been heard and declined.
-  pageImage: 'grok-imagine',                 // Edit/inpaint tier ($0.02/image)
+  // The page INPAINT no longer reads this key: since 2026-09-07 inpaintPage
+  // passes pageRenderImage explicitly — the owner's reversal of the 2026-09-06
+  // pin, with evidence in docs/decisions.md 2026-09-07. Style repair and the
+  // generic edit path stay here on Standard; char repair has its own pin
+  // (charRepairModel).
+  pageImage: 'grok-imagine',                 // Edit tier ($0.02/image)
   // The tier a final page render — and every redo/repair regeneration of a
   // page — uses. Per-environment (see runtime.js): Imagine 2.0 on staging,
   // Standard everywhere else. Redos read this same key so a page cannot change
@@ -434,6 +469,10 @@ const MODEL_DEFAULTS = {
   // call sites used to pass the page's resolved model verbatim, so plates
   // silently inherited any page-tier change; they read this key instead.
   emptyScenePlateModel: 'grok-imagine',
+  // The tier a Visual Bible cell renders on when its entry carries `text` —
+  // words that must be readable (a sign, a plaque). Standard cannot spell;
+  // 2.0 is typography-aware. Solo cells only (buildReferenceSheetBatches).
+  vbTextCellModel: 'grok-imagine-2',
   avatar: 'grok-imagine',                    // Character avatars (clothing variants). Switched from
                                               // Gemini 2.5 Flash Image because Gemini's safety filter
                                               // rejects adult-face photos with IMAGE_OTHER, leaving
@@ -449,7 +488,17 @@ const MODEL_DEFAULTS = {
   // Quality evaluation models
   // Grok vision is supported via callGrokVisionAPI() — set qualityEval to a grok model to use it
   qualityEval: 'gemini-2.5-flash',          // Image quality evaluation. Lite missed small distant targets (e.g. paper-on-bench) and produced confused "X pointing at Y" reads — the resulting bad fix-targets triggered repair loops that cost more than the eval-tier upgrade.
+  // Blind inventory (eval Stage 1) judge — per-environment, see runtime.js.
+  // Was the same key as qualityEval until 2026-09-07.
+  inventoryModel: require('./runtime').runtime('inventoryModel'),
   bboxDetection: 'gemini-2.5-flash',        // Bounding box detection — kept on the same tier as qualityEval so missing-object detection lines up with the eval that uses it.
+  // Face-integrity gate on a char repair (faceIntegrityGate.js). Same tier as
+  // qualityEval: a two-image comparative yes/no, and the native Gemini path
+  // takes no `reasoning` option — gemini-3.7-flash, which the gate named as a
+  // hardcoded fallback while this key did not exist, 400s on OpenRouter without
+  // one ("reasoning is mandatory", evalPipeline.js:255) and the gate then failed
+  // open on every single call.
+  repairFaceCheck: 'gemini-2.5-flash',
 
   // Image-prompt compression — the head rewrite in shrinkPromptForModel when a
   // page prompt exceeds the backend's char budget. NOT a utility call: what it
@@ -813,7 +862,7 @@ const IMAGE_MODELS = {
     supportsThinking: false,
     temperature: 0.5,  // Lower temp for more consistent character reproduction
     maxPromptLength: 30000,  // Gemini supports very long prompts
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'gemini-3-pro-image-preview': {
     modelId: 'gemini-3-pro-image-preview',
@@ -827,28 +876,28 @@ const IMAGE_MODELS = {
     // 3.x, and a value left here would only read as a promise the API does not
     // keep. 2.5 still honours it and keeps its 0.5.
     maxPromptLength: 30000,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'flux-schnell': {
     modelId: 'runware:5@1',
     description: 'FLUX Schnell via Runware - Ultra fast, cheap ($0.0006/image)',
     backend: 'runware',
     maxPromptLength: 2900,  // Runware limit is 3000, leave margin
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'flux-dev': {
     modelId: 'runware:6@1',
     description: 'FLUX Dev via Runware - Better quality ($0.004/image)',
     backend: 'runware',
     maxPromptLength: 2900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'ace-plus-plus': {
     modelId: 'ace-plus-plus',
     description: 'ACE++ via Runware - Face-consistent avatar generation (~$0.005/image)',
     backend: 'runware',
     maxPromptLength: 2900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'grok-imagine': {
     modelId: 'grok-imagine-image',
@@ -860,7 +909,7 @@ const IMAGE_MODELS = {
     // compression pass that deleted four characters' hats. 100 chars of margin
     // is enough for the assembly slack; the compressor is the expensive guard.
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   // Imagine Image 2.0 — xAI's current recommended image model, shipped to the
   // API 2026-08-07 as `grok-imagine-image-2.0` ($0.04/image). Typography-aware,
@@ -875,7 +924,7 @@ const IMAGE_MODELS = {
     description: 'Grok Imagine Image 2.0 - typography-aware ($0.04/image), ref image support',
     backend: 'grok',
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
@@ -887,7 +936,7 @@ const IMAGE_MODELS = {
     // compression pass that deleted four characters' hats. 100 chars of margin
     // is enough for the assembly slack; the compressor is the expensive guard.
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   }
 };
 
@@ -968,11 +1017,33 @@ const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.e
 const REPAIR_MAX_PASSES = require('./runtime').runtime('repairMaxPasses');
 
 const REPAIR_DEFAULTS = {
-  scoreThreshold: 50,       // Pages scoring below this need redo (0-100). Lowered
-                            // from 60 (2026-08-09): measured, a page entering
-                            // repair at 50-59 was regenerated and came back
-                            // WORSE far more often than better.
+  scoreThreshold: 60,       // Pages scoring below this need redo (0-100).
+                            // 2026-09-09 (owner): back to 60, superseding ONLY the
+                            // 60 -> 50 rider inside the 2026-08-09 decisions.md entry
+                            // (iterateSalvageFloor and the four numeric gates there
+                            // are untouched). The 2026-08-09 lowering was argued from
+                            // REGENERATION outcomes, but a 50-59 page today routes to
+                            // local repair, not to a full regen. Measured over 53
+                            // recent staging stories, pages entering repair at 50-59
+                            // improved 48% of the time (+8.0 avg) -- the best
+                            // cost/benefit band left above 0. 60-69 improves only 24%
+                            // (+4.7), which is why the floor is 60 and not 70.
+                            // Blast radius: +24 pages (+3.9%).
+                            // NOTE: the MANUAL admin repair workflow does NOT move with
+                            // this -- IMAGE_QUALITY_THRESHOLD is pinned at 50 in
+                            // server/utils/config.js and server/lib/evalPipeline.js.
   issueThreshold: 5,        // Pages with this many fixable issues need redo
+  // PER-ROUND REPAIR CAP (owner, 2026-09-09). Measured over 53 staging stories:
+  // 6.4 of 14.3 pages repaired per story (45%), 19 of 53 stories repaired MORE THAN
+  // HALF their pages, and one 14-page story repaired all 14 pages in round 2 AND all
+  // 14 again in round 3. A round may therefore work on at most this SHARE of the
+  // story's pages; the rest are DEFERRED to the next round, never dropped. Rounded so
+  // a 20-page story gives 10 then 6 (the owner's worked example).
+  maxRepairShareRound1: 0.5,
+  maxRepairShareLaterRounds: 0.3,
+  minRepairPagesPerRound: 3,  // ...but a short story still repairs at least this many
+                              // (or all its bad pages, if fewer). Gates are guidelines:
+                              // the cap limits work per round, it never fails a job.
   maxPasses: REPAIR_MAX_PASSES,  // Global passes over all pages — 1 on staging, 3 on prod
   maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
   // Char-repair Grok tier — PINNED to Imagine 1.x ('grok-imagine-image',
@@ -1219,10 +1290,28 @@ function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneV
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
 function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
 
+/**
+ * The model's own output ceiling, for the few direct provider calls that
+ * bypass textModels.js and whose API REQUIRES a max_tokens value (Anthropic).
+ * Owner rule (2026-08-29 / 2026-09-11): no output caps — the only number a call
+ * site may pass is the model's documented maximum, and it comes from here, not
+ * from a literal at the call site. Accepts a TEXT_MODELS key or a model id;
+ * throws on an unknown model rather than guessing a number.
+ */
+function maxOutputTokensFor(modelKeyOrId) {
+  const entry = TEXT_MODELS[modelKeyOrId]
+    || Object.values(TEXT_MODELS).find(m => m.modelId === modelKeyOrId);
+  if (!entry || !entry.maxOutputTokens) {
+    throw new Error(`maxOutputTokensFor: "${modelKeyOrId}" is not in TEXT_MODELS — add it with its documented maxOutputTokens`);
+  }
+  return entry.maxOutputTokens;
+}
+
 module.exports = {
   EVAL_TEMPERATURE,
   TEXT_MODELS,
   MODEL_DEFAULTS,
+  maxOutputTokensFor,
   resolveEvalModel,
   resolveComplianceModel,
   resolveSceneIterationModel,

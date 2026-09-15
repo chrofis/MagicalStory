@@ -6,6 +6,7 @@
  */
 
 const express = require('express');
+const { buildCastIndex, resolveEntity, canonicalName } = require('../lib/castResolver');
 const router = express.Router();
 const crypto = require('crypto');
 const pLimit = require('p-limit');
@@ -21,7 +22,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 // Services
 const { log } = require('../utils/logger');
 const { saveStoryData, saveScenePageData, saveCoverData, rehydrateStoryImages, saveStoryImage, getStoryImage, getActiveVersion, setActiveVersion, getNextVersionIndex, getPool, dbQuery, saveStyleLabImage, getStyleLabThumbnails, getStyleLabRunImages } = require('../services/database');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 
 // Shared repair logic
 const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
@@ -103,9 +104,11 @@ async function stampCanonicalScore(version, imageResult, opts = {}) {
 // Lib modules
 const {
   getPageText,
+  resolveEvalSceneHint,
   convertClothingToCurrentFormat,
   parseClothingCategory,
   getCharacterPhotoDetails,
+  buildWholeCastReferencePhotos,
   buildCharacterPhysicalDescription,
   buildCharacterDescriptionsForBbox,
   buildCharacterReferenceList,
@@ -155,7 +158,8 @@ const { runEntityConsistencyChecks, repairSinglePage, getStyledAvatarForClothing
 const { getActiveIndexAfterPush, arrayToDbIndex, dbIndexFor, arrayIndexForDb } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos, getStandardAvatar } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
-const { coverKeyToType, coverTypeToKey, coverLabel } = require('../lib/coverKeys');
+const { coverKeyToType, coverTypeToKey, coverLabel, COVER_PAGE_NUMBERS } = require('../lib/coverKeys');
+const { buildStoryEvalOptions } = require('../lib/evalReplayInputs');
 const r2 = require('../lib/r2');
 
 // Cover type ↔ virtual page number mapping
@@ -375,7 +379,19 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
     // Generate new scene description (includes Visual Bible recurring elements) — iteration model for regen
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, null, null, { clothingRequirements: storyData.clothingRequirements || null });
+    // THE BEAT (sibling of the iterate path, 3d3da1817). Passing null here makes
+    // buildSceneDescriptionPrompt fill both beat-shaped slots from the previous
+    // brief's own one-line summary, so the rewriter is handed a self-summary of
+    // the artefact it is rewriting while the template tells it the outline is
+    // authoritative. The page's plan line is stored on the scene entry.
+    const { resolvePlanLine } = require('../lib/iterateBeat');
+    const storedScene = sceneDescriptions.find(sc => sc.pageNumber === pageNumber) || null;
+    const storedImage = (storyData.sceneImages || []).find(si => si.pageNumber === pageNumber) || null;
+    const planLine = resolvePlanLine(storedScene, storedImage);
+    if (!planLine) {
+      log.warn(`⚠️ [REGEN SCENE ${pageNumber}] no stored plan line (outlineExtract) — the rewrite runs on the previous brief alone`);
+    }
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars, planLine ? { planLine } : null, null, { clothingRequirements: storyData.clothingRequirements || null });
     const sceneResult = await callClaudeAPI(scenePrompt, null, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[', usageLabel: 'regen_scene' });
     const newSceneDescription = sceneResult.text;
 
@@ -782,17 +798,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Shared eval + detection — the same primitives the unified pipeline uses
     // (Step 1 batch eval / Phase 5b-pre detection), run once for this version.
-    let regenQuality = null;
-    try {
-      regenQuality = await evaluateImageQuality(
-        genResult.imageData, imagePrompt, referencePhotos, 'scene', null,
-        `PAGE ${pageNumber}`, null, null, sceneCharacters,
-        // Era-aware landmark protection — the refs this regen rendered from.
-        { landmarkPhotos: pageLandmarkPhotos || null, era: sceneMetadata?.era || null }
-      );
-    } catch (evalErr) {
-      log.warn(`⚠️ [REGEN] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored version`);
-    }
     let regenDetection = null;
     try {
       regenDetection = await detectAllBoundingBoxes(genResult.imageData, {
@@ -809,6 +814,22 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       });
     } catch (bboxErr) {
       log.warn(`⚠️ [REGEN] Page ${pageNumber}: detection failed (${bboxErr.message})`);
+    }
+    let regenQuality = null;
+    try {
+      regenQuality = await evaluateImageQuality(
+        genResult.imageData, imagePrompt, referencePhotos, 'scene', null,
+        `PAGE ${pageNumber}`, null, null, sceneCharacters,
+        // Era-aware landmark protection — the refs this regen rendered from.
+        // DETECT-THEN-EVAL (2026-09-13): the detection above already ran on
+        // these exact bytes, so the roster arithmetic gets its figure count
+        // without a second detector call.
+        { landmarkPhotos: pageLandmarkPhotos || null, era: sceneMetadata?.era || null,
+          sceneMetadata: sceneMetadata || null, pageNumber,
+          detectedFigures: regenDetection?.figures || null }
+      );
+    } catch (evalErr) {
+      log.warn(`⚠️ [REGEN] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored version`);
     }
     // Same contract shape the old gen+eval bundle returned: eval fields
     // (score, reasoning, fixTargets, fixableIssues, semanticResult,
@@ -1164,7 +1185,12 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       sceneMetadata = extractSceneMetadata(desc);
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, null, sceneMetadata);
+        // Keep the grid in step with what the page prompt describes: the prompt is
+        // built from the scene brief's objects[], so a prop named there must bring its
+        // reference even if the Visual Bible filed it under other pages. Passing null
+        // here selected references from appearsInPages alone (referenceSheets.js:1567
+        // passes the page's ids).
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneMetadata?.objects || sceneMetadata?.fullData?.objects || null, sceneMetadata);
         const secLm = landmarkPhotos.slice(1);
         if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
@@ -1662,9 +1688,12 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
     }
     const sceneMetadata = extractSceneMetadata(scene.sceneDescription || scene.description || '');
     const { needsScaleRepair, runScaleRepair } = require('../lib/scaleRepair');
-    if (!needsScaleRepair(sceneMetadata)) {
+    // Only photo-backed characters count — a Visual Bible secondary promoted
+    // into characters[] by the scene reviewer (rules 5/5a) is not a figure the
+    // composite can cast.
+    if (!needsScaleRepair(sceneMetadata, storyData.characters || [])) {
       return res.status(400).json({
-        error: 'Scene does not need scale repair (no depth=background characters declared in metadata).',
+        error: 'Scene does not need scale repair (fewer than two photo-backed characters at foreground + background depth).',
       });
     }
     // Background character refs INTENTIONALLY OMITTED. Sending an avatar
@@ -1708,6 +1737,9 @@ router.post('/:id/scale-repair/:pageNum', authenticateToken, async (req, res) =>
 
     const result = await runScaleRepair(scene.imageData, sceneMetadata, {
       pageNumber,
+      // runScaleRepair re-runs the trigger internally; give it the same cast the
+      // gate above used, or the second check answers cast-blind.
+      castableCharacters: storyData.characters || [],
       sceneBackground: plate,
       backgroundCharacterRefs: [],  // intentionally empty — see comment above
       backgroundCharacterDescriptions: bgDescriptions,
@@ -2030,7 +2062,12 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
       }
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
       if (visualBible) {
-        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, null, sceneMetadata);
+        // Keep the grid in step with what the page prompt describes: the prompt is
+        // built from the scene brief's objects[], so a prop named there must bring its
+        // reference even if the Visual Bible filed it under other pages. Passing null
+        // here selected references from appearsInPages alone (referenceSheets.js:1567
+        // passes the page's ids).
+        const elRefs = getElementReferenceImagesForPage(visualBible, pageNumber, 6, sceneMetadata?.objects || sceneMetadata?.fullData?.objects || null, sceneMetadata);
         const secLm = landmarkPhotos.slice(1);
         if (elRefs.length > 0 || secLm.length > 0) visualBibleGrid = await buildVisualBibleGrid(elRefs, secLm);
       }
@@ -3919,12 +3956,14 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
     // Get character photos for reference images
     const characters = storyData.characters || [];
-    const characterPhotos = characters
-      .filter(c => c.photoUrl || c.avatars?.styled)
-      .map(c => ({
-        name: c.name,
-        photoUrl: c.avatars?.styled || c.photoUrl
-      }));
+    // Same builder the generator and the repair pipeline use — the old
+    // `c.photoUrl || c.avatars?.styled` filter matches nothing on stored
+    // characters, so the judge got no references and no clothing contract.
+    const characterPhotos = buildWholeCastReferencePhotos(
+      characters,
+      storyData.artStyle || null,
+      storyData.clothingRequirements || null
+    );
 
     // Run evaluations in parallel with concurrency limit
     const evalLimit = pLimit(100);
@@ -3981,40 +4020,48 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // the AD brief (scene.description), not the beats-scene outlineExtract
         // the render never saw. Covers keep the old expression — their brief
         // lives in outlineExtract/description depending on age.
-        const sceneHint = evaluationType === 'cover'
-          ? (scene.outlineExtract || scene.sceneHint || null)
-          : (scene.description || scene.sceneDescription || scene.outlineExtract || scene.sceneHint || null);
+        const sceneHint = resolveEvalSceneHint({
+          evaluationType,
+          entryDescription: scene.description,
+          sceneDescription: scene.sceneDescription,
+          outlineExtract: scene.outlineExtract,
+          sceneHint: scene.sceneHint,
+        });
 
-        // For covers, include text requirements so the evaluator knows what text to expect
-        // Without this, the evaluator marks required text (title, dedication, magicalstory.ch) as "UNWANTED"
-        let evalPrompt = scene.description || scene.prompt || '';
-        if (evaluationType === 'cover') {
-          const coverType = getCoverType(pageNumber);
-          if (coverType === 'frontCover') {
-            const title = storyData.title || storyData.storyTitle || '';
-            if (title) {
-              evalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact title text: "${title}"`;
-            }
-          } else if (coverType === 'initialPage') {
-            const dedication = storyData.dedication || '';
-            if (dedication) {
-              evalPrompt += `\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact dedication text: "${dedication}"`;
-            }
-          } else if (coverType === 'backCover') {
-            evalPrompt += '\n\nTEXT REQUIREMENT - CRITICAL: The image MUST include this exact text: "magicalstory.ch" in the bottom left corner.';
-          }
-        }
+        // The cover text contract is NOT hand-written here any more. This site
+        // appended "TEXT REQUIREMENT - CRITICAL: The image MUST include this
+        // exact title text" to every front cover — but the art is generated
+        // TEXTLESS and the app stamps the typography afterwards unless the run
+        // baked it in, so a correct cover was judged as missing its title. The
+        // shared resolver (resolveCoverTextContract, via buildStoryEvalOptions)
+        // decides per cover key and per baked-title flag, and evaluateImageQuality
+        // turns it into the right rule — including "the title is an app overlay,
+        // never flag it".
+        const evalPrompt = scene.description || scene.prompt || '';
 
         // Run evaluation with full parameters including storyText for semantic check
         const evaluation = await evaluateImageQuality(
           imageData,
-          evalPrompt,              // originalPrompt with text requirements for covers
+          evalPrompt,              // originalPrompt (the scene/cover brief)
           characterPhotos,         // referenceImages
           evaluationType,          // evaluationType
           qualityModelOverride || null,
           pageLabel,               // pageContext
           pageText,                // storyText for semantic fidelity
-          sceneHint                // sceneHint for semantic evaluation
+          sceneHint,               // sceneHint for semantic evaluation
+          // The page's own cast as stored on the sceneImage record — the
+          // EXPECTED CAST roster. The reference list above is the WHOLE
+          // story cast, which is why it cannot serve as the roster here.
+          scene.sceneCharacters || null,
+          // The ONE resolver, shared with the Lab replay sites and built from
+          // the same production baseline: visualBible, clothingRequirements,
+          // storyData cast, art style, landmark/era, and the cover text
+          // contract. Spelled by hand here, it carried none of them.
+          // No new detector call: this endpoint scores the page's ACTIVE image
+          // and the stored detection was made on those same bytes.
+          buildStoryEvalOptions(storyData, scene, pageNumber, {
+            detectedFigures: scene.bboxDetection?.figures || null,
+          }).options
         );
 
         if (!evaluation) {
@@ -4247,12 +4294,22 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     let scene;
     let evaluationType = 'scene';
     let pageLabel = `PAGE ${pageNumber}`;
+    // Active-version keys are 'frontCover'/'initialPage'/'backCover' for covers
+    // (scoring.js recomputeAllActiveVersions, setActiveVersion) — NOT the
+    // negative page number, and the array position is not the DB index either.
+    // Same fix as the re-evaluate endpoint above: passing -1/-2/-3 matched no
+    // stored key, fell through to 0, and this endpoint re-evaluated v0 while
+    // reporting on "the active version".
+    let versionKey = pageNumber;
+    let versionType = 'scene';
     if (isCoverPage(pageNumber)) {
       const coverType = getCoverType(pageNumber);
       if (!coverType) return res.status(400).json({ error: 'Invalid cover page number' });
       scene = getCoverData(storyData, coverType);
       evaluationType = 'cover';
       pageLabel = coverType.toUpperCase();
+      versionKey = coverType;
+      versionType = coverType;
     } else {
       scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
     }
@@ -4263,8 +4320,8 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
     // Get active version's image data
     let imageData = scene.imageData;
     if (scene.imageVersions?.length > 0) {
-      const activeDbIndex = await getActiveVersion(id, pageNumber);
-      const activeVersion = scene.imageVersions?.[activeDbIndex];
+      const activeDbIndex = await getActiveVersion(id, versionKey);
+      const activeVersion = scene.imageVersions?.[arrayIndexForDb(scene.imageVersions, activeDbIndex, versionType)];
       if (activeVersion?.imageData) {
         imageData = activeVersion.imageData;
       }
@@ -4275,21 +4332,27 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
 
     // Build character reference images (same pattern as re-evaluate)
     const characters = storyData.characters || [];
-    const characterPhotos = characters
-      .filter(c => c.photoUrl || c.avatars?.styled)
-      .map(c => ({
-        name: c.name,
-        photoUrl: c.avatars?.styled || c.photoUrl
-      }));
+    // Same builder the generator and the repair pipeline use — the old
+    // `c.photoUrl || c.avatars?.styled` filter matches nothing on stored
+    // characters, so the judge got no references and no clothing contract.
+    const characterPhotos = buildWholeCastReferencePhotos(
+      characters,
+      storyData.artStyle || null,
+      storyData.clothingRequirements || null
+    );
 
     // Get page text and scene hint
     const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
     const pageText = isCoverPage(pageNumber) ? null : (getPageText(fullStoryText, pageNumber) || scene.text || null);
     // SCENE_HINT = what the image was MADE from (2026-08-31): AD brief for
     // pages, cover brief for covers — same rule as repairPipeline.
-    const sceneHint = evaluationType === 'cover'
-      ? (scene.outlineExtract || scene.sceneHint || null)
-      : (scene.description || scene.sceneDescription || scene.outlineExtract || scene.sceneHint || null);
+    const sceneHint = resolveEvalSceneHint({
+      evaluationType,
+      entryDescription: scene.description,
+      sceneDescription: scene.sceneDescription,
+      outlineExtract: scene.outlineExtract,
+      sceneHint: scene.sceneHint,
+    });
 
     // ─── QUALITY EVALUATION ────────────────────────────────────────────
     if (evalType === 'quality') {
@@ -4328,7 +4391,16 @@ router.post('/:id/evaluate-single/:pageNum', authenticateToken, async (req, res)
         qualityModelOverride,
         pageLabel,
         null,                    // storyText — run quality only, semantic is separate
-        null                     // sceneHint — not used for quality-only
+        null,                    // sceneHint — not used for quality-only
+        scene.sceneCharacters || null,
+        // The ONE shared resolver (see the re-evaluate endpoint above). Without
+        // it this site ran degraded in the same three ways the cover iterate
+        // path did before 1f5101ef9: no visualBible, an outfit contract built
+        // from whatever rode on the reference photos, and no cover text
+        // contract. Same stored-bytes argument for detectedFigures.
+        buildStoryEvalOptions(storyData, scene, pageNumber, {
+          detectedFigures: scene.bboxDetection?.figures || null,
+        }).options
       );
 
       if (!evaluation) {
@@ -4554,11 +4626,15 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
       // generation scene site.
       const shCover = require('../lib/storyHelpers');
       const coverCat = parseClothingCategory(scene.description || '') || storyData.pageClothing?.primaryClothing || 'standard';
+      const coverCastIdx = buildCastIndex(storyData, storyData.visualBible || null);
       for (const name of Object.keys(expectedPositions)) {
         const existing = expectedClothing[name];
         const isCat = typeof existing === 'string' && /^(standard|winter|summer|costumed(:.*)?)$/i.test(existing.trim());
         if (existing && !isCat) continue;
-        const chObj = (storyData.characters || []).find(ch => (ch.name || '').toLowerCase() === String(name).toLowerCase());
+        // RESOLVE: expectedPositions is keyed by whatever spelling the cover
+        // hint used; one resolver decides which roster entry that is.
+        const chResolved = resolveEntity(name, coverCastIdx, { log, pageLabel: `${coverKeyD} ` });
+        const chObj = chResolved && chResolved.kind === 'cast' ? chResolved.entry : null;
         if (!chObj) continue;
         try {
           const txt = shCover.buildIdentityClothingText(chObj, (isCat ? existing.trim() : coverCat), storyData.artStyle, storyData.clothingRequirements || null, { label: `${coverKeyD} ` });
@@ -4634,6 +4710,8 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
           { text: refinePrompt }
         ];
 
+        assertPromptFilled(refineParts, 'regeneration:bboxRefine');
+
         const refineModelId = bboxModelOverride || MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
         const refineModelConfig = TEXT_MODELS[refineModelId];
         let refineData;
@@ -4642,7 +4720,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
           // Claude vision — uses callTextModel with images option
           const { callTextModel } = require('../lib/textModels');
           const imageDataUri = `data:${overlayMime};base64,${overlayBase64}`;
-          const claudeResult = await callTextModel(refinePrompt, 16000, refineModelId, { images: [imageDataUri], usageLabel: 'regen_refine' });
+          const claudeResult = await callTextModel(refinePrompt, null, refineModelId, { images: [imageDataUri], usageLabel: 'regen_refine' });
           if (claudeResult?.text) {
             refineData = { candidates: [{ content: { parts: [{ text: claudeResult.text }] } }] };
           }
@@ -4657,7 +4735,7 @@ router.post('/:id/refresh-bbox/:pageNum', authenticateToken, async (req, res) =>
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               contents: [{ parts: refineParts }],
-              generationConfig: { maxOutputTokens: 16000, temperature: 0.5, responseMimeType: 'application/json' },
+              generationConfig: { temperature: 0.5, responseMimeType: 'application/json' },
               safetySettings: GEMINI_SAFETY_SETTINGS
             })
           });
@@ -4796,6 +4874,8 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
       { text: iteratePrompt }
     ];
 
+    assertPromptFilled(parts, 'regeneration:iteratePlacement');
+
     const modelConfig = TEXT_MODELS[modelId];
     let data;
 
@@ -4803,7 +4883,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
       // Claude vision — uses callTextModel with images option
       const { callTextModel } = require('../lib/textModels');
       const imageDataUri = `data:${overlayMime};base64,${overlayBase64}`;
-      const claudeResult = await callTextModel(iteratePrompt, 16000, modelId, { images: [imageDataUri], usageLabel: 'regen_iterate' });
+      const claudeResult = await callTextModel(iteratePrompt, null, modelId, { images: [imageDataUri], usageLabel: 'regen_iterate' });
       if (!claudeResult?.text) {
         return res.status(500).json({ error: `${modelId} returned no response` });
       }
@@ -4823,7 +4903,7 @@ router.post('/:id/iterate-bbox/:pageNum', authenticateToken, async (req, res) =>
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { maxOutputTokens: 16000, temperature: 0.5, responseMimeType: 'application/json' },
+          generationConfig: { temperature: 0.5, responseMimeType: 'application/json' },
           safetySettings: GEMINI_SAFETY_SETTINGS
         })
       });
@@ -5711,10 +5791,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // story's clothingRequirements first — raw avatars.clothing is
           // character-level metadata that can be stale across stories and
           // redressed repairs in an old outfit.
-          const clothingDesc = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements) || '';
+          const storyClothingDesc = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements) || '';
 
           // Get scene description for context (what is the character doing?)
           const sceneDesc = sceneImage.description || sceneImage.translatedDescription || '';
+          // …resolved against THIS PAGE's worn state, through the same one
+          // resolver the image prompt and every judge use (2026-09-15). A
+          // manual repair is a page path like the automatic one.
+          const clothingDesc = require('../lib/wornItems')
+            .resolveOutfitForStoryPage(storyClothingDesc, characterName, storyData, pageNumber, sceneDesc);
 
           // Get face bbox for head whiteout (separate from repair bbox which may be full body)
           let faceBbox = null;
@@ -5764,7 +5849,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           if (protectionSource?.figures) {
             for (const fig of protectionSource.figures) {
               if (!fig.name || fig.name === 'UNKNOWN') continue;
-              if (fig.name.toLowerCase() === characterName.toLowerCase()) continue;
+              if (canonicalName(fig.name) === canonicalName(characterName)) continue;  // COMPARE
               if (fig.faceBox) {
                 const fb = toRect(fig.faceBox);
                 protectedFaces.push(fb);
@@ -5834,6 +5919,32 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               useFullScene: effectiveMode === 'fullScene',
             }
           );
+
+          // FACE-INTEGRITY GATE — the same gate the unified pipeline applies.
+          // A char fix is a maskless whole-frame edit and can smear the face it
+          // was meant to correct; the one repair a user can trigger by hand
+          // shipped those unchecked until 2026-09-15.
+          const faceGate = grokResult.imageData
+            ? await require('../lib/faceIntegrityGate').checkFaceIntegrity(
+              sceneImage.imageData,
+              grokResult.imageData,
+              characterName,
+              { log, jobKey: id, context: `CHAR REPAIR p${pageNumber} ${characterName}` }
+            )
+            : { ok: true, available: false, reason: null };
+          if (grokResult.imageData && !faceGate.ok) {
+            log.warn(`🚫 [CHAR REPAIR] Page ${pageNumber} ${characterName}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
+            return {
+              task, error: true,
+              failReason: `Repair rejected — face not intact after repair (${faceGate.reason})`,
+              rejectedReason: 'face_integrity',
+              gateMessage: faceGate.reason,
+              attempts: grokResult?.attempts ?? null,
+              // The pictures too — a rejected repair the panel cannot render is
+              // indistinguishable from one that never ran.
+              attemptFrames: grokResult?.attemptFrames || [],
+            };
+          }
 
           if (grokResult.imageData) {
             repairResult = {
@@ -6472,7 +6583,30 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     let qualityReasoning = null;
     try {
       const coverPrompt = existingCover.prompt || existingCover.description || '';
-      const evaluation = await evaluateImageQuality(editResult.imageData, coverPrompt, [], 'cover');
+      // Four bare positionals used to be the whole call: no references (so no
+      // CLOTHING CONTRACT at all), no cast roster, and no evalOptions — no
+      // visualBible, no art style, no cover text contract. The edited cover was
+      // scored by a judge holding almost none of the generator's spec. Same
+      // resolvers as every other cover eval site.
+      const coverPageNumber = COVER_PAGE_NUMBERS[coverKey];
+      const evaluation = await evaluateImageQuality(
+        editResult.imageData,
+        coverPrompt,
+        buildWholeCastReferencePhotos(
+          storyData.characters || [],
+          storyData.artStyle || null,
+          storyData.clothingRequirements || null
+        ),
+        'cover',
+        null,
+        coverKey.toUpperCase(),
+        null,                                   // storyText — a cover has no page prose
+        existingCover.description || existingCover.outlineExtract || null,
+        existingCover.sceneCharacters || null,
+        buildStoryEvalOptions(storyData, existingCover, coverPageNumber, {
+          detectedFigures: existingCover.bboxDetection?.figures || null,
+        }).options
+      );
       if (evaluation) {
         qualityScore = evaluation.score;
         qualityReasoning = evaluation.reasoning;

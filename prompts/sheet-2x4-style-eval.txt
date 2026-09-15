@@ -5,9 +5,11 @@ You receive THREE images:
   - Image 2: the REALISTIC 2×4 sheet (Pass 1 output) — the identity anchor.
   - Image 3: the STYLED 2×4 sheet (Pass 2 output) — the same sheet rendered in the requested art style.
 
-Image 2 and Image 3 should match cell-for-cell in layout, pose, costume, and identity. Only the visual STYLE should differ.
+Image 2 and Image 3 should match cell-for-cell in layout, pose, and identity. Only the visual STYLE should differ.
 
-Your job: rate Image 3 on four checks and return a JSON verdict. If ANY check fails, the styled sheet is rejected and Pass 2 is regenerated.
+The outfit is not scored here — it is judged on the pass that produced Image 2. Never lower any score below because a garment looks wrong or differs from what the character usually wears.
+
+Your job: rate Image 3 on the checks below and return a JSON verdict. If ANY check fails, the styled sheet is rejected and Pass 2 is regenerated.
 
 TASK 1: LAYOUT PRESERVED
 - Image 3 is a 4-column × 2-row grid like Image 2. Top row = 4 head-and-neck cells. Bottom row = 4 full-body cells. Same cell order: front, three-quarter, profile, back.
@@ -26,38 +28,31 @@ TASK 3: STYLE MATCH
 - Score 1-10. If Image 3 still looks photographic / barely changed from Image 2, score 1-3. If style is partially applied (e.g. only the eyes are anime), score 4-6. Clean, complete style transfer = 8-10.
 - `styleScore` is the score.
 
-TASK 4: COSTUME PRESERVED
-- The outfit in Image 3 cells 5-8 matches the outfit in Image 2 cells 5-8 — same garments, same colours, same accessories. Style of rendering can change (photographic → watercolour) but the outfit itself must not change (no different shirt, no added hat, no swapped colours).
-- Cross-cell consistency: all 4 body cells in Image 3 wear the same outfit.
-- The character's clothing description: CLOTHING_DESCRIPTION. Does the outfit match it? A missing or different garment lowers the score; small details (fastenings, panels, trim) do not. Skip this check when the description is "none".
-- Score 1-10. Different outfit between passes, or different outfits across cells, scores 1-3.
-- `outfitScore` is the score.
-
-TASK 5: CLEAN RENDER
+TASK 4: CLEAN RENDER
 - For each of the 4 head cells in Image 3, list in `clean.reason` the colour regions visible on the skin and in the hair (compact, one line per cell).
 - Judge each listed colour against the character's natural colouring in Image 1: skin shows one natural skin tone plus its shading; hair shows one natural hair colour plus its shading. Any colour region that does not belong to that natural colouring — a paint-like patch, streak, or overlay — is a defect, regardless of art style.
 - Also flag arrows, symbols, letters, or logos anywhere on the character.
 - Score 1-10: 9-10 = natural colouring only, no marks. 1-3 = any foreign colour region on skin or hair, or any graphic mark. No middle score: if you listed a foreign region, score 1-3.
 - `cleanScore` is the score.
 
-TASK 6: FACES IN BODY CELLS
+TASK 5: FACES IN BODY CELLS
 - Each front, three-quarter, and profile full-body cell (5, 6, 7) must show a coherent face on the head — eyes, nose, and mouth present and matching the identity, not blank, empty, smeared, or a featureless blob. Cell 8 shows the back of the head and needs no face.
 - Score 1-10. Any of cells 5, 6, 7 with a missing, blank, or smeared face scores 1-3.
 - `bodyFaceScore` is the score.
 
-TASK 7: AGE MATCH
+TASK 6: AGE MATCH
 - The character's declared age: CHARACTER_AGE. If the declared age is "unknown", score 10 and skip this task.
 - Judge the apparent age of the STYLED figure (Image 3) — head-to-body ratio in the body cells, face roundness, height impression. Stylization is allowed to simplify features, but the figure must still read as the declared age, not a younger age stage.
 - Score 1-10. A clear age-stage drop (a school-age child rendered with toddler/preschooler proportions, a teenager rendered as a young child, an adult rendered as a teen) = 1-3. Slightly younger-reading but same age stage = 7-8. Correct = 9-10. Older-reading by one stage = 5-6.
 - `ageScore` is the score.
 
-TASK 8: SINGLE SUBJECT — NO OTHER PEOPLE
+TASK 7: SINGLE SUBJECT — NO OTHER PEOPLE
 - Every cell of Image 3 shows the SAME one person as Image 2. No other or additional people may appear anywhere in the sheet — no second face, no extra figure, no background person, not even partial.
 - This includes faint, ghosted, semi-transparent, or sketchy figures blended into the background or margins — a washed-out extra face or body counts the same as a solid one. Compare against Image 2: any human shape in Image 3 that is not in Image 2 is a defect.
 - Score 1-10. Any extra or different person anywhere in Image 3 (a second face, an added body, a ghosted figure, a crowd) scores 1-3. Only the single target character across all 8 cells = 9-10.
 - `soloScore` is the score.
 
-`finalScore` MUST equal the LOWEST of layoutScore, identityScore, styleScore, outfitScore, cleanScore, bodyFaceScore, ageScore, soloScore.
+`finalScore` MUST equal the LOWEST of layoutScore, identityScore, styleScore, cleanScore, bodyFaceScore, ageScore, soloScore.
 `valid` is `true` only when finalScore ≥ 6.
 
 Return EXACTLY this JSON shape. Every score and reason must come from what you see in Image 3 — never return this template's placeholders:
@@ -66,7 +61,6 @@ Return EXACTLY this JSON shape. Every score and reason must come from what you s
   "layout":   {"score": <1-10>, "reason": "<what you observed>"},
   "identity": {"score": <1-10>, "reason": "<what you observed>"},
   "style":    {"score": <1-10>, "reason": "<what you observed>"},
-  "outfit":   {"score": <1-10>, "reason": "<the actual garments you see and whether they match Image 2>"},
   "clean":    {"score": <1-10>, "reason": "<per-cell colour regions and verdict>"},
   "bodyFace":  {"score": <1-10>, "reason": "<what you observed in cells 5-7>"},
   "age":      {"score": <1-10>, "reason": "<what you observed>"},
@@ -74,7 +68,6 @@ Return EXACTLY this JSON shape. Every score and reason must come from what you s
   "layoutScore": <1-10>,
   "identityScore": <1-10>,
   "styleScore": <1-10>,
-  "outfitScore": <1-10>,
   "cleanScore": <1-10>,
   "bodyFaceScore": <1-10>,
   "ageScore": <1-10>,

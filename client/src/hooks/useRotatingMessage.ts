@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 interface RotatingMessages {
   de: string[];
   fr: string[];
+  it: string[];
   en: string[];
 }
 
@@ -16,6 +17,11 @@ const THINKING_MESSAGES: RotatingMessages = {
     'Ton histoire prend forme...',
     'Les idées se rassemblent...',
     'L\'aventure se tisse...',
+  ],
+  it: [
+    'La tua storia prende forma...',
+    'Raccogliamo le idee...',
+    'Si prepara un\'avventura...',
   ],
   en: [
     'Your story is taking shape...',
@@ -37,6 +43,7 @@ export function useRotatingMessage(
   // Determine language key (default to 'en' if not found)
   const langKey = language.startsWith('de') ? 'de'
     : language.startsWith('fr') ? 'fr'
+    : language.startsWith('it') ? 'it'
     : 'en';
 
   const messages = THINKING_MESSAGES[langKey];

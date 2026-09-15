@@ -159,8 +159,45 @@ async function processFamily(apiBase, family, opts) {
     throw new Error(`No characters on ${family.email}. Run setup-demo-user.js first.`);
   }
 
-  console.log('4. Uploading to character profiles...');
-  const updated = characters.map(char => {
+  // The POST /api/characters merge guard (server/routes/characters.js, the
+  // `isUrl(mergedPhotos[key]) && isInlineImg(value)` continue) SILENTLY DROPS
+  // newly posted base64 whenever the slot already holds an R2 URL — it exists so
+  // the wizard cannot echo stale client base64 over the canonical URL. That guard
+  // stays; a regenerated portrait therefore has to empty the slot first.
+  // An empty string is the one value that gets through: null/undefined are skipped
+  // by the merge entirely, and '' is not an inline image, so it overwrites the URL.
+  const targeted = characters.filter(char => portraits[char.id]);
+  const uploadStart = Date.now();
+
+  const postCharacters = async (chars, label) => {
+    const res = await fetch(`${apiBase}/api/characters`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        characters: chars,
+        relationships: charData.relationships || {},
+        relationshipTexts: charData.relationshipTexts || {},
+        customRelationships: charData.customRelationships || [],
+        customStrengths: charData.customStrengths || [],
+        customWeaknesses: charData.customWeaknesses || [],
+        customFears: charData.customFears || [],
+      }),
+    });
+    if (!res.ok) throw new Error(`${label} failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  };
+
+  // Only the two slots this script writes are emptied; every other key
+  // (body, bodyNoBg, faceBox, …) is untouched, because the merge only walks the
+  // keys that were posted.
+  console.log('4. Clearing existing photo slots (the merge guard drops base64 over a URL)...');
+  const cleared = characters.map(char => (
+    portraits[char.id] ? { ...char, photos: { original: '', face: '' } } : char
+  ));
+  await postCharacters(cleared, 'Clear');
+
+  console.log('5. Uploading to character profiles...');
+  const updated = cleared.map(char => {
     const buf = portraits[char.id];
     if (!buf) return char;
     const dataUri = bufferToDataUri(buf);
@@ -169,23 +206,54 @@ async function processFamily(apiBase, family, opts) {
       photos: { ...(char.photos || {}), original: dataUri, face: dataUri },
     };
   });
+  await postCharacters(updated, 'Save');
 
-  const saveRes = await fetch(`${apiBase}/api/characters`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({
-      characters: updated,
-      relationships: charData.relationships || {},
-      relationshipTexts: charData.relationshipTexts || {},
-      customRelationships: charData.customRelationships || [],
-      customStrengths: charData.customStrengths || [],
-      customWeaknesses: charData.customWeaknesses || [],
-      customFears: charData.customFears || [],
-    }),
-  });
-  if (!saveRes.ok) throw new Error(`Save failed: ${saveRes.status} ${await saveRes.text()}`);
-  const result = await saveRes.json();
-  console.log(`   Saved ${result.count} characters with photos.`);
+  // Report what actually landed, not what was sent: the merge can still drop a
+  // slot, and "Saved N characters" said nothing about the photos.
+  // The R2 key is deterministic (…/characters/<uuid>/<id>/photos/original.jpg),
+  // so the stored URL is IDENTICAL whether or not the bytes changed. The only
+  // honest test is the object behind it: refetch cache-busted and check that it
+  // was written by this run. GET /api/characters strips photos — /:id/full is the
+  // endpoint that returns them.
+  console.log('6. Verifying stored photos...');
+  let landed = 0;
+  for (const char of targeted) {
+    let verdict = null;
+    try {
+      const res = await fetch(`${apiBase}/api/characters/${char.id}/full`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`GET /full → ${res.status}`);
+      const original = (await res.json())?.character?.photos?.original;
+      if (!original) {
+        verdict = 'no photos.original stored';
+      } else if (!/^https?:\/\//.test(original)) {
+        verdict = 'photos.original is not a stored URL';
+      } else {
+        const obj = await fetch(`${original}?cb=${Date.now()}`);
+        if (!obj.ok) {
+          verdict = `stored URL returned ${obj.status}`;
+        } else {
+          const lastModified = Date.parse(obj.headers.get('last-modified') || '');
+          // 60s of slack for clock skew between this machine and the store.
+          if (Number.isFinite(lastModified) && lastModified < uploadStart - 60_000) {
+            verdict = `stored image is stale (last modified ${new Date(lastModified).toISOString()}) — upload dropped`;
+          } else {
+            const bytes = Number(obj.headers.get('content-length')) || (await obj.arrayBuffer()).byteLength;
+            landed++;
+            console.log(`   ✓ ${char.name} (${char.id}): ${Math.round(bytes / 1024)}KB at ${original}`);
+          }
+        }
+      }
+    } catch (err) {
+      verdict = err.message;
+    }
+    if (verdict) console.error(`   ✗ ${char.name} (${char.id}): ${verdict}`);
+  }
+  console.log(`   ${landed}/${targeted.length} portrait(s) actually stored on ${family.email}.`);
+  if (landed < targeted.length) {
+    throw new Error(`${targeted.length - landed} portrait(s) were not stored for ${family.id}`);
+  }
 }
 
 async function main() {

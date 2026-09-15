@@ -156,7 +156,7 @@ async function judgeStoryText(story = {}, opts = {}) {
   const { callTextModel } = require('./textModels');
   let result;
   try {
-    result = await callTextModel(prompt, 2048, judgeModel, {
+    result = await callTextModel(prompt, null, judgeModel, {
       usageLabel: opts.usageLabel || 'text_quality_judge',
       // prefill nudges the model straight into the JSON object (supported on
       // anthropic + google providers). The parser prepends nothing, so the

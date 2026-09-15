@@ -6,9 +6,10 @@
  */
 
 const { log } = require('../utils/logger');
+const { guardPromptString } = require('../services/prompts');
 const { compressImageToJPEG } = require('./images');
 const { getPool } = require('../services/database');
-const { callAnthropicAPI } = require('./textModels');
+const { callTextModel } = require('./textModels');
 const { TEXT_MODELS } = require('../config/models');
 const r2 = require('./r2');
 const { servedPhotoUrl } = require('./landmarkPhotoStore');
@@ -166,8 +167,9 @@ Select the ${count} most DIVERSE photos - different angles, viewpoints, or featu
 Reply with ONLY ${count} numbers separated by commas (e.g., "1,4,7"). Nothing else.`;
 
   try {
-    const haikuModel = TEXT_MODELS['claude-haiku'];
-    const result = await callAnthropicAPI(prompt, 20, haikuModel.modelId);
+    // null = model max (owner rule: no output caps); the reply is a short list
+    // of numbers, and the ceiling is not what makes it short.
+    const result = await callTextModel(prompt, null, 'claude-haiku', { usageLabel: 'landmark_photo_pick' });
     const response = result.text.trim();
 
     // Parse comma-separated numbers
@@ -879,13 +881,15 @@ async function analyzeLandmarkPhoto(photoData, landmarkName, landmarkType) {
     const mimeType = 'image/jpeg';
     const base64Data = buf.toString('base64');
 
-    const prompt = `Describe this photo of "${landmarkName}"${landmarkType ? ` (a ${landmarkType})` : ''} for use in children's book illustration.
+    let prompt = `Describe this photo of "${landmarkName}"${landmarkType ? ` (a ${landmarkType})` : ''} for use in children's book illustration.
 
 Cover BOTH of:
 1. APPEARANCE — main architectural/natural features, colors, materials, textures, distinctive recognizable elements.
 2. LAYOUT IN FRAME — where the landmark sits and where the open space is. Use rough percentages or zones: "tower fills the right 60% of the frame from foreground to sky", "square dominates the lower two-thirds with the tower centered", "open plaza stretches across the foreground; landmark in the upper-right background", "open sky fills the upper third above the landmark roofline". Name which thirds/halves/corners are EMPTY GROUND, EMPTY SKY, or OPEN SQUARE — downstream prompts use this to decide where to place separate props (poles, fountains, signposts) without mounting them on the landmark.
 
 Write 3-5 sentences total. Be specific and visual. Do NOT mention the photo itself or use phrases like "The image shows".`;
+
+    prompt = guardPromptString(prompt, 'analyzeLandmarkPhoto');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -915,7 +919,7 @@ Write 3-5 sentences total. Be specific and visual. Do NOT mention the photo itse
           // and fed to the illustration prompt.
           //
           // Describing a picture in front of the model needs no reasoning chain.
-          maxOutputTokens: 600,
+          // No maxOutputTokens (owner rule: no output caps).
           temperature: 0.3,
           thinkingConfig: { thinkingBudget: 0 }
         }
@@ -1066,7 +1070,7 @@ async function analyzeImageQuality(imageUrl, landmarkName, expectedLocation = nu
       ? `\n  "locationMatch": <1-10>,\n  "detectedLocation": "where this photo appears to be taken",`
       : '';
 
-    const prompt = `Analyze this image of "${landmarkName}"${expectedLocation ? ` (expected location: ${expectedLocation})` : ''} for use as a reference in children's book illustration.
+    let prompt = `Analyze this image of "${landmarkName}"${expectedLocation ? ` (expected location: ${expectedLocation})` : ''} for use as a reference in children's book illustration.
 
 Rate each criterion 1-10:
 1. PHOTO_QUALITY: Is it a clear, well-lit photograph? (not blurry, not too dark)
@@ -1087,6 +1091,8 @@ Respond in this exact JSON format:
 }
 
 IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illustration, engraving, historical artwork, or any non-photographic image. Only set TRUE for actual photographs.`;
+
+    prompt = guardPromptString(prompt, 'analyzeImageQuality');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
@@ -1114,7 +1120,7 @@ IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illust
           // the budget is zero rather than larger: with thinking left on it
           // spends ~1000 thought tokens per image to return the same 75-token
           // object, and this runs over thousands of images.
-          maxOutputTokens: 600,
+          // No maxOutputTokens (owner rule: no output caps).
           temperature: 0.1,
           thinkingConfig: { thinkingBudget: 0 }
         }
@@ -1709,7 +1715,7 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
 
   let languages = defaultLangs;
   if (/switzerland|schweiz|suisse|svizzera/i.test(countryLower)) {
-    languages = ['de', 'en', 'fr']; // Swiss: German, English, French
+    languages = ['de', 'en', 'fr', 'it']; // Swiss: all four national/site languages — it.wikipedia is the only source for many Ticino and Italian-Grigioni landmarks
   } else if (/germany|deutschland/i.test(countryLower)) {
     languages = ['de', 'en']; // Germany: German, English
   } else if (/austria|österreich/i.test(countryLower)) {
@@ -1732,6 +1738,9 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
   // Note: No word boundaries - German compounds like "Holzbrücke" need substring matching
   // "bad" only at end (Thermalbad) to avoid matching city names like "Ennetbaden"
   const germanLandmarkIndicator = /(burg|schloss|kirche|dom|kathedrale|abtei|kloster|brücke|turm|museum|park|garten|palast|brunnen|denkmal|statue|bahnhof|theater|halle|platz|markt|tor|mauer|ruine|bad$|therme|tempel|kapelle|bibliothek|universität|schule|spital|synagoge|moschee|tunnel|pass|stadion|arena|mühle|damm|see|fluss|wasserfall|höhle|berg|gipfel|insel|leuchtturm)/i;
+
+  // Italian landmark indicators (for it.wikipedia)
+  const italianLandmarkIndicator = /(castello|rocca|chiesa|basilica|duomo|cattedrale|abbazia|monastero|convento|ponte|torre|museo|parco|giardino|palazzo|villa|fontana|monumento|statua|stazione|teatro|piazza|mercato|porta|mura|rovine|terme|tempio|cappella|santuario|biblioteca|università|scuola|ospedale|sinagoga|moschea|galleria|traforo|passo|stadio|arena|mulino|diga|lago|fiume|cascata|grotta|monte|montagna|cima|isola|faro)/i;
 
   // French landmark indicators (for fr.wikipedia)
   const frenchLandmarkIndicator = /(château|église|cathédrale|abbaye|monastère|pont|tour|musée|parc|jardin|palais|fontaine|monument|statue|gare|théâtre|place|marché|porte|mur|ruine|bain|therme|temple|chapelle|bibliothèque|université|école|hôpital|synagogue|mosquée|tunnel|col|stade|moulin|barrage|lac|rivière|cascade|grotte|montagne|île|phare)/i;
@@ -1777,6 +1786,8 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
           hasLandmarkIndicator = hasLandmarkIndicator || germanLandmarkIndicator.test(name);
         } else if (lang === 'fr') {
           hasLandmarkIndicator = hasLandmarkIndicator || frenchLandmarkIndicator.test(name);
+        } else if (lang === 'it') {
+          hasLandmarkIndicator = hasLandmarkIndicator || italianLandmarkIndicator.test(name);
         }
 
         // Skip administrative divisions (not actual landmarks)
@@ -2859,9 +2870,11 @@ async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 2
  *
  * Lookup order:
  *   1. exact city name (with diacritic + comma + first-word fallbacks)
- *   2. when (1) returns 0 and lat/lon are supplied, proximity search at
- *      20km → 50km → 100km radius (handles unindexed villages like
- *      Wabern → falls back to nearby Bern landmarks).
+ *   2. when (1) returns 0, proximity search at 20km → 50km → 100km radius
+ *      (handles unindexed villages like Wabern → falls back to nearby Bern
+ *      landmarks). The centre is the caller's lat/lon when supplied; failing
+ *      that, the coordinates of a row the name lookup matched but could not
+ *      serve (a town's own aerial).
  *
  * @param {string|Object} cityOrLocation
  * @param {number} limit
@@ -2996,11 +3009,42 @@ async function getIndexedLandmarks(cityOrLocation, limit = 30) {
       result = { rows: [] };
     }
 
-    if (result.rows.length === 0 && typeof latitude === 'number' && typeof longitude === 'number') {
+    // The caller's coordinates are optional — but a row we MATCHED is itself a
+    // place on the map, and `landmark_index` stores its latitude/longitude.
+    // When the name lookup produced only unusable rows (the town's own aerial,
+    // or a photoless ruin) and the caller supplied no coordinates, that row's
+    // own position IS the town's position. Using it as the proximity centre is
+    // the difference between serving the aerial and finding a real landmark
+    // next door: Fislisbach's only row is its village overview, and from its
+    // coordinates the 20km rung reaches the Holzbrücke and the Zeitturm in
+    // Mellingen, ~3km away.
+    //
+    // Deliberately gated on the caller having given NOTHING: when coords come
+    // in, they win, and this cannot change what the search does. DECIMAL
+    // columns arrive from node-pg as STRINGS, so coerce rather than
+    // typeof-check (the caller's own values were normalised to number|null at
+    // the top of this function).
+    const rowCoord = v => {
+      if (v === null || v === undefined || v === '') return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    let searchLat = latitude;
+    let searchLon = longitude;
+    if (typeof searchLat !== 'number' || typeof searchLon !== 'number') {
+      const anchor = weakRows.find(r => rowCoord(r.latitude) !== null && rowCoord(r.longitude) !== null);
+      if (anchor) {
+        searchLat = rowCoord(anchor.latitude);
+        searchLon = rowCoord(anchor.longitude);
+        log.info(`[LANDMARK-INDEX] "${city}": no caller coordinates — using matched row "${anchor.name}" (${searchLat}, ${searchLon}) as the proximity centre`);
+      }
+    }
+
+    if (result.rows.length === 0 && typeof searchLat === 'number' && typeof searchLon === 'number') {
       for (const radiusKm of [20, 50, 100]) {
-        const nearby = await getIndexedLandmarksNearLocation(latitude, longitude, radiusKm, limit, city);
+        const nearby = await getIndexedLandmarksNearLocation(searchLat, searchLon, radiusKm, limit, city);
         if (nearby.length > 0) {
-          log.info(`[LANDMARK-INDEX] Proximity fallback: "${city}" → ${nearby.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
+          log.info(`[LANDMARK-INDEX] Proximity fallback: "${city}" → ${nearby.length} landmarks within ${radiusKm}km of (${searchLat}, ${searchLon})`);
           return nearby;
         }
       }

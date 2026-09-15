@@ -1,0 +1,16 @@
+### COVER_NOTE
+COVER NOTE: a book-cover portrait. Do not deduct for characters facing or looking at the viewer, or for the title being flat 2D rather than three-dimensional.
+
+### TEXT_NOTE_APP_OVERLAY
+TEXT NOTE: The title, dedication, and "magicalstory.ch" branding on this cover are handled by the app as a typographic overlay, not painted by the image model. Never flag missing/absent title/dedication/branding text as a defect, and if such text IS present treat it as the intended app-composited overlay — never flag it as unrequested rendered text.
+
+### TEXT_RULES
+⚠️ TEXT RULES FOR THIS IMAGE:
+Allowed text: "{EXPECTED_TEXT}" — and nothing else prominent.
+Severities for text issues:
+- Allowed text missing or misspelled (any character difference) → severity: CATASTROPHIC.
+- Other prominent unrequested text on the cover (labels, captions, watermarks, extra words) → severity: MAJOR.
+- Small incidental in-world signage in the background → do not flag; if garbled → severity: MINOR.
+If the only text on the image is exactly the allowed text, evaluate normally.
+
+Before reporting a title misspelling, RE-READ the rendered text letter-by-letter against the allowed text above. Report a mismatch ONLY if you can quote the exact rendered string and it differs from the allowed text. If you are uncertain whether the rendering matches, do NOT flag it.

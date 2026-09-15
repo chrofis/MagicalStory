@@ -1,30 +1,37 @@
 /**
- * VB ELEMENT BUDGET — never more than three Visual Bible elements on a page.
+ * VB ELEMENT BUDGET — how many Visual Bible elements a page may claim.
  *
  * Owner ruling, 2026-09-06: "Never more than 3 VB elements per scene. Drop the
  * least important ones if more are requested. Do a mechanical check of it and
- * feed it into the feedback loop."
+ * feed it into the feedback loop." Raised to FOUR on 2026-09-11, and the
+ * "drop the least important" half was withdrawn the same day — see below.
  *
  * A Visual Bible ELEMENT is a bible entry that becomes a reference image packed
  * into the page's Grok slot — the same set `getElementReferenceImagesForPage`
- * (visualBible.js) selects: secondary characters, animals, artifacts, vehicles,
- * and INVENTED locations. Real landmarks are excluded there (they ship as real
- * photographs, not generated references) and are excluded here, so a page may
- * cite its landmark LOC and still hold three elements.
+ * (visualBible.js) selects: secondary characters, animals, artifacts and
+ * vehicles. LOCATIONS DO NOT COUNT — none of them (owner ruling, 2026-09-08,
+ * superseding the 2026-09-06 wording: "Do not count it as it is the empty scene
+ * not an artifact"). A real landmark ships as a photograph, and an invented
+ * location is what the empty-scene plate is built from — the backdrop the
+ * characters are composited into, not a prop competing for a slot. Counting it
+ * spent it twice. The selection still hands the page its location cell, LAST
+ * and at most one. With the budget at FOUR (2026-09-11) a full page WANTS
+ * VB_ELEMENT_BUDGET + 1 = 5 cells and Grok's VB_SLOT_MAX_ELEMENTS is 4, so the
+ * location — last in priority — is the cell that gives way. That is deliberate:
+ * five cells would put every crowded page on the 200px identity floor, and the
+ * page already receives the location as its background plate.
  *
  * Two sources put an element on a page, and both are counted, because both feed
  * the selection: the brief's own `objects[]` (an id the Art Director asked for)
- * and the bible entry's `appearsInPages` (the bible's own answer). Locations are
- * the one exception — selection admits them by `appearsInPages` only, so the
- * count does too.
+ * and the bible entry's `appearsInPages` (the bible's own answer).
  *
  * RANKING (the "least important" the ruling drops). Data, never prose:
  *   0. a recurring creature — pinned first, exactly as visualBible.js pins it.
- *   1. type: character < animal < artifact < vehicle < location. This is the
- *      priority order the selection already sorts by (visualBible.js:2202-2224,
- *      mirrored in grok.js VB_TYPE_PRIORITY) — using any other order here would
- *      make the code-side truncation and the downstream cap keep different
- *      elements.
+ *   1. type: character < animal < artifact < vehicle. This is the priority
+ *      order the selection already sorts by (visualBible.js
+ *      getElementReferenceImagesForPage, mirrored in grok.js VB_TYPE_PRIORITY)
+ *      — using any other order here would make the code-side truncation and
+ *      the downstream cap keep different elements.
  *   2. focal on this page: the element is an actor or the object of a row in
  *      the brief's `interactions[]`. The page is about what is being handled.
  *   3. asked for: named in `objects[]` beats present only via `appearsInPages`.
@@ -32,37 +39,55 @@
  *      coming back to outranks a one-page prop.
  *   5. id, ascending — determinism, never insertion order.
  *
- * The check REPORTS into the scene review's fault block (sceneBriefCheck) and
- * the review's targeted second round carries it verbatim. A brief that still
- * overflows after that round SHIPS, with the lowest-ranked ids truncated out of
- * `objects[]` in code and a stored `vbElementOverflow` flag — a gate is a
- * guideline, it never kills a paid run.
+ * NOTHING IN CODE ENFORCES IT (owner, 2026-09-11: "we have AI calls for this").
+ * The budget is a rule the Art Director is given in its prompt and a fault the
+ * scene review is handed with the ids named. All three code-side enforcers were
+ * removed that day — the bible-time assignment trim, the brief truncation, and
+ * the budget-shaped selection cap — because code cannot know which objects a
+ * page is about, and withdrawing one removes it from the page prompt's REQUIRED
+ * OBJECTS line while its reference cell still exists.
  *
- * TWO HALVES, TWO ENFORCERS. Truncation can only take back what the BRIEF
- * asked for; an element the bible placed on the page through `appearsInPages`
- * is not the brief's to withdraw, so re-running the truncation on an already
- * truncated brief still counts it. That half is bounded where it actually
- * matters — the page-gen reference selection, which is called with this same
- * VB_ELEMENT_BUDGET and this same priority order (referenceSheets.js,
- * storyJobPipeline.js), so it keeps exactly the three this module ranks first.
- * Grok's own VB_SLOT_MAX_ELEMENTS stays at 4: it is the net under the paths
- * this budget does not author (covers, repair, iterate), and a page that
- * reaches it with four is a violation worth seeing rather than hiding.
+ * The check still REPORTS: an overflow lands in the scene review's fault block
+ * (sceneBriefCheck) and is stored per page as `vbElementOverflow`, where
+ * `dropped` now means "over budget and shipped anyway", not "removed".
+ *
+ * What remains is PHYSICAL, not a budget: the page-gen reference selection is
+ * bounded by Grok's VB_SLOT_MAX_ELEMENTS (4) because the grid shares one
+ * reference slot and cell size scales as 1/n. `rankPageElements` decides which
+ * cells win that space, in the priority order above.
  */
 
 const { extractSceneMetadata, parseProseMetadataFormat } = require('./sceneMetadata');
-const { getRecurringCreatureIds } = require('./visualBible');
+const { getRecurringCreatureIds, entryNamedByRow } = require('./visualBible');
 
-/** The owner's number. One source of truth for prompt, check and truncation. */
-const VB_ELEMENT_BUDGET = 3;
+/**
+ * The owner's number. One source of truth for the prompts and the checks.
+ *
+ * FOUR since 2026-09-11 (owner), up from three. The raise is free at the book's
+ * page aspect: the slot renders 768x1024 (`pageAspect: '3:4'`), the VB column is
+ * capped at a third of the width, so a cell's effective size is
+ * min(256, floor(1024/n)) — 256px at THREE cells and 256px at FOUR. The column
+ * width binds, not the height, so the fourth element costs no resolution at all.
+ *
+ * The FIFTH cell is what would cost: 204px, four pixels above
+ * `VB_CELL_FLOOR_PX`, and below ~200px a secondary character's face is a smear
+ * the model replaces with a prior. So Grok's `VB_SLOT_MAX_ELEMENTS` stays at 4:
+ * a page using all four elements drops its LOCATION cell (last in priority)
+ * rather than shrinking every cell on the most crowded pages. The location is
+ * the one cell that is genuinely redundant — the page already receives that
+ * plate as its background.
+ */
+const VB_ELEMENT_BUDGET = 4;
 
-/** Selection's priority order, by collection. Locations are `appearsInPages` only. */
+/** Selection's priority order, by collection. Locations are not elements (header).
+ *  Keyed on the COLLECTION arrays, which is what keeps `visualBible.genericObjects[]`
+ *  invisible to the budget: a generic entry was dropped at parse time and has no id,
+ *  so it can never be ranked, cited or counted (owner, 2026-09-15). */
 const ELEMENT_COLLECTIONS = [
   { key: 'secondaryCharacters', type: 'character', priority: 1, viaObjects: true },
   { key: 'animals', type: 'animal', priority: 2, viaObjects: true },
   { key: 'artifacts', type: 'artifact', priority: 3, viaObjects: true },
   { key: 'vehicles', type: 'vehicle', priority: 4, viaObjects: true },
-  { key: 'locations', type: 'location', priority: 5, viaObjects: false },
 ];
 
 /**
@@ -86,14 +111,14 @@ function objectIds(objects = []) {
   return ids;
 }
 
-/** Every name/id the brief's interactions[] touch, upper-cased, for the focal test. */
-function interactionTokens(metadata) {
+/** The `character` / `object` strings of the brief's interactions[], for the focal test. */
+function interactionFields(metadata) {
   const rows = (metadata && Array.isArray(metadata.interactions)) ? metadata.interactions : [];
-  const out = new Set();
+  const out = [];
   for (const row of rows) {
     for (const field of ['character', 'object']) {
-      const v = String((row && row[field]) || '').trim().toUpperCase();
-      if (v) out.add(v);
+      const v = String((row && row[field]) || '').trim();
+      if (v) out.push(v);
     }
   }
   return out;
@@ -111,14 +136,13 @@ function interactionTokens(metadata) {
 function rankPageElements(pageNumber, metadata, visualBible) {
   if (!visualBible) return [];
   const asked = new Set(objectIds(metadata && metadata.objects));
-  const tokens = interactionTokens(metadata);
+  const fields = interactionFields(metadata);
   const recurring = new Set(getRecurringCreatureIds(visualBible).map(id => String(id).toUpperCase()));
   const rows = [];
   for (const col of ELEMENT_COLLECTIONS) {
     const entries = visualBible[col.key];
     for (const entry of (Array.isArray(entries) ? entries : [])) {
       if (!entry || !entry.id) continue;
-      if (col.key === 'locations' && entry.isRealLandmark) continue;
       const id = baseId(entry.id) || String(entry.id).trim().toUpperCase();
       const onPage = Array.isArray(entry.appearsInPages) && entry.appearsInPages.includes(pageNumber);
       const named = col.viaObjects && asked.has(id);
@@ -130,11 +154,20 @@ function rankPageElements(pageNumber, metadata, visualBible) {
         type: col.type,
         recurring: recurring.has(id),
         priority: recurring.has(id) ? 0 : col.priority,
-        focal: tokens.has(id) || (!!name && tokens.has(name.toUpperCase())),
+        focal: false,
+        entry,
         fromObjects: !!named,
         appearsCount: Array.isArray(entry.appearsInPages) ? entry.appearsInPages.length : 0,
       });
     }
+  }
+  // Focal = an interactions[] row names the element — the ONE row→entry
+  // matcher (visualBible.entryNamedByRow), disambiguated against every other
+  // element on this page, so a paraphrased name still counts.
+  const candidates = rows.map(r => r.entry);
+  for (const r of rows) {
+    r.focal = fields.some(f => entryNamedByRow(f, candidates) === r.entry);
+    delete r.entry;
   }
   return rows.sort((a, b) => (
     (a.priority - b.priority)
@@ -145,9 +178,11 @@ function rankPageElements(pageNumber, metadata, visualBible) {
   ));
 }
 
-/** `Name (ID, type)` — how an element is named to the reviewer. */
+/** `Label (ID, type)` — how an element is named to the reviewer. The label is
+ * the element's ONE authored English label (vbLabel.labelOf); the id rides
+ * along because the reviewer is a text judge, not an image model. */
 function label(e) {
-  return `${e.name || e.id} (${e.id}, ${e.type})`;
+  return `${require('./vbIdGuard').elementDisplayLabel(e)} (${e.id}, ${e.type})`;
 }
 
 /**
@@ -243,8 +278,171 @@ ${JSON.stringify(metadata, null, 2)}`,
   };
 }
 
+
+/**
+ * USAGE FROM THE BRIEFS — the bible's `appearsInPages` rebuilt from what the
+ * FINAL scene briefs actually cite.
+ *
+ * The bible is written before the briefs exist, so every page assignment in it
+ * is the bible model's own guess. Anything that decided at bible time which
+ * element belongs on which page was deciding without the evidence: measured on
+ * staging job_1789147573901_m3uam0nxi, the plan-line trim stripped 19
+ * (element, page) claims and left six entries — the story's central prop and the
+ * signpost carrying its plot-critical text among them — with `appearsInPages:
+ * []`, so `getElementsNeedingReferenceImages` rendered no cell for them, while
+ * the final briefs asked for exactly those ids (p10 objects: ["LOC004",
+ * "ART006"]).
+ *
+ * The briefs are the single source of truth for usage. Run this once the briefs
+ * are final and before any reference cell is selected: every entry's pages
+ * become the pages whose brief cites it, and an entry no brief cites gets `[]` —
+ * a truthful "nothing uses this", which correctly renders no cell.
+ *
+ * A brief cites an element in `objects[]`, as a bare id (`ART006`) or a dotted
+ * state/vantage handle (`ART015.1`). A dotted handle credits the PARENT entry
+ * AND the matching `states[]` row (`vantages[]` for a location). A page's
+ * `characters[]` and `interactions[]` may name a secondary character or an
+ * animal by NAME rather than by id; those count too, resolved through the one
+ * row→entry matcher (`entryNamedByRow`).
+ *
+ * `clothing` is never rebuilt: no brief cites a CLO id, so deriving its pages
+ * from the briefs would only empty it.
+ *
+ * Pure apart from the in-place mutation, idempotent, and never throws: with no
+ * briefs (the legacy unified path and the trial path both reach reference-sheet
+ * generation before any brief exists) it is a no-op and reports nothing.
+ *
+ * @param {Object} visualBible  parsed bible (MUTATED in place)
+ * @param {Array} pagesWithMetadata  [{pageNumber, metadata|objects|brief|sceneDescription}]
+ * @returns {{applied:boolean, pages:number[], entries:Array<{id,collection,name,
+ *   oldPages:number[], newPages:number[], gained:number[], lost:number[]}>,
+ *   changed:number, emptied:string[], revived:string[]}}
+ */
+const USAGE_COLLECTIONS = [
+  ...ELEMENT_COLLECTIONS.map(c => c.key),
+  'locations',
+];
+
+/** Every id token a brief's metadata cites, bare or dotted, uppercased. */
+function citedHandles(metadata) {
+  const out = [];
+  const push = (t) => {
+    const s = String(t || '').trim().toUpperCase();
+    const m = s.match(/\b([A-Z]{3}\d{3})(?:\.(\d+))?\b/);
+    if (m) out.push({ id: m[1], index: m[2] ? Number(m[2]) : null });
+  };
+  for (const raw of (Array.isArray(metadata && metadata.objects) ? metadata.objects : [])) {
+    push(typeof raw === 'string' ? raw : (raw && (raw.id || raw.name)));
+  }
+  return out;
+}
+
+/** The free-text names a page's cast/interactions carry, for the by-name credit. */
+function castFields(metadata) {
+  const out = [];
+  for (const raw of (Array.isArray(metadata && metadata.characters) ? metadata.characters : [])) {
+    const v = String((typeof raw === 'string' ? raw : (raw && (raw.name || raw.id))) || '').trim();
+    if (v) out.push(v);
+  }
+  return out.concat(interactionFields(metadata));
+}
+
+function applyBriefUsage(visualBible, pagesWithMetadata = []) {
+  const report = { applied: false, pages: [], entries: [], changed: 0, emptied: [], revived: [] };
+  if (!visualBible || typeof visualBible !== 'object') return report;
+
+  // Normalise the briefs to {pageNumber, metadata}; a page with no parseable
+  // metadata block contributes nothing but does not invalidate the rest.
+  const briefs = [];
+  for (const sd of (Array.isArray(pagesWithMetadata) ? pagesWithMetadata : [])) {
+    if (!sd) continue;
+    const pageNumber = Number(sd.pageNumber ?? sd.page);
+    if (!Number.isFinite(pageNumber)) continue;
+    const metadata = sd.metadata
+      || (sd.objects ? { objects: sd.objects, characters: sd.characters, interactions: sd.interactions } : null)
+      || extractSceneMetadata(String(sd.brief || sd.sceneDescription || ''))
+      || null;
+    if (!metadata) continue;
+    briefs.push({ pageNumber, metadata });
+  }
+  if (briefs.length === 0) return report; // no briefs yet — the guess stands
+
+  report.applied = true;
+  report.pages = briefs.map(b => b.pageNumber).sort((a, b) => a - b);
+
+  // id -> {entry, collection}; the by-name pass needs the CHR/ANI entries too.
+  const byId = new Map();
+  const namedCandidates = [];
+  for (const key of USAGE_COLLECTIONS) {
+    for (const entry of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      if (!entry || !entry.id) continue;
+      byId.set(baseId(entry.id) || String(entry.id).trim().toUpperCase(), { entry, key });
+      if (key === 'secondaryCharacters' || key === 'animals') namedCandidates.push(entry);
+    }
+  }
+
+  const pagesFor = new Map();      // base id -> Set(pages)
+  const subPagesFor = new Map();   // `ID.N` -> Set(pages)
+  const credit = (map, key, page) => {
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key).add(page);
+  };
+
+  for (const { pageNumber, metadata } of briefs) {
+    for (const { id, index } of citedHandles(metadata)) {
+      if (!byId.has(id)) continue;
+      credit(pagesFor, id, pageNumber);
+      if (index !== null) credit(subPagesFor, `${id}.${index}`, pageNumber);
+    }
+    // A secondary character or animal a page's cast names without an id.
+    for (const field of castFields(metadata)) {
+      const hit = entryNamedByRow(field, namedCandidates);
+      if (!hit || !hit.id) continue;
+      credit(pagesFor, baseId(hit.id) || String(hit.id).trim().toUpperCase(), pageNumber);
+    }
+  }
+
+  const sorted = (set) => [...(set || [])].map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  for (const [id, { entry, key }] of byId) {
+    const oldPages = sorted(new Set(Array.isArray(entry.appearsInPages) ? entry.appearsInPages : []));
+    const newPages = sorted(pagesFor.get(id));
+    entry.appearsInPages = newPages;
+    if (Array.isArray(entry.pages) || oldPages.length > 0) entry.pages = [...newPages];
+
+    // Sub-rows: a state (or a location's vantage) keeps the pages whose brief
+    // cited that exact handle; a handle nobody cited for a page it used to
+    // claim loses it. A sub-row is matched by its own id, then by position.
+    const subKey = key === 'locations' ? 'vantages' : 'states';
+    const subs = Array.isArray(entry[subKey]) ? entry[subKey] : null;
+    if (subs) {
+      subs.forEach((st, i) => {
+        if (!st || typeof st !== 'object') return;
+        const handle = String(st.id || '').trim().toUpperCase() || `${id}.${i + 1}`;
+        const own = sorted(subPagesFor.get(handle));
+        // A page that cited the BARE parent id belongs to the parent's default
+        // sub-row (the first) — the same rule `defaultObjectState` applies.
+        const bare = i === 0
+          ? newPages.filter(p => ![...subPagesFor.keys()]
+            .filter(k => k.startsWith(`${id}.`))
+            .some(k => (subPagesFor.get(k) || new Set()).has(p)))
+          : [];
+        st.pages = sorted(new Set([...own, ...bare]));
+      });
+    }
+
+    const gained = newPages.filter(p => !oldPages.includes(p));
+    const lost = oldPages.filter(p => !newPages.includes(p));
+    report.entries.push({ id, collection: key, name: String(entry.name || ''), oldPages, newPages, gained, lost });
+    if (gained.length || lost.length) report.changed++;
+    if (oldPages.length > 0 && newPages.length === 0) report.emptied.push(id);
+    if (oldPages.length === 0 && newPages.length > 0) report.revived.push(id);
+  }
+  return report;
+}
+
 module.exports = {
   VB_ELEMENT_BUDGET,
+  applyBriefUsage,
   rankPageElements,
   checkVbElementBudget,
   buildVbElementFindings,

@@ -711,6 +711,22 @@ const VB_AGE_INDICATOR = /\b(?:\d{1,3}\s*(?:-|\s)?(?:year|yr)s?(?:\s*-?\s*old)?|
 // not a statement of sex, and "Rossa"/"Mrs Baker" must not satisfy the rule.
 const VB_PROSE_FIELDS = ['description', 'age', 'build', 'face', 'hair', 'signatureLook', 'clothing', 'features', 'type', 'setting'];
 
+// The authoring prompt mandates `age` as a NUMBER of years ("8", "34"), never
+// prose — so the compliant form is exactly the one VB_AGE_INDICATOR cannot
+// match and vbEntryProse drops before matching. A plausible year count is a
+// statement of apparent age in its own right. 0 and anything non-finite or out
+// of human range is NOT: an unset, defaulted or garbage field is precisely the
+// omission this rule exists to catch.
+const VB_AGE_YEARS_MAX = 120;
+
+/** True when `age` holds a plausible number of years (numeric or a numeric string). */
+function vbHasNumericAge(entry) {
+  const raw = entry?.age;
+  if (typeof raw !== 'number' && !(typeof raw === 'string' && /^\s*\d{1,3}(?:\.\d+)?\s*$/.test(raw))) return false;
+  const years = Number(raw);
+  return Number.isFinite(years) && years > 0 && years <= VB_AGE_YEARS_MAX;
+}
+
 const VB_CATEGORIES = ['secondaryCharacters', 'animals', 'artifacts', 'locations', 'vehicles', 'clothing'];
 
 /** Prose an entry actually authored, joined for indicator matching. */
@@ -765,7 +781,7 @@ function auditVisualBibleContract(visualBible, options = {}) {
     const prose = vbEntryProse(entry);
     const missing = [];
     if (!VB_SEX_INDICATOR.test(prose)) missing.push('sex');
-    if (!VB_AGE_INDICATOR.test(prose)) missing.push('apparent age');
+    if (!vbHasNumericAge(entry) && !VB_AGE_INDICATOR.test(prose)) missing.push('apparent age');
     if (missing.length) {
       findings.push({
         code: 'character-missing-sex-or-age',
@@ -779,8 +795,20 @@ function auditVisualBibleContract(visualBible, options = {}) {
   // (2) A range covering nearly the whole book was almost certainly not earned.
   // A genuinely single-setting story can trip this on its one location; the
   // warning is a prompt for a human look, not a defect claim.
+  //
+  // The HARM differs by category, so the message does too. For an ELEMENT
+  // (secondary character, animal, artifact, vehicle, clothing) a blanket range
+  // is what bakes it into scenes that never contain it — those are the
+  // collections `vbElementBudget.ELEMENT_COLLECTIONS` ranks and the page
+  // references are drawn from. A LOCATION is not an element (docs/SETTLED.md,
+  // 2026-09-08): it is the plate the cast is composited into, never a reference
+  // cell, and the one reader of a location's pages is the landmark page gate
+  // (storyHelpers.js), where a wide range is permissive rather than harmful. So
+  // a location keeps the tripwire but is told what it actually means — usually
+  // a single-setting book, worth one look to confirm it really stays there.
   if (pageCount >= 4) {
     for (const cat of VB_CATEGORIES) {
+      const isLocation = cat === 'locations';
       for (const entry of entriesOf(cat)) {
         const pages = pagesOf(entry);
         const covered = new Set(pages.filter(p => Number.isFinite(p))).size;
@@ -789,7 +817,9 @@ function auditVisualBibleContract(visualBible, options = {}) {
             code: 'blanket-appears-in-pages',
             id: entry?.id || entry?.name || '(unnamed)',
             category: cat,
-            message: `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — a blanket range bakes the element into scenes that never contain it`,
+            message: isLocation
+              ? `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — expected for a single-setting story; confirm the book really stays there`
+              : `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — a blanket range bakes the element into scenes that never contain it`,
           });
         }
       }
@@ -809,6 +839,7 @@ module.exports = {
   CLOTHING_CATEGORIES,
   auditVisualBibleContract,
   vbEntryProse,
+  vbHasNumericAge,
   parseCharacterClothingBlock,
   cleanPageText,
   parsePatchSections,
@@ -824,4 +855,5 @@ module.exports = {
   CLOTHING_CATEGORY_PATTERN,
   extractCharacterNamesFromScene,
   getExtractJsonFromText,
+  extractBalancedJsonObject,
 };

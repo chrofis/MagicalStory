@@ -7,7 +7,7 @@ description: Use when the owner asks to run a trial showcase, test the /try funn
 
 A **trial showcase** runs one real trial story end-to-end through the public `/try` API and reports it. It is the trial counterpart of `npm run showcase` (which runs full stories on fresh demo-family accounts).
 
-**One trial = 5 pages + title page + one preview avatar ≈ CHF 0.20–0.35.** This is a paid run under the CLAUDE.md spend-guard rule: launch only when the owner asked for it in this conversation. Preparing the command is never permission to fire it.
+**One trial = 5 pages + title page + one preview avatar ≈ CHF 0.20–0.35**, plus ~USD 0.02 and 5–10 s for the idea cards (see `--idea` below). This is a paid run under the CLAUDE.md spend-guard rule: launch only when the owner asked for it in this conversation. Preparing the command is never permission to fire it.
 
 ## Run it
 
@@ -17,7 +17,12 @@ node scripts/admin/trial-showcase.js --entry=2       # a specific rotation entry
 node scripts/admin/trial-showcase.js --dry-run       # print the plan, make no paid call
 node scripts/admin/trial-showcase.js --base=https://magicalstory.ch   # production
 node scripts/admin/trial-showcase.js --no-wait       # fire and exit, print the job id
+node scripts/admin/trial-showcase.js --idea=makebelieve   # take the fantasy card
 ```
+
+`--idea=grounded|makebelieve|first|random`, default **`grounded`** — which of the two idea cards to take. `grounded` is card 1 (the child's real town, with its indexed landmarks), `makebelieve` is card 2 (a made-up world), `first` is always card 1, `random` picks one. The card also sets `ideaKind`, which the server reads to decide whether the landmark mandate applies.
+
+Premise precedence: `--details=` → a non-empty `storyDetails` on the rotation entry → a generated idea card. The harness never posts an empty premise, and an idea failure is fatal rather than a silent fallback.
 
 Default is **staging** deliberately: trial had never run there before 2026-08-15, and staging is where the `trialMode → never beats` gate needs exercising.
 
@@ -29,8 +34,9 @@ Drives the same endpoints the wizard calls — no browser, so no Turnstile flaki
 2. `POST /api/trial/analyze-photo` → physical traits + face box.
 3. `POST /api/trial/generate-preview-avatar` → the avatar the pipeline seeds `avatars.standard` from.
 4. `POST /api/trial/create-anonymous-account` → fresh trial user (so the one-trial-per-user cap never blocks a rerun).
-5. `POST /api/trial/create-story` → job id.
-6. Polls `GET /api/trial/job-status/:jobId` to completion and prints the story URL.
+5. `POST /api/trial/generate-ideas-stream` → the two idea cards; one is picked per `--idea` and posted as `title + '\n' + summary`, exactly as the wizard does. Skipped only when `--details=` or the rotation entry already supplies a premise.
+6. `POST /api/trial/create-story` → job id.
+7. Polls `GET /api/trial/job-status/:jobId` to completion and prints the story URL.
 
 ## Rotation
 

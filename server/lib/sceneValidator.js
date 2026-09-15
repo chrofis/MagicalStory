@@ -655,7 +655,7 @@ async function repairScene(sceneJson, imageDescription, compositionIssues) {
   });
 
   // Call Claude to generate the repair
-  const result = await callTextModel(repairPrompt, 4000, resolveSceneValidationModel(), { prefill: '{', usageLabel: 'scene_validation' });
+  const result = await callTextModel(repairPrompt, null, resolveSceneValidationModel(), { prefill: '{', usageLabel: 'scene_validation' });
 
   const elapsed = Date.now() - startTime;
   const text = result.text;
@@ -761,6 +761,34 @@ async function validateAndRepairScene(sceneJson, options = {}) {
  * @param {string} sceneHint - Direct statement of what image should show (most authoritative)
  * @returns {Promise<{score: number, verdict: string, semanticIssues: Array, usage: Object}>}
  */
+/**
+ * The semantic judge's prompt, built. Split out of `evaluateSemanticFidelity`
+ * so the BUILT prompt — not the template, not a replica of the fill — can be
+ * asserted without a model call. Pure.
+ *
+ * @param {string} template - PROMPT_TEMPLATES.imageSemantic, or an A/B override
+ * @param {object} parts - the per-page inputs, already resolved by the caller
+ * @param {'light'|'full'} level - Gemini-safety sanitisation level
+ */
+function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, evalContext = {} } = {}, level = 'light') {
+  const { sanitizeForGemini } = require('./images');
+  const clean = (text) => text ? sanitizeForGemini(stripEntityIds(text), level) : null;
+  return fillTemplate(template, {
+    STORY_TEXT: clean(storyText),
+    SCENE_HINT: clean(sceneHint) || 'Not provided',
+    IMAGE_PROMPT: clean(imagePrompt) || 'No prompt provided',
+    INTERACTIONS_BLOCK: interactionsBlock || '(none declared)',
+    ELEMENTS_BLOCK: elementsBlock || '(none)',
+    ART_STYLE: evalContext.artStyle || '',
+    CLOTHING_CONTRACT: evalContext.clothingContract || '',
+    // ONE ROSTER (2026-09-14). buildExpectedCastBlock's block with its kind
+    // labels, so an `(animal)` entry is never weighed as a named character.
+    // '' for a caller that has no roster — the prompt then judges from the
+    // hint alone, exactly as before.
+    EXPECTED_CAST: evalContext.expectedCast || '',
+  });
+}
+
 async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null, templateOverride = null, evalContext = {}) {
   // evalContext.artStyle / .clothingContract: the same resolved values every
   // other evaluator gets — commissioned style and per-character outfits are
@@ -775,13 +803,12 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   const { sanitizeForGemini, callGrokVisionAPI, GEMINI_SAFETY_SETTINGS } = require('./images');
   const { TEXT_MODELS } = require('../config/models');
   // The semantic eval emits JSON with per-scene-action checks, visible entities,
-  // expected entities, and semantic_issues — the default Gemini output limit
-  // (8192) truncated this mid-JSON on pages with many interactions. 24k keeps
-  // complete JSON even for busy scenes after Gemini 2.5 thinking overhead.
+  // expected entities, and semantic_issues. No maxOutputTokens (owner rule:
+  // no output caps) — Gemini's default is the model's own ceiling.
   const model = genAI.getGenerativeModel({
     model: VISION_MODEL,
     safetySettings: GEMINI_SAFETY_SETTINGS,
-    generationConfig: { maxOutputTokens: 24000, temperature: EVAL_TEMPERATURE }
+    generationConfig: { temperature: EVAL_TEMPERATURE }
   }, EVAL_REQUEST_OPTIONS);
   const startTime = Date.now();
 
@@ -797,13 +824,21 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   // and this block — which is the ONE place `i.object` (a raw VB id) is
   // rendered — was the exception. Shared builder now (vbIdGuard.js).
   let interactionsBlock = '(none declared)';
+  // PAGE ELEMENTS: the one place a raw id is SHOWN to this judge on purpose. It
+  // reads the page's declared objects, resolves each to its bible name, and the
+  // judge copies the id back as `element` on every finding about that thing —
+  // which is how the repair is later handed the element's picture by id.
+  let elementsBlock = '(none)';
   try {
     const { extractSceneMetadata: getSceneMetadata } = require('./storyHelpers');
     const sceneMeta = getSceneMetadata(imagePrompt || sceneHint || '');
     const interactions = sceneMeta?.interactions
       || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
-    interactionsBlock = require('./vbIdGuard')
-      .formatInteractionsBlock(interactions, evalContext.visualBible || null);
+    const guard = require('./vbIdGuard');
+    interactionsBlock = guard.formatInteractionsBlock(interactions, evalContext.visualBible || null, sceneMeta?.characters || sceneMeta?.fullData?.characters || null);
+    const objects = sceneMeta?.objects
+      || (Array.isArray(sceneMeta?.fullData?.objects) ? sceneMeta.fullData.objects : null);
+    elementsBlock = guard.formatElementsBlock(objects, evalContext.visualBible || null);
   } catch { /* silent fallback */ }
 
   // Convert image to base64 if needed
@@ -813,17 +848,9 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
   }
 
   // Build prompt at a given sanitization level
-  const buildPrompt = (level) => {
-    const clean = (text) => text ? sanitizeForGemini(stripEntityIds(text), level) : null;
-    return fillTemplate(template, {
-      STORY_TEXT: clean(storyText),
-      SCENE_HINT: clean(sceneHint) || 'Not provided',
-      IMAGE_PROMPT: clean(imagePrompt) || 'No prompt provided',
-      INTERACTIONS_BLOCK: interactionsBlock,
-      ART_STYLE: evalContext.artStyle || '',
-      CLOTHING_CONTRACT: evalContext.clothingContract || '',
-    });
-  };
+  const buildPrompt = (level) => buildSemanticPrompt(template, {
+    storyText, sceneHint, imagePrompt, interactionsBlock, elementsBlock, evalContext,
+  }, level);
 
   // Parse the Gemini/Grok response text into a result object
   const parseResponse = (text, usageMeta, elapsed) => {
@@ -848,7 +875,12 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     // returns one. The score is computed from semanticIssues below.
     // Unified issue array (2026-08-08). semantic_issues is the pre-unification
     // name and stays readable so stored evaluations keep parsing.
-    const semanticIssues = analysis.fixable_issues || analysis.semantic_issues || [];
+    // PROVENANCE (2026-09-14): every finding names its emitter, in the one
+    // field routing reads and scoring passes through (server/lib/findingSources.js).
+    const semanticIssues = require('./findingSources').stampFindingSource(
+      analysis.fixable_issues || analysis.semantic_issues || [],
+      require('./findingSources').FINDING_SOURCES.SEMANTIC
+    );
 
     log.info(`🔍 [SEMANTIC] Token usage - input: ${usageMeta?.promptTokenCount?.toLocaleString() || 0}, output: ${usageMeta?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
     if (semanticIssues.length > 0) {
@@ -952,5 +984,6 @@ module.exports = {
   buildPreviewPrompt,
   generatePreviewFeedback,
   buildSimplePreviewPrompt,
-  evaluateSemanticFidelity
+  evaluateSemanticFidelity,
+  buildSemanticPrompt
 };

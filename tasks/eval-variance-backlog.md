@@ -9,7 +9,8 @@ finding was that the score carries roughly 26 points of run-to-run noise.
 ## B. Finding taxonomy (one prompt change across three templates + one validation run)
 
 **Verified against the tree 2026-08-20: B3, B4 and B5 shipped after this list was written.**
-Only B1/B2 remain.
+**Section B is now CLOSED:** B1 shipped 2026-09-11 (`3146b3c8d`, staging) and B2 was declined
+and closed by the owner on 2026-09-13.
 
 **Re-scoped 2026-09-06: the CONSUMER plumbing already landed** — 2bee3632c (the jury merges per
 `(bucket, subject)`) and `evalBuckets.js:265-353` carries `subject` through and warns that scoring
@@ -17,12 +18,22 @@ bills per `(class, subject)`. What remains for both B1 and B2 is the PROMPT-side
 `prompts/image-evaluation.txt` nor `prompts/image-semantic.txt` instructs the evaluator to emit a
 subject. Do not read these as unbuilt.
 
-- [ ] **B1. Clothing findings carry no `subject`.** Clothing is the largest producer of
-      deductions, so per-character billing degrades to per-page: two characters' clothing
-      problems collapse into one charge. Remaining work: the evaluator prompt must emit it.
-- [ ] **B2. Objects have no subject either.** Only 11% of `object_presence` and 3% of
-      `setting` findings carry one, so distinct objects merge. Owner accepted this merge for
-      now (2026-08-19); a `subject` field closes it properly. Remaining work: prompt-side emission.
+- [x] **B1. Clothing findings carry no `subject`.** (2026-09-11, `3146b3c8d`, staging branch
+      only — never merged to master.) Clothing is the largest producer of deductions, so
+      per-character billing degraded to per-page: two characters' clothing problems collapsed
+      into one charge. Both evaluator templates now require `character` on every finding that
+      belongs to a figure.
+- [x] **B2. Per-object billing for `object_presence` / `setting` — DECLINED AND CLOSED
+      (owner, 2026-09-13).** `object_presence` and `setting` stay in `PAGE_SCOPED_BUCKETS`
+      (`server/lib/scoring.js:478-489`); the 2026-08-19 ruling is reaffirmed, not reversed, and
+      no `subject`/`element` field is added to object findings in the evaluator prompts. No
+      code change. **The reason is cost, not missing data:** per-object billing would charge a
+      page missing three declared props 45 points instead of 15, crossing
+      `REPAIR_DEFAULTS.scoreThreshold`, and regenerated pages often come back worse. **And the
+      old premise was wrong:** post-B1, 96.7% of consolidated `object_presence` findings DO
+      carry a subject — `scoring.js:552` discards it deliberately. Do not re-open this on the
+      belief that objects have no subject.
+      → `docs/decisions.md` 2026-09-13 "Per-object billing is declined"
 - [x] **B3. `viewer_address` has its own type** — `evalBuckets.js:101` + `:188`.
       Done 2026-08-20, `docs/decisions.md` "emotion and viewer_address become their own types".
 - [x] **B4. `emotion` has its own type** — `evalBuckets.js:91` + `:179`. Same entry. The
@@ -59,12 +70,20 @@ subject. Do not read these as unbuilt.
 
 ## Open decisions for the owner
 
-- [ ] Approve the B1–B2 prompt change (a `subject` field on clothing and object findings).
-      B3/B4 already shipped.
+- [x] Approve the B1–B2 prompt change (a `subject` field on clothing and object findings).
+      B3/B4 already shipped. **RULED: B1 approved and shipped** (2026-09-11, `3146b3c8d`);
+      **B2 declined and closed** (2026-09-13) — objects and settings stay page-scoped, no
+      prompt change, no code change. → `docs/decisions.md` 2026-09-13 "Per-object billing is
+      declined"
 - [x] (2026-09-06) C1 targeted confirmation eval — **ALREADY DECIDED: DECLINED by the owner.**
       `docs/decisions.md` 2026-08-19 "False-clean pages are an ACCEPTED RISK": "Confirming every
       100 with a second eval was offered and declined" (restated `:14904`).
-- [ ] Whether any of this goes to master.
+- [x] (2026-09-11) ~~Whether any of this goes to master.~~ **CLOSED AS STALE — it was never a
+      separate decision.** It is the same thing as the standing P0 promotion item in
+      `tasks/BACKLOG.md` ("Verify on staging before promoting to master"): `origin/staging` was
+      **207 commits ahead of `origin/master`** when measured on 2026-09-11, and the eval work is
+      part of that same block. The owner does the promotion himself, later.
+      → `tasks/BACKLOG.md` (P0 section), `docs/decisions.md` (2026-09-11 triage entry)
 
 ## Done (the session that produced this backlog)
 
@@ -92,3 +111,45 @@ subject. Do not read these as unbuilt.
   (`evalPipeline.js:915` + `:621-633`). Merging collapses the cross-check into
   self-confirmation and cannot hold two sampling regimes. Reopening needs evidence that P1 and
   Stage 1 rarely disagree.
+
+## C4 — the book-audit judge's severity grade is a lottery (measured 2026-09-13)
+
+Lab experiments **#1258 / #1259**, on prod story `job_1789227389389_z18dmvnt6` copied to
+staging. Identical shipped bytes both runs (`input_tokens` 7,018 each), `gemini-2.5-flash` at
+temperature 0.
+
+- **28 vs 26 faults**; 22 in common — 84.6% overlap, Jaccard 68.8%.
+- **5 of the 22 common faults (22.7%) changed SEVERITY GRADE between the two runs** —
+  p3 MAJOR↔CRITICAL, p14 CRITICAL↔MAJOR, and three more.
+- The **route tag (IMG/TEXT) was stable**: zero divergences across both runs, all IMG. The
+  route flipping recorded for `gemini-3.7-flash` is that model's behaviour, not a property of
+  the stage — do not generalise one judge's instability to the others.
+- **A same-model double read does NOT fix recall.** Both runs scored 5/7 on the eye-verified
+  defect list, and so did their UNION; #1229 contributed zero unique observations. A repeat
+  buys ~23% more observations and nothing the model cannot see. The cheap recall win is a
+  CROSS-MODEL union (2.5-flash + 3.7-flash = 6/7 for $0.071).
+- **G6 (a prop rendered as a glowing orb containing a different creature) was missed by ALL
+  SEVEN configs tested** — 2.5-flash, 3.7-flash at three thinking levels, 3.8-flash, qwen,
+  grok, gpt. Some defects are invisible to VLM judges; a judge upgrade does not close a recall
+  gap by itself.
+
+**Why this is now load-bearing, not just an observation.** Before 2026-09-13 severity in the
+book audit was reporting only. The final-audit change (commit `deab72254`) admits a page to
+ONE extra repair round on `CRITICAL`/`CATASTROPHIC` only (`AUDIT_ADMIT_SEVERITIES`,
+`repairLogic.js`). A 22.7% grade lottery now sits directly under that gate: the same defect on
+the same bytes can buy a repair round in one run and not in the next.
+
+Published literature says this is normal, not a misconfiguration: "The Coin Flip Judge?"
+(arXiv:2606.13685) measures a 13.6% mean verdict flip rate on repeated identical calls and
+needs 11 trials for a majority vote to match a 50-trial reference. MLLM-as-a-Judge
+(arXiv:2402.04788) finds MLLMs track humans on pairwise comparison and diverge badly on
+absolute scoring — which is what a severity grade is.
+
+**Owner 2026-09-13: file it, do not change the gate yet.** The two options weighed, both
+deferred: widen admission to MAJOR+ (costs repair budget on more pages), or admit on the
+FAULT plus a low page score rather than on the grade (sidesteps the lottery entirely — the
+preferred shape if this is ever picked up). Accepting is also defensible: the grant is capped
+at one per book, so a lost grant costs one round on one page.
+
+Related: the recall half of this is what `BACKLOG.md` cluster work on `prompts/image-semantic.txt`
+addresses; C4 is the measurement, not another instance.

@@ -49,6 +49,14 @@ const SETTINGS = {
   // falls back to the Gemini bbox while cold, which is deliberate resilience.
   figureDetectionBackend: 'grounding-dino',
 
+  // ── Scene composite ────────────────────────────────────────────────────
+  // OFF (owner, 2026-09-11: "disable composite if it is not working"). It had
+  // never run in production before 2026-09-11 (call-site wiring bug), and on
+  // its first real run it lost 5 of 5 pages to the direct render
+  // (job_1789083667794). The Lab keeps every figure method; production pages
+  // take the direct render until a Lab set beats it on real pages.
+  sceneCompositeEnabled: false,
+
   // ── Cover title ────────────────────────────────────────────────────────
   // 'composited' (production): art is rendered TEXTLESS and the title is
   // stamped afterwards by composeCover, then restyled on a white plate by
@@ -114,6 +122,19 @@ const SETTINGS = {
   // (job_1786193650012_7baiaeftb) cost ~15 of its 50 minutes, and the owner is
   // watching the result, not the convergence.
   repairMaxPasses: perEnvironment({ default: 3, staging: 1, local: 1 }),
+
+  // ── Blind inventory judge (eval Stage 1) ───────────────────────────────
+  // The vision model that describes a rendered page before any judging. Its
+  // output feeds the compliance judge, the figure pairing and the animal
+  // completeness check. Qwen3-VL 32B (OpenRouter, ~$0.0007/call) is the only
+  // judge measured to SEE a headless animal or a ghost figure — Gemini 2.5
+  // Flash, 2.5 Pro, 3.1 Pro and Grok 4.6 all described a headless dragon as
+  // whole (Lab sets 24-26, experiments 1038-1054, 2026-09-07). Its boxes come
+  // back on mixed 0-1 / 0-1000 scales and are normalised in the parser; a
+  // failed or stalled call falls back to Gemini 2.5 Flash. Staging first
+  // (owner, 2026-09-07): production follows once staging stories confirm the
+  // compliance scores hold.
+  inventoryModel: perEnvironment({ default: 'gemini-2.5-flash', staging: 'qwen3-vl', local: 'qwen3-vl' }),
 };
 
 /**
@@ -137,7 +158,7 @@ function runtime(name) {
  *
  * DERIVATION — the two facts that decide it:
  *   1. How much text a page carries is the reading level (LANGUAGE_LEVELS,
- *      promptBuilders.js): 1st-grade 25–50 words, standard 40–150,
+ *      promptBuilders.js): 1st-grade 25–70 words, standard 40–150,
  *      advanced 250–300.
  *   2. Where that text lands is resolveLayout() (server/lib/layout.js). Since
  *      2026-09-05 EVERY level resolves to `square-below` — text typeset in a

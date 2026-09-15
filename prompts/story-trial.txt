@@ -3,7 +3,7 @@
 
 You write children's stories. Create a {PAGES}-scene story.
 SHORT story — {PAGES} scenes. Keep it focused:
-- One clear conflict, one resolution. No subplots. The conflict is an outside event with something at stake — a thing lost, broken, blocked, run out or wanted by two at once — never a feeling on its own.
+- One clear conflict, one resolution. No subplots. The conflict is an outside event with something at stake — something that happens in the world, never a feeling on its own.
 - Introduce quickly (scene 1), build tension (2-3), resolve (4-5).
 - The low point — the setback or loss — gets a scene of its own; the loss and its resolution never share a scene.
 
@@ -13,10 +13,13 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - NO questions, just produce the output
 - Keep it simple, warm, and age-appropriate
 - 100-140 words per page, flowing paragraphs
-- Start with action, not weather or waking up
+- Page 1 starts with action, not weather or waking up
+- {PAGE_OPENING_VARIETY}
+- The text never asserts a position, an action or an object the scene hint does not stage: a figure the hint leaves out of frame does nothing visible on that page, and an action the hint stages as its aftermath is told as its aftermath
 - Show character personality through actions
 - Never describe a character's hair, eye colour, skin or clothing in the story text — appearance belongs to the scene hints and the illustrations
 - No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
+{RISK_FRAMING}
 
 # Story Parameters
 
@@ -26,11 +29,17 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 {CATEGORY_GUIDELINES}
 
+{STORY_SHAPE}
+
 {AGE_MODE}
+
+{CREATURE_TONE}
 
 {AVATAR_SELECTION}
 
 {LANDMARKS}
+
+{SEASON}
 
 # Scene Hint Format
 
@@ -57,13 +66,16 @@ It must be detailed enough to illustrate without additional context.
         "position": "[left/right/center]",
         "action": "[what they're doing]",
         "expression": "[facial expression — one instant, never a transition such as changing from one expression to another]",
-        "clothing": "[standard | costumed]",
+        "clothing": "{CLOTHING_ENUM}",
         "depth": "[foreground|midground|background]",
         "perspective": "[front|side|back view|over-the-shoulder]"
       }
     ],
     "objects": [
-      {"id": "[ART001]", "name": "[Object name]", "position": "[where in scene]"}
+      {"id": "[ART001]", "name": "[Object name]", "position": "[where in scene]", "size": "[OMIT unless this object's size matters on this page; then how big it is here against the character beside it or the surface it rests on. No metric or imperial units.]"}
+    ],
+    "interactions": [
+      {"character": "[Name]", "object": "[object name or ART001]", "where": "[short sentence naming the object as the contact action, e.g. 'holds the lantern in both hands']", "priority": "[essential|normal|low]"}
     ],
     "background": "[empty|a few passersby|busy crowd|dense forest|etc.]"
   }
@@ -73,14 +85,18 @@ It must be detailed enough to illustrate without additional context.
 - MAX 3 characters per scene — the main character plus at most two others — and keep the cast minimal: add a secondary character only when the story needs one. Use character names, not descriptions.
 - `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
 - Every person named in `imageSummary` also appears in that scene's `characters`: with their visual bible `CHR` id, or — when the visual bible has no entry for them — with a `description` field giving age, build, hair, face and clothing.
-- `characters.clothing`: a character with a `costumed` variant wears it in every scene except the very first, which is set before the adventure starts. Never `standard` on every page.
-- `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures.
+{CLOTHING_RULE}
+- `characters.depth` (optional, default `foreground`): how far from camera. Use `background` for tiny/distant figures. `depth` never states a size: a stated size holds at every depth.
 - `characters.perspective` (optional, default `front`): camera angle on this character.
 - `setting.location`: use `"Name [LOC001]"` for the default photo. When the landmark in the LANDMARKS section lists PHOTO ANGLES, use `"Name [LOC001.N]"` where N is the variant whose description fits the scene framing (interior shots for "on/in the landmark" scenes, exterior shots for distant/establishing views).
 - `setting.camera`: shot type determines facial detail visibility. `close-up`/`medium` = expressions visible. `wide`/`ultra-wide` = body language only.
-- `objects`: include visual bible items visible in the scene with their IDs.
+- `objects`: include visual bible items visible in the scene with their IDs. `size` restates the object's scale for this page's shot, in the same shape the visual bible uses; it overrides the bible entry where they differ.
 - `background`: describes crowd/environment density. Tells image generator if scene feels isolated or populated.
+- `interactions`: 1-4 visible character-to-object or character-to-character contacts, one row per foreground/midground character. `priority: "essential"` for the page's central action, `"low"` for incidental gaze or pose. When several characters use ONE object together, join their names with ` + ` in one row — separate rows with the same object render as duplicate objects. Omit pure ground/floor contact, leaning on walls and sitting on generic chairs. Every row also appears in the story text as the same physical contact.
 - Use `"n/a"` for weather in indoor scenes.
+
+**Composition — every scene hint obeys these:**
+{AD_COMPOSITION}
 
 # OUTPUT FORMAT
 
@@ -93,16 +109,16 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
 ```json
 {
   "secondaryCharacters": [
-    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[sex and apparent age, e.g. 'a woman in her thirties', 'a boy of about eight']", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, distinctive features; for adults state facial hair]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
+    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "scaleClass": "[how big this element is beside a standing adult, one of: fingertip, palm, hand, forearm, arm, knee, hip, chest, head, double, house, landmark. fingertip: sits on a fingertip. palm: a hand closes around it. hand: fills an open hand. forearm, arm: as big as that limb. knee, hip, chest: reaches that part of the adult. head: as big as the adult. double: twice the adult. house: several adults high. landmark: fills the horizon. Judge the element’s largest dimension, not how the story feels about it. This is the only place the element’s size is stated. Never omitted.]", "age": "[sex and apparent age, e.g. 'a woman in her thirties', 'a boy of about eight']", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, distinctive features; for adults state facial hair]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
   ],
   "animals": [
-    { "id": "ANI001", "name": "[Name]", "pages": [1, 2], "species": "[type and breed]", "coloring": "[exact colours and full pattern]", "size": "[relative size]", "features": "[collar, markings, accessories]" }
+    { "id": "ANI001", "name": "[Name]", "pages": [1, 2], "scaleClass": "[how big this element is beside a standing adult, one of: fingertip, palm, hand, forearm, arm, knee, hip, chest, head, double, house, landmark. fingertip: sits on a fingertip. palm: a hand closes around it. hand: fills an open hand. forearm, arm: as big as that limb. knee, hip, chest: reaches that part of the adult. head: as big as the adult. double: twice the adult. house: several adults high. landmark: fills the horizon. Judge the element’s largest dimension, not how the story feels about it. This is the only place the element’s size is stated. Never omitted.]", "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]", "species": "[type and breed]", "coloring": "[exact colours and full pattern]", "features": "[collar, markings, accessories]" }
   ],
   "artifacts": [
-    { "id": "ART001", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "type": "[what kind of object]", "size": "[against a person: 'fits in one hand', 'carried in both arms', 'as tall as the child']", "description": "[appearance: shape, color, material, size, distinctive features]", "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words, never a feature `description` already carries]\", \"pages\": [X]}]" }
+    { "id": "ART001", "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]", "name": "[plain English description of the object, e.g. 'toy treasure chest' — never a proper noun; a name the story gives it goes in properName]", "properName": "[OMIT unless the story names this object]", "pages": [2, 3, 4], "scaleClass": "[how big this element is beside a standing adult, one of: fingertip, palm, hand, forearm, arm, knee, hip, chest, head, double, house, landmark. fingertip: sits on a fingertip. palm: a hand closes around it. hand: fills an open hand. forearm, arm: as big as that limb. knee, hip, chest: reaches that part of the adult. head: as big as the adult. double: twice the adult. house: several adults high. landmark: fills the horizon. Judge the element’s largest dimension, not how the story feels about it. This is the only place the element’s size is stated. Never omitted.]", "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]", "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']", "description": "[appearance: shape, colour, material, distinctive features]", "states": "[OMIT unless the story alters this object. Otherwise the COMPLETE set of looks it wears, the unaltered look FIRST, at most 4 in all: {\"name\": \"[one or two words]\", \"delta\": \"[what distinguishes this look, one clause, at most 15 words, never a feature `description` already carries]\", \"pages\": [X]}]" }
   ],
   "locations": [
-    { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }
+    { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "scaleClass": "[how big this element is beside a standing adult, one of: fingertip, palm, hand, forearm, arm, knee, hip, chest, head, double, house, landmark. fingertip: sits on a fingertip. palm: a hand closes around it. hand: fills an open hand. forearm, arm: as big as that limb. knee, hip, chest: reaches that part of the adult. head: as big as the adult. double: twice the adult. house: several adults high. landmark: fills the horizon. Judge the element’s largest dimension, not how the story feels about it. This is the only place the element’s size is stated. Never omitted.]", "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }
   ],
   "backgrounds": [
     { "pages": [1, 2], "description": "A sun-drenched cobblestone village square with a medieval fountain in the center. Warm afternoon light. Wide shot. Open space in foreground where characters would stand." },
@@ -114,12 +130,13 @@ TITLE: [A creative, specific title in {LANGUAGE}, containing the name {MAIN_CHAR
 Don't include the main character ({MAIN_CHARACTER_NAME}) — they have reference photos.
 Only include characters that you invent (friends, shopkeepers, etc.) as `secondaryCharacters`.
 Use empty arrays `[]` for categories with no elements.
+An entry shaped like a person — an invented figure, a small winged being, a doll, a figurine, a statue, a puppet — states its HAIR in `description`: colour, length and how it is worn, or plainly that it has none. Such an entry reaches the image model as its description and nothing else, and a head described only by its eyes is drawn bald. State the head the same way a face is stated: hair, then whatever else the figure's head carries.
 
 **Real-world landmarks:** Any location whose name comes from (or is recognisably) an entry in the LANDMARKS section above is a real-world landmark. For every such location:
 - `"isRealLandmark": true` (not false — if you wrote the landmark's name, you picked it from the list, so it is real)
 - `"landmarkQuery"`: the exact landmark name from the LANDMARKS section. Copy it verbatim — do not paraphrase, do not drop parens, do not anglicise.
 
-This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). When in doubt, mark it as real — false negatives waste the photo pipeline and produce off-brand renders.
+This is the difference between the system fetching a real Wikipedia photo of the actual building (correct) and the model inventing a generic illustration of what it thinks the building looks like (wrong). A place that exists in reality but is not listed in the LANDMARKS section stays `"isRealLandmark": false` — when in doubt, leave it false. With no LANDMARKS section, every location is false.
 
 Example — picking "Kapellbrücke (Luzern) [Bridge]" from the LANDMARKS section:
 ```json
@@ -140,9 +157,14 @@ Each background describes a scene with no people, no human figures. Include: loc
 - For indoor scenes: describe furniture, walls, lighting, floor
 - For outdoor scenes: describe landscape, sky, vegetation, architecture
 
+- Every Visual Bible element carries `scaleClass`, and it is the only place an element’s size is stated. It is never omitted, and an adjective is not a band — massive, tiny, huge name none. No entry gives a size of its own, in words or in units.
+- A generic element is named in the page's scene prose like any other physical fact, and never appears in `objects[]`. It has no id to cite.
+
 **Keep it MINIMAL for a 5-scene story:**
 - max **2 locations**
-- A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — lit, broken, mended, opened, filled. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta, because each state is drawn as its own reference cell. A part added to an object is a state of it unless some page stages that part on its own, away from the thing it belongs to.
+- A change to an object is a state, not a second object. One physical thing is ONE entry however the story alters it — broken, mended, opened, filled. How the world lights it is not a state; the scene decides that. Its own light is a state — a thing that glows and goes dark; the emission lives in `states[]`, never in `description`. `description` holds what is always true of it; `states[]` lists every look it wears — the unaltered one first — each a short delta, because each state is drawn as its own reference cell. A part added to an object is a state of it unless some page stages that part on its own, away from the thing it belongs to.
+- An artifact a character WEARS carries `wornAs`: `"<CharacterName>.<slot>"` (`headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`), and that character's outfit describes the same item in that slot.
+- A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose.
 - max **2 artifacts** (only props that actually drive the action across multiple scenes — not background dressing)
 - max **2 secondary characters** (only if they appear on 2+ pages — single-scene helpers can stay nameless in prose)
 - 3-5 backgrounds (one per scene if scenes change settings, fewer if scenes share a setting)
@@ -150,7 +172,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 Every entry costs a reference image generation pass. A 5-page story rarely benefits from more than 2 of each — pick the elements that need consistency across scenes and leave the rest as scene-prose details.
 
 ---COVER SCENE---
-Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Wide shot, balanced composition. Characters in costumed clothing.
+Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no secondary characters. Wide shot, balanced composition.{COVER_CLOTHING_NOTE}
 
 **LOCATION REQUIREMENT (STRICT):** The front cover's `setting.location` MUST reference a Visual Bible location with `isRealLandmark: true`. If you wrote multiple locations in the VB and any are real landmarks, pick one of those for the cover — never a fictional indoor/underground/imagined location, even if it's the dramatic climax setting. The cover is the marketing image; it must show a recognisable real place. If your VB has NO real landmarks, fall back to the first location and accept the limitation.
 
@@ -175,7 +197,7 @@ Front cover scene hint. ONLY the main character ({MAIN_CHARACTER_NAME}), no seco
         "position": "center",
         "action": "[heroic or characteristic pose/action]",
         "expression": "[confident/happy/determined]",
-        "clothing": "costumed"
+        "clothing": "{COVER_CLOTHING}"
       }
     ],
     "objects": [

@@ -20,6 +20,26 @@ Score each dimension 1-10 and be demanding. Anchor the scale: a competent but un
 
 A BRIEF section may precede the arc: the commission, including the page count, the reading level, the ages of the cast, and the roles they were cast in. Judge fit, focus and difficulty against it. It is context, never scored. It is a premise, not a specification — an arc that invents what the brief left open is doing its job, and anything the brief asks for is intended by design.
 
+Where the BRIEF carries an age-band section, that section governs which dimensions apply. A book
+that correctly contains none of what its band forbids is doing the right thing: score it on what
+the band asks for instead, and never deduct for the absence of the forbidden thing. Repetition,
+sameness and a level line are the intended shape at those bands, not a fault, and the deduction
+list in the anchors is scoped the same way — it does not reach a dimension the band redefines. What
+the affected dimensions measure there:
+- attempts: whether the repetition holds its shape — the same move made again at each turn, in the
+  count the band asks for, each turn a new place, thing or way rather than a restatement of the
+  last. Rising difficulty and mounting cost are not wanted.
+- lost: whether the book correctly stays clear of a low point. Full marks when nothing is lost for
+  good and no moment makes the goal look finished; deduct only if such a moment intrudes.
+- blockers: whether what holds the character up is a thing, a size, a place or the weather rather
+  than someone unwilling. Full marks when nobody stands in the way; deduct for a figure who means
+  harm or withholds.
+- change: where the band gives the main character no arc, whether the character stays recognisably
+  themselves throughout and the book closes the way the band says it closes; deduct for a
+  transformation imposed on them.
+Every other dimension is scored as written. Where the BRIEF carries no age-band section the whole
+rubric applies unchanged, and hard.
+
 Output strict JSON only, no text around it:
 {
   "arc": {"dims": {"shape": 0, "attempts": 0, "lost": 0, "agency": 0, "ensemble": 0, "change": 0, "blockers": 0, "grounding": 0, "fit": 0, "focus": 0, "entrances": 0, "difficulty": 0, "sense": 0, "engaging": 0}, "notes": ""}

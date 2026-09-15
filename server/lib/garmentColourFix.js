@@ -29,6 +29,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
+const { guardPromptString } = require('../services/prompts');
 const { _rgbToLab, _labToRgb } = require('./imageCompositing');
 const { isGarmentPixel } = require('./garmentHueNormalize');
 
@@ -630,16 +631,17 @@ async function askIsThisTheGarment(cropBuf, alpha, cw, ch, garmentKey, cfg) {
   }
   const overlay = await sharp(out, { raw: { width: cw, height: ch, channels: 3 } })
     .jpeg({ quality: 88 }).toBuffer();
-  const prompt = `The magenta highlight marks a region of this illustration.
+  let prompt = `The magenta highlight marks a region of this illustration.
 Answer only about the highlighted region.
 Is the highlighted region the ${garmentKey} worn by the person?
 Reply as JSON: {"isGarment": true|false, "whatItIs": "<what the highlighted region actually is, 5 words max>"}`;
+  prompt = guardPromptString(prompt, 'askIsThisTheGarment');
   const body = {
     contents: [{ parts: [
       { inline_data: { mime_type: 'image/jpeg', data: overlay.toString('base64') } },
       { text: prompt },
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } },
+    generationConfig: { temperature: 0, thinkingConfig: { thinkingBudget: 0 } },
   };
   try {
     const res = await fetch(

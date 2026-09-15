@@ -20,15 +20,20 @@ Experience is BELOW average on every keyword** (the weak component).
 ## A. Landing Page Experience  (the weak QS component)
 - [x] (2026-09-06, a51316ad7 + 0d3fb7efd) A1. Ship the LCP fix to production — both commits are
       present on `origin/master` for `client/index.html`.
-- [ ] A2. Above-the-fold: make "personalisiertes Kinderbuch" unmistakable in the hero
-      H1/subhead so it matches the search query (keyword relevance).
-- [ ] A3. Trust signals near the top: visible pricing, reviews/testimonials,
-      "Gedruckt in der Schweiz", secure-checkout / Impressum / privacy links.
-- [ ] A4. Mobile UX: adequate tap targets, no load-time interstitial/popup, readable
-      without zoom.
-- [ ] A5. Further speed: trim render-blocking JS/CSS to push FCP < 1.8s (LCP now tracks
-      FCP, so this pulls LCP into clearly-good territory).
-- [ ] A6. Re-measure (LCP script + PageSpeed Insights / CrUX) after each change.
+- [x] (e42752e6e hero subhead, on master; 2026-09-09 meta description aligned) A2. Above-the-fold:
+      "personalisiertes Kinderbuch" in the hero subhead directly under the H1 + in the homepage
+      meta/og description (`server/lib/seoMeta.js` '/', `client/index.html`).
+- [x] (2026-09-09; price "ab CHF 29" since e42752e6e) A3. Trust row under the hero CTA:
+      Stripe payment, printed+shipped in CH, Impressum, Datenschutz (`LandingPage.tsx`).
+      Reviews/testimonials still open — no real reviews collected yet (never fabricate).
+- [x] (2026-09-09) A4. Mobile UX: hero CTA is 60px tall; login + trust links got min-h 44px;
+      no consent banner/interstitial exists (Consent Mode defaults granted, CH-only); body text
+      is 18px on mobile.
+- [x] (2026-09-09) A5. Render-blocking audit: gtag.js already async, fonts async (preload+swap),
+      homepage critical CSS inlined by beasties (c29f3b867), module bundle deferred. Only change:
+      `<meta charset>`/viewport moved to the top of `<head>` (was past the 1024-byte boundary).
+- [ ] A6. Re-measure after each change: `node tests/manual/measure-lcp.js https://magicalstory.ch/`
+      (Moto G4 + Slow-4G, prints LCP element + FCP/LCP) + PageSpeed Insights / CrUX.
 
 ## B. Ad Relevance
 - [ ] B1. Pause `kinderbuch selbst gestalten` (BELOW ad relevance — DIY intent, doesn't

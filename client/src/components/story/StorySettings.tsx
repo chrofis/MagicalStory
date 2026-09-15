@@ -126,6 +126,18 @@ export function StorySettings({
   languageLevel = '',
   pages = 0,
 }: StorySettingsProps) {
+  /**
+   * The child the age band is resolved from: the OLDEST main character, the
+   * same rule the server uses (resolveAgeBand → pickMainCharacters). Feeds the
+   * topic picker's in-window sort; never gates anything.
+   */
+  const focusAge = (() => {
+    const mains = characters.filter(c => mainCharacters.includes(c.id));
+    const ages = (mains.length ? mains : characters)
+      .map(c => parseInt(String(c.age ?? ''), 10))
+      .filter(n => Number.isFinite(n) && n >= 0);
+    return ages.length ? Math.max(...ages) : null;
+  })();
   const { t, language } = useLanguage();
   const lang = language as UILanguage;
   const thinkingMessage = useRotatingMessage(lang);
@@ -229,6 +241,7 @@ export function StorySettings({
           onTopicChange={onTopicChange}
           onThemeChange={onThemeChange}
           onCustomThemeTextChange={onCustomThemeTextChange}
+          focusAge={focusAge}
           onLegacyStoryTypeChange={onLegacyStoryTypeChange}
         />
       )}
@@ -268,7 +281,7 @@ export function StorySettings({
                   >
                     <Pencil size={14} className="text-gray-500" />
                     <span className="font-medium text-gray-700">
-                      {language === 'de' ? 'Thema ändern...' : language === 'fr' ? 'Changer le thème...' : 'Change topic...'}
+                      {language === 'de' ? 'Thema ändern...' : language === 'fr' ? 'Changer le thème...' : language === 'it' ? 'Cambia tema...' : 'Change topic...'}
                     </span>
                   </button>
                 </div>
@@ -412,7 +425,7 @@ export function StorySettings({
               {getMainCharacterNames() && (
                 <div>
                   <span className="text-gray-500">
-                    {language === 'de' ? 'Hauptfiguren' : language === 'fr' ? 'Personnages principaux' : 'Main characters'}:
+                    {language === 'de' ? 'Hauptfiguren' : language === 'fr' ? 'Personnages principaux' : language === 'it' ? 'Personaggi principali' : 'Main characters'}:
                   </span>{' '}
                   <span className="font-medium text-indigo-700">{getMainCharacterNames()}</span>
                 </div>
@@ -421,7 +434,7 @@ export function StorySettings({
               {getSupportingCharacterNames() && (
                 <div>
                   <span className="text-gray-500">
-                    {language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : 'Also in story'}:
+                    {language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : language === 'it' ? 'Anche nella storia' : 'Also in story'}:
                   </span>{' '}
                   <span className="font-medium">{getSupportingCharacterNames()}</span>
                 </div>
@@ -430,7 +443,7 @@ export function StorySettings({
               {languageLevel && (
                 <div>
                   <span className="text-gray-500">
-                    {language === 'de' ? 'Lesestufe' : language === 'fr' ? 'Niveau' : 'Level'}:
+                    {language === 'de' ? 'Lesestufe' : language === 'fr' ? 'Niveau' : language === 'it' ? 'Livello' : 'Level'}:
                   </span>{' '}
                   <span className="font-medium">{getReadingLevelLabel()}</span>
                 </div>
@@ -439,7 +452,7 @@ export function StorySettings({
               {pages > 0 && (
                 <div>
                   <span className="text-gray-500">
-                    {language === 'de' ? 'Seiten' : language === 'fr' ? 'Pages' : 'Pages'}:
+                    {language === 'de' ? 'Seiten' : language === 'fr' ? 'Pages' : language === 'it' ? 'Pagine' : 'Pages'}:
                   </span>{' '}
                   <span className="font-medium">{pages}</span>
                 </div>
@@ -463,12 +476,12 @@ export function StorySettings({
                 {isGeneratingIdeas ? (
                   <>
                     <Loader2 size={18} className="animate-spin" />
-                    {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : 'Generating...'}
+                    {language === 'de' ? 'Generiere...' : language === 'fr' ? 'Génération...' : language === 'it' ? 'Generazione...' : 'Generating...'}
                   </>
                 ) : (
                   <>
                     <Sparkles size={18} />
-                    {language === 'de' ? 'Vorschlag generieren' : language === 'fr' ? 'Générer une suggestion' : 'Generate Suggestion'}
+                    {language === 'de' ? 'Vorschlag generieren' : language === 'fr' ? 'Générer une suggestion' : language === 'it' ? 'Genera suggerimento' : 'Generate Suggestion'}
                   </>
                 )}
               </button>
@@ -494,6 +507,8 @@ export function StorySettings({
                   ? 'Idee auswählen oder bearbeiten:'
                   : language === 'fr'
                   ? 'Choisissez une idée ou modifiez-la:'
+                  : language === 'it'
+                  ? 'Scegli un\'idea o modificala:'
                   : 'Choose an idea or edit it:'}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -516,7 +531,7 @@ export function StorySettings({
                         className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-b-lg font-semibold hover:bg-green-700 transition-all"
                       >
                         <Check size={18} />
-                        {language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this'}
+                        {language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : language === 'it' ? 'Usa questa' : 'Use this'}
                       </button>
                     </>
                   ) : isGeneratingIdea1 ? (
@@ -533,7 +548,7 @@ export function StorySettings({
                       <span className="text-sm text-gray-500">
                         {ideaProgress1 < 80
                           ? thinkingMessage
-                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : 'Writing idea...')}
+                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : language === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
                       </span>
                     </div>
                   ) : null}
@@ -557,7 +572,7 @@ export function StorySettings({
                         className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-b-lg font-semibold hover:bg-green-700 transition-all"
                       >
                         <Check size={18} />
-                        {language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this'}
+                        {language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : language === 'it' ? 'Usa questa' : 'Use this'}
                       </button>
                     </>
                   ) : isGeneratingIdea2 ? (
@@ -574,7 +589,7 @@ export function StorySettings({
                       <span className="text-sm text-gray-500">
                         {ideaProgress2 < 80
                           ? thinkingMessage
-                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : 'Writing idea...')}
+                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : language === 'it' ? 'Scrittura idea...' : 'Writing idea...')}
                       </span>
                     </div>
                   ) : null}
@@ -598,6 +613,8 @@ export function StorySettings({
                   ? 'Beschreiben Sie die Handlung oder klicken Sie auf "Vorschlag generieren"'
                   : language === 'fr'
                   ? 'Décrivez l\'intrigue ou cliquez sur "Générer une suggestion"'
+                  : language === 'it'
+                  ? 'Descrivi la trama oppure clicca su "Genera suggerimento"'
                   : 'Describe the plot or click "Generate Suggestion"'}
               </p>
             </>
@@ -607,7 +624,7 @@ export function StorySettings({
         {/* Dedication (Widmung) - Optional */}
         <div>
           <label className="block text-xl font-semibold mb-3">
-            {language === 'de' ? 'Widmung' : language === 'fr' ? 'Dédicace' : 'Dedication'} <span className="text-sm font-normal text-gray-500">{t.storyDetailsOptional}</span>
+            {language === 'de' ? 'Widmung' : language === 'fr' ? 'Dédicace' : language === 'it' ? 'Dedica' : 'Dedication'} <span className="text-sm font-normal text-gray-500">{t.storyDetailsOptional}</span>
           </label>
           <textarea
             value={dedication}
@@ -616,6 +633,8 @@ export function StorySettings({
               ? 'z.B. "Für meine liebe Tochter Emma zum 5. Geburtstag"'
               : language === 'fr'
               ? 'Par exemple "Pour ma chère fille Emma pour son 5ème anniversaire"'
+              : language === 'it'
+              ? 'Per es. "Per la mia cara figlia Emma per il suo 5° compleanno"'
               : 'e.g. "For my dear daughter Emma on her 5th birthday"'}
             className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none text-base"
             rows={2}
@@ -626,6 +645,8 @@ export function StorySettings({
               ? 'Dieser Text wird auf der Einführungsseite Ihres Buches gedruckt. Wenn Sie nichts eingeben, enthält die Einführungsseite nur eine Illustration ohne Text.'
               : language === 'fr'
               ? 'Ce texte sera imprimé sur la page d\'introduction de votre livre. Si vous ne saisissez rien, la page d\'introduction ne contiendra qu\'une illustration sans texte.'
+              : language === 'it'
+              ? 'Questo testo verrà stampato sulla pagina iniziale del tuo libro. Se non inserisci nulla, la pagina iniziale conterrà solo un\'illustrazione senza testo.'
               : 'This text will be printed on the initial page of your book. If you leave it empty, the initial page will contain only an illustration with no text.'}
           </p>
         </div>
@@ -638,7 +659,7 @@ export function StorySettings({
         <Modal
           isOpen={isEditSettingsOpen}
           onClose={() => setIsEditSettingsOpen(false)}
-          title={language === 'de' ? 'Einstellungen bearbeiten' : language === 'fr' ? 'Modifier les paramètres' : 'Edit Settings'}
+          title={language === 'de' ? 'Einstellungen bearbeiten' : language === 'fr' ? 'Modifier les paramètres' : language === 'it' ? 'Modifica impostazioni' : 'Edit Settings'}
           size="xl"
         >
           <div className="space-y-6 max-h-[70vh] overflow-y-auto">
@@ -650,6 +671,7 @@ export function StorySettings({
               onCategoryChange={onCategoryChange}
               onTopicChange={onTopicChange}
               onThemeChange={onThemeChange}
+              focusAge={focusAge}
               onLegacyStoryTypeChange={onLegacyStoryTypeChange}
             />
 
@@ -659,7 +681,7 @@ export function StorySettings({
                 onClick={() => setIsEditSettingsOpen(false)}
                 className="px-6 py-2 bg-indigo-500 text-white font-semibold rounded-lg hover:bg-indigo-600 transition-colors"
               >
-                {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : 'Done'}
+                {language === 'de' ? 'Fertig' : language === 'fr' ? 'Terminé' : language === 'it' ? 'Fatto' : 'Done'}
               </button>
             </div>
           </div>

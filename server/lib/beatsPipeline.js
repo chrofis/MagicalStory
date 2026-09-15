@@ -1,6 +1,7 @@
 
 
-const { runPlanCounters, collectPlaceNames, highActionPageBudget } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames } = require('./planCounters');
+const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
 const { buildCharacterDescription } = require('./visualBible');
@@ -20,27 +21,36 @@ const { buildCharacterDescription } = require('./visualBible');
  *      to one, a panel of outside models proposes solutions, the same creator
  *      re-tells the story whole. Replaces the old arc audit/review chain
  *      (owner, 2026-08-30 — see docs/decisions.md)
- *   1. beats_plan            Sonnet    PAGE PLAN (one plan line per page), FROM the approved arc
+ *   1. beats_plan            MODEL_DEFAULTS.outline    PAGE PLAN (one plan line per
+ *      page), FROM the approved arc
  *   2. plan_check            counters + one cheap call: arithmetic over the
  *      DIVISION only, then at most ONE re-plan by the planner. No story
  *      checking happens at this layer by design (owner, 2026-09-01)
- *   3. beats_story_bible     Sonnet    clothing + Visual Bible + cover hints
- *   4. beats_scene_expansion Sonnet    ONE call over ALL pages (cross-page continuity)
- *   5. beats_scene_review    DeepSeek  ONE call over ALL briefs, rewrites faulted
- *   6. beats_story_text      Sonnet    page text written from the arc + the locked plan lines
+ *   3. beats_story_bible     MODEL_DEFAULTS.outline    CLOTHING REQUIREMENTS only
+ *   4. beats_scene_expansion MODEL_DEFAULTS.sceneDescription  ONE call over ALL pages: the VISUAL BIBLE
+ *      and the COVER SCENE HINTS first, then every page's brief (cross-page
+ *      continuity, and no page can cite an element nobody declared)
+ *   5. beats_scene_review    MODEL_DEFAULTS.sceneReviewModel  ONE call over ALL briefs, rewrites faulted
+ *   6. beats_story_text      MODEL_DEFAULTS.storyText  page text written from the arc + the locked plan lines
+ *
+ * Model names are NOT written here: every stage above names the
+ * server/config/models.js key it resolves from, so this header cannot go
+ * stale when a model is swapped. (It had said "Sonnet" for the Art Director
+ * for weeks after it moved to gemini-3.1-pro, and sent an investigator to the
+ * wrong model.)
  *
  * Scheduling is by data dependency, not by list order:
  *
- *   beats ─> plan check ─> bible ─┬─> styled avatars    (caller-owned, long pole)
- *                                   └─> scene expansion ─> scene review ─> page text
+ *   beats ─> plan check ─> wardrobe ─┬─> styled avatars  (caller-owned, long pole)
+ *                                    └─> scene expansion (bible + briefs)
+ *                                          ─> scene review ─> page text
  *
  * Step 6 runs AFTER the scene review and reads the FINAL briefs (owner decision
  * 2026-08-10: the scenes come first, the text must follow — see the note at the
  * old kickoff site below). Styled avatars need only clothingRequirements, so
  * they start the instant step 3 returns (via opts.onClothingRequirements) and
  * overlap everything after it — page images await briefs AND avatars, both in
- * server.js, unchanged. Step 3 is the one thing that cannot overlap: its
- * output IS step 4's input.
+ * server.js, unchanged.
  *
  * Step 7 (text_refine) already runs downstream in server.js and is untouched.
  *
@@ -48,18 +58,30 @@ const { buildCharacterDescription } = require('./visualBible');
  * uses (server/lib/testlab.js → runBeatsScenesStage); that stage stays the
  * measurement harness, this module is the production wiring.
  *
- * Step 3 closes the gap the unified call used to cover. It serves two consumers:
- *  - IN-PIPELINE: the parsed Visual Bible becomes the Art Director's
- *    {RECURRING_ELEMENTS} and the parsed clothing requirements its
- *    {AVAILABLE_AVATARS}, so scene briefs are written with VB ids and the
- *    right per-category outfits instead of blind.
- *  - DOWNSTREAM: the raw sections are spliced into `rawOutline` — which
- *    server.js feeds to UnifiedStoryParser as `unifiedResponse` — in the SAME
- *    section format the unified writer used, so extractClothingRequirements(),
- *    extractVisualBible() and extractCoverHints() work with no parsing change.
+ * Steps 3 and 4 together close the gap the unified call used to cover. The
+ * split of authorship is deliberate (owner, 2026-09-11):
+ *  - Step 3 writes the CLOTHING REQUIREMENTS, and only those. Styled avatars
+ *    are the long pole in front of every image and start the moment it returns,
+ *    so the wardrobe cannot wait for the Art Director. Clothing depends on the
+ *    cast and the setting, both already fixed by the plan.
+ *  - Step 4 — the ART DIRECTOR — writes the VISUAL BIBLE and the COVER SCENE
+ *    HINTS, ahead of page 1, then the page briefs. One author owns both what is
+ *    in each picture and what each thing looks like, so the two cannot
+ *    contradict each other, and a page's `objects[]` cannot name an entry that
+ *    was never declared. Before this, step 3 had to GUESS page assignment from
+ *    plan-line prose and on job_1789147573901_m3uam0nxi the guess emptied the
+ *    story's central prop and the lettered signpost page 10 then asked for.
+ *  - DOWNSTREAM: the raw sections from both steps are concatenated into
+ *    `rawOutline` — which server.js feeds to UnifiedStoryParser as
+ *    `unifiedResponse` — in the SAME section format and order the unified
+ *    writer used, so extractClothingRequirements(), extractVisualBible() and
+ *    extractCoverHints() work with no parsing change.
  *
- * If that one call fails the run still completes, degraded (blind briefs, empty
- * VB, null clothing, default front-cover hint) rather than aborted.
+ * If either call fails the run still completes, degraded (blind briefs, empty
+ * VB, null clothing, default front-cover hint) rather than aborted. The
+ * per-page fallback (expandOnePage) cannot author a whole-book bible and does
+ * not try: it reuses whatever the all-pages call produced, and with nothing at
+ * all it expands blind — the same degradation a failed bible stage always had.
  */
 
 const textModels = require('./textModels');
@@ -74,10 +96,14 @@ const {
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
+  arcInventedAllowance,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
+  parsePlanCheckRoster,
   buildReplanSection,
+  replanRank,
+  findingPages,
   buildClothingReviewPrompt,
   parseClothingReview,
   parsePlanResponse,
@@ -89,9 +115,11 @@ const {
   parseRefinedText,
   buildAvailableAvatarsForPrompt,
   extractSceneMetadata,
+  stripTrailingSeparator,
   getHistoricalLocations,
   getHistoricalObjects,
 } = require('./storyHelpers');
+const { parseCastRemovals, diffCastRemovals, revertUndeclaredRemovals } = require('./sceneReviewGuard');
 const { UnifiedStoryParser } = require('./outlineParser/unified');
 const { stableCandidateIndex } = require('./outlineParser/shared');
 const { log } = require('../utils/logger');
@@ -140,9 +168,17 @@ function resolvePipelineMode(inputData = {}) {
   if (inputData?.trialMode) return 'unified';
   const raw = inputData?.pipelineMode || require('../config/runtime').runtime('pipelineMode');
   const mode = String(raw).trim().toLowerCase();
+  // 'unified' is TRIAL-ONLY since 2026-09-15: the pre-beats unified writer
+  // (buildUnifiedStoryPrompt + prompts/story-unified*.txt) was deleted, so a
+  // non-trial job has no single-call writer to run. Anything unrecognised — and
+  // an explicit non-trial 'unified' — resolves to beats.
   if (!PIPELINE_MODES.includes(mode)) {
-    log.warn(`[BEATS] Unknown pipelineMode "${raw}" — falling back to 'unified'`);
-    return 'unified';
+    log.warn(`[BEATS] Unknown pipelineMode "${raw}" — falling back to 'beats'`);
+    return 'beats';
+  }
+  if (mode === 'unified') {
+    log.warn(`[BEATS] pipelineMode 'unified' is trial-only (the unified writer was deleted) — running beats`);
+    return 'beats';
   }
   return mode;
 }
@@ -154,29 +190,44 @@ const NOOP_LOG = { info: () => {}, warn: () => {}, error: () => {}, setStage: ()
  * that UnifiedStoryParser still looks for in `unifiedResponse`:
  * extractClothingRequirements / extractVisualBible / extractCoverHints.
  * Spelling and spacing are the parser's regexes — do not "tidy" them.
+ *
+ * TWO AUTHORS since 2026-09-11. The wardrobe stage writes the first marker
+ * (the styled avatars start the moment it returns and cannot wait); the
+ * ALL-PAGES Art Director writes the other two, ahead of page 1, so no page can
+ * cite an element that was never declared. beatsPipeline concatenates the two
+ * bodies in this order, which is the order the transcript has always carried.
  */
 const BIBLE_MARKERS = ['---CLOTHING REQUIREMENTS---', '---VISUAL BIBLE---', '---COVER SCENE HINTS---'];
+const CLOTHING_MARKERS = ['---CLOTHING REQUIREMENTS---'];
+const AD_BIBLE_MARKERS = ['---VISUAL BIBLE---', '---COVER SCENE HINTS---'];
 
 /**
- * Strip any preamble the bible model wrote before the first section marker and
- * any trailing ---STORY PAGES--- it invented (that marker terminates the
- * cover-hints regex, so a stray one would swallow the real cover hints once
- * this block is spliced into the transcript).
+ * Strip any preamble the model wrote before the first section marker, and
+ * everything from the first thing that ENDS the section block: a stray
+ * ---STORY PAGES--- it invented, or (the Art Director's response) the real
+ * `## Page N` heading that starts the briefs. Both matter because neither
+ * terminates the cover-hints regex, so leaving them in would swallow the whole
+ * story into the cover hints once this block is spliced into the transcript.
  *
- * @returns {{body: string, found: string[]}|null} null when no section marker exists at all.
+ * @param {string} raw
+ * @param {string[]} [markers] - which section markers this caller expects.
+ * @returns {{body: string, found: string[]}|null} null when no expected marker exists at all.
  */
-function extractBibleSections(raw) {
+function extractBibleSections(raw, markers = BIBLE_MARKERS) {
   const text = String(raw || '');
-  const positions = BIBLE_MARKERS.map(m => text.indexOf(m));
+  const positions = markers.map(m => text.indexOf(m));
   const present = positions.filter(i => i >= 0);
   if (present.length === 0) return null;
 
   let body = text.slice(Math.min(...present)).trim();
-  const stray = body.search(/---\s*STORY PAGES\s*---/i);
-  if (stray >= 0) body = body.slice(0, stray).trim();
+  const ends = [
+    body.search(/---\s*STORY PAGES\s*---/i),
+    body.search(/^\s*#{1,4}\s*\**\s*(?:Page|Seite|Pagina)\s*\**\s*\d+/im),
+  ].filter(i => i >= 0);
+  if (ends.length) body = body.slice(0, Math.min(...ends)).trim();
   if (!body) return null;
 
-  return { body, found: BIBLE_MARKERS.filter(m => body.includes(m)) };
+  return { body, found: markers.filter(m => body.includes(m)) };
 }
 
 /**
@@ -202,6 +253,343 @@ function replaceClothingSection(bibleSections, clothingRequirements) {
   if (!re.test(text)) return text;
   const body = '```json\n' + JSON.stringify({ clothingRequirements }, null, 2) + '\n```\n\n';
   return text.replace(re, (_m, marker) => `${marker}${body}`);
+}
+
+/**
+ * Write the in-memory bible's page assignment (and the invented-peer age clamp)
+ * back into the ---VISUAL BIBLE--- JSON of a bible transcript.
+ *
+ * Same reason as replaceClothingSection: mutating the parsed object is NOT
+ * enough. `bibleSections` is spliced into `rawOutline`, storyJobPipeline
+ * re-parses the bible out of that text (`parser.extractVisualBible()`), the
+ * resume path and the Lab's `plainStoredBeats` re-parse `data.outline` again —
+ * so every in-memory mutation done here reached exactly the Art Director and
+ * nobody else. Measured on job_1788957347999_ijseol49a: `vbAssignmentTrim`
+ * reported VEH002 stripped from pages 8 and 18, the stored bible and outline
+ * still listed both, and the scene review's `vb_element_overflow` on those
+ * pages survived every reviewer (Lab 1157/1179).
+ *
+ * The transcript JSON is the WRITER's shape (`pages`, raw `states`, `age`),
+ * and the parser's is a superset built by spreading it, so the projection is a
+ * field-by-field copy of exactly what the post-checks may change, matched by
+ * entry id: `pages` from `appearsInPages`; each state's `pages` (a state left
+ * without a page is gone from the array — `normaliseObjectStates` re-mints the
+ * dotted ids identically on re-parse); a clamped secondary's `age` plus its
+ * `secondaryAgeClamped` record. Entries the parser dropped (a real landmark
+ * staged on no page) are left as written. Nothing else in the JSON is touched.
+ *
+ * @returns {string} the transcript with the section rewritten, or unchanged
+ *   when there is no parseable section (the caller warns and keeps shipping).
+ */
+/**
+ * Adopt the scene review's ---VISUAL BIBLE--- corrections.
+ *
+ * The review is the one stage holding both the plan lines and the bible, so it
+ * is the one stage that can say which pages a state covers. Evidence for the
+ * channel: job_1789343124794_z2c779f7i, whose first state was a change claiming
+ * every page of the story — the page-prompt path can drop a wrong delta from
+ * the prose but cannot swap the reference cell, so the first six pages rendered
+ * an object in a look the story had not reached.
+ *
+ * STRICTLY a page-range edit. Only `states[]` is taken, only for ids the bible
+ * already holds, and every structural problem drops that entry's correction
+ * with a warning — a malformed review section must never end a paid run.
+ *
+ * A correction may also LOSE a look. On Lab 1264 the reviewer inserted the
+ * missing unaltered state and returned three states where the bible held four,
+ * silently dropping "broken" — and page 17, the page the object breaks open,
+ * ended up covered by no state at all. The invariant is PAGE COVERAGE, not
+ * names: renaming, merging and re-ranging states is precisely what the reviewer
+ * is for, since it is the one stage holding the plan lines. On Lab 1265 it
+ * re-covered pages 9-11 with a differently named state ("unaltered" replacing
+ * "muddy"), losing nothing — a name-matching rule wrongly rejected that and the
+ * repair went net-zero. Two rules guard the real invariant, both dropping the
+ * whole entry's correction so the authored bible stands:
+ *   1. every page the current `states[]` covers must be covered by some
+ *      incoming state;
+ *   2. a handle a brief already cites (`ID.N`) must still have a state at that
+ *      id afterwards — a handle whose state changed name or delta is fine,
+ *      that is the correction working.
+ *
+ * @param {Set<string>|Array<string>} [citedHandles] dotted handles the briefs
+ *   cite (e.g. `ART001.3`). Omitted → rule 2 is skipped.
+ * @returns {{applied: Array, rejected: Array}} applied entries carry
+ *   {id, name, oldPages, newPages}; rejected carry {id, reason}.
+ */
+function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) {
+  const out = { applied: [], rejected: [] };
+  const text = String(raw || '');
+  if (!text || !visualBible || typeof visualBible !== 'object') return out;
+  const marker = text.match(/---\s*VISUAL BIBLE\s*---/i);
+  if (!marker) return out;
+  const body = text.slice(marker.index + marker[0].length).split(/\n---\s*[A-Z][A-Z ]*---/)[0];
+  const fenced = body.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const jsonText = (fenced ? fenced[1] : body).trim();
+  if (!jsonText) return out;
+  let json;
+  try { json = JSON.parse(jsonText); } catch (err) {
+    out.rejected.push({ id: '(section)', reason: `unparseable JSON (${err.message})` });
+    return out;
+  }
+  if (!json || typeof json !== 'object') {
+    out.rejected.push({ id: '(section)', reason: 'section is not a JSON object' });
+    return out;
+  }
+
+  // Every entry the bible holds, by BASE id, whatever collection it sits in —
+  // a reviewer that files an artifact under the wrong key still names a real
+  // entry, and the id is the identity.
+  const byId = new Map();
+  for (const key of SYNCED_COLLECTIONS) {
+    for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      const id = e && e.id && String(e.id).trim().toUpperCase().split('.')[0];
+      if (id) byId.set(id, e);
+    }
+  }
+  const maxPage = Number.isFinite(Number(pageCount)) && Number(pageCount) > 0 ? Number(pageCount) : null;
+  const incoming = [];
+  for (const value of Object.values(json)) {
+    if (Array.isArray(value)) incoming.push(...value);
+  }
+  for (const row of incoming) {
+    const id = row && row.id && String(row.id).trim().toUpperCase().split('.')[0];
+    if (!id) { out.rejected.push({ id: '(none)', reason: 'entry has no id' }); continue; }
+    const entry = byId.get(id);
+    if (!entry) { out.rejected.push({ id, reason: 'no bible entry has that id' }); continue; }
+    if (!Array.isArray(row.states) || row.states.length === 0) {
+      out.rejected.push({ id, reason: 'correction carries no states[]' });
+      continue;
+    }
+    const states = [];
+    let bad = null;
+    for (const st of row.states) {
+      const name = st && String(st.name || '').trim();
+      const delta = st && String(st.delta || '').trim();
+      if (!name || !delta) { bad = 'a state is missing name or delta'; break; }
+      const pages = (Array.isArray(st.pages) ? st.pages : []).map(Number);
+      if (pages.length === 0 || pages.some(n => !Number.isFinite(n) || n < 1 || (maxPage && n > maxPage))) {
+        bad = `state "${name}" has pages outside the book`;
+        break;
+      }
+      // `held` is the object's contact flag, read by resolveObjectState. Take
+      // the reviewer's when it states one, else keep what the same look had.
+      const prior = (Array.isArray(entry.states) ? entry.states : [])
+        .find(o => String(o && o.name || '').trim().toLowerCase() === name.toLowerCase());
+      const held = typeof (st && st.held) === 'boolean' ? st.held
+        : (typeof (prior && prior.held) === 'boolean' ? prior.held : null);
+      states.push({ name, delta, pages, ...(typeof held === 'boolean' ? { held } : {}) });
+    }
+    if (bad) { out.rejected.push({ id, reason: bad }); continue; }
+    // Ids stay canonical: numbered by position, never carried over from the
+    // review (which renumbers nothing when it reorders).
+    states.forEach((st, i) => { st.id = `${id}.${i + 1}`; });
+
+    const current = Array.isArray(entry.states) ? entry.states.filter(Boolean) : [];
+    // RULE 1 — no page loses its look. The names may change freely; the pages
+    // the bible already covers may not fall out from under the briefs.
+    const coveredNow = new Set();
+    for (const st of states) for (const p of st.pages) coveredNow.add(p);
+    let uncovered = null;
+    for (const o of current) {
+      const pages = (Array.isArray(o.pages) ? o.pages : []).map(Number).filter(n => Number.isFinite(n));
+      const lost = pages.filter(p => !coveredNow.has(p));
+      if (lost.length > 0) { uncovered = { from: o, lost }; break; }
+    }
+    if (uncovered) {
+      out.rejected.push({
+        id,
+        reason: `correction leaves page(s) ${JSON.stringify(uncovered.lost)} uncovered — they carry state `
+          + `${uncovered.from.id || `${id}.?`} ("${uncovered.from.name}"), and no incoming state covers them`,
+      });
+      continue;
+    }
+    // RULE 2 — a handle a brief already cites must still exist. Its state may
+    // change name or delta; there must simply BE a state at that id.
+    const cited = citedHandles instanceof Set ? citedHandles
+      : (Array.isArray(citedHandles) ? new Set(citedHandles) : null);
+    if (cited && cited.size > 0) {
+      const incomingIds = new Set(states.map(st => String(st.id).toUpperCase()));
+      let vanished = null;
+      for (const h of cited) {
+        const handle = String(h || '').trim().toUpperCase();
+        if (!handle.includes('.') || handle.split('.')[0] !== id) continue;
+        if (!incomingIds.has(handle)) { vanished = handle; break; }
+      }
+      if (vanished) {
+        out.rejected.push({
+          id,
+          reason: `correction removes cited handle ${vanished}: a brief cites it, and the correction `
+            + `leaves no state at that id`,
+        });
+        continue;
+      }
+    }
+    const oldPages = (Array.isArray(entry.states) ? entry.states : [])
+      .map(o => `${o && o.name}=${JSON.stringify((o && o.pages) || [])}`).join(' ');
+    entry.states = states;
+    out.applied.push({
+      id,
+      name: entry.name || null,
+      oldPages,
+      newPages: states.map(st => `${st.name}=${JSON.stringify(st.pages)}`).join(' '),
+    });
+  }
+  return out;
+}
+
+const SYNCED_COLLECTIONS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing'];
+function syncVisualBibleSection(bibleSections, visualBible) {
+  const text = String(bibleSections || '');
+  if (!text || !visualBible || typeof visualBible !== 'object') return text;
+  const sectionRe = /(---VISUAL BIBLE---\s*)([\s\S]*?)(?=---[A-Z\s]+---|$)/i;
+  const section = text.match(sectionRe);
+  if (!section) return text;
+  const jsonMatch = section[2].match(/```json\s*([\s\S]*?)```/i);
+  if (!jsonMatch) return text;
+  let json;
+  try { json = JSON.parse(jsonMatch[1]); } catch { return text; }
+  if (!json || typeof json !== 'object') return text;
+
+  const pageList = (arr) => (Array.isArray(arr) ? arr : []).map(Number).filter(Number.isFinite);
+  for (const key of SYNCED_COLLECTIONS) {
+    const raw = json[key];
+    const parsed = visualBible[key];
+    if (!Array.isArray(raw) || !Array.isArray(parsed)) continue;
+    const byId = new Map(parsed.filter(e => e && e.id).map(e => [String(e.id).trim().toUpperCase(), e]));
+    for (const entry of raw) {
+      if (!entry || !entry.id) continue;
+      const mem = byId.get(String(entry.id).trim().toUpperCase());
+      if (!mem) continue;
+      entry.pages = pageList(mem.appearsInPages);
+      if (Array.isArray(entry.states) && Array.isArray(mem.states)) {
+        entry.states = mem.states.map(st => ({
+          name: st.name,
+          delta: st.delta,
+          pages: pageList(st.pages),
+          ...(typeof st.held === 'boolean' ? { held: st.held } : {}),
+        }));
+      }
+      // The authored English label (and the code repair that replaced it) is
+      // a mutation like any other: unprojected, every later re-parse reads the
+      // bible WITHOUT it and the page prompt falls back to `type` — the
+      // duplicate-`tool` defect this label exists to end.
+      if (mem.label) entry.label = mem.label;
+      if (mem.labelRepaired) entry.labelRepaired = mem.labelRepaired;
+      if (key === 'secondaryCharacters' && mem.secondaryAgeClamped) {
+        entry.age = mem.age;
+        entry.secondaryAgeClamped = mem.secondaryAgeClamped;
+      }
+    }
+  }
+
+  const body = '```json\n' + JSON.stringify(json, null, 2) + '\n```\n\n';
+  return text.replace(sectionRe, (_m, marker) => `${marker}${body}`);
+}
+
+/**
+ * ONE fed-back round over the Visual Bible's element labels.
+ *
+ * Every element needs one authored English `label`: it is the only handle the
+ * page prompt has on it (ids never reach an image model). On
+ * job_1789301291267_ueh8h145m two artifacts both typed "tool", so REQUIRED
+ * OBJECTS read `**tool** (object)` twice and the model could not tell the two
+ * props apart.
+ *
+ * The shape is the canonical fed-back retry (worn-state round, landmark
+ * minimum-2): a deterministic check names the faults, the AUTHOR gets exactly
+ * one extra round to fix the ids it faulted on, and whatever survives is
+ * repaired in code. Never a kill and never a second model round — a naming
+ * guideline must not end a paid run.
+ *
+ * @param {object} visualBible mutated in place
+ * @param {{model: string, language?: string, gl: object, log: object, stageReport?: object}} opts
+ * @returns {Promise<{round: number, findings: number, repairedByModel: number, repairedByCode: number, unresolved: string[]}>}
+ */
+async function runVisualBibleLabelRound(visualBible, { model, language, gl, log: logger = log, stageReport } = {}) {
+  const { validateLabels, repairLabels } = require('./vbLabel');
+  const report = { round: 0, findings: 0, repairedByModel: 0, repairedByCode: 0, unresolved: [] };
+
+  let findings = [];
+  try { findings = validateLabels(visualBible) || []; } catch { findings = []; }
+  if (!findings.length) {
+    if (stageReport) stageReport.labelRound = report;
+    return report;
+  }
+  report.findings = findings.length;
+
+  const faulted = new Set(findings.map(f => String(f.id).trim().toUpperCase()));
+  const byId = new Map();
+  for (const key of SYNCED_COLLECTIONS) {
+    for (const entry of (Array.isArray(visualBible?.[key]) ? visualBible[key] : [])) {
+      const id = String(entry?.id ?? '').trim().toUpperCase();
+      if (id && faulted.has(id)) byId.set(id, entry);
+    }
+  }
+
+  const before = new Map([...byId].map(([id, e]) => [id, String(e.label ?? '')]));
+
+  try {
+    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+    const template = PROMPT_TEMPLATES.vbLabelRepair;
+    if (!template) throw new Error('vb-label-repair template unavailable');
+
+    const block = findings.map(f => `- ${f.id}: ${f.detail}`).join('\n');
+    const entries = [...byId.entries()].map(([id, e]) => ({
+      id,
+      label: String(e.label ?? ''),
+      name: e.name ?? null,
+      type: e.type ?? null,
+      description: e.extractedDescription || e.description || null,
+    }));
+    const prompt = fillTemplate(template, {
+      LABEL_FINDINGS: block,
+      LABEL_ENTRIES: JSON.stringify(entries, null, 2),
+      STORY_LANGUAGE: language || '',
+    });
+
+    // maxTokens null = the model's own maximum (owner rule: no output caps).
+    const res = await textModels.callTextModelStreaming(prompt, null, null, model, { usageLabel: 'beats_vb_label_repair' });
+    if (res?.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
+
+    const parsed = require('./storyHelpers').extractJsonFromText(res?.text || '');
+    const rows = Array.isArray(parsed?.labels) ? parsed.labels : [];
+    for (const row of rows) {
+      const id = String(row?.id ?? '').trim().toUpperCase();
+      const label = String(row?.label ?? '').trim();
+      // ONLY the ids that faulted, and ONLY the label field.
+      if (!label || !byId.has(id)) continue;
+      byId.get(id).label = label;
+    }
+    report.round = 1;
+  } catch (err) {
+    logger.warn(`⚠️ [BEATS] Visual Bible label round failed (${err.message}) — repairing ${findings.length} label fault(s) in code`);
+  }
+
+  let after = [];
+  try { after = validateLabels(visualBible) || []; } catch { after = []; }
+  report.repairedByModel = [...byId.keys()].filter(id => !after.some(f => String(f.id).trim().toUpperCase() === id)
+    && String(byId.get(id).label ?? '') !== before.get(id)).length;
+
+  let repair = { repaired: [], unresolved: [] };
+  if (after.length) repair = repairLabels(visualBible, after);
+  report.repairedByCode = repair.repaired.length;
+  report.unresolved = repair.unresolved;
+
+  if (repair.unresolved.length) {
+    visualBible.labelUnresolved = repair.unresolved;
+    logger.warn(`⚠️ [BEATS] Visual Bible label(s) still faulty after the fed-back round and the code repair: ${repair.unresolved.join(', ')} — shipping flagged`);
+    gl?.warn?.('beats_vb_label_unresolved',
+      `Element label(s) unresolved after one author round and the code repair: ${repair.unresolved.join(', ')}`,
+      null, { unresolved: repair.unresolved, findings: report.findings });
+  } else {
+    logger.info(`🏷️ [BEATS] Visual Bible labels: ${report.findings} fault(s) — ${report.repairedByModel} fixed by the author, ${report.repairedByCode} by code`);
+    gl?.info?.('beats_vb_label_round',
+      `Element labels: ${report.findings} fault(s) resolved (${report.repairedByModel} by the author, ${report.repairedByCode} by code)`,
+      null, { findings: report.findings });
+  }
+
+  if (stageReport) stageReport.labelRound = report;
+  return report;
 }
 
 // ── Cross-story challenge memory ────────────────────────────────────────────
@@ -319,6 +707,12 @@ async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
  *   generation (the long pole in front of every image) while scene expansion and
  *   page text are still running. Same callback the unified stream's progressive
  *   parser fires; it must be non-blocking and own its own error handling.
+ * @param {Function} [opts.onWardrobeCorrected] - fired when the wardrobe/bible
+ *   check actually REWROTE an outfit clause, with the affected character names.
+ *   The avatars for those characters were kicked off from the pre-correction
+ *   text (the kickoff is deliberately early — the Visual Bible does not exist
+ *   yet at that point), so the caller re-renders exactly those and nothing else.
+ *   Non-blocking, owns its own error handling.
  * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, clothingReviewReport, sceneReviewReport}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
@@ -334,6 +728,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     modelOverrides = {},
     heartbeat = null,
     onClothingRequirements = null,
+    onWardrobeCorrected = null,
     // Per-stage progress reporter (percent, message). Without it the job sits
     // at 1% "Starting story generation..." for the entire ~10-minute text
     // phase — heartbeat only bumps updated_at, never the visible bar.
@@ -372,8 +767,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // Hard cap at 3 (owner, 2026-08-30): the iteration study peaked at v3 and
   // regressed at v4. The adaptive early stop below usually ends sooner.
   const arcRoundsRequested = parseInt(modelOverrides.arcRounds, 10) || MODEL_DEFAULTS.arcRounds || 1;
-  const arcRounds = Math.max(1, Math.min(3, arcRoundsRequested));
-  if (arcRoundsRequested > 3) log.warn(`⚠️ [ARC] arcRounds=${arcRoundsRequested} clamped to 3 (owner cap 2026-08-30 — iteration study regressed at round 4)`);
+  const arcRoundsMax = MODEL_DEFAULTS.arcRoundsMax || 3;
+  const arcRounds = Math.max(1, Math.min(arcRoundsMax, arcRoundsRequested));
+  if (arcRoundsRequested > arcRoundsMax) log.warn(`⚠️ [ARC] arcRounds=${arcRoundsRequested} clamped to ${arcRoundsMax} (owner cap 2026-08-30 — iteration study regressed at round 4)`);
   // Scene and wardrobe reviews are their own decisions — see models.js. They
   // deliberately do NOT follow the beats reviewer.
   const sceneReviewModel = modelOverrides.sceneReviewModel || MODEL_DEFAULTS.sceneReviewModel || reviewModel;
@@ -414,6 +810,16 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // ISSUE → CHANGE lines on the final arc. They ride into the beats prompt
   // (applied while dividing) and the text writer (the text supports them).
   let arcHints = '';
+  // The arc's own declared invented-figure list and the allowance it was given.
+  // Both travel to the plan counters as a REPORTING-ONLY cross-check.
+  let arcInventedNames = null;
+  // Named figures the commission's PREMISE supplies that its character list does
+  // not — a sibling, a friend, a pet. They are commissioned (the arc budget rule
+  // has always excluded them from the invented count), but only the arc reads
+  // the premise, so without this list the counters saw `inputData.characters`
+  // alone and charged them against the invented allowance.
+  let arcPremiseNames = [];
+  let arcInventedLimit = null;
   // The machine's full trail. Kept under the arcReviewReport key so the
   // storyJobPipeline persistence and the dev-mode wiring stay untouched.
   let arcReviewReport = null;
@@ -443,6 +849,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         try {
           const res = await textModels.callTextModelStreaming(prompt, null, onChunk, arcCreatorModel, { usageLabel: label, ...tempFor(arcCreatorModel, temp) });
           if (!String(res?.text || '').trim()) throw new Error('empty response');
+          // A cut arc parses as a shorter arc (missing ARC 2, missing critique
+          // lines) — treat it as a failed attempt, never as the creator's answer.
+          if (res.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(res.truncation)}`);
           return res;
         } catch (err) {
           lastErr = err;
@@ -483,7 +892,21 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // critique for round 1, then each round's fresh critique.
     let prevCritique = commit.critique;
     const roundReports = [];
-    for (let round = 1; round <= arcRounds; round++) {
+    // The invented-figure allowance this commission carries, and the list the
+    // arc declares against it. Code re-counts the DECLARED LIST only — never
+    // the arc prose (planCounters.js:227 documents why a regex cast extraction
+    // over narrative is banned).
+    const inventedAllowance = arcInventedAllowance(inputData);
+    arcInventedLimit = inventedAllowance;
+    let arcInvented = commit.invented || { present: false, names: [] };
+    if (commit.premiseFigures?.names?.length) arcPremiseNames = commit.premiseFigures.names;
+    if (arcInvented.present) arcInventedNames = arcInvented.names;
+    // A forced round may extend the budget by one, never past the clamp, and
+    // at most once per story.
+    let roundBudget = arcRounds;
+    let inventedRoundForced = false;
+    for (let round = 1; round <= roundBudget; round++) {
+      let forceAnotherRound = false;
       await checkCancellation();
       await stage(2, 'Convening the story panel...', { next: 2, ms: 120000 });
       const panelPrompt = buildArcPanelPrompt(inputData, currentBlock);
@@ -550,10 +973,42 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // Worst surviving fault (untagged lines count as MAJOR, so pre-tag
       // output keeps working); null = the critique names no faults at all.
       const maxSeverity = critiqueMaxSeverity(retold.critique);
+      // INVENTED-FIGURE RE-COUNT (2026-09-09). The arc used to grade its own
+      // cast inside the same call and self-certify: job_1788903616404_iqvhj4l8m
+      // wrote four invented figures on an allowance of two and reported
+      // "Invented figures past allowance: none — Fenno and Nolo, exactly two".
+      // Arithmetic on the model's own emitted list, nothing else.
+      arcInvented = retold.invented && retold.invented.present ? retold.invented : arcInvented;
+      if (retold.premiseFigures?.names?.length) arcPremiseNames = retold.premiseFigures.names;
+      const inventedCount = (arcInvented.names || []).length;
+      if (arcInvented.present) arcInventedNames = arcInvented.names;
+      if (MODEL_DEFAULTS.arcForceRoundOnInventedOvercount && arcInvented.present && inventedCount > inventedAllowance) {
+        const detail = { round, names: arcInvented.names, counted: inventedCount, allowance: inventedAllowance, declaredWritten: arcInvented.written, declaredAllowed: arcInvented.allowed };
+        if (inventedRoundForced) {
+          log.warn(`⚠️ [ARC] Round ${round}: ${inventedCount} invented figure(s) [${arcInvented.names.join(', ')}] against an allowance of ${inventedAllowance} — a round was already forced for this story; shipping with the overrun`);
+          gl.warn('arc_invented_overcount', `Round ${round}: ${inventedCount} invented figures (${arcInvented.names.join(', ')}) against an allowance of ${inventedAllowance} — one round was already forced; the arc ships with the overrun`, null, detail);
+        } else if (round >= roundBudget && roundBudget >= arcRoundsMax) {
+          log.warn(`⚠️ [ARC] Round ${round}: ${inventedCount} invented figure(s) [${arcInvented.names.join(', ')}] against an allowance of ${inventedAllowance} — cannot force another round at the clamp of ${arcRoundsMax}; shipping with the overrun`);
+          gl.warn('arc_invented_overcount_declined', `Round ${round}: ${inventedCount} invented figures (${arcInvented.names.join(', ')}) against an allowance of ${inventedAllowance} — the round clamp of ${arcRoundsMax} is reached, so no round is forced; the arc ships with the overrun`, null, detail);
+        } else {
+          inventedRoundForced = true;
+          forceAnotherRound = true;
+          if (round >= roundBudget) roundBudget = Math.min(arcRoundsMax, roundBudget + 1);
+          log.warn(`⚠️ [ARC] Round ${round}: ${inventedCount} invented figure(s) [${arcInvented.names.join(', ')}] against an allowance of ${inventedAllowance} — forcing one more re-telling round (budget now ${roundBudget}/${arcRoundsMax})`);
+          gl.warn('arc_invented_overcount_forced', `Round ${round}: ${inventedCount} invented figures (${arcInvented.names.join(', ')}) against an allowance of ${inventedAllowance} — forcing one more panel + re-telling round`, null, { ...detail, roundBudget });
+        }
+      }
       roundReports.push({
         round,
         panel,
         failedPanelists,
+        // The prompts each round actually sent (2026-09-11). The report already
+        // keeps every OUTPUT verbatim; without the inputs a dev-mode reader can
+        // see what the panel said but not what it was asked, which is where a
+        // prompt regression hides. Same treatment the beats and text stages
+        // already give their prompts (outlinePrompt, storyTextPrompts).
+        panelPrompt,
+        retellPrompt,
         retellModel: retellRes.modelId || arcCreatorModel,
         finalArc: retold.finalArc,
         used: retold.used,
@@ -568,8 +1023,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // ADAPTIVE EARLY STOP (owner, 2026-08-30): another round only earns its
       // cost while a CRITICAL or MAJOR fault survives. When nothing above
       // MINOR remains, more rounds are where the study's regression came from.
-      if (round < arcRounds && (maxSeverity === null || maxSeverity === 'MINOR')) {
-        gl.info('arc_rounds_early_stop', `Round ${round}: critique has nothing above MINOR — skipping ${arcRounds - round} remaining round(s)`, null, {
+      if (!forceAnotherRound && round < roundBudget && (maxSeverity === null || maxSeverity === 'MINOR')) {
+        gl.info('arc_rounds_early_stop', `Round ${round}: critique has nothing above MINOR — skipping ${roundBudget - round} remaining round(s)`, null, {
           round, maxSeverity, reason: 'nothing above MINOR',
         });
         break;
@@ -581,8 +1036,8 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // critique it answered, the arc has stopped materially changing —
       // another round cannot earn its cost. Tolerant: unparseable Fixing
       // never stops on this trigger.
-      if (round < arcRounds && fixingBelowMajor(retold.fixing, prevCritique)) {
-        gl.info('arc_rounds_early_stop', `Round ${round}: Fixing addressed nothing above MINOR — skipping ${arcRounds - round} remaining round(s)`, null, {
+      if (!forceAnotherRound && round < roundBudget && fixingBelowMajor(retold.fixing, prevCritique)) {
+        gl.info('arc_rounds_early_stop', `Round ${round}: Fixing addressed nothing above MINOR — skipping ${roundBudget - round} remaining round(s)`, null, {
           round, maxSeverity, reason: 'fixing_below_major',
         });
         break;
@@ -622,6 +1077,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       roundsRun: roundReports.length,
       durationMs: meta.timings.arcMs,
       create: createRes.text,
+      createPrompt,
       committedArc: commit.n,
       committed: commit.committed,
       discarded: commit.discarded,
@@ -714,7 +1170,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   await checkCancellation();
   let beats = plan.pages;
   let beatsReviewReport = null;
-  const commissionedNames = (inputData?.characters || []).map(c => c && c.name).filter(Boolean);
+  // The character list PLUS the figures the premise supplied (the arc reports
+  // them; see `arcPremiseNames`). A pet the commission named is commissioned.
+  const commissionedNames = [
+    ...(inputData?.characters || []).map(c => c && c.name).filter(Boolean),
+    ...arcPremiseNames.filter(n => n && String(n).trim()),
+  ];
+  if (arcPremiseNames.length) log.info(`👪 [BEATS] Premise figures counted as commissioned: ${arcPremiseNames.join(', ')}`);
   // The counters must never read a PLACE as a person. The names come from the
   // same authoritative data the planner itself was given — the resolved
   // landmark list, the family's town, and (historical stories) the canonical
@@ -736,13 +1198,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
    * model half is advisory, and a lost call leaves the counters standing alone
    * rather than skipping the check entirely.
    */
+  // MODEL FIRST, COUNTERS SECOND (2026-09-11). The counters used to run first
+  // and their lines were shown to the model for reference. They cannot run
+  // first any more: who is on a page is a question about English, the model
+  // call answers it as a ROSTER, and the counters do arithmetic on that answer
+  // instead of re-deriving the cast from the prose with a grammar heuristic.
   const runCheck = async (label, pages, planText) => {
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, highActionPages: highActionPageBudget(pageCount) });
     let modelFindings = [];
+    let roster = null;
     let checkModelId = null;
     let prompt = null;
     try {
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, counters.lines);
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, []);
       if (!prompt) throw new Error('plan-check template unavailable');
       const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
         usageLabel: label,
@@ -751,9 +1218,22 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       });
       checkModelId = res.modelId || planCheckModel;
       modelFindings = parsePlanCheck(res.text || '');
+      roster = parsePlanCheckRoster(res.text || '');
     } catch (err) {
-      log.warn(`⚠️ [BEATS] Plan check (${label}) failed (${err.message}) — the counters' findings stand alone`);
-      gl.warn(`${label}_failed`, `Plan check failed: ${err.message} — the counters' findings stand alone`);
+      // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
+      // with it (the counters do arithmetic on its roster), so this is an
+      // ERROR in the run log and in the generation log — not a WARN that two
+      // days of beats runs scrolled past (2026-09-13, the undefined
+      // `parsePlanCheckRoster` binding). It still never aborts a paid run:
+      // quality gates ship with a warning (feedback_gates_are_guidelines).
+      log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
+      gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
+    }
+    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster });
+    if (counters.skipped) {
+      const got = roster ? roster.size : 0;
+      log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);
+      gl.error(`${label}_counters_skipped`, `Plan counters did not run (${counters.skipped}): the check's roster covers ${got} of ${pages.length} page(s)`, null, { reason: counters.skipped, rosterPages: got, pages: pages.length });
     }
     // Findings travel STRUCTURED to the re-plan: a counter keeps its code, a
     // model finding the check number it answered, so buildReplanSection can rank
@@ -777,31 +1257,155 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let replannedPages = [];
   if (check1.lines.length > 0) {
     try {
-      await checkCancellation();
-      await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
-      const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
-        finalArc: approvedArc,
-        arcHints,
-        replan: buildReplanSection(pagePlan, check1.findings),
-      });
-      if (!replanPrompt) throw new Error('story-beats template unavailable');
-      const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
-      const second = readPlan(rpRes.text);
-      if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
-      if (second.parsed.missing.length > 0) {
-        log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — first division kept`);
-        gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — first division kept`);
-      } else {
-        const before = new Map(plan.pages.map(p => [p.pageNumber, p.planLine || '']));
-        replannedPages = second.parsed.pages
+      // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
+      // recheck → ship: a fault the RE-PLAN ITSELF introduced was named by the
+      // recheck and never fixed. Measured on the dragon story: the first
+      // division buried the spring's release inside a four-action page; the
+      // re-plan correctly split it out and left the new page holding the deed
+      // AND its effect ("rams the branch into the crack, water shoots out").
+      // The recheck said so in those words and the story shipped that way.
+      // A second round runs only when a MUST-FIX finding survives — the
+      // ranking `replanRank` already computes, so an "also noted" line can
+      // never spend a round. Bounded at two re-plans; the plan model is the
+      // cheapest call in the stage and a third round has never been needed.
+      const MAX_REPLAN_ROUNDS = 2;
+      let pendingCheck = check1;
+      // A round must EARN its keep. Measured 2026-09-09 on
+      // job_1788903616404_iqvhj4l8m: round 2 re-wrote 17 of 18 pages to clear
+      // three must-fix findings and minted five new ones (findings 26 -> 13 ->
+      // 23). The planner re-emits the whole division each round, so a round
+      // that does not reduce the must-fix count is not converging — it is
+      // rolling the dice on every page at once. Such a round is DISCARDED and
+      // the previous division stands, which makes the loop monotonic.
+      const mustFixCount = c => (c.findings || []).filter(f => replanRank(f) === 'must').length;
+      let bestBeats = beats;
+      let bestPagePlan = pagePlan;
+      let bestMustFix = mustFixCount(check1);
+      for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
+        await checkCancellation();
+        await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
+        const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
+          finalArc: approvedArc,
+          arcHints,
+          replan: buildReplanSection(pagePlan, pendingCheck.findings),
+        });
+        if (!replanPrompt) throw new Error('story-beats template unavailable');
+        const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
+        const second = readPlan(rpRes.text);
+        if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
+        // MERGE, don't replace. The re-plan is asked for ONLY the pages a
+        // finding names; every other page stands. Until 2026-09-09 it returned
+        // the whole division, and the planner rewrote 15-18 of 18 pages every
+        // round — which is how a story lost the page where its quest object was
+        // put back (job_1788903616404_iqvhj4l8m: check 9 named the page, the
+        // re-plan answered by deleting the moment, and no check noticed it had
+        // gone). Pages no finding named are restored from the division that
+        // stands, so a round can only change what it was asked to change.
+        const namedPages = new Set();
+        for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
+        // When NO finding names a page — a whole-book finding, or a finding whose
+        // page reference could not be read — the re-plan is answering for the
+        // whole division, so every returned page is accepted. The merge still
+        // runs: a page the return omits is filled from the division that stands,
+        // which is what keeps a partial answer from failing the page-count guard
+        // below and having the round discarded without a word.
+        const scopeAll = namedPages.size === 0;
+        {
+          const standing = new Map(beats.map(b => [b.pageNumber, b]));
+          const kept = [];
+          for (const pg of second.parsed.pages) {
+            if (scopeAll || namedPages.has(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
+            else kept.push(standing.get(pg.pageNumber));
+          }
+          for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
+          kept.sort((a, b) => a.pageNumber - b.pageNumber);
+          const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !namedPages.has(pg.pageNumber) && standing.has(pg.pageNumber)).length;
+          if (overridden > 0) {
+            log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named - restored from the standing division`);
+            gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) no finding named; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b) });
+          }
+          second.parsed.pages = kept;
+          second.parsed.missing = [];
+        }
+        // A re-plan that answers "this page holds two actions" by copying a
+        // neighbouring page has destroyed the page, not fixed it. Measured
+        // 2026-09-09 on job_1788903616404_iqvhj4l8m: the page staging the
+        // quest object's return came back as a verbatim duplicate of the page
+        // before it, and the story lost its climax with no check firing.
+        // Two pages with the same instant is corruption, so the round is
+        // discarded and the division that stands is kept.
+        {
+          const instants = second.parsed.pages.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
+          const dupe = instants.find((t, k) => t && instants.indexOf(t) !== k);
+          if (dupe) {
+            log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
+            gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
+            beats = bestBeats;
+            pagePlan = bestPagePlan;
+            break;
+          }
+        }
+        // THE PAGE COUNT IS THE ORDER (2026-09-14). The re-plan may move, split
+        // or merge instants, but a round that returns more or fewer pages than
+        // the division that stands is not a re-division of THIS book: on
+        // job_1789337998754_apslnsq1z an 18-page order came back as 19 plan
+        // lines, passed both guards above (no duplicate, nothing omitted), and
+        // shipped as a 19-page book. Same remedy as the duplicate guard: the
+        // round is discarded and the previous division stands.
+        if (second.parsed.pages.length !== beats.length) {
+          log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
+          gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
+          beats = bestBeats;
+          pagePlan = bestPagePlan;
+          break;
+        }
+        if (second.parsed.missing.length > 0) {
+          log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+          gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+          break;
+        }
+        const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
+        const changedThisRound = second.parsed.pages
           .filter(p => (before.get(p.pageNumber) || '') !== (p.planLine || ''))
           .map(p => p.pageNumber);
         beats = second.parsed.pages;
-        pagePlan = second.pagePlan || pagePlan;
-        gl.info('beats_replan', `Planner re-divided ${replannedPages.length} page(s) for ${check1.lines.length} finding(s)`, null, {
-          replannedPages, findings: check1.lines.length,
+        // Rebuild the plan TEXT from the merged pages. `second.pagePlan` is the
+        // raw re-plan response, so on any page the merge restored, the string
+        // and the array disagreed — and the string is what every report, every
+        // later reader and the recheck see. Measured 2026-09-09: one page of
+        // eighteen, and it was one of the pages a reviewer then judged against
+        // a line that had never been used. Deriving it from the pages makes the
+        // two representations incapable of diverging.
+        pagePlan = beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
+        replannedPages = [...new Set([...replannedPages, ...changedThisRound])].sort((a, b) => a - b);
+        gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
+          round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
         });
-        check2 = await runCheck('plan_recheck', beats, pagePlan);
+        check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
+        const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
+        if (stillMustFix.length >= bestMustFix && round > 1) {
+          log.warn(`⚠️ [BEATS] Round ${round} did not reduce must-fix (${bestMustFix} → ${stillMustFix.length}) — discarding it, the previous division stands`);
+          gl.warn('beats_replan_discarded', `Round ${round} did not reduce must-fix findings (${bestMustFix} → ${stillMustFix.length}) — the round was discarded and the previous division stands`, null, {
+            round, before: bestMustFix, after: stillMustFix.length,
+          });
+          beats = bestBeats;
+          pagePlan = bestPagePlan;
+          break;
+        }
+        bestBeats = beats;
+        bestPagePlan = pagePlan;
+        bestMustFix = stillMustFix.length;
+        if (stillMustFix.length === 0) break;
+        if (round === MAX_REPLAN_ROUNDS) {
+          // Ships with the fault named. A division is never withheld from a
+          // paid run over a plan finding (gates are guidelines).
+          log.warn(`⚠️ [BEATS] ${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} re-plan round(s) — the division ships as it stands`);
+          gl.warn('beats_replan_unfixed', `${stillMustFix.length} must-fix finding(s) survive ${MAX_REPLAN_ROUNDS} round(s): ${stillMustFix.map(f => f.line).join(' | ')}`, null, {
+            rounds: MAX_REPLAN_ROUNDS, unfixed: stillMustFix.map(f => f.line),
+          });
+          break;
+        }
+        pendingCheck = check2;
       }
     } catch (err) {
       // Never block a story on the check: the first division is a complete plan.
@@ -857,89 +1461,60 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     });
   }
 
-  // ── Step 3: visual contract from the locked beats ─────────────────────────
-  // MUST precede scene expansion: the Visual Bible fills the Art Director's
-  // {RECURRING_ELEMENTS}. Expanding a scene before it exists produces a brief
-  // with no recurring elements at all — no location, artifact, animal or
-  // secondary-character continuity — and the scene review downstream then has
-  // nothing to check it against. It also gates the avatar kickoff below.
+  // ── Step 3: WARDROBE contract from the locked beats ───────────────────────
+  // Clothing ONLY since 2026-09-11. The Visual Bible and the cover hints used
+  // to be written here and are now authored by the all-pages Art Director
+  // below, alongside the page briefs — a bible written at this point had to
+  // guess which page used which element from plan-line prose, and on
+  // job_1789147573901_m3uam0nxi that guess emptied the story's central prop and
+  // the signpost carrying the plot-critical text.
   //
-  // The call never throws: a beats run without a bible is degraded (blind scene
-  // briefs, empty VB, null clothing, default front-cover hint) but must still
-  // produce a story, exactly as it did before this stage existed.
+  // Clothing did NOT move, deliberately: the styled avatars are the long pole
+  // in front of every image and start the instant this call returns (via
+  // onClothingRequirements below). Clothing depends on the cast and the
+  // setting, both fixed by the plan, so it needs nothing the Art Director adds.
+  //
+  // The call never throws: a beats run without a wardrobe is degraded (null
+  // clothing, avatars from the stored wardrobe) but must still produce a story.
   await checkCancellation();
   const bibleModel = planModel;
+  // The transcript spliced into rawOutline. The wardrobe section lands here
+  // first; the Art Director's bible + cover sections are appended to it below.
   let bibleSections = null;
+  // Authored by the ALL-PAGES Art Director, further down. Declared here because
+  // the clothing review, the avatar kickoff and expandOnePage all close over it.
   let visualBible = null;
   let clothingRequirements = null;
   const biblePrompt = buildStoryBibleFromBeatsPrompt(inputData, beats);
   if (!biblePrompt) {
-    log.warn('⚠️ [BEATS] story-bible-from-beats template unavailable — no Visual Bible, clothing or cover hints');
-    gl.warn('beats_story_bible_failed', 'Bible template unavailable — story ships with an empty Visual Bible');
+    log.warn('⚠️ [BEATS] story-bible-from-beats template unavailable — no clothing requirements');
+    gl.warn('beats_story_bible_failed', 'Wardrobe template unavailable — story ships with no clothing contract');
   } else {
     t = Date.now();
     try {
-      await stage(18, 'Building the visual contract...', { next: 23, ms: 71000 });
+      await stage(18, 'Building the wardrobe contract...', { next: 23, ms: 71000 });
       const bibleRes = await textModels.callTextModelStreaming(biblePrompt, null, onChunk, bibleModel, { usageLabel: 'beats_story_bible' });
-      const sections = extractBibleSections(bibleRes.text || '');
+      const sections = extractBibleSections(bibleRes.text || '', CLOTHING_MARKERS);
       meta.timings.storyBibleMs = Date.now() - t;
       if (!sections) {
-        log.warn(`🚨 [BEATS] Bible call returned no parseable section markers (${(bibleRes.text || '').length} chars)`);
-        gl.warn('beats_story_bible_failed', `${bibleRes.modelId || bibleModel} emitted no section markers — story ships with an empty Visual Bible`);
+        log.warn(`🚨 [BEATS] Wardrobe call returned no parseable section marker (${(bibleRes.text || '').length} chars)`);
+        gl.warn('beats_story_bible_failed', `${bibleRes.modelId || bibleModel} emitted no ---CLOTHING REQUIREMENTS--- marker — story ships with no clothing contract`);
       } else {
         bibleSections = sections.body;
         // Parse with the SAME parser server.js will run over the finished
-        // transcript, so what the Art Director sees here and what the story
-        // stores downstream can never diverge.
-        const bibleParser = new UnifiedStoryParser(bibleSections);
-        visualBible = bibleParser.extractVisualBible();
-        clothingRequirements = bibleParser.extractClothingRequirements();
-        const missing = BIBLE_MARKERS.filter(m => !sections.found.includes(m));
-        if (missing.length > 0) {
-          log.warn(`⚠️ [BEATS] Bible missing section(s): ${missing.join(', ')}`);
-          gl.warn('beats_story_bible_partial', `Bible missing ${missing.map(m => m.replace(/-/g, '')).join(', ')}`);
-        }
-        // An invented child the bible declares a PEER of the commissioned
-        // children must state an age inside their band. The band went into the
-        // bible prompt above; this is the deterministic post-check over what
-        // came back — no model call, no classification, it reads the bible's
-        // own `peer` field and compares a number. Fail-soft like the rest of
-        // this stage: clamp to the nearest tolerated edge, flag the entry,
-        // warn. No retry loop and never a kill — an age constraint must not be
-        // able to end a paid run.
-        // Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy in the striped
-        // scarf" stated ten next to a commissioned 6-year-old, rendered 11-12
-        // on p5.
-        const childBand = visualBible?.secondaryCharacters?.length
-          ? commissionedChildBand(inputData.characters || [])
-          : null;
-        if (childBand) {
-          const band = childBand;
-          const applied = applySecondaryAgeBand(visualBible.secondaryCharacters, band, buildCharacterDescription);
-          for (const a of applied) {
-            log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
-            gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${band.min}-${band.max}; clamped to ${a.clampedTo}`, null, {
-              id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: band.low, bandHigh: band.high,
-            });
-          }
-        }
-        const vbCount = visualBible
-          ? Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)
-          : 0;
-        gl.info('beats_story_bible', `Visual contract by ${bibleRes.modelId || bibleModel}: ${vbCount} VB entries, ${Object.keys(clothingRequirements || {}).length} clothing reqs (${(meta.timings.storyBibleMs / 1000).toFixed(1)}s)`, null, {
-          vbEntries: vbCount, clothingChars: Object.keys(clothingRequirements || {}).length, model: bibleRes.modelId || bibleModel,
+        // transcript, so what this stage hands on and what the story stores
+        // downstream can never diverge.
+        clothingRequirements = new UnifiedStoryParser(bibleSections).extractClothingRequirements();
+        gl.info('beats_story_bible', `Wardrobe contract by ${bibleRes.modelId || bibleModel}: ${Object.keys(clothingRequirements || {}).length} clothing req(s) (${(meta.timings.storyBibleMs / 1000).toFixed(1)}s)`, null, {
+          clothingChars: Object.keys(clothingRequirements || {}).length, model: bibleRes.modelId || bibleModel,
         });
       }
     } catch (err) {
       meta.timings.storyBibleMs = Date.now() - t;
-      log.warn(`🚨 [BEATS] Bible call failed (${err.message}) — story ships with an empty Visual Bible`);
-      gl.warn('beats_story_bible_failed', `${bibleModel} failed: ${err.message} — story ships with an empty Visual Bible`);
+      log.warn(`🚨 [BEATS] Wardrobe call failed (${err.message}) — story ships with no clothing contract`);
+      gl.warn('beats_story_bible_failed', `${bibleModel} failed: ${err.message} — story ships with no clothing contract`);
     }
   }
-
-  // Deliberately OUTSIDE the bible try/catch: a throw from the caller's hook
-  // must abort the run, not be swallowed into "ships with an empty bible".
-  if (onVisualBible && visualBible) await onVisualBible(visualBible);
 
   // ── Step 3b: wardrobe review, BEFORE the avatars are kicked off ───────────
   // The bible writes clothingRequirements and nothing checked it: a costume
@@ -967,9 +1542,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         for (const fix of parsed.entries) {
           // Match the character case-insensitively — the reviewer echoes the
           // name back and case drift must not silently drop a correction.
-          const name = Object.keys(clothingRequirements)
-            .find(n => n.toLowerCase() === fix.name.toLowerCase());
-          let entry = name ? clothingRequirements[name]?.[fix.category] : null;
+          // RESOLVE: one name-keyed-map reader for the reviewer's echoed name.
+          const hit = lookupByName(clothingRequirements, fix.name, null);
+          const name = hit ? hit.key : null;
+          let entry = hit ? hit.value?.[fix.category] : null;
           // Check 9 (coverage) ADDS a category the bible missed: a beat that
           // transforms or costumes a character whose wardrobe has no entry for
           // it. Accepted only in the explicit `costumed:<name>` form — a plain
@@ -1106,6 +1682,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       }
     );
     let lastErr = null;
+    // The best incomplete brief seen, kept as the last resort. A page with half
+    // a spec still beats a page with none: this fallback's throw ABORTS the run
+    // (Promise.all over the missing pages), and a contract miss must never end a
+    // paid run (docs/SETTLED.md, gates are guidelines).
+    let salvage = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         // Own usage label (2026-08-31): fallback pages used to book under
@@ -1115,11 +1696,27 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // batch + 5 fallbacks from 6 batches).
         const res = await textModels.callTextModelStreaming(prompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion_fallback' });
         if (!res || !res.text || !res.text.trim()) throw new Error('empty scene brief');
+        // Same contract as the batch merge above — a recovery that itself comes
+        // back cut is not a recovery. The second attempt is the retry; if both
+        // are cut the throw below names why, instead of storing half a spec.
+        const { assessSceneBrief, describeSceneBrief } = require('./iterateBriefGuard');
+        const verdict = assessSceneBrief(res.text);
+        if (!verdict.usable) {
+          if (!salvage) salvage = { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel, verdict };
+          throw new Error(`incomplete scene brief — ${describeSceneBrief(verdict)}`);
+        }
         return { pageNumber: b.pageNumber, brief: res.text, prompt, modelId: res.modelId || sceneModel };
       } catch (err) {
         lastErr = err;
         log.warn(`⚠️ [BEATS] Scene expansion page ${b.pageNumber} attempt ${attempt} failed: ${err.message}`);
       }
+    }
+    if (salvage) {
+      const { describeSceneBrief } = require('./iterateBriefGuard');
+      const why = describeSceneBrief(salvage.verdict);
+      log.error(`🚨 [BEATS] Page ${b.pageNumber}: both per-page attempts returned an incomplete brief (${why}) — SHIPPING IT ANYWAY; every metadata-driven supervisor runs blind on this page`);
+      gl.warn('beats_scene_brief_incomplete', `Page ${b.pageNumber} ships with an incomplete brief after two per-page attempts — ${why}`, null, { pages: [b.pageNumber] });
+      return { pageNumber: salvage.pageNumber, brief: salvage.brief, prompt: salvage.prompt, modelId: salvage.modelId };
     }
     throw new Error(`Scene expansion failed for page ${b.pageNumber}: ${lastErr?.message || 'unknown error'}`);
   }
@@ -1127,11 +1724,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   t = Date.now();
   const beatPageNumbers = beats.map(b => b.pageNumber);
   let expansions = [];
+  // The Visual Bible + cover hints the Art Director emits ahead of page 1.
+  let adBible = null;
   // No rulings travel here any more (2026-09-01): the beats reviewer that
   // produced them is gone, and the plan check never rules on anything — it
   // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
   const allPrompt = buildSceneExpansionAllPrompt(inputData, beats, {
-      visualBible,
       availableAvatars,
       maxCharactersPerScene,
       // The whole story, read-only, for the Art Director's judgment — it
@@ -1158,7 +1756,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // never rewrite pages already parsed.
     let allModelId = sceneModel;
     const byPage = new Map();
-    await stage(30, 'Writing scene briefs...', { next: 42, ms: 176000 });
+    await stage(30, 'Writing the visual bible and the scene briefs...', { next: 42, ms: 176000 });
     for (let attempt = 1; attempt <= 2; attempt++) {
       let allRaw = '';
       try {
@@ -1170,21 +1768,242 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
         break;
       }
-      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
-      for (const p of parsed.pages) {
-        if (p.text && p.text.trim() && !byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
+      // THE BIBLE RIDES IN FRONT of page 1 (2026-09-11). A response is only
+      // whole when BOTH halves parsed: a partial bible must never ship, and
+      // JSON.parse is the completeness test — a reply cut mid-JSON yields null
+      // here, not half a bible, and the retry below is the recovery.
+      if (!adBible) {
+        const sections = extractBibleSections(allRaw, AD_BIBLE_MARKERS);
+        const parsedVb = sections ? new UnifiedStoryParser(sections.body).extractVisualBible() : null;
+        if (sections && parsedVb) {
+          adBible = { body: sections.body, visualBible: parsedVb, found: sections.found, modelId: allModelId };
+        } else if (sections) {
+          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: ---VISUAL BIBLE--- present but its JSON did not parse (${sections.body.length} chars) — treating the bible as MISSING rather than shipping a partial one`);
+        } else {
+          log.error(`🚨 [BEATS] All-pages attempt ${attempt}: response carries no ---VISUAL BIBLE--- section (${allRaw.length} chars)`);
+        }
       }
-      if (byPage.size >= beats.length) break;
+      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
+      // A PAGE IS NOT A BRIEF. parseRefinedText accepts any non-empty run of
+      // text under a `## Page N` heading, so a page the reply cut mid-sentence
+      // counted as delivered: no retry, no fallback, no warning — the generator
+      // rendered half a spec and the eval judged it against that same half.
+      // Measured once in 955 staging pages (job_1789207854566_l43qgl34w p7).
+      // Incomplete pages are simply not merged, which hands them to the retry
+      // above and the per-page fallback below — the recovery that already
+      // exists. The verdict is the one the iterate round already uses
+      // (iterateBriefGuard.js), built from this very page: prose, parseable
+      // metadata, a sceneIntent. Measured over 1035 stored beats briefs / 85
+      // staging stories it rejects 4 — p7, and three August pages that predate
+      // sceneIntent. No current story loses a page to it.
+      const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
+      const { whole, cut, formatWide } = partitionSceneBriefs(parsed.pages);
+      for (const p of (formatWide ? cut : whole)) {
+        if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, p.text);
+      }
+      if (formatWide) {
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) — accepting them as written rather than re-expanding the whole book`);
+        gl.warn('beats_scene_brief_contract_missed', `No scene brief in the all-pages reply meets the brief contract (${cut.length} page(s), first: ${describeSceneBrief(cut[0].verdict)}) — briefs ship as written and every metadata-driven supervisor runs blind`);
+      } else if (cut.length > 0) {
+        const detail = cut.sort((a, b) => a.pageNumber - b.pageNumber)
+          .map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ');
+        const pages = cut.map(p => p.pageNumber);
+        log.error(`🚨 [BEATS] All-pages attempt ${attempt}: incomplete brief(s) — ${detail} — treating them as NOT delivered`);
+        gl.warn('beats_scene_brief_incomplete', `Brief(s) for page(s) ${pages.join(', ')} came back incomplete — ${detail}. Not accepted; re-expanded instead`, null, { pages });
+      }
+      if (byPage.size >= beats.length && adBible) break;
       if (attempt === 1) {
         const missingNow = beats.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
-        log.error(`🚨 [BEATS] All-pages expansion truncated: ${byPage.size}/${beats.length} briefs parsed (missing page(s) ${missingNow.join(', ')}) — retrying the batch ONCE at full cap`);
-        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${beats.length} briefs (missing page(s) ${missingNow.join(', ')}) — retrying the batch once at full output cap`);
+        const what = [
+          missingNow.length ? `missing page(s) ${missingNow.join(', ')}` : null,
+          adBible ? null : 'no parseable Visual Bible',
+        ].filter(Boolean).join(' and ');
+        log.error(`🚨 [BEATS] All-pages expansion incomplete: ${byPage.size}/${beats.length} briefs parsed, ${what} — retrying the batch ONCE at full cap`);
+        gl.warn('beats_scene_expansion_truncated', `All-pages call returned ${byPage.size}/${beats.length} briefs, ${what} — retrying the batch once at full output cap`);
       }
     }
     expansions = beats
       .filter(b => byPage.has(b.pageNumber))
       .map(b => ({ pageNumber: b.pageNumber, brief: byPage.get(b.pageNumber), prompt: allPrompt, modelId: allModelId }));
   }
+
+  // ── Adopt the Art Director's Visual Bible ─────────────────────────────────
+  // Runs BEFORE the per-page fallback below, so a recovered page is expanded
+  // against the same bible the batch wrote, and before the scene review and the
+  // page text, so the landmark-shortfall hook can still abort attempt 1 cheaply.
+  //
+  // With no parseable bible at all the run is degraded exactly as a failed
+  // bible stage used to be — empty VB, no cover hints, blind per-page briefs —
+  // and says so loudly. It is never a kill: a contract miss must not end a paid
+  // run (docs/SETTLED.md, gates are guidelines).
+  if (adBible) {
+    visualBible = adBible.visualBible;
+    let bibleBody = adBible.body;
+    if (!adBible.found.includes('---COVER SCENE HINTS---')) {
+      log.warn('⚠️ [BEATS] Art Director emitted no ---COVER SCENE HINTS--- section — covers fall back to the default hint');
+      gl.warn('beats_story_bible_partial', 'Art Director emitted no cover scene hints — covers use the default hint');
+    }
+
+    // An invented child the bible declares a PEER of the commissioned children
+    // must state an age inside their band. The band went into the prompt above;
+    // this is the deterministic post-check over what came back — no model call,
+    // no classification, it reads the bible's own `peer` field and compares a
+    // number. Fail-soft: clamp to the nearest tolerated edge, flag the entry,
+    // warn. No retry loop and never a kill — an age constraint must not be able
+    // to end a paid run. Evidence: job_1788641639919_mpjwlzkf1, CHR001 "The boy
+    // in the striped scarf" stated ten next to a commissioned 6-year-old,
+    // rendered 11-12 on p5.
+    // ONE authored English label per element, enforced the moment the bible is
+    // adopted — BEFORE the clamp, so the clamp's own sync carries the labels
+    // too. Its own sync below runs regardless, so the projection never depends
+    // on whether the clamp fired.
+    const labelRound = await runVisualBibleLabelRound(visualBible, {
+      model: sceneModel, language: inputData.language, gl, log, stageReport: meta,
+    });
+    if (labelRound.findings > 0) {
+      const synced = syncVisualBibleSection(bibleBody, visualBible);
+      if (synced === bibleBody) {
+        log.warn('⚠️ [BEATS] Element labels could not be written back into the transcript — downstream re-parses will read the UNLABELLED bible');
+        gl.warn('beats_vb_sync_failed', 'Element labels could not be written back into the transcript — stored bible will not reflect them');
+      } else {
+        bibleBody = synced;
+      }
+    }
+
+    const childBand = visualBible?.secondaryCharacters?.length
+      ? commissionedChildBand(inputData.characters || [])
+      : null;
+    if (childBand) {
+      const ageClamps = applySecondaryAgeBand(visualBible.secondaryCharacters, childBand, buildCharacterDescription);
+      for (const a of ageClamps) {
+        log.warn(`⚠️ [BEATS] ${a.detail} — clamped to ${a.clampedTo}`);
+        gl.warn('beats_secondary_age_clamped', `${a.name} was ${a.statedAge} beside commissioned children ${childBand.min}-${childBand.max}; clamped to ${a.clampedTo}`, null, {
+          id: a.id, statedAge: a.statedAge, clampedTo: a.clampedTo, bandLow: childBand.low, bandHigh: childBand.high,
+        });
+      }
+      // ONE SOURCE OF TRUTH. The clamp mutated this module's parsed copy only;
+      // the transcript is what every later reader re-parses (storyJobPipeline,
+      // resume, the Lab). Write the mutated fields back so every
+      // extractVisualBible() from here on agrees.
+      if (ageClamps.length > 0) {
+        const synced = syncVisualBibleSection(bibleBody, visualBible);
+        if (synced === bibleBody) {
+          log.warn('⚠️ [BEATS] Age clamp could not be written back into the transcript — downstream re-parses will read the UNCLAMPED bible');
+          gl.warn('beats_vb_sync_failed', 'Age clamp could not be written back into the transcript — stored bible will not reflect it');
+        } else {
+          bibleBody = synced;
+        }
+      }
+    }
+
+    // Append to the wardrobe transcript in the order the transcript has always
+    // carried: CLOTHING REQUIREMENTS, VISUAL BIBLE, COVER SCENE HINTS.
+    bibleSections = bibleSections ? `${bibleSections.trimEnd()}
+
+${bibleBody}` : bibleBody;
+
+    const vbCount = Object.values(visualBible).reduce((n, v) => n + (Array.isArray(v) ? v.length : 0), 0);
+    gl.info('beats_visual_bible', `Visual Bible by ${adBible.modelId || sceneModel}: ${vbCount} entr(ies), written with the page briefs`, null, {
+      vbEntries: vbCount, sections: adBible.found,
+    });
+  } else if (allPrompt) {
+    log.error('🚨 [BEATS] All-pages call produced NO parseable Visual Bible after both attempts — story ships with an empty bible, no cover hints and blind briefs');
+    gl.warn('beats_visual_bible_missing', 'The Art Director returned no parseable Visual Bible — story ships with an empty bible and no cover hints');
+  }
+
+  // The page images need each real landmark's PHOTO VARIANTS on the bible entry
+  // (the resolver serves the variant a brief's landmarkView asks for). The Art
+  // Director already chose its viewpoints from the PHOTOS lines in
+  // {AVAILABLE_LANDMARKS_SECTION}; these two steps link what it chose to the
+  // index rows. Both are cheap (in-memory matching; one DB query) and
+  // idempotent, so the caller repeating them costs nothing.
+  if (visualBible) {
+    try {
+      if (inputData.availableLandmarks?.length) {
+        require('./visualBible').linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
+      }
+      await require('./landmarkPhotos').loadLandmarkPhotoDescriptions(visualBible);
+      const realLandmarks = (visualBible.locations || []).filter(l => l.isRealLandmark);
+      if (realLandmarks.length > 0) {
+        const withVariants = realLandmarks.filter(l => l.photoVariants?.length).length;
+        log.info(`🌍 [BEATS] Landmark photo variants linked: ${withVariants}/${realLandmarks.length} real landmark(s) carry variants`);
+      }
+    } catch (err) {
+      log.warn(`⚠️ [BEATS] Landmark linking/variants did not load: ${err.message}`);
+    }
+  }
+
+  // ── Wardrobe contract vs Visual Bible ────────────────────────────────────
+  // The two describe the same body and nothing compared them: a costume line
+  // could put a hat on a character the bible already dresses with a different
+  // one, on every page she appears (staging job_1789420511893_zly5rcdej,
+  // ART002). The bible wins — it has a rendered reference cell — so the outfit
+  // clause is rewritten here, the first moment both exist, and every swap is
+  // logged. Contained like every other check: a throw ships the contradiction
+  // rather than killing the run, but never silently.
+  let wardrobeBibleReport = null;
+  if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+    try {
+      const { applyWardrobeBibleCorrections } = require('./clothingCheck');
+      const { findings, applied, unresolved } = applyWardrobeBibleCorrections(clothingRequirements, visualBible);
+      // `applied` holds RE-DERIVED finding objects (the corrector re-checks
+      // after every rewrite), so identity comparison against `findings` was
+      // always false and every successful correction logged as uncorrected.
+      // Compare on what identifies a finding instead.
+      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
+      const appliedKeys = new Set(applied.map(correctionKey));
+      if (findings.length > 0) {
+        wardrobeBibleReport = {
+          conflicts: findings.map(f => ({
+            character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel,
+            wardrobeClause: f.wardrobeClause, corrected: appliedKeys.has(correctionKey(f)),
+          })),
+        };
+        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible wardrobe conflict(s): ${findings.map(f => `${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
+          conflicts: wardrobeBibleReport.conflicts,
+        });
+        // The transcript is what every later consumer re-parses the contract
+        // out of; correcting only the object leaves them on the old outfit.
+        if (applied.length > 0 && bibleSections) {
+          const rewritten = replaceClothingSection(bibleSections, clothingRequirements);
+          if (rewritten === bibleSections) {
+            gl.warn('beats_wardrobe_bible_unmerged', `${applied.length} outfit(s) corrected against the Visual Bible but the transcript has no CLOTHING REQUIREMENTS section to update`);
+          } else {
+            bibleSections = rewritten;
+          }
+        }
+        if (unresolved.length > 0) {
+          wardrobeBibleReport.unresolved = unresolved.map(f => ({
+            character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel, wardrobeClause: f.wardrobeClause,
+          }));
+        }
+      }
+      // THE AVATAR WAS RENDERED FROM THE PRE-CORRECTION TEXT. The styled-avatar
+      // kickoff fires at the story-bible stage, long before the Visual Bible
+      // this check needs exists — deliberately, because avatars are the long
+      // pole in front of every image. So page prompts would carry the corrected
+      // garment while the avatar reference cell still wore the old one: the
+      // words-vs-picture split, one layer upstream. The affected characters —
+      // and only those — are re-rendered by the caller.
+      if (applied.length > 0 && typeof onWardrobeCorrected === 'function') {
+        const names = [...new Set(applied.map(f => f.character).filter(Boolean))];
+        try {
+          onWardrobeCorrected(names, clothingRequirements);
+        } catch (err) {
+          log.warn(`🚨 [BEATS] onWardrobeCorrected threw (${err.message}) — avatars keep the pre-correction outfit`);
+        }
+      }
+    } catch (err) {
+      log.error(`🚨 [BEATS] Wardrobe-vs-bible check failed: ${err.message} — a contract/bible contradiction would ship unnoticed`);
+    }
+  }
+
+  // Deliberately OUTSIDE every try/catch above: a throw from the caller's hook
+  // must abort the run (the landmark-shortfall retry uses exactly that), not be
+  // swallowed into "ships with an empty bible".
+  if (onVisualBible && visualBible) await onVisualBible(visualBible);
 
   // Page-count guard: a short response must never ship a story with pages that
   // have no brief. Only the MISSING pages are re-expanded per-page.
@@ -1203,9 +2022,17 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // ── Step 4: ONE review over ALL scene briefs ──────────────────────────────
   await checkCancellation();
   let sceneReviewAnalysis = '';
+  // Set when the review reply was truncated (textReplyGuard.js): the briefs
+  // shipped unreviewed and the report says so instead of "rewrote nothing".
+  let sceneReviewFailed = null;
   // Same contract as beatsReviewReport above: null only when the review never
   // ran; an object with empty pages[] when it ran and rewrote nothing.
   let sceneReviewReport = null;
+  // What the review's optional ---VISUAL BIBLE--- section changed, so the next
+  // story proves the channel ran (the labelRound lesson).
+  let bibleCorrections = null;
+  let castRemovalsDeclared = null;
+  let castRemovalAudit = [];
   // Mechanical clothing faults, computed here and handed to the review — the
   // ONE place they get fixed (owner decision 2026-08-08). Free: no API call, no
   // image. Only the findings measured to carry signal are rendered
@@ -1220,7 +2047,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let wornRound = null;
   let briefUnfixedList = [];
   let briefIntroducedList = [];
-  let briefSecondRound = null;
+  // The two REWRITE-UNTIL-ZERO types (owner, 2026-09-08): a page declaring two
+  // actions, and a page over the three-element budget. What this adds is a
+  // VISIBLE verdict when they survive the single review round — page numbers per type,
+  // and for the budget which pages the brief itself could not have fixed
+  // (the bible's `appearsInPages` places elements the brief never cited, and
+  // objectsAsked ≤ 3 means the reviewer had nothing left to withdraw).
+  // Null when both types ended at zero. Never kills the run.
+  let rewriteToZeroUnfixed = null;
   try {
     const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
     const checkPages = expansions.map(x => {
@@ -1252,6 +2086,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // review rather than auto-repaired (owner decision 2026-08-11 — the reviewer
   // authored both halves; we must not invent a figure nobody wrote).
   let briefFindings = '';
+  // The plan line rides along for the element-coverage check: it is the page's
+  // authority on what is in the picture, and the brief's objects[] is the only
+  // route by which any of it reaches the illustrator. Hoisted — the re-check
+  // after the review must compare against the same lines.
+  const planLineOf = (pageNumber) => (beats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
   // Hoisted for the post-review re-check below, which needs the same cast list
   // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
   let briefCastNames = [];
@@ -1285,7 +2124,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     });
     briefCastNames = castNames;
     const res = checkBriefs(
-      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+      expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
       castNames,
       visualBible,
       { textZoneRules: textZoneRulesActive(inputData) }
@@ -1308,8 +2147,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const srPrompt = buildSceneReviewPrompt(
     inputData,
     expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-    // Locked beats feed the review's check 5 (character in beat vs brief).
-    { clothingFindings, briefFindings, beats }
+    // Locked beats feed the review's check 5 (character in beat vs brief);
+    // the bible feeds check 9f (a stated object's state page ranges).
+    { clothingFindings, briefFindings, beats, visualBible }
   );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
@@ -1334,7 +2174,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         log.error(`❌ [BEATS] Scene review returned an EMPTY response (${srOutTok} output tokens) — briefs ship unreviewed`);
         gl.warn('beats_scene_review_empty', `Scene review returned nothing (${srOutTok} output tokens) — provider failure, briefs shipped unreviewed`);
       }
-      const parsed = parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
+      // TRUNCATION (textReplyGuard.js): a review cut at the ceiling rewrote the
+      // EARLIEST pages and never reached the ones it named — adopting the pages
+      // that fit would ship a half-review as a review. Fall back to the raw
+      // briefs (the input), exactly as the Lab guard does; the failure is
+      // recorded on the story (sceneReviewFailed) and in the generation log.
+      const srTruncated = !!srRes.truncation?.suspected;
+      if (srTruncated) {
+        sceneReviewFailed = `scene review ${textModels.describeTruncation(srRes.truncation)} — briefs shipped unreviewed`;
+        log.error(`❌ [BEATS] ${sceneReviewFailed}`);
+        gl.warn('beats_scene_review_truncated', sceneReviewFailed, null, srRes.truncation);
+      }
+      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
       sceneReviewAnalysis = parsed.analysis || '';
       const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
       const changed = [];
@@ -1371,6 +2222,117 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       if (!faultLine) {
         log.debug('[BEATS] Scene review analysis has no FAULTED PAGES line — incompleteness check skipped');
       }
+      // DECLARED REMOVALS (owner decision 2026-09-13). A rewrite that drops a
+      // character used to be expressible only as an absence — no delta, no
+      // reason, and nothing parsed. `REMOVED CAST:` in the output contract is
+      // that channel; this reads it, then checks it against what actually
+      // happened to `characters[]`, page by page. Mechanical name-set
+      // arithmetic over the brief metadata only — never an inference from
+      // description prose.
+      //
+      // Detected AND REVERTED (2026-09-15, superseding the detect-only ruling
+      // of 2026-09-13). Evidence for the detection:
+      // job_1789207854566_l43qgl34w p7/p15, where five commissioned characters
+      // became "five soaked pirates: one in a blue tricorn…" with
+      // `characters: []` / `["Fiona"]` and nothing said. Evidence for the
+      // revert: job_1789420511893_zly5rcdej p16, where the error fired, the
+      // page rendered on the emptied cast anyway, and the corrupt contract
+      // produced a phantom CRITICAL against a child who IS in the prose — three
+      // repair rounds, and a correct original destroyed by the round-2 inpaint.
+      const castRemovals = parseCastRemovals(sceneReviewAnalysis);
+      const metaOf = (brief) => (extractSceneMetadata(brief) || {});
+      castRemovalsDeclared = castRemovals;
+      castRemovalAudit = diffCastRemovals(
+        sceneDiffs.map(d => {
+          const mb = metaOf(d.before), ma = metaOf(d.after);
+          // `objects[]` carries the Visual Bible secondaries. A name that moved
+          // there is still commissioned — routing, not removal.
+          return {
+            pageNumber: d.pageNumber,
+            beforeCast: mb.characters || [],
+            afterCast: ma.characters || [],
+            afterObjects: (ma.objects || []).map(o => (typeof o === 'string' ? o : (o && (o.id || o.name)))).filter(Boolean),
+          };
+        }),
+        castRemovals
+      );
+      if (castRemovals.malformed.length > 0) {
+        log.warn(`⚠️ [BEATS] Scene review REMOVED CAST line has ${castRemovals.malformed.length} unparseable entr(ies): ${castRemovals.malformed.join(' | ')}`);
+        gl.warn('beats_scene_review_removals_malformed', `REMOVED CAST entries could not be parsed: ${castRemovals.malformed.join(' | ')}`, null, castRemovals.malformed);
+      }
+      for (const r of castRemovalAudit) {
+        if (r.declared.length === 0) continue;
+        const why = (castRemovals.pages.find(p => p.pageNumber === r.pageNumber) || {}).reason || '(no reason given)';
+        log.info(`📣 [BEATS] Scene review DECLARED removal on page ${r.pageNumber}: ${r.declared.join(', ')} — ${why}`);
+        gl.info('beats_scene_review_removal_declared', `Page ${r.pageNumber}: reviewer removed ${r.declared.join(', ')} — ${why}`, null, r);
+      }
+      const undeclaredRemovals = castRemovalAudit.filter(r => r.undeclared.length > 0);
+      if (undeclaredRemovals.length > 0) {
+        const detail = undeclaredRemovals.map(r => `page ${r.pageNumber}: ${r.undeclared.join(', ')}`).join('; ');
+        log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
+        gl.error('beats_scene_review_removal_undeclared',
+          `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
+        // The page does NOT render on a cast the reviewer silently emptied: its
+        // whole brief goes back to the version that was sent for review, which
+        // is internally consistent by construction. That page's other review
+        // fixes are lost with it and are reported below through the ordinary
+        // faulted-but-not-rewritten channel — `changed` is trimmed here, before
+        // that check reads it.
+        const reverted = revertUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
+        if (reverted.length > 0) {
+          const pages = reverted.map(r => r.pageNumber).join(', ');
+          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — an undeclared cast removal must not render`);
+          gl.warn('beats_scene_review_removal_reverted',
+            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration, so that page's review fixes were discarded with it`,
+            null, reverted);
+        }
+      }
+
+      // BIBLE CORRECTIONS (2026-09-14). The review may return an optional
+      // ---VISUAL BIBLE--- section correcting a stated object's state page
+      // ranges — the fault sceneBriefCheck's vb_state_* findings hand it. The
+      // merge is strict and fail-soft; see applyReviewBibleCorrections.
+      if (visualBible && !srTruncated) {
+        try {
+          // The handles the briefs ALREADY cite: a correction that renames one
+          // of them re-points a page at a different look (Lab 1264).
+          const citedHandles = new Set();
+          for (const ex of (Array.isArray(expansions) ? expansions : [])) {
+            const meta = extractSceneMetadata(ex && ex.brief) || {};
+            const objs = Array.isArray(meta.objects) ? meta.objects : [];
+            for (const o of objs) {
+              const h = typeof o === 'string' ? o.trim().toUpperCase() : '';
+              if (h.includes('.')) citedHandles.add(h);
+            }
+          }
+          const corr = applyReviewBibleCorrections(srRes.text || '', visualBible, expansions.length, citedHandles);
+          bibleCorrections = corr;
+          for (const r of corr.rejected) {
+            log.warn(`⚠️ [BEATS] Scene review bible correction REJECTED for ${r.id}: ${r.reason}`);
+            gl.warn('beats_scene_review_bible_rejected', `Bible correction for ${r.id} rejected: ${r.reason}`, null, r);
+          }
+          if (corr.applied.length > 0) {
+            for (const e of corr.applied) {
+              log.info(`[VB-STATE] ${e.id} "${e.name}" ${e.oldPages} → ${e.newPages}`);
+            }
+            gl.info('beats_scene_review_bible',
+              `Scene review corrected ${corr.applied.length} stated object(s): `
+              + corr.applied.map(e => `${e.id} ${e.oldPages} → ${e.newPages}`).join('; '), null, corr);
+            // ONE SOURCE OF TRUTH: the transcript is what every later reader
+            // re-parses, exactly as the label round and the age clamp do.
+            const synced = syncVisualBibleSection(bibleSections, visualBible);
+            if (synced === bibleSections) {
+              log.warn('⚠️ [BEATS] Scene review bible correction could not be written back into the transcript — downstream re-parses will read the UNCORRECTED bible');
+              gl.warn('beats_vb_sync_failed', 'Scene review bible correction could not be written back into the transcript — stored bible will not reflect it');
+            } else {
+              bibleSections = synced;
+            }
+          }
+        } catch (bcErr) {
+          log.warn(`⚠️ [BEATS] Scene review bible correction failed (${bcErr.message}) — bible unchanged`);
+        }
+      }
+
       const faultedNotFixed = (namedPages || []).filter(n => !changed.includes(n));
       if (faultedNotFixed.length > 0) {
         log.warn(`⚠️ [BEATS] Scene review named page(s) ${faultedNotFixed.join(', ')} but rewrote none of them`);
@@ -1442,6 +2404,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
               try {
                 log.info(`🎩 [BEATS] worn-state round on page(s) ${label} (${subset.length}/${expansions.length} briefs)`);
                 const wrRes = await textModels.callTextModelStreaming(wrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_worn' });
+                // A cut round is a failed round — the catch below keeps the
+                // briefs as they were and ships the pages flagged.
+                if (wrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(wrRes.truncation)}`);
                 const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
                 const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
                 for (const x of subset) {
@@ -1516,15 +2481,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       try {
         const { checkScenes: checkBriefs, REVIEWABLE } = require('./sceneBriefCheck');
         const after = checkBriefs(
-          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
+          expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
           briefCastNames,
           visualBible,
           { textZoneRules: textZoneRulesActive(inputData) }
         );
-        // pageNumber 0 is the whole-book text-position tally. It is reported,
-        // but it can never drive the targeted second round below — that round
-        // re-sends only the faulted PAGES, and rebalancing a distribution means
-        // re-sending the whole book at full cost.
+        // pageNumber 0 is the whole-book text-position tally, reported on its
+        // own line below rather than mixed into the per-page fault list.
         const left = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber !== 0);
         const bookLevel = after.findings.filter(f => REVIEWABLE.has(f.type) && f.pageNumber === 0);
         if (bookLevel.length > 0) {
@@ -1549,73 +2512,52 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         }
         if (left.length === 0) log.info('🧩 [BEATS] brief check after review: clean');
 
-        // TARGETED SECOND ROUND (owner, 2026-08-25). Reporting a fault does not
-        // stop it shipping, and the page that motivated this — staging
-        // job_1787638394061_hs70901tfsn p1 — went out declaring two actions.
-        //
-        // The briefs ARE the input: 71,030 of the review's ~19,820 input tokens
-        // were the 16 briefs, so re-sending only the faulted ones costs roughly
-        // an eighth of a full round (~$0.018 against $0.14 measured on that
-        // story). buildSceneReviewPrompt already takes a page subset, so there
-        // is nothing to change in the builder.
-        //
-        // Exactly ONE extra round, ever. No loop: whatever survives it is
-        // reported and ships, which is the same contract as before, only with
-        // one cheap attempt at a fix in between.
-        if (left.length > 0) {
-          const faultPages = new Set(left.map(f => f.pageNumber));
-          const subset = expansions.filter(x => faultPages.has(x.pageNumber));
-          const subsetByPage = new Map();
-          for (const [pn, list] of after.byPage) if (faultPages.has(pn)) subsetByPage.set(pn, list);
-          const { renderFindingsBlock: renderBriefBlock2 } = require('./sceneBriefCheck');
-          const rrPrompt = buildSceneReviewPrompt(
-            inputData,
-            subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-            { briefFindings: renderBriefBlock2(subsetByPage), beats }
-          );
-          if (rrPrompt) {
-            try {
-              const pagesLabel = [...faultPages].sort((a, b) => a - b).join(', ');
-              log.info(`🧩 [BEATS] second review round on page(s) ${pagesLabel} (${subset.length}/${expansions.length} briefs)`);
-              const rrRes = await textModels.callTextModelStreaming(rrPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review_r2' });
-              const rrParsed = parseRefinedText(rrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
-              const rrByPage = new Map(rrParsed.pages.map(p => [p.pageNumber, p.text]));
-              const rrChanged = [];
-              for (const x of subset) {
-                const fixed = rrByPage.get(x.pageNumber);
-                if (fixed && fixed.trim() && fixed !== x.brief) {
-                  sceneDiffs.push({ pageNumber: x.pageNumber, before: x.brief, after: fixed, round: 2 });
-                  x.brief = fixed;
-                  x.reviewRewrote = true;
-                  rrChanged.push(x.pageNumber);
-                }
-              }
-              const after2 = checkBriefs(
-                expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-                briefCastNames,
-                visualBible
-              );
-              const left2 = after2.findings.filter(f => REVIEWABLE.has(f.type));
-              briefUnfixedList = left2;
-              briefSecondRound = {
-                pages: [...faultPages].sort((a, b) => a - b),
-                rewrote: rrChanged,
-                before: left.length,
-                after: left2.length,
-                usage: rrRes.usage || null,
-              };
-              if (left2.length === 0) {
-                log.info(`🧩 [BEATS] second round resolved all ${left.length} fault(s)`);
-                gl.info('beats_brief_round2', `Second review round on page(s) ${pagesLabel} resolved all ${left.length} fault(s)`);
-              } else {
-                const d = left2.map(f => `p${f.pageNumber} ${f.type}`).join('; ');
-                log.warn(`⚠️ [BEATS] second round: ${left2.length}/${left.length} fault(s) still present — ${d}`);
-                gl.warn('beats_brief_round2_unfixed', `Second review round left ${left2.length} fault(s): ${d}`, null, { findings: left2 });
-              }
-            } catch (r2Err) {
-              log.warn(`⚠️ [BEATS] second review round failed (${r2Err.message}) — faults ship as reported`);
-            }
+        // NO SECOND MODEL ROUND (owner, 2026-09-11). A targeted second
+        // reviewer call used to re-send the faulted pages here. Measured over
+        // two reruns it broke even: on the dragon rerun it cleared
+        // interaction_object_shared_hands and the p12/p13 trough plate but
+        // INTRODUCED interaction_multiple_actions on p1 (it split one action
+        // back into two), and on the pirate rerun it changed nothing at all.
+        // A paid call that trades one fault for another is not worth making.
+        // The deterministic re-check above stays — it costs nothing and is the
+        // diagnostic signal — so faults are reported and ship flagged, which
+        // is the same contract round 2 had on the pages it failed to fix.
+
+        // REWRITE-UNTIL-ZERO verdict for the two one-moment types, after the
+        // single review round. Measured on staging
+        // job_1788816451791_25b31uqlp: 11 of 18 pages shipped over budget after
+        // two rounds, and on every one of them the brief's own objects[] was
+        // already within three — the surplus came from the bible's
+        // appearsInPages, which no rewrite can withdraw. Saying so per page is
+        // the difference between "the reviewer ignored the fault" and "the
+        // fault is not the reviewer's to fix".
+        const ZERO_TYPES = ['interaction_multiple_actions', 'vb_element_overflow'];
+        const zeroLeft = briefUnfixedList.filter(f => ZERO_TYPES.includes(f.type) && f.pageNumber !== 0);
+        if (zeroLeft.length > 0) {
+          const { rankPageElements, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
+          const pagesOf = (type) => [...new Set(zeroLeft.filter(f => f.type === type).map(f => f.pageNumber))].sort((a, b) => a - b);
+          const overflowDetail = pagesOf('vb_element_overflow').map((pn) => {
+            const x = expansions.find(e => e.pageNumber === pn);
+            const meta = x ? (extractSceneMetadata(x.brief) || {}) : {};
+            const ranked = rankPageElements(pn, meta, visualBible);
+            const objectsAsked = ranked.filter(e => e.fromObjects).length;
+            return { pageNumber: pn, elements: ranked.length, objectsAsked, briefFixable: objectsAsked > VB_ELEMENT_BUDGET };
+          });
+          rewriteToZeroUnfixed = {
+            interaction_multiple_actions: pagesOf('interaction_multiple_actions'),
+            vb_element_overflow: pagesOf('vb_element_overflow'),
+            vbOverflowDetail: overflowDetail,
+            rounds: 1,
+          };
+          const parts = [];
+          if (rewriteToZeroUnfixed.interaction_multiple_actions.length) parts.push(`two actions on page(s) ${rewriteToZeroUnfixed.interaction_multiple_actions.join(', ')}`);
+          if (rewriteToZeroUnfixed.vb_element_overflow.length) {
+            const bibleSide = overflowDetail.filter(d => !d.briefFixable).map(d => d.pageNumber);
+            parts.push(`over the ${VB_ELEMENT_BUDGET}-element budget on page(s) ${rewriteToZeroUnfixed.vb_element_overflow.join(', ')}`
+              + (bibleSide.length ? ` (bible-side on ${bibleSide.join(', ')} — the brief cites ≤${VB_ELEMENT_BUDGET}, the surplus is appearsInPages)` : ''));
           }
+          log.warn(`⚠️ [BEATS] rewrite-until-zero NOT reached after ${rewriteToZeroUnfixed.rounds} round(s): ${parts.join('; ')} — shipping flagged`);
+          gl.warn('beats_one_moment_unfixed', `Briefs still ${parts.join('; ')} after the review's round budget — shipped flagged, never killed`, null, rewriteToZeroUnfixed);
         }
       } catch (rcErr) {
         log.warn(`⚠️ [BEATS] brief re-check failed (${rcErr.message})`);
@@ -1626,6 +2568,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         durationMs: meta.timings.sceneReviewMs,
         changedPages: sceneDiffs.map(d => d.pageNumber),
         namedButNotRewritten: faultedNotFixed,
+        // The reviewer's declared-removals channel and the mechanical audit of
+        // it (2026-09-13). `castRemovalAudit` holds one row per page that lost
+        // a name, split into `declared` / `undeclared`.
+        castRemovals: castRemovalsDeclared,
+        castRemovalAudit,
+        failed: sceneReviewFailed,
         analysis: sceneReviewAnalysis,
         pages: sceneDiffs,
         // Dev-mode inspection (owner request 2026-08-09): the exact prompt the
@@ -1639,9 +2587,15 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         wornUnresolved,
         wornUnresolvedPages,
         wornRound,
+        // The VB label round writes its outcome to `meta` at adoption time;
+        // without this line it reached no stored report (job_1789337998754_apslnsq1z
+        // had valid labels and a null labelRound everywhere).
+        labelRound: meta.labelRound || null,
+        // {applied, rejected} from the review's ---VISUAL BIBLE--- section.
+        bibleCorrections,
         briefUnfixed: briefUnfixedList,
         briefIntroduced: briefIntroducedList,
-        briefSecondRound,
+        rewriteToZeroUnfixed,
       };
       gl.info('beats_scene_review', `Scene review by ${srRes.modelId || sceneReviewModel}: ${changed.length} brief(s) rewritten (${(meta.timings.sceneReviewMs / 1000).toFixed(1)}s)`, null, {
         changedPages: changed, model: srRes.modelId || sceneReviewModel,
@@ -1652,29 +2606,37 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     }
   }
 
-  // STRIKE TWO — the VB element budget applied in code (owner, 2026-09-06).
-  // The Art Director was given the budget in its prompt, and the scene review
-  // was handed every overflow as a fault with the ids to drop named. Whatever
-  // still exceeds three is truncated HERE, lowest-ranked first, so the packer
-  // never sees a fourth element — and the page ships, flagged, never killed.
-  // Runs unconditionally: a review that failed, timed out or had no template
-  // must not be a way past the budget.
+  // VB ELEMENT BUDGET — REPORTED HERE, NEVER ENFORCED (owner, 2026-09-11).
+  // `truncateBriefToBudget` used to cut each brief's `objects[]` down to the
+  // budget at this point, lowest-ranked first. It was removed with the
+  // assignment trim above: code has no way to know which objects a page is
+  // about, and dropping a citation removes the object from the page prompt's
+  // REQUIRED OBJECTS line even though its reference cell exists — the same
+  // failure as the trim, one layer down. The budget is now enforced ONLY where
+  // it is understood: the Art Director's prompt and the scene review's fault
+  // block, both fed from VB_ELEMENT_BUDGET. An overflowing brief ships with
+  // every object it asked for.
+  // The overflow REPORT stays: it is stored per page as `vbElementOverflow`
+  // and the Lab measures reviewer behaviour with it. `dropped` now means
+  // "over budget and shipped anyway", not "removed from the brief".
   const vbOverflowByPage = new Map();
   try {
-    const { truncateBriefToBudget } = require('./vbElementBudget');
+    // Same call, same ranking — its rewritten `brief` is DISCARDED. Reusing it
+    // keeps one source of truth for what counts and what ranks lowest; only
+    // the assignment of `x.brief` is gone.
+    const { truncateBriefToBudget, VB_ELEMENT_BUDGET } = require('./vbElementBudget');
     for (const x of expansions) {
       const t2 = truncateBriefToBudget(x.brief, visualBible, x.pageNumber);
       if (!t2) continue;
-      x.brief = t2.brief;
       vbOverflowByPage.set(x.pageNumber, { requested: t2.requested, kept: t2.kept, dropped: t2.dropped });
-      log.warn(`⚠️ [BEATS] VB element budget: page ${x.pageNumber} still referenced ${t2.requested.length} elements after the review — kept ${t2.kept.join(', ')}, dropped ${t2.dropped.join(', ')}`);
+      log.warn(`⚠️ [BEATS] VB element budget: page ${x.pageNumber} references ${t2.requested.length} elements after the review — over budget, shipping as written (lowest-ranked: ${t2.dropped.join(', ')})`);
       gl.warn('beats_vb_element_overflow',
-        `Page ${x.pageNumber} referenced ${t2.requested.length} Visual Bible elements (budget 3) after the scene review — dropped ${t2.dropped.join(', ')}`,
-        null, { pageNumber: x.pageNumber, requested: t2.requested, kept: t2.kept, dropped: t2.dropped });
+        `Page ${x.pageNumber} references ${t2.requested.length} Visual Bible elements (budget ${VB_ELEMENT_BUDGET}) after the scene review — shipped unchanged, lowest-ranked ${t2.dropped.join(', ')}`,
+        null, { pageNumber: x.pageNumber, requested: t2.requested, kept: t2.kept, dropped: t2.dropped, enforced: false });
     }
-    if (vbOverflowByPage.size === 0) log.info('🧱 [BEATS] VB element budget: every page within three elements');
+    if (vbOverflowByPage.size === 0) log.info('🧱 [BEATS] VB element budget: every page within budget');
   } catch (vbErr) {
-    log.warn(`⚠️ [BEATS] VB element budget truncation failed (${vbErr.message}) — briefs ship as written`);
+    log.warn(`⚠️ [BEATS] VB element budget check failed (${vbErr.message}) — briefs ship as written`);
   }
 
   // ── Step 6: page text — runs HERE, after the scene review, with the briefs ─
@@ -1694,7 +2656,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // parseable TITLE_PICK the hash pick stands: stableCandidateIndex is the same
   // deterministic pick the unified parser uses, so cover generation and the
   // story save never diverge on the title.
-  const titleSection = (textRaw.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z])/i) || [])[1] || '';
+  // The block runs to the next block marker or to the end of the reply — it is
+  // the LAST block since 2026-09-11 (the title is picked from the finished
+  // pages, not guessed ahead of them), and the old lookahead required a
+  // following `---X` that no longer exists.
+  const titleSection = (textRaw.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z]|$)/i) || [])[1] || '';
   const cleanTitle = s => String(s || '')
     .replace(/^\**\s*TITLE\s*:\s*/i, '')
     .replace(/^\*{1,2}|\*{1,2}$/g, '')
@@ -1754,7 +2720,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     for (let attempt = 1; attempt <= 2 && !parsed; attempt++) {
       try {
         const res = await textModels.callTextModelStreaming(textPrompt, null, onChunk, textModel, { usageLabel: 'beats_story_text' });
-        const candidate = parseRefinedText(res.text || '', beatPages);
+        // TITLE is the LAST block (2026-09-11) — name it so the final page's
+        // text stops there instead of swallowing it.
+        const candidate = parseRefinedText(res.text || '', beatPages, 'STORY TEXT', ['TITLE']);
         if (candidate.pages.length === 0 || candidate.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Text attempt ${attempt}: ${candidate.pages.length} page(s) parsed, missing ${candidate.missing.join(', ') || 'none'}`);
           if (attempt < 2) continue;
@@ -1787,7 +2755,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const pages = [];
   const scenes = [];
   for (const b of beats) {
-    const text = (textByPage.get(b.pageNumber) || '').trim();
+    // stripTrailingSeparator: the writer's "---" page rule, when it lands
+    // INSIDE the page body, survives the parser's cut at the next heading and
+    // ships under the illustration (job_1789348171785_9oxos7dwv p1/p2/p8).
+    const text = stripTrailingSeparator((textByPage.get(b.pageNumber) || '').trim());
     if (!text) {
       log.warn(`⚠️ [BEATS] Page ${b.pageNumber} has no text — dropped`);
       continue;
@@ -1827,12 +2798,53 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // and the Lab's stored-beats recovery all decide beats-vs-unified mode
       // from this field's shape.
       outlineExtract: `PLAN: ${b.planLine || ''}`,
-      // Present only on a page whose brief was truncated to the three-element
-      // budget: {requested, kept, dropped} ids, for the page view and the Lab.
+      // Present only on a page whose brief went OVER the element budget:
+      // {requested, kept, dropped} ids, for the page view and the Lab. Since
+      // 2026-09-11 nothing is actually dropped — the brief ships as written
+      // and `dropped` names the lowest-ranked ids that went over.
       ...(vbOverflowByPage.has(b.pageNumber) ? { vbElementOverflow: vbOverflowByPage.get(b.pageNumber) } : {}),
     });
   }
   if (pages.length === 0) throw new Error('Beats pipeline produced no usable pages');
+
+  // USAGE COMES FROM THE BRIEFS. The bible's `pages` were guessed before a
+  // single brief existed; the briefs are now final, so rebuild every entry's
+  // `appearsInPages` (and its states/vantages) from what they actually cite.
+  // This runs BEFORE rawOutline is assembled and before the caller kicks off
+  // the reference sheet (storyJobPipeline, full mode), so the cells that get
+  // rendered are the elements the story asks for — and an entry no brief cites
+  // truthfully renders none. See job_1789147573901_m3uam0nxi, where the old
+  // plan-line trim emptied the central prop and the lettered signpost that p10
+  // then asked for by id. Never a kill: a page with no parseable metadata
+  // contributes nothing, and with no briefs at all this is a no-op.
+  if (visualBible) {
+    const { applyBriefUsage } = require('./vbElementBudget');
+    const usage = applyBriefUsage(visualBible, scenes);
+    if (usage.applied) {
+      const changed = usage.entries.filter(e => e.gained.length || e.lost.length);
+      if (beatsReviewReport) beatsReviewReport.vbBriefUsage = usage;
+      const detail = changed.slice(0, 12)
+        .map(e => `${e.id} [${e.oldPages.join(',')}] → [${e.newPages.join(',')}]`).join('; ');
+      gl.info('vb_usage_from_briefs', `Visual Bible page assignment rebuilt from the final briefs: ${usage.changed}/${usage.entries.length} entr(ies) changed`
+        + (usage.revived.length ? `, ${usage.revived.length} revived (${usage.revived.join(', ')})` : '')
+        + (usage.emptied.length ? `, ${usage.emptied.length} now cited by no brief (${usage.emptied.join(', ')})` : '')
+        + (detail ? ` — ${detail}` : ''), null, usage);
+      for (const e of changed) {
+        log.info(`[VB-USAGE] ${e.id} "${e.name}" [${e.oldPages.join(',')}] → [${e.newPages.join(',')}]`);
+      }
+      // ONE SOURCE OF TRUTH: the transcript below is what storyJobPipeline,
+      // the resume path and the Lab re-parse. Write the rebuilt pages back.
+      if (usage.changed > 0 && bibleSections) {
+        const synced = syncVisualBibleSection(bibleSections, visualBible);
+        if (synced === bibleSections) {
+          log.warn('⚠️ [BEATS] Brief-derived page assignment could not be written back — the transcript has no rewritable ---VISUAL BIBLE--- JSON');
+          gl.warn('beats_vb_sync_failed', 'Brief-derived Visual Bible pages could not be written back into the transcript — stored bible keeps the bible-time guess');
+        } else {
+          bibleSections = synced;
+        }
+      }
+    }
+  }
 
   // Human-readable transcript, stored as data.outline so the dev outline view
   // shows what each stage produced — AND the string server.js hands to
@@ -1894,7 +2906,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   };
   log.info(`🪜 [BEATS] job=${jobId} done: ${pages.length} pages in ${(meta.totalMs / 1000).toFixed(1)}s`);
 
-  return { title, titleJudge, beats, pages, scenes, rawOutline, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  // `visualBible` is the SAME object the Art Director and the reviews used —
+  // trimmed, age-clamped, landmark-linked. The caller prefers it over a
+  // re-parse of rawOutline so the two can never diverge (the transcript is
+  // kept in step by syncVisualBibleSection; the re-parse is the fallback).
+  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges };
+module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

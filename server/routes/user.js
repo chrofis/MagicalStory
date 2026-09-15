@@ -21,7 +21,24 @@ router.get('/location', async (req, res) => {
 
 // POST /api/user/verify-location - Verify a user-entered location via Nominatim (OSM)
 // Body: { city?, plz?, country? } — country defaults to Switzerland
-// Response: { verified: boolean, city, country, plz, displayName, lat, lon }
+// Response: { verified: boolean, city, country, plz, displayName, lat, lon, matches[] }
+//
+// `matches` lists every DISTINCT real place the input names, top match first,
+// each with the canton/region that tells them apart ("Bremgarten, Aargau" vs
+// "Bremgarten bei Bern, Bern"). Nominatim was asked for one result only, so a
+// name shared by several towns silently resolved to whichever OSM ranked
+// first and the user was never shown that a choice existed. The top-level
+// city/lat/lon fields are unchanged and still describe matches[0], so the
+// wizard consumer needs no change.
+// Fold accents/case and drop a trailing canton tag so "Buchs (SG)" still reads
+// as the "Buchs" the user typed.
+const normalizeTown = str => (str || '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/\([^)]*\)/g, '')
+  .replace(/[^a-z0-9]+/g, ' ')
+  .trim();
+
 const locationVerifyCache = new Map();
 const LOCATION_VERIFY_TTL = 24 * 60 * 60 * 1000; // 24h
 
@@ -42,7 +59,7 @@ router.post('/verify-location', async (req, res) => {
       return res.json(cached.result);
     }
 
-    const params = new URLSearchParams({ format: 'json', limit: '1', addressdetails: '1' });
+    const params = new URLSearchParams({ format: 'json', limit: '10', addressdetails: '1' });
     if (cleanPlz) params.set('postalcode', cleanPlz);
     if (cleanCity) params.set('city', cleanCity);
     if (cleanCountry) params.set('country', cleanCountry);
@@ -64,20 +81,51 @@ router.post('/verify-location', async (req, res) => {
       return res.json(result);
     }
 
-    const top = data[0];
-    const addr = top.address || {};
-    const resolvedCity = addr.city || addr.town || addr.village || addr.municipality || cleanCity || null;
-    const resolvedCountry = addr.country || cleanCountry || null;
-    const resolvedPlz = addr.postcode || cleanPlz || null;
+    // One OSM place can come back as several rows (a node and its boundary
+    // relation); collapse on the resolved name + region so the picker offers
+    // real alternatives only.
+    const seen = new Set();
+    const matches = [];
+    for (const row of data) {
+      const a = row.address || {};
+      const name = a.city || a.town || a.village || a.municipality || cleanCity || null;
+      if (!name) continue;
+      // Nominatim pads a multi-town name with fuzzy neighbours ("Buchs" also
+      // returns Basse-Allaine and Uffikon). A candidate has to actually carry
+      // the typed name, or the picker offers towns the user never asked for.
+      if (cleanCity && !normalizeTown(name).includes(normalizeTown(cleanCity))) continue;
+      const region = a.state || a.county || null;
+      const key = `${name}|${region || ''}`.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      matches.push({
+        city: name,
+        region,
+        country: a.country || cleanCountry || null,
+        plz: a.postcode || cleanPlz || null,
+        displayName: row.display_name || null,
+        label: region ? `${name}, ${region}` : name,
+        lat: row.lat ? parseFloat(row.lat) : null,
+        lon: row.lon ? parseFloat(row.lon) : null,
+      });
+    }
 
+    if (matches.length === 0) {
+      const result = { verified: false };
+      locationVerifyCache.set(cacheKey, { ts: Date.now(), result });
+      return res.json(result);
+    }
+
+    const top = matches[0];
     const result = {
       verified: true,
-      city: resolvedCity,
-      country: resolvedCountry,
-      plz: resolvedPlz,
-      displayName: top.display_name || null,
-      lat: top.lat ? parseFloat(top.lat) : null,
-      lon: top.lon ? parseFloat(top.lon) : null,
+      city: top.city,
+      country: top.country,
+      plz: top.plz,
+      displayName: top.displayName,
+      lat: top.lat,
+      lon: top.lon,
+      matches,
     };
     locationVerifyCache.set(cacheKey, { ts: Date.now(), result });
     res.json(result);

@@ -140,6 +140,46 @@ const aboutContent: Record<string, {
     ctaText: 'Créez votre première histoire personnalisée en moins de 3 minutes. Sans compte.',
     ctaButton: 'Créer une histoire gratuite',
   },
+  it: {
+    title: 'Chi è Magical Story',
+    tagline: 'Libri per bambini personalizzati in cui tuo figlio è la star.',
+    missionTitle: 'Ogni bambino è un eroe',
+    missionText: [
+      'Ogni bambino ha una storia che merita di essere raccontata — e merita di esserne l\'eroe. Magical Story trasforma le foto di famiglia in libri per bambini personalizzati in cui tuo figlio è protagonista su ogni pagina.',
+      'Non un libro qualsiasi. Un libro su di lui. Uno che coglie davvero chi è, e che trasforma il momento della lettura in qualcosa che aspetterete entrambi con gioia.',
+    ],
+    scienceTitle: 'Vedono l\'eroe allo specchio — e sanno che possono farcela anche loro.',
+    scienceTagline: 'Piccole storie, grandi momenti.',
+    scienceText: [
+      'Nella storia, tuo figlio è l\'eroe — coraggioso, onesto, gentile. E quando si guarda allo specchio, vede lo stesso eroe che lo guarda — e sa che può farcela anche nella vita vera.',
+      'Questa fiducia è il vero regalo. Molto dopo l\'ultima pagina — al primo giorno di scuola o quando è difficile fare la cosa giusta — tuo figlio la affronta già sicuro di chi è.',
+      'La ricerca conferma ciò che ogni genitore percepisce: i bambini ricordano di più, si coinvolgono più a fondo e sviluppano una vera fiducia in sé stessi quando sono l\'eroe della storia. Non attraverso lezioni o regole — ma con l\'avventura, le risate e la magia di vedersi su ogni pagina.',
+    ],
+    scienceLink: 'La scienza dietro tutto questo',
+    valuesTitle: 'I nostri valori',
+    values: [
+      {
+        icon: 'shield',
+        title: 'Prima la privacy',
+        text: 'Le tue foto vengono usate solo per creare la tua storia. Non le condividiamo, vendiamo o riutilizziamo mai.',
+      },
+      {
+        icon: 'book',
+        title: 'Qualità che puoi toccare',
+        text: 'Stampato professionalmente su carta di alta qualità con colori vivaci. Un vero libro, non solo un file digitale.',
+      },
+      {
+        icon: 'heart',
+        title: 'Fatto con cura',
+        text: 'Rivediamo costantemente i nostri risultati per garantire illustrazioni belle, adatte all\'età e fedeli a tuo figlio.',
+      },
+    ],
+    swissTitle: 'Made in Switzerland',
+    swissText: 'Ideato e gestito in Svizzera. Ci teniamo a fare le cose per bene — qualità, privacy e affidabilità.',
+    ctaTitle: 'Prova gratis',
+    ctaText: 'Crea la tua prima storia personalizzata in meno di 3 minuti. Nessun account necessario.',
+    ctaButton: 'Crea una storia gratuita',
+  },
 };
 
 const iconMap = {

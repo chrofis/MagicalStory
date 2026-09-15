@@ -20,6 +20,7 @@
 'use strict';
 
 const { log } = require('../utils/logger');
+const { buildCastIndex, sameEntity, canonicalName } = require('./castResolver');
 
 const getStoryHelpers = () => require('./storyHelpers');
 const images = () => require('./images');
@@ -68,14 +69,40 @@ function buildPageCast({
     { pageLabel: label, extraNames: outlineCharacters || [] },
   ));
 
-  if (requiredName && !expected.some(c => String(c.name).toLowerCase() === String(requiredName).toLowerCase())) {
-    const ch = (storyData?.characters || []).find(x => String(x?.name).toLowerCase() === String(requiredName).toLowerCase());
+  // COMPARE + RESOLVE: a short-form `requiredName` ("Rossa") must not be
+  // appended a second time when the lineup already carries the full form
+  // ("Kapitänin Rossa"), so membership goes through the one resolver.
+  const castIdx = buildCastIndex(storyData || null, visualBible || storyData?.visualBible || null);
+  if (requiredName && !expected.some(c => sameEntity(c.name, requiredName, castIdx))) {
+    const ch = (storyData?.characters || []).find(x => sameEntity(x?.name, requiredName, castIdx));
     const clothingText = ch
       ? sh.buildIdentityClothingText(ch, clothing[requiredName], style, storyData?.clothingRequirements || null, { label })
       : '';
     expected.push({ name: requiredName, description: ch ? sh.buildIdentityLine(ch, clothingText) : '' });
   }
-  return expected;
+
+  // ONE ROSTER (2026-09-13). Membership is buildExpectedCastBlock's answer for
+  // every cast builder in the pipeline; the identity lines above are this
+  // builder's own and are never rewritten. Repainting a face is the most
+  // destructive thing here — a lineup shorter than the roster is exactly how a
+  // user's name lands on a Visual Bible secondary.
+  try {
+    const { resolveExpectedCastNames, reconcileDetectorCast } = require('./evalPipeline');
+    const vb = visualBible || storyData?.visualBible || null;
+    const authoritative = resolveExpectedCastNames({
+      sceneCharacters: sceneCharacters || null,
+      visualBible: vb,
+      evaluationType: 'scene',
+      pageLabel: label,
+      sceneMetadata,
+      extraNames: outlineCharacters || [],
+      storyData,
+    });
+    return reconcileDetectorCast(expected, authoritative, { visualBible: vb, pageLabel: label, storyData }).entries;
+  } catch (err) {
+    log.debug(`[CHAR-REPAIR TARGET] ${label}roster reconciliation skipped: ${err.message}`);
+    return expected;
+  }
 }
 
 /**
@@ -109,6 +136,14 @@ function briefNamesForPage({ sceneCharacters = [], sceneMetadata = {} } = {}) {
 function findBorrowedLabel({ figures, sceneCharacters = [], sceneMetadata = {}, characterName = '', pageNumber = null } = {}) {
   if (!Array.isArray(figures)) return null;      // no figure list → no opinion
   const brief = briefNamesForPage({ sceneCharacters, sceneMetadata });
+  // SURPLUS is a diagnostic, never a refusal (2026-09-10): more figures than
+  // the brief names means a figure nobody wrote for — the quality evaluator's
+  // `extra_character` (image-evaluation D-04b) owns that finding. Logged here
+  // so repair targeting shows the count mismatch it used to pass over in
+  // silence (five children for a four-boy cover, job_1788903616404_iqvhj4l8m).
+  if (brief.size > 0 && figures.length > brief.size) {
+    log.warn(`[CHAR REPAIR] p${pageNumber}: ${figures.length} figure(s) drawn for a brief of ${brief.size} character(s) — ${figures.length - brief.size} surplus figure(s) nobody was written for (labels still trusted)`);
+  }
   if (brief.size <= figures.length) return null;
 
   const drew = [...new Set(figures.map(f => f.name || 'unidentified figure'))];
@@ -144,7 +179,9 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
     return { faceBbox: null, bodyBbox: null, source: null };
   }
   const pairs = (det) => !imageData || images().bboxPairsWith(det, imageData);
-  const lowerName = charName.toLowerCase();
+  // COMPARE: a stored figure name against a stored roster name from the same
+  // run — canonical equality only, no resolution ladder.
+  const canonName = canonicalName(charName);
   const toRect = (b) => {
     if (!b) return null;
     if (Array.isArray(b)) return b;
@@ -182,7 +219,7 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
           const detection = bestEval?.bboxDetection;
           const paired = pairs(detection) ? detection : null;
           const figs = paired?.figures || [];
-          const selfIdx = figs.findIndex(f => f?.name && f.name.toLowerCase() === lowerName);
+          const selfIdx = figs.findIndex(f => f?.name && canonicalName(f.name) === canonName);
           return {
             faceBbox,
             bodyBbox,
@@ -207,8 +244,10 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
   const figures = pairs(bestEval?.bboxDetection) ? (bestEval?.bboxDetection?.figures || []) : [];
   const figure = figures.find(f => {
     if (!f.name || f.name === 'UNKNOWN') return false;
-    return f.name.toLowerCase() === lowerName ||
-      (f.label && f.label.toLowerCase().includes(lowerName));
+    // The `f.label.includes(name)` branch that used to sit here is the
+    // whited-out-head bug (job_1787514666616_yw9qsv1vf p15): a label merely
+    // CONTAINING the target name selected a different person's figure.
+    return canonicalName(f.name) === canonName;
   });
   if (figure && (figure.faceBox || figure.bodyBox)) {
     // Reuse the detection SAM silhouette (page-res PNG, _gdinoMasks index-
@@ -233,8 +272,8 @@ function resolveCharBbox(charName, { bestEval, entityReport, pageNumber, imageDa
   // Tier 3: quality eval matches (face only)
   const matches = bestEval?.matches || [];
   const match = matches.find(m =>
-    m.name?.toLowerCase() === lowerName ||
-    m.character?.toLowerCase() === lowerName
+    canonicalName(m.name) === canonName ||
+    canonicalName(m.character) === canonName
   );
   if (match && (match.face_bbox || match.bbox)) {
     return {
@@ -274,8 +313,9 @@ async function resolveFigureMask(charName, resolved, { storyId, pageNumber } = {
     return null;
   }
   const figures = Array.isArray(resolved?.figures) ? resolved.figures : [];
-  const lower = String(charName).toLowerCase();
-  const idx = figures.findIndex(f => f?.name && f.name.toLowerCase() === lower);
+  // COMPARE: stored figure name vs the stored target name.
+  const canon = canonicalName(charName);
+  const idx = figures.findIndex(f => f?.name && canonicalName(f.name) === canon);
   if (idx < 0) {
     log.warn(`[FIGURE-MASK] ${charName}: not in the resolved cast (${figures.length} figure(s): ${figures.map(f => f?.name).join(', ') || 'none'}) — cannot map to a stored mask`);
     return null;

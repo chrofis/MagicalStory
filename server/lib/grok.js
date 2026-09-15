@@ -16,6 +16,7 @@ const { log } = require('../utils/logger');
 const r2 = require('./r2');
 const { withGrok } = require('./aiConcurrency');
 const { frameColorForName } = require('./characterFrames');
+const { guardPromptString } = require('../services/prompts');
 
 const XAI_API_KEY = process.env.XAI_API_KEY;
 const XAI_API_URL = 'https://api.x.ai/v1';
@@ -97,6 +98,7 @@ async function generateWithGrok(prompt, options = {}) {
   log.info(`🎨 [GROK] Starting generation (model: ${model}, aspect: ${aspectRatio}, res: ${resolution})`);
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
+  prompt = guardPromptString(prompt, 'grok.generateWithGrok');
   const body = {
     model,
     prompt,
@@ -457,6 +459,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
   }
   log.debug(`🎨 [GROK] Prompt (${prompt.length} chars): ${prompt.substring(0, 120)}...`);
 
+  prompt = guardPromptString(prompt, 'grok.editWithGrok');
   const body = {
     model,
     prompt,

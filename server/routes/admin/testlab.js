@@ -119,9 +119,11 @@ const STAGE_TEMPLATE_KEYS = {
   book_audit: 'bookAudit',
   scene_hazard_count: 'sceneHazardAudit',
   beats_scenes: 'storyBeats',
-  // Cover prefill shows the front-cover template; the override replaces
-  // whichever cover template the target's coverType selects.
-  cover: 'frontCover',
+  // A cover is built from the SAME image-generation template a page uses
+  // (buildCoverPrompt → promptTemplateOverride || PROMPT_TEMPLATES.imageGeneration),
+  // so that is what the override replaces. The old 'frontCover' key here was
+  // stale — front-cover.txt retired 2026-08-26, so the prefill loaded null.
+  cover: 'imageGeneration',
   // Avatar sheet eval prefill shows the pass-1 realistic evaluator; pass-2
   // (styled) uses sheet-2x4-style-eval.txt — paste that manually when A/B-ing
   // the styled eval prompt.
@@ -133,6 +135,44 @@ const STAGE_TEMPLATE_KEYS = {
   // dedupe, MINOR definition), so its rules are the highest-leverage prompt to
   // A/B. Pair the override with params.model to vary the model applying them.
   consolidate: 'feedbackConsolidator',
+  vb_element_cell: 'referenceSheet',
+  // The two trial-variety stages: the idea generator's own template, and the
+  // trial's one-call story template.
+  trial_idea_variety: 'trialIdea',
+  trial_challenge_draw: 'storyTrial',
+  // Scene review replay runs the scene-review critic over frozen briefs.
+  scene_review_replay: 'sceneReview',
+  // Story bible replay re-authors the VB from the locked beats.
+  story_bible_replay: 'storyBibleFromBeats',
+  // Story text replay re-writes the page text from the locked beats.
+  story_text_replay: 'storyTextFromBeats',
+  // Wardrobe review — the critic that has to catch the bad costume.
+  clothing_review: 'clothingReview',
+  // Arc panel replay runs the panel over a stored committed arc.
+  arc_panel_replay: 'arcPanel',
+};
+
+// Stages whose template key is chosen at RUN time from a param, so no single
+// static entry can express it. Shape: stage -> { param, options: value -> key }.
+// GET /templates resolves every option to its text, and the UI picks the one
+// matching the param the user typed in the params JSON.
+const STAGE_TEMPLATE_VARIANTS = {
+  // runAuditReplayStage switches the audit prompt on params.level.
+  audit_replay: {
+    param: 'level',
+    options: {
+      arc: 'storyArcAudit',
+      text: 'storyTextAudit',
+      'text-blind': 'storyTextAuditBlind',
+    },
+  },
+  // scoreArtifactsWithJudge takes the prompt key from the evaluator that
+  // params.evalVersion resolves to — derived from the EVALUATORS registry in
+  // server/lib/storyScorecard.js so a new evaluator version needs no edit here.
+  story_scorecard: {
+    param: 'evalVersion',
+    options: require('../../lib/storyScorecard').EVALUATOR_PROMPT_KEYS,
+  },
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage
@@ -144,15 +184,25 @@ router.get('/templates', async (req, res) => {
     for (const [stage, key] of Object.entries(STAGE_TEMPLATE_KEYS)) {
       templates[stage] = PROMPT_TEMPLATES[key] || null;
     }
-    res.json({ templates });
+    const variants = {};
+    for (const [stage, { param, options }] of Object.entries(STAGE_TEMPLATE_VARIANTS)) {
+      variants[stage] = {
+        param,
+        options: Object.fromEntries(
+          Object.entries(options).map(([value, key]) => [value, PROMPT_TEMPLATES[key] || null])
+        ),
+      };
+    }
+    res.json({ templates, variants });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load templates', details: err.message });
   }
 });
 
 // GET /api/admin/testlab/text-models — full text-model catalogue (single source
-// of truth = server/config/models.js TEXT_MODELS) so the outline_review
-// comparison UI can offer every model with pricing instead of a hardcoded list.
+// of truth = server/config/models.js TEXT_MODELS) so the Lab's model pickers
+// can offer every model with pricing instead of a hardcoded list. Built for the
+// outline_review comparison UI (retired 2026-09-13); text_refine uses it now.
 router.get('/text-models', async (req, res) => {
   try {
     const { TEXT_MODELS, MODEL_PRICING, MODEL_DEFAULTS } = require('../../config/models');
@@ -491,7 +541,10 @@ let runningExperiments = 0;
 // clear of that; what it catches is a process that is GONE, which never comes
 // back and otherwise blocks every push until the old 2h bound expired.
 const HEARTBEAT_INTERVAL_MS = 30_000;
-const HEARTBEAT_STALE = '5 minutes';
+// The staleness window lives with the reaper that applies it — one definition,
+// so the beat here and the two readers (the Test Lab list, the push gate's busy
+// probe) can never disagree about when a quiet row counts as dead.
+const { HEARTBEAT_STALE } = require('../../lib/testlabReaper');
 
 async function executeExperiment(experimentId, stage, targets, opts) {
   const { runStageOnTarget } = require('../../lib/testlab');
@@ -729,13 +782,12 @@ router.get('/experiments', async (req, res) => {
     // minutes instead of the old blanket 2h, which both blocked pushes for an
     // hour (exp747) and could reap a genuinely long run out from under itself.
     // Rows predating the heartbeat column have NULL and keep the 2h rule.
+    // ONE reconciler, shared with boot and the busy probe (server/lib/testlabReaper.js).
+    // It used to be inline here, so an orphaned row was only reconciled when a
+    // human opened the Test Lab — meanwhile the probe's freshness rule had
+    // already stopped counting it and reported the environment idle.
     if (runningExperiments === 0) {
-      await dbQuery(
-        `UPDATE testlab_experiments SET status = 'failed', error = 'server restarted mid-run', completed_at = NOW()
-         WHERE status = 'running'
-           AND (heartbeat_at < NOW() - INTERVAL '${HEARTBEAT_STALE}'
-             OR (heartbeat_at IS NULL AND created_at < NOW() - INTERVAL '2 hours'))`
-      ).catch(() => {});
+      await require('../../lib/testlabReaper').reapOrphanedExperiments();
     }
     // Bounded by default. The old query took the newest 100 unconditionally AND
     // called jsonb_array_length(results) on each, which detoasts the whole blob

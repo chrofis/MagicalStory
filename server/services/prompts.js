@@ -218,6 +218,11 @@ async function loadPromptTemplates() {
     // template pages use (buildCoverPrompt). The four cover templates above are
     // retired once every caller routes through it.
     ['coverComposition', 'cover-composition.txt'],
+    // The cover CRITIC's three notes — the cover-only preamble evaluateImageQuality
+    // prepends to the evaluator prompt. String literals in evalPipeline.js until
+    // 2026-09-15; a template file so the generator/critic sibling set can name a
+    // path instead of a 5,000-line module. Sections via promptSections().
+    ['coverEvaluationNotes', 'cover-evaluation-notes.txt'],
     ['rewriteBlockedScene', 'rewrite-blocked-scene.txt'],
     ['characterAnalysis', 'character-analysis.txt'],
     ['imageSystemInstruction', 'image-system-instruction.txt'],
@@ -240,31 +245,28 @@ async function loadPromptTemplates() {
     // Post-repair figure-integrity check (repair-acceptance): MATCH/EDGES
     // observations -> enum rating; clearly off or worse rejects the repaint.
     ['repairNaturalness', 'repair-naturalness.txt'],
+    ['repairFaceCheck', 'repair-face-check.txt'],
     ['characterRepairBodyBlended', 'character-repair-body-blended.txt'],
     ['characterRepairCutout', 'character-repair-cutout.txt'],
     ['characterRepairInpaint', 'character-repair-inpaint.txt'],
     ['bboxRefine', 'bbox-refine.txt'],
-    ['storyUnified', 'story-unified.txt'],
-    ['storyUnifiedImageFirst', 'story-unified-imagefirst.txt'],
     // THE canonical DO-NOT-WRITE list — banned gestures, phrases, page-1
     // openings, trait labels, buzzwords, plot formulas, the gesture re-use cap.
     // Body only; each consuming template keeps its own heading. Read by
-    // buildDoNotWriteSection (beats text writer + refiner), by the split-review
-    // reviewer, and by the two unified writer templates through their
-    // {DO_NOT_WRITE_LIST} placeholder — so there is exactly one copy.
-    // It used to be SLICED out of story-unified-imagefirst.txt at runtime,
-    // which made deleting that "legacy" template a silent way to strip the
-    // whole list from production (rule-survival audit 2026-09-03, item M2).
+    // buildDoNotWriteSection (beats text writer + refiner) and by the
+    // split-review reviewer — so there is exactly one copy. It used to be
+    // SLICED out of story-unified-imagefirst.txt at runtime, which made
+    // deleting that "legacy" template a silent way to strip the whole list
+    // from production (rule-survival audit 2026-09-03, item M2). That template
+    // is gone (2026-09-15); the list is a file of its own, so it cannot recur.
     ['doNotWriteList', 'do-not-write-list.txt'],
-    // Shared ANALYSIS instruction bodies — injected into the {ANALYSIS_INSTRUCTIONS}
-    // placeholder of the matching unified template (single-call mode) AND into the
-    // external reviewer prompt (split outline review). One source per variant so the
-    // self-critique and the external review can never drift apart.
-    // NOT dead code when the unified pipeline is off: buildTextRefinePrompt
-    // slices its review CRITERIA out of the imageFirst body on every BEATS run
-    // (sliceAnalysisAspect, aspect 'text'), so deleting these files strips the
-    // refiner's criteria and it returns null. Verified 2026-09-03.
-    ['outlineAnalysisTextFirst', 'outline-analysis-textfirst.txt'],
+    // The shared ANALYSIS instruction body — injected into the external
+    // reviewer prompt (split outline review) and sliced by buildTextRefinePrompt.
+    // LIVE ON THE BEATS PATH: buildTextRefinePrompt slices its review CRITERIA
+    // out of this body on every beats run (sliceAnalysisAspect, aspect 'text'),
+    // so deleting this file strips the refiner's criteria and it returns null.
+    // Verified 2026-09-03, re-verified 2026-09-15 when the unified writer
+    // templates it also fed were deleted.
     ['outlineAnalysisImageFirst', 'outline-analysis-imagefirst.txt'],
     ['outlineReview', 'outline-review.txt'],
     // Iterative text refinement (Lab): full text in, full text out, one round
@@ -344,11 +346,17 @@ async function loadPromptTemplates() {
     // step 3b). It runs BEFORE the styled-avatar kickoff — an outfit reviewed
     // after the avatars exist is a rejected avatar, not a corrected outfit.
     ['clothingReview', 'clothing-review.txt'],
+    // ONE fed-back round over the Visual Bible's authored element labels
+    // (beats-first pipeline, right after the Art Director's bible is adopted).
+    // Deterministic validation finds the faults, this prompt asks the author
+    // to fix exactly those ids, and code repairs whatever survives.
+    ['vbLabelRepair', 'vb-label-repair.txt'],
     ['storyTrial', 'story-trial.txt'],
     ['trialIdea', 'trial-idea.txt'],
     // Plot-shape rules per age band of the OLDEST MAIN character. One of these
-    // is injected as {AGE_MODE} into the idea, trial, arc and beats prompts;
-    // empty from age 6 up — see buildAgeModeSection in promptBuilders.js.
+    // is injected as {AGE_MODE} into the idea, trial, arc and beats prompts.
+    // Never empty: ages 6 and up read age-band-journey.txt, whose {BAND_TITLE},
+    // {READER_LINE} and {SHAPE_SCALE} are filled by fillBandTokens (2026-09-14).
     ['ageBandRoutine', 'age-band-routine.txt'],
     ['ageBandQuest', 'age-band-quest.txt'],
     ['ageBandTries', 'age-band-tries.txt'],
@@ -365,6 +373,13 @@ async function loadPromptTemplates() {
     ['subRegionDetection', 'sub-region-detection.txt'],
     ['generatedImageAnalysis', 'generated-image-analysis.txt'],
     ['emptyScene', 'empty-scene.txt'],
+    // The plate's CRITIC (validateEmptyScene, evalPipeline.js) — the judge the
+    // empty-scene generator above is graded by. A string literal in that module
+    // until 2026-09-15; a template file so the pair is a registry set over two
+    // paths. Sections BODY / ERA_CHECK / PLACEMENTS_CHECK via promptSections();
+    // its {GEOMETRY_CHECK} is still generated from GEOMETRY_DIMENSIONS
+    // (sceneGeometry.js), the one source the plate prompt also reads.
+    ['emptySceneQc', 'empty-scene-qc.txt'],
     ['textSpaceRepair', 'text-space-repair.txt'],
     ['feedbackConsolidator', 'feedback-consolidator.txt'],
     ['storyTextQualityJudge', 'story-text-quality-judge.txt'],
@@ -407,6 +422,21 @@ async function loadPromptTemplates() {
 }
 
 /**
+ * Split a multi-section template into { SECTION_KEY: body }.
+ *
+ * Sections are delimited by a `### KEY` line at column 0; each body is trimmed
+ * of surrounding blank lines so a section is byte-identical to the string
+ * literal it replaced.
+ */
+function promptSections(text) {
+  const out = {};
+  if (!text) return out;
+  const parts = String(text).split(/^### ([A-Z0-9_]+)[ 	]*$/m);
+  for (let i = 1; i < parts.length; i += 2) out[parts[i]] = parts[i + 1].replace(/^\n+/, '').replace(/\s+$/, '');
+  return out;
+}
+
+/**
  * Replace placeholders in prompt templates
  * @param {string} template - Template string with {PLACEHOLDER} syntax
  * @param {Object} replacements - Key-value pairs for replacements
@@ -440,6 +470,108 @@ function fillTemplate(template, replacements) {
   result = result.replace(/\{[A-Z][A-Z0-9_]*\}/g, '');
   result = result.replace(/\n{3,}/g, '\n\n');
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// BOUNDARY GUARD — a prompt must never reach a model with a hole in it.
+//
+// fillTemplate() already warns-then-strips unfilled `{TOKEN}` placeholders, but
+// that guard failed twice over in practice (2026-09-14):
+//   * warn-then-strip HIDES the damage — the prompt still ships, minus a whole
+//     instruction, and the warning is one line among thousands; and
+//   * it is bypassed entirely by a caller that never calls fillTemplate at all,
+//     which is exactly what `evaluateSheetRow`'s heads branch did: it handed the
+//     judge the literal string `{REQUESTED_OUTFIT}`, so a rule shipped the day
+//     before could never fire on any story.
+//
+// A guard inside the filler cannot catch a caller who skips the filler, so the
+// check lives HERE and is called at the model-call boundary — the one place
+// every path must cross. In tests it throws (a hole is a bug, and the suite is
+// where it should surface). In production it reports and strips: the owner's
+// standing rule is that a gate ships with a warning and never kills a paid run.
+// ---------------------------------------------------------------------------
+
+const PLACEHOLDER_RE = /\{[A-Z][A-Z0-9_]*\}/g;
+
+// Narrow, named exemptions: tokens that are MEANT to survive into the prompt a
+// model sees (a template documenting its own format, an instruction that shows
+// the model a placeholder). Add an entry only with a comment saying why — never
+// loosen PLACEHOLDER_RE instead.
+const PLACEHOLDER_EXEMPT = new Set([
+  // (empty — every {TOKEN} in prompts/*.txt as of 2026-09-14 is a real fill)
+]);
+
+function isTestEnv() {
+  return process.env.VITEST === 'true' || process.env.VITEST === '1' || !!process.env.VITEST_WORKER_ID
+    || process.env.NODE_ENV === 'test';
+}
+
+/**
+ * Collect every human-readable string out of a prompt argument. Entry points
+ * pass a plain string, a Gemini `parts` array, or an OpenAI-style message list;
+ * all three are scanned, and anything else is ignored.
+ */
+function collectPromptText(prompt, out = [], depth = 0) {
+  if (depth > 6 || prompt == null) return out;
+  if (typeof prompt === 'string') { out.push(prompt); return out; }
+  if (Array.isArray(prompt)) {
+    for (const p of prompt) collectPromptText(p, out, depth + 1);
+    return out;
+  }
+  if (typeof prompt === 'object') {
+    // Only text-bearing fields — never inline_data/base64 payloads.
+    for (const k of ['text', 'content', 'prompt']) {
+      if (prompt[k] != null) collectPromptText(prompt[k], out, depth + 1);
+    }
+  }
+  return out;
+}
+
+/**
+ * Assert that a prompt about to be sent to a model carries no unfilled
+ * `{PLACEHOLDER}` token.
+ *
+ * @param {string|Array|Object} prompt - the prompt (string, Gemini parts, messages)
+ * @param {string} context - call-site label, e.g. 'callGeminiAPIForImage'
+ * @returns {string[]} the offending tokens (empty when clean)
+ * @throws {Error} in tests only
+ */
+function assertPromptFilled(prompt, context = 'unknown') {
+  let tokens = [];
+  for (const text of collectPromptText(prompt)) {
+    const hits = text.match(PLACEHOLDER_RE);
+    if (hits) tokens.push(...hits);
+  }
+  tokens = [...new Set(tokens)].filter((t) => !PLACEHOLDER_EXEMPT.has(t));
+  if (tokens.length === 0) return [];
+
+  const msg = `[PROMPT GUARD] Unfilled placeholder(s) reached the model call at ${context}: ${tokens.join(', ')}`;
+  if (isTestEnv()) {
+    const err = new Error(msg);
+    err.code = 'PROMPT_UNFILLED_PLACEHOLDER';
+    err.tokens = tokens;
+    throw err;
+  }
+  log.error(msg);
+  try {
+    const genLog = require('../lib/generationLogger').getCurrentLogger();
+    if (genLog) {
+      genLog.error('prompt_unfilled_placeholder', msg, null, { context, tokens });
+    }
+  } catch (_) { /* logger unavailable — the log.error above already carried it */ }
+  return tokens;
+}
+
+/**
+ * Strip unfilled placeholders after reporting them. Entry points that hold a
+ * plain prompt string use this so the call continues with a hole rather than
+ * a literal `{TOKEN}` in front of the model.
+ */
+function guardPromptString(prompt, context = 'unknown') {
+  if (typeof prompt !== 'string' || !prompt) return prompt;
+  const tokens = assertPromptFilled(prompt, context);
+  if (tokens.length === 0) return prompt;
+  return prompt.replace(PLACEHOLDER_RE, '');
 }
 
 /**
@@ -518,14 +650,29 @@ function buildEmptyScenePrompt(opts = {}) {
     const gateAboardId = opts.aboardId || null;
     const adAuthored = Array.isArray(opts.sceneObjects);
     const { sceneObjectsNameEntry } = require('../lib/visualBible');
-    const pageVehicles = (opts.visualBible.vehicles || []).filter(v => {
+    const { isLargeScaleClass } = require('../lib/visualBible');
+    const staged = (v) => {
       if (!v.description) return false;
       if (adAuthored) {
         return (gateAboardId && v.id === gateAboardId) || sceneObjectsNameEntry(opts.sceneObjects, v);
       }
       const pages = v.pages || v.appearsInPages;
       return Array.isArray(pages) && pages.includes(opts.pageNumber);
-    });
+    };
+    // STRUCTURES, not just vehicles (owner, 2026-09-15). A built structure the
+    // bible classed at vehicle, building or landscape scale is part of the
+    // backdrop exactly like a vessel, and the plate is the only place its size
+    // can be stated against bollards, cobbles and quay height. Same AD-authority
+    // gate, same aboard exception. Vehicles keep the pre-2026-09-15 behaviour
+    // whatever their class — stored bibles carry none.
+    const pageVehicles = [
+      ...(opts.visualBible.vehicles || []),
+      // Artifacts only: a creature or a person is a FIGURE, and this prompt
+      // forbids drawing one. Listing it under "vessel, vehicle or built
+      // structure" both mislabelled it and asked for something the same prompt
+      // refuses (2026-09-15).
+      ...(opts.visualBible.artifacts || []).filter(e => isLargeScaleClass(e.scaleClass)),
+    ].filter(staged);
     if (pageVehicles.length > 0) {
       // The vehicle the camera stands ON gets a name-only mention, never its
       // full exterior description. The plate prose for such a page is already
@@ -538,13 +685,13 @@ function buildEmptyScenePrompt(opts = {}) {
       // without it, and a genuine exterior shot still needs the construction).
       const aboardId = opts.aboardId || null;
       const lines = pageVehicles.map(v => (aboardId && v.id === aboardId)
-        ? `- ${v.name || v.type || 'vehicle'}: the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.`
-        : `- ${v.name || v.type || 'vehicle'}: ${v.description}`);
+        ? `- ${v.name || v.type || 'structure'}: the camera stands on board this one — render the deck, rail, mast base and fittings around it, never its hull, bow or full silhouette, and never a second copy of it in the background.`
+        : `- ${v.name || v.type || 'structure'}: ${v.description}`);
       // Render only the visible PART, not the whole vessel. The old wording
       // ("render it exactly to its description") demanded the full vehicle even
       // when the camera stands on its deck, which shipped duplicate ships, a
       // ship inside a cave, and wheels on dry land (audit 2026-08-29).
-      description += `\n\n**VEHICLES:** Any boat, ship, wagon, carriage, or other vehicle in this backdrop is one of the vessels described below — match its colour, construction and named parts, never a generic substitute:\n${lines.join('\n')}\nRender only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.`;
+      description += `\n\n**STRUCTURES:** Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute:\n${lines.join('\n')}\nRender only the part of the vessel the camera sees. When the camera stands on board, show the deck, rail and fittings around it — never the vessel seen from outside.`;
     }
   }
 
@@ -558,12 +705,28 @@ function buildEmptyScenePrompt(opts = {}) {
     description += `\n\n**REFERENCE:** The place or vessel in this scene is the one shown in the attached reference image — render the part of it the camera sees, consistent in colour and construction.`;
   }
 
+  // Geometry only, and only when the caller has the page's scene prose. Always
+  // a declared key below: fillTemplate drops an undeclared placeholder silently.
+  const { extractSceneGeometry } = require('../lib/sceneGeometry');
+  const geometryBlock = opts.sceneGeometry != null
+    ? String(opts.sceneGeometry)
+    : extractSceneGeometry({
+        mainScenePrompt: opts.mainScenePrompt || null,
+        castNames: opts.castNames || [],
+        shot: opts.shot || null,
+      });
+
   const filled = fillTemplate(opts.template || PROMPT_TEMPLATES.emptyScene, {
     STYLE_DESCRIPTION: opts.style || '',
     EMPTY_SCENE_DESCRIPTION: description,
     CHARACTER_SPACE: opts.characterSpace || '',
     TEXT_AREA_INSTRUCTION: opts.textAreaInstruction || '',
     ERA_GUARD: opts.eraGuard || '',
+    // The plate is GRADED on the page's composition geometry (validateEmptyScene
+    // checks path direction, vanishing point and lighting direction against the
+    // scene prose). Derived here — never the raw prose — so the generator sees
+    // the same three facts it is judged on and none of the cast.
+    SCENE_GEOMETRY: geometryBlock,
     LANDMARK_FIDELITY: opts.landmarkFidelity || '',
   });
 
@@ -671,9 +834,19 @@ function buildEvaluationPrompt(opts = {}) {
     // template then tells the model to skip clothing judgments entirely
     // rather than invent a contract from the theme.
     CLOTHING_CONTRACT: opts.clothingContract || '',
+    // Empty when the caller knows no cast for this frame — the template then
+    // tells the model not to judge the figure count (evalPipeline
+    // buildExpectedCastBlock owns the roster).
+    EXPECTED_CAST: opts.expectedCast || '',
     // Empty when the caller has no prompt to read a style from — the template
     // then tells the model to skip the style rule and judge normally.
     ART_STYLE: opts.artStyle || extractArtStyle(opts.originalPrompt) || '',
+    // The page's REQUIRED OBJECTS checklist, passed as its own input for the
+    // same reason ART_STYLE and CLOTHING_CONTRACT are: ORIGINAL_PROMPT on the
+    // batch path is the scene DESCRIPTION, which carries no prompt tail, so a
+    // rule reading the tail out of it can never fire. Empty when the caller
+    // could not resolve the list — D-16b then skips.
+    REQUIRED_OBJECTS: opts.requiredObjects || '',
   });
 }
 
@@ -682,6 +855,7 @@ module.exports = {
   withTemplates,
   loadPromptTemplates,
   fillTemplate,
+  promptSections,
   buildEmptyScenePrompt,
   buildEvaluationPrompt,
   extractArtStyle,
@@ -692,4 +866,7 @@ module.exports = {
   isPhotographicArtStyle,
   repairStyleGuard,
   applyRepairStyleGuard,
+  assertPromptFilled,
+  guardPromptString,
+  PLACEHOLDER_EXEMPT,
 };

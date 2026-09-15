@@ -182,6 +182,12 @@ const MAX_SEVERITY_TYPES = {
   // critical arm and puts the page in the repair queue regardless of score.
   // A cap at major reproduces job_1788681313413_xqmtk2gcs p1 exactly — the
   // defect was seen, rated MAJOR, and shipped at 80.
+  //
+  // extra_character is deliberately ABSENT too (2026-09-10): a figure that
+  // matches no EXPECTED CAST entry is a person the book never commissioned,
+  // the same rank as one entirely absent (missing_character, CRITICAL). A
+  // MAJOR cap would leave a 100-scoring five-for-four cover unrepaired, which
+  // is the case that created the type (job_1788903616404_iqvhj4l8m).
 };
 
 // Types with a severity FLOOR — the cost is raised to at least this, whatever
@@ -197,8 +203,22 @@ const MAX_SEVERITY_TYPES = {
 // it an excuse. So the model keeps the comfortable CRITICAL vocabulary and the
 // bill is raised here, per the owner's severity rule: classification belongs
 // to the prompt, code may change a severity.
+//
+// `face_destroyed` (owner, 2026-09-12): a face rendered featureless, smeared or
+// melted IN THE PAGE. It exists because `cutout_artifact` was carrying two
+// meanings — "our crop is broken" (harmless, zero-point) and "the figure is
+// broken in the picture" (expensive) — and the second was billing at zero.
+// Measured on job_1789207854566_l43qgl34w p9: a repair erased a figure's face,
+// entity filed it as `cutout_artifact`/major, it cost 0, and the faceless page
+// shipped at 70 and out-ranked the intact original. The floor is CRITICAL,
+// matching image-evaluation D-11 (`figure_completeness`, a bodiless or headless
+// figure) — a head with no features is the same class of failure — and CRITICAL
+// is also what puts the page into character repair under the settled
+// critical-only routing (2026-09-04). Deliberately NOT in ZERO_POINT_TYPES and
+// NOT capped.
 const MIN_SEVERITY_TYPES = {
   composite_seam: 'catastrophic',
+  face_destroyed: 'critical',
 };
 
 // NO TEXT MATCHING IN SCORING. Owner rule, 2026-08-09: "you can not build this

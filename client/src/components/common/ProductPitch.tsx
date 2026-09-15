@@ -25,6 +25,11 @@ const texts: Record<string, { line: string; free: string; cta: string }> = {
     free: 'Première histoire gratuite',
     cta: 'Essayer gratuitement',
   },
+  it: {
+    line: 'Tuo figlio diventa il protagonista di un libro illustrato personalizzato — carica una foto, scegli un tema e la storia è pronta in pochi minuti.',
+    free: 'Prima storia gratis',
+    cta: 'Prova gratis',
+  },
 };
 
 export function ProductPitch() {

@@ -174,11 +174,19 @@ router.delete('/:fileId', authenticateToken, async (req, res) => {
     const { fileId } = req.params;
 
     if (isDatabaseMode()) {
-      const result = await dbQuery('DELETE FROM files WHERE id = $1 AND user_id = $2', [fileId, req.user.id]);
+      // RETURNING file_url — the row is the only reference to the R2 object
+      // (orders/{files.id}.pdf); dropping it without pruning orphans the PDF.
+      const result = await dbQuery(
+        'DELETE FROM files WHERE id = $1 AND user_id = $2 RETURNING id, file_url',
+        [fileId, req.user.id],
+      );
 
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'File not found or unauthorized' });
       }
+
+      // dbQuery returns the ROWS array (with rowCount attached), not a pg result.
+      await require('../lib/r2Pending').pruneFileRows(result, 'file deleted by user');
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }

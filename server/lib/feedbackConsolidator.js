@@ -13,9 +13,11 @@
  */
 
 const { callTextModel } = require('./textModels');
+const { buildCastIndex, lookupByName } = require('./castResolver');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { extractJsonFromText, buildCharacterPhysicalDescription } = require('./storyHelpers');
 const { log } = require('../utils/logger');
+const { FINDING_SOURCES, sourcesOf, mergeSources } = require('./findingSources');
 
 /**
  * Build the Haiku input text from all feedback sources.
@@ -207,6 +209,10 @@ function flattenEntityIssues(entityReport) {
         type: iss.subType || iss.type || iss.category || null,
         severity: iss.severity || 'MODERATE',
         pageNumbers: iss.pageNumbers,
+        // PROVENANCE. This whitelist is a drop site: anything not named here is
+        // gone. Carried, never re-derived — an entity finding that arrives
+        // without one is stamped, because THIS is the entity pool.
+        sources: mergeSources(sourcesOf(iss), [FINDING_SOURCES.ENTITY]),
       });
     }
   }
@@ -249,8 +255,21 @@ function flattenEntityIssues(entityReport) {
  *
  * Rule: one vote → that vote. Two → the lower. Three or more → the middle,
  * lower-middle on an even count.
+ *
+ * EXCEPT A CRITICAL VOTE, WHICH WINS (owner, 2026-09-11 — an explicit reversal
+ * of the 2026-07-30 "pure median for all severities, no lone escalation"
+ * ruling, which accepted a rare real miss in exchange for fewer false alarms).
+ * Measured on job_1789147573901_m3uam0nxi p13 and p17: quality rated an
+ * `object_presence` defect CRITICAL and semantic rated it MAJOR, the median
+ * took MAJOR, the page scored 85 — and the defect was real, a whole phantom
+ * dragon drawn where the story's central prop should have been (the same pages
+ * the D1 assignment trim broke). A page that one witness says cannot be
+ * published does not become publishable because a second witness was milder.
+ * Below CRITICAL the median still stands: that is where the false alarms the
+ * old ruling was protecting against actually live.
  */
 const SEVERITY_RANK = ['MINOR', 'MODERATE', 'MAJOR', 'CRITICAL', 'CATASTROPHIC'];
+const ESCALATING_VOTE = new Set(['CRITICAL', 'CATASTROPHIC']);
 function medianSeverity(severities) {
   if (!severities || typeof severities !== 'object') return null;
   const votes = Object.values(severities)
@@ -258,6 +277,8 @@ function medianSeverity(severities) {
     .filter(v => SEVERITY_RANK.includes(v))
     .sort((a, b) => SEVERITY_RANK.indexOf(a) - SEVERITY_RANK.indexOf(b));
   if (!votes.length) return null;
+  // Any witness at CRITICAL or above → the highest vote, never the middle.
+  if (votes.some(v => ESCALATING_VOTE.has(v))) return votes[votes.length - 1];
   return votes[Math.floor((votes.length - 1) / 2)];
 }
 
@@ -339,6 +360,8 @@ async function consolidateFeedback({
         characterName: e.characterName || e.name || '(unknown)',
         description: e.description || e.issue || '',
         severity: e.severity || 'MODERATE',
+        // Same drop site as flattenEntityIssues, same rule (2026-09-14).
+        sources: mergeSources(sourcesOf(e), [FINDING_SOURCES.ENTITY]),
       }));
     } else {
       entityIssues = flattenEntityIssues(entityReport);
@@ -356,13 +379,12 @@ async function consolidateFeedback({
     // override. The override matters for costumed scenes — without it, the
     // description reads the default modern outfit and fix instructions
     // redress medieval characters in hoodies.
+    // RESOLVE: the scene keys this map with whatever spelling the brief used
+    // ("Rossa" for "Kapitänin Rossa"); one resolver decides who that is.
+    const castIdx = buildCastIndex({ characters }, visualBible);
     const clothingLookup = (name) => {
-      if (!sceneClothing || !name) return null;
-      const lower = String(name).toLowerCase();
-      for (const [k, v] of Object.entries(sceneClothing)) {
-        if (k.toLowerCase() === lower) return v || null;
-      }
-      return null;
+      const hit = lookupByName(sceneClothing, name, castIdx);
+      return hit ? (hit.value || null) : null;
     };
 
     const characterDescriptions = {};
@@ -407,11 +429,10 @@ async function consolidateFeedback({
     const evalModel = modelOverride || resolveEvalModel();
     // cachePrefix caches the stable template — Anthropic-only; harmless (ignored)
     // for OpenRouter models, which don't take the cache_control block.
-    // 6000 out (was 3000): busy pages with many issues + per-fix critiques
-    // overran 3000 and truncated the JSON, which failed the parse and dropped
-    // the whole page to the legacy raw-issue fallback. Extra headroom only
-    // costs more when the output is genuinely longer (the failing case).
-    const result = await callTextModel(userInput, 6000, evalModel, {
+    // null = the model's own ceiling (owner rule: no output caps). 3000 and
+    // then 6000 both truncated busy pages' JSON, which failed the parse and
+    // dropped the page to the legacy raw-issue fallback.
+    const result = await callTextModel(userInput, null, evalModel, {
       // Judging, not writing — pinned so a rules/model A/B is reproducible.
       temperature: require('../config/models').EVAL_TEMPERATURE,
       usageLabel: 'eval_consolidation',

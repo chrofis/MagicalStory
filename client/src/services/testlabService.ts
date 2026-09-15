@@ -302,6 +302,14 @@ export interface ExperimentResult {
   sceneReviews?: SceneReviewArm[] | null;
   finalBeats?: { pageNumber: number; planLine: string }[];
   timeToScenesMs?: number | null;
+  // Set when the stage could not produce a brief for every page it was asked
+  // to expand, after the batch retry AND the per-page fallback. The card
+  // renders it as a banner: a partial run must never read as a whole one.
+  sceneExpansionIncomplete?: {
+    measured: number; expected: number; missingPages: number[]; message: string;
+  } | null;
+  allPagesCost?: number | null;
+  allPagesModelId?: string | null;
   sceneExpansions?: {
     pageNumber: number; ok: boolean; error?: string; elapsedMs?: number;
     modelId?: string; provider?: string | null; ttftMs?: number | null;
@@ -513,7 +521,9 @@ export const TESTLAB_STAGES = [
   // The measurement for the hazard-reduction loop: how many render hazards do
   // this book's briefs (or beat SCENE lines) demand, by class.
   { id: 'scene_hazard_count', label: 'Scene hazard count — render hazards per page in the briefs, by class', producesImage: false, overridable: true, storyLevel: true },
-  { id: 'outline_review', label: 'Outline review — compare reviewer models', producesImage: false, overridable: false, storyLevel: true },
+  // outline_review retired 2026-09-13 — it measured the split-outline-review
+  // branch, which beats mode (the only pipeline) never reaches. Stored rows
+  // still render; the stage can no longer be started.
   { id: 'text_refine', label: 'Text refine — 2 audits, merge, 1 repair, 1 lector', producesImage: false, overridable: true, storyLevel: true },
   // Step 2 (fast structural review) retired 2026-09-01 — this stage now only
   // plans + expands scenes; historical rows with a review still display.
@@ -548,7 +558,10 @@ export const TESTLAB_STAGES = [
   // still pay" and "does rotating the reviewer beat repeating one" are
   // measurable. params.variants asks for N arcs in ONE call plus a merge pass,
   // to compare best-of-N against sequential review.
-  { id: 'arc_rounds', label: 'Arc rounds (plan the arc, review it N times / best-of-N, scored each round)', producesImage: false, overridable: true, storyLevel: true },
+  // builtPromptOverride: the override replaces the fully BUILT plan prompt
+  // (buildArcCreatePrompt, story data already filled in), not a template — so
+  // there is nothing to prefill and no template key for this stage.
+  { id: 'arc_rounds', label: 'Arc rounds (plan the arc, review it N times / best-of-N, scored each round)', producesImage: false, overridable: true, storyLevel: true, builtPromptOverride: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.
@@ -558,6 +571,9 @@ export const TESTLAB_STAGES = [
   // only variable is the prompt (or the models). params.retell also re-tells
   // against the new panel output, answering "does it help" end to end.
   { id: 'arc_panel_replay', label: 'Arc panel replay (frozen arc → what does the panel catch?)', producesImage: false, overridable: true, storyLevel: true },
+  // One Visual Bible element's reference cell(s) + the cell gate's verdict.
+  // params: elementId (required), gateOnly, text, model, description.
+  { id: 'vb_element_cell', label: 'VB element cell (render + cell gate; params.elementId)', producesImage: true, overridable: true, storyLevel: true },
   // Both runners existed server-side but were absent from this list, so the
   // dropdown could never select them — unreachable except by hand-posting.
   { id: 'garment_colour_fix', label: 'Garment colour fix (DINO+SAM mask → L*a*b* match)', producesImage: true, overridable: false },
@@ -565,6 +581,10 @@ export const TESTLAB_STAGES = [
   { id: 'avatar_realistic', label: 'Avatar pass 1 (realistic anchor)', producesImage: true, overridable: false, characterLevel: true },
   { id: 'avatar_style', label: 'Avatar pass 2 (style transfer)', producesImage: true, overridable: true, characterLevel: true },
   { id: 'avatar_eval', label: 'Avatar sheet eval', producesImage: false, overridable: true, characterLevel: true },
+  // Trial variety: is the idea generator repetitive, and does the random
+  // challenge draw (which the trial's one-call writer never receives) help?
+  { id: 'trial_idea_variety', label: 'Trial idea variety (N draws of the same pair → repeats)', producesImage: false, overridable: true, storyLevel: true },
+  { id: 'trial_challenge_draw', label: 'Trial challenge draw (story with vs without the catalogue draw)', producesImage: false, overridable: true, storyLevel: true },
 ] as const;
 
 export const testlabService = {
@@ -577,7 +597,12 @@ export const testlabService = {
   },
 
   getTemplates() {
-    return api.get<{ templates: Record<string, string | null> }>('/api/admin/testlab/templates');
+    return api.get<{
+      templates: Record<string, string | null>;
+      // Stages whose template is chosen at run time from a param: the param
+      // name plus value -> template text.
+      variants: Record<string, { param: string; options: Record<string, string | null> }>;
+    }>('/api/admin/testlab/templates');
   },
 
   getTextModels() {

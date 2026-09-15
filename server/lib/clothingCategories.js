@@ -25,6 +25,7 @@
 
 // Canonical buckets — the ONLY valid cache key values
 const CANONICAL = Object.freeze(['standard', 'winter', 'summer', 'costumed']);
+const { buildCastIndex, lookupByName } = require('./castResolver');
 
 // The three avatar slots that every character is expected to have (excludes
 // story-specific 'costumed', which is generated on demand).
@@ -89,10 +90,9 @@ function normalizeClothingCategory(category) {
 function getUsedClothingCategories(clothingRequirements, characterName) {
   if (!clothingRequirements || !characterName) return [];
   // Case-insensitive lookup — Claude is inconsistent about character name casing
-  const charNameLower = String(characterName).trim().toLowerCase();
-  const charReqs = Object.entries(clothingRequirements).find(
-    ([name]) => name.trim().toLowerCase() === charNameLower
-  )?.[1];
+  // RESOLVE: one name-keyed-map reader (lookupByName). No index here — the
+  // caller has no story data — so it resolves exact + canonical key only.
+  const charReqs = (lookupByName(clothingRequirements, characterName, null) || {}).value;
   if (!charReqs || typeof charReqs !== 'object') return [];
 
   const used = [];
@@ -175,6 +175,64 @@ function reconcileCoverClothingWithRequirements(coverHints, clothingRequirements
 }
 
 /**
+ * Reconcile ONE PAGE's per-character clothing against the story's
+ * clothingRequirements — the page-side sibling of
+ * `reconcileCoverClothingWithRequirements`.
+ *
+ * The two fields are written by different owners and could disagree silently:
+ * `clothingRequirements` is the story's clothing CONTRACT (which outfits exist
+ * and were generated as styled avatars), while the per-page category comes from
+ * the writer's scene hint. When a page asks for a category the character never
+ * marked `used`, that outfit does not exist: `resolveClothingForPage` finds no
+ * description and returns null, so the page renders the standard avatar with no
+ * clothing guidance at all — and any garment the writer put in the Visual Bible
+ * instead arrives through REQUIRED OBJECTS as a prop, painted onto the standard
+ * outfit rather than worn (prod job_1788698812047_q5b1vuds7, pages 2-5: a straw
+ * costume declared on four pages against `costumed.used: false`).
+ *
+ * Resolution is the cover reconciler's: fall back to the first category the
+ * character actually marked used. The contradiction is logged at ERROR — it
+ * means an upstream stage produced an impossible request, and the render that
+ * follows is a salvage, not the intent.
+ *
+ * Does NOT mutate the input; returns the reconciled map.
+ *
+ * @param {Object|null} perCharClothing - { [charName]: category } for this page
+ * @param {Object|null} clothingRequirements - story clothing contract
+ * @param {{pageNumber?: number|string, logger?: Object, label?: string}} [options]
+ * @returns {{ clothing: Object, overrides: Array<{pageNumber, character, requested, replacedWith}> }}
+ */
+function reconcilePageClothingWithRequirements(perCharClothing, clothingRequirements, options = {}) {
+  const { pageNumber = null, logger = null, label = 'PAGE CLOTHING' } = options;
+  const clothing = { ...(perCharClothing || {}) };
+  const overrides = [];
+  if (!perCharClothing || !clothingRequirements) return { clothing, overrides };
+
+  for (const [charName, requested] of Object.entries(perCharClothing)) {
+    const usedCategories = getUsedClothingCategories(clothingRequirements, charName);
+    if (usedCategories.length === 0) continue; // no contract for this character — leave as-is
+    const requestedCanonical = normalizeClothingCategory(requested);
+    const isUsed = usedCategories.some(
+      (cat) => normalizeClothingCategory(cat) === requestedCanonical
+    );
+    if (isUsed) continue;
+
+    const replacement = usedCategories[0];
+    clothing[charName] = replacement;
+    overrides.push({ pageNumber, character: charName, requested, replacedWith: replacement });
+    if (logger?.error) {
+      logger.error(
+        `❌ [${label}] page ${pageNumber ?? '?'}: ${charName} declared "${requested}" but ` +
+        `clothingRequirements marks only [${usedCategories.join(', ')}] used — that outfit does not ` +
+        `exist in this story; rendering "${replacement}"`
+      );
+    }
+  }
+
+  return { clothing, overrides };
+}
+
+/**
  * Resolve a character's entry in the story's clothingRequirements blob.
  * The blob is keyed by the character name as the outline model wrote it,
  * which can drift from character.name in case/whitespace — an exact-key
@@ -185,13 +243,13 @@ function reconcileCoverClothingWithRequirements(coverHints, clothingRequirements
  * @param {string|null|undefined} name - character name
  * @returns {object|null} the per-category requirements for this character
  */
-function resolveCharacterReqs(clothingRequirements, name) {
+function resolveCharacterReqs(clothingRequirements, name, index = null) {
   if (!clothingRequirements || !name) return null;
-  const direct = clothingRequirements[name] || clothingRequirements[String(name).trim()];
-  if (direct) return direct;
-  const lower = String(name).trim().toLowerCase();
-  const key = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === lower);
-  return key ? clothingRequirements[key] : null;
+  // RESOLVE: exact key, canonical key, then — when the caller can supply a
+  // cast index — the same entry under a different spelling ("Rossa" for
+  // "Kapitänin Rossa").
+  const hit = lookupByName(clothingRequirements, name, index);
+  return hit ? hit.value : null;
 }
 
 /**
@@ -205,6 +263,7 @@ function resolveCharacterReqs(clothingRequirements, name) {
  */
 function resolvePageClothingCategory(storyData, pageNumber, charName) {
   const pc = storyData?.pageClothing;
+  const castIdx = buildCastIndex(storyData || null, storyData?.visualBible || null);
   // COVERS (negative page numbers) never appear in pageClothing — their cast's
   // outfits live on the outline's coverHints. Without this the covers resolved
   // to null and every cover-side consumer skipped (observed live after the
@@ -215,9 +274,8 @@ function resolvePageClothingCategory(storyData, pageNumber, charName) {
     const hint = coverKey ? storyData?.coverHints?.[coverKey] : null;
     const byChar = hint?.characterClothing;
     if (byChar && typeof byChar === 'object') {
-      const lower = String(charName || '').trim().toLowerCase();
-      const key = Object.keys(byChar).find(k => k.trim().toLowerCase() === lower);
-      if (key && byChar[key]) return normalizeClothingCategory(byChar[key]);
+      const hit = lookupByName(byChar, charName, castIdx);   // RESOLVE
+      if (hit && hit.value) return normalizeClothingCategory(hit.value);
     }
     // The story's primary category is canonical, not a guess: it is what the
     // writer decided the book's cast wears.
@@ -227,9 +285,8 @@ function resolvePageClothingCategory(storyData, pageNumber, charName) {
   const entry = pc?.pageClothing?.[pageNumber] ?? pc?.[pageNumber];
   if (typeof entry === 'string' && entry.trim()) return normalizeClothingCategory(entry);
   if (entry && typeof entry === 'object') {
-    const lower = String(charName || '').trim().toLowerCase();
-    const key = Object.keys(entry).find(k => k.trim().toLowerCase() === lower);
-    if (key && entry[key]) return normalizeClothingCategory(entry[key]);
+    const hit = lookupByName(entry, charName, castIdx);      // RESOLVE
+    if (hit && hit.value) return normalizeClothingCategory(hit.value);
     const first = Object.values(entry).find(v => typeof v === 'string' && v.trim());
     if (first) return normalizeClothingCategory(first);
   }
@@ -242,6 +299,7 @@ module.exports = {
   normalizeClothingCategory,
   getUsedClothingCategories,
   reconcileCoverClothingWithRequirements,
+  reconcilePageClothingWithRequirements,
   resolveCharacterReqs,
   resolvePageClothingCategory,
 };

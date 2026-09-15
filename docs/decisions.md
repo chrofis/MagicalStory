@@ -7,6 +7,48 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-14 — Real physical risk must be FRAMED, not forbidden: the endorsement-without-caution rule
+
+**Context:** a story had an 8-year-old climb a bell tower alone ahead of a storm. The owner's
+objection was not the act and not that he was unsupervised — it was that the telling endorsed it
+without caution: the only weather mention was an adult's "you have time, but not much", nobody was
+wary, no risk was named anywhere, and the close was an approving smile. Nothing in the pipeline
+guards this.
+
+- The peril rule ("nothing dangerous enough that it could lead to death") is a ceiling on threat
+  MAGNITUDE, not a check on how a permitted risk is told. A lone climb clears it easily.
+- `prompts/story-trial.txt` carried ZERO safety language in 229 lines, and the trial runs no review
+  stage of any kind — the writer prompt is the only place a rule can reach a trial story. This is
+  the path the incident happened on.
+- `prompts/scene-expansion`'s `scene-hazard-audit.txt` is about RENDER hazards and is Test Lab only.
+- The pattern recurs and clusters at ages 7-8 — exactly where `AGE_BANDS` resolves to `'standard'`,
+  for which no band file exists, so those stories receive no age-band rules at all.
+
+**Decision:** one new telling rule, scoped to FRAMING rather than prohibition. Danger may appear and
+a child may do a risky thing; what may not happen is the story treating it as simply fine.
+
+> - Where a child does something with real physical risk, the risk is present in the telling:
+>   someone is careful, names it aloud, or the child feels it — and the close does not treat it as
+>   nothing. An adult who permits it still says what to watch for.
+
+One constant, `RISK_FRAMING_RULE` in `promptBuilders.js`, with four consumers: the shared
+`{TELLING_RULES}` block (arc-create / arc-retell) and a new `{RISK_FRAMING}` placeholder in the
+three templates that block never reaches — `story-trial.txt`, `story-unified.txt` and
+`story-unified-imagefirst.txt` (the latter is the DEFAULT unified template, so it needed it most).
+No copies: the existing peril rule lives in four near-copies and is the warning against that.
+
+**Rationale:** the narrowest of the three candidate rules, chosen deliberately. "Children may not do
+dangerous things" would collide with the rule two lines above it — *the children resolve it
+themselves; adults may comfort, permit or watch* — and would flatten stakes, which is the exact
+failure the 2026-08-19 round was fixing when it RAISED risk after the reviewer kept removing it.
+The permission clause extends "adults may permit" rather than contradicting it. This is a NEW
+decision, not a reversal: nothing in `docs/SETTLED.md` governs risk framing.
+
+**Touched:** `server/lib/promptBuilders.js` (`RISK_FRAMING_RULE`, `buildTellingRulesSection`, the
+unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `tests/unit/risk-framing-rule-reach.test.ts`.
+**Status:** ✅ active — no corpus run yet (no paid calls were authorised for this change).
+
 ## Title (one sentence verdict)
 **Context:**   what problem / constraint led here
 **Decision:**  what we actually do
@@ -20,6 +62,93 @@ history — if a decision is reversed, add a new entry marking the old one
 superseded and link forward.
 
 ---
+
+## A reference-cell claim resolves from the citation UNION, not from `objects[]` alone (2026-09-14)
+
+**Context.** `41cde02d0` (backlog #76) established that a Visual Bible entity citation
+resolves from the UNION of a page's `objects[]` and `characters[]`, because a repair
+rewrite can reclassify an entity from one list to the other. That fix covered **only the
+REQUIRED OBJECTS text block** in the page prompt. The reference-cell grid — the thing that
+decides which reference IMAGES are attached to the page — still read the raw
+`sceneMetadata.objects`. So a repair that moved an animal into `characters[]` kept its name
+and its size clause in the prompt text while its reference-CELL claim was dropped without a
+word in the log. An element with no cell is drawn from the image model's imagination and
+drifts page to page: that is what rendered one egg as dull mottled stone, then smooth
+glossy red, then speckled, across a single story (backlog #65).
+
+**Measured population: ZERO.** The grid was never simply broken.
+`getElementReferenceImagesForPage` gates on `if (!onPage && !named)`, where `onPage` comes
+from the entry's own `appearsInPages` — the bible's page list already rescues the ordinary
+case. The residual is narrow: an entity whose `appearsInPages` does NOT cover the page,
+which the page genuinely cites, where the citation sits in `characters[]`. Replayed against
+the three stored staging stories (`job_1789337998754_apslnsq1z`,
+`job_1789343124794_z2c779f7i`, `job_1789348171785_9oxos7dwv`): **0 pages** by the
+VB-id-shaped rule (those stories file `characters[]` as bare names — `["Mother Dragon",
+"Funkli", ...]` — which the resolver deliberately does not resolve), and **0 pages** by the
+looser bare-name rule as well (3 such citations exist; `appearsInPages` covers all 3).
+
+**Decision.** Ship the union as PREVENTION anyway, at the single consumer — the same call
+made for #79, which was also measured at 0. `getElementReferenceImagesForPage` now builds
+its `askedFor` map from `sceneObjectIds` PLUS `collectVbObjectCitations(sceneMetadata)`
+over `characters[]`/`fullData.characters`. One site covers all four callers
+(`storyJobPipeline.js`, `images.js` iterate via `buildPageCompositeRefs`, `testlab.js`,
+`regeneration.js`) instead of patching each producer.
+
+**Rationale.**
+- **No second resolver.** `collectVbObjectCitations` / `vbObjectIdOf` were built and tested
+  the same day for the text-block fix. Object prefixes are `ANI|ART|CLO|LOC|VEH`; CHR ids
+  and bare names resolve to `null`, so the human cast path is untouched and the cell set can
+  never grow merely because a name appears somewhere.
+- **The worn-item dedupe still rules.** Owner ruling 2026-09-06: a garment named inside a
+  character's own clothing line gets no standalone cell, because the avatar reference
+  already wears it and sending the plate made the model paint it twice. That dedupe runs
+  downstream of this union and is unchanged — a test pins it, and its log line fires in the
+  test run, proving the union pulls the garment in and the dedupe removes it.
+- **Measured-at-zero is not the same as theoretical.** The failure mode is silent and its
+  symptom (identity drift across pages) is the expensive one; the guard costs one map build.
+
+**Touched files.** `server/lib/visualBible.js`
+(`getElementReferenceImagesForPage` — `askedFor` now built from the citation union),
+`tests/unit/vb-ref-cell-citation-union.test.ts` (new, 4 tests), `tasks/BACKLOG.md`.
+
+---
+
+## The plate pixel-QC judges a uniform patch by shape and position, not by a bare count (2026-09-14)
+
+**Context.** `vantage_plate_qc_failed` fired 5 times across the 2026-09-14 validation
+stories. All five were reviewed. THREE were genuine — the Phase-2 semantic judge caught
+genuinely wrong plates, and all three re-renders passed. The remaining ones came from the
+Phase-1 PIXEL heuristic only: the offending plate was downloaded and viewed, and the
+"white box" is a watercolour paper border around the edge of the image — an intended part
+of the art style, not an AI glitch. The check counted uniform blocks ANYWHERE and compared
+the raw fraction to 0.08, so a thin uniform frame around the perimeter accumulated enough
+blocks to trip it with no rectangular glitch present anywhere in the picture.
+
+**Decision.** The Check-1 fraction is now the largest 4-connected uniform patch remaining
+after a perimeter band is peeled, via `largestInteriorUniformFraction()`. A line is peeled
+inward from a side only while it is uniform across its WHOLE span (capped at 15% of the
+dimension), then the biggest surviving component is measured against the unchanged 0.08
+threshold over the unchanged full-block denominator. The BLACK twin gets the identical
+treatment — a dark deckle edge or vignette false-positives it for exactly the same reason,
+and fixing one and leaving the other would just move the bug. The Phase-2 semantic plate
+checks are untouched: they were correct on all three genuine failures. The gate keeps its
+ship-with-warning behaviour; nothing here can kill a paid run.
+
+**Rationale.** A real AI box artifact is a contiguous patch in the INTERIOR of the frame; a
+paper border, vignette or deckle edge is a thin band hugging the PERIMETER. Requiring a
+full-span uniform line before peeling is what keeps this from being "ignore the edges": a
+glitch that merely touches an edge does not span it, so it is never peeled, and its body is
+still measured. Sensitivity to a genuine artifact did not drop — a real box is one
+connected component, so the largest-component fraction equals what the old count saw; only
+uniform blocks scattered across the frame, which were never a box, stop firing. An entirely
+uniform image still trips the check, because peeling is capped and a large interior
+survives. Pinned by `tests/unit/empty-scene-uniform-patch-shape.test.ts` (perimeter band
+white, perimeter band black, interior patch just over threshold plus an edge-touching one,
+fully uniform frame).
+
+**Touched files.** `server/lib/evalPipeline.js` (`largestInteriorUniformFraction`,
+Check 1 of `validateEmptyScene`), `tests/unit/empty-scene-uniform-patch-shape.test.ts`,
+`tasks/BACKLOG.md`.
 
 ## Story generation
 
@@ -49,17 +178,38 @@ gets one taste, then claims their account to unlock the full pipeline.
 **Context:** Quality eval costs another Gemini call per page, plus the
 auto-repair loop can re-generate pages and add several minutes to wall
 time. Trial users won't wait.
-**Decision:** Trial jobs set `skipQualityEval: true` (see
-`server/routes/trial.js:2243`). `server.js:6060` short-circuits the entire
-evaluation + repair pipeline when this flag is set.
+**Decision:** Trial jobs set `skipQualityEval: true` (`server/routes/trial.js:2638`).
+One gate, `storyJobPipeline.js:5416`, short-circuits the entire evaluation +
+repair pipeline when the flag is set.
 **Rationale:** Same as draft skip — speed and cost. Trial output is "good
 enough to demonstrate the product"; full users pay for the polish.
+
+**Amended 2026-09-11 — COVERS ARE INCLUDED, and always were.** Closing the last
+open half of the cover/page unification risk list ("keeping trial covers cheap"),
+the owner confirmed: on trial, neither a cover nor a page is evaluated. Verified
+in the tree, no gap and no fix needed. Since the unification made covers
+pages-with-flags, covers are pushed into `rawImages` as pseudo-pages with
+negative page numbers at `storyJobPipeline.js:5267-5294` — but that happens
+BEFORE the gate, and the skip branch filters them straight back out at
+`storyJobPipeline.js:5428` (`pageNumber >= 0`). Covers never had a gen-time eval
+in the first place (`storyJobPipeline.js:1816`: "covers generate exactly like
+pages — generation only, no gen-time eval/bbox/retry"). The other cover-eval
+site, `iterateCover` (`server/lib/coverIterate.js:1302`, `:1377`, guarded by
+`skipEval` at `:726`), is reachable only from the post-generation regen routes,
+which a trial never reaches because it sets `enableFullRepair: false`.
+Text-region detection is disabled twice over on trial (`layout.textInImage:
+false` at `server/routes/trial.js:2630`, and it filters to `pageNumber > 0` at
+`storyJobPipeline.js:5318`). Cover avatars are ungraded like the rest
+(`storyJobPipeline.js:3117`).
+
 **Touched:**
-- `server/routes/trial.js:2243` — sets the flag
-- `server.js:5970, 6060, 6367` — short-circuits eval + repair
+- `server/routes/trial.js:2638` — sets the flag (was `:2243` before the routes split)
+- `storyJobPipeline.js:5299` — reads it; `:5416` — the gate; `:5428` — drops the
+  cover pseudo-pages in the skip branch (the old pointers `server.js:5970, 6060,
+  6367` are stale; the code moved into the pipeline module)
 - `server/lib/styledAvatars.js`, `server/lib/character2x4Sheet.js` —
   per-call `skipQualityEval` override flows through the avatar pipeline too
-**Status:** ✅ active.
+**Status:** ✅ active, covers confirmed in scope 2026-09-11.
 
 ### Phantom character recovery
 **Context:** Sonnet sometimes references a character in scene prose or
@@ -460,6 +610,226 @@ agents restoring rules on the same day could not install the same rule at two si
 **Status:** ✅ active.
 
 ---
+
+### A trial is only told about a costume when it HAS one — and a page may not wear an outfit the story never declared
+**Context:** Prod `job_1788698812047_q5b1vuds7` (trial, theme `mothers-day`) put
+a one-year-old in a straw costume that reads as a prop stuck on him rather than
+worn. Stored evidence: `clothingRequirements` = `{ Amian: { costumed: { used:
+false }, standard: { used: true } } }`, while `pageClothing` said `costumed` on
+4 of 6 pages; `costumedAvatarGeneration` is `[]` and only a `styled-standard`
+sheet exists. The costume lived instead as Visual Bible artifact `ART002`,
+`type: "costume"`, and reached page 2's prompt through REQUIRED OBJECTS —
+`Objects: hat: on Amian's head; costume: worn by Amian` — with the cast line
+carrying no clothing description at all, because `resolveClothingForPage` finds
+no description for a category whose `used` is false and returns null.
+Root cause is `prompts/story-trial.txt` + `buildTrialStoryPrompt`: a trial's
+clothing contract does NOT come from the writer (unlike every full-story
+prompt), it comes from the static `getTrialCostume(theme)` table, and
+`mothers-day` has no entry. Only the `AVATAR_SELECTION` block was gated on a
+costume existing — the scene-hint enum `[standard | costumed]`, the rule "a
+character with a `costumed` variant wears it in every scene except the very
+first", and a front cover fixed at `"clothing": "costumed"` were stated
+unconditionally. The writer obeyed (p1 standard, p2-5 costumed), invented the
+garment the premise mentioned, and — this template having no
+`clothingRequirements` section to declare clothing in — filed it in the only
+slot left, an artifact. The same missing fact makes the trial prewarm's
+`if (costume && …)` seed of the standard avatar from `previewAvatar` skip, so a
+full standard sheet is generated instead.
+**Decision:** Two changes, both code-side; no eval or classification rule moved.
+(1) Every costume instruction in `story-trial.txt` is a placeholder
+(`{CLOTHING_ENUM}`, `{CLOTHING_RULE}`, `{COVER_CLOTHING_NOTE}`,
+`{COVER_CLOTHING}`) filled from the same `costume` lookup that already gates
+`AVATAR_SELECTION`. With no costume the enum is `standard`, the cover says
+nothing about costumes, and the rule states that nobody wears one and a costume
+named in the story idea stays scenery. With a costume the rendered prompt is
+byte-identical to before.
+(2) `reconcilePageClothingWithRequirements()` — the page-side sibling of the
+existing `reconcileCoverClothingWithRequirements()` — replaces a per-page
+category the character never marked `used` with their first used category and
+logs it at **ERROR**. Wired at the three sites that read `page.characterClothing`
+before it can be used: the streaming scene-expansion path, the streaming trial
+page render, and the post-parse `storyPages` loop (which also fixes what gets
+stored as `pageClothing`).
+**Rationale:** `clothingRequirements` and `pageClothing` are written by
+different owners and had no arbiter on the page side, only on covers; a
+contradiction resolved silently into "no clothing description + garment as
+prop", which is exactly the render the owner complained about. Classification
+was never the model's to get wrong here — it was instructed to costume a story
+that has no costume, so the fix belongs where the instruction is emitted. An
+artifact with `type: "costume"` stays legitimate for a costume that is NOT worn
+(on a rack, in a display case, carried); `story-bible-from-beats.txt` already
+codifies that split via `wornAs`, and `story-trial.txt` does not (backlog).
+Corpus check over the 58 most recent prod stories (597 pages with clothing): the
+guard fires on exactly the 4 defective pages of this story and nowhere else.
+**Touched:** `prompts/story-trial.txt`, `server/lib/promptBuilders.js`
+(`buildTrialStoryPrompt`), `server/lib/clothingCategories.js`,
+`storyJobPipeline.js`, `tests/unit/page-clothing-reconcile.test.ts` (new).
+**Status:** ✅ active.
+
+---
+
+---
+
+## The plate holds the world BEFORE the action; a contained figure is shot from inside; the beat never hands a trapped figure the way out (2026-09-08)
+**Context:** Four pages on two staging stories were hand-fixed by brief edits alone (USD 0.54, every render viewed): `job_1788816451791_25b31uqlp` p11 and p15 (dragon), `job_1788820396445_9erw6xc01` p8 and p13 (pirate). Five faults were measured. R1 — the plate stripped a static prop: p11's `emptyScenePrompt` called the basin interior "completely empty" while the page's subject lay in it, and the render invented a live creature; naming the object's presence and silhouette (never its break texture, which turned it into a fish) fixed it in one render. R2 — the plate contained the action's effect: p15's plate painted water shooting from the stone before the figure whose lever causes it existed; a dry crack fixed causality in one render. R3 — orientation stated once for a pair did not bind: p8 had structured `perspective: back view` for both figures and the builder logged both directives, yet one faced camera; "seen from behind, walking away from the viewer, face not visible" inside EACH figure's own clause fixed it. R4 — containment was unrenderable from outside: p13's beat chose `ultra-wide`, the AD placed the figure `depth: background` and wrote an exterior plate; the fix took three coupled changes (shot into the container, interior plate, foreground/midground depth). Nothing in the chain covered a character inside a container the camera sees from outside — 7d covers a figure OFF the ground, 11d the CAMERA inside, the below-ground clause named only cellar/basement/cave, and FOOTING pushed the plate to ground level. R5 — the beat handed the exit over: "gripping its rim" let every stage draw a shallow well; depth had to be stated as a multiple of body height. One level up, the scene review on the dragon flagged `vb_element_overflow` on 11 of 18 pages and `interaction_multiple_actions` on 4, rewrote across two rounds, and shipped `briefUnfixed: 11`.
+**Decision:** (A) `prompts/story-beats.txt`: two one-moment lines — a trapped/cut-off figure is given no means to end it, distance named against the body; a figure inside/below/at the bottom of something gets a shot that looks INTO it. (B) `prompts/scene-expansion-all.txt` and its per-page sibling `prompts/scene-expansion.txt` (shared rule set, edited in step): rule 1 gains the subtractive clause (every element traces to the plan line or an implied VB id; choose and simplify, never add; every physical fact the plan line states about the world is in the brief); 8c gains facing-inside-the-character's-own-clause; new 11e "Inside is not outside" (shot, interior plate and foreground/midground depth change together; depth is distance, never elevation); the plate rules gain "the world the instant before the action — static props by presence and silhouette, a broken object by its outline, never damage texture, no effects, never call a space empty"; FOOTING yields to containment (the container's floor is the standable surface); the below-ground clause extends to a figure at the bottom of a shaft, pit or hollow. The code-side FOOTING sentence in `storyJobPipeline.js` names the same floor. (C) `server/lib/beatsPipeline.js`: after the review's last allowed round, `interaction_multiple_actions` and `vb_element_overflow` survivors are logged at WARN with page numbers and stored as `sceneReviewReport.rewriteToZeroUnfixed` (`beats_one_moment_unfixed` in the generation log); for the budget each page carries `objectsAsked` and `briefFixable`. The round budget (one full + one targeted round) is unchanged; the run is never failed.
+**Rationale:** Each rule is the smallest sentence that would have prevented a measured, hand-verified fault, placed at the chokepoint that produced it (beats for R5 and the containment shot, AD for R1-R4, one sibling each). The gating verdict exists because the overflow number was misread: on the dragon every one of the 11 surviving overflow pages had a brief whose own `objects[]` cited three or fewer elements — the surplus came from the bible's `appearsInPages`, which `vbElementBudget.js` counts by design and no brief rewrite can withdraw. "Rewrite until zero" is therefore reachable for the two-actions type and NOT, by construction, for bible-side overflow; the flag says which is which per page instead of leaving `briefUnfixed: 11` to read as reviewer non-compliance. More review rounds were not added: the one-extra-round contract is the owner's (2026-08-25).
+**Touched:** `prompts/story-beats.txt`, `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`, `storyJobPipeline.js` (plate FOOTING sentence), `server/lib/beatsPipeline.js` (rewrite-until-zero verdict).
+**Status:** ✅ active — rerun of beats + AD on both stories (no images) reported in the session; image validation is the coordinator's call.
+
+---
+
+## The season is its own placeholder, not part of the location block (2026-09-09)
+**Context:** A wizard story configured Zurich + Jahreszeit Herbst came back with
+a fantasy idea reading "Im Koenigreich Valdorn, in einem Sommer vor langer
+Zeit". The season WAS sent by the client and WAS built server-side — but it was
+appended into `userLocationInstruction` as `seasonPart`. A fantasy idea blanks
+`USER_LOCATION_INSTRUCTION: ''` (and `AVAILABLE_LANDMARKS`) so the reader's real
+city cannot leak into a made-up world, which blanked the season with it. The
+fantasy card's prompt therefore carried no season at all and the model defaulted
+to summer. Both idea endpoints, streaming and non-streaming, carried the
+identical coupling.
+**Decision:** The season gets its own `{SEASON_INSTRUCTION}` placeholder in
+`prompts/generate-story-idea-single.txt` and `prompts/generate-story-ideas.txt`,
+built independently of the location and passed through
+`buildIdeasPromptContext`. The world overrides still blank location and
+landmarks only. The instruction states the season applies in an invented world
+too.
+**Rationale:** Two unrelated facts shared one placeholder, so suppressing one
+suppressed the other. Separating them is the root fix; adding the season back
+into the fantasy branch by hand would have left the same trap for the next
+field that gets welded into the location string. A made-up kingdom in Herbst is
+exactly what the reader asked for, so the season is not location-conditional.
+**Touched:** `prompts/generate-story-idea-single.txt`,
+`prompts/generate-story-ideas.txt`, `server/routes/storyIdeas.js`
+(`buildIdeasPromptContext` signature + `SEASON_INSTRUCTION` replacement, both
+endpoints).
+**Status:** ✅ active — verified by rendering both prompts for the reported case:
+fantasy keeps the season and leaks no city, location keeps both, no placeholder
+left unsubstituted. Not yet confirmed with a live idea generation.
+
+**Follow-up (same day): /try gets a season too, and all four paths share one
+builder.** The trial asks the visitor nothing about the season, so its idea and
+its story text carried none at all — while its IMAGES already rendered one,
+because `buildSeasonNote` runs through `resolveSeason`, which defaults to the
+story's own date. Pictures in autumn, words in whatever the model chose. Both
+trial templates now take a `{SEASON}` placeholder, filled from the same
+date-derived default the images use (`buildSeasonInstruction({})`), so prose and
+pictures agree by construction. The instruction wording moved into
+`server/lib/season.js` as `buildSeasonInstruction` — the text-side sibling of
+`buildSeasonNote` — and the two duplicated `seasonLabels` maps in
+`storyIdeas.js` were deleted in favour of it, so an absent wizard season now
+resolves to the date instead of dropping the line, as season.js documents.
+Historical stories still get no season line on any path. Touched additionally:
+`prompts/trial-idea.txt`, `prompts/story-trial.txt`, `server/lib/season.js`,
+`server/lib/promptBuilders.js` (`buildTrialStoryPrompt`), `server/routes/trial.js`.
+Verified by rendering all four: trial idea ✅, trial story ✅, wizard fantasy ✅
+(no city leak), wizard local ✅.
+
+---
+
+## The trial idea prompt names the town and forbids invented places (2026-09-09)
+**Context:** A /try session in Baden produced "Der mutige Zauberlehrling Lukas
+entdeckt an der Reuss einen alten Zauberstein". Baden is on the Limmat; the
+Reuss is Bremgarten/Mellingen/Gebenstorf. The landmark lookup was innocent —
+Baden has 12 own-locality rows, above `MIN_OWN_LOCALITY_ROWS`, so
+`getIndexedLandmarks` never widens to the commune and `Reuss (Fluss)`
+(locality Gebenstorf, nearest_city Baden) was never served. The prompt gave the
+model a list of bare landmark names and the phrase "the child's own town" —
+never the town's NAME. A model that recognises one landmark but not the town
+around it fills the rest of the geography in from general knowledge.
+**Decision:** `server/routes/trial.js` names the town in the local-idea branch
+and, when landmarks were found, forbids naming any place beyond them — no other
+river, lake, mountain, street, square or building; any further setting stays
+generic.
+**Rationale:** Naming the town alone still leaves unnamed detail to invention;
+the owner chose town + no-invented-places (AskUserQuestion, 2026-09-09). The
+fantasy branch already said "no real place names", so only the local branch
+needed it.
+**Touched:** `server/routes/trial.js` (`localIdea`).
+**Status:** ✅ active — not yet confirmed with a live /try run.
+
+---
+
+## verify-location returns every matching town, not just OSM's first (2026-09-09)
+**Context:** `/api/user/verify-location` asked Nominatim for `limit=1`. A name
+belonging to several towns silently resolved to whichever OSM ranked first:
+"Bremgarten" gave Bremgarten bei Bern with no sign Bremgarten AG existed, and
+"Buchs" is three towns (SG, ZH, AG). The whole story is then set in the wrong
+place, with the user never shown that a choice existed.
+**Decision:** Ask for 10, collapse duplicate rows on name+region, drop
+Nominatim's fuzzy tail (a candidate must carry the typed name — "Buchs" also
+returned Basse-Allaine and Uffikon), and return them as `matches[]`. Top-level
+`city`/`lat`/`lon` still describe `matches[0]`, so the wizard consumer is
+unchanged. The trial city editor lists them by canton when there is more than
+one and waits for a pick before regenerating any idea; a single match keeps the
+one-step behaviour.
+**Rationale:** Additive response shape means no consumer migration. The
+name-carrying filter is required because Nominatim pads a multi-town query with
+unrelated neighbours, which would offer towns the user never typed. Scoped to
+typed cities only — the IP path returns one specific place with coordinates and
+has no ambiguity to resolve (owner's call, AskUserQuestion 2026-09-09).
+**Touched:** `server/routes/user.js` (`/verify-location`, `normalizeTown`),
+`client/src/pages/trial/TrialIdeasStep.tsx` (`CityMatch`, `applyCity`,
+`cityMatches` dropdown, `chooseCity` in 4 languages).
+**Status:** ✅ active — verified against the live Nominatim API: Buchs 3,
+Bremgarten 2, Baden 1, Zuerich 1, nonsense `verified:false`.
+
+---
+
+## A visitor with no ?lang= is redirected to their browser language (2026-09-09)
+**Context:** `server.js` picked the pre-rendered file with
+`SUPPORTED_LANGS.has(req.query.lang) ? req.query.lang : 'de'` — `Accept-Language`
+was read nowhere in the codebase. The client DOES detect the browser language
+(`detectBrowserLanguage()` walking `navigator.languages`), but on a pre-rendered
+route `initialLanguage` overrides it by design so SSR HTML and hydration agree.
+Net effect: browser detection was dead on exactly the pages that receive organic
+traffic. An Italian or French speaker arriving at the homepage from a search
+result or an ad got German unless the link carried `?lang=`. Verified against
+production: `GET /` with `Accept-Language: fr-CH,fr;q=0.9` returned the German
+page. Owner: "If a user does an italian google search he must land on an italian
+webpage."
+**Decision:** When a request carries no `?lang=`, the best supported match from
+`Accept-Language` is resolved (q-values honoured, primary subtag only, same rule
+as the client) and, if it is not German AND a pre-rendered file exists for it,
+the request is 302-redirected to the same URL with `?lang=xx`. The redirect
+carries `Cache-Control: no-store` and `Vary: Accept-Language`. An explicit
+`?lang=` always wins, so the redirect cannot loop. App routes are unaffected —
+the redirect is gated on a pre-rendered file existing for that path.
+**Rationale:** Redirecting keeps ONE URL PER LANGUAGE, so hreflang, the
+self-referencing canonicals and the 24h `s-maxage` CDN cache on the HTML all
+stay valid. Serving a different language on the same URL was rejected:
+Cloudflare does not vary cached HTML on `Accept-Language`, so the first
+visitor's language would be pinned for everyone, and avoiding that means
+dropping CDN caching on all HTML. Client-side switching after hydration was
+rejected too — it flashes German first and leaves the HTML that Google and link
+previews see unchanged. Googlebot sends no `Accept-Language` (or `en`), so it
+still crawls the German x-default and reaches every alternate through hreflang.
+**Touched:** `server.js` (`preferredLangFromHeader`, the SPA fallback handler).
+**Status:** ✅ active — parser unit-tested against 11 header shapes (q-value
+ordering, unsupported primaries, `*`, empty, absent, `q=0`). Live behaviour not
+yet confirmed on staging.
+
+---
+
+## The <html lang> attribute carries the Swiss regional variant (2026-09-09)
+**Context:** `og:locale` already emitted `de_CH` and `buildHreflang()` already
+listed `de-CH` / `fr-CH` / `it-CH`, while the served HTML said `lang="de"` — the
+one inconsistent language signal left. Owner's rule: use the regional variant
+wherever the field can express one, leave the plain code where it cannot.
+**Decision:** One `HTML_LANG` map (`de: 'de-CH'`, `fr: 'fr-CH'`, `it: 'it-CH'`,
+`en: 'en'`) drives the attribute. English keeps the plain tag because no `en-XX`
+variant is declared anywhere in the hreflang table. The `?lang=` query codes and
+the internal `Language` union stay two-letter — they are our own enum, not a
+BCP-47 field.
+**Rationale:** Three sites had to change together or each would have reverted
+the others: `injectMeta` for pre-rendered pages, `client/index.html` for the raw
+SPA shell that app routes are served verbatim, and `LanguageContext`'s
+`document.documentElement.lang` assignment, which overwrote the server's value
+on hydration.
+**Touched:** `server/lib/seoMeta.js` (`HTML_LANG`, `injectMeta`),
+`client/index.html`, `client/src/context/LanguageContext.tsx`.
+**Status:** ✅ active.
 
 ---
 
@@ -2132,6 +2502,51 @@ causes with independent fixes.
 **Touched:** `server/routes/avatars.js` (`evaluateAvatarFaceMatch` +
 4 callsites + `MIN_BASE_AVATAR_SCORE`); `prompts/avatar-evaluation.txt`
 (scoring rules + JSON schema).
+**Status:** ✅ active.
+
+### The trial funnel records WHICH topic was chosen, and whether a deep link had already fixed it (2026-09-14)
+**Context:** `topic_selected` fired on every visit that got that far, but `meta`
+was NULL on all 9 stored rows — the endpoint recorded THAT a topic was picked
+and threw away WHICH. That is the highest-intent signal in the funnel and it is
+free to capture. Separately, the SEO theme pages deep-link in as
+`/try?category=…&topic=…` with a React-Router `<Link>`, so `document.referrer`
+never changes, `captureAttribution()` only ever looked at utm/gclid/referrer,
+and `TrialWizard` read the params into state and dropped the provenance:
+0 of 29 `landing` rows carried meta and none carried an internal referrer. So we
+could not say what share of trials arrive with the topic ALREADY fixed — which
+is exactly the number that decides whether curating the in-wizard topic grid
+buys anything, since 43 of the 59 life challenges are reachable only by deep
+link.
+**Decision:** `topic_selected` now carries `{category, topic, theme,
+preselected, age}` and `landing` carries `{deepLink, category, topic}` when the
+arrival URL had those params. The `meta` JSONB column already existed
+(migration 024, verified against the staging DB — no migration). The endpoint
+no longer stores whatever object the client sent: `sanitizeTrialEventMeta()`
+keeps an allowlist (`TRIAL_META_SCHEMA`) of eight keys, each only in its
+declared shape — booleans must be booleans, ids must match the catalogue-slug
+regex `^[a-z0-9][a-z0-9-]{0,39}$`, age must be an integer 0-18 — and everything
+else is dropped silently rather than rejecting the event.
+**Rationale:** The five fields are the minimum that make the signal readable and
+nothing more. `topic` is the measurement; `category` groups it; `theme` is the
+adventure branch's equivalent of a topic id, without which the majority of
+trials would record an empty choice; `age` is the denominator, because the age
+band decides which six tiles were even shown and a pick rate is meaningless
+against the wrong population; `preselected` compares the ARRIVAL topic to the
+chosen one, so a visitor who deep-linked and then changed their mind in the grid
+is not miscounted. **This exists to replace the authored `liveness` weights in
+`client/src/constants/storyTypes.ts` with measurement** — those numbers are
+today one person's judgement of what parents want, and within a few weeks these
+rows say what parents actually pick. The allowlist rather than a length cap: a
+slug shape cannot carry a child's name or anything a parent typed, and it keeps
+the row far under the 2000-char truncation in `recordTrialEvent()` — which, being
+a `.slice()` on serialised JSON, would otherwise write unparseable JSONB.
+Dropping bad fields instead of rejecting the event keeps a measurement bug from
+costing the funnel step itself.
+**Touched:** `server/routes/trial.js` (`TRIAL_META_SCHEMA`,
+`sanitizeTrialEventMeta`, the `/event` handler's meta argument, the export);
+`client/src/pages/TrialWizard.tsx` (`deepLink` ref, the `landing` and
+`topic_selected` calls); `client/src/utils/trialFunnel.ts` (allowlist note on
+`trackTrialStep`); `tests/unit/trial-funnel-topic-meta.test.ts`.
 **Status:** ✅ active.
 
 ## Performance
@@ -19778,7 +20193,7 @@ the background is legitimately small) was presented and not chosen; it would
 need its own plan and Lab validation if ever revisited.
 
 **Touched:** nothing — confirmation of existing code.
-**Status:** ✅ settled by owner. Don't propose lowering it on near-miss evidence.
+**Status:** 🗄 superseded 2026-09-10 — the gate is removed by owner decision (see "The depth-spread gate is removed").
 
 ---
 
@@ -26366,7 +26781,7 @@ Owner rulings on the dragon salvage (`job_1788551692337_bc479p945`); per-item de
 **Context:** the run's landmark pages rendered with zero reference photos, silently — staging's index rows had no `photo_r2_url` at run time (backfill landed hours later), the live Commons fetches at page-gen failed, and the null return was swallowed; pages carried "preserve this exact building" with no photo attached. Separately, an unlinked Swiss landmarkQuery could fall into the free-form Wikipedia lazy path. **Decision:** (a) Swiss user → landmarks resolve strictly from `landmark_index` (strong-name match, servable+judged, class>0); no hit → WARN + serve nothing — Wikipedia free-form is barred for Switzerland; non-Swiss keeps the fetch routine with a bounded 75s pre-page await. (b) Fidelity block ⇔ photo bytes invariant: any miss downgrades that page to prose with a loud log (`landmarkPhotoMisses` on pageData). Premise correction: index row 210 "Lindenhof (Zürcher Hügelzug)" IS the Zurich square (Q39374) — label cosmetic, not wrong entity. **Touched:** server/lib/landmarkPhotos.js, storyHelpers.js, storyJobPipeline.js (43c907d2e).
 
 ### Arc budgets are computed, not asked for; coverage nests deeds inside events
-**Context:** the 18-page 1st-grade run packed ~15 events and invented a named parent (allowance should be 0); the critique had no dimension for load or cast inflation — it opened a new event per character deed. **Decision:** `buildArcBudgetSection` computes an event budget (pages/3 at 1st-grade + one obstacle chain, /2 standard, /1.5 advanced, floor 3) and an invented-named-figure allowance (`clamp(round(pages/8)−floor(cast/2),0,3)`; anchors 1 char/20p→3, 5 chars/10p→0) and injects the numbers into arc-create AND arc-retell; the critique counts events vs the budget (exceeding = MAJOR, cut whole events never compress) and flags unjustified figures past the allowance (MAJOR, unless a one-line cannot-work-without justification). New shared rule: coverage is served by giving several characters deeds inside the same event — never a new event per character. **Touched:** server/lib/promptBuilders.js, prompts/arc-create.txt, arc-retell.txt (cb7407ab6, 69dbb1ec4).
+**Context:** the 18-page 1st-grade run packed ~15 events and invented a named parent (allowance should be 0); the critique had no dimension for load or cast inflation — it opened a new event per character deed. **Decision:** `buildArcBudgetSection` computes an event budget (pages/3 at 1st-grade + one obstacle chain, /2 standard, /1.5 advanced, floor 3) and an invented-named-figure allowance (`clamp(round(pages/8)−floor(cast/2),0,3)`; anchors 1 char/20p→3, 5 chars/10p→0) and injects the numbers into arc-create AND arc-retell; the critique counts events vs the budget (exceeding = MAJOR, cut whole events never compress) and flags unjustified figures past the allowance (MAJOR, unless a one-line cannot-work-without justification). New shared rule: coverage is served by giving several characters deeds inside the same event — never a new event per character. **Touched:** server/lib/promptBuilders.js, prompts/arc-create.txt, arc-retell.txt (cb7407ab6, 69dbb1ec4). **Status:** 🗄 superseded 2026-09-07 by "Plot complexity is keyed on the age band, not on page count" (the event and invented-figure arithmetic only; the critique dimensions and the coverage-nests-deeds rule stand).
 
 ### Arc critique gains agency, fidelity, theme and plant/payoff dimensions
 **Context:** same run — the title dragon acted twice after hatching (cargo), the commissioned quest was silently inverted, the theme was thin, planted threads dropped. **Decision:** shared rule + critique questions (five→ten): central figure acts in every third (passive stretch = MAJOR); commission's central quest and named elements honored or the deviation named and fixed/justified in one line; the commissioned theme genuinely delivered throughout, not nominal; every plant pays off and every payoff traces to a plant (both directions, arc level; page level via plan-check Q7). Archetype list and its "last three are MAJOR" pointer untouched; shared blocks verified byte-identical. **Touched:** prompts/arc-create.txt, arc-retell.txt (cb7407ab6).
@@ -28950,6 +29365,10 @@ silent, 181/150 fires; the original 71-vs-50 motivating case still fires
 - `server/lib/textRefine.js` (`WORD_BUDGET_TOLERANCE`, `buildWordBudgetFindings`)
 - `prompts/story-text-proofread.txt`
 
+> 🗄 **Numbers superseded 2026-09-08** — the 1st-grade band this tolerance was
+> calibrated against moves to 25–70 words / 3–6 sentences; see the 2026-09-08 entry
+> at the end of this file. The mechanism described here is unchanged.
+
 **Status:** ✅ active. Supersedes the tolerance-free half of `cf10d7cd9`
 (2026-09-05); the counter itself, its `LANGUAGE_LEVELS` single source of truth
 and its 'counter' merge source are unchanged.
@@ -29681,3 +30100,11160 @@ into the artwork with no font fallback; the evaluator's rendered-text check rema
 
 **Touched:** `server/config/runtime.js`, `tests/unit/cover-title-mode.test.ts`, `docs/SETTLED.md`.
 **Status:** ✅ active — reaches production with the next master push.
+
+## 2026-09-06 — Admin-script OAuth lives in its own Google Cloud project, never the customer one
+
+**Context:** customers hit *"Google hasn't verified this app — the app is requesting
+access to sensitive info"* on the Google sign-in at the trial email step
+(reproduced on production, client `69965481554-cl8hv6p5…`, `scope=openid+email+profile`).
+Both sign-in paths request only non-sensitive scopes
+(`server/routes/auth.js:460`, `client/src/services/googleAuth.ts:184`), so the
+warning did not come from what the login asks for. Project `magical-story-3b745`
+(number `69965481554`) also held **MagicalStory Ads CLI**, which requested
+`.../auth/adwords` — a sensitive scope — and had burned the project's
+`1 user / 100` unverified-sensitive-scope cap. The project's Data Access table
+was additionally **empty**: the three login scopes were never declared, so
+Google treated them as unapproved (its own Audience-page note: *"it is because
+your OAuth request includes additional scopes that haven't been approved"*).
+Google-registration events stopped after `pascale.niggli@gmail.com`
+on 2026-08-16, with six in the ten weeks before — consistent with the console's
+migration to the Auth Platform dropping the scope declarations.
+
+**Decision:** the customer project `magical-story-3b745` carries **only**
+non-sensitive scopes (`openid`, `userinfo.email`, `userinfo.profile`), declared
+explicitly on Data Access, publishing status *In production*, External. Every
+admin script that needs a sensitive scope authorizes against a **separate**
+Cloud project, `magicalstory-admin-tools` (number `69638796140`, client
+`69638796140-mvt49e…`, Desktop type, External/published-unverified). Ads
+(`.../auth/adwords`) and Search Console (`.../auth/webmasters.readonly`) live
+there and nowhere else. The old `MagicalStory Ads CLI` client was deleted from
+the customer project.
+
+**Rationale:** a sensitive scope requested by *any* client in a project puts the
+whole project into unverified-sensitive-scope state, and that state is what the
+consent screen shows customers — a red warning at the exact moment a parent is
+asked for their email, plus a hard 100-user lifetime cap. Verifying the project
+instead would need a privacy-policy review, domain verification and a demo video
+per scope, days-to-weeks of Google review, with the warning live throughout —
+for scopes only the owner ever authorizes. Internal user type would have avoided
+it entirely but requires Workspace; the accounts here are consumer, so External
+is the only option. The admin project is published (not left in Testing) so its
+refresh tokens do not expire every 7 days.
+
+**Touched:** `scripts/ads/config.json` + `scripts/seo/config.json` (gitignored,
+local only — `client_id`/`client_secret`/`refresh_token` now point at
+`69638796140-…`; `developer_token`, `customer_id`, `login_customer_id` unchanged,
+they belong to the Ads manager account not the Cloud project). No application
+code changed. Verified after migration: `node scripts/ads/whoami.js` → both
+customer accounts, `node scripts/seo/report.js` → live Search Console data.
+
+**Status:** ✅ active — verified on production 2026-09-06: the trial sign-in shows a
+plain consent card, no warning screen. Do NOT consolidate the two Cloud projects
+back into one, and never add a sensitive scope to `magical-story-3b745`.
+
+---
+
+## 2026-09-06 — A prewarmed avatar cache scope is RETAINED for the story job, not wiped
+
+**Context:** Refcounting the shared `trial-<userId>` scope (entry above) only protects an
+OVERLAP — two runners inside the scope at once. The normal trial ordering has no overlap:
+`/api/trial/prepare-title` finishes its 2×4 sheet, is the only runner in the scope, so its
+`clearStyledAvatarCache()` runs, and the story job enters the same scope a moment later to
+find it empty. Production trial `job_1788698812047_q5b1vuds7` (Amian, watercolor, no costume,
+so the prewarm generated a full `standard` sheet instead of seeding it from the preview
+avatar): `data.styledAvatarGeneration` holds TWO records for Amian/watercolor/standard with
+BYTE-IDENTICAL 4097-char prompts — the prewarm's (77.3 s, full quality eval) and the job's
+(57.9 s, `no-eval-requested`, i.e. `skipQualityEval: !!trialMode`), starting 220 ms apart.
+One wasted Grok 2×4 + style transfer and ~58 s of latency on every such trial. The DB handoff
+(`preGeneratedStyledAvatars`) does not save it: `/api/trial/create-story` waits at most 60 s
+for an in-flight prewarm (the sheet alone takes ~77 s), and the prewarm writes the character
+row AFTER it clears the cache — the story's stored `characters[0].preGeneratedStyledAvatars`
+is `null`, so the job seeded nothing.
+
+**Decision:** `retainCacheScopeForHandoff(scopeId, ttlMs = 180000)` marks a scope as having a
+pending consumer. `clearStyledAvatarCache()` is a no-op (logged) while a retention is live;
+the next `runInCacheScope(scopeId)` CLAIMS the retention (cancels its TTL) and its own clear
+frees the scope for real. If no consumer ever enters — abandoned trial — the TTL frees the
+entries; at most `MAX_PENDING_HANDOFFS = 20` scopes may be retained at once, oldest evicted.
+Retaining is skipped when another runner is already inside the scope (the refcount guard
+already covers that, and a retention would only park the bytes until the TTL).
+`prepare-title` retains before clearing. Also: a cache HIT in `prepareStyledAvatars` now
+writes the sheet onto `char.avatars.styledAvatars[artStyle]` via
+`rememberStyledAvatarOnCharacter()` — the skip path previously left that object empty, which
+is how a seeded trial character once shipped the whole 2×4 sheet as every page's reference
+(`job_1787647410717_5dvfqu8jg` p2); the handoff makes that skip path the normal one.
+
+**Rationale:** Refcount-with-pending-consumer is the smallest lifecycle that states the real
+invariant: the cache lives until the run that will consume it has finished, and is freed
+anyway if that run never arrives. TTL alone would be an unbounded retention policy; deleting
+the prewarm's clear would leak every abandoned trial's image bytes. Raising the 60 s wait in
+`/create-story` was rejected — it serialises the trial (the prewarm's whole point is to run
+under the outline window) and only narrows the race instead of removing it.
+
+**Sibling paths checked:** `clearStyledAvatarCache()` has exactly three call sites —
+`prepare-title` and `storyJobPipeline.js` (job end + job error). Only the trial shares a scope
+between two runners; a full story's scope is its unique `jobId`, and the cover path runs
+inside that same job scope, so neither can hit this. `ensureStyledAvatarCoverage()` only reads
+the cache and never clears. The per-scope avatar LOG buckets have the same shared-scope
+shape but are cleared only by the job's finalizer, so the prewarm's entries already survive.
+
+**Touched:** `server/lib/styledAvatars.js` (`retainCacheScopeForHandoff`,
+`releasePendingScopeHandoff`, `clearScopeEntries`, `runInCacheScope`,
+`clearStyledAvatarCache`, `rememberStyledAvatarOnCharacter`), `server/routes/trial.js`
+(`prepare-title` handler), `tests/unit/styled-avatar-scope-guard.test.ts`.
+**Status:** ✅ active
+
+### Bible-invented cast carries its appearance into the page image prompt (JSON briefs only)
+**Context:** A Visual Bible secondary character has no uploaded photo, no
+reference card and no `clothingRequirements` entry — this prompt is the only
+channel by which its look can reach the image model. The beats scene brief is
+structured JSON whose character records hold position / action / expression /
+depth / perspective and have **no appearance field**, so an invented adult
+arrived as a bare name. Prod `job_1788698812047_q5b1vuds7` p2 (2026-09-06):
+`- Mama:, right, bending down toward Amian, …`, with an AGE & PROPORTIONS block
+naming only the commissioned 1-year-old. The model invented the mother from
+nothing on every page and drifted her between pages; she also read far too
+young for a parent of a one-year-old, because nothing stated her age.
+**Decision:** `buildImagePrompt` emits one `CAST WITHOUT A REFERENCE IMAGE`
+line per bible secondary that is in THIS page's cast and has no reference photo
+of its own — the entry's own `description` string, verbatim. Cast membership is
+read structurally (the brief's `fullData.characters` records by id, then by
+exact name; `appearsInPages` only as the fallback for a brief with no cast
+list). The same entries are fed through the already-written but never-wired
+`secondaryAgeCues()`, so an invented CHILD whose age is readable as a number
+joins the existing AGE & PROPORTIONS block instead of getting a second header.
+**Emitted only for the structured brief** (`isProseFormat === false`).
+**Rationale:** This is not a reinstatement of the SECONDARY CHARACTERS block
+removed 2026-06-09. That block was a THIRD copy of a description the *prose*
+format already embeds inline — verified still true: `job_1787689073034_1v6ew0y1kae`
+p11 spells out the park keeper's hat, shirt, trousers and boots in the sentence
+itself. A JSON brief has no such sentence, so the same reasoning gives the
+opposite answer, and the format gate keeps both. No clothing heuristic is
+re-introduced: one bible string is copied whole, nothing is inferred, filtered
+or assembled, and the "prose owns clothing" no-backstop ruling (2026-08-09)
+still governs every character the prose does dress. VB ids cannot leak — the
+block goes through the `sanitizeVbIdsInPrompt` chokepoint like every other
+builder. Cost measured over 6 stories (de-ch + fr-ch, JSON and prose briefs):
+~250 chars on the pages that fire, max page prompt 6.7k against the 8k Grok cap.
+The block sits in the compressible HEAD, where `shrinkPromptForModel`'s
+instruction already names "every character with their age band and body
+proportions … what each one wears" as must-keep — the same protection the age
+cues have had.
+**Touched:** `server/lib/promptBuilders.js` (`collectSecondaryCastForPage`,
+`buildImagePrompt`), `server/lib/inventedAgeBand.js` (`secondaryAgeCues`, now
+wired), `tests/unit/secondary-cast-appearance.test.ts`,
+`tests/manual/rebuild-page-prompt.js`
+**Status:** ✅ active
+
+### REQUIRED OBJECTS labels the whole list by one rule
+**Context:** Same page. Two artifacts, two different labels:
+`**hat** (object)` (the entry's English `type`) beside
+`**child-sized tunic made of woven straw** (object)` (a chop of the
+description). The state-aware branch rebuilt the ref source as a bare
+`{ description }`, dropping `type`, so `englishEntityRef`'s non-English-story
+branch could not fire and it silently fell back to a description chop.
+**Decision:** the state-aware rebuild spreads the entry —
+`{ ...obj.entry, description }` — restating only the description.
+**Rationale:** the label is a presence checklist and a GroundingDINO grounding
+key (`parseVisualBibleObjects` reads what is between the asterisks); one rule
+per list keeps the key stable across pages. Note: the older, worse form of this
+defect — `**small** (object)`, an adjective as the label, still visible in the
+stored prod prompt — was already fixed by `02e667497` (clause extension in
+`clauseRef` + `language` threaded into `englishEntityRef`); production simply
+had not deployed it when that story ran.
+**Touched:** `server/lib/promptBuilders.js`,
+`tests/unit/secondary-cast-appearance.test.ts`
+**Status:** ✅ active
+
+---
+
+## 2026-09-07 — A trial premise never asks for a costume the trial cannot render
+
+### The idea generator is told whether this theme has a costume
+**Context:** Prod `job_1788698812047_q5b1vuds7` (trial, `storyCategory:
+adventure`, `storyTheme: mothers-day`) shipped a premise — accepted untouched —
+in which the child puts a costume ON and then explores a museum in it. A trial's
+clothing does not come from the writer: `storyJobPipeline.js` discards the
+writer's `clothingRequirements` in trial mode and uses the static
+`getTrialCostume` table, which has no `mothers-day` entry. `costumed.used` was
+therefore `false`, no costumed avatar sheet was ever generated, and the pipeline
+could only paint the garment as scenery. `3f537c51f` fixed the downstream half
+(the trial story prompt no longer instructs a costume that does not exist, and
+`reconcilePageClothingWithRequirements()` stops the two fields disagreeing) —
+which made the render coherent but left it diverging from the premise the user
+accepted.
+
+The idea generator (`POST /api/trial/generate-ideas-stream` →
+`prompts/trial-idea.txt`) had no knowledge of costume availability at all, and
+two of its instructions actively invited a worn costume: the own-town branch
+("A costume or theme shows in what they **wear**…") and the make-believe branch
+("It opens where the child really is — **dressing up**, or starting to play").
+
+**Decision:** the idea generator performs the same costume lookup the pipeline
+does, and is instructed accordingly.
+- costume available → wording unchanged, byte-identical.
+- no costume → the appended rule states that no character puts on, changes into
+  or wears a costume, disguise or special outfit, and that a costume may still
+  appear as an object in the scene (on display, on a rack, carried); the two
+  branch instructions drop "wear" and "dressing up".
+
+The three strings live in one builder, `buildTrialIdeaCostumeInstructions()`
+(`server/lib/promptBuilders.js`), and the category/theme/topic → costume mapping
+— previously hand-rolled identically at two call sites — now lives once in
+`server/config/trialCostumes.js` as `resolveTrialCostumeLookup()` /
+`getTrialCostumeForStory()`, used by the story job, the avatar prewarm and the
+idea generator.
+
+**Rationale:** the premise and the renderable pipeline must agree, and the cheap
+side to move is the premise: a costume-less theme simply never proposes a worn
+costume. The rejected alternative was promoting a premise costume into
+`clothingRequirements` and generating a real costumed sheet — an extra paid Grok
+sheet per trial and a second, writer-driven source of trial clothing, which is
+exactly the split `3f537c51f` closed. The worn-vs-prop distinction the rule
+draws is the one already codified at `prompts/story-bible-from-beats.txt:61`.
+
+Reach: of the 33 adventure themes, exactly three have no costume entry —
+`mothers-day`, `fathers-day`, `custom` — and all 54 historical topics have one.
+The trial wizard offers only the 13 "popular" themes, of which two are
+costume-less (`mothers-day`, `fathers-day`), in both trial categories
+(life-challenge picks its theme from the same list). `custom` is not reachable
+from the trial.
+
+One divergence the unification closed: `buildTrialStoryPrompt` resolved the
+lookup as `storyTopic || storyTheme`, so a **life-challenge** trial looked the
+challenge id (`understanding-rules`) up in the costume table, found nothing, and
+— after `3f537c51f` made the costume instructions conditional — would have told
+the writer the story has no costume while `clothingRequirements` and the avatar
+sheets carried the theme's costume (prod `job_1788727744192_gxf6gbywo`,
+`job_1788724538469_n6ylqxq7w`: `costumed.used: true`, costume `cowboy` /
+`superhero`, from a topic that is not in the table). Prod never ran that
+combination — `3f537c51f` is staging-only and prod still carries the
+unconditional wording — so no shipped story is affected. Adventure and
+historical trials resolve identically before and after.
+
+Sibling path: full stories are unaffected by design. Their
+`clothingRequirements` come from the writer (`storyJobPipeline.js` — the
+`inputData.trialMode` ternary), and the avatar pipeline generates a costumed
+sheet on demand from whatever the writer declared, so a full-story premise that
+needs a costume produces one. The gate is trial-only.
+
+**Verified without paid calls:** `tests/manual/render-trial-idea-prompt.js`
+renders both branches from stored inputs and asserts the costume-available
+branch is byte-identical to the pre-gate wording. 809 unit tests pass (12 new).
+
+**Touched:** `prompts/trial-idea.txt`, `server/routes/trial.js`,
+`server/lib/promptBuilders.js`, `server/config/trialCostumes.js`,
+`storyJobPipeline.js`, `tests/unit/trial-idea-costume-gate.test.ts`,
+`tests/manual/render-trial-idea-prompt.js`
+**Status:** ✅ active
+
+### Object states are normalised on the LIVE parse path, and a page resolves its state cell from the bible's own `pages[]`
+**Context:** Staging trial story `job_1788763045123_z8so79ngb` shipped its central
+prop — a hand-drawn greeting card with three declared states — with **no reference
+image on any of the 5 pages it appears on**, and with none of its per-page state
+deltas in the prompt. The paid 3-cell sheet rendered correctly and was discarded:
+`referenceSheetBatches[2]` stored `elementIds: [null, null, null]`. Two causes, one
+class. (1) `normaliseObjectStates` — which mints each state's dotted id
+(`ART001.2`) and its empty cell fields — was called only from
+`visualBible.parseVisualBible`, a function with **no callers**; the live path is
+`outlineParser/unified.js#extractVisualBible`, which spread the raw JSON and left
+`states[]` id-less. Ids never mattered while `expandElementStateCells` also emitted
+a base cell carrying the parent id — `d473434ed` removed that base cell (4 states,
+4 cells), so the object's ONLY cells were the id-less ones: nothing could be written
+back, and `getElementReferenceImagesForPage` found no cell on any page. (2) The Art
+Director cites the **bare** parent id on almost every page (measured: 6/6 pages of
+that story wrote `[ART001]`, never `[ART001.2]`) — partly because the States line it
+is given rendered as `[undefined]` — so state resolution keyed only on a dotted
+handle never fired, and p3's `torn and wet` delta ("flower missing") never reached
+the render.
+**Decision:** (a) `extractVisualBible` normalises `states[]` through
+`normaliseObjectStates` for every entry that declares them — the one live place
+state ids are minted. (b) State→page resolution gains a deterministic second
+channel: `objectStateForPage(entry, pageNumber)` reads the state's own declared
+`pages[]`. Resolution order everywhere is **cited dotted handle → the state the
+bible declares for this page → the default (first) state**; it feeds both the
+reference cell (`elementRefCell`) and the REQUIRED OBJECTS delta clause. (c) The
+degradation is now LOUD: an element on a page that has a reference sheet but
+resolves to no usable cell `log.error`s; a rendered cell arriving with no element id
+`log.error`s instead of returning silently; a state row with no id is backfilled at
+sheet-build time with a `log.error` (bibles stored before this fix); a page of a
+stated object that no state declares `log.warn`s. (d) A stated object whose wanted
+state has no cell substitutes a sibling state's cell (right object, wrong state)
+rather than shipping no reference at all.
+**Rationale:** `d473434ed`'s verdict — 4 states, 4 cells, no base cell — is NOT
+reversed; this fixes the parse and consumer sides so it works without a base cell,
+which is the shape the owner asked for. Of the three candidate fixes (restore the
+base cell / give the state cells their ids / teach the page lookup about state
+cells), the base cell is the reversal and was not taken; the other two are both
+implemented, because ids alone would still have left every page on the default
+state while the brief writes bare ids. Page-based resolution beats trusting the
+model to echo a dotted handle: the bible already declares which pages each state
+covers, and the authoring templates require that mapping to be total. Verified with
+no paid calls by replaying the stored story through the current builders: before,
+p1/p2/p3 carried no reference-images line at all and p4/p5/p6 named only ART002;
+after, all six pages carry the card, p3 resolves to the `torn and wet` cell, and its
+prompt carries "corner torn away, paper wrinkled and damp, flower missing".
+Sibling paths swept in the same change: the empty-scene plate references, the
+page-lookup location loop, the cover prop image (`coverIterate`, which read the
+entry's own render and so lost a stated prop's picture), and the inpaint
+missing-element artifact reference (`images.js`) all resolve through `elementRefCell`
+now instead of reading `referenceImageData/Url` off the entry.
+**Touched:** `server/lib/outlineParser/unified.js`, `server/lib/visualBible.js`,
+`server/lib/promptBuilders.js`, `server/lib/referenceSheets.js`,
+`server/lib/coverIterate.js`, `server/lib/images.js`,
+`tests/unit/vb-object-states.test.ts`
+**Status:** ✅ active (2026-09-07)
+
+## 2026-09-07 — A skipped avatar-sheet eval scores `null`, never 10
+**Context:** Staging story `job_1788763045123_z8so79ngb` stored a styled 2×4
+avatar sheet at 10/10 on every axis — layout, identity, outfit, clean — while
+the image itself is a merged crowd: overlapping semi-transparent figures with no
+cell grid, including two adults who are not the character. The stored record
+shows why: `passes.pass2.attempts[0].stage = "no-eval-requested"`,
+`finalVerdict: null`, and pass-1's verdict carries `heads: null`, `bodies: null`,
+`identityReport: null` with all scores 10. **No judge ever ran.** The run passed
+`skipQualityEval` (trial fast path) and each skip branch minted a passing 10:
+`generateComposited2x4`'s two row loops (`review = { valid: true, score: 10 }`),
+its `finalScore = skipReview ? 10 : …` plus the `?? 10` sub-score defaults, and
+`runStyleTransferPass`'s `best = { …, score: 10, verdict: null }`. Same disease
+as `hollow-eval-scores-100` (2026-09-02): an evidence-free eval became a perfect
+score.
+**Decision:** An unevaluated sheet is **unknown**, not perfect. Every skip path
+records `score: null`, `evaluated: false`, and the verdict carries
+`evalSkipped: 'skipQualityEval'`; sub-scores are `null` rather than 10. `valid`
+stays `true` and the sheet still ships (the caller asked for no reviews, and a
+trial cannot act on a verdict — gates are guidelines). Best-of-N ranks an
+unscored attempt below any judged one. `styledAvatars.js` reports
+`innerFinalScore`/`combinedScore` as `null` with `evaluated: false` and logs
+"shipped UNSCORED — quality eval skipped".
+**Rationale:** The gate did not misjudge this sheet; it never saw it. The only
+defect that can be fixed on the eval side is the silent default. Nulling the
+axes keeps the fail-open behaviour those branches were written for while making
+"nobody looked" impossible to read as "verified perfect".
+**Also (prompt side):** no rubric asked whether a cell contains exactly one
+figure. `sheet-row-heads-eval.txt` and `sheet-row-bodies-eval.txt` gain a SINGLE
+SUBJECT task (one head / one figure per cell, ghosted and blended figures
+included, merged cells score 1-3), mirrored into `sheet-2x4-evaluation.txt`; the
+Pass-2 style eval already had it as TASK 8. `applyPoseHeadGate`'s recompute —
+which is what the gate reads, not the model's own `finalScore` — includes the
+new `soloScore`, or it would be scored and silently dropped.
+**Not fixed (reported):** a trial still ships an unjudged styled sheet. Catching
+this class inside a trial needs the Pass-2 solo check to actually run there, which
+is a paid Gemini call per character on the fast path — owner's call, not built.
+The corruption itself (the style anchor's cast blending into the sheet;
+`usedAnchor: true` on the winning attempt) is a separate bug.
+**Touched:** `server/lib/character2x4Sheet.js`, `server/lib/styledAvatars.js`,
+`prompts/sheet-row-heads-eval.txt`, `prompts/sheet-row-bodies-eval.txt`,
+`prompts/sheet-2x4-evaluation.txt`, `tests/unit/avatar-sheet-eval-gate.test.ts`
+**Status:** ✅ active
+
+## The Pass-2 style anchor is attached only when the sheet can be judged (2026-09-07)
+**Context:** Staging trial `job_1788763045123_z8so79ngb` (Emma, 5, de) shipped a
+styled 2×4 avatar sheet that was one merged crowd instead of 8 cells, with a
+boy, a woman and an elderly man painted over the child. The three strangers are
+not the story's cast: they are the figures in `server/assets/style-anchor-watercolor.jpg`,
+attached as Grok reference slot 2 by `runStyleTransferPass`. Every page then got
+a geometric slice of that crowd as the child's identity reference (four of six a
+HEADLESS torso), and apparent age drifted p3 ≈ 3 / p2 ≈ 8–9 / others ≈ 5 despite
+an identical age cue in all six page prompts. Pass 1 was perfect — the stored
+`realisticImageData` is a clean 8-cell sheet — so the whole defect is Pass 2.
+This is the SAME failure mode as `job_1787252581387_6sn8z0nh2` (2026-08-20),
+which is why the anchor-dropping retry and the fall-back-to-Pass-1 gate exist.
+Both of those key off the Gemini styled-sheet verdict. A trial passes
+`skipQualityEval`, so the loop breaks on attempt 1 with no verdict: neither
+defence could fire, and the sheet shipped. The clean control
+`job_1788725396265_p3dh87hsv` (Lily, staging, 2026-09-06 20:09 CH) was equally
+unjudged and equally anchored — it simply did not blend. Prod control
+`job_1788698812047_q5b1vuds7` (Amian) likewise looked fine. So this is not a
+regression from any commit in the 20:09 → 06:37 window: identical prompts,
+inputs and `grok-imagine-image` model in the broken and clean staging runs, and
+staging was already on Imagine 2.0 before the clean control, which eliminates
+the 76d4055d5 / c07cd70fc tier switch. It is a stochastic contamination that was
+never guarded on the unjudged path.
+**Decision:** The style anchor is attached only when `GEMINI_API_KEY` is set AND
+`skipQualityEval` is false — i.e. only when a verdict can reject the result and
+a retry can drop the anchor. Test Lab `promptOverride` runs keep it, since an
+A/B must measure its exact reference set. Separately, `quickLayoutCheck` now runs
+on every Pass-2 output and `log.error`s a failed sheet, recording `layoutValid`
+on the attempt record — **advisory only**: `docs/image-routing.md` measured
+painterly false-positives (oil sheets at 25.3% and 57.4% were structurally fine)
+and forbids wiring it as a Pass-2 gate, so it decides nothing.
+**Rationale:** The anchor lifts style fidelity and is clean in the large
+majority of runs, so removing it everywhere would cost quality for a
+low-probability defect. But an unjudged, un-retryable run has no safety net at
+all, and the sheet it produces is the identity reference for every page of the
+story — the most expensive image in the pipeline to get wrong. Style fidelity is
+worth a re-roll; it is not worth an unguarded roll. The per-page cropper is NOT
+at fault: re-running `cropAvatarCell` on the stored sheet reproduces the stored
+p2 slice byte-for-byte (181952 bytes), and the same crop on the clean Lily sheet
+and on Emma's own Pass-1 sheet yields a whole single figure. It sliced a corrupt
+sheet correctly.
+**Touched:** `server/lib/character2x4Sheet.js` (`runStyleTransferPass`),
+`tests/unit/avatar-sheet-anchor-guard.test.ts`, `docs/image-routing.md`
+**Status:** ✅ active
+
+## 2026-09-07 — The arc budgets ACTIONS, not just events; the over-length word fault stops asking for lost meaning
+
+**Context:** `job_1788727233899_1dpnym94p` (18 pages, `1st-grade`) shipped
+incoherent text. The stage reports show the arc was *inside* its budget and the
+damage happened anyway:
+
+- `buildArcBudgetSection` budgets **events**: `max(3, round(pages/divisor))`,
+  divisor 3 / 2 / 1.5 by reading level (entry of 2026-09-05, "buildArcBudgetSection
+  computes an event budget"). That run got 6 events and the arc critique correctly
+  self-reported "six, at budget".
+- But the prompt defines an event as "steps within one happening count as one
+  event", so one event holds any number of actions. The 18 beats carried **66
+  action clauses, 3.0 per page**.
+- Words are spent per **action**, not per event. At `1st-grade` the band is
+  25-50 words/page, so **13 of 18 pages ran 61-128 words**.
+- `buildWordBudgetFindings` then emitted `FAULT[LENGTH]: … shorten without losing
+  content` on **11 pages**. At a 60% cut that instruction is impossible, so the
+  refiner obeyed the only way it could: it deleted causality — a character's act
+  of courage, the ravens' motivation, the explanation a later image depends on.
+
+Nothing in the pipeline counted the unit that costs words. `story-beats.txt`
+lines 38-40 do carry one-action rules, but they constrain the **picture** only
+("give the picture one of them"); the beat keeps every action.
+
+**Decision:**
+1. **An action budget in the arc, keyed on reading level.** `buildArcBudgetSection`
+   emits a third `# BUDGETS` line alongside events and invented figures:
+   `1st-grade` 1-2 actions/page, `standard` 2-4, `advanced` 5-8; the stated total
+   is `pages × per-page-max`. The numbers are interpolated in code — never written
+   into a prompt file — the same single-source-of-truth pattern as the two
+   existing lines.
+2. **The arc counts its own actions.** The CRITIQUE instruction in *both*
+   consumers of `{ARC_BUDGETS}` (`prompts/arc-create.txt`, `prompts/arc-retell.txt`)
+   gains, immediately after the existing event count, an actions count — counted
+   one by one even where several sit inside one event — with the same MAJOR
+   severity and the same remedy: cut whole events, never compress them.
+   The count is performed by the ARC, deliberately: no counter was added to
+   `planCounters.js` or the beats stage.
+3. **The word-budget tolerance becomes asymmetric.** `WORD_BUDGET_TOLERANCE = 0.2`
+   splits into `WORD_BUDGET_TOLERANCE_OVER = 0.5` and
+   `WORD_BUDGET_TOLERANCE_UNDER = 0.2`. An overlong page is faulted only past
+   **+50%**; the under-budget side is unchanged.
+4. **The over-length finding stops asking for deletion.** `— shorten without
+   losing content` becomes `— tighten the wording; keep every action, line of
+   dialogue and feeling. Losing one is a fault.` The under-length finding
+   (`expand without padding`) is untouched, and both still name the TRUE budget.
+
+**Rationale:** the event budget was necessary and is kept — it is the unit a
+child retells — but it is not the unit that costs words, so it cannot bound page
+length on its own. Fixing this at the text stage alone is impossible by
+construction: once 66 actions are in the beats, no rewrite fits them into 25-50
+words a page without deleting some. So the real fix is upstream, at the arc,
+where an action can still be cut whole; the text stage merely stops making the
+impossible demand. The two directions of the word band do not carry the same
+risk — running a few words long costs nothing, forcing a 60% cut costs an action
+— which is why the tolerance is no longer symmetric. Meaning outranks word
+count: overrun by a few words rather than delete an action.
+
+Validated statically (no paid run): `buildArcBudgetSection` rendered across all
+three levels and page counts 4/8/10/12/18/24 (18 / `1st-grade` / cast 4 →
+6 events, "at most 36 actions, 1-2 to a page", 0 invented figures);
+`buildWordBudgetFindings` exercised at both band edges per level (1st-grade
+75 words silent, 76 fires; advanced 198 fires under-min, 203 silent); both arc
+templates render with zero unfilled placeholders.
+
+**Touched:**
+- `server/lib/promptBuilders.js` (`buildArcBudgetSection`)
+- `prompts/arc-create.txt`, `prompts/arc-retell.txt` (CRITIQUE action count)
+- `server/lib/textRefine.js` (`WORD_BUDGET_TOLERANCE_OVER` /
+  `WORD_BUDGET_TOLERANCE_UNDER`, `buildWordBudgetFindings`)
+- `tasks/action-budget-2026-09-07.md`
+
+> 🗄 **Item 3 superseded 2026-09-08** — the upstream fix it called for landed as a
+> 1st-grade budget raise (25–70 words / 3–6 sentences); the `OVER = 0.5` tolerance
+> itself is KEPT by explicit owner decision. See the 2026-09-08 entry at the end of
+> this file.
+
+**Status:** ✅ active. **Extends** the 2026-09-05 event-budget entry (search
+"buildArcBudgetSection computes an event budget") — the event budget stands
+unchanged; this adds a second, finer unit beside it. **Supersedes** the
+2026-09-06 entry "The word-budget counter gets a 20% grace band" *in its
+symmetry only*: the grace band, the true-budget-in-the-finding-text rule, the
+`LANGUAGE_LEVELS` single source of truth and the lector idiom line all stand;
+only the over-budget bound moves from 0.2 to 0.5, and only the over-length
+finding's wording changes. Not a `SETTLED.md` reversal.
+
+
+### Plot complexity is keyed on the age band, not on page count
+**Context:** `buildArcBudgetSection` derived the event budget from page count and reading level alone (`max(3, round(pages/divisor))`) and never consulted the age band. Rendering the real prompt showed the same 3-year-old getting 3 events + 1 invented figure at 5 pages but 7 events + 3 invented figures at 20 — length inflating plot. `Math.max(3, ...)` was a floor bug that forced three events into a five-page toddler book. Inside one prompt the BUDGETS block contradicted STORY SHAPE: for a 20-page age-3 story the shape said "Challenges: one, met three times" while BUDGETS allowed 7 events and 3 invented named figures.
+**Decision:** two independent knobs. The **age band** (`resolveAgeBand`) says how hard the story may be; **page count + reading level** say how long it is. Events are emitted as a RANGE (so the arc may use fewer), floor 1: routine and quest flat 1; tries pages/7-pages/5; fear-choice pages/6-pages/4; journey pages/5-pages/4. At 6+ no band applies, so the reading level stands in as the maturity proxy: 1st-grade pages/4-pages/3, standard pages/3-pages/2, advanced pages/2-pages/1.5. Invented named figures become a per-band ceiling minus half the cast, floored at 2 (`max(2, base - floor(cast/2))`; base: routine/quest/tries/fear-choice 2, journey 3, and at 6+ 1st-grade 3, standard 6, advanced 9) — page count no longer enters the calculation at all. The three simple bands additionally get one bullet saying extra length buys repetition, not plot. The ACTIONS bullet and the 1st-grade followability bullet are unchanged; actions are per-page and already scaled correctly.
+**Rationale:** owner's two-knob model with verbatim anchors — a simple 3-year-old story carries **1 event at 5 pages and 3-4 at 20**, and the slope **steepens with age**. Each band's old value becomes roughly the TOP of its new range, so the older end is not gutted (age 8 + advanced at 18 pages renders 9-12, against 12 before); only the young end is cut. On the invented-figure side the floor of 2 is structural: a story needs an antagonist and a helper, so a large cast may reduce the allowance but never remove them, while the ceiling rises with the band because a complex book may want two or three of each plus additional figures. The previous rule's page-scaling AND its cast subtraction together could reach 0, forbidding figures stories legitimately need — the measured case is the dragon story (journey, cast 4), which scored 0 under the old rule and renders 2 now. Verified statically by rendering the full BUDGETS block across ages 1/2/3/4/5/8 x pages 5/10/18/20 at 1st-grade plus age 8 at standard and advanced: the two anchors land exactly, no configuration falls below 1 event, the repetition bullet appears for routine/quest/tries only, the followability bullet for 1st-grade only, and the 20-page age-3 shape/budget contradiction is gone (3-4 events, 1 invented figure, was 7 and 3). No paid calls. Supersedes the 2026-09-05 entry "Arc budgets are computed, not asked for" for the arithmetic only.
+**Touched:** server/lib/promptBuilders.js (`buildArcBudgetSection`, `EVENT_BUDGETS`, `EVENT_BUDGETS_STANDARD`, `INVENTED_FIGURE_BASE`)
+**Status:** ✅ active
+
+
+### The arc's ACTION budget is a per-page shape, not a countable total
+**Context:** the ACTIONS bullet emitted a computed book total ("at most N actions, min-max to a page"). Measured twice on the same 18-page story: `claude-sonnet-4-6` with a ceiling of 36 wrote **62** actions (3.44/page) and its critique claimed "36 actions. Exactly at budget"; `claude-opus-5` with the same ceiling wrote **43** (2.39/page) and claimed "about 31 — under budget". Both self-certified compliance while overrunning. A TOTAL is an arithmetic claim the model re-granulates until it passes.
+**Decision:** the total is removed entirely — no `pages * aMax`, no "at most N actions". The bullet emits a per-page SHAPE, keyed the same way the event budget is (age band; `languageLevel` as the maturity proxy for the standard band at 6+). Young shape for every band and for the standard band at 1st-grade: "A page carries ONE main action — at most two … A page where several things happen at once is too much for this reader." Older shape for the standard band at standard ("two to three") and advanced ("three to four"): "…and one of them is the main one — the picture renders that one." **advanced drops 5-8 → 3-4** on measured evidence — the advanced arc wrote 2.17 actions/page unprompted, less than half its old band. The action definition sentence stays. The CRITIQUE line in `prompts/arc-create.txt` and `prompts/arc-retell.txt` no longer says "Count the arc's actions … more than the stated budget"; it now says "Check the arc's action load per page — a page carrying more than the stated shape allows is MAJOR".
+**Rationale:** a shape has nothing to count, so there is nothing to fudge, and it mirrors the picture side — `prompts/story-beats.txt` already tells the beats stage the image renders one moment. Verified statically (ages 1/3/5/8 x pages 5/18/20 at 1st-grade, plus age 8 at standard and advanced): no rendered block contains a total action count, and the older wording appears only for the standard band at standard/advanced. Verified once paid: one `arc-create` call on the exact inputs of `job_1788727233899_1dpnym94p` (claude-opus-5, 18 pages, 1st-grade, $0.45, 266 s) produced **41 actions / 2.28 per page**, against Sonnet's 62 / 3.44 and the earlier Opus run's 43 / 2.39; 5 of 18 pages exceed the two-action shape. Its critique made no total claim and instead named pages at the ceiling and proposed splitting one — a per-page inspection, not a self-certification. **Confound:** that run differs from the previous Opus run by the action wording AND by the band-keyed event/figure budgets committed in 71d32e7be/072e0721e, so the effects are not fully separable.
+**Touched:** server/lib/promptBuilders.js (`buildArcBudgetSection`, `ACTION_SHAPE_STANDARD`), prompts/arc-create.txt, prompts/arc-retell.txt
+**Status:** ✅ active
+
+## 2026-09-07 — Page inpaint follows the page render tier; named animals are checked for completeness; a per-character fix names its subject once
+
+**Context:** prod job_1788727233899_1dpnym94p (18 pages, Imagine 2.0 render tier). Of 9 pages entering repair, every chain that went through the Standard-tier (1.x) whole-frame inpaint degraded (p7 60→60 with the dragon's head erased, p13 65→35→20→25, p17 −20/40/−20/−20); the two rescues were iterate re-renders on 2.0. The inpaint has no mask on the live path (the mask dispatcher is dead code): it is a whole-frame edit that repaints everything the instruction does not name. The same mechanism wiped two real landmarks on 2026-09-05 (job_1788614817116 p2) and got a landmark-only guard. The eval passed the headless dragon because animals live in the inventory's `objects` list with no completeness field, so D-11 (`figure_completeness`, figures only) never fired. The consolidator's instruction repeated the subject's 30-word visual identifier three times in two sentences.
+
+**Decision 1 — routing (REVERSES the 2026-09-06 "repairs stay on the edit tier" ruling, owner sign-off via AskUserQuestion 2026-09-07):** `inpaintPage` passes `MODEL_DEFAULTS.pageRenderImage` to `editImageWithPrompt`; `pageImage` is no longer read by the page inpaint. Iterate already followed the render tier. Char repair keeps its 2026-09-01 1.x pin (0/82 structural defects measured); style repair stays on Standard. Evidence: three degraded pages in one story (p7, p13, p17) plus the 2026-09-05 landmark wipe — all whole-frame 1.x edits of a 2.0 render. Cost: $0.04 instead of $0.02 per inpaint.
+
+**Decision 2 — eval (prompt only, owner: "is the animal complete, not a count"):** `image-inventory-unified.txt` `objects[]` carries `complete` for an animal or creature (true = one whole body; false = head or body missing where it should be visible; frame crop and occlusion are not incomplete). `image-prompt-compliance.txt` lists `figure_completeness` for an inventory-marked incomplete animal under CRITICAL; `image-evaluation.txt` D-11 says a named animal counts as a figure. No new scored type, no code. The Lab-only `image-vision-inventory.txt` carries the same line. Not a limb count — the counting approaches remain rejected (memory: anatomy-detection verdicts).
+
+**Decision 3 — instruction wording:** `stripCharacterNames` takes `ownName`; inside a per-character fix the subject's own name becomes "this character" (the entry is already headed "For <identifier>:"). Found while testing: another character with no identifier used to inherit the SUBJECT's identifier; with `ownName` given it now falls to its own descriptor.
+
+**Grok 2.0 region editing — measured, not available:** `POST /v1/images/edits` accepts any unknown field silently (a `zzz_bogus` field returned 200), so acceptance of `mask` proves nothing. A decisive test — a half-green/half-blue source, a mask over one half, "fill the masked area with red, change nothing outside" — came back uniformly repainted on both halves. The consumer app's magic-wand and segmentation tools are not exposed by the API. Four calls, $0.28.
+
+**Validation (Lab sets 24/25, experiments 1038-1044, 2026-09-07):** the `complete` flag is emitted, and the production judge answers it wrong. On the headless page gemini-2.5-flash (production), gemini-2.5-pro, gemini-3.1-pro and grok-4.6 all returned `complete: true`; only gemini-3.7-flash returned "a headless blue winged dragon", `complete: false`, and marked four intact animals on five control pages complete. This matches the recorded verdict that generative-vision judges normalise generative defects (memory: anatomy-detection verdicts). 3.7 Flash costs 1.8-3.5x per call ($0.0051-$0.0101 vs $0.0029; $0.10-$0.30 more per 43-call story, Google list doubling 2027-01-01). **Owner: keep 2.5 Flash.** The prompt rule stays as the classification; production will keep missing this class until a judge that sees it is affordable. The inpaint tier change is the fix that removes the cause observed here.
+**Prompt-wording sweep on 2.5 Flash (Lab set 26, experiments 1045-1048):** four alternative questions on the headless page — a `head: visible/hidden/absent` field, a free-text `missing_parts` list, a look-for-the-head-first instruction, and a child's-eye `looks_wrong` field — all answered "whole" (`visible`, `none`, `complete: true`, `nothing`); the split-inventory arm described the dragon as "facing away, with its head turned to the left", inventing a head. **The wording is not the limit; 2.5 Flash cannot be prompted into seeing this.** Do not re-run prompt variants on this model for anatomy absence — the untested residual is a zoomed per-animal crop (code, not prompt), which needs owner sign-off (memory: anatomy-detection verdicts).
+
+**Touched:** server/lib/images.js (inpaintPage model, stripNames ownName), server/lib/imageCompositing.js (stripCharacterNames), server/config/models.js (comment), prompts/image-inventory-unified.txt, prompts/image-prompt-compliance.txt, prompts/image-evaluation.txt, prompts/image-vision-inventory.txt, tests/unit/inpaint-routing.test.ts, docs/SETTLED.md.
+**Status:** ✅ active (staging)
+
+### The blind inventory can run an OpenRouter vision judge (2026-09-07)
+**Context:** the animal-completeness check (above) is only answered correctly by gemini-3.7-flash, at 1.8-3.5x the per-call price of 2.5 Flash. The owner asked for cheaper judges, Chinese models included. `runVisualInventory` spoke only Gemini (direct) and xAI, so no OpenRouter model could be measured.
+**Decision:** `callOpenRouterVisionAPI` (images.js) returns the same Gemini-shaped response as `callGrokVisionAPI`; `runVisualInventory` routes `provider: 'openrouter'` models through it. TEXT_MODELS gains `qwen3.6-plus` and `kimi-k2.6`; `qwen3-vl` and `minimax-m3` already existed. Temperature 0 (SETTLED). No production default changes — `qualityEval` stays gemini-2.5-flash; this is Lab plumbing.
+**Rationale:** one adapter in the existing shape, so the inventory parser, retries and fallback are shared and a model swap stays a one-key change if a candidate wins.
+**Touched:** server/lib/images.js, server/lib/evalPipeline.js, server/config/models.js.
+**Status:** ✅ active (staging)
+
+### The ARC judge is briefed with the ARC commission, not the beats commission (2026-09-07)
+**Context:** `sc.buildBriefContext()` builds the BRIEF the arc judge scores an arc against
+(`server/lib/testlab.js` `runArcRoundsStage`). It called `buildStoryShapeSection(d, pages)`
+with no options, so the judge received the full **beats-stage** shape block ("Challenges:
+exactly 3", "Page budget: opening 2, 3 major challenges at 3 pages each (9), 2 secondary
+moments…") while the arc creator received the lean arc variant (owner ruling 2026-08-31:
+"here a full page budget, this belongs to the beats. the arc should just make the story").
+It also never included `buildAgeModeSection()` (the `prompts/age-band-*.txt` file) or
+`buildArcBudgetSection()`. The judge was therefore grading against a commission the arc was
+never given — and the arc retell, which is driven verbatim by the judges' notes and lowest
+dims, then restructured arcs toward the superseded spec.
+**Evidence:** measured over seven arc configurations this session. Judges quoted the
+superseded budget verbatim ("an opening-heavy 18-beat list against the 2+9+4+2 budget"). A
+correct age-3 arc scored mean 4.7 with `change` 2/10 and `focus` 1/10. Worst case, config E
+(age 2, `quest` band, 18 pages): the band file says "No danger, no villain, nobody unkind,
+nothing lost for good", the draft obeyed it, the un-briefed judges scored `blockers` 1/2/5
+and `lost` 6/4/8 because the generic rubric demands them, and the retell wrote a theft, an
+anger beat, a deadline and a low point into a two-year-old's book. Gemini's own note stated
+the mismatch: "While the arc perfectly calibrates difficulty, entrances, and focus for a
+1-year-old, it fails standard structural dimensions by delaying the sole challenge until
+page 14 and omitting attempts, blockers, and character change."
+**Decision:** `buildBriefContext(d, { arc = false } = {})`. Opt-in: with `arc: true` it passes
+`{ arc: true }` to `buildStoryShapeSection` and appends `buildAgeModeSection(d)` and
+`buildArcBudgetSection(d, pages)`. The arc judge path (`testlab.js` `runArcRoundsStage`)
+passes it; the full-story scorecard path (`runStoryScorecardStage`) does not and is
+byte-identical to before. The existing lazy require + try/catch degradation is kept — a judge
+context must never throw.
+**Rationale:** a judge and a creator working from different commissions is not a strict
+rubric, it is a broken measurement: every deduction on a dimension the age band forbids is a
+false positive, and the retell turns those false positives into real damage to the book.
+Opt-in rather than a global change because the full-story scorecard grades finished beats,
+where the page-allocation block is the correct commission.
+**Effect (verified):** for the three simple bands (`routine`, `quest`, `tries`) the shape block
+was already band-specific — the change there is the added age-band file and `# BUDGETS`. For
+`fear-choice`, `journey` and `standard` (configs F, J, B, C) the "Challenges: exactly N /
+Page budget / secondary moments" lines are gone from the brief.
+**Measured after the fix (21 judge calls, $0.69, 2026-09-07; scratchpad `rejudge_*`):** panel
+means old → new — D 4.5→5.8, E 5.3→3.6, A 4.7→4.7, F 6.3→5.4, J 7.0→7.2, B 6.3→6.1, C 7.2→5.6.
+The scores did NOT simply rise for the simple bands: the corrected brief makes judges stricter,
+because it also hands them the age-band rules and the event budget, and they now catch real
+band violations. On E, gemini went 6.4→3.7 with band-anchored reasons that are all correct
+("the dog resolves the search, taking the discovery away from Levin"; "carrying the disguised
+object for 14 pages is a trick/puzzle, explicitly forbidden for a 2-year-old"; "Julian speaks on
+page 8 but his arrival is completely omitted") where before it praised the same arc and deducted
+on missing blockers instead. The literal old-spec quotes ("2+9+4+2", "exactly 3", "secondary
+moments") appear in zero new notes and appeared in four old ones. **Still open:** the rubric
+dims `attempts`, `lost`, `blockers` and `change` continue to be deducted on the simple bands
+even with the band file in the brief (E: blockers 1/1/5, change 1/1/2) — the brief tells the
+judge the band forbids them, but `prompts/story-arc-judge.txt` still asks for them, and one
+judge explicitly cited "the rubric explicitly penalises". Fixing that is a rubric/prompt change
+and needs the owner. What the brief fix DID buy is the retell: see below.
+**The retell no longer damages the book (config E, the decisive test):** re-running the arc
+retell on the corrected panel, the marmots stay friendly ("they show him a heap of shiny
+pebbles and not one scale"; they whistle at their burrow at the end) and the theft, the anger
+beat, the deadline and the low point the damaged retell had written in are all absent; Levin
+finds the scale himself out of his own basket. One place per page and the verbatim repeated
+call survive across all search pages.
+**Touched:** `server/lib/storyScorecard.js` (`buildBriefContext` options, `flattenNotes`),
+`server/lib/testlab.js` (arc judge call site, notes flattening).
+**Status:** ✅ active (staging, not pushed)
+
+## 2026-09-07 — The arc RULES OF THE TELLING are band-conditional, not one fixed block
+
+**Context:** Seven arc renders across ages 1/2/3/4/5/8 (this session) showed the arc prompt
+layer contradicting itself in four places. `# RULES OF THE TELLING` was byte-identical in
+`prompts/arc-create.txt` and `arc-retell.txt` for every band and demanded "near the end the
+goal looks lost before it is won", "each challenge... harder because the last was not clean",
+an unyielding blocker, and a rival thread — against `prompts/age-band-routine.txt` /
+`age-band-quest.txt`, which say "no danger, no villain, nobody unkind, nothing lost for good".
+The measured cost was already visible downstream: an age-2 arc that obeyed its own band was
+then scored against a rubric demanding a villain and a low point. Three further collisions in
+the same prompt: the `routine` STORY SHAPE said "N pages, N distinct events" while `# BUDGETS`
+said "at most 1 event"; the reader line was hardcoded to "a 3-5 year old" for every 1st-grade
+book including ages 1 and 2; and the invented-figure rule ("one line in the arc stating why
+the story cannot work without them") produced a justification written INSIDE a numbered story
+sentence — production text a child would hear. Separately, 4 of the 7 arcs split the cast onto
+separate paths, including the age-3 book whose own budget says "one thread" — the single most
+repeated structural fault across all bands.
+
+**Decision:** the block is emitted by `buildTellingRulesSection(inputData, { landmarks })` and
+interpolated as `{TELLING_RULES}`; the templates are not forked. For `SIMPLE_BANDS`
+(`routine`/`quest`/`tries`) the escalation/low-point line and the unyielding-blocker line are
+REPLACED by their simple-band equivalents (repetition shape; nothing stands in the way on
+purpose) rather than deleted, and the rival-thread line is dropped. A no-split line is added
+for every band except `standard` at the standard/advanced reading levels, where the STORY
+SHAPE legitimately allows a second thread. The `routine` shape line no longer says "events"
+(page-moments, not plot events — the event budget is unchanged). The reader-age phrase is
+derived from the band via `READER_AGE_BY_BAND` (routine → 1-2, quest → 2-3, rest → 3-5) and
+still appears only at 1st-grade. The invented-figure justification must sit on its own line
+before the numbered arc, enforced in `buildArcBudgetSection` and in both CRITIQUE sentences.
+
+**Rationale:** a prompt that demands what another section of the same prompt forbids is one
+tweak away from the model resolving it the wrong way; both test runs happened to resolve it
+correctly, which is luck, not a guarantee. Replacing rather than deleting keeps a shape for
+the simple bands — a board book still needs one, just not escalation. Band-conditional text is
+computed in code and interpolated so the two templates never diverge.
+
+**Effect (verified, rendered matrix ages 1/2/3/4/5/8 x 1st-grade + age 8 standard/advanced):**
+ages 1-3 get the repetition/friendly-obstacle lines and no rival thread; ages 4+ keep the
+originals; the reader phrase tracks the band; no STORY SHAPE/BUDGETS event contradiction at any
+age; the emitted rules block at age 8 standard and advanced is byte-identical to before except
+the no-split line, which is correctly absent there.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildTellingRulesSection`, `READER_AGE_BY_BAND`,
+`buildArcBudgetSection`, `buildStoryShapeSection` routine branch, both arc prompt builders,
+exports), `prompts/arc-create.txt`, `prompts/arc-retell.txt`.
+**Status:** ✅ active (staging, not pushed)
+
+## 2026-09-07 — The arc-judge rubric is age-band aware
+
+**Context:** three of the 14 arc dimensions demand exactly what the simple age bands forbid.
+`lost` wants "a point before the end where the goal looks finished"; `attempts` wants challenges
+"in rising order; each fails or costs for a different reason and leaves the cast worse off";
+`blockers` wants "whoever stands in the way wants something of their own". `age-band-quest.txt`
+and `age-band-routine.txt` say the opposite — "No danger, no villain, nobody unkind, nothing lost
+for good" — and `age-band-tries.txt` is the third member of `SIMPLE_BANDS`. Since `c903b6473`
+`buildBriefContext(d, { arc: true })` hands the judge the age-band file and the `# BUDGETS`
+block, so the judge can SEE the band; it deducted anyway, because the rubric still demanded the
+forbidden thing. Measured on the re-judge run, config E (age 2, `quest`): `blockers` 1/1/5,
+`change` 1/1/2, `attempts` 2/2/4. `claude-sonnet` named the conflict outright — *"this is the
+same failure repeated 14 times, which the rubric explicitly penalises."* `gemini-3.1-pro`
+partially self-corrected — *"blockers: 5 — appropriately follows the Age 2 rule of friendly
+encounters without real blockers"* — proving the judge WILL adapt when it reasons about the
+band, but nothing in the rubric told it to. Consequence: a correctly-executed toddler book
+cannot score above roughly 5/10, and those scores feed the repair as panel input.
+
+**Decision:** the rubric now states that the BRIEF's age-band section, where present, governs
+which dimensions apply, and that a dimension the band forbids is scored on whether the arc does
+the RIGHT thing for that band rather than deducted for the absence of the forbidden thing. Four
+dimensions are named with what they measure instead: `attempts` → whether the repetition holds
+its shape (same move, band's count, a new place/thing/way each turn; escalation not wanted);
+`lost` → whether the book correctly stays clear of a low point; `blockers` → whether what holds
+the character up is a thing, a size, a place or the weather rather than someone unwilling;
+`change` → where the band gives no arc, whether the character stays recognisably themselves and
+the book closes as the band says. The anchor paragraph's deduction list is scoped the same way.
+Where the BRIEF carries no age-band section the whole rubric applies unchanged and hard — an
+age 5 `journey` book, and anything at 6+, is judged exactly as before. The strict-JSON contract
+is untouched: all 14 keys, same order, every one still a 1-10 integer; no nulls, no N/A, no
+variable key set, because `ARC_RUBRIC` validation in `testlab.js:7345` requires all 14 finite
+and in range and treats a missing key as an unusable draw.
+
+**Rationale:** this completes the `c903b6473` fix. That change let the judge SEE the band; this
+one tells it what to DO with it. Fixing it in the rubric rather than in code keeps the
+classification in the prompt where it belongs, and keeps a single scale — redefining what a
+dimension measures for a band preserves the 1-10 contract, whereas exempting a dimension would
+break the fixed key set the panel averages over.
+
+**Touched:** `prompts/story-arc-judge.txt`.
+**Status:** ✅ active (staging, not pushed)
+
+## 2026-09-07 — The baked cover title states a trim-safe margin as a fraction of canvas width
+
+**Context:** `coverTitleMode` is `baked` everywhere (2026-09-06), so the image
+model — not the app — sets the front-cover type. Nothing told it where the
+edges are. Two staging trials painted ink into the last pixel column of an
+864px-wide cover: `job_1788763045123_z8so79ngb` "Emmas Blumengeheimnis" (ink
+19→863, right margin **0px**, final `s` sliced in half) and
+`job_1788802404497_i1mm4yn6h` "Emma und das vergessene Geschenk" (ink 47→861,
+right margin **2px**, final `k` missing its lower leg). `server/lib/pdf.js`
+adds a 3mm bleed per side for Gelato and the printer trims it — 3/148 of the
+cover width, ~18px on that raster — so both books lose their final letter
+physically. The margins were asymmetric (19/47px left vs 0/2px right): the
+model sets the line and runs out of room, it is not centring tight on both
+sides. The app-side typography path was never affected — `coverTypography.js`
+places from a real font at `MARGIN = 0.045` and `BRAND_INSET = 0.08`.
+
+**Decision:** `bakedTitleLine()` in `server/lib/promptBuilders.js` gains two
+sentences at the end of the existing instruction: every letter, accent and
+descender stays at least **8% of the canvas width** clear of the left and
+right edges, and a long title **breaks onto more lines** rather than reaching
+that margin. The margin is a FRACTION, never pixels — the raster differs by
+book format. The addition stays inside the TITLE block at the absolute end of
+the prompt; that tail placement is what `shrinkPromptForModel` preserves
+verbatim, and a title moved earlier was silently deleted on an over-cap prompt
+(`job_1788551692337_bc479p945` shipped a titleless cover).
+
+**Rationale:** Prompt-side first, per the settled rule that a stated
+constraint is tried before code. Measured on four renders through the real
+cover path (`iterateCover`, `grok-imagine-2`, `skipTypography`), two of them a
+deliberately long German title:
+
+| cover | before | after |
+|---|---|---|
+| Emmas Blumengeheimnis | L 19px / R **0px** | L 76px / R 55px, title on 2 lines |
+| Emma und das vergessene Geschenk | L 47px / R **2px** | L 34px / R 129px, 3 lines |
+| "Emma und das grosse Blumengeheimnis vom Uetliberg" (49 chars) | — | L 87px / R 35px, 3 lines |
+| "Emmas allergroesstes Blumengeheimnis am Grossmuenster" (52 chars) | — | title ends x≈750, R ≈114px, 3 lines |
+
+Every glyph clears the 18px trim on all four. The model reliably takes the
+extra line rather than the extra width, which is the behaviour the second
+sentence buys. Caveat on measurement: the band-wide dark-ink box is confounded
+by scene ink on covers whose foliage reaches the top corners — the
+Grossmuenster cover measures R=0 automatically while a crop shows the last
+letter 114px inside the frame. A future geometric gate must measure the
+letterforms, not the band.
+
+**Touched:** `server/lib/promptBuilders.js` (`bakedTitleLine`),
+`tests/unit/cover-title-trim-margin.test.ts`.
+**Status:** ✅ active
+
+### Blind inventory judge: Qwen3-VL on staging, with box normalisation and a Gemini fallback (2026-09-07)
+**Context:** the animal-completeness check is answered correctly only by judges that do not normalise generative defects. Measured on the headless dragon (Lab set 25): gemini-2.5-flash, 2.5-pro, 3.1-pro, grok-4.6, minimax-m3 and kimi-k2.6 said "whole"; gemini-3.7-flash (1.8-3.5x the price) and qwen3-vl-32b ($0.104/$0.416 per 1M, ~$0.0007/call, a quarter of 2.5 Flash) said "incomplete"; qwen3.6-plus flagged an intact dragon too. On the 20-crowded-pages set (experiments 1053 vs 1054) Qwen matched Gemini on figure counts (107 vs 87 over 20 pages), hair, clothing and ages, and additionally flagged two see-through ghost figures Gemini did not list (verified on the pixels). Its boxes came back on mixed 0-1 / 0-1000 scales (73 of 107 body, 55 of 72 face); per-element normalisation made all 179 well formed and 100 of 107 centres landed inside Gemini's box for the same figure. 3 of 20 pages stalled on the single OpenRouter upstream.
+**Decision:** new runtime key `inventoryModel` — `qwen3-vl` on staging and local, `gemini-2.5-flash` in production until staging stories confirm compliance scores hold (owner). `runVisualInventory` reads it (a Lab quality-model override still wins), normalises every provider's boxes through `server/lib/inventoryBoxes.js`, and falls back to gemini-2.5-flash when the OpenRouter call throws, times out (120s, one retry) or returns non-2xx. The owner's first proposal — a separate Gemini call for boxes — was dropped: the real boxes come from GroundingDINO at $0, the inventory box is only a pairing estimate, and a second model's figure labels cannot be joined to Qwen's.
+**Cost:** ~$0.0011/call with the fallback rate observed vs $0.0029 today (~$0.05 vs $0.12 per 43-call story). The gain is sight, not cents.
+**Touched:** server/config/runtime.js, server/config/models.js, server/lib/evalPipeline.js, server/lib/images.js (timeout/retry), server/lib/inventoryBoxes.js (new), tests/unit/inventory-boxes.test.ts (7).
+**Status:** ✅ active on staging; production pending owner promotion.
+**Follow-up the same evening (Lab 1055):** with Qwen live, the inventory returned `complete: false` for the headless animal and the compliance judge filed nothing — the rule lived only in the STEP 4 severity list, which the judge reads after it has chosen its findings. It is now a STEP 1b scene-check step (`prompts/image-prompt-compliance.txt`), together with "animals live in `objects`, never `figures`": the same run filed a false `unverified_absence` because the judge looked for the animal among the figures. Also observed on one control page: Qwen described two short-haired children as shoulder-length, which the judge turned into a MAJOR identity finding (page 40 → 0). One page; watch hair-length findings on staging stories before promoting.
+**Closed 2026-09-08 (owner: stop here, keep Qwen on staging, record it).** Five runs of the same headless-animal page through the Qwen inventory at temperature 0 (experiments 1049, 1055, 1057 → `complete: false`; 1058, 1059 → `complete: true`): 3 catches in 5, the OpenRouter upstream is not deterministic. When the flag was false (1057) the compliance judge (qwen3-max) filed nothing despite the STEP 1b rule; in 1058 it filed the animal as `missing_character` against the rule that says animals live in `objects`. The judge prompt is ~30k characters and both judges treat a rule a third of the way in as noise. The deterministic alternative — code turning the typed `complete: false` field into a `figure_completeness` finding — was offered and declined for now. Net: Qwen stays the staging inventory for its verified gains (ghost figures on the crowded set, ~4x cheaper, boxes normalised, Gemini fallback); the animal-completeness check remains documentation of intent and ships no finding in either environment. The first staging story evaluated under Qwen (job_1788816451791, 18 pages) completed with no fallback logged and scores in the normal range. `quality_eval` Lab results now carry `complianceRaw` so the next judge investigation can see what the judge wrote.
+
+**Correction 2026-09-08 (bug `inventory-model-shadowed-by-default-override`).** The sentence above about job_1788816451791 was wrong: Qwen never ran on that story, nor on job_1788820396445. Every stored stage-1 call on both stories carries 1990 input tokens — the gemini-2.5-flash signature (Lab 1054/1060/1061), where qwen3-vl measures 2692 (Lab 1049/1053) — and the stored inventories are word-for-word the 2.5 Flash Lab output. `processUnifiedStoryJob` handed the resolved default (`modelOverrides.qualityModel = MODEL_DEFAULTS.qualityEval`) to the repair pipeline as `qualityModelOverride`, and `runVisualInventory` lets any override beat `inventoryModel`; only the Lab `quality_eval` stage, which passes no override, ever reached Qwen (experiment 1056). Fix: the pipeline passes only a dev-mode user override; the quality judge itself is unchanged because a null override resolves to the same default. "No fallback logged" was true and meaningless — there was nothing to fall back from. The staging validation of Qwen on real stories therefore starts with the next story generated after this fix, not with these two.
+
+**Qwen vs 2.5 Flash on those two stories, measured the same day (Lab sets 28/29; experiments 1060/1061 = 2.5 Flash, 1062/1063 = qwen3-vl, unified template, temperature 0; the 2.5 Flash Lab output is byte-identical to what the stories stored).** Over 34 pages Qwen matched Gemini on figure count on every page it inventoried, and on clothing, pose and interactions. Differences, checked on the pixels: (1) Qwen listed story props Gemini dropped — the dragon-scale chip on p2, a paper map on the climbing page, a black-sailed ship named as such, a small bronze object by the wall; the p11 scale came back as "a light blue shovel", still an object the judge could match. (2) Qwen flagged `complete: false` on p3's dragon whose body is inside the cave: a false positive against the template's own "occlusion by scenery is not incomplete" line — the same normalisation problem in reverse. (3) Lettering: Qwen read "MONT BÉNÉDICTE 1800 m, readable" off a plaque that is squiggles (p12); Gemini read Hebrew off a crossbar of squiggles on p17. Both invent text; neither is safe as a lettering witness. (4) Hair length: Qwen says "shoulder-length" for hair Gemini calls "long" (Fiona, past the shoulders on every page) and for a toddler's short curls (p8, p13) — the bias seen on the 20-page set again, 4 pages here; it did not create findings because the judge compares against the prompt's own wording. (5) Age: Qwen reads the Fiona character 5-10 years older than Gemini (35-45 vs 25-40); on the pixels she reads about 40, so both would flag the expected 25. Two pages (Drachenschuppe p15, Fiona p11) had no stored inventory at all under Gemini; Qwen inventoried both. Net: nothing Gemini caught was missed by Qwen; Qwen adds prop recall and drops boxes into a usable form, at the cost of one occlusion false positive and the hair-length drift. Production stays on 2.5 Flash; the compliance-score check on staging starts with the first story evaluated after 86ea3d9ab.
+
+### The quality judge (P2) can run an OpenRouter vision model; the Lab quality_eval stage gets a `model` knob (2026-09-08)
+**Context:** owner asked whether Qwen3-VL is as good as gemini-2.5-flash as the PAGE QUALITY judge — the largest judge cost per story ($0.37-0.57 for 20-30 calls with reference sheets, versus ~$0.10-0.14 at Qwen prices). Nothing could measure it: `evaluateImageQuality`'s `callQualityAPI` routed only Gemini and xAI, and the Lab `quality_eval` stage had a compliance-model knob but no knob for the judge itself.
+**Decision:** `callQualityAPI` routes `provider: 'openrouter'` models through `callOpenRouterVisionAPI` (same Gemini-shaped response as the Grok path); the parsed `figures` and `matches` boxes go through `normaliseInventoryBoxes` like the inventory's. `runQualityEvalStage` passes `params.model` as the quality-model override and returns `modelId` + per-stage `usage`, so what ran is readable from the result. No production default changes; no fallback on the P2 OpenRouter path (a failed call is a skipped eval, as for any API error). Measurement: Lab sets on the two staging stories (job_1788816451791, job_1788820396445), one arm per judge, compared page by page against the pixels — result recorded below when in.
+**Touched:** `server/lib/evalPipeline.js`, `server/lib/testlab.js`.
+
+**Result (Lab sets 30/31; experiments 1065/1067 = gemini-2.5-flash control, 1066/1068 = qwen3-vl; 34 pages, one run each, 2026-09-08).** Verdict: ❌ NOT a drop-in replacement for the page quality judge; production stays on 2.5 Flash. Ten divergent pages checked on the pixels. Gemini's errors are false CRITICALs: p3 "dungaree shorts rendered as overalls" (they are dungaree shorts), Fiona p15 "Rossa missing, an unrequested red-haired pirate present" (that is Rossa), p13 "ibex absent" (present), "chest lacks iron handles" (has them). Qwen's errors are leniency and drift: it missed the rendered-too-young ages on p2 (5-year-old drawn as 2) that Gemini flagged, missed the main-action defect on Fiona p5 (single barrel, no stack — Gemini CRITICAL, correct), invented stubble on a clean-shaven face, called a sailcloth "a rolled map" (false CRITICAL, Fiona p2), and its hair-length drift became a real MAJOR on p8 (ear-length curls filed as shoulder-length, 100 → 40). Qwen's genuine wins: the phantom lizard in the basin and the missing plate-sized scale on p11 (two true CRITICALs Gemini scored 80 past) and the navy sash on Fiona p5. Finding counts 104 (Gemini) vs 71 (Qwen). Noise floor, measured in the same runs: the SEMANTIC judge — same model, same image, temperature 0 — moved 40-50 points between the two arms on three pages (p2 60/100, p17 50/10, Fiona p2 100/70), and the Gemini control differed from the stored in-pipeline Gemini score by up to 65 points (p3 65 → 0, Fiona p15 100 → 0). Single-run page scores are inside that noise; only finding-level truth was compared. Not measured: Qwen's P2 cost (the stage did not return the quality-call tokens; it does now). `runQualityEvalStage` returns `quality_input_tokens`/`quality_output_tokens` alongside the stage usage. Caveat on verification: the Lab's `logLines` are a process-wide buffer, so with four experiments running concurrently the lines are interleaved and cannot attribute a call to an arm; the Qwen arm is known to have run Qwen because the override is the direct `modelId` of `callQualityAPI` with no silent fallback (an OpenRouter error would have failed the page, and no page failed), and its stage-1 signature was 2692 tokens on every page.
+
+## 2026-09-08 — The page instant outranks a contradicting object state; one resolver picks a page's state for clause and cell
+
+**Context (extends "An object the story alters is ONE Visual Bible entry with `states[]`", 2026-09-06 — not a reversal).**
+Staging `job_1788816451791_25b31uqlp`, page 11. Plan line: *"Kiaan holds the small chip against the big scale
+resting in the dry stone trough, the broken edges fitting together"*. The stored bible gave the chip
+(`ART001`) state `.2` "resting in an open upturned palm, fully visible from above" for pages [6,11] and the
+scale (`ART010`) state `.1` "lying flat and still inside the dry stone trough, **no hands touching it**" for
+pages [11-14]. No state existed for the instant the beat names. The p11 brief cited both; the code took each
+delta and appended it verbatim to the REQUIRED OBJECTS line — precedence at the time was
+`state: objectStateFor(artifact, handle) || objectStateForPage(artifact, pageNumber)` then
+`stateNote = " — " + trimStateClause(state.delta)` (`promptBuilders.buildImagePrompt`), with nothing comparing
+a delta to the page. The render obeyed the states across two attempts (chip held up in a palm, edges never
+met); only a hand-edited brief citing neither state fixed it.
+Second defect on the same path: the cited handle was trusted first at BOTH sites (prompt clause and
+`elementRefCell`), silently. p2 cited `ART001.2` against a table declaring `.1`; p12 cited `ART010.2`
+(on the horns, pages 16-17) against a table declaring `.1`. Measured against the plan lines, **neither
+channel is reliably right**: p2's plan line *"holds up a warm blue chip in his open palm"* — the BRIEF was
+right and the table wrong; p12's *"Gian planted unmoving in front of the scale"* — the TABLE was right and
+the brief wrong. What is reliable is the page's own instant.
+Root of the p11 table: `story-bible-from-beats.txt` asked for a delta per state but never said the delta is
+read off THAT page's plan line, so the model filed p11 under a neighbouring page's untouched look.
+
+**Decision:**
+1. **Prompt (the root).** `story-bible-from-beats.txt`: a state's `delta` is read off THAT page's plan line,
+   never copied from a neighbouring page; a page whose instant has the object in someone's hands, or pressed
+   against or fitted to another object, gets a state that says so and never a resting/untouched look. Each
+   state carries a structured **`held`** flag (true = hands on it in that look, false = nothing touches it).
+2. **Schema.** `states[].held: boolean|null`, minted in `normaliseObjectStates` (the one live minter, via
+   `extractVisualBible`). `null` on every bible authored before the field, never a guess. Readers swept:
+   `normaliseObjectStates` (writes it), `resolveObjectState` (reads it), `pageHoldsObject`; the reference-sheet
+   cell builder (`expandElementStateCells`) and the Art Director's `States:` line read only `delta`/`name` and
+   are unchanged; no client code reads `states[]`.
+3. **One resolver.** `visualBible.resolveObjectState(entry, handle, pageNumber, sceneMetadata)` is the ONE
+   place a page's state is decided, used by both the REQUIRED OBJECTS clause and `elementRefCell`, so the
+   reference picture and the prompt text can never name different states. Order: cited and declared agree
+   (or only one exists) → that state; they disagree → the one whose `held` matches the page's declared
+   contact, else the bible's page table, with a WARN naming both ids and the reason; neither → default.
+   The page's contact comes from `pageHoldsObject`: the brief's structured `interactions[]` rows with
+   `hands: true` whose `object` names the entry by id (any facet) or name — never from prose. Rows exist but
+   none names the object → false; no rows, or the object named without a hands verdict → null.
+4. **The instant outranks the state.** A chosen state whose `held` disagrees with the page's contact is
+   `contradicted`: `buildImagePrompt` drops its delta from the line with
+   `⚠️ [VB-STATE] Page N: ART###.n ("name") says the object is untouched|in hand but the brief's
+   interactions put hands on it|declare no hands on it — state clause dropped, the page's instant wins.
+   Delta was: "…"`. The object stays listed; the reference cell is kept (identity is right either way).
+5. **Cited-vs-table precedence changes** from "cited → table → default" (2026-09-07 entry above) to
+   "agreement, else the contact-consistent one, else the TABLE". The 2026-09-07 rationale — the brief usually
+   writes the bare id — still holds; this only decides the disagreement case, which that entry never measured.
+
+**Verified.** Static replay of the stored p2/p11/p12 briefs through the current builders: with the stored
+bible (no `held`) p2 `ART001.2 → ART001.1` and p12 `ART010.2 → ART010.1` both WARN and follow the table;
+p11 is unchanged (see limit below). With `held` flags as the template now emits them, p2 resolves to the
+cited `.2` ("the brief's interactions match the cited state"). ONE paid bible-from-beats call from the 18
+stored plan lines (claude-sonnet-4-6, the model the run used; 7.5k in / 6.8k out, ≈$0.13, no output cap)
+produced: `ART001.1 resting — lying flat on an open palm, untouched by any other hand — held:true — [2,3,5,6]`;
+**`ART001.2 matched — pressed edge-to-edge against ART002, broken edges aligned — held:true — [11]`**;
+`ART002.1 in trough — lying flat inside the stone trough, untouched — held:false — [11-15]`; `ART002.2 lifted
+free — raised out of the trough by Gian's horns — held:false — [16,17]`. The p11 instant now has its own
+state. Unit: `tests/unit/vb-object-states.test.ts` 59/59 (10 new), whole suite 845/845.
+
+**Limit, recorded rather than papered over.** The AD's `interactions[]` are character→object rows only. So
+"two objects meeting" (p11's SCALE, which no row names — its untouched state passes the structural check)
+and "open palm vs pressed" are NOT detectable in code without reading prose, which is banned. For those the
+prompt-side derivation rule is the guard. An object→object interaction row would live in
+`scene-expansion-all.txt`, owned by a parallel session today — on `tasks/BACKLOG.md` for the owner.
+On a stored bible without `held`, a cited-vs-table disagreement now follows the table where it used to
+follow the brief; the two measured cases split 1-1, so this is a coin the owner may re-flip with evidence.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `server/lib/visualBible.js` (`normaliseObjectStates`,
+`pageHoldsObject`, `resolveObjectState`, `elementRefCell`, `getElementReferenceImagesForPage`),
+`server/lib/promptBuilders.js` (REQUIRED OBJECTS state selection), `tests/unit/vb-object-states.test.ts`,
+`tasks/bugs.json` (`vb-object-state-contradicts-page-instant`, fixed), `tasks/BACKLOG.md`.
+**Status:** ✅ active on `staging` (not pushed at time of writing).
+
+---
+
+## 2026-09-08 — Visual Bible page assignment is trimmed to the element budget at birth; LOCATIONS ARE NOT ELEMENTS (supersedes "Three Visual Bible elements per page, enforced at the Art Director", 2026-09-06)
+
+**Context:** `prompts/story-bible-from-beats.txt:68` says `pages` is earned — only the pages whose
+plan line contains the element. The model does not obey it and nothing checked it. Measured on staging
+`job_1788816451791_25b31uqlp` (18 pages): the stored bible gave `ART013` (a worn backpack) 11 pages
+and `LOC007` (the invented summit) pages 11-17; **10 of 18 pages carried more than 3 elements at
+birth**. A fresh re-derivation with the same template put the backpack on 15 pages while **no plan line
+named it**, with 12/18 pages over and p13 at 7. Downstream the Art Director reported
+`vb_element_overflow` on 11 pages, the scene review rewrote twice and shipped `briefUnfixed: 11` —
+`briefFixable:false`, because a brief cannot withdraw a bible placement (the 2026-09-08 rewrite-until-zero
+entry recorded exactly this gap and left it as the owner's call). Reader sweep: the parser keeps BOTH
+`pages` and `appearsInPages` on every entry, and six readers prefer `pages` (`promptBuilders.js:626,3055`,
+`sceneMetadata.js:1609`, `prompts.js:526`, `visualBible.js:1392`, `entityConsistency.js:1498`) — a trim
+that touched only `appearsInPages` would have been invisible to them.
+
+**Decision, part 1 — the trim.** `vbElementBudget.trimVbAssignments(visualBible, planPages, {castNames})`
+runs once, right after `extractVisualBible()` in `beatsPipeline.js` (beside the peer-age clamp), before
+the Art Director sees the bible. Per page, counting exactly what `rankPageElements` counts: when more than
+`VB_ELEMENT_BUDGET` entries claim the page, entries whose name/`properName` tokens occur in that page's
+PLAN LINE keep it, then the rest in `rankPageElements` order; every loser loses the page from
+`appearsInPages` AND `pages`, one WARN per (element, page). Token matching is lexical on the plan line
+only — words of four letters or more, parentheticals dropped, a short function-word list dropped, and
+for anything that is not itself a person or creature the cast's names are dropped too ("<owner>'s
+satchel" is named by "satchel", never by the owner on every page). Never prose classification, never the
+story text. **State contract kept:** a stripped page leaves the entry's `states[].pages` too; a state
+left with no page is dropped with a WARN and the survivors re-minted through `normaliseObjectStates`
+(dense dotted ids — nothing has cited a handle yet at this point). Outcome is visible on the story record:
+`beatsReviewReport.vbAssignmentTrim = {pagesOverBudgetBefore, pagesOverBudgetAfter, stripped:[{id,page,reason}], droppedStates}`
+plus a `beats_vb_assignment_trimmed` generation-log warning. Never fails the run. The prompt rule at
+line 68 is strengthened in place (physical presence is not earning; `{VB_ELEMENT_BUDGET}` now filled
+from the constant) — one chokepoint, no second copy.
+
+**Decision, part 2 — the reversal.** Owner ruling 2026-09-08, via `AskUserQuestion` this session,
+verbatim: **"Do not count it as it is the empty scene not an artifact."** An invented location is what
+the empty-scene plate is built from — the backdrop the cast is composited into, not a prop competing for a
+reference slot; counting it spent it twice. So **locations — real or invented — do not count against the
+per-page element budget**, extending the `isRealLandmark` exemption to the whole `locations` collection.
+This supersedes the 2026-09-06 wording ("never more than 3 VB elements per scene", which counted invented
+locations) — the number 3 stands; what it counts changes: secondary characters, animals, artifacts and
+vehicles. Evidence for the reversal: the measurements above (10/18 and 12/18 pages over at birth, the
+invented `LOC007` holding a slot on pages 11-17, `briefUnfixed: 11` with `briefFixable:false`).
+Sites: `vbElementBudget.rankPageElements` (the `locations` collection removed from `ELEMENT_COLLECTIONS`);
+`visualBible.getElementReferenceImagesForPage` now returns up to `maxRefs` non-location cells PLUS at
+most one location cell, LAST — 3 + 1 = 4 = `VB_SLOT_MAX_ELEMENTS`, so Grok's cap can never be exceeded on
+the page path and the packer's own priority sort (location = 5) keeps it last there too; both
+scene-expansion templates say "a LOC does not, real or invented". Plate construction and routing are
+unchanged (with a plate set, `referenceSheets.js` already dropped location cells from the composite refs).
+A page claiming two invented locations rides the first and WARNs.
+
+**Rationale:** The 2026-09-06 entry had two enforcers — the brief check and the page-gen selection — and
+neither could touch the half that actually overflowed: the bible's own placement. Enforcing at assignment
+closes that half where it is born, with the plan line as the deterministic authority the template already
+named. Locations were the largest single source of false overflow (one on nearly every page by
+construction) and are rendered as the plate anyway.
+
+**Replay (static, stored data, $0).** Stored dragon bible: 9 pages over → 0 (10 → 0 under the old
+count); 11 (element, page) claims stripped; p11 keeps the chip, the large scale and the stone trough (all
+three named in its plan line) and drops the backpack and the summit panel; no state emptied. Fresh
+`bible_response.txt`: 10 → 0 (12 → 0 old count); 19 stripped; the backpack falls from 15 pages to the 7
+where the page had room; three states emptied and dropped (`ART013.1/.2`, `ART003.2`), survivors
+re-minted. Note honestly: p11 still has five non-location claimants (chip, scale, trough, backpack, panel),
+so the location exemption alone does not make it fit — the plan-line trim is what keeps the right three.
+
+**Verified:** `tests/unit/vb-assignment-trim.test.ts` (11 new), `vb-element-budget.test.ts` and
+`recurring-creature-slot.test.ts` updated to the new count; whole suite green; `check-settled.js` OK.
+
+**Touched:** `server/lib/vbElementBudget.js` (`trimVbAssignments`, `ELEMENT_COLLECTIONS`, header),
+`server/lib/visualBible.js` (`getElementReferenceImagesForPage` tail), `server/lib/beatsPipeline.js`
+(post-check + `vbAssignmentTrim`), `server/lib/promptBuilders.js` (`{VB_ELEMENT_BUDGET}` in the bible
+prompt), `prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `tests/unit/vb-assignment-trim.test.ts`,
+`tests/unit/vb-element-budget.test.ts`, `tests/unit/recurring-creature-slot.test.ts`, `docs/SETTLED.md`,
+`tasks/bugs.json` (`vb-pages-not-earned-by-plan-line`), `tasks/BACKLOG.md`.
+**Status:** ✅ active on `staging` (not pushed at time of writing).
+
+## 2026-09-08 — Art Director second pass: the plate never carries the action's effect; per-clause facing and plate-effect become REVIEWER findings; the plan line is the authority a rewrite may not contradict
+
+**Context.** Commit `115333de6` added two Art Director rules as prompt prose: the plate is "the world before the
+action, no effects" (R2) and each character's facing is written inside their own clause (rule 8c, R3). Measured on a
+beats+AD rerun of two stored stories (`job_1788816451791_25b31uqlp` dragon, `job_1788820396445_9erw6xc01` pirate,
+same models as stored, no output cap), **neither bound**: the dragon water page's plate read "A clear jet of water
+shoots straight out from a narrow vertical crack" pre-review AND final, and the pirate back-view page declared
+`back view` on all five `characters[]` while the prose stated facing only collectively ("all five are seen from
+behind"). R2 failed because rule 1 of the same template said "every physical fact the plan line states … is in the
+brief" — the plan line names the water, so that clause pulled the EFFECT into the plate; two rules competed and the
+wrong one won. The scene review's targeted second round also REGRESSED round 1: `interaction_multiple_actions`
+3 → 0 after round 1 → 3 after round 2, and on the trough page round 2 moved the scale onto the grass while the plan
+line said "the scale stays in the trough".
+
+**Decision.**
+1. *Rule conflict resolved at the source* (`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`; ONE
+   sentence used in both rule 1 and the plate rule so they cannot compete): "The page's action and its effect — a jet
+   of water, a splash, a break, smoke, a fall — belong with the characters, in the prose and `sceneIntent`; the
+   `emptyScenePrompt` is the world the instant before and never carries them." "Never call a space empty" is scoped
+   to a space the plan line puts something in.
+2. *R2 and R3 are reviewer-checked findings now, not prose the Art Director is trusted to obey*
+   (`prompts/scene-review.txt`): `[plate_contains_effect]` (10a) and `[facing_not_per_character]` (8bb). Classification
+   stays with the reviewer model (SETTLED: classification is the prompt's job). Stated plainly because the brief
+   assumed otherwise: scene-review tags are NOT parsed into typed findings anywhere in code — only the `FAULTED PAGES:`
+   line is read (`beatsPipeline.js`), and the round-2 subset plus the rewrite-until-zero verdict are driven solely by
+   the deterministic `sceneBriefCheck` types; `mergeAuditFindings` belongs to the lector (`textRefine.js`). So the two
+   new types are enforced like the other 25 tags: round 1 on every page, round 2 on the pages the code check re-sent.
+   Whether reviewer tags should also drive the round-2 subset is an open owner decision (BACKLOG); no parser was built.
+3. *Plan line as authority, unconditional* (item C): the task preamble of `scene-review.txt` says a rewrite never
+   moves an object the plan line places, never drops a character it puts in frame, never adds an action it does not
+   name — when a fix would need that, simplify inside the plan line; check 4's rewrite REMOVES the action the plan
+   line does not name, never adds one. `buildSceneReviewPrompt` renders plan lines verbatim (the 300-char cut lost the
+   "what is true after" segment on long lines) and round 2 passes only the beats of the pages under review. The
+   "rule-block carry" hypothesised for round 2 does not exist as a mechanism: round 2 is built from the SAME template
+   by the SAME builder, so it already renders the identical check block — there was nothing to carry.
+4. *Bug* (`tasks/bugs.json` `round2-recheck-drops-textzone-findings`): the round-2 re-check called `checkBriefs`
+   without `{ textZoneRules }` and never excluded page 0; fixed to match the two earlier calls.
+
+**Measured after the change (same harness, everything in incl. `a7c413022`/`a8e7c009c`; USD 0.55 + 0.73 = 1.28).**
+- Dragon (18 pages; the planner re-divided, so the water page is now p16 and the trough page p12): p16 plate "narrow
+  vertical fissure … completely dry and tightly sealed with red gravel … untouched stone" — the jet lives only in
+  `sceneIntent` (R2 absent). p12/p13 plate "a large teardrop-shaped blue-grey object rests inside a dry stone trough"
+  AFTER a round-2 rewrite of both pages — the plan-line authority held. Code-check counts before → after r1 → after
+  r2: `interaction_multiple_actions` 5 → 0 → **1** (p1: round 1 merged "riding bicycles", round 2 split it back into
+  "riding bicycle" / "riding balance bike"); `vb_element_overflow` 5 → 5 → 5; `interaction_object_shared_hands`
+  2 → 1 → 0. `briefUnfixed` 6 (previous rerun: 15). Reviewer tags: `plate_contains_effect` none/none;
+  `facing_not_per_character` p18 in r1 (fixed for two of four figures — Max and Kiaan still have no facing clause),
+  none in r2; `interaction_multiple_actions` named on 8 pages in r1, none in r2. `vbAssignmentTrim` 9 → 0 pages
+  over budget, 11 claims stripped, 1 emptied state dropped.
+- Pirate (16 pages): p8 (the five-figure back-view page) — each clause now carries "seen from behind" (R3 absent,
+  fixed by the reviewer in round 1 on its own `facing_not_per_character` finding); p9 and p13 clean. Counts:
+  `interaction_multiple_actions` 1 → 0 → 0; `vb_element_overflow` 5 → 5 → 5; `cast_unlisted` 3 → 0 → 0;
+  `interaction_object_shared_hands` 1 → 0 → 0. `briefUnfixed` 5 (previous rerun: 13). Reviewer tags r1:
+  `plate_contains_effect` p1 (an "empty" sea chest = the map already lifted out → final plate "the old cloth map still
+  resting inside it") and p5 (stacked casks = the stacking done → final "the hold waits empty", i.e. the fix produced
+  the word the negation check dislikes); `facing_not_per_character` p8, p16 (p16's three background figures still lack
+  a facing clause after the fix). Both new types none in r2. `vbAssignmentTrim` 4 → 0, 6 stripped.
+- "empty" in plates: dragon 7, pirate 1 — every one a sky, a path or the cleared figure band, none a space the plan
+  line fills; the scoped rule holds as written.
+- **Overflow at birth is NOT near zero: 5 and 5 (was 11 and 12).** Cause, read from `rankPageElements`: the trim keeps
+  the ≤3 bible claims the plan line names, and the Art Director then cites up to 3 OTHER ids in `objects[]`; the
+  check counts the UNION (pirate p12: bible ART005/ART004/ART008 + brief CHR001/ART003/ART009 = 6). Round 2 made
+  this worse on dragon p12/p13/p16 by ADDING the trough's id. `briefFixable` (objectsAsked > 3) is therefore
+  mislabelled on 8 of 10 pages — the brief could withdraw its citations. Open item, not fixed here.
+
+**Rationale.** A rule the generator ignores twice in a row is not a rule; a reviewer finding with a rewrite is. The
+conflict fix is the actual root cause of R2; the findings are the enforcement. Round 2's regression is now ONE page
+instead of three; the evidence says the remaining case is the reviewer re-splitting one shared action into two
+vehicle-specific labels despite the authority sentence — a prompt cannot forbid that harder than it already does, so
+the next step (if wanted) is mechanical: revert a round-2 page whose rewrite introduces a code-detected REVIEWABLE
+finding the page did not have after round 1. That is a code change on code-detected types (no prose classification)
+and is left for the owner to call.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`, `prompts/scene-review.txt`,
+`server/lib/beatsPipeline.js` (round-2 options, page-0 filter, subset beats), `server/lib/promptBuilders.js`
+(`buildSceneReviewPrompt` verbatim plan lines), `tasks/bugs.json`, `tasks/BACKLOG.md`. Commits `52ba34d61`,
+`4086fff75`. Harness: `scratchpad/encode_/rerun_beats_ad.js` (session-local). **Status:** on `staging`, not pushed.
+
+## 2026-09-08 — A brief's interactions[] row names a bible entry by TOKEN OVERLAP, not substring (extends "The page instant outranks a contradicting object state", same day)
+
+**Context.** The resolver above (`a7c413022`) reads the page's contact from `interactions[]` rows whose `object`
+string names the entry. Its first matcher was `rowLower.includes(nameLower)`. Reproduced on the page it was built
+for: staging `job_1788816451791_25b31uqlp` p13, row `object: "the large blue scale", hands: true` against `ART010`
+"Large dragon scale" — `"the large blue scale".includes("large dragon scale")` is false, so `pageHoldsObject` saw
+no row for the scale, returned `false`, `resolveObjectState` reported no contradiction, and the assembled prompt still
+carried `.1`'s "no hands touching it" (the delta that put the chip in the air on two earlier renders). The Art
+Director PARAPHRASES names as a matter of course; a substring rule fails on exactly the rows that matter.
+
+**Decision.** One matcher, `visualBible.entryNamedByRow(rowField, candidates)`, used everywhere a row is tied to an
+entry (`pageHoldsObject` → `resolveObjectState` → the REQUIRED OBJECTS clause and `elementRefCell`; and
+`vbElementBudget.rankPageElements`' `focal` flag, which compared upper-cased whole strings — same blind spot). Rules:
+(1) a VB id in the row wins; (2) otherwise the row and each candidate are tokenised (lower-case letters, ≥ 4 chars,
+a function-word list — size and colour words are deliberately KEPT, unlike `ENTITY_MATCH_STOPWORDS` /
+`TRIM_STOPWORDS`, which drop "large"/"small" for their own jobs), and a candidate is named when the row shares with
+it at least one token no OTHER candidate carries. Candidates are the entry under test plus every entry the brief's
+`objects[]` cites (`citedEntries`; `visualBible` is now threaded through `resolveObjectState` / `elementRefCell` for
+that). "the large blue scale" → shares *scale* with scale and chip, *large* with the scale alone → `ART010`;
+"the chip" → `ART001`; "the dragon scale" → only shared tokens → `null`, never a guess. No prose classification.
+
+**Measured behaviour of `held === null`, recorded so nobody re-derives it.** Stored bibles carry no `held`, so on
+the stored p13 bible the match is now right (`held: true` for `ART010`) but `contradicted` stays false — the flag,
+not the match, is what is missing; the clause survives (arm A of the dry replay). Stamp `held:false` on `ART010.1`
+as a fresh bible would and the page fires: `⚠️ [VB-STATE] Page 13: ART010.1 ("in trough") says the object is
+untouched but the brief's interactions put hands on it — state clause dropped`, "no hands touching it" gone (arm B).
+`ART001.2` "open upturned palm" stays on both arms (no row names the chip, no `held` stored); on a fresh bible with
+`held:true` on it the reverse rule drops it too, because the page declares its contacts and none touches the chip.
+The chip really is in Levin's hand on p13 — the AD wrote the scale as the row's object — so a fresh-bible p13 would
+lose a correct clause. Object→object / "held while fitting" rows are the open AD-schema question already recorded
+in the 2026-09-08 entry above; not changed here.
+
+**Touched:** `server/lib/visualBible.js` (`entryNamedByRow`, `citedEntries`, `rowMatchTokens`, `pageHoldsObject`,
+`resolveObjectState`, `elementRefCell`), `server/lib/promptBuilders.js` (passes `visualBible`),
+`server/lib/vbElementBudget.js` (`rankPageElements` focal via the shared matcher), `tests/unit/vb-object-states.test.ts`,
+`tasks/bugs.json` `vb-row-matcher-substring-misses-paraphrase`. Replay harness: `scratchpad/replay_p13_dry.js`
+(session-local, dry). **Status:** on `staging`, not pushed.
+
+### 2026-09-08 — Art Director rule 7f: tip on the target, receiver clear
+
+**Context:** A page whose moment is "a tool acts on one thing and a second thing receives the result" (a lever in a crack freeing water that runs to a basin) rendered the result coming out of the tool — water pouring from a stick into the trough while the crack stayed sealed. Measured twice on the same page: once through the pipeline (stale VB state contributed), and once with NO Visual Bible at all (`scratchpad/refix_out/refix6_dragon_branch_a1`): given a stick and a receiving basin, the renderer's default is to connect them. One sentence in the prose fixed it on the next render (`refix6_…_a2`): the tip pressed INTO the crack at the base of the stone, the trough several steps clear of the branch. Owner ruling: encode it, as simple and general as possible.
+**Decision:** Rule 7f in `prompts/scene-expansion-all.txt` and its sibling `prompts/scene-expansion.txt`, beside the contact/force/support rules: the prose states where the tool's tip touches the target, the receiver stands clear of the tool and never between actor and target, and the result appears where the tool touches. No numbers, no story words.
+**Rationale:** Same shape as the containment rule — a spatial fact the model cannot reinterpret, stated where the figure is described. A reviewer check `[result_not_at_contact]` was added in `prompts/scene-review.txt` beside `plate_contains_effect` the same evening — the owner asked why it was omitted, and the evidence of the night (plate-effect and per-character facing both failed as prose and bound only as reviewer findings) gave no reason to expect 7f to differ.
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`, `docs/decisions.md`.
+
+---
+
+## 2026-09-08 — The 1st-grade word budget is raised to 25–70 words / 3–6 sentences; the counter's 0.5 over-tolerance deliberately stays
+
+**Context:** The `1st-grade` band in `LANGUAGE_LEVELS` (`server/lib/promptBuilders.js`)
+asked for 25–50 words and 2–4 sentences per page. Measured against what the writer
+actually produces at that level on staging — 3 stories, 53 pages — the band was not a
+budget the writer ever met: mean ~84 words/page, per-story medians 61 / 89 / 94, worst
+page 128. **48 of 53 pages (91%) exceeded the 50-word max, and 34 of 53 exceeded even
+the tolerated 75.** The `standard` band over the same corpus is calibrated by contrast:
+1 page out of 63 past tolerance.
+
+The cost showed up downstream. LENGTH findings were **43–50% of ALL findings** on
+1st-grade stories versus 0–36% on standard; on `job_1788614817116_vxnu60yjg` **all 18
+pages carried a LENGTH fault**. And the faults did damage: on
+`job_1788816451791_25b31uqlp` page 4 (128 words, LENGTH finding) the repair compressed
+the page to 95 words and in doing so reordered paragraphs and stranded a pronoun. A
+budget the writer cannot hit turns the refiner into a paragraph shredder.
+
+**Decision:** Raise the `1st-grade` band ONLY:
+- `wordsPerPageMax`: 50 → **70**
+- `sentencesPerPage`: `'2-4'` → **`'3-6'`** — the sentence count must move with the
+  words, or 70 words over 2–4 sentences implies 17–35 words/sentence, wrong for a first
+  reader. The `pacing` string gains one clause saying the extra room buys more
+  sentences, never longer ones.
+- `wordsPerPageMin` stays **25**; `standard` and `advanced` are untouched.
+- **`WORD_BUDGET_TOLERANCE_OVER` stays 0.5** (fault fires at 105 words) and
+  `WORD_BUDGET_TOLERANCE_UNDER` stays 0.2. This is the owner's explicit choice: the
+  counter is meant to catch only runaway pages, and it is left deliberately loose rather
+  than re-tightened to track the new budget.
+
+**Rationale:** The 2026-09-07 asymmetric-tolerance entry said outright that "the real fix
+is upstream… the text stage merely stops making the impossible demand." This is that
+upstream fix: the demand itself was wrong, so the tolerance was doing the work of a
+mis-set budget. Re-running the deterministic `buildWordBudgetFindings` in-process over
+the STORED writer text (`textRefineReport.pages[].before`) of 30 staging stories — free,
+no model calls — the 1st-grade LENGTH faults drop **34 → 8 across 96 pages** (8 stories),
+while `standard` is unchanged at **1 → 1 across 235 pages**. Per story: 14→4, 16→2, 4→2
+on the three recent 18/18/17-page runs; the five older 1st-grade stories were already at
+0 and stay at 0. Keeping OVER at 0.5 on top of the new ceiling means a page is only
+faulted past 105 words — an accepted looseness, not an oversight.
+
+**Side effect worth recording:** `server/lib/layout.js` argues every reading level is
+forced to `square-below` because no word budget fits the overlay calm zone, and cited
+1st-grade's 50-word ceiling as "already eating 94% of the smaller zone" — the one case
+still near-fitting. At 70 words (≈97,930 px² at 14pt) that ceiling now **overflows** the
+smaller zone (74,675 px²) outright and reaches ≈99% of even the full-width band
+(99,360 px²). Behaviour does not change today (`square-below` is already universal), but
+this removes the last remaining case for `a4-overlay`: no level's ceiling fits any zone
+the text-region pass offers.
+
+**Also corrected:** `client/src/pages/wizard/WizardStep3BookSettings.tsx` advertised
+`~20-35 words per page` for 1st-grade — already wrong against the old 25–50 band, and
+absurd against 70. It also advertised `~120-150` for standard against the code's 40–150.
+Both UI strings now match the code; **no band numbers changed for standard**.
+`prompts/story-trial.txt` keeps its own hardcoded 100–140 — the trial writes in one call
+via `buildTrialStoryPrompt` and never reads `LANGUAGE_LEVELS` (verified), so it is
+untouched.
+
+**Supersedes:** 2026-09-05 "Per-page word budget is counted in code and fed to the
+text-review chain" (cf10d7cd9), 2026-09-06 "The word-budget counter gets a 20% grace
+band", and item 3 of the 2026-09-07 arc-action-budget entry — all three remain accurate
+about the mechanism; only the 1st-grade numbers they were calibrated against change here.
+`docs/SETTLED.md` carries no word-budget line, so this is not a SETTLED reversal.
+
+**Touched:**
+- `server/lib/promptBuilders.js` (`LANGUAGE_LEVELS['1st-grade']`)
+- `client/src/pages/wizard/WizardStep3BookSettings.tsx` (both `wordRange` strings)
+- `server/lib/layout.js`, `server/lib/pdf.js`, `server/config/runtime.js` (comments made truthful)
+- `server/lib/textRefine.js` — **unchanged, deliberately**
+
+**Status:** ✅ active
+
+### 2026-09-08 — Rule 7g (tip on the target) measured: did not bind as prompt text or as a reviewer check
+
+**Context:** After adding rule 7g (numbered 7f at first; renumbered because a 7f already existed) to both AD templates and `[result_not_at_contact]` to the scene review, the Art Director was re-run on the dragon story with a fresh Visual Bible and the two pages rendered once each (`scratchpad/refix7_*`). The lever page: water again poured out of the branch into the trough — the fifth render of this moment to fail that way; the one that succeeded (`refix6_…_a2`) was a hand-written brief that placed the trough "several steps in front, well clear of the branch".
+**Measured:** (1) the AD prose placed the tip and the result correctly ("a thick jet shoots outward from the base of the fissure around the wood") but never placed the receiver beyond "nearby" — the receiver-clear clause of 7g was not written; (2) `[result_not_at_contact]` fired on no page in either review round, including this one; (3) the fresh bible's trough state for that page — "water jetting into the interior from the direction of the rock face crack" — reached REQUIRED OBJECTS verbatim, and the sceneIntent headline read "water jets out violently into the trough": the receiver-effect enters the prompt through the VB state path and the intent line, neither of which 7g or the reviewer inspects. The scale page failed separately: no shape wording (one smooth piece, straight broken edge) survived into the prompt, and the render was a bowl.
+**Decision:** 7g and its reviewer check stay (harmless, and correct as far as they reach) but are recorded as NOT proven. The fix this evidence points at is mechanical, not prose: a structured receiver on the interaction row, with the prompt builder emitting the placement sentence itself; and a bible rule that an object's state describes the object's own look, never what arrives at it from elsewhere. Neither built tonight — owner's call after the full dragon rerun on the deployed code.
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt` (renumber), `prompts/scene-review.txt` (relabel 10b), `docs/decisions.md`.
+
+### 2026-09-09 — One action per page: a deed, its effect, and where the effect goes are three actions; plus a structured `receiver` fallback in the prompt builder
+
+**Context:** Six renders of one moment (a boy drives a branch into a crack; a buried spring is freed; water runs to a trough). Five failed the same way — water poured out of the BRANCH TIP into the trough, the crack stayed dry, the trough sat under or beside the tip: the stale-VB pipeline render, hand brief attempt 1, two fresh-bible renders, and the pipeline with AD rule 7g (`scratchpad/refix_out/refix7_dragon_p16_a1_page.jpg`). One succeeded (`refix6_dragon_branch_a2`): a hand brief with the tip "pressed INTO the crack" and the trough "several steps in front, well clear of the branch". Stage-by-stage seeding of the receiver, all verified in stored artefacts: the beats plan line held deed + effect + destination in one instant ("drives the branch tip hard into the crack … water beginning to jet from the base … water runs toward the hollow beside the trough"); the bible wrote the effect onto the receiver's state (`ART007.2` "water jetting into the interior from the direction of the rock face crack"); the AD copied it into the sceneIntent headline and cited the state in `objects[]`; the builder emitted the state delta verbatim on the REQUIRED OBJECTS line. Three prose rules written the same night (plate-before-effect, per-character facing, 7g) did not bind; the structured fields (`perspective`, `objects[]`) did.
+
+**Owner's diagnosis (verbatim):** "Why not split it in two pages, one he pushes the branch in the crack. 2nd the water flows in the trough. My diagnosis is that it is too complex. Boy, pushing stick, stick in crack, water out of crack, water into trough. For me this is like 4-5 actions instead of the one mandated action." The one-action check passed the plan line because the planner counts cause + result + destination as one action.
+
+**Decision:**
+1. **Beats rule** (`prompts/story-beats.txt`, one-moment list) and the **plan-check** action-load check (`prompts/plan-check.txt` item 5), verbatim: *One action per page. A deed is one action; its effect is another; where the effect goes is a third. When a plan line holds more than one, the later ones move to the next page.* Generic on purpose — the same sentence for a stick in a crack, a chip pressed to a scale while someone refuses, a door pushed open onto a room.
+2. **Bible rule** (`prompts/story-bible-from-beats.txt`, states): a state describes the object's OWN look, never what arrives at it from elsewhere on that page; the arrival is the action's result and belongs to the acting page's character stage.
+3. **Fallback mechanism** for a plan line that still names tool and receiver together: an optional `receiver` (and `target`) on `interactions[]` rows (`scene-expansion*.txt`), passed through `sanitizeInteractions`; `buildImagePrompt` then (a) drops the receiver's state clause for the page with a `[RECEIVER]` WARN (same drop as the `held` contradiction; the object stays listed; a receiver not in `objects[]` is left alone — out of frame is the preferred outcome), and (b) appends one fixed sentence after the scene prose, deterministic string assembly from the row, no prose classification: *The result of this action appears only where <tool> meets <target>; <receiver> stands well clear of <tool>, several steps away, never under or beside its tip.* The scene review's `[result_not_at_contact]` gains the structural half: a row whose `where`/`action` names a second object receiving the result with no `receiver` set is a finding. Demoted to fallback by the owner; do not expand it.
+
+**Measured (2026-09-09, `scratchpad/refix8_*`, total USD 0.30):**
+- Beats stage rerun once on the dragon arc with the rule (`scratchpad/encode_/rerun_beats_only.js`, Sonnet 4.6 plan + GPT-5.6 check + replan + recheck, USD 0.117; output `encode_/job_1788816451791_25b31uqlp.R8.plan.json`): the lever line came out as the STRIKE alone — first pass *"he drives the branch into the crack in the rock and heaves down on it with both hands — the branch is in use as the tool that will free the water"*, final *"he rams the branch into the crack and heaves down on it with both arms — water shoots out of the crack"*. No water and no trough in the instant. But the planner did NOT give the release its own page: the water moved into the after-segment and the trough never receives it in any instant. Page count stayed 18 — the ending's flight page was merged into the wing repair (p18), the boulder moment split into two pages (p10 push, p11 branch in the wet earth), and the chip/refusal moment split into found (p12) / refused (p13, close-up of the ibex turning from the ball) / reason (p14). The recheck's action-count line, verbatim: *"Pages 3, 5, 6, 9, 10, 11, 14 and 18 each put more than one action in the instant; pages 7, 8, 12 and 15 state only positions or presence; page 16 shows the effect—water shooting out—rather than only the deed that produces it."* So the critique counts deed and effect apart, and the planner obeys it for the instant, but resolves "move to the next page" by moving the effect to the after-segment instead. Finding, not built: a code-side clause counter on the instant segment is the next step if the owner wants the release page forced.
+- Attempt 1 (strike, brief from the planner's p16 line, no water, no trough in `objects[]`/plate): PASS on the action — tip in the rock-face crack, stone dry, no water, effort visible. The trough was in frame anyway: the plate copied it from the location's reference cell, which shows the trough (the trough is both a LOC feature and an ART object in this bible). He also faced the camera despite `perspective: three-quarter back view`.
+- Attempt 2 (release, hand split, trough `ART007.2` with its arrival state kept, prose "several steps to one side, well clear"): water originated at the rock face at the crack, but the branch leaned from the crack down INTO the trough directly beneath it — the sixth time prose placed the receiver "clear" and the render put it under the tip.
+- Attempt 3 (attempt 2 + `receiver: "ART007"`, `target: "the crack in the rock face"` on the branch row — mechanism 3): `[RECEIVER]` dropped the trough's "water jetting into the interior" clause; the sentence reached the prompt as *"The result of this action appears only where sturdy straight branch roughly as long as a five-year-old is tall meets the crack in the rock face; rectangular basin carved from pale grey limestone stands well clear of sturdy straight branch …, several steps away, never under or beside its tip."* Render: water out of the rock-face crack, cascading down over the branch lying at the foot of the wall, the trough several steps to the left and clear of it. **PASS** — the first render of this moment from a real-builder brief that put the water in the rock and the trough clear.
+- All three plates were dry and all three came back letterboxed inside the 1:1 canvas (painted margins) — a pre-existing plate defect, noted in BACKLOG, no attempt spent on it.
+
+**Touched:** `prompts/story-beats.txt`, `prompts/plan-check.txt`, `prompts/story-bible-from-beats.txt`, `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`, `prompts/scene-review.txt`, `server/lib/sceneMetadata.js` (`sanitizeInteractions`), `server/lib/promptBuilders.js` (`buildReceiverPlacement`, the `[RECEIVER]` strip in the REQUIRED OBJECTS artifact loop), `tests/unit/receiver-placement.test.ts`, `tasks/bugs.json`.
+**Status:** ✅ active — staging only, not pushed (dragon job in flight).
+
+**Addendum (2026-09-09, attempt 4 — make the re-plan spend a page; `scratchpad/encode_/…R9.plan.json`, USD 0.119):**
+- Added one line to the RE-DIVIDE header in `buildReplanSection` (`server/lib/promptBuilders.js`), the single chokepoint for the re-plan request: *When a page is named for holding more than one action, the fix is a second page for the later action. Moving it into "what is true after" is not a fix. Keep the page count by merging two pages that each hold only presence or position, or by dropping the weakest.* `plan-check.txt` item 5 has no how-to-fix phrase (the check may not propose rewrites), so nothing to align there.
+- Measured: one beats rerun on the dragon arc (Sonnet 4.6 plan, GPT-5.6 check/recheck). First plan p15 = *Levin on the grass, the branch upright in both hands, pressed into the crack … — the branch is being driven into the crack as lever; the solution is in action*. Check named it (*Page 15 combines levering with the water shooting out and then running into the hollow*). Re-plan p16 = the same push line verbatim; **no release page anywhere in the book** — the water never appears, and the recheck says so (*The middle's most wanted picture is the spring bursting free, but page 16 shows only Levin heaving with the branch and reports the water's release rather than showing it*). The planner spent its pages elsewhere (a cave-fear page at p3, the stream split across p9/p10) and rewrote 17 of 18 pages despite "everything else stands". Same shape as R8: a prose instruction to page the effect did not make it page.
+- Verdict: ❌ the re-plan line is kept as harmless guidance but does not deliver the release page. Attempt 5 (AD + render from a planner line) was not spent. Remaining lever is code-side: a check on the instant segment of each plan line that fails when it holds a deed plus its effect, feeding the failing page back as a must-fix (check 5 currently ranks "also noted": `REPLAN_MUST_FIX_CHECKS = {4, 8}`). Not built — owner's call.
+
+### 2026-09-09 — A deed and its effect are two pages: check 9, ranked must-fix, with bounded re-plan rounds
+
+**Context:** One moment failed six renders in a row — a boy levers a branch into a crack, water leaves the rock, water reaches a trough. Every stage propagated it faithfully because the plan line held all three: `he drives the branch tip hard into the crack … water beginning to jet … water runs toward the hollow beside the trough`. The owner's diagnosis: "Boy, pushing stick, stick in crack, water out of crack, water into trough. For me this is like 4-5 actions instead of the one mandated action."
+**Measured, in order:**
+1. A prose rule in `story-beats.txt` alone: the planner moved the effect into the after-segment (R8), then deleted the water entirely (R9). Never spent a page.
+2. Ranking the WHOLE of Q5 must-fix: 15 then 12 must-fix findings, every page of the division re-written twice, and **new Q4/Q8 regressions** — the setup's wanted picture and the ending's own event lost pages. Q5 bundles presence-only and after-state instants with this fault; forcing all three churns the book. Rejected on that evidence; it is the same loss `REPLAN_MUST_FIX_CHECKS` was created to prevent.
+3. Q9 as its own check, must-fix, plus "watching, standing and being present are not actions" in both the rule and the check: must-fix findings fell to 5, and the planner split the moment itself — `p15 … drives it deep into the crack … the attempt is under way` / `p16 water pours from the crack into the hollow`.
+**Also fixed:** the plan loop was check → re-plan → recheck → ship, so a fault the RE-PLAN introduced was named by the recheck and never repaired — which is how the deed+effect page was created in the first place. It is now a bounded loop: another round only while a MUST-FIX finding survives, at most two re-plans, and an unfixed must-fix ships with a `beats_replan_unfixed` warning naming it (a division is never withheld from a paid run).
+**Touched:** `prompts/plan-check.txt` (check 9 appended — existing numbers untouched, the parser reads the leading number), `prompts/story-beats.txt` (one-action rule), `server/lib/promptBuilders.js` (`REPLAN_MUST_FIX_CHECKS` → 4, 8, 9), `server/lib/beatsPipeline.js` (re-plan rounds), `tests/unit/plan-replan-ranking.test.ts`.
+
+---
+
+## 2026-09-09 — The cover NAME invariant: an entity named in a cover scene description is FULLY SENT, or its name does not appear
+
+**Context:** Staging story `job_1788903616404_iqvhj4l8m`, front cover. Visual Bible
+entry `ANI001` is "Nia", a **dog**. The assembled cover scene description contained
+`"Max, a preschooler little boy, stands in the right of Levin, leaning forward with
+Nia beside him"`. The cover prompt carried **no definition** for Nia and **no
+reference image** of her. The image model painted a fifth *human* child (girl,
+pigtails, purple dress) standing with the four boys; the evaluator then free-matched
+that girl to the name "Nia" at 0.9 confidence and passed the cover at 100/100.
+
+Three mechanisms had to line up for this:
+
+1. `buildCoverSceneFromHint()` is pure JS templating. The per-character sentence
+   pastes the outline's `position` field **verbatim and uninspected** (`stands ${pos}`);
+   only `holds:` is id-resolved (`resolveHoldable`). Any entity NAME the writer puts
+   in that free text reaches the image prompt undefined.
+2. KEY STORY ELEMENTS is filtered by `collectCoverHintElementIds()` — `coverHint.objects[]`
+   ∪ each character's `holds:` id. `ANI001` was in neither, so its definition was gated out.
+3. The VB reference grid's name-match safety net in `buildCoverReferences()` existed,
+   but was gated behind `if (elementRefs.length === 0)`. The dragon and the scale had
+   already filled the grid, so the net never ran.
+
+The planner is not at fault: `prompts/story-unified.txt` asks the cover hint for
+`LOC### + the story's central ANI### + 1-2 ART###`; the central animal (the dragon)
+WAS included. Nia is a *second* animal, legitimately absent from the hint. No prompt
+was changed.
+
+**Decision:** A Visual Bible entity whose name appears in the assembled cover scene
+description is either **fully sent** — (a) its definition emitted in KEY STORY ELEMENTS
+**and** (b) its reference image in the VB grid — or **its name is stripped from the
+description** before the prompt is built.
+
+- One matcher is the source of truth: `matchVbEntitiesInText(text, visualBible)` in
+  `coverIterate.js`. Case-insensitive, whole-word (Unicode boundaries, so "Nia" does not
+  match inside "Niamh"), skips nameless entries, scans `secondaryCharacters` / `animals` /
+  `artifacts` / `vehicles` only — **not locations** (a location is the plate, not an
+  element — SETTLED 2026-09-08) and not main characters (they ride as character reference
+  cards).
+- `reconcileCoverSceneEntities()` unions resolvable ids into the `allowedElementIds` that
+  gate KEY STORY ELEMENTS; `buildCoverReferences()` re-derives the same matches for the
+  grid, its name-match block promoted from a `length === 0` fallback to an **always-run
+  union**.
+- Enforcement: an entity that cannot be fully sent — no reference image, or the cover
+  reference budget is already full — has its name **stripped** (whole companion clause
+  first, so the prose stays grammatical), with a WARN naming the id, the name and the
+  reason. Conservative exception: a name that is not proper-noun-shaped (a generic
+  lowercase noun like "rope") is warned about but never cut out of prose — a generic
+  noun does not summon a phantom named figure.
+- The trial cover's description is a fenced JSON blob, so it strips in `stripMode: 'token'`
+  (the name word only) — clause surgery there would break the JSON.
+- Budget: the cover grid cap is now the named `COVER_ELEMENT_REF_CAP = 6` (previously two
+  bare `6` literals in `buildCoverReferences`), and the reconcile pass makes the same budget
+  decision the grid does. `VB_ELEMENT_BUDGET` (3) and Grok's `VB_SLOT_MAX_ELEMENTS` (4) are
+  **untouched** — the Grok packer remains the net downstream of whatever this produces.
+
+**Rationale:** The failure is not "the writer named an extra animal" — that is legitimate
+prose. The failure is a prompt that names something it does not define or show: an image
+model asked for a name with no referent invents one, and a free-matching evaluator then
+certifies the invention. Injecting the definition + reference is the right answer whenever
+it fits; stripping is the only safe answer when it does not. Doing this at the description
+level (rather than pattern-matching in the evaluator) means it holds for every cover path
+and needs no eval change — evaluator logic, scoring and repair gates are deliberately
+untouched here.
+
+**Touched:**
+- `server/lib/coverIterate.js` — `COVER_ELEMENT_REF_CAP`, `COVER_NAME_MATCH_POOLS`,
+  `matchVbEntitiesInText`, `stripEntityNameFromDescription`, `reconcileCoverSceneEntities`
+  (new, exported); `iterateCover` reconcile + `let sceneDescription`; `buildCoverReferences`
+  name-match promoted to an always-run union under the cap.
+- `storyJobPipeline.js` — first-generation cover path (scene built before the VB text so the
+  gate sees the assembled names) and the trial cover path (token-mode strip).
+- `tests/unit/cover-name-invariant.test.ts` — 14 tests: matching, injection, strip fallback,
+  budget, JSON safety.
+- `tasks/bugs.json` — `cover-scene-names-undefined-vb-entity`.
+
+**Status:** ✅ active
+
+## Creature appearance is softened by the focus child's age — appearance only, never plot (2026-09-09)
+**Context:** Staging story `job_1788903616404_iqvhj4l8m` (focus main aged 5, other mains 3,
+reading level `1st-grade`). The Visual Bible designed `ANI002` "a dragon" as *"very large — body
+length roughly equivalent to two city buses end to end… children appear tiny beside him… two
+backward-swept curved horns"*, and `CHR002` (a 400-year-old secondary) as *"pale grey skin, small
+deep-set amber eyes under heavy brow ridges… jutting square chin"*, *"stout, hunched"*. Rendered,
+they read as a menacing reptile and a troll looming over a small child. No reader-age or tone
+signal reached Visual Bible entity design at all: `{READING_LEVEL}` is a sentence-length statement,
+`{CHILD_AGE_BAND}` constrains only how old an invented PEER CHILD may be (a 400-year-old is
+unconstrained), and `{AGE_MODE}` — the plot-shape block — is not in this template. The bible's own
+creature instructions are specificity-only (`story-bible-from-beats.txt:73/75`), and the output
+schema for `animals` / `secondaryCharacters` has no tone or expression field.
+**Decision:** A new `{CREATURE_TONE}` block in `prompts/story-bible-from-beats.txt` (inside
+`# VISUAL BIBLE`, next to the render-in-the-named-style line), filled by
+`buildCreatureToneSection(inputData)`. Three levels keyed on the focus main character's AGE
+(owner, 2026-09-09): 0-4 "really cute", 5-6 "not menacing", 7+ "formidable where the story means
+it to be" — claws and teeth shown, physical weight and presence, no toy-like softening; it may
+loom and its size may be stated against a child. An unparseable or missing age emits NOTHING at
+all. The block governs facial features (brow, eye shape, mouth), bared teeth and displayed claws,
+posture, and how size is stated relative to a child. It does NOT forbid a creature being large,
+nor a story having a frightening moment.
+
+**Level 3 is a ceiling, not a floor.** It licenses a formidable look only where the story's own
+nature for that creature is powerful, wild or formidable; a pet, a domestic animal or a comic one
+stays gentle and friendly-looking at every level. The story's intent decides, the reader's age only
+lifts what is permitted. An unknown age therefore emits nothing rather than defaulting into level
+3, which would harden creatures in stories whose reader age we cannot read.
+**Rationale:** Keyed on age rather than on the band name because `AGE_BANDS` collapses everything
+from 6 upward into `standard` and so cannot express the owner's boundary at 7; the same age source
+(`pickMainCharacters(inputData).focus?.age`) keeps one source of truth for whose age counts.
+`AGE_BANDS` / `resolveAgeBand` are untouched — they stay the plot-shape driver.
+**Scope is appearance only, deliberately.** `server/lib/promptBuilders.js` (comment above
+`bandDifficulty` in `buildStoryShapeSection`) records that a blanket "the focus child is under six,
+so keep it simple" softener was removed on purpose, because it flattened exactly the `fear-choice`
+(4) and `journey` (5) bands that are meant to carry a real fear and a real low point. Those two
+ages are precisely the ones that still need soft visuals, so the softening had to be split from
+the plot: a 5-year-old still gets the `journey` shape with a real low point — it just gets a
+friendly-looking creature. The prompt text says so explicitly so a future model does not
+over-apply it. Injection point is the Visual Bible only (owner's call): not the image prompt, not
+scene expansion, not the evaluator. Reverses no `docs/SETTLED.md` line — SETTLED has nothing on
+creature design, tone or visual age-appropriateness; this is a new rule.
+**Touched:**
+- `server/lib/promptBuilders.js` — `CREATURE_TONE_LEVELS`, `creatureToneLevel()`,
+  `buildCreatureToneSection()` (next to `resolveAgeBand`/`buildAgeModeSection`), exported; wired
+  into `buildStoryBibleFromBeatsPrompt`'s `fillTemplate` as `CREATURE_TONE`.
+- `prompts/story-bible-from-beats.txt` — `{CREATURE_TONE}` placeholder.
+- `tests/manual/test-creature-tone.js` — age → band → tone resolution, ages 1/3/4/5/6/7/8 and a
+  missing age. Free, no API calls.
+**Status:** ✅ active
+
+## Plan-check Q9 (deed and effect) stays advisory — the planner detects it but destroys the page when forced (2026-09-09)
+**Context:**   A single plan line holding a deed, its effect and the effect's destination
+produced six consecutive renders of water pouring out of a stick. Check 9 was added to
+`prompts/plan-check.txt` to name every page whose instant shows an action together with its
+result, and was then ranked must-fix so the beats re-plan would split it.
+**Decision:**  Check 9 ships, and `REPLAN_MUST_FIX_CHECKS` stays `{4, 8}`. Q9 is a visible
+"also noted" finding that the planner may act on, never a mandate that forces another round.
+**Rationale:** Measured on an 18-page story across four consecutive re-plan configurations.
+The check names the right page every time. The planner's answer to being told that page holds
+two actions was, in turn: demote the effect into "what is true after"; delete the moment
+outright; return a verbatim duplicate of the preceding page. In every case the page where the
+quest object was returned — the book's climax — was gone, and no other check noticed, because
+a division with no climax violates nothing a counter measures. Forcing the whole of Q5 was
+rejected the same day for the neighbouring reason (12-16 must-fix pages, whole-book churn, Q4
+and Q8 pictures lost). The trade is asymmetric: a deed-and-effect page is a mild fault a reader
+sees, a missing climax is a severe fault nobody sees. Detection without forced repair keeps the
+first and avoids the second. The five guards built while testing this all stay — they are
+correct regardless of what is ranked must-fix, and they are what made the corruption legible.
+**Touched:**   `server/lib/promptBuilders.js` (`REPLAN_MUST_FIX_CHECKS` + rationale block),
+`tests/unit/plan-replan-ranking.test.ts`, `prompts/plan-check.txt` (check 9 kept)
+**Status:**    ✅ active
+
+## The beats re-plan may only change the pages a finding named (2026-09-09)
+**Context:**   The re-plan returned the whole division every round, and the planner rewrote
+15-18 of 18 pages each time — including pages nothing was wrong with.
+**Decision:**  Five guards in `beatsPipeline.js`: (1) merge only the pages a finding named,
+restoring every other page from the standing division; (2) bounded rounds
+(`MAX_REPLAN_ROUNDS = 2`); (3) monotonic discard — a round that leaves more must-fix findings
+than the best so far is thrown away and the previous division stands; (4) a duplicate-plan-line
+guard, since two pages with the same instant is corruption, not a fix; (5) `findingPages()`
+reads a finding's structured `.pages`, falling back to page numbers parsed out of its text.
+Each fires a `gl.warn` counter (`beats_replan_unnamed_pages`, `beats_replan_discarded`,
+`beats_replan_duplicate`, `beats_replan_unfixed`) so the behaviour is measurable in a run.
+**Rationale:** A re-plan round should be able to change only what it was asked to change.
+Measured on one story: 11 unasked-for page rewrites restored across two rounds, one regressing
+round discarded (must-fix 6 → 2), zero duplicates shipped.
+**Touched:**   `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js` (`findingPages`,
+`buildReplanSection`), `server/lib/storyHelpers.js` (facade re-export)
+**Status:**    ✅ active
+
+## Holder-in-cell and repair-reference fixes: prompt only, no prose parsing (2026-09-09)
+**Context:**   Two faults measured on one story. (1) A state cell's caption was the base
+description plus the state's `delta`, and the bible prompt asked for deltas like "gripped in
+one hand"; rendered, "gripped in the animal's forepaws" came back as the object FUSED onto a
+four-legged animal, which then became ground truth for every downstream check. (2) `inpaintPage`
+attached a visual-bible reference only for findings carrying a structured `item`; the semantic
+evaluator names the object in prose, so the repair was asked to paint an object it had never
+been shown.
+**Decision:**  Fault (1) is fixed in the PROMPT alone: `prompts/story-bible-from-beats.txt`
+now says a `delta` describes the object and names no figure and no body part — `held` already
+records that something has hold of it. Code parses nothing. Fault (2) is NOT fixed yet; the
+structural fix is for the evaluator to emit the element id it means (as it already emits
+`character`) so the repair attaches the reference by id.
+**Rationale:** Two code-side versions were built and REVERTED the same day: `objectLookOnly`
+(clause-by-clause regex over the delta to strip figures/body parts) and `vbNameInText` (matching
+bible names inside a finding's wording). Owner ruling, and the standing rule in CLAUDE.md:
+classification belongs to the prompt; code never pattern-matches prose to work out what it
+means. The regex versions also demonstrated the rule's point — one shipped with `` written
+as literal 0x08 bytes so three checks matched nothing, and a "size cue" variant was drafted on
+one unreplicated A/B success before being caught. The A/B itself (Lab set 32, runs 1069-1072)
+stands as evidence: a reference is the only thing that ever got a missing object painted back
+(1 of 8 attempts), and it is not reliable (the same reference decapitated the dragon on the
+repeat). `elementRefsFromText` was removed with the parser.
+**Touched:**   `prompts/story-bible-from-beats.txt` (kept); `server/lib/referenceSheets.js`,
+`server/lib/visualBible.js`, `server/lib/images.js`, `server/lib/testlab.js` (reverted to
+24d09089d)
+**Status:**    ✅ active (prompt rule) / 🟡 open (evaluator emits element ids — not built)
+
+## A state is a change to the object itself; place, holder and contact are never states (2026-09-09)
+**Context:**   The bible prompt's line 63 demanded a state for an object "carried, or pressed
+against or fitted to another object". On one story that minted four states for one unaltered
+scale — used as door, at sealed hole, carried up, pressed to wing — each rendered as its own
+reference cell. A placement state is a holder by definition, so "carried up" rendered the scale
+fused onto the animal carrying it, and "pressed to wing" rendered a wing: the page then had two
+wing sources (the cell and the dragon's own reference) and drew the scale AS a wing, and on a
+repeat put a spare wing where the dragon's head was. Line 62, one line above, already said the
+right thing ("lit, broken, mended, opened, filled") and was contradicted by 63.
+**Decision:**  Owner ruling, and the test, in the owner's words: the bible shows the object and
+nothing else — take away everything that is not the object (the hands, the hole, the wing, the
+shelf) and if what is left looks the same, it is not a state. A flower wilts, a bottle breaks, a
+canvas gets painted: states. Held, carried, set down, in front of something: the same object.
+`states[]` exist only for a change to the object ITSELF — broken,
+lit, opened, filled, wet, torn, mended. Where it is, who holds it and what it touches are never
+states; the page's brief stages that. A delta describes the altered look and nothing else: no
+place, no figure, no body part, no other element. The `held` flag is dropped from the schema —
+it only ever existed to describe placement states, and code that read it tolerates its absence.
+**Rationale:** A state's cell must be drawable from the object alone. A state defined by contact
+with another element cannot be — it drags that element into the cell, and the renderer is then
+handed two sources for one thing. Placement is per page and already lives in the brief's prose
+and interactions; encoding it a second time in the bible produced cells that could only be wrong.
+Supersedes the same-day wording "a delta describes the OBJECT, never who is touching it", which
+treated the symptom (a named holder) rather than the category error (a placement state).
+**Touched:**   `prompts/story-bible-from-beats.txt` (rules 63-64, `states` schema field)
+**Status:**    ✅ active
+
+## The repair is handed an element's reference by id, never by name (2026-09-09)
+**Context:**   `inpaintPage` attached a bible reference only for findings carrying a structured
+`item`. The semantic judge names the object in prose and never saw a bible id — every id is
+scrubbed out of its inputs — so the repair was asked to paint an object it had never been shown.
+A Lab A/B (set 32, runs 1069-1072) measured the effect: with no picture of the object, 0 of 4
+repairs painted it; with one, 1 of 4 did (and 2 damaged the frame). A prose-matching resolver
+was built and reverted the same day (classification belongs to the prompt; code never
+pattern-matches prose).
+**Decision:**  The judge is shown PAGE ELEMENTS — a legend of the page's declared objects as
+"<id> — <name>" (`formatElementsBlock`, the one place a raw id is shown to it on purpose) — and
+copies the id onto every finding as `element`, or null. `inpaintPage` looks that id up in the
+bible, resolves the cell for THIS page's state via `elementRefCell(entry, handle, pageNumber,
+sceneMetadata)`, and attaches it; at most two element references per repair. Nothing is read
+out of prose; an id the bible does not know is skipped and logged.
+**Rationale:** The judge already emits `character` structurally; `element` is the same contract
+for things. Availability is the fix here, not reliability — the A/B shows a reference is
+necessary and not sufficient — and the reference the repair sees is now the one the page cites.
+Completes the "🟡 open" half of the entry above ("Holder-in-cell and repair-reference fixes").
+**Touched:**   `prompts/image-semantic.txt`, `server/lib/sceneValidator.js`,
+`server/lib/vbIdGuard.js` (`formatElementsBlock`), `server/lib/images.js` (`inpaintPage`),
+`server/lib/repairPipeline.js`, `server/lib/testlab.js` (both pass `sceneMetadata`)
+**Status:**    ✅ active
+
+## Creature size in the VB is an age-scaled RECOMMENDATION, never a cap (2026-09-09)
+**Context:**   The creature-tone block (commit `05ba6c706`) governs how non-human cast LOOK per
+focus age, including how size is PHRASED. It said nothing about what size to pick, so a young
+child could still get an enormous creature. Owner asked for age-scaled size — "not a rule but a
+recommendation".
+**Decision:**  Each of the three levels gains one size-preference sentence, worded as a lean:
+0-4 prefers a creature near the child's own size; 5-6 prefers one clearly bigger but still
+in-frame and approachable rather than overwhelming; 7+ says size may be whatever the story
+wants. Every level states that the story's own needs win — a being that is ridden, carries
+characters or blocks a way is that size. No "must"/"never" is used for the size itself; the
+existing size-PHRASING rules (metres not child-multiples, no looming at levels 1-2) are
+unchanged and sit after the new sentence.
+**Rationale:** A hard cap would make already-planned pages unrenderable. Evidence:
+`job_1788903616404_iqvhj4l8m` (focus child age 5, level 2) has a creature carrying four
+children and their bicycles on its back in flight — the arc fixed that beat before the bible is
+written, so a mandated small creature contradicts the plot. Preference-with-override gives the
+default scale without breaking the story. Phrasing and choice are separate concerns and stay in
+separate sentences.
+**Touched:**   `server/lib/promptBuilders.js` (`CREATURE_TONE_LEVELS`, all three levels),
+`tests/manual/test-creature-tone.js`
+**Status:**    ✅ active
+
+## Animals and invented figures may carry `states[]`; almost none do (2026-09-09)
+**Context:**   `states[]` existed only on artifacts. A creature whose look the story changes —
+a dragon with one wing broken, then whole — had no way to say so, so its reference showed the
+unaltered look on every page, every render started from a whole animal, and the judge's finding
+("the wing does not show the gap") had nothing a repair could be shown for.
+**Decision:**  Owner ruling. `states[]` is allowed on `animals` and `secondaryCharacters`, under
+the same test as objects: take away everything that is not the thing itself and, if what is
+left looks the same, it is not a state. A wing broken then whole, a coat lost then found:
+states. The field is for the rare thing the story itself changes — the bible prompt says so in
+words ("almost every entry has no states at all"), and no rule is added beyond the test.
+Commissioned (main) characters do not get `states[]`: their look changes are clothing, which
+already has its own per-page system.
+**Rationale:** The parser (`outlineParser/unified.js`), the reference sheet
+(`expandElementStateCells`), the per-page cell resolver (`elementRefCell`) and the page reference
+walk were already pool-agnostic; the only artifact-only code was the Art Director's element
+list, which now prints a `States:` line for animals and secondary characters too, so a brief can
+cite `ANI001.2`. Both scene-expansion builders edited in step; the "all" builder also gained the
+artifact `States:` line it had been missing. Shipped in two commits (deb77cce9 and the one
+carrying this entry) because a chained push ran ahead of its own gate — the tree was green both
+times, verified after the fact.
+**Touched:**   `prompts/story-bible-from-beats.txt` (rule 62, `states` on two schema blocks),
+`server/lib/promptBuilders.js` (both recurring-elements builders)
+**Status:**    ✅ active
+
+## The repair admission gate: floor back to 60, a type rescue above it, and a PER-ROUND CAP on how many pages a round may repair (2026-09-09)
+**Context:** Two opposite faults, measured on the same 53 recent staging stories
+(avg 14.3 pages).
+
+*Too little repair, in a dead band.* `job_1788903616404_iqvhj4l8m` page 3 shipped at
+finalScore 55 with THREE MAJOR findings and ZERO repair attempts: three-stage
+`clothing`, three-stage `action_interaction`, semantic `missing_element`.
+`findBadPages` admitted a page only on `score < 50` OR `issueCount >= 5` OR a
+CRITICAL — 55 / 2 findings / no CRITICAL matched nothing.
+
+*Too much repair, everywhere else.* 6.4 pages repaired per story (45% of all pages);
+**19 of 53 stories repaired more than half their pages**; worst case a 14-page story
+repaired all 14 pages in round 2 AND all 14 again in round 3. Nothing in the round
+loop bounded per-round work.
+
+**Decision:** Three changes, one owner decision.
+1. `REPAIR_DEFAULTS.scoreThreshold` **50 → 60**.
+2. **Type rescue** — a page above the floor is admitted when it carries a
+   MAJOR-or-worse finding whose DECLARED type is in `SAFE_REPAIRABLE_TYPES`
+   (`object_presence`, `missing_element`, `accessory_missing`, `object_count`,
+   `emotion`, `viewer_address`), minus anything in `NOT_INPAINTABLE_TYPES`.
+   **Entity-sourced findings are never admitted by this path.**
+3. **Per-round cap** — a round may work on at most 50% (round 1) / 30% (rounds 2+)
+   of the story's pages: 20 pages → 10, then 6. Floor of 3 pages (or all bad pages,
+   if fewer) so short stories still repair. Over-cap pages are **deferred, not
+   dropped** — they are still bad next round and come back. `findBadPages` now
+   orders worst-first (CRITICAL-carrying pages first per the 2026-09-04 ruling,
+   then ascending finalScore) because the cap consumes that list from the front.
+   The cap logs at WARN naming eligible / admitted / deferred page numbers, and
+   never fails a job ("gates are guidelines").
+
+**Rationale:** The floor's 2026-08-09 lowering to 50 was argued from REGENERATION
+outcomes, but a 50-59 page today routes to LOCAL repair, not a full regen. Measured
+repair value by entry score on pages with >1 stored version: <0 → 71% improved;
+0-49 → 63%; **50-59 → 48% (+8.0 avg)**; 60-69 → 24% (+4.7); 70-79 → 9% (+0.3);
+80+ → 5%. 50-59 is the best band left above 0, and 60-69 is not — hence 60, not 70.
+Blast radius: floor +24 pages (+3.9%), type rescue +63, combined ≈ +70 at ~$0.06 per
+page per round on a ~$4.66 story. `pickBestVersionIndex` already discards a repair
+that scored worse, so the risk of extra admissions is cost, not quality. The cap is
+the highest-value part: the runaway it guards against is already occurring, and a
+50%/30% taper spends each round's budget on the worst pages instead of grinding the
+whole book three times.
+
+This **supersedes ONLY the 60 → 50 `scoreThreshold` rider inside the 2026-08-09
+entry**. `iterateSalvageFloor` and the four numeric gates in that entry are
+untouched. There is no `docs/SETTLED.md` line on `scoreThreshold` (verified).
+
+The MANUAL admin repair workflow does NOT move with the floor: `IMAGE_QUALITY_THRESHOLD`
+is now pinned to an explicit `MANUAL_REPAIR_STOP_SCORE = 50` instead of being derived
+from `REPAIR_DEFAULTS.scoreThreshold`. Deriving it would have silently made
+operator-driven "repair until good" grind every page up to 60 and multiplied the cost
+of a manual session — a change nobody asked for, in a flow a human is already pacing.
+
+**Touched:** `server/config/models.js` (scoreThreshold, `maxRepairShareRound1`,
+`maxRepairShareLaterRounds`, `minRepairPagesPerRound`), `server/lib/repairLogic.js`
+(`findBadPages` rescue + worst-first order, `SAFE_REPAIRABLE_TYPES`,
+`findSafeRepairableFinding`, `applyRoundCap`), `server/lib/repairPipeline.js` (cap
+wired into the round loop; bad-page list keeps worst-first order; a deferred page is
+not pulled back in by the garment-colour path), `server/utils/config.js` +
+`server/lib/evalPipeline.js` (`MANUAL_REPAIR_STOP_SCORE`),
+`client/src/config/repairDefaults.ts` (comment; the client already said 60),
+`tests/unit/repair-gate-cap.test.ts`.
+**Status:** ✅ active
+
+## The writer sees each landmark's photos, and the Art Director waits for them (2026-09-09)
+**Context:**   p18 of a staging story asked for a hilltop skyline with the Hauptbahnhof and the
+Grossmünster below. The bible had named the station "distant aerial view"; the landmark index
+holds three photos of it — one street-level waterfront façade and two interiors — and the
+resolver served the façade. Two consumers were deciding blind. (1) The writer/bible: its REAL
+LANDMARKS section printed name, type and Wikipedia extract only, with a comment excluding photo
+descriptions on purpose — so it authored a viewpoint no photo shows. (2) The Art Director: it is
+meant to see a "Photo variants:" line per real landmark (`buildVbLocationLines`), but in the
+beats pipeline the variant fill started as an un-awaited promise in `onVisualBible` and the
+single AD call ran before it resolved; the stored AD context carried no variants for either
+landmark, and `landmarkView: "distant"` was chosen without knowing no such photo existed.
+**Decision:**  Owner's call: both. `beatsPipeline` awaits `loadLandmarkPhotoDescriptions`
+right after `onVisualBible`, before scene expansion (the race is a clear bug —
+`tasks/bugs.json`). `buildAvailableLandmarksSection` adds a PHOTOS line per landmark — one
+clause per reference photo, its kind and a short description, indexer tag stripped — and a rule:
+a landmark is drawn from one of its photos, so a location or vantage of it may only be named
+from a viewpoint one of them shows; if no photo shows what a page needs, that landmark is not
+available for that page. The Wikipedia extract stays for what the landmark IS.
+**Rationale:** The photos are the landmark as far as the pictures are concerned; a viewpoint
+the index cannot supply renders from prose whatever else is right. Reverses the "Wikipedia
+extract only" choice recorded in the builder's comment: that choice kept photo wording out of
+the story text, which the "DESCRIPTION is reference, not wording" rule already handles, and it
+cost the one thing the writer needed to know. The AD fix alone would leave the bible free to
+promise an unphotographable view; the bible fix alone would leave the AD blind whenever the
+race is lost.
+**Touched:**   `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`
+(`buildAvailableLandmarksSection`), `tests/unit/available-landmarks-photos.test.ts`
+**Status:**    ✅ active
+**Correction (same day):** the "race" diagnosis was wrong and the first code fix was a no-op.
+Linking real landmarks to their index entries and loading their variants both happen in the
+caller AFTER `generateStoryViaBeats` returns; awaiting only the loader inside beats found nothing
+linked. Measured on the next run (job_1788983823620_csjcyp1q9): bible linked with four variants
+at the end, AD context with none. Beats now runs `linkPreDiscoveredLandmarks` and then
+`loadLandmarkPhotoDescriptions` itself before scene expansion, and logs how many real landmarks
+carry variants at that point so the next run proves it. The PHOTOS line for the writer stands.
+
+## The arc ENUMERATES the figures it invented; code re-counts the list and may force one more round (2026-09-09)
+**Context:**   `job_1788903616404_iqvhj4l8m` was commissioned for four children with photos
+(allowance 2, journey band, cast 4). The arc invented four named figures — a dragon, a mountain
+creature, a **mother** with a wholly fabricated face on pages 2 and 18, and a dog — and its own
+critique reported, verbatim: `"Invented figures past allowance: none — Fenno and Nolo, exactly two"`.
+Nobody caught it, for four independent reasons, all verified in source. (1) `buildArcBudgetSection`
+never defined what COUNTS: its only gloss was "enough for the story's opposition and its help",
+which names the roles the allowance is FOR, not what counts against it — so the model read the
+dragon as help, the creature as opposition, and excluded the mother and the dog as neither.
+(2) The critique dimension was a self-certifiable verdict ("does every figure past the allowance
+carry justification?"), answerable "none past allowance" without ever writing a list.
+(3) The three independent readers were never told the allowance — `buildArcPanelPrompt` and
+`buildArcHintsPrompt` filled only brief/characters/arc, and `arc-panel.txt` had no allowance
+placeholder. Only the author, grading itself inside the same call, knew the number.
+(4) Nothing in code re-counted anything.
+**Decision:**  Four changes, no number touched.
+1. **Membership is defined by SOURCE, not by role.** A figure is invented when the STORY named it
+   and the COMMISSION did not — persons, animals and creatures alike, including a one-page figure,
+   a non-speaking one, and a framing adult (parent, grandparent, teacher, shopkeeper, neighbour who
+   sets a rule, waits, permits or welcomes). Excluded: anyone the commission named **including any
+   animal or companion it supplied** (this owner's brief named the dog), places/buildings/landmarks/
+   vehicles/objects however named, a group named collectively, and a figure referred to only by what
+   it is. The de-naming dodge is closed explicitly.
+2. **The critique EMITS a list, not a verdict** — `Invented figures:` then one dash line per figure
+   (`- <name> — <what it is in the story, three words>`), then `Allowed: <N>. Written: <M>.`
+   **Unnumbered** by contract (`critiqueMaxSeverity` reads `/^\s*\d+[.)]/` and defaults untagged
+   numbered lines to MAJOR — a numbered list would mint phantom MAJORs and break the arc-round early
+   stop), **head-positioned** (before `Fixing:` in arc-retell so `parseArcRetell`'s head slice keeps
+   it out of `finalArc`; at the head of the CRITIQUE in arc-create so it stays out of `commit.arc`),
+   and **optional** — an absent block yields an empty reading and the run degrades to the old
+   behaviour. Read by `parseInventedFigures`, the same block-read shape as `Challenges taken:`.
+3. **The panel is briefed.** `buildArcPanelPrompt` now fills `{INVENTED_ALLOWANCE}` and
+   `arc-panel.txt` carries a seventh lens, CAST, asking the panel to audit the author's list against
+   the arc it is reading. Three models already run every round, so this costs nothing.
+   NOT added to `buildArcHintsPrompt`: hints ride forward into the beats and text prompts, where
+   removing a character is architecturally forbidden — a hint nothing can act on is noise.
+4. **Code re-counts and may force ONE more round.** Arithmetic over the model's own emitted list
+   against the code allowance (`arcInventedAllowance`, now the single source of truth for the budget
+   section, the panel and the re-count). On an overcount the two arc-round early stops are suppressed
+   and another panel + re-telling round runs — a re-telling rewrites the whole story and is the only
+   mechanism that can remove a figure spanning several pages. At most ONE forced round per story,
+   never past `arcRoundsMax` (3, owner cap 2026-08-30); at the clamp it logs and ships with a warning,
+   per "gates are guidelines". Switchable: `MODEL_DEFAULTS.arcForceRoundOnInventedOvercount`.
+5. **Beats cross-check, reporting only.** `runPlanCounters` compares the arc's declared list against
+   the `cast.invented` it already derives from the plan lines and emits `ARC_INVENTED_UNDECLARED` /
+   `ARC_INVENTED_OVER_ALLOWANCE`. Deliberately NOT in `REPLAN_MUST_FIX_CODES`: a re-plan is
+   architecturally forbidden from removing a character (`story-beats.txt` tells the stage the arc is
+   finished), so enforcement there would demand something the stage cannot do.
+**Rationale:** An enumeration cannot be self-certified — a model that must write the names writes
+them, and a list is arithmetic a judge and a piece of code can both check. The role gloss was the
+actual hole: it is a description of purpose, and purpose is exactly the axis a model reasons its way
+around. **No regex runs over the arc prose** — `planCounters.js:227-248` records why (German
+capitalises every noun; "Deck", "Karte", "Truhe" became cast members), and it is the same banned
+class as the mirror-guard removed 2026-08-09. **The allowance NUMBER is unchanged**: the floor of 2
+set 2026-09-07 citing this exact story shape (journey, cast 4) still holds, page-count scaling is
+still gone, and `arcInventedAllowance` computes byte-identical values to the inline code it
+replaced. Defining membership, enumerating, briefing the panel and re-counting are additions to how
+a number is applied, not a reversal of the number — `docs/SETTLED.md` carries no line on invented
+figures (re-verified 2026-09-09). The arc prompts do not pass through `shrinkPromptForModel` (it is
+called only from `images.js`, `grok.js` and `sceneComposite.js`, all image paths), so head-block
+deletion is not a hazard here.
+**Touched:**   `server/lib/promptBuilders.js` (`arcInventedAllowance`, `buildArcBudgetSection`,
+`parseInventedFigures`, `parseArcCreate`, `parseArcRetell`, `buildArcPanelPrompt`),
+`prompts/arc-create.txt`, `prompts/arc-retell.txt`, `prompts/arc-panel.txt`,
+`server/config/models.js` (`arcRoundsMax`, `arcForceRoundOnInventedOvercount`),
+`server/lib/beatsPipeline.js` (arc round loop), `server/lib/planCounters.js`,
+`server/lib/storyHelpers.js` (facade), `tests/unit/arc-invented-figures.test.ts`
+**Status:**    ✅ active
+
+## The scene review checks both directions of the cast: nobody missing, nobody imported (2026-09-10)
+**Context:**   A plan line staged a subject page — a vessel tiny in fog, dolphins, rocks, no one
+named. The plate rendered exactly that. The Art Director's first draft put the whole cast on the
+deck anyway (its own rules 3 and 10b forbid it), the review passed it, five reference cards
+went into the render, and the vessel grew to fit the people. Every stage after the AD executed
+the error faithfully: the evaluator judged against the brief, so it counted the people rather
+than questioning them, and the repair added the one it found missing.
+**Decision:**  `prompts/scene-review.txt` gains check 5a `[cast_not_in_plan]`: a brief that
+lists in `characters[]`, or names in its prose as present, a character the page's plan line does
+not name is a fault, however natural their presence would be; a plan line that names nobody is
+a subject page with an empty cast; the rewrite removes the imported characters and restates the
+subject's scale rather than keeping them small or far away. The preamble's rewrite contract
+gains the same clause ("never keeps a character the plan line does not name").
+**Rationale:** Rule 5 `[cast_over_cap]` tested one direction only — a character in the plan
+line but absent from the brief — and `[cast_unlisted]` compares prose against metadata, not
+brief against plan. So the review could catch a dropped character and never an added one, and
+adding is the failure mode that destroys a subject page: character references force the
+subject to human scale. The AD already has the rule; the fix is the check that enforces it,
+because the AD demonstrably breaks it when the plan line names the cast's own vessel or a
+discovery that implies discoverers. Generic by construction: it compares the brief to the plan
+line and names no story.
+**Touched:**   `prompts/scene-review.txt` (preamble, check 5a)
+**Status:**    ✅ active
+
+## The character-cell gate judges the reference against its own description: sex (2026-09-10)
+**Context:**   The pipeline judges identity AGAINST the reference sheet — the quality eval pairs
+each figure with a cell, the semantic eval is told identity is that system's job, the compliance
+eval may not call a matched figure CRITICAL — and nothing judged the reference against its own
+description. A secondary character the bible described as "a woman, wiry and angular…, 58"
+rendered as a man on her sheet; the sheet passed the cell gate (skin, art style, apparent age);
+every page then matched the man to "Malva" at 0.9 and shipped. The scale-sheet chimera of
+2026-09-09 was the same blind spot on an object.
+**Decision:**  Owner ruling: "we must eval vb against sex". `checkCharacterCellRender` gains a
+fourth clause, fed by the bible's `build` field verbatim — the field the bible prompt already
+requires to open with the character's sex ("a woman, broad-shouldered"). The vision model
+compares figure to sentence; code parses nothing. The gate keeps its shape (one yes/no question,
+one re-render on NO, accept what comes back). The question is built by `cellGatePrompt()`,
+exported and unit-tested.
+**Rationale:** Measured on the cell that shipped: old question → natural:true; new question with
+the real build text → natural:false, "the figure reads as male, not female"; the same cell with
+a build saying "a man" → natural:true (no false positive). A wrong reference is agreed with by
+every downstream check on every page, so the only cheap, decisive place to ask "does this
+picture match its words" is the sheet, once, before it is copied. Known limit: the one permitted
+re-render uses the same description, so it may draw the same man; the run then logs
+`vb_character_cell_still_bad` and ships. Leading the description with the sex (build before
+age in `buildCharacterDescription`) would make that re-render count and is proposed, not done.
+**Touched:**   `server/lib/referenceSheets.js` (`cellGatePrompt`, `checkCharacterCellRender`,
+two call sites), `tests/unit/cell-gate-sex.test.ts`
+**Status:**    ✅ active
+
+## Two named figures on different levels are staged from one level, never face to face across the edge (2026-09-10)
+**Context:**   A page staged a standoff across a ship's rail: one figure on the deck, the other
+looking up from a rowing boat on the water. Every render put the boat on the deck at the first
+figure's feet. Owner asked whether a correct plate fixes it; measured in the Lab (set 33/34,
+experiments 1073-1075): a plate built from the page's own Art-Director prompt was exactly right
+(medium view across the rail, boat afloat below), and both page renders onto it hauled the boat
+up onto the deck anyway. The prompt said "below her, on the water" each time. The renderer
+draws every referenced figure on one plane and moves the world to do it — the same mechanism
+that grew a tiny ship to fit five reference cards and turned a held scale into the wing it
+touched.
+**Decision:**  Art-Director rule 11f in both sibling prompts: two named figures on different
+levels are staged from ONE level — camera on the upper level looking down, the lower figure
+small and far at background depth with its surface visibly below the edge; or camera on the
+lower level looking up, the upper figure at the edge above — never both at full size facing
+each other across the edge. Both figures stay in `characters[]`, so the review's contract
+(never drop a plan-line character) holds; the reviewer's `[drawability]` check names the
+face-to-face-across-an-edge staging and rewrites to one level.
+**Rationale:** A plate fix was the obvious repair and the experiment showed it insufficient;
+the constraint is the character pass, so the staging has to respect it. The plan-side option
+(two pages, or the moment given to one figure) is not taken here — it is a beats-prompt
+decision and is proposed separately.
+**Touched:**   `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt` (11f),
+`prompts/scene-review.txt` (check 7)
+**Status:**    ✅ active
+**Measured (same day, Lab exp 1076-1080):** the rule reaches the Art Director and not the renderer. With
+11f live the AD staged the page exactly as asked (upper figure looking down, lower figure small below,
+head at rail height, `depth: background`) and both native renders on the correct plate still drew the
+two at full size on one plane - one put the upper figure INTO the boat. That is 4/4 native renders
+across two briefs. Production's stratified composite on the same plate (exp 1079, 1080) kept the world
+2/2 - boat afloat below the rail, first figure at true scale - because cut-outs are pasted onto a
+finished plate and never re-drawn; but it pasted the second figure onto the ship's edge 2/2, because
+placement is left/right x depth with no vertical axis. (Exp 1079's line-and-wash look was the Lab
+override dropping the ART STYLE block, not the routine; 1080 carried it and is a proper watercolour.)
+So 11f as a camera instruction is measured INEFFECTIVE; the working directions are a plan-level rule
+(a two-level moment is two pages, or one named figure in frame) and a vertical placement anchor in the
+composite. Both await the owner's decision; the rule stands only until then.
+
+**Measured further (Lab exp 1081-1084, same day):** production's silhouette composite
+(`generateSceneComposite`, uniform) DOES draw the two-level page. Fed the page's own plate words,
+its populated plate put the second figure at half height on the water below the rail 3/3; with
+the silhouette line told the figure is "seated in the rowing boat" it put her IN the boat and the
+finished, blended page is correct (exp 1084, $0.06) - the only correct render of the page across
+twelve attempts. Two things stood in the way in production: (1) the depth-spread gate refused the
+first two samples at 1.95x and 1.84x against 2.0x (the run that completed measured 2.19x because
+the seated stand-in is shorter - the gate is sensitive to pose, not only to depth); (2) the
+silhouette line carries position and size but not containment, so "from her rowing boat" landed
+the stand-in beside the boat 1/3. Both fixes exist only as Lab knobs (`minDepthSpread`,
+`castActionOverrides`); production is unchanged. Also: one DINO run returned no person boxes on
+a plate it had detected minutes earlier (exp 1083; cause not established), and a detector refusal
+now keeps its plate (28cfb269c). Owner's call on carrying the gate (settled 2026-08-25) and the
+containment wording into production.
+
+
+## The refiner may MOVE a scene to the page whose picture shows it; a $0 shingle check catches a copy (2026-09-10)
+
+**Context:** `job_1788983823620_csjcyp1q9` ("Fiona und die Karte aus Kohle", 16p, de-ch)
+shipped pages 12 and 13 carrying the same paragraph — eleven 5-word sequences byte-identical.
+Chain, verified from `stories.data.textRefineReport` and the prompts: the page plan was right
+(p12 = one figure at the mast refusing to turn back; p13 = the chart made and pinned); the
+draft writer merged both into text-p12, so text ran one page ahead of the pictures; the
+arc-informed audit correctly flagged MISMATCH on p12/p13/p14; the repair, bound by
+`text-refine.txt` "never change what HAPPENS on it. Do not add, remove, reorder or reverse an
+event", could not take the passage OFF p12 — it wrote p13 fresh, left p12 byte-identical, and
+self-reported *"that material is now split 12/13 as the pictures demand."* Copied, not split.
+Nothing downstream could see it: the re-audit was deleted on 2026-09-03 (its accepted cost was
+exactly "a fault the repair pass introduces has nothing reading its output"), and the diff and
+lector passes judge spans inside one page, never across pages.
+
+What the 2026-08-10 rule protected against: a refiner blind to the brief rewriting EVENTS
+(`job_1786309527338` p6 — the cork stays stuck, the map is never unrolled). A move to the page
+whose plan line and picture already show the scene changes no event of the STORY, reverses
+no outcome and contradicts no picture; it restores the text to the division the plan made.
+Not on `docs/SETTLED.md`.
+
+**Decision:** two halves.
+1. `prompts/text-refine.txt` — one permitted operation: a MISMATCH whose text carries a scene
+   the next or previous page's picture shows is closed by MOVING the passage; a moved passage
+   leaves its source page; the same scene, event or spoken line never appears on two pages.
+   Ledger: recorded as "moved from p<a> to p<b>", the source page's line lists what left.
+   `story-text-from-beats.txt` Step 1 also names a page that "carries a later page's instant".
+2. `server/lib/textRefine.js` — a mechanical cross-page REPETITION check right after the
+   repair pass (the only whole-page writer): 5-word shingles, lowercased, punctuation and «»
+   and dashes stripped; a pair trips at `MODEL_DEFAULTS.textRepetitionMinShingles` = 4 shared
+   shingles (a recurring proper noun yields 1–2 per pair; the measured copy yielded 11). One
+   fed-back corrective `runRepairPass` (kind `repetition_fix`, usage label
+   `text_refine_repetition_fix`) carries the duplicated words, both page numbers and both plan
+   lines in the FAULT-line contract; the check re-runs once; a still-tripping result ships with
+   a WARN naming pages and passages — never a failed job. Exactly one pass per story, never a
+   loop; its cost is logged and stored. Order: repair → repetition check/fix → diff → lector,
+   so the diff reviews the corrective rewrite and the lector proofs it; the diff's BEFORE is
+   the writer's text for every page either pass touched. Stored as
+   `textRefineReport.repetition = { minShingles, pairs, correctivePassRan, resolved, remaining, cost }`.
+
+**Rationale:** string equality on the pages' own words is not classification — it needs no
+prompt and costs nothing, and it is the one failure class the deleted re-audit left open. The
+re-audit stays deleted; this is its $0 replacement for that class only.
+
+**Touched:** `prompts/text-refine.txt`, `prompts/story-text-from-beats.txt`,
+`server/lib/textRefine.js`, `server/config/models.js`, `storyJobPipeline.js`,
+`tests/unit/text-repetition.test.ts` (new).
+**Status:**    ✅ active (staging; unverified on a live run)
+
+## The plan's own grammar marks a THING: an article- or preposition-marked name is never cast (2026-09-10)
+**Context:**   First live firing of the 2026-09-09 `ARC_INVENTED_UNDECLARED` cross-check, on
+`job_1788983823620_csjcyp1q9`, named the story's SHIP and its TOWN as undeclared invented
+figures. Both are excluded by the source-based definition (vehicles and places never count),
+but the check compares the arc's list against `resolveCast().invented`, whose
+acts-like-a-person test ("name followed by a lowercase word") promoted them: "the <ship> seen
+from the water", "<town> and its chain block the way". The story's place data
+(`collectPlaceNames`) cannot know an invented ship or harbour, so the existing exclusions did
+not reach them.
+**Decision:**  A grammatical test in `resolveCast`, beside the place-data and calendar
+exclusions (`isThingMarked`): the PAGE PLAN is English by contract, and English marks a thing
+with an article — "the <ship>", "the harbour of <town>" — while nobody writes "the <person>".
+On the IMMEDIATELY preceding token only: an occurrence is thing-marked when that token is an
+article (`the/a/an`) or one of the module's place prepositions (`of/at/through/…` — the same
+class, the same list `nameCandidates` already trusts; `through` was missing and is added). An
+occurrence acts unmarked when it has no marker and is followed by a lowercase word other than
+a coordinator (`and/or/nor` — "<town> and its chain block" is the pair's verb, not the name's).
+A name is a THING when marked at least once and never acting unmarked; a name marked once but
+acting on its own elsewhere stays a person. Commissioned names never reach the test. The
+result joins `cast.places`, so every counter is protected; `ARC_INVENTED_UNDECLARED`
+re-applies it (`thingMarkedNames`) so a thing is never listed there even for a cast it did
+not resolve. The arc-side enumeration, `ARC_INVENTED_OVER_ALLOWANCE`, and what the arc must
+list are unchanged.
+**Rationale:** Owner ruling: fix on the counter side, mechanically, and never by widening what
+the arc must list. Vocabulary matching ("ship", "harbour") is the banned prose-sniff; an
+article test is a contract of the plan's grammar, the class `planCounters.js` already relies
+on (stopwords, place prepositions, "Plan in ENGLISH"). Measured on the real plan: the ship and
+the town leave the cast, the one real invented person stays, the finding is gone. The rule
+also drops the article-marked compound landmarks blind (without place data) on the earlier
+Uetliberg case, so the place-data test there was narrowed to the bare hill it still needs.
+**Touched:**   `server/lib/planCounters.js` (`ARTICLES`, `THING_MARKERS`, `COORDINATORS`,
+`isThingMarked`, `thingMarkedNames`, `resolveCast`, the 6b cross-check; `through` in
+`PLACE_PREPOSITIONS`), `tests/unit/plan-counters.test.ts`
+**Status:**    ✅ active (staging, not on master)
+
+## `stripQuoted` strips only quote-shaped single-quote spans; a possessive apostrophe never opens one (2026-09-10)
+**Context:**   `planCounters.stripQuoted` — the pre-pass every cast test in the module runs
+(`nameCandidates`, `resolveCast`, `thingMarkedNames`, `namesIn`) — had a third clause
+`'[^']*'` meant for single-quoted vessel names and speech. A possessive apostrophe matched it
+as an opening quote, so "the ship's bow … Fiona's chart" was read as ONE quotation and
+everything between the two possessives was deleted, across plan-line breaks. Measured on the
+real plan of `job_1788983823620_csjcyp1q9`: the joined 16-line corpus is 3818 chars, the old
+strip retained 2849 (969 chars = 25.4% gone, whole pages invisible to the scan). Across the 25
+most recent staging plans (198 plan lines): 0 straight single-quote quotations, 0 curly
+quotes, 20 guillemet pairs, 127 possessives — the clause has never matched a real quotation
+in production; it has only ever eaten text between two possessives.
+**Decision:**  The single-quote clause is quote-shaped:
+`/(^|\s)'[^']*?'(?=[\s.,;:!?)]|$)/g` — the opening `'` sits at the start of the text or after
+whitespace, the closing `'` is followed by whitespace, sentence punctuation or the end. A
+possessive has a letter directly before its apostrophe and can never open a match. The
+clause is NOT deleted (a genuine `'Halt!'` would otherwise leak a capitalised word into the
+cast scan) and no curly-quote handling is added (measured 0). The `«…»` and `"…"` clauses are
+unchanged; the contract (quoted span → one space) is unchanged. `stripQuoted` is now
+exported for its unit tests.
+**Rationale:** Measured on the real plan: new strip retains 3818/3818. `runPlanCounters`
+before/after produces the IDENTICAL finding list (MAIN_UNDER_HALF, NO_COMMISSIONED_ON_PAGE,
+UNDER_COVERED_CHARACTER, CONSECUTIVE_SAME_SHOT_CAST — same pages), so no finding on this
+plan was a strip artefact. What did change: the resolved cast now also carries the bare
+first name of the one invented figure ("Malva", from the previously-eaten instant segment of
+page 4, beside "Malva Grimm"), and page 4's cast count rose from 2 to 3 — a pre-existing
+`nameCandidates` duplicate (full name and its first token are separate candidates) that the
+fuller corpus now exposes; tracked in `tasks/BACKLOG.md`, not fixed here.
+**Touched:**   `server/lib/planCounters.js` (`stripQuoted`, export), `tests/unit/plan-counters.test.ts`
+**Status:**    ✅ active (staging, not on master)
+
+## Cast resolution folds a bare first name into its one full name; two people sharing a first name are never guessed (2026-09-10)
+**Context:**   `planCounters.nameCandidates` returns a full name and its bare first token as
+two separate candidates ("Malva Grimm" in the who-column, "Malva" in the instant). Measured on
+the real plan of `job_1788983823620_csjcyp1q9` once the corpus was fully visible (after the
+`stripQuoted` fix, `e541d93b5`): `resolveCast` produced `cast.invented = ["Malva Grimm",
+"Malva"]` — one person counted twice — page 4 counted 3 in frame instead of 2, and with the
+arc's declared list (`['Malva Grimm']`) the 6b cross-check reported a false
+`ARC_INVENTED_UNDECLARED` for "Malva". `CAST_OVER_3` did not trip only because it needs >3; a
+page with three real names plus one bare-first-name mention would have. The commissioned test
+was an exact full-string compare, so a commissioned two-word name mentioned by first name
+alone was classed as invented.
+**Decision:**  A canonicalisation step in `resolveCast` (`canonicalName(cand, pool)`), applied
+to every candidate BEFORE the commissioned check so every downstream consumer sees one person.
+Pool = all multi-token candidates from the plan corpus ∪ all commissioned names. A
+single-token candidate whose token equals (case-insensitively) the FIRST token of exactly ONE
+pool name folds into that name, in the pool's spelling. Zero matches: kept as it is (a genuine
+single-name character). Two or more (two people sharing a first name): NOT folded — the bare
+token stays its own candidate and is logged once at debug level. The grammar tests
+(`isThingMarked`, acts-like-a-person) still run on the form actually written; the verdict is
+recorded under the canonical name, and the first verdict for a canonical name wins. The
+per-page scan (`namesIn`) takes `cast.aliases` (`firstTokenAliases`, the same rule) so a page
+writing both forms counts one person and a bare "Anna" is credited to neither of two Annas.
+`nameCandidates`, `stripQuoted`, the thing-marker rule and `promptBuilders.js` are untouched.
+**Rationale:** The folding belongs where the pool of names is known, not in the token scanner.
+Real-plan before/after: `cast.invented` `["Malva Grimm","Malva"]` → `["Malva Grimm"]`; page 4
+count 3 → 2; the false `ARC_INVENTED_UNDECLARED` (Malva) is gone; every other finding is
+identical (MAIN_UNDER_HALF p5,7,10,13; NO_COMMISSIONED_ON_PAGE p2,3; UNDER_COVERED_CHARACTER
+Saira p7; CONSECUTIVE_SAME_SHOT_CAST p8,9); no other page's cast count changed. Never guessing
+on a shared first name is deliberate: a wrong fold would silently merge two people, which is
+worse than the duplicate this fixes.
+**Touched:**   `server/lib/planCounters.js` (`canonicalName`, `firstTokenAliases`,
+`resolveCast`, `namesIn`, `runPlanCounters` row scan, export), `tests/unit/plan-counters.test.ts`
+**Status:**    ✅ active (staging, not on master)
+
+## Composite blend prompts are scrubbed of bible ids; the Lab can render phantom poses (2026-09-10)
+**Context:**   The scene-composite blend census copied each interaction's object id verbatim, so Grok
+was told "Looking at ART001.1" (Lab exp 1084/1087, job_1788983823620_csjcyp1q9 p4); no VB-id scrub ran
+anywhere in sceneComposite.js. In exp 1087 the map that line named vanished from the figure's hands in
+the blend. Separately, the per-figure phantom-pose render (a seated silhouette gets a seated figure)
+was off by default and never exposed to the Lab, so a standing cut-out was pasted into a seated
+silhouette on every composite of that page.
+**Decision:**  Every blend prompt passes through scrubBlendPrompt (scrubVbIds + warnIfVbIds) in all
+three builders, with the Visual Bible threaded in from both call sites - through the blendPastedCanvas
+and _stratifiedBody bags, not a module-level opts (check-no-undef caught that first draft). The Lab
+composite stage gains params.phantomPoseRender, params.minDepthSpread and params.castActionOverrides,
+plateDescriptionOverride. Production passes none of them: the gate stays at the settled 2.0x and
+phantom pose stays off until measured.
+**Rationale:**  Same rule as the cover leak (2026-08): an id is noise to an image model and the object
+it names is what disappears. The Lab knobs exist so the page-4 experiment can run the production
+routine to completion without changing what production does.
+**Touched:**   server/lib/sceneComposite.js, server/lib/testlab.js, storyJobPipeline.js
+**Status:**    active
+
+## Composite: an over-wide cut-out is cropped, not thrown; rembg retries once after a cold miss (2026-09-10)
+**Context:**   Lab exp 1089 (phantom-pose composite, page 4): after both phantom renders the run died
+with sharp's "Image to composite must have same dimensions or smaller", outside any try, with no frame
+persisted. Placement clipped overlay HEIGHT to the canvas but never WIDTH. Separately, the analyzer
+loads rembg lazily and the cold load runs past the 60 s call budget, so the first remove-bg call after
+every deploy timed out (exp 1084) and the caller fell to the white-threshold cut-out - the whole sheet
+card pasted into the page.
+**Decision:**  Placement centre-crops a cut-out wider than the canvas (warn logged) and logs every
+cut-out's dimensions and target height. rembgRemoveBackground makes one retry after a failed or
+timed-out call; a warm failure still returns null and the caller's fallback is unchanged.
+**Rationale:** A crop is a visible fault, a throw is a lost page. One retry costs nothing when warm and
+is exactly the cold-load case when not - the same reasoning as the 300 s DINO budget.
+**Touched:**   server/lib/sceneComposite.js, server/lib/rembg.js
+**Status:**    active
+
+## Composite: a head measured as the whole figure is rejected on geometry (2026-09-10)
+**Context:**   Lab exp 1086/1089/1091: DINO's face box on a featureless silhouette was the whole
+figure; the tint scan inside it ran crown to hands; head came out 705px on a 705px silhouette. The
+sizer read the figure as 18% visible, scaled it to 3910px and pasted a giant head (exp 1091 final).
+The same page measured 135px in exp 1087. The only existing check rejects a tint too SMALL.
+**Decision:**  Where the detector builds a result row: a head >= 60% of a silhouette whose box has
+full-body proportions (height >= 2x width) is dropped, with a warning, and the figure is sized as
+painted. A head-only silhouette above a wall is near-square and keeps its measurement.
+**Rationale:** Geometry, not prose: a head cannot be its own standing body. The occlusion sizing
+this feeds is right when the head is real and catastrophic when it is not; one ratio separates them.
+**Touched:**   server/lib/sceneComposite.js
+**Status:**    active
+
+## Composite plate: a figure whose action puts it in or on something is placed there (2026-09-10)
+**Context:**   The populated-plate prompt said "Figures must stand on a SOLID surface (dock plank, floor,
+ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water." A cast entry
+seated in a rowing boat on the water was therefore fighting a hard rule: across five plates the
+stand-in landed in the boat twice, beside it, on the deck, and on the rail (Lab exp 1081-1091). The
+rule was written to stop floating figures, not to keep a figure out of a boat.
+**Decision:**  The rule keeps its list and its NEVER for bare water and sky, and gains: when a cast
+entry's action puts the figure in or on something - a boat, a cart, a saddle, a chair, a wall, a
+ledge - the figure is placed in or on that thing, at its position and level, and that thing is its
+surface; a figure seated in a rowing boat sits inside the hull, below any deck beside it.
+**Rationale:** Two instructions and the model picks one at random is exactly a 2-of-5. Containment is
+already stated in the action; the surface rule just has to yield to it.
+**Touched:**   server/lib/sceneComposite.js (populated-plate prompt)
+**Status:**    active
+
+## Page 4 drawn by the production composite; phantom render keeps the whole figure in frame (2026-09-10)
+**Context:**   Lab exp 1095 (job_1788983823620_csjcyp1q9 p4): the production silhouette composite,
+analyzer warm, phantom pose on, gate floor 1.5x (passed at 2.23x), the stand-in told it is seated in
+the boat, produced the page - one figure on deck at true scale, the other seated in the rowing boat on
+the water below the rail, feet in, watercolour intact. Fifteen experiments (1081-1095) each removed
+one fault; the ledger is in the entries above. 5 Grok calls, $0.10, against 1 call and $0.02 for the
+native render that drew the boat on the deck four times out of four. The only defect left is the
+male reference sheet, caught on new stories by the cell gate.
+**Decision:**  Phantom-pose prompt asks for the whole figure inside a white margin, no part touching
+a frame edge (it asked the figure to "fill most of the frame" and the boots left the frame, exp 1093);
+the composite checks the returned render for a figure touching the bottom edge and re-renders once
+before accepting it. Still unreachable in production (phantom pose is off there) and not exercised
+in the Lab yet: exp 1095 rolled the feet inside.
+**Open (owner):** whether the composite, with phantom pose, the containment clause and a gate that
+is pose-sensitive, is worth 5x the calls for two-level pages - or whether the plan rule (two pages,
+or one named figure in frame) draws them for one call. Nothing here changes what production runs.
+**Touched:**   server/lib/phantomPoseRender.js, server/lib/sceneComposite.js
+**Status:**    active
+
+## `looksAt`: eyes are a field; interactions[] means hands (2026-09-10)
+**Context:**   Page 4 of job_1788983823620_csjcyp1q9 staged two characters facing each other. The
+brief carried two interactions, both targeting the map - the holder's hands and the watcher's
+gaze - and every consumer that needed to know where a character LOOKS read that one slot: the
+composite's blend census ("Looking at ART001.1"), the plate cast line, the image prompt. So a
+woman clutching a map was told to stare at it, and no field existed for the other person. History
+checked: no gaze-target field ever existed; `contact: gaze` lived 56 minutes on 2026-08-23
+(88e0f0c70 -> 76d4ffa49) as a classification of a row toward an object, replaced by `action`.
+**Decision:**  Each foreground/midground character carries `looksAt` - another character, a bible
+id, `camera`, or `away`. AD rule 8j (both siblings): eyes are this field; hands live in
+interactions[]; a holder does not look at what it holds unless the plan line says so; two named
+characters facing each other look at each other unless the plan gives one a different gaze, in
+which case the other looks at them. Consumers: the image prompt (EXPRESSIONS AND EYES), the composite
+blend census (looksAt first; a `watching` row only as fallback for older briefs) and its plate cast
+lines (ids resolved to names in compositeCastBuilder), the evaluators' INTERACTIONS block (a gaze
+line per character), and the reviewer (`[gaze_budget]` reads looksAt; new `[gaze_missing]`).
+Character rows pass through both parser paths untouched, so no parser change.
+**Rationale:** One field, one meaning. Every earlier fix smuggled gaze through a field that means
+contact; this stops inferring eyes from hands anywhere.
+**Touched:**   prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-review.txt,
+server/lib/promptBuilders.js, server/lib/sceneComposite.js, server/lib/compositeCastBuilder.js,
+server/lib/vbIdGuard.js, server/lib/sceneValidator.js, server/lib/evalPipeline.js, tests/unit/looks-at.test.ts
+**Status:**    active
+
+## looksAt for secondary characters lives in a `watching` interaction (2026-09-10, addendum)
+**Context:**   The first looksAt run on page 4 (Lab exp 1096) wrote Fiona `looksAt: CHR001` -
+correct - and dropped Malva Grimm entirely: a secondary character (a CHR id in objects[]) has no
+characters[] row by schema, so the new field gave her gaze nowhere to live and the AD stopped
+writing her `watching` row too.
+**Decision:**  Rule 8j and the reviewer's [gaze_missing]: a secondary character's gaze is a
+`watching` interaction whose object is what it looks at, with the prose saying the same. The
+composite already reads a `watching` row as its gaze fallback, so no code change.
+**Verified:**  Lab exp 1097 (page 4, commit c7837902): characters[] = Fiona looksAt CHR001; interactions[] = Fiona pressing the chart (hands) + CHR001 watching ART001.1 from the rowing boat below, gaze upward (the secondary character's gaze as a watching row). Eyes and hands in separate fields for the first time; the AD also framed the page from one level unprompted (camera below deck level, Fiona large above, boat small below).
+**Touched:**   prompts/scene-expansion-all.txt, prompts/scene-expansion.txt, prompts/scene-review.txt
+**Status:**    active
+
+## The acts-like-a-person test in `resolveCast` reads one plan line at a time; a line break never bridges a name to the next line's first word (2026-09-10)
+**Context:**   `server/lib/planCounters.js` `resolveCast` promotes a capitalised candidate to an invented person when the name is followed by a lowercase word — a verb ("X rows"). The regex used `\s+` between name and word, and `\s` matches `\n`. The corpus is every plan line joined with `\n`, and every plan line OPENS with a lowercase shot word (`medium`, `wide`, `close-up`, `ultra-wide`), so a name sitting at the very END of one line ("…the crew names the ship <ship>") was read as "<ship> medium" and became a person. Recorded in `tasks/BACKLOG.md` on 2026-09-10 while fixing the ship/town false positives on `job_1788983823620_csjcyp1q9`; the `isThingMarked` test added that day was already same-line (`[ \t]+`), the older `acts` test was not. The same `\s+` sat twice in `nameCandidates`: the preceding-token group `(\S+\s+)?` could read the last word of the previous line as the marker before a line-opening name, and the multi-token join `(?:\s+[A-Z]…)*` glued a line-ending name to a capitalised line-opening word — measured against the pre-fix module, `"<ship>\nClose"` came back as ONE candidate when the next line opened with `Close-up`. The plan is one line per page by contract (prompts/story-beats.txt), so nothing about a name legitimately spans lines.
+**Decision:**  All three sites use horizontal whitespace only, `[ \t]+`, never `\s+`: the `acts` regex in `resolveCast`, and both groups of the capitalised-name regex in `nameCandidates`. Nothing else changes — the thing-marker rule, `canonicalName`, `stripQuoted`, the stopword list and the marker sets are untouched. Real plan of `job_1788983823620_csjcyp1q9` (commissioned Sarah, Saira, Facundo, Fiona, Lorena; arc declared `Malva Grimm`) before and after: `cast.invented` = `["Malva Grimm"]`, `cast.places` = `["Grossmünster","Sturmfeder","Krummhafen"]`, findings `MAIN_UNDER_HALF, NO_COMMISSIONED_ON_PAGE, UNDER_COVERED_CHARACTER, CONSECUTIVE_SAME_SHOT_CAST` — identical, because on that plan every line-ending name happened to be article/preposition-marked and `isThingMarked` caught it first; the defect fires on an UNMARKED line-ending name ("names the ship <ship>"), which the new unit fixtures use for exactly that reason. Same-line is now the rule for every per-name grammar test in the module: any future test that looks at a name's neighbours uses `[ \t]`.
+**Touched:**   server/lib/planCounters.js (`resolveCast` acts regex, `nameCandidates` regex), tests/unit/plan-counters.test.ts (5 fixtures, incl. the real 16-line plan)
+**Status:**    active
+
+## Two named characters at two heights is not one picture: plan rule sharpened, plan-check Q10 (2026-09-10)
+**Context:**   The plan prompt already said "Everyone stands on the ground. A figure up high only
+when the event IS that height - then one figure up there and no one else off the ground" (rule 44),
+and no plan-check question asked about it. Page 4 of job_1788983823620_csjcyp1q9 staged two named
+characters facing each other across a rail with a boat below, and five native renders across three
+briefs, two plates and a declared gaze (looksAt) collapsed both onto one level - the renderer puts
+every named figure on one plane and moves the world to fit. Measured across the last six staging
+stories (104 plan lines, 13 two-height candidates): the ones that failed were those where BOTH
+figures had to be seen (a ledge/below page at q10; this page 5/5), the ones that passed had one
+figure up high and the rest a mass or tiny (three flight pages at q100).
+**Decision:**  Rule 44 gains the WHY and the three working shapes: from the lower level with the
+upper character alone in frame; from the upper level with the lower character alone; or two pages.
+A crowd, a mount or a vehicle carrying the whole cast is one thing at one height and is exempt.
+plan-check.txt gains Q10 (two heights), advisory - not in REPLAN_MUST_FIX_CHECKS, for the reason
+recorded there against Q9: the planner detects reliably and a forced repair has destroyed pages.
+**Rationale:** The constraint is the renderer's and cannot be prompted away downstream (AD rule 11f
+measured ineffective the same day); the plan is the one stage that can choose a different picture.
+Advisory first; promote to must-fix only on the same evidence the Q4/Q8 set required.
+**Amended (same day, owner):** the first wording ran to 766 and 596 characters - "too complicated that
+anyone could follow it". Both cut to one breath: one level per picture; stage from one level with the
+other character out of frame, or a page per level; a whole cast carried together is one level. Same
+content, a quarter of the words.
+**Touched:**   prompts/story-beats.txt (rule 44), prompts/plan-check.txt (Q10),
+server/lib/promptBuilders.js (rationale comment only)
+**Status:**    active
+
+## The quality evaluator gets an EXPECTED CAST roster; `extra_character` is a real CRITICAL type (2026-09-10)
+**Context:**   Front cover of `job_1788903616404_iqvhj4l8m`: four commissioned boys, FIVE children
+painted (a dog's name had leaked into the cover prose — fixed in `53f7a9b62`). The stored eval
+of that version: `figures` = 5, `matches` = Julian 0.9 / Levin 0.9 / Max 0.9 / **Nia 0.9** / Kiaan
+0.9, `fixable_issues` = [], verdict PASS, qualityScore **100/100**. The judge bound the phantom child
+to the dog's name because nothing in its inputs said what "Nia" was or how many figures to expect:
+`evaluateImageQuality` passed only `ORIGINAL_PROMPT` prose and reference photos, `sceneCharacters`
+fed the clothing contract and photo attachment only. `image-evaluation.txt` penalised MISSING (D-04)
+and DUPLICATE (D-03/D-03b); N-09 "Crowd extras" was an unconditional never-deduct; the `matches`
+spec did not constrain `reference` to a roster. `extra_character` sat in `evalBuckets.TYPE_TO_BUCKET`
+with no prompt able to emit it (orphan, BACKLOG 2026-09-06). The only count comparison in the repo,
+`findBorrowedLabel`, is repair TARGETING and returns null unless the brief has MORE names than
+figures — one-directional. SETTLED check: N-09 / crowd extras is NOT a settled line; pose-mirror is
+the only never-deduct on that page.
+**Decision:**  "Compute in code, inject into the critique, prompt classifies":
+1. `buildExpectedCastBlock` (`server/lib/evalPipeline.js`) builds, ONCE inside `evaluateImageQuality`,
+   `EXPECTED CAST (N): name, name, VBname (secondary character), VBname (animal, dog)` — the page's
+   `sceneCharacters` + the Visual Bible secondaries AND animals the page metadata names, through the
+   SAME helper char-repair targeting uses (`buildSecondaryExpectedCharacters`, new `includeAnimals`
+   opt — the detector default still excludes animals, owner 2026-08-19). Covers add every VB person /
+   animal the cover description names via `matchVbEntitiesInText` (the cover NAME invariant's matcher).
+   `evalOptions.detectedFigureCount` appends `Detector figure count (GroundingDINO): n` when the caller
+   has a prior detection (batch eval passes `img.bboxDetection.figures.length`; first-round evals run
+   before detection, so null there). Empty block when no cast is known → the template says do not
+   judge the count. New `{EXPECTED_CAST}` placeholder = INPUTS item 8 (`buildEvaluationPrompt`). The
+   eval prompt never passes through `shrinkPromptForModel` (image-gen only), so placement is safe.
+2. `prompts/image-evaluation.txt`: **D-04b `extra_character` → CRITICAL** — a person or animal figure
+   matching no EXPECTED CAST entry outside a populated setting the USER_PROMPT calls for; a person
+   never satisfies an animal entry; one entry per surplus figure, `character` = figure id. `matches.
+   reference` must be a roster name or the literal `unmatched` — never a name in neither. **N-09 was
+   narrowed**: extras are free ONLY when the USER_PROMPT itself calls for a populated setting; a cast
+   list with no crowd language has no extras.
+3. Mirrors: `feedback-consolidator.txt` closed list + "keeps its own type when merging, one entry per
+   surplus figure"; `image-prompt-compliance.txt` never pairs an `unmatched` figure with a prompt name
+   (quality owns the finding). `image-semantic.txt` untouched — it judges named characters from prose;
+   an uncommissioned figure is a quality-eval fact.
+4. Scoring: CRITICAL, deliberately ABSENT from `MAX_SEVERITY_TYPES` (comment added beside
+   `duplicate_identity`) — a MAJOR cap leaves a 100-scoring five-for-four cover unrepaired; CRITICAL
+   trips `findBadPages`' critical arm regardless of score. Bucket `character_presence` (already mapped).
+5. Diagnostics only, never findings: `evalPipeline` WARNs `N figure(s) for a roster of M (k unmatched)
+   — NO extra_character finding emitted` (+ metric `eval_figure_surplus_unflagged`); `findBorrowedLabel`
+   now also WARNs on SURPLUS (`5 figure(s) drawn for a brief of 4 … 1 surplus`) — its deficit refusal is
+   unchanged.
+**Repair route** for a CRITICAL `extra_character`: `findBadPages` critical arm → `decideRepairMethod`:
+not CATASTROPHIC, no entity finding, not clothing → step 3 **inpaint** (`extra_character` is not in
+`NOT_INPAINTABLE_TYPES`; the consolidated plan carries the `fix` "Remove this figure; the frame holds
+the EXPECTED CAST only"). No figure-removal method was built; a Grok whole-frame edit is the removal
+path. Covers (`pageNumber <= 0`) skip the entity gate and take the same inpaint route.
+**Rationale:** The roster is the count; the prompt classifies. Classification stays out of code
+(SETTLED); code adds an input and bounds nothing new. CRITICAL because MAJOR reproduces the failure.
+**Verified:**  `tests/unit/extra-character-type.test.ts` (20 tests: page + cover roster, CRITICAL
+billing through `parseFixableIssues` → `composeDeductions`, critical arm, both borrowed-label
+directions, prompt vocabulary); `npm run test:unit` 78 files / 1007 pass. Offline render of the real
+stored cover (staging `stories`, no model call): `EXPECTED CAST (5): Levin, Julian, Max, Kiaan, Nia
+(animal, dog)` / `Detector figure count (GroundingDINO): 5` — the roster now says the fifth entry is a
+dog, so a fifth child is D-04b; with `53f7a9b62` the prose no longer names her and the roster is 4.
+**Not wired:** manual page-edit / manual-repair / cover-edit / char-repair eval calls in
+`server/routes/regeneration.js` (:3413, :3612, :3707, :6108, :6475) pass no cast (their reference
+lists are the WHOLE story cast, unusable as a roster) — block empty, count not judged there.
+**Touched:**   server/lib/evalPipeline.js, server/lib/promptBuilders.js, server/services/prompts.js,
+server/lib/images.js, server/lib/charRepairTarget.js, server/lib/scoring.js (comment),
+server/routes/regeneration.js (re-evaluate endpoint passes `scene.sceneCharacters`),
+prompts/image-evaluation.txt, prompts/feedback-consolidator.txt, prompts/image-prompt-compliance.txt,
+tests/unit/extra-character-type.test.ts
+**Status:**    active (staging, not on master)
+
+## Composite cast is built from characters[] only; a secondary character named as a CHR id is invisible to it (2026-09-10)
+**Context:**   Lab exp 1101, page 4 of job_1788983823620_csjcyp1q9, production composite on the
+looksAt brief (exp 1097): cast = Fiona alone. The brief lists the secondary character as CHR001 in
+objects[] and as a `watching` interaction - correct per the AD schema, which forbids secondaries in
+characters[] - and buildCompositeCast reads characters[] only (its Visual-Bible secondary fallback
+matches NAMES of characters[] entries). The plate put the one figure into the empty boat; the final
+is the main character standing in the other character's boat, that character absent. Every
+earlier composite of this page had the secondary only because the stored brief had put her in
+characters[] against the schema.
+**Decision:**  Recorded, not changed. The gap: a `watching`/`holding` interaction whose character
+is a CHR id should seed a cast entry resolved through the bible (name, reference sheet, singleImage),
+depth from the interaction's position words or `background` when the id sits in objects[] only.
+Owner's call, because it widens what the production composite renders.
+**Touched:**   nothing (docs only)
+**Status:**    open
+
+## Composite casts a secondary character staged as a CHR id; the trigger counts it (2026-09-10)
+**Context:**   The Art Director schema keeps secondary characters out of characters[] (no avatar,
+no clothing category); they are a CHR id in objects[] and the `character` of an interaction. The
+composite cast was built from characters[] only, so a schema-correct two-figure page was a
+one-figure cast: Lab exp 1101 pasted the main character into the other character's empty boat.
+needsScaleRepair likewise counted characters[] only and excluded any background figure "in the
+boat" - the workaround for the plate putting boats on decks, which the containment clause now fixes.
+**Decision:**  secondaryCastSeeds (pure, exported, tested): every CHR id in objects[] or as an
+interaction's character resolves to its bible entry and joins the cast at midground with the
+row's `where` as its action and a `watching` row's object (or `looksAt`) as its gaze; the
+reference sheet is fetched exactly as the name-matched fallback does. needsScaleRepair counts those
+figures, fires on one foreground figure plus one midground or background figure, and the shared-
+vessel exclusion is removed. Production widens accordingly: pages pairing a main character with a
+staged secondary now reach the composite after their native render.
+**Rationale:** Owner: "fix the gaps, don't record it". The composite is the one path measured to
+draw a two-level page (exp 1095), and it could not see the second figure of a correct brief.
+**Touched:**   server/lib/compositeCastBuilder.js, server/lib/scaleRepair.js,
+tests/unit/composite-secondary-cast.test.ts
+**Status:**    active
+
+## Composite: the depth-spread gate is skipped under phantom pose; production renders phantom poses (2026-09-10)
+**Context:**   With both figures finally in the cast (secondaryCastSeeds), two consecutive plates
+staged page 4 correctly - the secondary seated in the boat on the water, the main character at the
+rail above, looking at each other - and the depth-spread gate refused both at 1.47x and 1.33x
+(Lab exp 1103, 1104). The AD's one-level camera (from the water, looking up) makes a deck figure
+and a boat figure similar in apparent size, so the gate measured "no depth" on exactly the staging
+the rule asked for. The gate's own rationale is the STATIC-CELL paste: below the floor, replacing
+the plate's figures with standing avatars can only lose (a kneeling or waist-deep figure becomes a
+standing one).
+**Decision:**  Under phantomPoseRender the gate is skipped (info log): each cut-out is re-posed to
+its silhouette, so the loss the gate guards against cannot happen and the plate's staging stands.
+The 2.0x floor itself is untouched - not lowered, not reversed (owner-settled 2026-08-25); it still
+applies to the static-cell path. Production's composite call now passes phantomPoseRender: true
+(+$0.02 per figure on triggered pages); without it a standing cell is pasted into a seated
+silhouette (exp 1087).
+**Rationale:** Owner: fix the gaps. The gate and the pose render are one mechanism seen from two
+sides; keeping the gate while enabling the pose render would refuse the plates that are now right.
+**Touched:**   server/lib/sceneComposite.js, storyJobPipeline.js
+**Status:**    active
+
+## 2026-09-10 — The depth-spread gate is removed (owner reversal of 2026-08-25)
+**Context:**   The 2.0× floor (calibrated on Lab 707/708/709, confirmed by the owner 2026-08-25 with
+"don't propose lowering it on near-miss evidence") refused the two plates that finally staged a
+two-level page correctly: Lab exp 1103 (1.47×) and 1104 (1.33×), both with the secondary seated in
+the boat on the water and the main character at the rail above. The owner judged 1104 "great" and
+said "remove the gate". The measure was wrong for this staging, not near-missed by it: a camera
+looking up from the lower level makes the upper figure SMALLER, so tallest/shortest read the
+strongest two-level staging as "no depth". The gate's own rationale - a static-cell paste below
+the floor can only lose - no longer applies now that production renders phantom poses.
+**Decision:**  The refusal is gone. The spread is still measured, logged, and written to
+debug.depthSpread as evidence; nothing acts on it. MIN_DEPTH_SPREAD and the Lab floor knob are
+deleted. Supersedes "MIN_DEPTH_SPREAD stays at 2.0×" (2026-08-25), owner's call on this evidence.
+**Touched:**   server/lib/sceneComposite.js, server/lib/testlab.js
+**Status:**    ✅ active; 2026-08-25 entry 🗄 superseded
+
+---
+
+### AD model bake-off REDO on the new AD role (2026-09-10) — gemini-3.1-pro still lowest, no gap beyond noise except vs opus
+**Context:** The 2026-08-29 verdict ("Art Director model = gemini-3.1-pro", Lab
+893-953) measured the AD as it was then. Since that date the AD prompts changed
+in 36 commits (`looksAt` gaze field, one level per frame, rules 7f/7g, VB element
+budget at the AD, plate = world before the action, one-instant rules, worn-item
+states, bidirectional cast check in the review). The owner asked for a rerun
+under a hard USD 4.00 cap.
+**Method:** Lab `beats_scenes` with `plainStoredBeats: true`, `expandPages: 8`
+(the FIRST 8 stored beats, identical page set for every arm of a story),
+`sceneReviewModel: deepseek-v4-pro` passed explicitly (the production
+`sceneReviewModel`; the harness's own fallback is `outlineReviewModel` =
+grok-4.6, which is what the August arms 901-944 actually ran with — see
+limitation 3). Judge: `scene_hazard_count`, `models: gpt-5.6-sol`, `source:
+briefs`, `fromExperiment`, `artifact: raw | reviewed` — same as 905/906.
+Stories (frozen shipped beats, 2026-09-08/09 format): Der Drache, der nicht
+fliegen konnte (`job_1788903616404_iqvhj4l8m`, "dragon") and Bimo kann nicht
+fliegen (`job_1788957347999_ijseol49a`, "bimo"). The third planned story (Fiona
+und die Karte aus Kohle, `job_1788983823620_csjcyp1q9`) was CUT for budget —
+this is a **2 stories x 4 models x 8 pages** run, not 3 stories.
+Experiments — AD arms: dragon 1107 sonnet, 1108 gpt-5.6-sol, 1109 gemini-3.1-pro,
+1110 claude-opus; bimo 1121 sonnet, 1122 gpt-5.6-sol, 1123 gemini-3.1-pro, 1124
+claude-opus. Judge runs (raw/reviewed): dragon sonnet 1111/1112, gpt 1113/1114,
+gemini 1116/1117, opus 1118/1119; bimo sonnet 1127/1128, gpt 1129/1130, gemini
+1131/1132, opus 1133/1134.
+**Cost (actual, metered):** AD arms $2.805 (expansion sonnet 0.160+0.141, gpt
+0.143+0.131, gemini 0.196+0.219, opus 0.720+0.566; DeepSeek review ≈ $0.075
+each; 1110's review is unmetered — `direct_cost: 0` on the OpenRouter usage,
+review DID run and rewrote p1-3 — count ~$0.08 by analogy). Judge 16 runs
+$0.755 (≈ $0.047 each at 8 pages). **Total ≈ $3.64** of the $4.00 cap. Note:
+opus is 3.6x the other arms per story ($0.72 vs $0.14-0.20 at 8 pages; it
+wrote 24k output tokens for 8 pages).
+**Results (hazard count, 8 pages, judge gpt-5.6-sol; raw / reviewed):**
+
+| model          | dragon  | bimo    | TOTAL raw / reviewed | reviewer effect |
+|----------------|---------|---------|----------------------|-----------------|
+| claude-sonnet  | 13 / 13 | 7 / 10  | 20 / 23              | +3              |
+| gpt-5.6-sol    | 10 / 7  | 11 / 13 | 21 / 20              | −1              |
+| gemini-3.1-pro | 7 / 9   | 11 / 8  | 18 / 17              | −1              |
+| claude-opus    | 12 / 13 | 14 / 17 | 26 / 30              | +4              |
+
+Per-class totals over both stories (raw → reviewed): CROWD 0 → 0 for every
+model (the new beats rules removed it upstream, as predicted in August).
+MULTIACT sonnet 6→5, gpt 8→7, gemini 4→3, opus 8→8. GAZE sonnet 2→6, gpt 4→7,
+gemini 5→5, opus 9→10. NEG sonnet 9→11, gpt 7→4, gemini 5→4, opus 7→9.
+CONTACT 0 everywhere except gemini reviewed 1. TEMPORAL ≤1 per model. FORCE
+gemini 3→2, others ≤2. Reviewer rewrites: dragon 2/3/0/3 pages, bimo 0/6/7/6
+pages (sonnet/gpt/gemini/opus).
+**Verdict:** (1) gemini-3.1-pro is still the lowest in both raw (18) and
+reviewed (17) totals, but its lead over gpt-5.6-sol (3) and sonnet (6) is
+inside the ±5-per-cell judge noise (two cells summed); only the gap to opus
+(13 reviewed) is signal. (2) Opus is NO LONGER the cleanest raw writer — it is
+the worst raw arm (26; August: best at 40 vs gemini 49) and the most expensive.
+(3) The "reviewer degrades opus" pattern is directionally present (+4) but
+inside noise; sonnet +3, gpt −1, gemini −1 likewise. Nothing here reverses
+the August ranking at the top. Comparison with August is by ranking and
+direction only — different stories, 8 pages not 16-18, and a different
+reviewer model (deepseek here, grok-4.6 there).
+**Limitations:** (1) The hazard judge reads the prose brief only — the AD's
+new structured fields (`looksAt`, `interactions`, `emptyScenePrompt`) are
+invisible to it, so the classes the new role targets (GAZE, MULTIACT) are
+judged from the prose, not the fields. (2) Two stories, 8 pages: the totals
+are ~1/3 of August's sample; a 6-count difference is not a result. (3) The
+Lab `beats_scenes` harness defaults the scene reviewer to
+`MODEL_DEFAULTS.outlineReviewModel` (grok-4.6) while production uses
+`sceneReviewModel` (deepseek-v4-pro) — `server/lib/testlab.js` ~3825. Every
+August bake-off arm therefore measured the grok-4.6 pairing; the "deepseek
+degrades opus" wording in the 2026-08-29 entry is a grok-4.6 finding. Not
+changed here (owner's call whether the harness default should track
+production). (4) Sonnet's dragon review (1107) hit the 16,000 output-token
+cap on the DeepSeek call; its reviewed brief set may be truncated.
+**Recommendation:** Do NOT change `MODEL_DEFAULTS.sceneDescription`; the
+evidence does not justify a change in either direction. If a decision is
+wanted between gemini and gpt-5.6-sol, it needs the third story plus
+duplicate cells (≈ $2 more) — the current gap is noise.
+**Touched:** none (docs only).
+**Status:** 📋 reported, default unchanged — owner decides.
+
+## Composite: in-place figure render (`figureMethod: inPlace`), Lab-only; plate judge measured blind (2026-09-10)
+**Context:**   Phantom-pose renders ignore the silhouette (exp 1106: a rail figure turned three-quarter came back frontal, full length; a seated figure came back with the whole scene painted in, so background removal cut a leg off). The 2026-08-13 in-place method (`charRepair`) shipped a raw silhouette on exp 1126 (blend gate refused three redraws) and a faceless smear for the other figure. The owner asked for the plain form of in-place: hand Grok the plate and the reference sheet, "put figure A where the red silhouette is", once per figure on the ORIGINAL plate, then move each rendered figure with DINO/SAM onto the depopulated plate.
+**Decision:**  New `figureMethod: inPlace` in `generateSceneComposite`: one edit per figure on the original plate (never chained), DINO person box matched by IoU to the silhouette, SAM mask cut, pasted on the clean plate in occlusion z-order, no blend. Fallback when no figure is found: the dilated silhouette mask. Lab saves each render and the phantom crop actually sent. Unvalidated until the runs under the 2026-09-10 goal (10 runs / CHF 2) are read.
+**Also:**      The judged plate the owner chose the same day (flash-lite yes/no on placement, one re-roll) was measured on five stored plates before wiring: both models answered "all placed" for the two plates a human rejected (exp 1086 boat figure with legs on the deck; exp 1091 no cast lines stored at all). Helpers `platePlacementPrompt` / `judgePopulatedPlate` stay exported, nothing calls them in production. The measured gate is gone (2026-09-10 entry above) and no gate replaces it.
+**Touched:**   server/lib/sceneComposite.js, server/lib/figureDetection.js (`_mobilesamMaskFull` export), server/lib/testlab.js, tests/unit/composite-inplace.test.ts, tests/unit/plate-judge.test.ts, docs/image-routing.md, docs/image-generation-methods.html
+**Status:**    active (inPlace Lab-only); plate judge parked
+
+## Composite: in-place figures are the production method (2026-09-11)
+**Context:**   Goal set by the owner on 2026-09-10: improve the composite within 10 Lab runs or CHF 2. Page 4 of job_1788983823620_csjcyp1q9 (one figure at a rail, one seated in a boat below) was the bench. Paste + phantom pose lost the pose on both figures (exp 1106); the 2026-08-13 in-place repair shipped a raw silhouette (exp 1126).
+**Decision:**  `figureMethod: inPlace` is the production composite method (storyJobPipeline). Eight runs, $0.70: exp 1136 first correct staging but the chart was lost; 1138 sheet panels painted into the scene and a 1.9x figure; 1140 my own fit shrank two correct figures (measured the grown mask against the tight box - reverted to box-vs-box); 1142 a standing figure at 2.7x for a seated placeholder; 1144 a waist-up placeholder behind a bulwark completed with legs over the hull, twice; 1146 and 1148 clean. What made it hold, in order: (1) the sheet is named a reference whose panels never appear; (2) the cut is person mask + silhouette + pixels the render changed inside the box, closed at 8% (render background is the plate, so over-inclusion is free); (3) other silhouettes are subtracted; (4) nothing below the silhouette bottom edge is kept - that edge is the feet or the occluder; (5) the person box, clipped there, is measured against the silhouette (0.75-1.4x, IoU >= 0.45); off the band, ONE re-render with the failure in the prompt; the fit to the silhouette is the last resort only. Cost 4 calls $0.08, +$0.02 per re-render. No blend pass.
+**Rejected:**  scaling a wrong-pose render to the silhouette (1142, 1144: a tiny standing figure is still wrong); a re-render triggered by unclipped IoU (1146: spent $0.02 on a correct figure).
+**Touched:**   storyJobPipeline.js, server/lib/sceneComposite.js, server/lib/testlab.js, docs/image-routing.md, tasks/BACKLOG.md
+**Status:**    active; validated next by the dragon-story rerun
+
+## Composite: the production call site never handed it a brief or a plate prompt (2026-09-11)
+**Context:**   Dragon rerun job_1789078732136_622wecmhj was meant to validate the in-place composite. It ran nowhere: `needsScaleRepair` fired on 13 of 18 pages and every one stored `compositeOutcome {aborted, "cleanBackgroundPrompt or scene.description required"}`. Staging census since 2026-08-25: 44 of 49 outcomes are this abort, 5 "cast empty", 0 composited. Every composite verdict recorded for production pages since 2026-08-15 was therefore a Lab verdict; production has shipped the direct render throughout.
+**Cause:**     The call site read `fdMeta.description` / `pageData.sceneDescription` and `pageData.emptyScenePrompt`; in that closure the brief is `pageData.scene.sceneDescription` and the plate prompt is `sceneBackgrounds[page].prompt` (or `sceneMetadata.emptyScenePrompt`). The composite throws when both are empty, the pipeline catches and keeps the direct render, and the warning never reached anyone.
+**Decision:**  Read the fields that exist (bugs.json `composite-aborts-on-empty-scene-fields`). The dragon story is rerun once more for the actual validation. Lesson for the record: a stage that "fails open" into the previous render needs its abort counted, not only logged - see BACKLOG.
+**Touched:**   storyJobPipeline.js, tasks/bugs.json
+**Status:**    active
+
+## Composite on real pages: lost 5 of 5 in the dragon rerun; three guards, still not trusted (2026-09-11)
+**Context:**   job_1789083667794_17lz946ik, the first production run where the composite executed at all (wiring fix above). It fired on p6, p7, p10, p17, p18 and the picker rejected its output on every page (composite vs direct finalScore: -110/25, 26/36, 10/85, 0/45, -40/53). Four of the five pages fired only because the CHR-id widening counted the dragon as a figure; the production cast builder renders characters[] only, so the dragon was absent from every plate. p18 shipped three raw silhouettes (2 of 5 boys rendered); p10, the one real two-depth human page, came back with a clipped figure and a hard seam. Worse, the direct render was then charged for the composite's defects: Step 1 ran on the composite pixels and the rescue applied that entity report to the pre-composite original (p18 93 -> 53, p10 100 -> 85). Cost $0.56 for nothing.
+**Decision:**  (1) CHR-id promotion removed from needsScaleRepair - the trigger fires only for characters[] the composite can cast. (2) In-place is all or nothing: placed < cast throws and the page keeps its direct render. (3) The pre-scale-repair original is flagged step1Pixels:false and scored without the Step-1 entity report. The composite stays wired for genuine two-depth human pages; the Art Director rule that steers plans away from two-level frames stays. Bench (Lab exp 1146/1148) and production disagree: the Lab cast the VB secondary via secondaryCastSeeds, production does not - see BACKLOG.
+**Touched:**   server/lib/scaleRepair.js, server/lib/sceneComposite.js, server/lib/repairPipeline.js, tests/unit/composite-secondary-cast.test.ts, tasks/bugs.json
+**Status:**    active
+
+## Cover KEY STORY ELEMENTS includes hint-named secondary characters and vehicles; cover name check is state-aware (2026-09-11)
+**Context:** staging job_1789078732136_622wecmhj front cover drew the four
+boys riding the dog instead of the dragon. `coverHints.frontCover.objects =
+[LOC001, ANI001, CHR001]`, every position "on Fenn's back". CHR001 (the
+dragon) is a `secondaryCharacters` entry whose renders live only on its state
+cells (CHR001.1/.2). `buildFullVisualBiblePrompt` built KEY STORY ELEMENTS
+from `animals` and `artifacts` only, so the cover prompt carried "Fenn" 4×
+with no species and "dragon" 0× — the dog was the only creature defined, so
+the model put the riders on it. Rebuilt from the stored story data:
+before = `**Nia** (animal): dog, …` alone; after = `**Fenn** (character): a
+dragon, broad-chested and sturdy, … tall enough to carry four small children
+on his back …` followed by the Nia line. Latent second fault:
+`coverIterate.hasEntityReference` checked the parent-level image only, while
+the grid's `visualBible.hasElementReference` is state-aware — had the hint not
+listed CHR001, the name invariant would have STRIPPED Fenn as "no reference
+image" while the grid could have carried him.
+**Decision:** (1) `secondaryCharacters` (first) and `vehicles` (last) join
+the KEY STORY ELEMENTS loop, gated by the same `elementAllowed` filter and the
+existing 3-entry cap, but ONLY when an allowed-id list is given (a cover hint);
+a hint-less legacy cover keeps animals + artifacts exactly as before, never a
+dump of every CHR. A secondary character is emitted like an animal — proper
+name + `(character)` + its description, which opens with what it is ("a
+dragon, …"); vehicles keep the generic English `**Vehicle**:` lead.
+(2) `coverIterate.hasEntityReference` IS `visualBible.hasElementReference`
+— one predicate for "can this entity be fully sent" on both sides of the
+cover invariant.
+**Not done:** the page path's "The attached reference images include a rough
+image of …" sentence (promptBuilders.js REQUIRED OBJECTS block) is not
+emitted on covers. Covers carry no REQUIRED OBJECTS block, and in all three
+cover paths (first-gen, trial, iterate) the prompt is assembled BEFORE
+`buildCoverReferences` decides the grid (it also renders the empty-scene
+plate), so the attachment set is unknown at prompt time; claiming it from the
+hint ids would be a prediction, not the set actually sent. Reordering the
+paths is a separate change.
+**Rationale:** the hint is the cover's cast list; an id it names must be
+defined in the prompt or the name is a phantom (same class as the 2026-09-08
+cover NAME invariant, which this bug slipped past because the id WAS listed).
+**Touched:** `server/lib/visualBible.js` (`buildFullVisualBiblePrompt`),
+`server/lib/coverIterate.js` (`hasEntityReference`),
+`tests/unit/cover-key-elements-secondary.test.ts`, `tasks/bugs.json`.
+**Status:** ✅ active
+
+---
+
+## Lab scene review was capped at 16k output tokens — 2026-09-10 redo "reviewed" cells invalid; guard + per-reviewer fan-out added (2026-09-11)
+**Context:** `server/lib/testlab.js` `beats_scenes` called the scene reviewer
+with `callStream(srPrompt, 16000, …)`. Production (`beatsPipeline.js`, scene
+review) passes `null` = model max under the owner's rule "no output caps ever"
+(2026-08-29), and `textModels.js` (:1104, :1172) already carries a comment
+naming this exact failure ("the scene reviewer hit exactly 16000"). The Lab
+harness was never updated. Measured on the 2026-09-10 AD bake-off redo
+(experiments 1107-1110, 1121-1124; reviewer deepseek-v4-pro via OpenRouter/
+BaseTen): 6 of 8 reviews report `output_tokens: 16000` exactly. 1109 and 1121
+returned a ZERO-character response and rewrote nothing; 1122 and 1124 returned
+17-18k chars cut mid-output; only 1110 (9,391 tok) and 1123 (13,809 tok)
+completed. No error was recorded anywhere: the harness kept `fromBeats` as the
+"reviewed" brief on every untouched page and `scene_hazard_count
+artifact=reviewed` judged it as reviewed. Production on the same three
+stories: 21,134 and 33,664 output tokens, 17/17 and 14/14 pages rewritten.
+Same signature in August: #879 shows `out 16,000` with `raw: ""`.
+**Consequences for prior verdicts:** (1) The 2026-09-10 redo's "reviewed"
+column is INVALID for 6 of 8 arms — it compared raw against mostly-raw. The
+BACKLOG line "scene review has a measured NULL effect on render hazards"
+(Lab 1107-1134: 27 of 64 briefs edited, +0 on touched vs +5 on untouched)
+is withdrawn; the review's effect is UNMEASURED, not null. The AD-model
+ranking in that entry (raw column) stands. (2) The August (2026-08-29) reviewed
+column was NOT truncated: all 12 AD arms (901-904, 910-913, 919-922, reviewer
+x-ai/grok-4.6) show 21,325-33,513 review output tokens, 0 of 12 at 16,000, and
+3-14 pages rewritten each. Its defect is reviewer IDENTITY — grok-4.6 (the
+harness default `outlineReviewModel`) instead of production's deepseek-v4-pro
+(already noted in the redo entry) — not the cap. One August cell, #920 (levin,
+gpt-5.6-sol AD), returned an EMPTY review (3,899 tokens, 0 chars, 0 rewrites)
+and was stored as reviewed; that is the second failure kind the guard now
+catches. (3) Stored `rawResponse` is clipped at 40,000 chars in several August
+rows — that is the harness's storage clip (`.slice(0, 40000)` for the dev
+panel), not a model truncation; `usage.output_tokens` is the truncation
+witness, not `rawResponse.length`. Left as is.
+**Decision:** (a) Every hard numeric max-tokens in `testlab.js` now passes
+`null` = model max, as production does: scene review (16000), `audit_replay`
+(16000), `scene_hazard_count` (16000), `review_writer` (64000),
+`outline_review` (32000). None carried a justifying comment; none is kept.
+(b) New `server/lib/sceneReviewGuard.js`. `assessSceneReview` marks a review
+FAILED when the text is empty, the provider `stop_reason` is
+`max_tokens`/`length` (Anthropic streams expose it; xAI/Gemini/OpenRouter
+streams do not, so the next check carries them), `output_tokens` ≥ the
+ceiling actually in force (now the model max, e.g. 64,000 for deepseek-v4-pro),
+or the response is >2,000 chars and the SCENES parser found zero pages (format
+failure, unless it reads as a "no changes" verdict). A failed reviewer is stored
+with `ok:false`, `error`, `stopReason`, `capInForce`, `rewrotePages: []`, no
+`reviewedBrief` on any page (never silently equal to raw), and a WARN log naming
+story, reviewer key, modelId, provider, tokens and cap. (c) `scene_hazard_count`
+with `fromExperiment` + `artifact=reviewed` REFUSES an experiment whose primary
+review is `ok:false`, quoting the stored error; `artifact=raw` still works.
+(d) Multi-reviewer fan-out retention for the owner's 5-reviewer bake-off
+(grok-4.6, gpt-5.6-sol, qwen3.8-max, deepseek-v4-pro, gemini-3.1-pro from ONE
+AD expansion, judged per reviewer): `beats_scenes` with
+`sceneReviewModel=a,b,c` keeps the single-reviewer behaviour byte-identical
+(first reviewer = primary → `reviewedBrief`/`reviewRewrote`) and additionally
+stores every OTHER successful reviewer's rewrite per page in
+`sceneExpansions[].reviewedBriefs[modelKey]` (the primary is not duplicated; a
+failed reviewer stores nothing). `scene_hazard_count` accepts
+`params.reviewer=<modelKey>` with `artifact=reviewed` and measures
+`reviewedBriefs[reviewer]` (or `reviewedBrief` for the primary) falling to
+`fromBeats` only on pages that reviewer did not rewrite; a reviewer absent from
+the source experiment or failed there is refused with a clear error, never
+swapped for the primary. Without `params.reviewer` behaviour is unchanged.
+**Rationale:** A truncated or empty review is a provider failure, not a review
+that "found nothing"; storing it as reviewed and judging it produced a
+NULL-effect finding that was about to drive a keep/drop decision on a
+production stage. The guard mirrors production's own three-way split
+(`beatsPipeline.js`: empty / truncated at cap / genuine no-op) and makes the
+Lab refuse to measure what it does not have. Removing the caps aligns the Lab
+with the owner's no-caps rule; nothing on `docs/SETTLED.md` concerns Lab caps,
+so this is alignment, not a reversal.
+**Drive the bake-off:** stage `beats_scenes`, params
+`sceneReviewModel=deepseek-v4-pro,grok-4.6,gpt-5.6-sol,qwen3.8-max,gemini-3.1-pro`
+(first = primary, order otherwise free); then stage `scene_hazard_count` per
+reviewer with `fromExperiment=<id>`, `source=briefs`, `artifact=reviewed`,
+`reviewer=<modelKey>` (and once with `artifact=raw` for the baseline).
+**Touched:** `server/lib/testlab.js` (5 call sites, `applyReviewerPages`,
+hazard-count selector), `server/lib/sceneReviewGuard.js` (new),
+`tests/unit/scene-review-guard.test.ts` (new, 15 tests), `tasks/bugs.json`,
+`tasks/BACKLOG.md`.
+**Status:** ✅ active; the 2026-09-10 redo entry's reviewed column and the
+2026-09-11 "NULL effect" BACKLOG finding are 🗄 withdrawn as evidence.
+
+## Visual Bible element cells: the kind sentence, the element/state cell gates, and `text` cells on the typography tier (2026-09-11)
+**Context:**   job_1789078732136_622wecmhj (staging, "Der Drache, der nicht fliegen konnte"): ART001 "small dragon scale" and ART002 "large dragon scale" both rendered as ceramic dishes in the Visual Bible, and every page holding one inherited the dish. The cell line was the description alone — `buildReferenceSheetPrompt` dropped name and type on purpose (2026-08, a labelled "Name (artifact) - …" line got the name painted onto a parchment). "an oval, slightly convex scale about as wide as a child's palm…" contains no noun that says what the thing IS; the model read "scale" as a shape word. Root-cause report: ~/Downloads/dragon-cover-scale-rootcause.html Q2. Side finding from the same sheets: LOC004's description names "the Windchopf sign post", and the neighbouring sign cell (ART005, whose own description says "illegible carved lettering") came back lettered "Windchopf" — the cross-cell bleed the batch guard warns about, from a LOCATION description this time.
+**Decision:**  (1) Every non-character cell line opens with a plain-prose kind sentence built from the entry's name and type — `This is the small dragon scale, a single reptile scale: <description>` (`elementKindSentence`, `server/lib/referenceSheets.js`). Owner's framing: "say it is a dragon scale, but just in sentences — not a bold title that risks getting drawn as text". A state cell names the parent (`displayName`). Characters keep their line (`build` opens with the noun; age cue follows). (2) An element-cell gate with the character gate's shape: one flash-lite question (does the cell read as a <type> matching the description; material/colour/parts; style; for `text` entries the exact words), one re-render on NO, accept afterwards, fail-open. Stated objects get a state-cells consistency question over the whole solo sheet (same object, differing only in the named state) with one re-render of the sheet. Classification is in the question text; code only decides the one re-render. Verdicts go to the generation log (`vb_element_cell_gate|_rerender|_still_bad`, `vb_state_cells_gate|_rerender|_still_bad`), onto the bible entry (`cellGates[]`, `visualBible.recordElementCellGate`) and into `generateReferenceSheet`'s result (`cellGates`). (3) A bible artifact may carry `text` — words the reader must be able to read (sign, plaque, banner; at most three). Such an entry renders SOLO (`buildReferenceSheetBatches`) on `MODEL_DEFAULTS.vbTextCellModel` = `grok-imagine-2` (typography-aware, $0.04; Standard cannot spell), with the words quoted inside a sentence (`elementTextSentence`) and the template's blanket no-lettering line swapped for a quoted-words-only line (`{TEXT_RULE}` in `prompts/reference-sheet.txt`). The face-prop rule in `story-bible-from-beats.txt` now says readable words go in the face entry's `text`; the settled "no lettering unless the entry names the exact words" verdict is unchanged (the words are named, in `text`). (4) Test Lab story stage `vb_element_cell` (params `elementId`, `gateOnly`, `text`, `model`, `description`): renders one element the production way, or judges the stored cell(s), and shows the gate's question + verdict as steps.
+**Cost:**      +1 flash-lite call (~$0.001) per non-character cell, +$0.02-0.04 per NO (one re-render). ~20 elements per story → ≈$0.02 plus re-renders.
+**Evidence:**  Unit tests `tests/unit/vb-element-cell-prompt.test.ts`. Lab stage `vb_element_cell` on job_1789078732136_622wecmhj (staging, 2026-09-11, ~$0.12 total: 5 renders + 9 flash-lite gates):
+- exp 1164 / 1165 — ART001 / ART002 fresh render, sentence WITHOUT the type (found here: `getElementsNeedingReferenceImages` overwrites `type` with the pool label, so "single reptile scale" never reached the prompt; fixed in 8d1b53270 as `kind`). Output: no dish any more — a teal oval with a central ridge (1164) and TWO such objects on wool (1165; the description's "matching ART001" cross-reference plus "partially buried under grey wool" put a second object in). Gate NO on both ("a leaf, not a dragon scale" / "two abstract shapes that resemble leaves or petals").
+- exp 1169 / 1170 — same with the type in the sentence ("This is the small dragon scale, a single reptile scale: …") on grok-imagine (Standard). Output: single teal oval scale-shaped objects with a ridge; gate NO on both ("a leaf-like shape … not a reptile scale"; ART002 "a leaf or petal, and not partially buried under grey wool"). Verdict by eye: dish is gone, the object is scale-shaped, but a lone scale with no dragon in frame stays ambiguous (leaf/petal/pod). Two fresh attempts failed the gate → stopped (burn-loop rule); in production the gate would spend exactly one re-render.
+- exp 1175 / 1176 — gate on the STORED dish cells: ART001 NO ("a ceramic dish, not a reptile scale" — correct); ART002 YES (a false pass — it is the same dish; flash-lite matched "oval, convex, central ridge, translucent edges").
+- exp 1168 — ART005 sign with `text:"Windchopf"` on grok-imagine-image-2.0: the plank reads "Windchopf" in clean legible lettering with the three arrows, nothing else lettered; gate YES with the lettering check. Text-bearing cells on the 2.0 tier work.
+- exp 1177 — ART003 (ball, 3 states) state gate YES (same ball, only the named state changes) + 3 element gates YES. exp 1178 — CHR001 (dragon, 2 states) state gate YES ("identical, only the wing scale differs") + 2 character gates YES.
+Gate precision on this sample: 5 of 6 correct on the object cells (one false pass), 0 false rejections on the 7 good cells.
+**Rejected:**  type-only sentence (owner asked for the object to be named, "dragon scale", not only its class); a bold/labelled cell heading (the 2026-08 lettering leak); pattern-matching the description in code to detect a missing noun (eval-logic rule: classification lives in the prompt).
+**Touched:**   server/lib/referenceSheets.js, server/lib/visualBible.js, server/config/models.js, prompts/reference-sheet.txt, prompts/story-bible-from-beats.txt, server/lib/testlab.js, server/routes/admin/testlab.js, client/src/services/testlabService.ts, tests/unit/vb-element-cell-prompt.test.ts, tasks/bugs.json (vb-element-cell-no-noun-scale-rendered-as-dish), docs/prompt-inventory.md
+**Status:**    active on staging (31deb92ce, 20c8ce29a, 162617b52, 8d1b53270, 304e0d724); not on master. Open: the scale still reads leaf/petal to the gate (a lone scale needs more than a noun — see BACKLOG), the ART002 false pass, and ART002's description cross-reference that doubles the object.
+
+## Composite: one-cell reference (`refMode: cell`) measured on the five failed dragon pages; the dragon enters through the plate; two placeholder gates (2026-09-11)
+**Context:**   Owner's design: render each figure in place, but hand Grok ONE cell of the 2x4 sheet (the pose that matches the cast entry) instead of the whole grid; cast the Visual Bible secondaries; test on three of the five pages the production composite lost in job_1789083667794_17lz946ik. Lab set 54 "composite: 5 failed pages (dragon rerun 2)" (p6, p7, p10, p17, p18). Spend cap CHF 1.50; spent $0.64 in 5 composite runs.
+**Measured:**  The dragon (CHR001 Karu) has NO reference image in the bible (`referenceImageUrl` null; it is a secondaryCharacter, not an `animals[]` entry), so neither the production nor the Lab cast builder can cast it, and the plate's creature block never named it - that, not a cast-builder split, is why it was absent from all five production plates. `unreferencedSecondaries: 'plate'` (Lab param) hands such an entry to the plate's creature block, painted from its description: the dragon was present on every plate of exps 1151/1152/1154/1156 and survived depopulation. It is a text-only rendering (a friendly orange "dinosaur", not the direct render's winged dragon) - a bible reference for stated secondaries is the real fix (BACKLOG: front cover omits the dragon for the same reason).
+Runs, `figureMethod: inPlace` + `refMode: cell`: **exp 1150 p10** (two humans, the only genuine two-depth page): 4 calls $0.08, both figures placed, IoU 0.70/0.70, correct size and pose, watercolour style held - a clear win over the production in-place composite (v1: clipped figure with a seam) and a usable page; residual defects: ball red instead of the brief's yellow, a hard-edged patch of repainted ground below each figure where the changed-pixel union meets the silhouette-bottom clip. **exp 1151 p17** (Rico from a single bible image + Levin + dragon): 6 calls $0.12; Rico drawn 1.8x the silhouette on both attempts (kept at IoU 0.37), Levin 1.54x both attempts and scaled down as last resort; the cut carried the dragon's head, which the render had moved against Rico's; loses to the direct render. **exp 1152 p6** (four back-view boys + dragon): 7 calls $0.14; two renders were no-ops (plate returned untouched; a silhouette merely re-tinted blue to teal) and the geometry gate accepted both because DINO boxes a raw silhouette as a person - two flat placeholders shipped. The "back" cell of the 2x4 sheet shows the boy's FACE (sheet defect); every render faced the camera or the dragon. **exp 1154 p6** after the residue gate: 7 calls $0.14; the no-op attempt was rejected and re-rendered (100% unchanged), all four placed, but standing children were drawn over seated silhouettes and the uncovered blue/yellow placeholder came along in the cut. **exp 1156 p6** after leftover-colour subtraction: 8 calls $0.16, placed 2/4, all-or-nothing kept the direct render (the two refusals were not recoverable from the row - fixed: abort now stores the in-place renders, references, cut-outs and inPlaceLog).
+**Decision:**  (1) `refMode: 'cell'` stays a Lab knob; it does not beat the whole sheet on real pages - the failures are scale (1.5-1.8x on small silhouettes), pose (standing for seated, front for back) and no-op renders, none of which the reference changes. (2) Two mechanical gates are production code on the in-place path: a render whose silhouette pixels are >= 50% unchanged or >= 60% flat saturated fill is an unpainted placeholder - fed back once, unplaced if it repeats; leftover placeholder pixels (unchanged, or flat in the placeholder hue) are dropped from the cut. Thresholds measured on stored renders: no-op 100%/86%, re-tint 5%/88%, painted figures 0%/<= 30%. (3) `unreferencedSecondaries: 'plate'` stays Lab-only pending the owner's call on painting text-only secondaries into production plates. (4) Production `figureMethod` unchanged (`inPlace`, whole sheet).
+**Rejected:**  Promoting `cell` to production (1 win / 2 losses, the win is not attributable to the cell).
+**Touched:**   server/lib/sceneComposite.js (`refMode`, `placeholderResidue*`, cut subtraction), server/lib/compositeCastBuilder.js (`unreferencedSecondaryCreatures`), server/lib/testlab.js (params, steps, abort intermediates), tests/unit/composite-inplace.test.ts, tests/unit/composite-secondary-cast.test.ts, docs/image-routing.md, tasks/BACKLOG.md
+**Status:**    active (gates); refMode cell parked; Lab set 54 exps 1150-1156
+
+
+## Scene composite OFF in production (2026-09-11)
+**Context:**   Owner: "disable composite if it is not working". It had never executed in production before 2026-09-11 (call-site wiring bug since 08-25) and on its first real run lost 5 of 5 pages to the direct render (job_1789083667794); the one-cell reference variant went 1 win / 2 losses in the Lab (set 54, exp 1150-1156).
+**Decision:**  `runtime.sceneCompositeEnabled = false`; the production trigger records `compositeOutcome {status: disabled}` and the page keeps its direct render. Every figure method stays available in the Test Lab (`scene_composite` stage). Re-enable only after a Lab set on real story pages beats the direct render. Owner ruling on secondaries: no new reference sheet - a stated entity uses its Visual Bible state image as its reference (the cover check does this since 1f9dc5a0; the composite cast builder still needs it, BACKLOG). This supersedes the 2026-09-11 "in-place figures are the production method" entry.
+**Touched:**   server/config/runtime.js, storyJobPipeline.js
+**Status:**    active
+
+
+## No output caps anywhere + a truncation guard on every text reply (2026-09-11)
+**Context:** Owner order 2026-09-11: "Remove the token caps everywhere and install a guard everywhere that detects truncated replies." The rule itself dates from 2026-08-09 / 2026-08-29 (entries "Writers and reviewers get the model's full output ceiling", "no output caps"): `null` = model max in `callTextModel` / `callTextModelStreaming`, and every writer/reviewer passed `null`. Yesterday's Lab fix (`ee2d00c72`) found the harness had never been updated — 6 of 8 reviews cut at exactly 16,000 tokens, stored as "reviewed" with no error — and removed five caps in `testlab.js`. The same sweep noted `storyJobPipeline.js:2569` still passed 64000. A repo-wide enumeration found the rule held only where someone had happened to look: 39 numeric caps on the `callTextModel*` family (including a hidden one — the entry points' own default `maxTokens = 4096`, applied to any caller that omitted the argument), plus ~50 numeric `maxOutputTokens` / `max_tokens` literals on direct Gemini / Anthropic / xAI / OpenRouter calls (vision judges, gates, classifiers, landmark descriptions). Several carried comments describing the exact failure they had suffered at a smaller number and then re-capped one size up (consolidator 3000→6000, entity check 2048→8192, bbox refine 2500, sheet judges 2500→8000, bookAudit 4000→16000, text-refine 16000→64000). And nothing at the shared layer ever said "this reply was cut": Anthropic's `stop_reason`, Gemini's `finishReason`, xAI's and OpenRouter's `finish_reason` were read only by the Anthropic stream (and dropped) or not at all, so a truncated reply reached every parser as a shorter reply.
+**Decision:**
+1. **Every text-model call passes `null` (= `TEXT_MODELS[model].maxOutputTokens`, clamped as before).** The three entry points now DEFAULT to `null` (`callTextModel`, `callTextModelStreaming`, `callClaudeAPI`; was 4096). Sites changed, old cap in brackets: `storyJobPipeline.js` scene_expansion [10000], unified_story [64000], outline_review [32000], scene_translation [2000]; `server/lib/bboxDetection.js` bbox_detect Claude-vision [16000]; `server/routes/trial.js` two trial idea streams [800, 800]; `server/routes/storyIdeas.js` story_ideas [6000] + two streams [3000, 3000]; `server/routes/regeneration.js` regen_refine [16000], regen_iterate [16000]; `server/lib/evalPipeline.js` semantic_compliance [8192]; `server/lib/feedbackConsolidator.js` eval_consolidation [6000]; `server/lib/images.js` scene_rewrite [1000], prompt compress [12000]; `server/lib/landmarkPhotos.js` photo pick — was a raw `callAnthropicAPI(…, 20)` outside the usage chokepoint, now `callTextModel(null, 'claude-haiku', usageLabel landmark_photo_pick)`; `server/lib/phantomCharacters.js` phantom_patch [4000, 3000]; `server/lib/premiseWorld.js` premise_world_classify [2000]; `server/lib/sceneValidator.js` scene_validation [4000]; `server/lib/textQualityJudge.js` [2048]; `server/lib/visualBible.js` vb_chr_dedup [80]; `server/lib/testlab.js` testlab_scene_expansion / _ab ×2 / scene_variant / scene iterate [10000 ×5], scene_rewrite [1000], genericity [500]; `server/lib/textRefine.js` the four `MAX_OUT = TEXT_MODELS[m].maxOutputTokens || N` variables (already model max, fallbacks 32000/64000/16000/16000) → `null`; scripts: `check-prompt-genericity.js` [600], `test-models.js` [10000], `test-scene-expansion.js` [1200], `_tmp_p5recreate.js` [8000], `analysis/replay-consolidator.js` [3000], `analysis/rerun-eval-sonnet.js` [4096], `admin/score-landmarks-for-stories.js` [120], `analysis/dry-run-text-diff.js` (model-max variable → null).
+2. **Direct provider calls drop the numeric literal.** Gemini `generationConfig.maxOutputTokens` removed (Gemini's default is the model's own ceiling; `finishReason === 'MAX_TOKENS'` stays the witness): `evalPipeline.js` P1 inventory [32000], empty-scene QC [350], quality eval [32000]; `bboxDetection.js` refine [2500] and the utility call [2000]; `bookAudit.js` [16000]; `regeneration.js` two Gemini refine/iterate bodies [16000, 16000]; `entityConsistency.js` [8192]; `routes/avatars.js` [4096, 4000, 2000]; `imageInpainting.js` [1024, 500]; `visualBible.js` photo analysis [2000]; `sceneValidator.js` SDK model [24000]; `styleAnalysis.js` [500, 4000, 300, 200, 1024]; `referenceSheets.js` gates [1024, 256]; `coverTitlePaint.js` [200]; `garmentColourFix.js` [200]; `figureDetection.js` Gemini [2000]; `character2x4Sheet.js` `callSheetJudge` ignores its cap argument, sites [4000, 8000, 8000, 8000]; `landmarkPhotos.js` description + quality judge [600, 600]; `testlab.js` title transcription [200], plate judge [1500]; `server/scripts/{add-historical-image,upload-historical-images,reevaluate-historical-images,prefetch-historical-locations}.js` [600 ×4]; scripts `analysis/bbox-gemini-redo.js` [2500], `test-2x4-eval-with-context.js` [4000], `analysis/eval-prompt-bake-off.js` [4096], `analysis/rerun-eval-sonnet.js` [4096], `admin/classify-landmark-photos.js` [20], `admin/reindex-missing-cities.js` [20], `analysis/_tmp_identity_vendors.js` Gemini [2000]. OpenAI-compatible `max_tokens` removed (provider default = upstream ceiling): `images.js` Grok vision [16000] and OpenRouter vision [16000]; `evalJudges.js` [8192]; `figureDetection.js` Qwen [1500]; `traitPanel.js` Qwen [400]; `_tmp_identity_vendors.js` OpenRouter + Grok [1500, 1500]. Anthropic REQUIRES `max_tokens`, so the four direct Anthropic bodies take it from the new `maxOutputTokensFor(modelIdOrKey)` in `server/config/models.js` (throws on an unknown model rather than guessing): `figureDetection.js` Haiku [1500], `traitPanel.js` Haiku [400], `scripts/admin/rewrite-landmark-extracts.js` [4000], `_tmp_identity_vendors.js` Haiku [1500].
+3. **Kept, listed for veto:** `server/routes/admin/diagnostics.js:72` `max_tokens: 1` — API-key liveness ping, reply discarded. `server/lib/bboxDetection.js:564` `maxOutputTokens: 2500` — documented pressure valve: flash-lite repetition loops run past 15k tokens inside one label and the tight cap fails fast into the Grok fallback. `server/routes/ai-proxy.js:78` `max_tokens || 8192` — forwards the CLIENT's value (`client/src/services/storyService.ts` `callClaude` default 8192) to `claude-sonnet-4-5-20250929`, which is not in TEXT_MODELS; the route already warns on `stop_reason === 'max_tokens'`. `scripts/cloudflare-worker.js:50` `max_tokens || 4000` — same passthrough shape in a Cloudflare worker. `scripts/test-json-output.js` `--max-tokens` CLI default 32000 — an explicit experiment knob on a direct-HTTP dry run. The allow-list lives in `tests/unit/no-output-caps.test.ts` (`KEPT_DIRECT_CAPS`); removing a kept cap without updating it fails the test, and so does adding a new numeric one anywhere.
+4. **Guard contract — `server/lib/textReplyGuard.js`, run inside both entry points (`guardReply`).** Every reply now carries `result.truncation = { suspected, reason, outputTokens, capInForce, stopReason, provider, model }` with `reason ∈ {empty, stop_reason, cap_hit, near_cap, unparsed}`: empty text; provider finish reason `max_tokens` / `length` / `MAX_TOKENS` (now captured on EVERY path as `result.stop_reason`: Anthropic `data.stop_reason` and stream `message_delta.delta.stop_reason`; Gemini `candidates[0].finishReason` non-stream and stream; xAI `choices[0].finish_reason` non-stream and stream; OpenRouter stream `choices[0].finish_reason`); `output_tokens >= capInForce` where capInForce is the ceiling actually sent (the number passed or the model max); and, for OpenRouter streams that report `usage.cost` but no finish reason, `output_tokens` within 1% of the ceiling. `parsedOk:false` on a reply longer than `minMeaningfulChars` (2000) marks a format failure. On `suspected` the chokepoint logs `❌ [TEXT TRUNCATION] <label>: <model> via <provider> <reason> — reply starts: "<120 chars>"` at ERROR and increments a process counter exposed as `textTruncation` on `GET /api/health/config` (`{suspected, byReason, byLabel, last}`). It never throws — gates are guidelines; a paid run must not die on a heuristic. `sceneReviewGuard.assessSceneReview` is now a thin wrapper over `assessTextReply` (same messages; `ee2d00c72`'s 15 tests unchanged).
+5. **Callers wired to REACT (fallback = the input they were given):** `beatsPipeline.js` scene review round 1 → briefs ship RAW (`parsed = {pages: []}`), `sceneReviewReport.failed` set, `gl.warn('beats_scene_review_truncated')`; worn-state round and round 2 → throw into their existing catch (briefs kept as they were, pages ship flagged); arc creator (`creatorCall`, arc_create + arc_retell) → a cut arc is a failed attempt (one retry, then the existing containment). `storyJobPipeline.js` outline review → failed attempt (`continue` into the one retry, then the draft ships unpatched exactly as on a shape failure). `textRefine.js` → both audits `ok:false` with `error` (findings stay out of the merge); repair pass throws (`rewrites unusable`; caller keeps `current`); diff and lector throw into their catches (text kept as the repair pass left it). `evalPipeline.js` → a truncated Stage-2 compliance reply returns `{ evalFailed: true, evalError }` instead of `null` — both consumers log it and merge nothing, so it never reads as "compliance found nothing"; a `MAX_TOKENS` P1 inventory returns `null` with the reason logged (was "JSON parse failed"); the quality eval's own `MAX_TOKENS` retry is unchanged and still returns `null` → `evaluated:false` → redo.
+**Rationale:** A ceiling is a safety limit, not a target — models stop when finished, so removing a cap costs nothing on runs that fit and stops silently discarding the ones that do not. Every number removed here had been chosen at a call site and revisited only after it truncated something; the guard makes the next truncation loud instead of leaving it to be found by hand in `usage.output_tokens`. Detection lives at the chokepoint because that is the one place every reply passes; reaction lives at the caller because only the caller knows what "fall back to the input" means for it.
+**Touched:** `server/lib/textReplyGuard.js` (new), `server/lib/textModels.js`, `server/lib/sceneReviewGuard.js`, `server/config/models.js` (`maxOutputTokensFor`), `server/routes/health.js`, `server/lib/beatsPipeline.js`, `storyJobPipeline.js`, `server/lib/textRefine.js`, `server/lib/evalPipeline.js`, plus every file in items 1–2; tests `tests/unit/text-reply-guard.test.ts`, `tests/unit/no-output-caps.test.ts`, `tests/unit/truncation-caller-fallbacks.test.ts` (real `refineStoryText` / `evaluateThreeStage` with the model call mocked). `tasks/bugs.json` entry `numeric-output-caps-remained-after-no-caps-rule`.
+**Status:** ✅ active (staging commit; master pending owner approval). Open: `TEXT_MODELS[*].maxOutputTokens` values are the ceilings the guard measures against, and only three carry a cited source in the repo (claude-opus 128000, gemini-3.1-pro 65536, qwen3.8-max 131072) — the rest are unverified (BACKLOG).
+
+## Scene REVIEWER bake-off, 5 models on the fixed harness (2026-09-11)
+**Context:**   The 2026-09-10 AD bake-off (Lab 1107-1134) never measured the scene reviewer: the harness capped it at 16,000 output tokens and 6 of 8 reviews were truncated or empty with no error (entry "Lab scene review was capped at 16k", fixed in ee2d00c72). With the guard in place the owner mandated a five-reviewer bake-off under a hard USD 4.00 cap: `grok-4.6`, `gpt-5.6-sol`, `qwen3.8-max`, `deepseek-v4-pro` (production `sceneReviewModel`), `gemini-3.1-pro`. The owner also suspected the reviewer "does not get" the `looksAt` gaze field.
+**Method:**    Staging (confirmed `c78f472c` at launch; redeployed to `24a527c1` by another session mid-run — the diff touches only the `vb_element_cell` and composite stages, not the review or judge code). One `beats_scenes` expansion per story with the production AD (`sceneModel: gemini-3.1-pro`, `plainStoredBeats`, `expandPages: 8`) fanned out to all five reviewers on the SAME frozen briefs (`sceneReviewModel: 'deepseek-v4-pro,grok-4.6,gpt-5.6-sol,qwen3.8-max,gemini-3.1-pro'`); then `scene_hazard_count` (judge `gpt-5.6-sol`, `source: briefs`, `fromExperiment`) once on `artifact: raw` and once per reviewer (`artifact: reviewed, reviewer: <key>`). Second, free yardstick: `sceneBriefCheck.checkScenes` (the deterministic checks the review prompt itself is fed) run offline on raw vs each reviewer's briefs. `looksAt` preservation counted by parsing `characters[]` on every rewritten page. Judge noise controlled by splitting each delta into rewritten pages vs untouched pages (untouched pages carry raw text, so any movement there is judge noise).
+Experiments — dragon `job_1788903616404_iqvhj4l8m` ("Der Drache, der nicht fliegen konnte"): AD **1157**; judges 1158 raw, 1159 deepseek, 1161 sol, 1162 qwen, 1180 grok, 1181 gemini (1160/1163 were killed seconds after launch by the 09:19 CH redeploy and sit orphaned as `running`; 1180/1181 are their reruns). Bimo `job_1788957347999_ijseol49a` ("Bimo kann nicht fliegen"): AD **1179**; judges 1182 raw, 1183 deepseek, 1184 grok, 1186 gemini (1185 = judge returned an empty answer, 413 reasoning tokens, $0; retried once), 1187 sol, 1188 qwen. Fiona (`job_1788983823620_csjcyp1q9`) cut for budget.
+**Guard record (all 10 reviews passed `assessSceneReview`, `ok:true`, `stopReason null`):**
+| reviewer | provider | dragon out tok / cap / s / $ / pages rewritten | Bimo out tok / cap / s / $ / pages rewritten |
+|---|---|---|---|
+| deepseek-v4-pro | BaseTen | 16,394 / 64,000 / 127 / 0.077 / 4 [2,3,6,8] | 18,642 / 64,000 / 141 / 0.083 / 8 |
+| grok-4.6 | xAI | 17,045 / 32,768 / 284 / 0.125 / 7 [1-4,6-8] | 19,073 / 32,768 / 303 / 0.135 / 5 [2,3,4,7,8] |
+| gpt-5.6-sol | OpenAI / Azure | 11,686 / 16,384 / 219 / 0.145 / 8 | 7,455 / 16,384 / 136 / 0.288 / 5 [1,3,4,7,8] |
+| qwen3.8-max | Alibaba | 43,505 / 131,072 / 1,069 / 0.284 / 8 | 28,775 / 131,072 / 658 / 0.194 / 5 [1,3,4,7,8] |
+| gemini-3.1-pro | Google AI Studio | 15,339 / 65,536 / 123 / 0.207 / 8 | 21,222 / 65,536 / 162 / 0.276 / 5 [1,3,4,7,8] |
+Caveat on sol: `TEXT_MODELS['gpt-5.6-sol'].maxOutputTokens` is 16,384 — its two 8-page reviews stayed under it, but production reviews of full books run 21-34k output tokens, so sol as a production reviewer would be truncated by that cap.
+**Results — hazard judge (gpt-5.6-sol; total hazards, raw → reviewed):**
+| reviewer | dragon all (8p) | dragon rewritten-only | dragon untouched (noise) | Bimo all (8p) | Bimo rewritten-only | Bimo untouched (noise) | both stories, rewritten-only |
+|---|---|---|---|---|---|---|---|
+| raw baseline | 12 (NEG 2, GAZE 3, MULTIACT 4, CONTACT 1, SCALE 1, UNHELD 1) | | | 11 (NEG 4, GAZE 4, MULTIACT 3) | | | |
+| deepseek-v4-pro | 12 → 7 | 9 → 5 (4p) | 3 → 2 | 11 → 12 | 11 → 12 (8p) | — | 20 → 17 (−3, 12p) |
+| grok-4.6 | 12 → 15 | 11 → 14 (7p) | 1 → 1 | 11 → 4 | 8 → 4 (5p) | 3 → 0 | 19 → 18 (−1, 12p) |
+| gpt-5.6-sol (= judge) | 12 → 10 | 12 → 10 (8p) | — | 11 → 9 | 8 → 7 (5p) | 3 → 2 | 20 → 17 (−3, 13p) |
+| qwen3.8-max | 12 → 10 | 12 → 10 (8p) | — | 11 → 10 | 8 → 9 (5p) | 3 → 1 | 20 → 19 (−1, 13p) |
+| gemini-3.1-pro | 12 → 8 | 12 → 8 (8p) | — | 11 → 11 | 8 → 9 (5p) | 3 → 2 | 20 → 17 (−3, 13p) |
+Per class, both stories, all pages (raw → reviewed): GAZE 7 → deepseek 5, grok 3, sol 7, qwen 7, gemini 6. MULTIACT 7 → 4, 6, 5, 5, 5. NEG 6 → 6, 4, 4, 5, 6. CONTACT 1 → 0, 1, 0, 0, 0. FORCE 0 → 3, 2, 2, 1, 1 (every reviewer ADDS force hazards — the rewrites make hands and pressure explicit). Judge noise: identical raw text on untouched pages moved −1, 0, −3, −1, −2, −1 across the six untouched sets (the Bimo raw pages 2/5/6 read 3 hazards in the raw run and 0 in the grok run). The noise is the same size as every measured effect, so the hazard judge CANNOT rank these reviewers; the honest reading is "−3 ± 3 hazards over 12-13 rewritten pages for every one of them". The sol cell is doubly weak (reviewer = judge).
+**Results — the review's own deterministic checks (`checkScenes`, findings raw → reviewed):** dragon raw 8 (`interaction_actor_unknown` 2, `interaction_multiple_actions` 2, `vb_element_overflow` 4); Bimo raw 4 (`cast_unlisted` 3, `vb_element_overflow` 1). deepseek 8 → 4 / 4 → 1; grok 8 → 4 / 4 → 1; sol 8 → 4 / 4 → 1; qwen 8 → 4 / 4 → 1; gemini **8 → 7** / 4 → 1. Every reviewer clears every cast/interaction finding it is handed (7 of 7); no reviewer clears a single `vb_element_overflow` (5 of 5 survive all ten reviews — the reviewer does not drop Visual Bible elements to fit the grid). Gemini is the only regression: it re-introduces 3 `interaction_actor_unknown` on the dragon.
+**Results — `looksAt`:** preserved on 100% of rewritten pages by every reviewer (dragon 4/4, 7/7, 8/8, 8/8, 8/8; Bimo 8/8, 5/5, 5/5, 5/5, 5/5) — the field is not dropped, and on pages where the raw brief left a foreground character without one the reviewers add it. The owner's suspicion that the reviewer "does not get" `looksAt` is not supported by these 20 rewrites. Shared deviation found on the way: on pages where a SECONDARY is the counterpart (dragon p8 Nolo CHR002, Bimo p3/p7 Bimo CHR001) all five reviewers add a `characters[]` row for the secondary with its own `looksAt` — the expansion spec (rule 8bc) gives a secondary a `watching` interaction, not a row. Gemini additionally drops CHR001 out of `objects[]` on those pages. Whether the row is a harmless duplicate or breaks a downstream consumer is an open question, not measured here.
+**Cost / latency per review (8 pages):** deepseek $0.08 / 2.2 min; grok $0.13 / 4.9 min; sol $0.14-0.29 / 2.3-3.7 min; qwen $0.19-0.28 / 11-18 min; gemini $0.21-0.28 / 2.1-2.7 min.
+**Verdict:**   deepseek-v4-pro (production) is justified: cheapest by 1.6-3.5x, in the fastest tier, clears every code-detected finding, preserves `looksAt`, and its hazard delta is indistinguishable from the other four within judge noise. No reviewer is worth switching to: gemini regresses on the review's own checks, qwen is 5-8x slower, sol costs 2-3.5x with a 16k cap that would truncate full-book reviews, grok is 2.3x slower and 1.6x the cost for the same measured effect. `scene_hazard_count` with a single judge run is not a fit instrument for reviewer ranking at this effect size (run it 3x or more per cell, or pair-judge, if this question is ever reopened).
+**Spend (actual, metered):** 1157 AD $0.183 + reviews $0.077/$0.125/$0.145/$0.284/$0.207 = $1.020; dragon judges 1158 $0.182, 1159 $0.139, 1161 $0.112, 1162 $0.119, 1180 $0.160, 1181 $0.038 = $0.749 (1160/1163 orphaned, partial streams unmetered, at most ~$0.13 each); 1179 AD $0.253 + reviews $0.083/$0.135/$0.288/$0.194/$0.276 = $1.229; Bimo judges 1182 $0.052, 1183 $0.045, 1184 $0.082, 1185 $0 (empty), 1186 $0.140, 1187 $0.111, 1188 $0.133 = $0.564. **Total $3.56** of the USD 4.00 cap (at most $3.82 with the orphan worst case). Judge runs cost $0.04-0.18 each, not the ~$0.05 assumed — sol at $30/M output.
+**Touched:**   docs only (this entry, `tasks/BACKLOG.md`). No config change.
+**Status:**    reported, default unchanged — owner decides. Open: the secondary-gets-a-`characters[]`-row deviation shared by all five reviewers; `vb_element_overflow` untouched by any reviewer; 1160/1163 orphaned `running` rows.
+
+## Visual Bible trim was never persisted — the transcript is the source of truth, and in-memory bible mutations are written back into it (2026-09-11)
+**Context:**   `trimVbAssignments` (a8e7c009c, 2026-09-08 entry "Visual Bible page assignment is trimmed to the element budget at birth") ran in `beatsPipeline.js` on the bible that module had parsed for itself (`bibleParser.extractVisualBible()`, :1046) and mutated that object only. `storyJobPipeline.js:2756` then did `parser.extractVisualBible()` — a FRESH parse of the outline's `---VISUAL BIBLE---` JSON, which nobody had rewritten — and that untrimmed object became `streamingVisualBible`, went to every downstream stage (:1674, :1759, :1793, :2096, :2232, :2264) and was persisted as `stories.data.visualBible`. The resume path (`storyJobPipeline.js:279`) and the Lab's `plainStoredBeats` re-parse `data.outline` too. Measured on staging `job_1788957347999_ijseol49a` (Bimo, 2026-09-09, after the trim shipped): `beatsReviewReport.vbAssignmentTrim = { stripped: [VEH002 from page 8, VEH002 from page 18], pagesOverBudgetBefore: 2, pagesOverBudgetAfter: 0 }`, yet stored `data.visualBible.vehicles[VEH002].appearsInPages = [8,18]`, the outline text still lists `"pages": [8, 18]`, and `rankPageElements` over the stored bible shows pages 8 and 18 at 4 elements each. So the 2026-09-08 decision reached exactly one reader — the Art Director inside the beats stage — and nobody else. **Consequence for the record: the "Scene REVIEWER bake-off" entry above (Lab 1157/1179) reports that every `vb_element_overflow` finding "survives all ten reviews (5 of 5)" and reads it as the reviewer not trimming elements. What it measured was this bug: the Lab's expansion re-parsed the untrimmed bible, so the overflow was on the input the reviewer was handed, and a brief cannot withdraw a bible placement (`briefFixable:false`).** The same loss applied to the invented-peer age clamp (`applySecondaryAgeBand`, beatsPipeline.js:1069). The clothing review had already solved this for its own section (`replaceClothingSection`) — the two later post-checks did not follow it.
+**Decision:**  (1) The persisted source of truth for the bible is the outline transcript, so every in-memory mutation of the bible inside the beats stage is written back into the `---VISUAL BIBLE---` JSON: `syncVisualBibleSection(bibleSections, visualBible)` (beatsPipeline.js, next to `replaceClothingSection`) projects the mutable fields by entry id — `pages` from `appearsInPages`, each state's `pages` with emptied states removed (`normaliseObjectStates` re-mints the dotted ids identically on re-parse), a clamped secondary's `age` + `secondaryAgeClamped` — and re-serialises the block; nothing else in the JSON is touched. It runs once, after both post-checks, only when either changed something; a transcript with no rewritable block warns (`beats_vb_sync_failed`) and ships. (2) `generateStoryViaBeats` returns `visualBible` and `storyJobPipeline.js` prefers it (`beatsResult.visualBible`) over the re-parse, which stays as the fallback only — the two paths cannot diverge again. (3) An assertion, never a gate, on the object the `unified_story` checkpoint persists, placed at the bible pick in storyJobPipeline (the one point a re-parse could diverge; `detectAndPatchOrphanObjectIds` may legitimately add entries between there and the save, which is not a lost trim): `vbTrimLostPages(visualBible, vbAssignmentTrim)` re-runs `rankPageElements` over the bible about to be saved and logs `vb_trim_lost` (ERROR + genLog warn) naming the pages if any exceeds `VB_ELEMENT_BUDGET` while the trim reported `pagesOverBudgetAfter === 0`.
+**Mutation sites audited (beatsPipeline.js, after the parse at :1046 and before the story save):** `applySecondaryAgeBand` (:1069) — LOST, now written back; `trimVbAssignments` (:1087) — LOST, now written back; `linkPreDiscoveredLandmarks` / `loadLandmarkPhotoDescriptions` (:1129/:1131) — derived from the landmark index and DB, not authored by the writer, and re-run idempotently by storyJobPipeline on whatever object it holds — not a transcript concern, and now the object it holds IS the beats one; `onVisualBible` (landmark-minimum hook) — read-only; clothing review rewrites (:1192) — already written back via `replaceClothingSection`; scene review / `truncateBriefToBudget` — mutate briefs, not the bible.
+**Rationale:**  Not a reversal — it makes the 2026-09-08 decision take effect. `docs/SETTLED.md` line 58-60 describes the budget "enforced at ASSIGNMENT (`trimVbAssignments`…)"; that was true for the Art Director only. Writing the object back is chosen over "stop re-parsing" because three independent readers re-parse the transcript (pipeline, resume, Lab) and the transcript is what `data.outline` stores; one source of truth means the text must carry the truth. The projection is field-by-field rather than a full re-serialisation of the parsed object because the parser's shape is a superset (spread + computed `description`, minted state ids, null reference-cell fields) and the writer's JSON must stay the writer's shape for every existing reader.
+**Touched:**   `server/lib/beatsPipeline.js` (`syncVisualBibleSection`, wiring after the trim, `visualBible` on the return, exports), `server/lib/vbElementBudget.js` (`vbTrimLostPages`), `storyJobPipeline.js` (prefer `beatsResult.visualBible`; `vb_trim_lost` assertion before the `unified_story` checkpoint), `tests/unit/vb-trim-persisted.test.ts`, `tasks/bugs.json` (`vb-trim-not-persisted-reparsed-from-outline`), `tasks/BACKLOG.md`.
+**Status:**    fixed on staging, not on master. The bake-off's `vb_element_overflow` "5/5 survive" line and BACKLOG's "the check counts the UNION … 5/5 pages, not ~0" item (line ~443) both need re-measuring on a story generated AFTER this fix before either is read as a reviewer or counting problem.
+### Character-cell gate judges a non-human character on its own stated material, not human skin
+**Context:** Staging story `job_1789147573901_m3uam0nxi` has two secondary
+characters that are stone golems (CHR001, CHR002) — the bible describes "a
+figure of human shape ... made entirely of pale grey layered stone". The
+character-cell gate (`cellGatePrompt`) asked only about human skin, and was
+given the art style, age and `build` but never the description. It logged
+`vb_character_cell_rerender` — "VB reference cell failed render gate: The
+figure is made of stone and does not have a plausible human skin color." —
+then `vb_character_cell_still_bad` — "Re-rendered cell still fails render gate
+(The figure is made of stone and does not have a plausible human skin color.)
+— accepted anyway" (and a second pair citing "a pale gray, which is not a
+plausible..."). A correct render was failed, a paid re-render was burned per
+character, and the original shipped. The 2026-09-11 creature-awareness fix
+landed on the ELEMENT gate only; a non-human SECONDARY CHARACTER still went
+down the human-skin branch because it is a character.
+**Decision:** `cellGatePrompt` quotes the bible `description` verbatim and
+check (1) is a single rule against it: "do the figure's colouring and material
+match what the description states?" There is no human/non-human classification
+step and no standalone human-skin assertion. When the bible gave no
+description, check (1) reads "no description was given, so nothing is checked
+here" — the numbering of the art-style, age and sex checks stays fixed either
+way. `checkCharacterCellRender` takes the description and the call site passes
+`element.extractedDescription || element.description`.
+**Rationale:** The description IS the specification, so the cell is judged
+against it and nothing else, the way the page evaluator judges against what it
+was given. The standalone human-skin assertion only ever existed because the
+gate had no description to judge against; a description stating a skin colour
+already catches a green-tinted figure, so the branch was redundant the moment
+the description was passed in. With no description there is no specification,
+so inventing a standard for the model to apply would be worse than saying
+plainly that nothing is checked. Per CLAUDE.md the classification belongs to
+the PROMPT — no code may pattern-match "stone"/"made of" in the prose.
+Fail-open behaviour ("accepted anyway") is untouched — that is a separate open
+decision.
+**History:** shipped first (2be79f734) as a human/non-human branch inside check
+(1); the owner collapsed it to the single rule the same day, which is the shape
+above.
+**Touched:** `server/lib/referenceSheets.js` (`cellGatePrompt`,
+`checkCharacterCellRender`, the cell-gate call site),
+`tests/unit/cell-gate-sex.test.ts`
+**Status:** ✅ active
+
+### Visual Bible page assignment comes from the FINAL scene briefs, not from a bible-time guess
+**Context:** The Visual Bible is written at beats stage 3, the scene briefs at
+stage 4. Everything that decided at stage 3 which element belongs on which page
+was deciding without the evidence. `trimVbAssignments` (2026-09-08) did exactly
+that: per over-budget page it kept the entries whose NAME tokens appear in that
+page's PLAN LINE. Plan lines are prose — they describe a prop ("the big wing
+scale"), they never cite ids. Measured on staging `job_1789147573901_m3uam0nxi`:
+the trim stripped 19 (element, page) claims and left six entries at
+`appearsInPages: []` — ART003 (the story's central prop), ART006 (the signpost
+carrying the plot-critical text), ART009, ART010, ART014, ART016.
+`getElementsNeedingReferenceImages` skips an entry below the minimum page count,
+so no reference cell was rendered for any of them. The proof the trim was wrong
+is in the FINAL briefs of the same job: p10 `sceneMetadata.objects` =
+`["LOC004","ART006"]` — the brief asks by id for the entry the trim had emptied.
+**Decision:** The briefs are the single source of truth for usage.
+`applyBriefUsage(visualBible, scenes)` (`server/lib/vbElementBudget.js`) rebuilds
+every entry's `appearsInPages` from what the final briefs cite — a bare id
+(`ART006`), a dotted state/vantage handle (`ART015.1`, crediting the parent AND
+the matching `states[]`/`vantages[]` row), or a secondary character/animal a
+page's `characters[]`/`interactions[]` names by name (resolved through
+`entryNamedByRow`). It runs in `generateStoryViaBeats` once the briefs are final
+and BEFORE `rawOutline` is assembled and before the caller kicks off
+`generateReferenceSheet`, and writes the result back through
+`syncVisualBibleSection` so storyJobPipeline, the resume path and the Lab all
+re-parse the same pages. An entry no brief cites gets `[]` — a truthful "nothing
+uses this", which correctly renders no cell. `clothing` is not rebuilt (no brief
+cites a CLO id). The bible-time trim call is gone.
+**Rationale:** The schedule was already right — in full mode the reference sheet
+is kicked off after `generateStoryViaBeats` returns, so the briefs exist when
+cells are selected; only the data source was wrong. The three-element budget is
+unaffected: it is still enforced where the briefs exist (`rankPageElements` +
+`truncateBriefToBudget` in the scene review) and again at the page-gen reference
+selection, and after this rebuild `appearsInPages` and `objects[]` agree by
+construction instead of the bible half being un-withdrawable
+(`briefFixable:false`). TRIAL is deliberately left on the old early path:
+`trialReferenceSheetPromise` fires inside `onVisualBible`, before any brief
+exists, so `applyBriefUsage` is a no-op there and trial keeps the bible's guess.
+**Touched:** `server/lib/vbElementBudget.js` (`applyBriefUsage`;
+`trimVbAssignments`/`vbTrimLostPages` stay exported for their tests),
+`server/lib/beatsPipeline.js` (trim call removed, usage rebuild + write-back
+added), `storyJobPipeline.js` (the now-dead `vb_trim_lost` assertion removed),
+`tests/unit/vb-brief-usage.test.ts`
+**Status:** ✅ active. Supersedes the assignment-trim half of the 2026-09-08
+`trimVbAssignments` decision; `docs/SETTLED.md`'s three-element line is updated
+to name the brief-time enforcers.
+
+### A face prop is ONE bible entry with a state per side
+**Context:** `story-bible-from-beats.txt` required a face prop (map, letter,
+note, chart, book, page, sign, board, plaque) to be TWO entries with consecutive
+ids, one "(turned away)" and one "(face to camera)" — the 2026-08-26 design,
+which predates `states[]`. It contradicts the same template's own rule that "a
+change to an object is a state, not a second entry", doubles the id space for
+one physical thing, and on `job_1789147573901_m3uam0nxi` produced two such pairs
+(ART005/ART006, ART007/ART008) of which the assignment trim emptied one half.
+**Decision:** One entry; which side is turned to us is a `states[]` row, the
+away side first, each with its own `pages`. The readable words stay in the
+entry's `text`. The Art Director names one STATE id in `objects[]` per page (the
+turned-away state unless the page is about what the document says), which is the
+same per-page selection the pair gave — a state is rendered as its own reference
+cell and its `delta` rides the REQUIRED OBJECTS line, so both the picture channel
+and the text channel of the 2026-08-26 design survive.
+**Rationale:** Owner direction, and it removes the only rule in the template that
+said the same object may have two canonical descriptions. No plumbing is needed:
+dotted state handles are already cited, selected, rendered and prompt-fed.
+**Touched:** `prompts/story-bible-from-beats.txt` (face-prop rule, the state
+carve-out in the "test for a state", the artifacts `states`/`description` schema
+notes), `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`
+**Status:** ✅ active. Supersedes 2026-08-26 "A face-prop is TWO bible entries,
+not one entry with two views". Not yet exercised by a generated story — the
+first beats run that produces a face prop should be checked.
+
+### The Visual Bible has no minimum entry count
+**Context:** The same template demanded "At least {PAGE_COUNT} entries", a floor
+unrelated to what the story contains; it pushes the model to invent elements to
+reach a number, and every invented element then competes for a page's
+three-element budget.
+**Decision:** "As many entries as the story needs, no more." The neighbouring
+"include an element even if it appears once" stays. `{PAGE_COUNT}` is still
+substituted elsewhere in the template.
+**Rationale:** With usage now derived from the briefs, an entry no brief cites
+renders no cell — a padded bible is dead weight, not a safety margin.
+**Touched:** `prompts/story-bible-from-beats.txt`
+**Status:** ✅ active.
+
+## A reference-sheet cell that holds several drawn panels stores NO reference (2026-09-11)
+**Context:** Staging story `job_1789147573901_m3uam0nxi` logged three
+`vb_sheet_layout_mismatch` events in one run — "drew 9 cells (3x3) for 3
+requested", "drew 2 cells (2x1) for 3 requested", "drew 6 cells (3x2) for 2
+requested". On the 2x1 sheet the gutter detector merged three stacked panels
+into one cell; the identification call named that cell for a single element and
+the crop was stored as that entry's reference. The stored image shows a
+signpost, a cave wall and a boulder — three objects offered to every downstream
+prompt as one.
+**Decision:** After the identification call, every MAPPED crop is re-measured
+with `detectSheetGrid`; a crop that itself splits into more than one panel has
+its assignment dropped (`vb_sheet_cell_multi_element`) and the element gets no
+reference image. Detection failure counts as one panel, so the check can never
+invent a drop, and nothing throws — the run continues with one fewer reference.
+**Rationale:** A missing reference degrades gracefully (the entry is drawn from
+prose, as every sub-threshold entry already is); a reference showing three
+objects poisons every page prompt that receives it, silently and permanently.
+The check is deterministic, costs no model call, and reuses the detector that
+already exists. A hard failure was rejected — gates are guidelines, a paid run
+is never killed for this.
+**Touched:** `server/lib/sheetGrid.js` (`rejectMultiPanelAssignments`),
+`server/lib/referenceSheets.js` (`countPanelsPerCell`,
+`splitGridIntoReferences`), `tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active
+
+## A reference-cell re-render is told why the gate failed (2026-09-11)
+**Context:** Same story: `vb_state_cells_rerender` followed by
+`vb_state_cells_still_bad` with a word-for-word identical reason, for two
+different entries ("The left wing membrane is ragged in the first image and
+smooth in the second image…", "The color of the object in the second image is a
+darker, more muted teal…"). `rerenderSolo` rebuilt the prompt with exactly the
+first render's arguments; the judge's reason was logged and thrown away.
+**Decision:** `buildReferenceSheetPrompt` takes an optional `gateReason` and
+appends the judge's own sentence as a "PREVIOUS ATTEMPT REJECTED" note; both
+re-render paths (single element/character cell, and the state-cell batch) pass
+their verdict reason.
+**Rationale:** The project convention for retries — a retry carries the failure
+reason into the re-render prompt. The reason is runtime text from the judge,
+quoted and never parsed in code, so the prompt stays generic. The fail-open
+"accepted anyway" sites are deliberately unchanged; whether a twice-failed cell
+should ship is still the owner's open decision.
+**Touched:** `server/lib/referenceSheets.js`,
+`tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active
+
+## A cell draws the element only — never what its description compares it to (2026-09-11)
+**Context:** Same story: both state cells of the creature entry rendered four
+children and a dog sitting on its back, because the description says "large
+enough for four small children and a dog to sit across the back…". The known
+earlier instance is the production prop "roughly the size of two open palms",
+rendered with two human hands on it. `prompts/reference-sheet.txt` carried the
+rule only under FOR OBJECTS/ARTIFACTS and only for a "comparison" — a creature
+entry never reaches that section, and a scale clause is not phrased as one.
+**Decision:** One global REQUIREMENTS line binding every cell: only the element
+itself is drawn, and a person, animal or object the description names to convey
+size or scale is never drawn.
+**Rationale:** The failure is not object-specific, so the rule cannot live in
+the objects section. Prompt-side, generic, no example from any story. The bible
+prompt (`story-bible-from-beats.txt`) is deliberately untouched — phrasing
+scale without a simile there is a separate, still-open backlog item.
+**Touched:** `prompts/reference-sheet.txt`,
+`tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active
+
+## Backlog triage 2026-09-11 — seven owner verdicts, five of them "we deliberately do not do this"
+**Context:** The "Decisions waiting on the owner" section of `tasks/BACKLOG.md` had accumulated
+items that were blocking nothing but were also never going to be built, plus one that had
+silently become a duplicate. The owner triaged the section on 2026-09-11. Recording the
+declines matters as much as the approvals: an undocumented decline is re-proposed by the next
+session that reads the source plan. (Two further items from the same section — killing scene
+review round 2, and the B1/B2 `subject` field — were being implemented separately and are not
+covered here.)
+
+**Decision:** Seven verdicts.
+
+1. **"Whether any of the eval work goes to master" — CLOSED AS STALE, it is not a separate
+   decision.** It is the standing P0 promotion item: `origin/staging` was **207 commits ahead
+   of `origin/master`** when measured on 2026-09-11 (`git rev-list --count
+   origin/master..origin/staging`; the owner's own note that day said 205 — the gap is commits
+   landed in between), and the eval work is inside that block. The owner does the promotion
+   himself, later. The stale "36 commits ahead as of 2026-09-06" figure on the P0 line was
+   corrected at the same time.
+
+2. **The trial's 2×4 costumed sheet is generated LAZILY — inside the create-story job, not
+   up-front in the wizard.**
+
+3. **A cover gets the same entity check as a normal page. No special case.** The other surviving
+   risk from the cover/page unification review — *keeping trial covers cheap* — was **not**
+   answered and stays open as its own backlog line.
+
+4. **The anonymous account flow is DROPPED.** A March 2026 plan that was never built; moved to
+   `docs/archive/` with a drop note. Its four open questions (ideas step, story viewing without
+   email, 24h vs 48h cleanup, localStorage vs sessionStorage) are dropped with it.
+
+5. **T7 (spoil the payoff vs risk the reader) — DECLINED.** No change to
+   `prompts/story-arc-review.txt`. The arc review keeps stating a device's rule where the device
+   first appears.
+
+6. **T9(b) — `textQualityJudge` does NOT run in the unified pipeline.** The template and
+   `server/lib/textQualityJudge.js` stay unwired from the pipeline.
+
+7. **T12 — DECLINED, both halves.** No dialogue-count check in `prompts/story-text-from-beats.txt`,
+   and no companion-animal naming rule in `prompts/story-arc-review.txt`.
+
+**Rationale:**
+- (1) Two lines tracking one promotion produce two different stale numbers; one line with a
+  measured, dated figure is the whole value of the index.
+- (2) Trial abandonment is where trial spend leaks. Paying ~$0.06/character for users who never
+  reach story creation costs more than the extra in-job latency the lazy path adds. UX parity
+  with the eager path is explicitly not worth that price.
+- (3) The shipped unification is "covers are pages with flags" — its entire point is that a cover
+  is not a separate code path. Exempting covers from the entity check would rebuild the special
+  case the unification removed.
+- (4) Six months old, never built, and the trial flow has moved on without it (prewarm + PATCH
+  sync, deferred email, the one-trial-per-user cap). Keeping it listed as an open decision only
+  generated re-reads.
+- (5) The fault T7 describes is real, but the proposed alternative trades a known-understandable
+  story for a surprise the child may simply miss; the owner is not buying that trade.
+- (6) The reading-level re-check that shipped as T9(a) in `4b346fb0d` already covers this ground,
+  so a second judge buys nothing for its cost and latency.
+- (7) A dialogue floor is a countable rule with no evidence that the count is what makes a page
+  feel alive, and naming a companion animal changes story convention, not just prose.
+
+**Touched:** `tasks/BACKLOG.md` (P0 figure corrected; six lines closed, one new line split out for
+the still-open trial-cover-cost half), `tasks/eval-variance-backlog.md`,
+`tasks/story-scoped-avatars-plan.md`, `tasks/story-text-quality-2026-08-25.md` (T7, T9(b), T12),
+`docs/plans/2026-08-10-cover-page-unification-review.md`,
+`docs/archive/2026-03-08-anonymous-account-flow.md` (moved from `docs/plans/`).
+**No application code, prompt or eval rule was changed by this entry** — five of the seven
+verdicts are decisions NOT to change one.
+
+**Status:** ✅ active
+
+---
+
+## A Visual Bible entry with `states[]` is asked the identity question too, not only state consistency (2026-09-11)
+
+**Context:** The reference-sheet cell gate had two mutually exclusive branches. A batch of state
+cells (`batch.length > 1 && every cell has stateName`) went to `checkStateCellsConsistency` — "is
+this the same object in every cell, differing only in the named state?" — and an entry that took
+that branch was NEVER asked `checkElementCellRender`'s question: does the cell depict the object its
+description describes, in the declared art style? Measured on staging story
+`job_1789147573901_m3uam0nxi`: ART001 "Levin's Velolampe", described as *"A compact rectangular
+bicycle lamp approximately as long as a child's palm, black matte plastic casing with a flat rear
+face and a slightly convex circular lens at the front centre, a U-shaped black plastic bracket
+mounted perpendicular to the underside for clipping to a handlebar, overall length about ten
+centimetres"*, rendered in both state cells as a large black broadcast/CCTV-style camera body with a
+protruding round lens housing on a stubby mount. The stored gate record is a single `state_cells`
+entry, `ok: true`, reason verbatim: *"State cells pass: The object is consistent in shape, color,
+and material, with the only difference being the state of the lamp being off or lit."* Accurate
+about consistency and blind to the object being wrong; all five pages holding that reference
+reproduced the camera faithfully. The same blind spot covered ANI002 (the dragon) and ART002 (the
+small scale) in the same story. Stateful entries are by definition the props the story changes —
+the most plot-critical objects in the book — and they were the ones skipping the identity check.
+
+**Decision:** A state batch gets BOTH questions, through one new helper `checkStateBatch`. Identity
+is asked ONCE, of the FIRST cell (the bible's convention lists the unaltered look first) with the
+parent's base description — not of every state cell, which would multiply a paid judge call for no
+information. The batch fails if either question answers NO. The failing reason (prefixed `object
+identity:` / `state consistency:`) is what `buildReferenceSheetPrompt(..., gateReason)` feeds into
+the single re-render, so an identity failure re-renders against the identity complaint. Each
+question keeps its OWN gate record through `recordElementCellGate` — the identity verdict under
+gate `element_cell`, the consistency verdict under `state_cells` — so a pass on one and a fail on
+the other can never be stored as a pass. Unchanged: one re-render on NO, one re-check for the
+record, then accept; a check that ERRORS stays unchecked; and the `*_still_bad` fail-open — a cell
+that fails twice still ships (owner, same day).
+
+**Rationale:** Consistency and identity are different questions and the cheap one was standing in
+for both. Asking identity per cell would cost one judge call per state; asking it once of the
+unaltered cell answers the same question, because the consistency gate already establishes that the
+other cells are the same object. Cost: +1 judge call per state batch on the happy path, +2 when a
+re-render happens (both questions are re-asked, since the re-render replaced both cells). State
+batches are a minority of entries — typically 1-3 per story, so ~1-6 extra calls in the worst case.
+
+**Touched:** `server/lib/referenceSheets.js` (`checkStateBatch` + the `isStateBatch` branch in
+`generateReferenceSheets`), `tests/unit/vb-state-batch-gate.test.ts`.
+
+**Status:** ✅ active
+
+### The Art Director authors the Visual Bible, ahead of the page briefs
+**Context:** The Visual Bible was written at beats stage 3
+(`beats_story_bible`, `prompts/story-bible-from-beats.txt`), BEFORE the Art
+Director wrote the scene briefs at stage 4 (`beats_scene_expansion`,
+`prompts/scene-expansion-all.txt`). The bible therefore had to GUESS which page
+uses which element, matching plan lines that name things in prose ("the big
+wing scale") against entries the bible keys by id. On staging
+`job_1789147573901_m3uam0nxi` the guess removed 19 (element, page) claims and
+left six entries at `appearsInPages: []` — including the story's central prop
+and the signpost carrying plot-critical text. No reference cell was rendered
+for any of them, while the final briefs cited exactly those ids (p10
+`objects: ["LOC004", "ART006"]`), and p10 then shipped an unrepairable critical
+("no visible letters on the signpost for him to trace"). The bible-time trim
+was dropped and page assignment rebuilt from the final briefs the same day
+(`applyBriefUsage`, `cdb334904`) — a correction to the guess, not its removal.
+
+**Decision:** The guess is gone. The EXISTING all-pages Art Director call emits
+the `---VISUAL BIBLE---` and `---COVER SCENE HINTS---` sections FIRST, before
+page 1's heading, then the page briefs. **No new model call was added** — the
+sections ride the call that was already being made. Stage 3 keeps the
+`---CLOTHING REQUIREMENTS---` section and nothing else. `applyBriefUsage` is
+KEPT as a deterministic reconciler: it is free, tested, and it credits a
+secondary named only in a page's `characters[]` row, which `objects[]` never
+carries.
+
+**Rationale:**
+- One author now owns both what is in each picture and what each thing looks
+  like, so the two cannot contradict each other.
+- The emission ORDER is the mechanism: the model declares its cast and props,
+  then stages each page citing ids that already exist, which makes it
+  structurally impossible for a page's `objects[]` to name an entry that was
+  never declared. That is the exact failure being fixed.
+- Clothing did NOT move. Styled avatars are the long pole in front of every
+  image and start the instant stage 3 returns (`opts.onClothingRequirements`);
+  making the wardrobe wait for the Art Director would push every page image
+  back by a whole stage. Clothing depends on the cast and the setting, both
+  already fixed by the plan, so it needs nothing the Art Director adds.
+- The Art Director picks landmark viewpoints from the `PHOTOS:` lines in
+  `{AVAILABLE_LANDMARKS_SECTION}` (the same descriptions `photoVariants`
+  carries), so `landmarkView` is no more blind than before; the index linking
+  and variant load now run right after the bible is parsed instead of before
+  scene expansion.
+- Truncation headroom, measured offline on that same story (18 pages, no model
+  call): the built prompt is 71,661 chars (~17.9k tokens, no unfilled
+  placeholders) and the response has to carry the stored bible JSON (40,702
+  chars, an over-estimate — the stored copy is enriched), the cover hints
+  (4,073) and every brief (63,533) — ~27k output tokens against
+  `gemini-3.1-pro`'s 65,536 cap (`maxTokens=null`, no code-side cap). A partial
+  bible is never shipped: `JSON.parse` is the completeness test, a reply cut
+  mid-JSON yields no bible at all, and the existing batch retry is the recovery.
+- The per-page fallback (`expandOnePage`) cannot author a whole-book bible and
+  does not try — it reuses whatever the all-pages call produced. With no bible
+  at all the run is degraded exactly as a failed stage-3 bible always was
+  (empty VB, no cover hints, blind briefs) and says so loudly. Never a kill.
+- TRIAL IS UNAFFECTED: trials are always `pipelineMode: 'unified'`
+  (`resolvePipelineMode`), so the streaming `onVisualBible` callback in
+  `storyJobPipeline.js` — and the trial reference-sheet kickoff inside it — is
+  on the unified path and never sees this change.
+- The landmark-shortfall early abort (`onVisualBible` in beats mode) now fires
+  after the Art Director call instead of before it, so a retried attempt burns
+  the scene-brief stage too. It still saves the scene review and the page text,
+  and it is the only known cost of the move.
+
+**Touched:** `prompts/scene-expansion-all.txt`,
+`prompts/story-bible-from-beats.txt`, `server/lib/beatsPipeline.js` (stage-3
+block, `extractBibleSections` marker sets, the bible-adoption block after the
+all-pages call, the stage-order header), `server/lib/promptBuilders.js`
+(`buildSceneExpansionAllPrompt`, `buildStoryBibleFromBeatsPrompt`,
+`namedByMain`), `server/lib/testlab.js` (`runBeatsScenesStage` call site),
+`docs/prompt-inventory.md`, `tests/unit/ad-authored-bible.test.ts`,
+`tests/unit/vb-authoring-contract.test.ts`,
+`tests/unit/invented-age-band-wiring.test.ts`.
+
+**Status:** ✅ active
+
+## Visual Bible descriptions must read as the named object, not as a parts list (2026-09-11)
+**Context:** Staging story `job_1789147573901_m3uam0nxi` shipped two Visual Bible
+artifacts as a DIFFERENT OBJECT, and both reproduced on fresh renders against
+current code (Test Lab experiments 1189 and 1190). ART001 "Levin's Velolampe", a
+bicycle front lamp, rendered as a black CCTV / broadcast camera on 5 of 5 page
+appearances and again on the Lab re-render — where the new identity gate PASSED
+it ("The watercolor painting depicts a black bicycle front lamp with a U-shaped
+bracket, matching the description and art style"). ART002 "Kleine Schuppe", a
+small dragon scale, rendered as a ceramic dish on the shipped pages and as a
+scallop shell on the re-render, which the identity gate DID catch ("The object is
+a seashell, not a dragon scale fragment"). The stored descriptions are accurate
+and name the object correctly. Verbatim, the lamp: *"A compact rectangular
+bicycle lamp approximately as long as a child's palm, black matte plastic casing
+with a flat rear face and a slightly convex circular lens at the front centre, a
+U-shaped black plastic bracket mounted perpendicular to the underside for
+clipping to a handlebar, overall length about ten centimetres."* The scale: *"A
+single curved scale fragment roughly the size of a large coin, deep teal-green
+with a smooth convex outer face and a concave rough inner face, the edges thin
+and slightly translucent amber, the surface marked with a fine radiating pattern
+of shallow ridges spreading from the base like a fan."* Each is a geometric parts
+list whose nearest real-world match is a different object — thirty words of
+geometry out-vote a two-word noun at render time. The bible authoring schema in
+`prompts/scene-expansion-all.txt` asked for exactly this: `described by shape and
+parts`, with no recognisability requirement to hold it in place. The same problem
+was solved for clothing and got the opposite instruction there
+(`story-bible-from-beats.txt`: "The costume must read as that costume at a
+glance").
+**Decision:** The authoring prompt gains the costume rule's counterpart for every
+entry, as the FIRST bullet of the `description` contract and inside the artifact
+schema field: the description must read as that thing at a glance, name the thing
+with the word that names it, and name the one feature that separates it from the
+everyday object its bare geometry would otherwise describe — what it attaches to,
+what it is part of, what it does. Geometry is made subordinate ("Geometry serves
+recognition; it is never the whole description") rather than removed. The cell
+prompt (`prompts/reference-sheet.txt`) gains the render-side counterpart: each
+cell reads as the element it is named as, and when the shapes and parts described
+also fit a commoner everyday object the cell shows the named one.
+**Rationale:** Prompt-side and generic, per the standing rule that classification
+belongs to the prompt. The proven precedent in this codebase for "a description
+that is accurate but reads as the wrong thing" is the costume rule, so the wording
+is modelled on it. The existing "never by a style name" constraint is kept — it
+guards a real prior bug (a prop described as "<style>-style" instead of described)
+— and is now subordinate to recognisability instead of competing with it. Three
+things were deliberately NOT done: no rule about internal proportions or stated
+dimensions governing part sizes (the owner rejected that diagnosis — the failure
+is the wrong object, not wrong sizing); the cell gate's fail-open "accepted
+anyway" behaviour is unchanged (owner, same day: a twice-failed cell still ships);
+and `server/lib/referenceSheets.js` gate logic is untouched, the identity gate
+added earlier the same evening is working and caught the scale. The stored
+descriptions of the two motivating entries are data and were not edited — this
+changes what future bibles author. Whether a reference cell should be allowed a
+minimal mounting context for objects defined by what they attach to is left open
+for the owner (`tasks/BACKLOG.md`).
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/reference-sheet.txt`,
+`tests/unit/vb-authoring-contract.test.ts`,
+`tests/unit/reference-sheet-mismatch.test.ts`
+**Status:** ✅ active
+
+## Per-round repair cap: unchanged, covers included in the denominator (2026-09-11)
+**Context:**  Dragon rerun `job_1789147573901_m3uam0nxi` logged `[REPAIR-CAP] … on a
+21-page story — cap is 11` and deferred p11 and p16 (score 55). Two things were
+questioned: whether the 3 covers belong in `totalPages`, and what a deferral means
+on a run where `repairMaxPasses` is 1 (staging, local) so no later round exists —
+the cap's own wording promises the pages "come back next round". They do not; on a
+single-round run a deferred page is abandoned, and p11/p16 shipped at 55.
+**Decision:** No change. `totalPages` stays `Object.keys(roundEvalPages).length`
+(pages + covers) and the final-round deferral behaviour stays exactly as written.
+Owner ruling 2026-09-11, explicitly: keep as is, and stop asking about it.
+**Rationale:** Counting covers yields a LOOSER cap, not a tighter one — 21 × 50% =
+11 admitted versus 18 × 50% = 9 if only story pages counted. "Fixing" the
+denominator to story pages would have repaired two FEWER pages, the opposite of
+what the finding wanted. The cap exists to stop one round rewriting a whole book
+and minting new faults (measured on job_1788903616404_iqvhj4l8m: round 2 rewrote
+17 of 18 pages, findings 26 → 13 → 23), and that protection is worth an
+occasional abandoned page. The visibility of a page that ships unrepaired is
+tracked separately as D7 — a page scoring 0 or 5 shipping with no warning anywhere
+— and belongs there, not in the cap.
+**Touched:** `server/lib/repairLogic.js` `applyRoundCap`, `server/lib/repairPipeline.js:1896`,
+`server/config/runtime.js:124` (`repairMaxPasses`: 3 default, 1 staging/local)
+**Status:**   ✅ active — do not re-litigate; a future session asking this question again
+should read this entry and stop.
+
+## A reference cell draws only the object, never what it attaches to (2026-09-11)
+**Context:**  A bicycle-lamp entry in staging story `job_1789147573901_m3uam0nxi`
+rendered as a CCTV camera: its `description` was a parts list, and a parts list of
+a small box with a lens on a bracket also describes a camera. Lab experiments 1191
+and 1192 proved the fix — rewriting the description to name what the object
+attaches to made the cell come back unmistakably the right object. The rendered
+cell also DREW the mounting the words named. The owner rejected that, verbatim:
+"no handle bar. Only the thing itself." The cell prompt's existing isolation rule
+covered only a thing named to convey SIZE or SCALE, so an attachment named for
+recognition fell outside it.
+**Decision:** Owner ruling. Naming an attachment is for RECOGNITION, in words; the
+attachment itself is never DRAWN. Two rules, one in each layer:
+1. `prompts/reference-sheet.txt` REQUIREMENTS — the isolation line now also covers
+   anything the description names to say what the element "attaches to, is part of,
+   or is used with".
+2. `prompts/scene-expansion-all.txt` authoring rule — the read-as-that-thing rule
+   keeps its instruction to name what the object attaches to, and adds that naming
+   that thing "identifies the object and never puts it in the picture".
+This also CLOSES the `tasks/BACKLOG.md` question "should a cell be allowed a minimal
+MOUNTING context" with a No: the words-only lever is the whole fix, and no per-entry
+`mount` field is built.
+**Rationale:** The cell is the reference the page renderer copies. A drawn mount is
+copied onto every page that holds the object, and `composeVbSlot` shrinks a cell to
+as little as 200px with `fit: contain`, so a mount steals pixels from the object
+itself. The identification pass also names ONE element per cell, and a mounted
+object makes that call ambiguous. Words cost none of that and were measured to work.
+**Touched:** `prompts/reference-sheet.txt`, `prompts/scene-expansion-all.txt` (bible
+authoring rule), `tests/unit/reference-sheet-mismatch.test.ts`,
+`tests/unit/vb-authoring-contract.test.ts`, `tasks/BACKLOG.md`
+**Status:**  ✅ active
+
+## A change of light is not a state (2026-09-11)
+**Context:**  Same story, `job_1789147573901_m3uam0nxi`. Two entries each minted two
+states that differ only in light: `ART001` "off" / "lit" ("lens dark, no visible light
+emission" vs "lens glowing warm yellow-white"), and `ART002` "dim glow" / "plain"
+("surface emits a faint soft wash of painted light" vs "surface matte, no glow, colour
+unchanged"). Their two rendered cells are visually indistinguishable — two paid cells,
+one picture. The owner, verbatim: "Why whould glow and matte be two states, that is just
+different lighting". Our own prompts endorsed it: the state test listed "a lantern is lit"
+as an example of a state, and three copies of the one-entry rule opened their example list
+with "lit,".
+**Decision:** Owner ruling. Light is excluded from the state test. An object emitting,
+glowing, dimming, or being lit or unlit is not a state — the object itself is unchanged,
+and the scene sets the light page by page. The "a lantern is lit" example is replaced
+with a physical change ("a lid is torn off"), "lit," is dropped from the example list in
+all three copies, and the `states[].delta` schema clause gains "never light, that belongs
+to the scene" beside its existing material/colour/size clause. The rest of the test is
+unchanged: the take-away-everything test, the held/carried/set-down clause, the face-prop
+clause and the contact clause all stand. This EXTENDS "A state is a change to the object
+itself; place, holder and contact are never states" (2026-09-09) with a fourth
+non-state; it reverses nothing.
+**Rationale:** A state exists to give one object two different reference PICTURES. Light
+does not change the object, so it cannot produce a different picture of it — the two cells
+above prove that empirically. Lighting is a per-page scene decision and already lives in
+the page brief. Consequence, intended: an entry whose only states were lighting now has no
+states and renders ONE cell instead of two, halving its reference cost. Verified
+state-less is safe everywhere downstream: `expandElementStateCells` returns a single cell
+for `states.length === 0`; `objectStates` returns `[]` for a missing field;
+`objectStateFor`/`objectStateForPage`/`defaultObjectState` all return null, so
+`resolveObjectState` yields `state: null` and `elementRefCell` falls through to the
+entry's own cell; and every citation lookup keys on `baseVbId`, so even a stale dotted
+citation like `ART001.2` still resolves to the entry and its single cell. The Art Director
+is only ever shown dotted handles when states exist (the `States:` line in
+`buildRecurringElements` is omitted otherwise), so it cannot mint one for a state-less
+entry. No fallback was added and none is needed.
+**Touched:** `prompts/scene-expansion-all.txt` (state test, one-entry rule, artifacts
+`states` schema), `prompts/story-unified.txt` (one-entry rule, `states` schema),
+`prompts/story-trial.txt` (one-entry rule), `tests/unit/vb-authoring-contract.test.ts`
+**Status:**  ✅ active
+
+## Truncation guard: a reported natural stop beats token arithmetic (2026-09-11)
+**Context:**  `/api/health/config` reported two `cap_hit` truncation suspects on
+`job_1789147573901_m3uam0nxi` (labels `arc_panel`, `plan_recheck`) with
+`outputTokens 17278 ≥ capInForce 16384` — and both replies were complete,
+parsed and used normally. The guard inferred a cut purely from the token count.
+**Decision:** `cap_hit` and `near_cap` no longer fire when the provider reported
+a finish reason that is not a truncating one. An explicit `stop` is believed; the
+arithmetic rules stay as inferences for providers that report no finish reason.
+**Rationale:** MEASURED against OpenRouter `openai/gpt-5.6-luna-pro`, 2026-09-11
+(two direct calls, ~$0.001 total):
+  - `max_tokens: 200` → `finish_reason: "stop"`, `completion_tokens: 161`, of
+    which `completion_tokens_details.reasoning_tokens: 67`, for a 110-character
+    answer. **Output tokens include reasoning**, so they have no fixed relation
+    to the visible reply.
+  - `max_tokens: 300` → `finish_reason: "length"`, `completion_tokens: 965`, of
+    which `reasoning_tokens: 948`, and **zero visible characters**. **`max_tokens`
+    is not enforced on that total** — a 3.2x overrun.
+Either fact alone breaks `outputTokens >= capInForce` as a truncation test. The
+second also means a reasoning model can burn an entire allowance thinking and
+return an EMPTY reply with `finish_reason: length`; the guard's `stop_reason` and
+`empty` rules both catch that and are unchanged.
+**Touched:** `server/lib/textReplyGuard.js` `assessTextReply`,
+`tests/unit/text-reply-guard.test.ts`
+**Status:**   ✅ active. Related open item: `TEXT_MODELS['gpt-5.6-luna-pro'].maxOutputTokens
+= 16384` is a declared number that this provider does not enforce — it is the
+`planCheckModel`, so the plan check's reply length is bounded by the model, not by
+us. Verifying every TEXT_MODELS ceiling against its vendor page is tracked separately.
+
+## 2026-09-11 — The commission is injected ONCE (arc stage); the text writer never sees the raw idea again
+
+**Context:** `job_1789147573901_m3uam0nxi` (dragon, 18 pages, 1st-grade) shipped a
+three-way group split on p10 and a combination-locked summit gate on p12 — the
+"obstacle course" shape the owner has complained about. Tracing all four stages
+showed the arc machine was not the author of either:
+
+- The commission (`storyDetails`, this run's is `idea_source = 'user-written'`)
+  names both: *"der Weg teilt sich in drei Pfade, und sie müssen sich trennen"*
+  and *"Kiaan liest auf einem Schild am dritten Pfad den richtigen Code für das
+  Gipfeltor"*.
+- The arc creator explicitly OVERRODE the split on age grounds — its stored
+  split justification: *"four boys aged three to five never separate on a
+  mountain — [a peer] reads the sign and all four take one path together"* — and
+  dropped the coded gate entirely. The final arc contains neither.
+- `story-text-from-beats.txt` nevertheless carried `{STORY_BRIEF}`, i.e. the raw
+  idea in `<user_input>` tags, so the writer was handed the original wish list
+  AFTER the arc had already ruled on it. It restored both.
+
+The text audit then caught the restored split (`FAULT[UNFORCED]: p10 — The group
+splits up to take all three paths even though they just identified the middle
+path as the correct way`), the repair pass reported it fixed, and the split
+shipped anyway (separate defect: the word/repair self-report is never
+re-measured — see the open item below).
+
+**Decision:** the text stage receives no commission. `{STORY_BRIEF}` is removed
+from `story-text-from-beats.txt`; `buildStoryTextFromBeatsPrompt` documents why
+at the call site. Subject, world and cast reach the writer through the arc, the
+plan lines and `CHARACTER_DETAILS`.
+
+**Rationale:** by that stage the arc IS the story, and it has already judged the
+idea's mechanics — which obstacles survive, which are unsuited to the cast's age.
+A second injection re-opens rulings the pipeline deliberately made, with no
+memory that they were made. This is the general shape, not a dragon-specific
+patch: any idea naming its own mechanics gets them reinstated past the arc.
+
+**Sites checked** (per validating-prompt-changes): `{STORY_BRIEF}` also appears
+in `arc-create/panel/retell/hints` (correct — that is the stage that reads the
+commission), `story-arc-audit`, `story-arc-review`, `story-bible-from-beats`,
+`scene-review`, `clothing-review`, `story-child-critic`, `story-text-audit` and
+`text-refine`. The last two are the remaining re-import channels — an auditor or
+refiner holding the original wish list can fault the text for dropping it. In
+this run they did not (the arc-informed audit's five faults cite no commission
+item), so they are left as they are and noted here rather than changed unasked.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `server/lib/promptBuilders.js`
+(`buildStoryTextFromBeatsPrompt`).
+**Status:** ✅ active — verified at prompt-build level (a sentinel idea string,
+the COMMISSION block and the `<user_input>` tags are all absent from the built
+prompt; the arc is present; no unreplaced placeholders). Not yet validated
+against regenerated page text.
+
+## 2026-09-11 — The idea generator must name the want, the obstacle and the cost concretely (supersedes nothing; enforces the 2026-08-19 premise rule)
+
+**Context:** The 2026-08-19 entry ("The idea generator writes a premise, not a
+walkthrough") closed with *"not yet validated against generated output; no idea
+has been generated under the new rules."* First generation under those rules
+(this session, dragon commission's own parameters): the rules hold — no solution
+named, no walkthrough, peril fine — but the output drifted vaguer than the
+prompt's OWN worked examples. Owner's verdict: *"very generic, not bad, but could
+be slightly more concrete. The story could be anything afterwards."* Measured
+example: want = "to know what it is", obstacle unnamed ("more than they can see"),
+cost absent — though the 2026-08-19 decision requires the idea to name "the
+setup, the want, what stands in the way **and what failing costs**". So this is a
+compliance gap against that entry, not a reversal of it.
+
+**Correction to the 2026-08-19 entry:** it records *"No provenance is recorded
+for an idea"* and infers "generated-then-possibly-edited" from the text's shape.
+The `stories.idea_source` column now exists and reads `user-written` for this
+story (`idea_original` null, `data.ideaGeneration` null). The shape-based
+inference was wrong: that brief was typed by a person. The generator's own output
+does not carry the one-event-per-sentence walkthrough shape.
+
+**Decision:** the want, the obstacle and the cost are each required to be a
+concrete nameable thing, with the vague forms called out by name, plus a
+self-review check ("can you name each in three words?"). The ban on naming the
+object/gate/trick that decides the outcome is UNCHANGED.
+
+**Rationale:** the failure was under-specification of the situation, not
+over-specification of the solution. Loosening the solution ban would have
+recreated exactly the prescribed-task shape the 2026-08-19 entry exists to
+prevent.
+
+**Known seam:** a concrete obstacle pulls toward stating the test the characters
+must pass, which the 2026-08-19 rule bans. Observed in one of four samples ("the
+dragon lets nobody through who has not first convinced him"). Not a solution and
+not a per-child job, so it ships — but this is where prescriptiveness will
+re-enter if it does.
+
+**Validation:** 4 ideas generated under the edited prompts against 2 under the
+old, same commission parameters, `claude-sonnet` (`MODEL_DEFAULTS.idea`). All 4
+name want + obstacle + cost; neither of the 2 old ones names a cost. Run locally
+against the edited templates via `buildIdeasPromptContext`, not through staging.
+
+**Touched:** `prompts/generate-story-ideas.txt` (paragraph-2 spec, concreteness
+rule, self-review check 8), `prompts/generate-story-idea-single.txt` (same
+concreteness rule — the sibling site the 2026-08-19 entry names).
+**Status:** ✅ active.
+
+## A CRITICAL vote wins the severity merge; the score and the repair queue read one field (2026-09-11)
+**Context:**  On `job_1789147573901_m3uam0nxi`, p13 and p17 each reported an
+unrepaired CRITICAL `object_presence` **and** a finalScore of 85. Both numbers came
+from the same shipping version. The stored finding:
+`severity: "major"`, `severities: {semantic: "MAJOR", compliance: "CRITICAL"}` —
+one defect, three evaluators, two of them disagreeing on severity. The defect was
+real: a whole phantom dragon drawn where the story's central prop should have been,
+the same pages the D1 assignment trim broke.
+**Decision:** Two changes.
+  1. `medianSeverity` (feedbackConsolidator.js) returns the HIGHEST vote whenever any
+     witness says CRITICAL or CATASTROPHIC. Below that the median still stands.
+  2. `collectCriticalFindings` (repairLogic.js) reads ONLY `consolidatedPlan.deduped_issues`
+     when the page was consolidated, falling back to the raw quality/semantic pools
+     only when it was not.
+**Rationale:** (1) **REVERSES the 2026-07-30 ruling** "pure median for all severities,
+no lone CATASTROPHIC escalation — accepts a rare 1-of-3 real miss for far fewer false
+alarms" (see `## Multi-judge eval: bucket taxonomy + median jury`). Owner sign-off
+2026-09-11, framed as a reversal, on the evidence above: a page one witness says
+cannot be published does not become publishable because a second witness was milder.
+The false alarms that ruling protected against live below CRITICAL, where the median
+is unchanged.
+(2) is not a policy change but a contradiction: `composeDeductions` empties the raw
+quality/semantic/compliance buckets whenever a consolidated plan exists, so a defect
+is charged once at its MERGED severity — and `collectCriticalFindings` was reading the
+raw pools the scorer had just emptied. The score charged MAJOR (15 → 85) while the
+repair queue saw the raw CRITICAL. Fixing (1) alone would not close this: any future
+disagreement re-opens the same gap.
+**Touched:** `server/lib/feedbackConsolidator.js` `medianSeverity`,
+`server/lib/repairLogic.js` `collectCriticalFindings`,
+`tests/unit/critical-severity-agreement.test.ts`
+**Status:**   ✅ active. Supersedes the "pure median for all severities" half of the
+2026-07-30 entry for the CONSOLIDATOR path; the 3-judge `evalJudges` merge is untouched.
+**Watch:** the repair queue now admits pages it previously scored past, so round-1
+volume may rise. If false CRITICALs become common, the fix is the evaluator prompt or a
+`MAX_SEVERITY_TYPES` ceiling — not a return to taking the lower vote.
+
+## 2026-09-11 — The empty-scene plate mirrors the route's GRADIENT, not only its direction (settlement clause tested and rejected)
+
+**Context:** `job_1789147573901_m3uam0nxi` p2. The page text rides "aus der Stadt
+hinaus und den grünen Hügel hinauf"; the render shows a road descending toward a
+village. The scene brief was NOT at fault — its prose reads "pedalling it forward
+up a pale grey-beige tarmac road curving rightward around a grassy hillside", and
+the one figure shown stationary is faithful to the text (he stops at each bend).
+The fault is in `emptyScenePrompt`, which the plate is drawn from BEFORE any
+figure is placed: "a narrow pale grey-beige tarmac road curving around a grassy
+hillside … a soft haze of distant rooftops visible far beyond the curve". No
+gradient, plus a settlement the page has no location for. The geometry-mirroring
+bullet already required "the same direction for any path, river, road…" —
+direction as a frame bearing, which a climb is not.
+
+**Decision:** the mirrored geometry now includes gradient — a route a character is
+written climbing rises away from the camera, one they descend falls away. Applied
+to both `scene-expansion.txt` (per-page fallback) and `scene-expansion-all.txt`
+(the live beats path; both carry the bullet verbatim).
+
+**Rejected — a second clause banning imported settlements.** Tested in the same
+A/B: "Distance is filled with the same landscape, not with new places… buildings,
+rooftops, towers and settlements appear in it only where the page or a Visual
+Bible location puts them." The Art Director responded by NAMING a city ("the city
+of Zürich appears as a soft, hazy expanse of muted rooftops") and the plate
+rendered it larger and more prominent than the anonymous rooftops it replaced.
+The clause is not in the shipped change. The page's own location is `LOC002`
+(an invented hill road); the city is `LOC007`, declared for the final page only —
+so the correct fix keys off THIS page's declared location, which belongs with the
+open `appearsInPages` work rather than a prose ban.
+
+**Validation:** the stored 72k-token scene-expansion prompt for that run was
+re-sent to the same model (`gemini-3.1-pro`, `MODEL_DEFAULTS.sceneDescription`)
+with only these rule edits applied, regenerating all 18 briefs in one call. p2's
+plate prose changed to "winds diagonally up from the bottom left … curving around
+a sloping hillside"; the two plates were then rendered through the production
+path (`grok-imagine-image`, `emptyScenePlateRouting`) and the after-plate reads
+uphill where the before-plate descends into a village. Across the other 17 pages
+nothing moved: gradient language appears on p2 (wanted) and p17 (already there),
+settlements on p1 and p18 (legitimate — those pages' locations ARE Zürich). Both
+plates are single samples.
+
+**Known gap, not addressed here:** the semantic evaluator scored this page 100
+with its road running opposite to its own text.
+
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`.
+**Status:** ✅ active.
+
+## A creature carries its stated size into every page prompt (2026-09-11)
+**Context:**  On `job_1789147573901_m3uam0nxi` the same dragon rendered knee-high on
+p4 and p7, a bodiless wing at the frame edge on p5, and correctly house-sized on p18.
+The Visual Bible had stated the size all along, and in a usable form —
+`ANI002.size` = *"body length approximately four metres from snout to tail tip;
+wingspan approximately five metres fully spread; large enough for four small children
+and a dog to sit across the back"*. The pages whose Art Director prose happened to
+restate it came closest; p8 and p18 restated nothing and had nothing to go on.
+**Decision:** Two generation-side changes. Nothing in the evaluators.
+  1. `promptBuilders.js` REQUIRED OBJECTS: the `size` rider no longer excludes animals
+     (`obj.type !== 'animal'` removed), so a creature's stated size rides its checklist
+     line on every page that lists it.
+  2. `prompts/scene-expansion.txt` and `scene-expansion-all.txt` rule 8f now reads
+     "a vessel, building, vehicle **or creature**", and adds that a creature keeps the
+     size its entry states on every page it appears on, whatever the shot.
+**Rationale:** The animal exclusion was SCOPE, not a ruling: `793049e40` introduced the
+rider to fix a shoebox-sized chest rendering torso-sized and covered held props only.
+A creature is the element whose scale drifts most and the one nothing else anchors —
+its size is not implied by a hand holding it, a doorway beside it, or a character's
+height. Rule 8f had the same gap, and so does the evaluator: a wrongly-sized creature
+fits neither `scale` (everyday objects, figure age) nor `structure_scale` (vessels,
+buildings, vehicles), so no evaluator can report one even while looking at it. Fixing
+generation rather than eval was the owner's call (2026-09-11) — the data existed and
+was being discarded one line before it reached the model, which is a supply problem,
+not a detection problem.
+**Touched:** `server/lib/promptBuilders.js` (REQUIRED OBJECTS `sizeNote`),
+`prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`tests/unit/required-objects-label.test.ts`
+**Status:**   ✅ active. Still open and NOT addressed here: no check compares a rendered
+creature against its stated size, or against the adjacent page — D11's detection half,
+which needs a new evaluator type (owner decision, prompt-side).
+
+## A secondary character's stated height relation must reach the page prose (2026-09-11)
+**Context:**  D12 of the dragon rerun. Two stone guards drifted: p12 and p13 drew both
+as blocky boulder figures of the SAME size, p16 drew the smaller one as a slim grey
+humanoid. The bible was explicit — CHR001 "about as tall as a door", CHR002 "about two
+thirds the height of Wächter Gross" — and neither relation reached the picture.
+**Decision:** `scene-expansion.txt` / `scene-expansion-all.txt` rule 8f extends the
+size rule from creatures to secondary characters, and adds: "When an entry states its
+height against another named figure, write that relation into the prose on every page
+the two share."
+**Rationale:** Secondary characters are DELIBERATELY not emitted into the page prompt
+(`promptBuilders.js` ~3637, 2026-06-09: the CHR-id detour was removed because it
+emitted a second and sometimes third copy of each description — "the prose already
+carries them inline"). That leaves exactly two routes for a secondary's look: the
+reference cell, and the Art Director's per-page prose. The cell route was separately
+broken here — the `character_cell` gate failed BOTH guards for lacking "a plausible
+human skin color" on figures whose description says "made entirely of pale grey
+layered stone" — and is already fixed (`2be79f734`, `7b62ec8e5`, both 2026-09-11,
+three hours after this story rendered). The prose route had no rule at all: 8f covered
+vessels, buildings, vehicles and (2026-09-11) creatures, and a secondary character is
+none of those. Same family as the creature-size entry above; fixed the same way, on
+the generation side.
+**Touched:** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`tests/unit/required-objects-label.test.ts`
+**Status:**   ✅ active. Note on the p16 "grey humanoid": CHR002's own description reads
+"lean and narrow … two dark oval recesses for eyes set wide apart" — on a slim figure
+that IS a grey-alien silhouette, so that render was arguably faithful to a description
+that reads differently at two builds. Worth revisiting if it recurs now the cell gate
+passes stone figures and anchors them.
+
+## The 2×4 sheet's head row may be clothed — in the SAME garment as the body row (2026-09-11)
+**Context:**  D15. A commissioned child's shirt "drifted" between a blue-collared polo
+(p1, p3, p8) and a plain red crew (the other fifteen pages and the cover). Looking at
+the styled reference sheet itself settled it: the four TOP cells wear a red shirt with
+a BLUE COLLAR, the four BOTTOM cells wear a plain red crew. The story's clothing
+contract says "A red short-sleeved cotton T-shirt" — the bottom row is right and the
+top row invented a collar that exists nowhere else. The pages were not drifting; they
+were copying whichever row they anchored on.
+**Decision:** The head row MAY show clothing (owner, 2026-09-11), and the garment is
+now checked:
+  - `prompts/styled-costumed-avatar-2x4.txt` row 1 becomes "head and shoulders", and
+    any visible neckline is bound to `{COSTUME_DESCRIPTION}` — no collar, placket, hood
+    or trim row 2 does not have.
+  - `server/lib/character2x4Sheet.js` (the hardcoded identity-sheet prompt) same change
+    for cells 1-4.
+  - `prompts/sheet-row-heads-eval.txt` TASK 3 becomes COVERAGE AND GARMENT: a visible
+    garment must be the one `REQUESTED_OUTFIT` names. The placeholder was added; the
+    filler already supplied it to both row evaluators.
+  - `prompts/sheet-2x4-evaluation.txt` gains **cross-ROW** consistency beside its
+    existing cross-cell check, and `outfitScore` is now the LOWEST of the three.
+**Rationale:** `stackRowsInto2x4(headRowData, bodyRowData)` builds the sheet from two
+INDEPENDENT generations, and every garment check ran inside one row — the bodies
+evaluator checks "all 4 cells wear the same outfit" across cells 5-8 only. Nothing ever
+compared across the seam, so two rows could disagree and both pass. The prompts also
+contradicted each other: the sheet spec said row 1 shows "no clothing" while the
+head-row evaluator awarded coverage points for a clothed shoulder and penalised a bare
+one — so a head row that overstepped into a bust shot was not failed, it was told to
+put a collar on. Allowing clothing and checking it removes the contradiction in the
+direction the owner chose.
+**Touched:** `prompts/styled-costumed-avatar-2x4.txt`, `prompts/sheet-row-heads-eval.txt`,
+`prompts/sheet-2x4-evaluation.txt`, `server/lib/character2x4Sheet.js`,
+`tests/unit/sheet-row-garment-agreement.test.ts`
+**Status:**   ✅ active. The 2×2 IDENTITY sheet (`avatar-main-prompt.txt`,
+`avatar-ace-prompt.txt`) is deliberately UNCHANGED — its top quadrants are tight
+photoreal face crops with no neck, a different artifact from the styled sheet the pages
+anchor on. A test pins that distinction so a future sweep does not "harmonise" them.
+
+## The creature-tone rule has to reach the PAGE, not just the bible entry (2026-09-11)
+**Context:**  D20. A commissioned pet dog was drawn snarling, teeth bared, in a book
+whose reader is 5 — a tone level whose text says teeth are "not bared, raised or
+displayed". The ticket blamed scope ("CREATURE_TONE covers the dragon and the guards; a
+commissioned pet is not covered") and that was wrong: every level opens "**Animals**,
+creatures and non-human characters…", so the dog was in scope all along.
+**Decision:** Three changes, all generation-side.
+  1. `buildCreatureToneSection` appends one sentence to whichever level is in force:
+     where a creature is in frame, the PAGE's own prose states its face and expression
+     in those terms.
+  2. `prompts/scene-expansion.txt` gains the `{CREATURE_TONE}` placeholder — it had
+     none, so the per-page fallback path carried no tone rule at all.
+  3. `buildSceneExpansionPrompt` fills it, from `options.story` (the same inputData
+     source `SEASON` reads), falling back to the page's own cast.
+**Rationale:** `{CREATURE_TONE}` was injected into ONE template
+(`scene-expansion-all.txt`), in the section governing Visual Bible ENTRY descriptions.
+An animal's entry description never reaches a page: REQUIRED OBJECTS is name-only
+(2026-09-02 ruling) plus its size (2026-09-11), so the page's prose is the only place a
+creature's face is decided per page. On job_1789147573901_m3uam0nxi p11 the whole of
+that prose was "At the base of the block, Nia digs vigorously at the dirt with her
+paws" — a face left unwritten is drawn from the action alone, and effort reads as
+teeth. Neither evaluator flagged the bared teeth either; that detection gap is NOT
+addressed here.
+**Touched:** `server/lib/promptBuilders.js` (`buildCreatureToneSection`,
+`buildSceneExpansionPrompt`), `prompts/scene-expansion.txt`,
+`tests/unit/creature-tone-reaches-the-page.test.ts`
+**Status:**   ✅ active. Age boundaries unchanged (0-4 cute, 5-6 not-menacing, 7+
+formidable), and an unreadable age still emits nothing.
+
+## Orphaned Test Lab rows are reconciled at boot and by the busy probe (2026-09-11)
+**Context:**  A staging push landed mid-run on 2026-09-11 (~09:59 CH) and killed two
+paid judge experiments (1160, 1163, ≈$0.30 plus wall-clock). Afterwards both rows still
+read `status='running'` while `GET /api/health/busy` returned
+`{"busy":false,"reasons":[]}`. The Test Lab UI and the push gate gave opposite answers
+about the same two rows.
+**Decision:** One reconciler, `server/lib/testlabReaper.js`, called from THREE places:
+server boot, the busy probe (before it reports idle), and `GET /experiments` (which
+previously held the only copy). A row the probe cannot reconcile is reported BUSY, not
+idle. The 5-minute heartbeat window is unchanged.
+**Rationale:** Reaping lived inline in the experiments route, so an orphan was only
+reconciled when a human opened the Test Lab — meanwhile the probe counts only rows with
+a FRESH heartbeat (a live run beats every 30s via setInterval, so a quiet row is a dead
+row), and stopped seeing the orphan minutes after the death. Neither reader was wrong on
+its own terms; nothing made them agree. A restart is precisely what orphans these rows
+(the single-flight flag is in-process), so boot is the right moment to reconcile, and
+the probe reconciling before answering means whatever it calls idle is also marked ended
+in the database.
+The window stays at 5 minutes deliberately: the old blanket 2h rule held every push,
+staging and production, for an hour (exp747, 2026-08-19). Widening it back would trade
+this bug for that one.
+**Touched:** `server/lib/testlabReaper.js` (new), `server/lib/idleShutdown.js` (testlab
+probe), `server/routes/admin/testlab.js` (uses the shared reconciler; `HEARTBEAT_STALE`
+now has one definition), `server.js` (boot), `tests/unit/testlab-orphan-reaper.test.ts`
+**Status:**   ✅ active. NOT addressed: whether the pushing session bypassed the hook
+(`--no-verify`). This fix removes the stale-row route to a false idle; it cannot stop a
+deliberate bypass.
+
+## TEXT_MODELS ceilings raised to the vendors' real limits (2026-09-11)
+**Context:**  Since the 2026-09-11 no-caps change these numbers ARE the ceiling every
+text call runs at, and what `textReplyGuard` measures replies against. Only three were
+sourced. Verified all 38 against the vendors on 2026-09-11 — OpenRouter
+`GET /v1/models` → `top_provider.max_completion_tokens`, Anthropic `GET /v1/models` →
+`max_tokens`, Google `v1beta/models` → `outputTokenLimit`, xAI `GET /v1/models` + docs.
+**Result: 5 OK, 6 dead ids, 28 UNDERSTATED, 0 overstated.**
+**Decision:** 26 ceilings raised to the verified vendor value. Worst offenders:
+minimax-m3 16384→512000 (31x), deepseek-v4-pro-0813 16384→384000 (23x), qwen-vl
+8192→115200 (14x), kimi-k2.6 16384→235929 (14x), grok-4.6 32768→450000 (13.7x),
+kimi-k2 8192→100352 (12x), claude-haiku 8192→64000 (7.8x, the utility model),
+claude-sonnet 64000→128000 (the default idea+outline writer, at half its ceiling),
+deepseek-v4-pro 64000→384000 (the beats reviewer — its own adjacent comment said
+"up to 384K" while the code said 64000).
+**Rationale:** An understated ceiling does two things at once: it truncates real replies,
+and `outputTokens >= capInForce` then reports a false `cap_hit`. Both were live.
+**Dead ids are ANNOTATED, not changed** — retiring them is a routing decision and was not
+authorised here. They 404 rather than cap: `gemini-2.0-flash` (shut down),
+`grok-3`, `grok-3-mini`, `grok-4-1-fast-non-reasoning` (xAI serves only
+grok-4.20-*/4.3/4.5/4.6), `qwen/qwen-max`, `qwen/qwen3.8-max`. The catalogue has
+`qwen3.8-max-0902` but NOT the bare id, so the earlier decisions.md note about retesting
+qwen3.8-max "at the true limit" cannot run as written. **xAI publishes no output ceiling
+at all**, so any xai-provider entry is unverifiable in principle, not merely unverified.
+**Touched:** `server/config/models.js` TEXT_MODELS
+**Status:**   ✅ active. SEPARATE, NOT FIXED: 15 entries are reasoning models whose
+`completion_tokens` INCLUDE reasoning tokens, so `maxOutputTokens` is not comparable to
+visible output — measured on gpt-5.6-luna-pro (300 requested, 965 returned, 948 of them
+reasoning, zero visible characters). That set covers `planCheckModel`,
+`outlineReviewModel`/`arcReviewModel`, `textAuditModel` and `beatsAuditModel`.
+`deepseek-v4-pro` is both understated 6x and reasoning-enabled.
+
+## 2026-09-11 — The story title is picked AFTER the pages, and judged first on being true of them
+
+**Context:** `job_1789147573901_m3uam0nxi` shipped as "Der Drache, der nicht
+fliegen konnte" — a title promising a creature who cannot fly. The book never
+shows one trying and failing; the limitation is stated once, in one line of
+dialogue, and is narrower than the title ("kann ich das Grauhorn nicht
+überfliegen und nicht nach Hause" — a range limit, not an inability), and the
+creature flies on the final page carrying the whole cast. A buyer reads a
+condition the book does not tell.
+
+There is no title judge: the stored `titleJudge` is the TEXT WRITER's own
+inline pick (`beatsPipeline.js`), and its three criteria were "names the
+adventure or the bond / gives away no ending / a child of N can say it". None
+asks whether the title is TRUE, so the pick was honest against its own test. The
+discarded candidates show the cost — "Die Schuppe vom Grauhorn" is accurate and
+was rejected for naming "an object that merely carries it": the rule steered
+away from the true title toward the evocative false one. Worse, `---TITLE---`
+was the FIRST output block, so the title was committed before a word of the
+story existed and could only be guessed from the arc.
+
+**Decision:** truth leads the judging order — every word of the title is true of
+the pages as written, and a title naming a condition, a lack or an inability is
+one the story SHOWS on a page, never one a character only mentions; where no
+candidate qualifies, a fourth is written and shipped. The `---TITLE---` block
+moves to LAST, after the pages, so the pick is made against the finished story.
+
+**Parser work this forced:** `parseRefinedText` gave the last page everything to
+the end of the reply, so a trailing block would have shipped inside the final
+page of the book — the same failure its own headStart comment describes for page
+headings. Fixed with an opt-in `trailingMarkers` argument, NOT a blanket "any
+---MARKER--- ends a page": scene briefs carry ---METADATA--- inside each page, so
+a general rule would cut the last brief's metadata off. Only the text-writer call
+site passes `['TITLE']`. The title-section regex in `beatsPipeline.js` also had a
+lookahead requiring a following `---X` that no longer exists; it now accepts
+end-of-input. The synthesised `rawOutline` still emits ---TITLE--- first for the
+downstream unified parsers — unchanged, and unaffected.
+
+**Validation:** the stored text prompt for that run was re-sent to the same model
+(`claude-sonnet`, `MODEL_DEFAULTS.storyText`) with only these edits applied. All
+18 pages parsed, none missing, and the trailing block did not leak into the last
+page. New candidates: "Fauchis Schuppe" / "Die Reise zum Grauhorn" / "Das Licht
+am Velo" — the false title is no longer even proposed. Shipped pick: "Fauchis
+Schuppe". One run, not a distribution.
+
+**Known trade-off:** the winner names an OBJECT, which the second criterion
+disfavours. Truth now outranks it, so expect drift toward object titles.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `server/lib/promptBuilders.js`
+(`parseRefinedText`), `server/lib/beatsPipeline.js` (title regex + call site).
+**Status:** ✅ active.
+
+## 2026-09-11 — Telling costs what showing costs: one telling carries one new fact
+
+**Context:** `job_1789147573901_m3uam0nxi` p7 is one speech delivering five facts
+— who took the thing, while the owner slept, where it is now, that a second piece
+broke the same night, and why the owner is stuck. The writer did not invent that
+shape: the ARC packed all five into ONE numbered event, and the beats stage gave
+that event one page.
+
+The budget could not see it. `buildArcBudgetSection` limits EVENTS ("a happening
+a child would retell on its own") and ACTIONS ("one thing a character does that
+changes something"). A speech is one happening and changes nothing, so told
+information was free while shown information was rationed — the budget actively
+pushed backstory into a speech. The arc critique has the same blind spot: it
+counts distinct events and per-page action load, and nothing counts what is said.
+
+**Decision:** one telling carries one thing the reader did not already know;
+further facts arrive at the page that turns on them, or are found and shown
+rather than said. Plus the matching critique question: name any event in which
+one figure tells more than one unknown thing, AND name the page each surplus fact
+belongs on instead.
+
+**Rationale:** the clause ROUTES the surplus rather than banning it. A bare ban
+makes the model drop facts — precisely how a length rule once deleted a story's
+causality (2026-09-07, asymmetric word-budget tolerance) — and these five facts
+are the story's causal spine. "Name where it belongs instead" is what makes the
+fix redistribution rather than deletion.
+
+**Not done:** no code-side counting of facts per event. Classification belongs to
+the prompt (CLAUDE.md); a regex that recognises backstory in one story does not
+generalise.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildArcBudgetSection` — one edit
+covers both arc prompts, which share {ARC_BUDGETS}), `prompts/arc-create.txt`,
+`prompts/arc-retell.txt` (critique question, duplicated in both tellings).
+**Status:** 🟡 conditional — verified present in the built prompt, NOT yet run.
+The check that matters is that the five facts still exist somewhere in the arc
+afterwards: a shorter speech with facts deleted would look like success and be a
+regression.
+
+## 2026-09-11 — The text audit's UNFORCED question also asks why the obvious doer stays behind
+
+**Context:** the dragon story's central hole — a house-sized creature waits at
+its cave while four children aged three to five climb a mountain, face two
+guards and carry back an object big enough to patch a five-metre wing — was
+filed by nothing. UNFORCED already owned the question ("is a consequence declared
+while an easier option was visibly open?"): the creature going itself IS the
+easier option. The question simply never named that case.
+
+**Decision:** the clause folds into UNFORCED rather than becoming a thirteenth
+question — "So does the obvious doer — where the one who needs the thing, or is
+plainly the most able to fetch it, stays behind while others go, the book says on
+some page what keeps them from going."
+
+**Deliberately NOT mirrored into `story-text-audit-blind.txt`:** the two audits
+overlap only on TRANSITION and PAYOFF by design, and that non-overlap is what
+lets `mergeAuditFindings` treat same-page-same-category hits from different
+auditors as one fault. Adding UNFORCED to the blind reader would break the dedupe.
+
+**Validation (and a larger finding):** both arms run over the shipped text at
+temperature 0, one sentence apart. The target fault appears ONLY in the new arm
+("The text never explains what keeps the house-sized dragon … from simply walking
+up the mountain himself"). But the arms disagree on findings the clause cannot
+touch — old caught a p12 TRANSITION new missed, new caught p18's dropped quest
+goal old missed — so the 4→9 fault spread is NOT attributable to one sentence.
+Three runs of this audit over identical text yielded 5 (production), 4 and 9
+faults with partial overlap: whether a real defect is caught is substantially
+luck. That instability is tracked in tasks/BACKLOG.md and matters more than any
+single finding, because it bounds what this audit can be relied on for.
+
+**Touched:** `prompts/story-text-audit.txt` (question 2).
+**Status:** ✅ active.
+
+## VB element budget raised to FOUR; the location cell is what gives way (2026-09-11)
+**Context:**  The owner asked for four packable Visual Bible elements per page. The
+objection I had been holding it on was prompt length, and it does not survive contact
+with the code: `shrinkPromptForModel` holds the protected tail (REQUIRED OBJECTS +
+ART STYLE) back and reattaches it verbatim, so a longer element list is safe by
+construction. The real question was cell size, and it is now measured rather than feared.
+**Decision:** `VB_ELEMENT_BUDGET` 3 → 4. Grok's `VB_SLOT_MAX_ELEMENTS` stays at **4**,
+so a page using all four elements drops its LOCATION cell (last in priority) instead of
+shrinking every cell. Owner chose this over raising the slot to 5.
+**Rationale:** MEASURED at the book's page aspect (`pageAspect: '3:4'`, A4 portrait).
+The slot renders 768x1024; the VB column is capped at a third of the width (256px); a
+cell's effective size is its shorter side, `min(256, floor(1024/n))`:
+  - 3 cells → **256px**
+  - 4 cells → **256px**  (the column WIDTH binds, not the height — the fourth element
+    costs no resolution whatsoever)
+  - 5 cells → **204px**  (four pixels above `VB_CELL_FLOOR_PX`)
+So the raise itself is free and only the fifth cell costs. Below ~200px a secondary
+character's face is a smear the model replaces with a prior (a 136x136 cell once rendered
+a rescued girl with the lead child's auburn curls), and 4px is not margin. The location
+is the one cell that is genuinely redundant: the page already receives that plate as its
+background.
+**Touched:** `server/lib/vbElementBudget.js` (constant + header, which still described
+the three enforcers removed on 2026-09-11 and "never more than three"),
+`server/lib/promptBuilders.js` (two comments), `tests/unit/vb-element-budget.test.ts`,
+`tests/unit/vb-assignment-trim.test.ts`, `tests/unit/vb-trim-persisted.test.ts`
+**Status:**   ✅ active. Note for whoever reads those two trim test files:
+`trimVbAssignments` and `vbTrimLostPages` have NO production call site since cdb334904 —
+the tests pin `budget: 3` so they keep exercising the function's own logic without
+claiming 3 is the production budget. Deleting the dead trim is a separate decision.
+
+## 2026-09-11 — The commission reaches the arc stage and stops there (audit and refiner too)
+
+**Context:** completes the same-day entry "The commission is injected ONCE",
+which removed `{STORY_BRIEF}` from the text writer and listed the two remaining
+re-import channels as noted-but-unchanged. Owner asked for them closed.
+
+`story-text-audit.txt` presented the commission under a `# BACK COVER` heading
+and its preamble promised it as an input; `text-refine.txt` carried the block
+ahead of CHARACTER DETAILS. Both run AFTER the arc has ruled on the idea's
+mechanics, and the refiner rewrites whole pages — so an auditor holding the
+original wish list can fault the text for dropping an obstacle the arc
+deliberately cut, and the refiner can put it back. The audit's own preamble
+already names the arc as the master ("The story is what the book had to
+deliver"), so the commission was a second, competing authority in the same
+prompt.
+
+**Decision:** `{STORY_BRIEF}` is removed from both. The audit's `# BACK COVER`
+heading goes with it, and its opening sentence no longer promises an input it
+does not receive ("You get the story and its page plan, each page's text, and
+what its picture shows").
+
+**Not evidence of harm, and said plainly:** in the measured run the arc-informed
+audit's five faults cite no commission item, so neither channel was observed
+firing. This closes the shape, not a reproduced defect.
+
+**Touched:** `prompts/story-text-audit.txt`, `prompts/text-refine.txt`.
+**Status:** ✅ active — verified at prompt-build level (a sentinel commission
+string, the COMMISSION and BACK COVER headings are all absent from both built
+prompts; the arc is present; no unfilled placeholders).
+
+## 2026-09-11 — WITHDRAWN: "a user-written idea is never screened for peril"
+
+Logged here because the claim was written into the backlog earlier today and is
+wrong. The peril rule is NOT confined to the idea generator: `{TELLING_RULES}`
+in arc-create and arc-retell carries it via `buildTellingRulesSection`
+(promptBuilders.js) — "Nothing in the story or its pictures is dangerous enough
+that it could lead to death — for anyone. Frightening is the right level…" —
+together with the obstacle rule that bans a puzzle door, riddle or trick lock
+"unless the commission establishes it". A user-written idea is therefore
+screened at the arc, which is what dropped the flotation-aid stream crossing
+from the dragon commission.
+
+**Cause of the error:** the arc TEMPLATE was grepped for peril wording and the
+interpolated sections were not. A rule that reaches a prompt through a builder
+is invisible to a grep of the .txt file. Owner corrected it.
+
+## 2026-09-11 — WITHDRAWN: "the text audit prompt leaks Visual Bible ids"
+
+Recorded because the claim was written into the backlog earlier today and is
+wrong. The production audit does NOT carry VB ids: `storyJobPipeline.js` passes
+`arcReviewReport?.finalArc` as the audit's arc — 4,367 chars for
+`job_1789147573901_m3uam0nxi`, zero ids. The VB-ID-LEAK warning came from a
+VALIDATION HARNESS written the same day, which passed `stories.data.outline`
+(57,458 chars, including the whole `---VISUAL BIBLE---` JSON) instead.
+
+The guard behaved exactly as designed — it named the offending call label, which
+is what let the mistake be traced. What failed was reading a warning about a
+locally-built prompt as evidence about the shipped path.
+
+**Standing lesson, twice today:** a claim about production needs the production
+input, not the one the harness happened to pass. The same error produced the
+withdrawn peril claim above (arc template grepped, interpolated sections not).
+
+## 2026-09-11 — The word budget is re-measured after the whole-page passes; a self-report is not an outcome
+
+**Context:** `job_1789147573901_m3uam0nxi` shipped three pages far over budget at
+1st-grade (25-70 words, +50% tolerance, so 105 is the line): p10 at 126, p12 at
+112, p18 at 125. The deterministic counter that exists for exactly this ran and
+caught two of them — then the repair pass reported them closed:
+
+> "FAULT[LENGTH] p10 (130 words): fixed on p10 — 65 words…"
+> "FAULT[LENGTH] p18 (167 words): fixed on p18 — 82 words…"
+
+Neither was true. The report's own before/after shows p10 130 → 126 and p18
+167 → 125. And p12 went 82 → 112 — the rewriting pushed a page from inside the
+budget to outside it, invisibly, because the counter had already run.
+
+Cause: `buildWordBudgetFindings` is called once, on the writer's text, ahead of
+the repair pass ("Runs on the writer's text — `current` is untouched here").
+Nothing re-measures, so a claimed fix that is not one passes, and damage done by
+the rewriting is never seen. The same blind spot let an audited
+`FAULT[UNFORCED]` (p10's three-way split) be reported closed while the split
+shipped.
+
+**Decision:** re-measure on the text as the whole-page passes left it, and give a
+page that is still out ONE fed-back corrective pass (`kind: 'length_fix'`) —
+never a loop. Placed directly after the repetition check and before the diff, so
+the diff pass reviews this rewrite too, exactly as it does the repetition fix.
+The per-page counts and the before/after fault counts are recorded on the report
+as `wordBudget`, so a false closure is visible in stored data rather than only in
+the model's prose.
+
+**It re-measures, it does not tighten.** The findings are the counter's own, so
+the asymmetric tolerance and the "keep every action, line of dialogue and
+feeling. Losing one is a fault" wording travel unchanged. A page still over after
+the corrective pass SHIPS with a WARN: a paid run is never killed for length, and
+forcing the cut is what deleted causality before (2026-09-07).
+
+**Validation (no model call):** the story's own stored before/after text replayed
+through `buildWordBudgetFindings`. One measurement on the writer's text yields 2
+faults; the re-measure on the produced text yields 3 — p10 126, p12 112, p18 125.
+The claimed closures and the grown page are both exposed.
+
+**Touched:** `server/lib/textRefine.js` (the re-measure block, `wordBudget` on the
+snapshot and the return).
+**Status:** ✅ active — verified against stored text; the corrective pass itself
+has not yet run on a live generation.
+
+
+## 2026-09-12 — GDPR erasure: the eight design questions, ruled (three limits accepted)
+
+**Context:** `scripts/admin/delete-user-data.js` and `docs/gdpr-erasure.md` shipped
+2026-09-11 with eight questions the owner had to answer before a first real
+erasure (`tasks/gdpr-erasure-2026-09-11.md` §8). They cover what survives an
+erasure, whose rows we may rewrite, how long retained rows live, and what can be
+rehearsed. All eight were ruled on 2026-09-12. Three of them changed the script.
+
+**Decision:**
+
+- **Q1 — KEEP `credit_transactions` and `referral_payouts`** (the script deleted
+  them via the `users` cascade). Both are `user_id NOT NULL REFERENCES users(id)
+  ON DELETE CASCADE`, so the rows are reassigned to a sentinel `users` row,
+  `gdpr-erased-sentinel`, created idempotently by the script. The move is an
+  erasure only because the rows are scrubbed crossing over: `description` +
+  `reference_id` on `credit_transactions`, `description` on `referral_payouts`,
+  and `source_user_id` wherever it named the erased person. Amounts, balances,
+  types, dates, `order_stripe_session_id` and `stripe_refund_id` are kept — that
+  is the audit trail being preserved. The sentinel is not a person: no name, an
+  `@invalid` address (RFC 2606, undeliverable), a password that is not a bcrypt
+  hash so nothing can authenticate as it, and it is excluded from the admin user
+  list and count, the admin storage report and the activity feed.
+- **Q2 + Q3 — do not touch third parties' rows** (the script tombstoned
+  `users.referred_by`; that was removed). Other users' `referred_by` and
+  `orders.referral_code_used` keep the erased person's referral code.
+- **Q4 — abort on an unprocessed `stripe_webhook_retry` row** (`processed_at IS
+  NULL`) mentioning the person. Already the behaviour; now a recorded decision.
+  The admin triages the payment at `/api/admin/stripe-webhook-retry`, then re-runs.
+- **Q5 — retention is 10 years** (Swiss OR art. 958f). The privacy policy was
+  edited by the owner to say 10 years; the SOP and the plan now agree.
+- **Q6 — the policy describes the email request path** (`privacy@magicalstory.ch`,
+  one month) instead of a non-existent account setting. Owner-edited. A self-serve
+  delete button is a later follow-up.
+- **Q7 — a READ-ONLY orphan audit**, `scripts/admin/audit-r2-orphans.js`: lists the
+  bucket, compares each key's owning id against the live DB, and reports the count
+  and total bytes of unreferenced objects grouped by key prefix. It deletes nothing
+  and has **no delete mode at all**.
+- **Q8 — production-only R2, accepted.** No staging R2 credentials will be added.
+
+**Accepted limits — declines, recorded deliberately:**
+
+1. **A first name survives an erasure.** The referral code is
+   `Magic<Firstname><NNN>` (`server/lib/referral.js`), so third parties' retained
+   rows keep it. The script counts those rows and prints the count in the dry run
+   and on the receipt, so the limit is visible at every erasure rather than
+   forgotten.
+2. **Retained rows have no expiry.** No retention-date stamp and no purge job were
+   asked for, so nothing records when an anonymised `orders` row or a sentinel-owned
+   ledger row becomes deletable, and nothing will ever remove one. Tracked in
+   `tasks/BACKLOG.md`.
+3. **The R2 half of an erasure cannot be rehearsed.** It runs against production
+   only, so the first real erasure is the first real execution of that code. The
+   compensating control: the dry run prints the exact R2 keys it would delete.
+
+**Rationale:** Q1 — a ledger is evidence; deleting it to satisfy an erasure
+destroys the record of money that moved, and GDPR art. 17(3) does not require
+that. The sentinel exists because the FK does, not because anyone wanted another
+user row — hence the "cannot log in, cannot be emailed, invisible to admin"
+constraints. Q2/Q3 — both alternatives edit a row that belongs to someone else:
+NULLing `referred_by` silently restores that person's one-code-ever entitlement
+(`server/routes/print.js:1493` tests only for `NOT NULL`), and scrubbing
+`orders.referral_code_used` damages a financial record we are retaining. Leaving
+them and reporting the count is the honest trade. Q8 — the bucket-mismatch guard
+is what caught the config problem in the first place; inventing a second set of
+env vars to make a rehearsal possible would have been guesswork, so the exact-key
+print is the review step instead.
+
+**Touched files:**
+- `scripts/admin/delete-user-data.js` — sentinel creation + scrubbed ledger move,
+  the `users.referred_by` tombstone removed, third-party code counts on the dry run
+  and receipt, exact R2 keys printed in the dry run, retention wording, header notes
+- `server/lib/gdprSentinel.js` (new) — the sentinel identity + `sentinelExclusion()`
+- `server/routes/admin/users.js`, `server/routes/admin/analytics.js`,
+  `server/lib/adminActivity.js` — exclude the sentinel from the user list, the user
+  count, the storage report and the activity feed
+- `scripts/admin/audit-r2-orphans.js` (new) — the read-only orphan audit
+- `docs/gdpr-erasure.md`, `tasks/gdpr-erasure-2026-09-11.md`, `tasks/BACKLOG.md`
+- `client/src/pages/PrivacyPolicy.tsx` — 10-year retention + the email request path
+  (edited by the owner, not by this change)
+
+**Status:** ✅ active — dry runs verified on staging (sentinel path printed, bucket
+guard fired as designed) and read-only on production (bucket verified, exact-key
+list printed). No erasure has been executed.
+
+
+## 2026-09-12 — A figure filed as an object belongs on EXPECTED CAST; element coverage is checked against the plan line, never the page text
+
+**Context:** Staging `job_1789163494908_kc2joi4ax` (18 pages, de-CH), triaged in
+`tasks/vb-element-coverage-2026-09-12.md`. Two faults out of it.
+
+Fault 3: `buildExpectedCastBlock` asks for animals through
+`buildSecondaryExpectedCharacters(..., includeAnimals: true)`, which resolves names out of
+`collectSceneCharacterNames` — and that helper reads only `characters`, `characterPositions`
+and `characterClothing`. The Art Director files animals and secondary characters in `objects[]`
+by id (p12: `characters: ["Max"], objects: ["LOC002","ANI001"]`), so no animal ever reached the
+roster and pages 12, 15 and 16 each took a false `extra_character` CRITICAL (75 / 50 / 54) for
+drawing the cat their own prompt commissioned. The `includeAnimals` switch added 2026-09-10 was
+dead on arrival.
+
+Fault 1: five pages stage an element their `objects[]` never cites, so it never enters REQUIRED
+OBJECTS; the evaluator judges the image against the prompt and cannot see the gap either.
+
+**Decision:**
+1. New helper `collectSceneObjectFigureNames` (`sceneMetadata.js`) resolves `objects[]` ids against
+   `visualBible.animals` and `.secondaryCharacters` only — state suffix stripped (`ART002.1` →
+   `ART002`), free text matched by name — and `buildExpectedCastBlock` adds what it returns.
+   `collectSceneCharacterNames` is NOT widened: its other caller is the figure detector
+   (`images.js`), which must keep being handed people only.
+2. New brief check `element_uncited` (`sceneBriefCheck.js`), REVIEWABLE, on the existing re-plan
+   path: findings → `{BRIEF_FINDINGS}` → the scene review rewrites the page → the deterministic
+   post-review re-check reports what survived. Code never cites an id itself; composition stays
+   with the Art Director (the owner rejected auto-citing explicitly).
+3. Its source is the page's own ENGLISH plan line (`beats[].planLine`, stored per page as
+   `outlineExtract`), and only that line's `<who/what is in frame>` and `<the instant>` segments.
+   The trailing purpose clause is not read. The reader-facing page text is never read.
+4. `prompts/scene-review.txt` gains check 9d `[element_uncited]` so the reviewer applies the same
+   coverage over the material it holds — the plan line and the brief prose.
+
+**Rationale:** Everything in the planning chain is English; the page text is downstream, in the
+reader's language, and is not a source for a code check. Scoping to the in-frame and instant
+segments is what makes the rule honest rather than fitted: measured over the 18 stored pages it
+names exactly one (p14, a true defect) and no false ones, while reading the purpose clause as well
+would add one true page (p12) and four false ones (p5, p6, p13, p18 — all name the object in the
+purpose clause while correctly not drawing it). Three of the five known gaps (p3, p8, p9) are
+invisible to ANY pre-text check: their brief prose and `objects[]` agree — matching the English
+brief prose against uncited entries flags 0 of 18 — and the element surfaces only in the text the
+writer produces after the scene review, from a stage that has no way to send a page back. Closing
+those needs either element continuity tracking (the object was left at this place on the previous
+page and nothing moved it) or a post-text re-plan stage; neither was built.
+
+Matcher shape: head noun of each entry's `name` plus the head of `type`/`species`; a word owned by
+more than one entry is dropped as ambiguous (in this story `dragon` — shared by the mother dragon,
+the hatchling and the Dragon Egg — and `mother`); an entry already listed in `characters[]` is cast,
+not an uncited element.
+
+**Touched files:** `server/lib/sceneMetadata.js` (`collectSceneObjectFigureNames`),
+`server/lib/evalPipeline.js` (`buildExpectedCastBlock`), `server/lib/sceneBriefCheck.js`
+(`checkElementCoverage`, `coverageIndex`, REVIEWABLE), `server/lib/beatsPipeline.js` (plan lines
+passed into both brief-check rounds), `prompts/scene-review.txt` (check 9d),
+`tasks/vb-element-coverage-2026-09-12.md`.
+
+**Status:** ✅ active — verified by replaying the stored briefs of
+`job_1789163494908_kc2joi4ax`. No story rerun.
+
+## An object's OWN light is a state; the page's instant can drop a state's delta on the appearance axis too (2026-09-12)
+
+**Context:** Staging `job_1789163494908_kc2joi4ax`. The story's central prop is an object
+whose only change across the book is its own light — it glows, goes dark, glows again, and the
+glow is the plot signal. `prompts/scene-expansion-all.txt` banned light from a state delta
+("never light, that belongs to the scene") while requiring every page of an entry to fall in
+exactly one state. The author therefore filed the emission in `description` (always-true) and
+smuggled the change in as colour: one `dark` state claiming seven pages, three of which the
+text has glowing. `defaultObjectState` documents that the first state IS the unaltered look
+"by construction" — here the first state was the altered one, so even a bare citation resolved
+to `dark`. The p10 prompt read `THIS IMAGE DEPICTS: … the egg glows brightly again` above
+`* egg (object) — its shell is opaque dark brown`, and the renders split: the prose won on two
+pages, the object clause on three. No stage compares an entry's `description` with a state's
+`delta`, so nothing caught it.
+
+**Decision:** Two changes, both owner-approved (tasks/vb-element-coverage-2026-09-12.md, items
+B1 + B2).
+1. **Light is authorable.** The template now separates the two things it was conflating: how
+   the WORLD lights an object (a lamp on it, a shadow, dusk) stays the scene's, page by page;
+   the object's OWN emission — a thing that glows and goes dark, lights up and goes out — is a
+   state like any other change, and then the emission lives in the states, never in
+   `description`.
+2. **`contradicted` grows a second axis.** `resolveObjectState` already dropped a state's delta
+   (keeping its cell) when the state's `held` flag disagreed with the page's declared
+   interactions — the page's instant outranks the bible's table. `appearanceContradiction` puts
+   the appearance case on the same road: when the sentences of `sceneIntent` that name the
+   object speak exactly one SIBLING state's distinctive vocabulary and none of the chosen
+   state's, the delta is dropped and the cell kept. `contradictedBy` ('held' | 'appearance')
+   names the axis in the one warn line.
+
+**Rationale:** The detection is deliberately narrow, because a false positive silently strips a
+legitimate delta. Only the author's own words vote — there is no hand-written vocabulary of
+appearance concepts in the code, and no prose classification; only tokens DISTINCTIVE to one
+state vote; only the intent sentences that NAME the object are read, so the intent's closing
+"…, warm lamplight, hopeful mood" clause (scene lighting, present on nearly every page) cannot
+vote; the rival must be a single state. Sibling states are what makes this decidable without
+semantics: the template requires the complete set of looks with exactly one per page, so they
+are mutually exclusive by construction — the entry's `description`, being always-true, is NOT,
+and is deliberately not a rival source. Measured on the stored story: with the glow authored as
+a state and the page table mis-assigned (the failure shape), the dark delta is dropped on the
+two glowing pages and kept on every page whose text really is dark, including the page that
+mentions the cat lying "on top of" the object. The guard is silent on the story AS STORED,
+because there the rival look was in `description` — B1 is what makes B2 able to see it. It
+under-fires by design: a wrong delta shipping is the failure we already had, a stripped good
+delta would be a new one. First draft of the matcher read tokens of 3+ characters (so "egg" or
+"cat" can name its entry) and let "the" into the vote, which made every sibling a rival on
+every page — hence the explicit three-letter function-word stoplist.
+
+**Touched files:** `prompts/scene-expansion-all.txt` (state rule + the artifact `states[]`
+field), `server/lib/visualBible.js` (`APPEARANCE_STOPWORDS`, `appearanceStem`,
+`appearanceTokens`, `appearanceContradiction`, `resolveObjectState`),
+`server/lib/promptBuilders.js` (the REQUIRED OBJECTS warn line),
+`tasks/vb-element-coverage-2026-09-12.md`.
+
+**Status:** ✅ active
+
+## An element left at a place stays cited for the next two-three pages at that place (2026-09-12)
+**Context:** In `job_1789163494908_kc2joi4ax` a plan line left an artifact on the ground at LOC002 on
+p11; p12, staged at the same spot the very next page, cited only the location and one animal, so the
+artifact never entered the image prompt and the beat rendered unreadable (p14 the same). The code
+check `element_uncited` cannot see it: p12's plan line names the element only in the trailing "what is
+true after" clause, and that clause is deliberately not read — four other pages name it there while
+correctly not drawing it.
+**Decision:** Prompt-side only, per the owner's 2026-09-12 ruling. `scene-expansion-all.txt` gains
+cross-page rule **C7**: an element a plan line sets down at a location is cited in `objects[]` and
+staged in the prose on the next two-three pages set at that same location, ending at the first plan
+line that moves it, the first page set elsewhere, or three pages on; a whole-place distance shot or a
+camera pointed away inherits nothing, and the "what is true after" clause is not a placement.
+`scene-review.txt` gains the matching reviewer check **9e `[element_stranded]`**, beside 9d.
+**Rationale:** The window is deliberately short — an open-ended continuity rule would drag page 1's
+props into page 15. No code check: the condition needs the placement semantics of the plan line, which
+is what the Art Director and reviewer already read. Verified over the 18 stored plan lines of the
+source run: the condition is met on p12 and p14 (the two true defects) and not on p5, p6, p13, p18 —
+p5/p6 precede the placement, p18 is past the window, p13 is the whole-square ultra-wide.
+**Touched:** `prompts/scene-expansion-all.txt` (C7), `prompts/scene-review.txt` (9e),
+`tasks/vb-element-coverage-2026-09-12.md`.
+**Status:** ✅ active
+
+## 2026-09-11 — The arc machine's record is shown in dev mode, and its prompts are stored
+
+**Context:** owner asked why the arc prompt, the raw arc and the arc reviewers
+are "not stored any more". Two different answers:
+
+The raw arc and the reviewers ARE stored, and always were. `arcReviewReport`
+carries `create` (both arcs + both critiques, 15k chars on
+`job_1789163494908_kc2joi4ax`), `committed`, `discarded`, `rounds[].panel[]`
+(each panelist's full text with its model and letter), `critique`, `finalArc`,
+`arcHints`, `creatorModel`, `panelModels`.
+
+What failed is the dev-mode view. `ArcReviewReport` in `client/src/types/story.ts`
+still described the pre-arc-machine shape — `drafted`, `analysis`, `planModel`,
+`changed`, `prompt` — and `StoryDisplay.tsx` rendered from exactly those names.
+None of them exist on the report the pipeline writes, and every field is
+optional, so the panel showed `— → —`, claimed "unchanged", and silently
+rendered no sections at all. A producer moved to a new shape and its consumer
+stayed on the old contract without anything failing loudly.
+
+The prompts were the one real omission: `createPrompt`, `panelPrompt` and
+`retellPrompt` were built and never persisted, unlike the beats prompt
+(`outlinePrompt`) and the text prompts (`storyTextPrompts`). The report's own
+comment says "Everything the machine produced, verbatim — storage is cheap,
+debuggability is the point"; the inputs belong there for the same reason, since
+a prompt regression is invisible from outputs alone.
+
+**Decision:** the arc prompts are stored (create on the report, panel and re-tell
+per round), and the type plus the dev-mode panel are rewritten to the shape the
+pipeline actually writes: header with creator model, panel models, rounds run and
+worst severity; the approved arc; Fixing/Keeping; the critique; the hints; the
+committed and discarded arcs; the raw creation; then each round with its
+panelists by letter and model, the arc after that round, its critique, and the
+two prompts it sent.
+
+**Verified:** against the stored report for `job_1789163494908_kc2joi4ax` — every
+section the panel reads resolves to real content (8 sections, one round, three
+named panelists). The three prompt sections are empty for that story because it
+ran before this change; the render helper returns null for an absent value, so
+they appear only once populated. `tsc --noEmit` clean, client build clean.
+
+**Touched:** `server/lib/beatsPipeline.js` (report + roundReports),
+`client/src/types/story.ts` (`ArcReviewReport`, new `ArcRound`/`ArcPanelist`),
+`client/src/components/generation/StoryDisplay.tsx` (the arc panel).
+**Status:** ✅ active.
+
+## 2026-09-12 — R2 orphans: a failed prune is recorded, a PDF goes with its story, and the anchor was never `story_jobs`
+
+**Context:** `scripts/admin/audit-r2-orphans.js` (built under the GDPR erasure
+ruling, 2026-09-12) measured R2 objects that no database row can reach. Two
+mechanisms were proposed. One was right, one was wrong, and the wrong one
+matters enough to record plainly.
+
+*Right:* every prune in the app deletes the row first and prunes the bucket
+afterwards, best-effort — correct, because a user's "delete my story" must not
+be blocked by R2 being down. But `r2.deleteByPrefix` / `deleteObject` log a
+failure and return a count rather than throwing, so a failed prune was
+**silent**: once the row is gone nothing in the system knows which keys it
+owned, so no retry and no audit can ever reach them again.
+
+*Wrong:* the order-PDF orphans were diagnosed as the PDF key being anchored to
+a `story_jobs` row that gets pruned aggressively (5 job rows against 127
+stories on production). **That diagnosis is incorrect.** `keyForOrderPdf`
+(`server/lib/r2.js:138`) takes a **`files.id`**; `pdf-job_<jobId>-<ts>` is
+merely the *shape* of a files.id minted by `print.js`, and the audit resolves
+`orders/{id}.pdf` against the `files` table. Pruning `story_jobs` orphans
+nothing. The actual cause: **seven code paths delete `files` rows without
+deleting the R2 object**, and the row is the only thing that names the key.
+The dominant one is `POST /api/admin/cleanup-orphaned` (and
+`DELETE /api/admin/orphaned-files`), which delete every `files` row whose
+`story_id` no longer exists — i.e. the PDF row of every deleted story. That
+endpoint, named for cleaning orphans up, was **manufacturing** the 22-of-42
+orphaned order PDFs it was later blamed for.
+
+**Decision:**
+1. **`r2_pending_deletions`** (`migrations/036`) is the recovery log. A prune
+   that does not finish records its prefix or key; the DB delete still wins.
+   `server/lib/r2Pending.js` (`prunePrefix` / `pruneStory` / `pruneObject` /
+   `pruneFileRows`) replaces every raw prune call under `server/` — there are
+   now zero direct `deleteByPrefix` / `deleteObject` calls there. `r2.js`
+   gained `deleteByPrefixDetailed()` returning `{deleted, ok, error}` so a
+   failure is *detectable*; `deleteByPrefix` delegates to it and still returns
+   the bare count, so no existing caller changed. `retryPending()` runs from
+   `runDailyHousekeeping`, **before** the JSONB offload — the reverse order
+   would delete an object the same run had just re-uploaded and referenced.
+   Rows are never deleted, only stamped `deleted_at`: the table is also the
+   audit trail of every prune that had to be retried.
+2. **A story's PDFs go with the story** (owner ruling, this date). Every path
+   where a story is deleted by or on behalf of its owner now does
+   `DELETE FROM files … RETURNING id, file_url` and prunes the object through
+   the same `pruneFileRows` mechanism. The **`orders` row is never touched** —
+   the financial record is retained ten years (Swiss OR art. 958f, ruling Q5).
+   Verified: `orders` has no column referencing `files`, and no foreign key in
+   any migration points at `files.id`, so deleting a `files` row cannot cascade
+   into `orders`.
+3. **The `migrated/` prefix mismatch.** `dbHousekeeping.offloadInlineImages`
+   mints `stories/{userId}/{storyId}/migrated/…`; story deletion pruned only
+   `stories/{storyId}/`. Different shapes — so every offloaded image survived
+   every story deletion. Both prefixes are now pruned wherever a story dies.
+   A partial offload (some uploads succeed, row left unchanged) now records the
+   succeeded keys as pending, since the row still holds the inline bytes and a
+   later pass rewrites the same deterministic keys.
+4. **`ensureStoryRow` fails loudly.** That row is the anchor for the whole
+   `stories/{jobId}/` prefix; its failure was a `log.warn`, which meant a full
+   story's worth of objects written with nothing pointing at them. Now: one
+   retry, then throw. Failing there costs nothing — no model call has happened
+   yet, and `story_images` has a foreign key to that row, so the run could not
+   have been saved anyway.
+5. **`landmarks/historical/{rowId}-{slug}` stays unfixed** — no delete path
+   exists anywhere and the audit cannot resolve it (the slug is lossy). Backlog
+   item, not closed here: fixing it means a key change or a stored-key column.
+
+**Rationale:** The DB-delete-wins ordering is deliberate and stays. What was
+missing was not strictness but a *record* — an orphan is only permanent because
+the keys die with the row. One mechanism does the recording, at every call
+site, rather than each site inventing its own. The PDF fix needed no key
+rename and no backfill once the anchor was diagnosed correctly: existing
+`orders/*.pdf` keys are live and their read path is untouched.
+`scripts/admin/delete-user-data.js` was already consistent (it derives PDF keys
+from `files.file_url` and verifies its deletes); it now calls
+`r2Pending.keyForFileRow` so the derivation is not duplicated, while keeping
+its stricter policy of throwing on a failed delete — an erasure must be proven,
+not deferred to a retry.
+
+**Touched:**
+- `migrations/036_r2_pending_deletions.sql` (new table)
+- `server/lib/r2Pending.js` (new — the one tracked-prune mechanism)
+- `server/lib/r2.js` (`deleteByPrefixDetailed`, `storyPrefix`)
+- `server/lib/dbHousekeeping.js` (retry before offload; partial-offload recording)
+- `server/lib/landmarkPhotoStore.js` (both compensating deletes tracked)
+- `server/routes/stories.js`, `server/routes/characters.js`,
+  `server/routes/files.js`, `server/routes/print.js`, `server/routes/trial.js`,
+  `server/routes/admin/users.js`, `server/routes/admin/database.js`
+- `storyJobPipeline.js` (`ensureStoryRow` retry-then-throw)
+- `scripts/admin/delete-user-data.js` (shares `keyForFileRow`)
+- `scripts/admin/audit-r2-orphans.js` — read-only, untouched
+**Status:** ✅ active.
+
+## A creature's face is written on every page, same-kind beings are authored against each other, and gentle ones show no teeth (2026-09-12)
+**Context:** On `job_1789163494908_kc2joi4ax` (creature tone level `not-menacing`, focus age 5)
+the mother dragon was drawn as a fanged, slit-eyed predator looming over the square, and looked
+nothing like her own hatchling — she was "shimmering dark indigo scales, wedge-shaped head, long
+spiked tail", he was "bright orange scales, blunt rounded snout". Three separate causes, all
+measured: (1) pages 5, 6 and 13 carried NO face wording for her at all — no brow, eye, mouth,
+teeth or snout word — which is the case `CREATURE_TONE_PAGE_RULE` already describes ("a face left
+unwritten is drawn from the action alone, and effort reads as teeth"); (2) `{CREATURE_TONE}` sat
+only in the Visual-Bible-authoring section of `scene-expansion-all.txt`, so it shaped entries and
+never reached page prose; (3) nothing anywhere asked a parent creature and its young to look
+related — grep found no family-resemblance rule in any prompt. Separately the element cell gate
+rejected a creature for bared teeth while the prompt considered a smiling open mouth legal
+("Teeth and claws may exist but are not bared"), so gate and prompt disagreed.
+**Decision:** `{CREATURE_TONE}` is injected at BOTH sites — the bible section and a new per-page
+rule 8k ("A creature in frame has a written face") — which the loader supports because
+`prompts/services` replaces every occurrence, not the first. The bible section gains a same-kind
+rule: two or more beings of one kind are written against each other, unrelated ones differing in
+at least two glanceable dimensions, kin sharing the family look and parting only on age and size.
+The two gentle tone bands now say no teeth show at all, smiling included, and cap head
+projections at a single short pair. The `formidable` band (7+) is untouched — visible teeth and a
+rugged look are its stated purpose. `runBeatsScenesStage` now keeps the bible it authors
+(`authoredBible`), which is what made this verifiable.
+**Rationale:** Verified by re-running the Art Director on the same stored beats (Lab #1198) and
+rendering the element cells (#1201-1208): mother and hatchling came back both "European Dragon",
+both emerald green, both "open friendly face, level brow", parting on size and wing shape; her
+size is now stated in metres as the band asks. Owner ruled the horn cap and the no-teeth wording
+2026-09-12; distinctness stays the default for unrelated animals, shared identity is required
+only where the story makes them kin.
+**Touched files:** `prompts/scene-expansion-all.txt` (rule 8k + same-kind rule + second
+`{CREATURE_TONE}`), `prompts/scene-expansion.txt` (rule 8k), `server/lib/promptBuilders.js`
+(`CREATURE_TONE_LEVELS` cute + not-menacing), `server/lib/testlab.js` (`authoredBible`).
+Commits `fcd3056ca`, `a9fc72600`.
+
+## The costume CRITICAL needs actually-modern dress, not merely a garment the contract did not name (2026-09-12)
+**Context:** `image-prompt-compliance.txt:77` rated "Modern clothes (sweatshirt, jeans, sneakers) when
+the contract names a costume = CRITICAL". On job_1789207854566_l43qgl34w (five characters in
+generated pirate costumes) the compliance evaluator applied it to period garments it had merely
+named differently: a loose blouse with a sash tied at the waist came back as "a purple long-sleeved
+coat with tied front" (CRITICAL on a render that matched its contract word for word), the same
+garment from behind as "a hooded cloak", knee-cropped wide-leg trousers as "a skirt" on three pages,
+and a blouse under a leather vest as "a jacket". Measured across that story and
+job_1789163494908_kc2joi4ax: 9 of 9 `clothing` findings came back CRITICAL, against a quality-side
+rule (D-05) that caps the same type at MAJOR. `clothing` is also the one garment type with no
+`MAX_SEVERITY_TYPES` ceiling, so nothing bounded the over-application, and repair routes on CRITICAL.
+**Decision:** The CRITICAL clause now requires the render to actually be modern everyday dress
+(sweatshirt, hoodie, t-shirt, jeans, tracksuit, trainers) and says outright that a period garment the
+inventory calls by another name is not modern dress. Every other wrong garment type is MAJOR, which
+is what D-05 already said. Prompt-side only — no code ceiling added.
+**Rationale:** Owner ruled prompt-only 2026-09-12, choosing it over a `clothing: 'major'` ceiling so
+the genuine case the rule exists for — a costume story rendered in a hoodie — keeps its CRITICAL.
+Note the standing risk recorded beside `accessory` in scoring.js: a prompt rule has previously lowered
+a ceiling without holding it. If clothing CRITICALs persist on period garments in the next costume
+story, the code ceiling is the fallback.
+**Touched files:** `prompts/image-prompt-compliance.txt` (Clothing type bullet).
+
+## A character repair is refused when it leaves the face unreadable (2026-09-12)
+**Context:** `job_1789207854566_l43qgl34w` p9 shipped a character whose face is a featureless smear,
+at quality 70. The chain: a FALSE `accessory_missing` finding ("Lorena is missing her wide-brimmed
+tricorn hat") against a figure already wearing one — reproduced on a re-eval of the original — drove
+`char-fix-round-1`, a maskless whole-frame edit (the class docs/SETTLED.md records for 2026-09-07,
+where the same edit erased a named animal's head). It repainted the head, losing both the face and
+the hat. The damaged output then out-scored the intact original 70 to 10 and pick-best shipped it.
+The entity evaluator DID see it — `{"type":"cutout_artifact","severity":"major","description":"Severe
+blurring and missing regions impair assessment of facial features..."}` — but `cutout_artifact` is in
+`ZERO_POINT_TYPES` (owner, 2026-09-01) because it is meant to describe an artifact of OUR crop
+extraction, not of the page. One type carrying two meanings; the page-level meaning priced at zero.
+A judge bake-off on the two versions (Lab #1209-1216) confirmed the blindness is not model-specific:
+gemini-2.5-flash scored the damaged version 10 points HIGHER than the intact one, qwen3-vl 60 points
+higher, gemini-3.1-pro tied, gemini-2.5-pro errored on both arms.
+**Decision:** After a char fix, a comparative check receives BOTH images — the original as A, the
+repair as B — and answers one question about the named character's face in B
+(`prompts/repair-face-check.txt` → `{intact, confidence, reason}`). Not intact refuses the repair and
+keeps the original, counting `repair_reject_face_integrity`. Comparative rather than absolute, which
+is what makes it reliable where absolute anatomy judgment measured 0-precision: a face already turned
+away, distant or cropped in A is intact in B. Fails open — an unparsed or failed call accepts the
+repair rather than stalling a paid run. ~$0.0025 and ~4s per char fix.
+**Rationale:** Measured 4/4 on real pairs, including two controls: p9 A→B (destroyed) returns
+`intact:false, "facial features replaced with a blurred, featureless smear"`; the SAME pair reversed
+returns `intact:true`, so the check reads the images rather than always doubting a repair; p8's
+repair (face kept) and an identical-image pair both return `intact:true`. The separate type collision
+behind the zero-pointing is being fixed alongside this.
+**Touched files:** `prompts/repair-face-check.txt` (new), `server/services/prompts.js` (registration),
+`server/lib/repairPipeline.js` (the gate), `docs/prompt-inventory.md`.
+
+## 2026-09-12 — `face_destroyed`: a face broken IN THE PAGE is not a crop artifact, and is not free
+
+**Context:** On `job_1789207854566_l43qgl34w` page 9 a character repair destroyed a figure's face —
+it renders as a featureless smear, no eyes, nose or mouth. The entity evaluator saw it and filed
+`{"type":"cutout_artifact","severity":"major","description":"Severe blurring and missing regions
+impair assessment of facial features, hair, and skin tone"}`. `cutout_artifact` is in
+`ZERO_POINT_TYPES` (owner, 2026-09-01) for a correct reason: a grid cell with missing regions or
+hard white gaps is an artifact of OUR crop extraction, not of the page, and charging it would buy
+paid repairs for a defect the image does not have. So the finding cost 0, and the faceless page
+shipped at quality 70 — out-scoring the intact original it replaced.
+
+The fault was a TYPE COLLISION, not a wrong zero-point rule: one type carried two meanings — "our
+crop is broken" (harmless) and "the rendered figure is broken in the picture" (real and expensive) —
+and the page-level meaning was priced at the harmless one's rate.
+
+**Decision:** Split the second meaning into its own type, `face_destroyed`, scored normally.
+`cutout_artifact` keeps its zero-point rule untouched. The entity prompt separates them by WHERE the
+damage ends: at the cell edge (hard white gap, clean straight boundary, a limb stopping where the cut
+ran) → `cutout_artifact`; contained inside the head, away from any cell edge → `face_destroyed`, at
+CRITICAL. `face_destroyed` gets a CRITICAL **floor** in `MIN_SEVERITY_TYPES` (the sanctioned shape:
+the prompt classifies, code only bounds the cost), is deliberately absent from `ZERO_POINT_TYPES` and
+from `MAX_SEVERITY_TYPES`, and buckets to `character_identity` → `grok_face`.
+
+**Rationale:** CRITICAL matches `image-evaluation` D-11, where a headless or bodiless figure is
+CRITICAL — a head with no features is the same class of failure — and CRITICAL is what routes the
+page into character repair under the settled critical-only routing (2026-09-04). The floor lives in
+code rather than the prompt alone because `composite_seam` already measured what happens when a
+severity is escalated in prompt wording: detection *falls*. The repair route is the face patch, not
+a regen: the head size and tilt survive a smear, so the features can come back from the reference
+avatar. `face_destroyed` is added to `NOT_INPAINTABLE_TYPES` — asked to fix a face, inpaint repaints
+the whole figure and identity drifts.
+
+Verified: `deductionPoints` on the evidence finding as filed (`cutout_artifact`/major) = 0; the same
+finding retyped `face_destroyed`/major = 25 (floor applied), bucket `character_identity`.
+`cutout_artifact` still costs 0 at every severity.
+
+**Touched files:** `prompts/entity-consistency-check.txt` (visibility rules, severity guide, type
+tie-break), `prompts/feedback-consolidator.txt` (closed vocabulary + keep-its-own-type note),
+`server/lib/scoring.js` (`MIN_SEVERITY_TYPES`), `server/lib/evalBuckets.js` (`TYPE_TO_BUCKET`),
+`server/lib/faceRepair.js` (`FACE_DEFECT_TYPES`), `server/lib/repairLogic.js`
+(`NOT_INPAINTABLE_TYPES`), `client/src/hooks/useRepairWorkflow.ts` (mirror of the floor, and
+`entityIssuePoints` now reads `subType` first as the server does), `client/src/types/story.ts`
+(`EntityIssueSubType`).
+
+## Anatomy severity follows how badly the body is broken, not whether the defect adds or subtracts (2026-09-13)
+**Context:** D-09 rated extra limbs CRITICAL while D-10 rated a MISSING hand, limbs detached or joined
+wrongly, merged or duplicated faces and grossly misplaced features at MAJOR — so a spare arm cost 25
+points and a missing one 15, and "merged or duplicated faces" cost less than the `face_destroyed`
+floor set the day before for the same defect. The split ran along additive-vs-subtractive rather than
+along how badly the page is broken. Owner, seeing the face-destroyed work: "Is a 3rd arm or missing
+leg not also an anatomical issue that is critical?"
+**Decision:** D-09 now covers a limb or a face the body does not have or has lost — extra limbs, a
+missing hand/arm/leg, limbs detached or joined wrongly, merged or duplicated faces, features grossly
+misplaced. D-10 keeps only detail within a limb or face that is otherwise whole: six or more fingers,
+fused or melted fingers, cross-eyes. Those three stay MAJOR deliberately — they are the
+false-positive-prone ones, and a cheap wrong call there is the price of the rule.
+**Rationale:** `anatomy` is a graded type (no ceiling, no floor), so the prompt's own severity is what
+gets charged: minor 2 / major 15 / critical 25. Only the image-SEEING judge changed; the compliance
+prompt already has extra limbs CRITICAL and routes an absence it cannot verify to
+`unverified_absence`, which is correct for a judge that never sees the picture.
+**Known limit, measured:** re-grading changes nothing until the rules fire. Across all 34 pages of
+`job_1789207854566_l43qgl34w` and `job_1789163494908_kc2joi4ax` there were ZERO `anatomy` or
+`proportion` findings — including the page whose face was destroyed, which D-10's own wording
+("merged or duplicated faces, features grossly misplaced") described exactly. Consistent with the
+recorded verdict that anatomy checks measure 0-precision. Detection is tracked separately; the one
+framing that has measured well is comparative (the post-repair face check, 4/4), not absolute.
+**Touched files:** `prompts/image-evaluation.txt` (D-09, D-10).
+
+## 2026-09-13 — A pinned Lab version was never loaded: `ctx.versionIndex` was read but never set
+
+**Context.** Two page stages resolve their image with
+`loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null)` —
+`quality_eval` and `inventory_ab`. Nothing anywhere assigned `ctx.versionIndex`.
+`loadSceneContext` does not set it; `runStageOnTarget` attached the target as
+`ctx.target` only. The expression therefore evaluated to `null` on every run,
+which `loadActivePageImage` reads as "load the ACTIVE version".
+
+**Consequence.** A Lab target pinned as `storyId:page:version` silently judged
+whatever version happened to be active. The p9 face bake-off (#1209–#1216) was
+run precisely to compare an original render against the repair that damaged it;
+both arms in fact judged the repaired render, and the "gemini-2.5-flash prefers
+the damaged image by 10 points" verdict measured nothing but run-to-run noise.
+Those experiment IDs are void and must not be cited.
+
+**Decision.** Resolve the pinned version ONCE, in `runStageOnTarget`, next to
+`ctx.target`, so every stage that reads `ctx.versionIndex` gets the target's
+pin. Per-stage re-derivation is what let two stages disagree about which bytes
+they were judging.
+
+**What the corrected runs then showed** (#1218–#1220, p9 truly pinned to v0):
+- The blind inventory reads the hat correctly on the clean render — 4/4 for
+  `gemini-2.5-flash` ("purple pirate hat") and 4/4 for `qwen3-vl` ("purple
+  tricorn hat with small feather"). The `"headwear": "none visible"` that had
+  been treated as an inventory failure was recorded against v1, where the
+  repair had in fact destroyed the hat along with the face. It was correct.
+- The false `accessory_missing` does NOT reproduce on v0: a full `quality_eval`
+  pinned to v0 returned no hat finding at all. Task #17's premise — that it
+  reproduced in #1209 — rested on the version bug.
+- What DOES reproduce on v0 is the three-stage CRITICAL claiming the lantern is
+  held in a hand rather than hung from the chest's lock, on a render where it
+  plainly hangs from the lock. That CRITICAL is what commissions the maskless
+  char-fix, so it, not the hat, is the live fault.
+
+**Touched files.** `server/lib/testlab.js`.
+
+---
+
+## 2026-09-13 — Character presence is ONE code-derived signal, mutually exclusive by construction
+
+**Context:** Four layers argued about the same question — "is this figure
+really extra?" — and they disagreed with each other.
+
+1. `prompts/image-evaluation.txt` D-04 (`missing_character`), D-04b
+   (`extra_character`) and D-04c (a rule telling the model to reconcile the
+   two when the counts are equal).
+2. `prompts/feedback-consolidator.txt` — an EXCEPTION clause re-doing D-04c at
+   merge time.
+3. `server/lib/evalPipeline.js` — two log-only diagnostics plus the
+   `eval_missing_extra_pair` / `eval_figure_surplus_unflagged` metrics,
+   counting how often the prompt got it wrong.
+4. `server/lib/identityAgreement.js` — a two-witness filter deleting absence
+   claims after the fact, and a rescore behind it.
+
+The disagreement was destructive, not merely noisy. A critical
+`extra_character` routed through `decideRepairMethod` step 3 to inpaint — a
+Grok whole-frame edit — executing a "Remove this figure" instruction, and a
+commissioned child (Julian) was erased from a cover. On
+`job_1789207854566_l43qgl34w` p7 the same page carried BOTH a
+`missing_character` and an `extra_character`: each individually true, the
+counts never reconciled, one of them proposing to delete a figure the other
+said was absent. On p12 a `missing_character` was billed for a character
+(Fiona) the page's roster never commissioned at all.
+
+The inputs were also lying. Two rosters existed and disagreed — the detector
+matched against `bboxDetection.expectedCharacters`, the evaluator built its
+own via `buildExpectedCastBlock` — and the figure count was inflated by
+sub-1%-of-frame faceless boxes. Count-vs-roster reconciliation on that story
+measured 11/16 before the roster work.
+
+**Decision:** The evaluator OBSERVES; code DECIDES. Delivered as Phases 0-4.
+
+- **Phase 0** — `extra_character` keeps its score but loses its removal route:
+  the fix text is an identity reconciliation, and the type joined
+  `NOT_INPAINTABLE_TYPES` because the route, not the sentence, was the danger.
+- **Phase 1** — one roster (`buildExpectedCastBlock` is authoritative for
+  membership, every other builder resolves its name set through it); the count
+  filters micro-figures (`countRealFigures`); the page roster is the union of
+  hint and prose; per-page clothing keys are not a cast signal.
+- **Phase 2** — `derivePresenceFinding` (pure, exported, wired once in the
+  quality path) emits AT MOST ONE outcome per page:
+  `figures < cast` → `missing_character`; `figures > cast` →
+  `extra_character` unless the brief declared a crowd; `figures == cast` with
+  an unmatched figure → `character_identity` naming who it should be;
+  otherwise nothing. It declines entirely when the roster was never declared,
+  when no detector count reached the call, when `matches[]` breaks its
+  per-figure contract, or when the two witnesses disagree.
+  A new `crowdExpected` boolean on the scene brief carries the one thing
+  arithmetic cannot see — that a page was written to hold unnamed background
+  people. Derived findings are stamped `derivedBy: 'presence-arithmetic'`.
+  When the derivation speaks it owns the pair and the evaluator's own
+  missing/extra findings are dropped first; when it declines they stand.
+- **Phase 3** — D-04c deleted, D-04 demoted to observation, the consolidator
+  exception deleted, both diagnostics and the pair metric deleted, the surplus
+  metric replaced by per-outcome counters, and the two-witness filter plus its
+  rescore removed from `identityAgreement.js` / `images.js`.
+
+Classification normally belongs to the prompt and code may only change a
+severity. This is the agreed exception (owner, 2026-09-13): the decision moved
+into code because the arithmetic is mechanical — a count and a list the model
+itself declared. No finding's description text is read anywhere in the path.
+
+**Rationale:** The pair was never a real observation, it was two layers
+disagreeing about one recognition failure — and the layer that "won" was
+whichever ran last. Making the outcomes mutually exclusive BY CONSTRUCTION
+(one function, one return value) is the only shape where the pair cannot
+recur; every alternative is another reconciliation rule that can itself be
+wrong. The two-witness principle was not weakened, it moved earlier: instead
+of withdrawing a claim after billing it, a disagreement between the detector
+and the evaluator now means no claim is made.
+
+Measured on the 16 pages of `job_1789207854566_l43qgl34w`, replayed from
+stored data: every page yields exactly one outcome; three pages strictly
+improve (p4 and p13 emit `character_identity` where an arithmetically
+impossible `extra_character` stood; p12 loses a `missing_character` billed for
+a character the page never commissioned); p7 loses its destructive pair. Two
+pages (p7, p15) still emit a wrong `extra_character` — the cause is upstream,
+an Art Director brief whose `characters[]` is under-declared against its own
+`sceneIntent`, and the derivation reports it as one finding instead of two.
+
+**Addendum, same day — the identity branch needs a reference to accuse.**
+The replay's one regression was p3: a single figure, a roster of one (Frau
+Amrein, a Visual Bible secondary), and ZERO reference photos attached to the
+critique. `matches[]` is produced by comparing each figure to the labelled
+`Reference: <name>` images in the prompt, so for a cast member the evaluator
+has no image of, `unmatched` is the only answer available — whether she was
+drawn right or wrong — and the derivation billed a CRITICAL on it. So the
+identity branch is now gated on what the evaluator was ACTUALLY HANDED:
+`evaluateImageQuality` collects the names it attached a labelled reference
+for (attached, not requested — a photo that fails to resolve is skipped) and
+passes them to the pure function as `referenceNames`. With no reference-backed
+cast entry left unclaimed, the branch emits nothing. Deliberately
+`reconciled`, NOT `declined`: the counts did reconcile, so the derivation
+still owns the pair and still drops the evaluator's arithmetically impossible
+surplus. Replayed over the same 16 pages: p3, p4 and p13 (all three the same
+photo-less secondary) go from a derived `character_identity` to no finding
+while still dropping the stored `extra_character` on p4/p13; p7, p12, p15 and
+every reconciled page are bit-identical. An omitted `referenceNames` means
+"the caller cannot say" and leaves the branch as it was.
+
+**Touched:** `server/lib/evalPipeline.js` (`derivePresenceFinding`,
+`PRESENCE_DERIVED_MARKER`, `buildExpectedCastBlock` crowd carry, the single
+unconditional score recompute), `server/lib/sceneMetadata.js` (three parser
+return sites), `server/lib/images.js` (iterate passthrough, deleted
+two-witness call site + rescore), `server/lib/identityAgreement.js`,
+`server/lib/repairLogic.js` (Phase 0), `prompts/scene-expansion.txt`,
+`prompts/image-evaluation.txt`, `prompts/feedback-consolidator.txt`,
+`tests/unit/extra-character-type.test.ts`,
+`tests/unit/inpaint-routing.test.ts`,
+`tests/manual/test-compliance-severity-cap.js`,
+`tasks/presence-signal-rewrite-2026-09-13.md`.
+
+**Status:** ✅ active (staging only at the time of writing — not on master).
+
+---
+
+## 2026-09-13 — R2 garbage collection is COHORT-based: "no database reference" is never, by itself, proof an object is dead
+
+**Context:** Production R2 held 116,189 objects / 20.66 GB. A real problem
+existed underneath: deletion paths removed database rows without removing the
+objects they pointed at, so the bucket accumulated genuine orphans. (The
+prevention-side fixes are commit `0e07da278`, "fix(r2): stop creating orphans
+— record failed prunes, and delete the object with its row" — **staging only,
+NOT on master** at the time of writing.)
+
+Three successive classifiers were built to find the dead objects. All three
+shipped a different FALSE POSITIVE class, and all three shared one unsound
+inference: **absence of a database reference means the object is dead.** That
+inference is the trap, and it is worth stating plainly because it is the
+obvious thing to reach for:
+
+1. **The `orders` blind spot.** Order PDFs are keyed `orders/{files.id}.pdf`.
+   When the `stories` and `files` rows are pruned, the `orders` row survives
+   forever — and an `orders` row never stores the PDF URL anywhere. A
+   URL-based scan is therefore *structurally* blind to it: no bug, no
+   oversight, the reference simply does not exist in the schema. 22 PDFs would
+   have been destroyed. They belonged to 4 stories / 20 paid orders of ONE
+   customer, who happened to be the owner's own account, so nothing real was
+   lost — but the same mechanism hits a paying customer next time.
+
+2. **The `migrated/` mis-parse.** `server/lib/dbHousekeeping.js:148` writes
+   `` `${table}/${safe(row.owner)}/${safe(row.id)}/migrated` `` — so for those
+   keys, path segment 2 is a **USER id**, not a story id. A scan that read
+   segment 2 as a story id filed live users' migrated page images under
+   "dead stories". Live user `1764881868108` (27 stories, 77 orders) was in
+   the delete list.
+
+3. **Id-space ambiguity.** Numeric ids are simultaneously user ids, character
+   ids, and values inside `stories.data` JSONB (e.g.
+   `{"id": 1765719852125, "name": "Roger"}`). A verification pass built on
+   `src::text LIKE '%id%'` substring matching returned 9 "false positives" out
+   of 40 that were themselves partly spurious — substring hits inside longer
+   numbers and inside unrelated JSONB payloads. The classifier was unreliable
+   AND so was the verifier written to check it.
+
+**Decision:** Garbage collection groups bucket keys by **owner prefix cohort**
+— `stories/{id}/`, `characters/{user}/{char}/` — and a cohort is DEAD only if
+**ZERO of its objects appear in any URL stored anywhere in the database**.
+
+- No id parsing, no substring matching, no type coercion. The only question
+  ever asked is whether an exact key string is a member of the referenced set.
+- `orders/`, `landmarks/` and **any unrecognised top-level prefix** are
+  protected in code regardless of reference state
+  (`cohortOf()` in `scripts/admin/delete-r2-dead-cohorts.js`).
+- A table that fails to scan is a FATAL stop, never a skip: a silent zero
+  would mark that whole table's objects deletable.
+- Dry-run by default; `--confirm --production` both required; a final
+  assertion that no victim key is in the referenced set; deletes in batches of
+  1000 (S3 API max); every deleted key logged.
+
+The rule is deliberately conservative: a cohort with even ONE referenced
+object is untouchable **in full**, so a live user holding both live and
+deleted stories keeps everything. That leaves some genuine orphans behind.
+Accepted.
+
+**Rationale:** Each of the three failures was a different unknown-unknown, and
+the pattern is that you cannot enumerate them in advance — there will always
+be one more place a reference legitimately does not exist. The cohort rule
+does not try to. It replaces "prove this object is dead" with the much weaker,
+checkable claim "this entire owner is untouched by the whole database", which
+survives all three mechanisms above: the `orders` prefix never enters the
+candidate set at all; `migrated/` keys sit inside their owner's cohort no
+matter which segment holds which id, because no segment is interpreted; and
+substring matching is simply not used. Validated against the three ids that
+broke the earlier attempts — all correctly excluded.
+
+**Measured, same day:**
+- Deleted **22,011 objects / 3,107 MB**, from 95 dead story cohorts and 235
+  dead character cohorts (≈100 deleted test accounts). Log:
+  `tasks/r2-deletion-log-2026-09-13.jsonl` (gitignored).
+- Kept 13.4 GB of live-owner content **including all pipeline diagnostics** —
+  owner's explicit call 2026-09-13: diagnostics are a research asset ("maybe
+  later we go and check all cases where x failed"), and at Cloudflare's
+  $0.015/GB-month (pricing page, fetched 2026-09-12) the *entire* bucket cost
+  ~$0.16/month. Cost was never the reason to delete; completeness of deletion
+  was.
+- `landmarks/` was **PRISTINE**: 16,143 objects, zero unreferenced. The
+  counter-example — that subsystem tracks its own storage correctly, which is
+  why it needs no sweep, only its blanket protection.
+- Showcase/demo characters were never at risk: the canonical photos live on
+  disk under `tests/fixtures/demo-photos/{berger,dubois,miller}/`, and all 21
+  demo characters in production were referenced. They are protected by the
+  general reference rule, **not** by an explicit carve-out like `landmarks/` —
+  the owner declined adding one.
+- Found while scanning, NOT fixed: **17 of 128 production stories are owned by
+  a `user_id` with no `users` row** — stories outliving their owner. A real
+  integrity problem, independent of R2. On the backlog.
+
+**Consolidated to ONE tool, same day (owner ruling 2026-09-13).** The two
+id-attribution tools — `scripts/admin/audit-r2-orphans.js` and
+`scripts/admin/delete-r2-orphans.js` — were **deleted**. Keeping them was a
+standing hazard, not dead weight: the audit's manifest is a real file on disk in
+a real format, and `delete-r2-orphans.js` is a real deleter that consumes it. A
+future session reaching for the obvious-looking "audit then delete" pair would
+have re-run exactly the three false-positive classes above, with a deleter
+attached. Their genuinely useful, rule-independent parts were ported onto the
+cohort tool: per-prefix and per-sub-kind reporting (`debug`, `aux`, `retry`,
+`vb`, `empty_scene`, `tl_*`, …), an `--age-days` floor (default 30, applied per
+COHORT since deletion is all-or-nothing per cohort), loud reporting of
+unrecognised prefixes with samples, the bucket↔database host guard, and a
+manifest written to disk. The manifest is now a **review artefact only, never an
+input** — the reverse of the old design, so no file can drive a delete. Dropped
+with the scripts: gate 3 (owning-row lookup), the `orders/pdf-{jobId}-…` regex,
+landmark id parsing, and the batch re-verification built on the same id
+attribution.
+
+**Touched files:** `scripts/admin/delete-r2-dead-cohorts.js` (the single tool —
+report / dry-run / delete modes), `docs/r2-storage.md` (new — prefix map,
+reference tables, cohort rule, how to run it), `tasks/BACKLOG.md`.
+`scripts/admin/audit-r2-orphans.js` and `scripts/admin/delete-r2-orphans.js`
+deleted.
+
+**Status:** ✅ active. Note the bucket will re-accumulate orphans until
+`0e07da278` is promoted to master.
+
+---
+
+## 2026-09-13 — The read-only R2 audit is a FILE again, not a flag: "cannot delete" must be checkable without reading argument parsing
+
+**Context:** GDPR ruling Q7 (2026-09-12,
+`tasks/gdpr-erasure-2026-09-11.md` §8) required a READ-ONLY orphan audit for R2
+that "deletes nothing and has no delete mode" — a control, because
+`deleteStoryArtefacts` (`server/routes/stories.js:3334`) logs a failed prune
+instead of throwing, leaving objects unreachable by any per-user erasure. Later
+the same week, commit `3b1e18d2b` (entry above) killed the id-attribution verdict
+and consolidated `audit-r2-orphans.js` + `delete-r2-orphans.js` into one tool,
+`scripts/admin/delete-r2-dead-cohorts.js`. The audit survived only as a
+`--report-only` FLAG on a deleting tool.
+
+**Decision:** restore a separate read-only entrypoint,
+`scripts/admin/audit-r2-dead-cohorts.js`, on top of a shared scan module,
+`scripts/lib/r2Cohorts.js`. The module lists, reports and writes the manifest; it
+imports no delete command and exports no delete function. The audit file
+constructs no S3 client and has no confirm/production flag, so deletion is
+unreachable from it by construction. `delete-r2-dead-cohorts.js` keeps its CLI
+exactly — same flags, same output, same two-flag guard — and only re-points its
+internals at the module; `--report-only` stays as a convenience, not as the Q7
+answer. **Q7's original wording stands unamended**; only the script name moved.
+
+**Rationale:** the practical risk of the flag arrangement was low — a mistyped
+flag falls through to the dry run, and deletion needs both `--confirm` and
+`--production`. But a GDPR control's audience is someone auditing it, and they
+should not have to trust argument parsing to believe the audit cannot delete.
+That is an argument about who reads the file, not about probability, so the
+answer is a file with no delete path in it. The scan is NOT duplicated: two
+divergent implementations of the cohort rule is exactly the failure the
+consolidation fixed, so one module serves both tools and the rule cannot drift.
+The cohort rule itself and what counts as dead are unchanged. Verified by running
+the old and new deleting tool side by side against a stubbed S3 client and pg
+Pool (no network): stdout, stderr and manifest identical in both dry-run and
+`--report-only` mode, modulo the wall-clock `time` row.
+
+**Touched files:** `scripts/lib/r2Cohorts.js` (new — the one scan),
+`scripts/admin/audit-r2-dead-cohorts.js` (new — read-only entrypoint),
+`scripts/admin/delete-r2-dead-cohorts.js` (internals only),
+`tests/unit/r2-cohort-gc.test.ts` + `tests/unit/fixtures/r2-gc-stub.cjs` (new —
+pins both guarantees), `docs/gdpr-erasure.md` §12, `docs/r2-storage.md` §4,
+`tasks/gdpr-erasure-2026-09-11.md`.
+
+**Status:** ✅ active.
+
+---
+
+## 2026-09-13 — Blind inventory describers measured against the pixels: 2.5-flash makes 4× the consequential errors of 3.7-flash, and the reasoning-OFF arm is void
+
+**Context:** The blind visual inventory (`prompts/image-inventory-unified.txt`,
+`runVisualInventory`) is the first thing that looks at a rendered page. Every
+field it fills becomes input to the blind compliance judge, so a wrong value
+there is not a cosmetic blemish — it commissions a defect and, at high enough
+severity, a paid repair. The trigger was an `items_held` entry naming an object
+that was not gripped. Nothing had ever graded these descriptions against the
+actual images; the Lab's existing `perField` numbers score whether a field was
+*delivered*, not whether it is *true*.
+
+**Decision:** Graded the `unified` arm of Test Lab experiments **#1237**
+(`gemini-2.5-flash`, today's production default) and **#1238**
+(`gemini-3.7-flash`) over the 10 `benchmark_scenes` pages (ids 3, 5, 6, 11, 21,
+24, 25, 27, 29, 31) by opening each page's graded image version and checking
+every claim that can drive a downstream finding: `items_held`, `headwear`,
+`eyewear`, `worn_carried`, `standing_surface`, `zone`, `facing`, `clipped_by`,
+the `figures[]` count, `objects[]`, and the four `rendering` flags. Honest
+uncertainty (`cannot tell at this size`) and hedged-but-not-wrong answers were
+scored correct; a mistake repeated across several figures of one page counts
+once. Measurement only — **no verdict on switching models; that is the owner's
+call.**
+
+Measured, consequential errors per page:
+
+| | 2.5-flash (#1237) | 3.7-flash (#1238) |
+|---|---|---|
+| Consequential errors, 10 pages | **16** | **4** |
+| Per page | **1.6** | **0.4** |
+| Clean pages | 2 of 10 | 7 of 10 |
+| False `rendering` alarms | 0 | 0 |
+
+The two disagreed on at least one graded field on **8 of 10 pages**; on 14 of
+those disagreements exactly one model was right, and 3.7-flash was the right
+one in 11 of the 14. Both were wrong together on exactly one page (bs11: a
+third midground child missed, and a child facing the viewer called "away from
+viewer").
+
+**Rationale — what the errors actually are, because the direction matters more
+than the count:**
+- **2.5-flash's errors are mostly hallucinated or inverted detail.** A phantom
+  "leather quiver with arrows" and a "wooden bow" on a figure wearing a
+  crossbow (bs5); a rider plainly riding toward the camera reported "away from
+  viewer" (bs6); a boy facing the viewer reported facing "right" (bs24); four
+  figures all cut by the bottom frame reported `clipped_by: none` (bs24), and
+  conversely a fully-visible seated man reported `clipped_by: frame` (bs25); a
+  visible pair of spectacles and a whole second guard missed in a
+  three-figure background group (bs3); belts on both figures and a
+  chest-high door plank missing entirely from `objects[]` (bs31).
+- **3.7-flash's 4 errors are concentrated in one place: it is the model that
+  invents held objects.** Both of its `items_held` errors are false positives —
+  sandals lying on the ground called "touching a pair of yellow sandals"
+  (bs27), and a grounded vertical plank the girl rests one hand on called "held
+  in both hands" (bs31, and its own `objects[]` marks that plank
+  `grounded: true` in the same response). 2.5-flash's single `items_held` error
+  is the opposite kind: an *omission* (bs3, a kneeling woman cupping the
+  elephant reported as holding "nothing"). **A false held object commissions a
+  repair; an omission usually does not.** So the field that started this
+  investigation is the one field where the more accurate model is the more
+  dangerous one.
+- **Neither model raises false `rendering` alarms** — all four flags were
+  `false` on all 20 descriptions, with no invented anatomy defects. Both also
+  missed the same two genuine faults on bs6: a smeared, unreadable face (which
+  `rendering.issues` is specified to catch) and a crossbow whose prod is
+  mounted in the plane of the shot, which passed as `physics_ok: true`.
+- **`objects[]` differences are not errors.** The prompt scopes it to "each
+  notable object, animal or vehicle"; scenery belongs in `setting`. 2.5-flash
+  routinely lists rivers, mountains and paths there, 3.7-flash does not. That
+  is 2.5-flash over-listing against the spec, not 3.7-flash missing things.
+
+**Reasoning-OFF arm (#1241) is VOID — it did not run 3.7-flash.** It records
+`params.model = 'gemini-3.7-flash'` with `reasoning: {enabled: false}`, but 7 of
+its 10 unified outputs are **byte-identical** (same MD5, same `outputTokens`) to
+the 2.5-flash arm, and the other 3 differ only by resample drift (915 vs 913,
+1202 vs 1205, 1563 vs 1583 tokens) — including 2.5-flash's distinctive wrong
+answers ("brown leather quiver with arrows", `clipped_by: frame` on the
+fully-visible man). `runVisualInventory` silently falls back to
+`gemini-2.5-flash` when the OpenRouter call throws or returns non-200
+(`server/lib/evalPipeline.js:103-114`), while the experiment row keeps the
+*requested* model — so the arm is unlabelled 2.5-flash output. **No conclusion
+about reasoning-off can be drawn from it**, and the fallback needs to surface in
+the experiment record rather than only in a log line. On the backlog.
+
+**Measured cost (per the run's own token counts), so the owner can price the
+choice:** 2.5-flash 1,990 in / 1,561 out per page; 3.7-flash 2,821 in / 2,710
+out per page. At $0.30/$2.50 and $0.75/$3.75 per 1M that is **$0.068 vs $0.184
+per 15-call story, +$0.12**. From 2027, at $1.50/$7.50, 3.7-flash is **$0.368,
++$0.30**.
+
+**Touched files:** none in `server/` — this entry, `docs/image-routing.md`
+(routing line), `tasks/BACKLOG.md`. Evidence: `testlab_experiments` #1237,
+#1238, #1241 on staging; re-run via the `inventory_ab` stage
+(`server/lib/testlab.js` `runInventoryAbStage`).
+
+**Status:** ✅ active as a measurement. The model choice is NOT decided here.
+
+## `items_held` is a two-key schema, not free text (2026-09-13)
+**Context:**   A figure carrying a chest, with a lantern hanging off the chest's
+lock in front of her hand, was inventoried as holding the lantern. The same
+inventory's `action` field said she carried the chest — it contradicted itself.
+The three-stage compliance judge has NOT seen the image and is told the
+inventory is authoritative, so it cannot overrule it; it emitted a CRITICAL
+`action_interaction`, and a CRITICAL buys a repaint of a correct render. Three
+of four vision models reproduce it and they disagree about WHICH hand
+(2.5-flash right, qwen3-vl left twice, 3.1-pro right) — the signature of a
+guess. The 10-page grading (#1237/#1238) found both of gemini-3.7-flash's only
+consequential errors were this same field, so the model is not the variable.
+**Decision:** `items_held` is `{"left": ..., "right": ...}`; each value is the
+name of the object that hand's fingers wrap around, or `nothing`. Verbs and
+contact phrases are excluded. `action` continues to name what each hand touches
+and `worn_carried` takes anything strapped or slung, so contact information is
+not lost — it just stops arriving in the field that means grip.
+**Rationale:** The first attempt kept the field free-text and added a rule
+naming the distinction ("what each hand closes around… an object that hangs,
+rests or leans is named with what carries it"). The model complied by
+rewording rather than by answering differently: measured in #1244 against
+#1238, "held in both hands" became "gripping the edge of a vertical wooden
+board with both hands" and "touching a pair of yellow sandals on the ground"
+became "touching purple sandal strap with right hand". A free-text field can
+always phrase its way around a prohibition; a two-key schema has nowhere to put
+contact. Classification stays in the prompt per CLAUDE.md — no code reads
+`items_held`.
+**Touched:** `prompts/image-inventory-unified.txt` (field definition + example)
+**Status:**    ✅ active — controlled both ways. #1252/#1253 (10 pages) show
+the schema adopted everywhere and the sandals false positive gone
+("touching purple sandal strap with right hand" -> nothing). #1254/#1255 ran a
+set graded by eye first: one unambiguous positive (both hands wrapped around a
+shell) and five hard negatives (an object lying on the floor, a hat on the
+ground beside a worn lasso, a hand reaching toward but not touching an egg,
+palms flat on a table beside boxes, fingers curled into straw). Positives
+detected 2/2 by both models; no false positives on either. The only miss is
+2.5-flash reporting `nothing` for the curled-in-straw hands — an omission,
+which is the safe direction, since it commissions no repair.
+
+Two ground-truth labels from the earlier grading did NOT survive looking at
+the pixels: the "plank held in both hands" figure really does curl her fingers
+around the edge of an open barn door, and the straw is really grasped. Both
+were called false positives on the strength of `objects[].grounded`, which
+says nothing about grip. Check the image, not the neighbouring field.
+
+## The Lab records the model that answered, not the one requested (2026-09-13)
+**Context:**   Experiment #1241 requested gemini-3.7-flash with
+`reasoning:{enabled:false}`. Every call returned 400 — "Reasoning is mandatory
+for this endpoint and cannot be disabled" — the documented gemini-2.5-flash
+inventory fallback served all 10 pages, and the experiment row still read
+gemini-3.7-flash. The run reported "10/10 ok". It was caught only because the
+token counts came back byte-identical to the 2.5-flash arm.
+**Decision:** `runVisualInventory` returns `servedByModel` (its `modelId`, which
+the fallbacks already reassign), and the `inventory_ab` arm records it per run.
+**Rationale:** Without it any inventory A/B can silently compare a model with
+itself and be reported as a comparison. The fallback itself stays — it is on
+every page's critical path (owner, 2026-09-07) — but it must be visible.
+**Touched:** `server/lib/evalPipeline.js`, `server/lib/testlab.js`
+**Status:**    ✅ active — confirmed in #1243/#1244
+
+## gemini-3.7-flash has no usable thinking lever (2026-09-13)
+**Context:**   3.7-flash emits 1.74x the output tokens of 2.5-flash on the same
+pages, making it 2.7x the cost per story today and 5.4x from 2027. The question
+was whether a lower thinking level recovers that.
+**Decision:** There is none. `{enabled:false}` is rejected outright (400,
+"reasoning is mandatory for this endpoint"). `{effort:"low"}` (#1242) was
+accepted and changed nothing: the 7 pages that completed averaged 2,817 in /
+2,781 out against the default arm's 2,821 / 2,710, and 3 of 10 pages failed.
+**Rationale:** Recorded so the lever is not re-proposed. Note the standing
+`textModels.js` warning that `{effort:'low'}` measured 9x MORE expensive on
+deepseek-v4-pro — verify by token count, never by the parameter being accepted.
+**Touched:** measurement only (Lab #1238, #1241, #1242)
+**Status:**    ✅ active
+
+## Per-object billing is declined: `object_presence` and `setting` stay page-scoped (2026-09-13)
+**Context:**   B2 in `tasks/eval-variance-backlog.md` proposed billing object
+findings per object instead of once per page, and was framed as blocked on the
+evaluators not emitting a subject for them. It followed B1, which shipped the
+mandatory `character` field (2026-09-11, `3146b3c8d`, staging only).
+**Decision:** Declined. `object_presence` and `setting` remain in
+`PAGE_SCOPED_BUCKETS`, so `deductionClassKey` keeps returning `page:<bucket>`
+before the subject is read. The 2026-08-19 ruling is reaffirmed, not reversed.
+No `subject`/`element` field is added to object findings in the evaluator
+prompts, and no code changes.
+**Rationale — the real reason is cost, not missing data:** A MAJOR is 15
+points. A page missing three declared props bills 15 today and would bill 45
+per-object. That crosses `REPAIR_DEFAULTS.scoreThreshold` (redo below 50) and
+the issue threshold of 5, forcing redos on prop-heavy pages — and
+`REPAIR_DEFAULTS` already records that regenerated pages often come back worse.
+That is the same evidence behind C1, which the owner declined on 2026-08-19.
+Multiplicity is in any case already visible without costing points: the jury
+merges per `(bucket, subject)` since `2bee3632c`, repair targets resolve, and
+`duplicate_object` holds its own bucket specifically so a duplicated prop is not
+zero-rated on a page that already carries a missing element (see the existing
+`duplicate_object` entry).
+**Rationale — the correction:** B2 is NOT closed for want of a subject. Measured
+2026-09-13 (read-only, `stories.data → sceneImages[] → imageVersions[]`, 82
+stories / 20,030 findings, 2026-08-14 → 2026-09-12, buckets via
+`evalBuckets.bucketForType()`): on the consolidated list — the one the stale
+2026-08-20 "11% / 3%" figures actually matched — `object_presence` subject
+coverage went 22.9% → 96.7% (29/30) across B1, and on the raw evaluator lists
+27.3% (300/1099) → 45.5% (20/44). The subject IS available; `scoring.js:552`
+discards it by deliberate choice. `setting` is the one genuinely uncoverable
+case (0.7% → 15.8%, 3/19 consolidated), because a setting defect usually has no
+figure to attribute to, so a mandatory `character` field cannot reach it. For
+contrast, the buckets that ARE billed per subject: clothing 54.3% → 100%
+(47/47), character_identity 76.0% → 96.0%, action_interaction 65.1% → 94.0%;
+consolidated, clothing / character_identity / accessory all reach 100%.
+**Caveat:** n=2 post-B1 stories (`job_1789207854566_l43qgl34w`,
+`job_1789227389389_z18dmvnt6`), both staging. B1 is staging-branch only and was
+never merged to master, so production has no independent post-B1 story (its one
+"post" row is a copy of staging's). Directional, not established.
+**Touched:** none — no code changed. The unchanged mechanism is
+`server/lib/scoring.js:478-489` (`PAGE_SCOPED_BUCKETS`) and `:552`
+(`deductionClassKey` returning `page:<bucket>` before reading the subject).
+Backlog entries closed: `tasks/eval-variance-backlog.md` (B2 + the open
+decision), `tasks/BACKLOG.md` (the B1 note).
+**Status:**    ✅ active — closed by owner ruling; re-opening needs new evidence,
+not the "objects have no subject" premise, which is false.
+
+## The scene reviewer's cast cap is 6 and a recommendation, and every removal it makes is declared (2026-09-13)
+
+**Context:** `prompts/scene-review.txt` check 5b `[cast_over_three]` faulted any
+page whose frame held more than **three** figures and prescribed the remedy
+"rewrite to three by pushing the extras to background depth … or by moving the
+shot wider so the group reads as one mass". On
+`job_1789207854566_l43qgl34w` (Fiona) the Art Director correctly commissioned
+five named, positioned characters on p7 and p15; the reviewer obeyed 5b and
+rewrote them into anonymous figures — p15 ships "Behind the chest, four soaked
+young pirates stand crowd…" with `characters: ["Fiona"]`, and p7 ships
+`characters: []` against a `briefsIn` cast of Fiona, Facundo, Sarah, Saira,
+Lorena. The owner's stories carry five commissioned characters, so this fired on
+every group page. Nothing downstream could see it: only the `FAULTED PAGES:`
+line of the reviewer's analysis is parsed (`beatsPipeline.js`), so a removal was
+expressible **only as an absence** — no delta, no reason. `docs/decisions.md`
+(scene-review tags are not parsed into typed findings) records the same gap.
+
+Two things in the original diagnosis were wrong and are corrected here.
+`MAX_CHARACTERS_PER_SCENE` was **not** 3: `promptBuilders.js:2408` is a `|| 3`
+fallback that production never reaches, and the real value came from
+`IMAGE_MODELS[MODEL_DEFAULTS.pageImage].maxCharactersPerScene`, which was **5**
+for all eight image models. A five-character page therefore never tripped check
+5 at all — the check that anonymised the cast was 5b, whose "three" was a
+literal in the prompt, unconnected to the cap.
+
+**Decision:**
+1. `maxCharactersPerScene` is **6** for every image model
+   (`server/config/models.js`, was 5). This supersedes both the 3-character cap
+   the fault report named and the 5 that was actually in force.
+2. Check 5b becomes `[cast_crowded]`: it reads `{MAX_CHARACTERS_PER_SCENE}`
+   instead of a literal three, and exceeding it is a **composition
+   recommendation**, not a fault. Check 5 `[cast_over_cap]` keeps its real fault
+   (a plan-line character missing from the brief) and frames the over-cap half
+   as a recommendation too.
+3. **The anonymisation remedy is gone.** The reviewer's only options for a
+   crowded frame are staging — background depth, behind another figure, at
+   distance, cropped at the frame edge — and every name stays in `characters[]`
+   and in the prose. "Never drop a character, and never replace a name with a
+   description of the figure" is now written into the check.
+4. New machine-readable output field `REMOVED CAST:` beside `FAULTED PAGES:`,
+   one entry per page (`page = name, name: reason`) or `NONE`. Parsed by
+   `parseCastRemovals()` and persisted on `sceneReviewReport.castRemovals`.
+5. `diffCastRemovals()` audits it mechanically: the cast name-set of each
+   rewritten brief before vs after, from `characters[]` only. A declared name is
+   subtracted; whatever remains is an **undeclared removal** and is logged at
+   ERROR with page and names (`beats_scene_review_removal_undeclared`). A
+   declared one logs at info. Stored on `sceneReviewReport.castRemovalAudit`.
+   A name that moved into `objects[]` (a Visual Bible secondary carried by its
+   CHR id — Fiona p13/p16 with `CHR001`) is **routing, not removal** and is not
+   reported.
+6. **Detection only.** The undeclared removal is not auto-reverted; the owner
+   rejected that shape on 2026-09-13. A deterministic gate is a separate
+   decision.
+
+**Rationale:** A commissioned character is drawn as themselves or not at all —
+turning one into "one in a blue tricorn" destroys the thing the customer paid
+for, and the prompt was explicitly asking for it. Raising the cap to 6 and
+demoting it to a recommendation removes the pressure that produced the rewrite,
+while the declared-removals channel makes the remaining cases auditable instead
+of invisible. A previous attempt to fix this by exempting "collective terms" in
+the prompt was reverted by the owner as a cheap trick; this changes the rule and
+its remedy rather than carving an exception out of it. The audit is name-set
+arithmetic over metadata, never prose inference — recognising "five soaked
+pirates" as an anonymisation in code would not generalise past this story.
+
+**Touched:** `prompts/scene-review.txt` (checks 5, 5b, OUTPUT FORMAT),
+`server/config/models.js` (8 × `maxCharactersPerScene`),
+`server/lib/sceneReviewGuard.js` (`parseCastRemovals`, `castNameSet`,
+`diffCastRemovals`), `server/lib/beatsPipeline.js` (parse, logging, persistence
+on `sceneReviewReport`), `tests/unit/scene-review-removals.test.ts`,
+`tasks/presence-signal-rewrite-2026-09-13.md`.
+
+**Status:**    ✅ active. Prompt-side effect is unproven on stored data — a real
+run must show the reviewer emitting a `REMOVED CAST:` line, and group pages
+keeping their named cast instead of being rewritten into anonymous figures.
+The `|| 3` fallbacks at `promptBuilders.js:2408/2638/3032/5281` and
+`testlab.js:3806/3854` are left alone: unreachable defaults, and changing them
+is a separate question.
+
+## Trial gets four prompt-only ports from the full pipeline (2026-09-13)
+**Context:** Trial writes its story text AND its scene hints in ONE call
+(`story-trial.txt`), with no beats stage and no Art Director. Every rule that
+lives in `story-text-from-beats.txt` or `scene-expansion*.txt` therefore reaches
+zero trial pages. Measured: 45-48% of trial pages open with a character's name
+against 23% on staging full stories; the beats-vs-pre-beats control on the full
+pipeline moved 41% → 31%, so the gap is the rule, not the model. Separately, the
+`EXACT POSES` block was already wired into `buildImagePrompt` but never received
+data on the trial path — the trial scene-hint schema had no `interactions[]` —
+and the age-banded creature tone had no `{CREATURE_TONE}` fill site in the trial
+template.
+**Decision:** Four prompt-only changes, no new API call, model call, or latency:
+1. The page-opening variety rule ported verbatim from `story-text-from-beats.txt`
+   into the trial Rules block, UNGATED (no age-band conditional — owner's call).
+   The existing "Start with action, not weather or waking up" was rescoped to
+   "Page 1 starts with action…" so the two rules do not contradict.
+2. Six Art Director composition rules ported into the trial scene-hint section,
+   reworded for a scene hint rather than a full AD brief: one focal point,
+   one instant/no history, one level per frame, no partial immersion, footing,
+   close-up ends at the waist. Plus the prose/staging rule from
+   `story-text-from-beats.txt` in the Rules block.
+3. `{CREATURE_TONE}` placeholder in `story-trial.txt`, filled by the EXISTING
+   `buildCreatureToneSection(inputData)` — the same resolver the Art Director
+   uses. No level text is duplicated. 0-4 cute / 5-6 not-menacing / 7+ formidable.
+4. `interactions[]` added to the trial scene-hint schema, shaped
+   `{character, object, where, priority}` — the minimum `buildExactPosesBlock`
+   reads. `extractSceneMetadata` unwraps `{scene:{…}}` and runs the row through
+   `sanitizeInteractions`, so no parser change was needed.
+**Rationale:** These are the owner-approved SUBSET of the full-pipeline work that
+trial can afford. Trial's whole value is being fast and cheap, so anything that
+adds a stage, a review call or a second model pass was excluded by construction;
+prompt text is free. `EXACT POSES` is appended at the very end of the image
+prompt, after the `**REQUIRED OBJECTS` / `**ART STYLE` marker that
+`shrinkPromptForModel` uses as its protected-tail boundary, so the new
+interaction rows survive compression by construction rather than by obedience.
+Deliberately NOT done: `prompts/story-unified.txt` (the pre-beats writer) was
+left alone — it is not the trial path and not the measured 23% path.
+**Touched:** `prompts/story-trial.txt`, `server/lib/promptBuilders.js`
+(`buildTrialStoryPrompt` → `CREATURE_TONE`), `tests/unit/trial-prompt-parity.test.ts`
+**Status:** ✅ active
+
+---
+
+## The trial funnel's terminal step is `account_created`, covering both auth methods; `email_submitted` is a lead, not a conversion (2026-09-13)
+**Context:** The per-step /try funnel ended at `email_submitted`, which is emitted
+in exactly one place — `handleEmailSubmit`. The Google path (`completeGoogleLink`
+→ `POST /api/trial/link-google`) emitted no tracking at all. Measured on prod
+2026-09-13: all 4 conversions of the preceding 30 days came in through Google, so
+the panel reported 1 conversion against 8 finished stories (12.5%) where the truth
+was 5 of 8 (50%) — the funnel's headline number was wrong by 4×. Two further
+faults sat behind it: `completeGoogleLink` deletes `trial_session_token` before
+any tracking could fire, so post-signup events went out as unauthenticated beacons
+and the server resolved no user id (today's `generation_completed` row has
+`user_id = NULL`); and the panel's only window was
+`created_at >= NOW() - N days`, a rolling interval that can never express "today".
+**Decision:**
+1. One terminal step `account_created`, fired by BOTH auth paths with
+   `meta.method = email | google`. `email_submitted` stays as an OPTIONAL step
+   (`OPTIONAL_TRIAL_STEPS`, the same treatment `face_picked` has): it is reported,
+   but it never becomes the baseline for the step after it. It is a lead, not a
+   conversion.
+2. `trackTrialStep` falls back to `auth_token` when `trial_session_token` is gone,
+   and `POST /api/trial/event` accepts any valid token (not only an anonymous
+   one) when resolving the user id.
+3. The panel window is a `range` token: `<N>d` rolling as before, plus `today` and
+   `yesterday` evaluated on **Europe/Zurich calendar boundaries** via
+   `chDayRange()` in `scripts/lib/chTime.js`. The active window is shown as a
+   Swiss local label marked CH.
+4. Conversions that happened before the step existed are backfilled by
+   `scripts/admin/backfill-trial-account-created.js`, dated from the
+   `credit_transactions` "Welcome credits (Google sign-up)" row.
+**Rationale:** A funnel whose last step only one of two auth paths can reach does
+not measure conversion, it measures which button was clicked — and it was
+silently reporting a quarter of the real rate to the person deciding ad spend.
+The token fallback was chosen over re-ordering the statements in
+`completeGoogleLink` because it fixes EVERY post-signup event rather than one
+call site, and cannot be undone by a future edit that moves a line. Calendar-day
+windows are computed from Intl, never by hand: the container's local midnight is
+UTC, an hour or two off the day the owner means, and a fixed 24h subtraction gets
+both DST switch nights wrong (2026-03-29 is a 23-hour Swiss day, 2026-10-25 a
+25-hour one) — both pinned by tests.
+**Touched:**
+- `server/routes/trial.js` (`TRIAL_FUNNEL_STEPS`, `OPTIONAL_TRIAL_STEPS`,
+  `buildTrialFunnelRows`, `resolveTrialWindow`, `getTrialStepFunnel`, `POST /event`)
+- `scripts/lib/chTime.js` (`chOffsetMs`, `chDayStart`, `chDayRange`)
+- `server/routes/admin/analytics.js` (`range` query param, `days` still accepted)
+- `client/src/utils/trialFunnel.ts` (`TrialStep` union, auth_token fallback)
+- `client/src/pages/TrialGenerationPage.tsx` (both emit sites)
+- `client/src/services/adminService.ts`, `client/src/pages/AdminDashboard.tsx`,
+  `client/src/pages/admin/translations.ts` (range buttons, CH label, step labels)
+- `scripts/admin/backfill-trial-account-created.js`
+- `tests/unit/trial-funnel-window.test.ts`
+**Status:** ✅ active — no schema change needed (`trial_events.step` is a
+VARCHAR(40) whitelisted in code, not an enum). The production backfill has NOT
+been run yet; it awaits owner approval.
+
+---
+
+### The book that ships gets audited, and a CRITICAL finding buys ONE more repair round
+**Context:** The mid-loop book audit was gated on `round < maxRegenAttempts`
+(`repairPipeline.js`), so the FINAL round's output — the book that actually
+reaches the customer — was never read by anything. The separate post-repair
+final audit had been removed on 2026-09-01 because it wrote to
+`sceneImages[].bookAuditFaults`, a field with zero consumers; that removal left
+the shipping state unmeasured. Measured on production story
+`job_1789227389389_z18dmvnt6`: three repair rounds ran; its round-2 audit
+recorded 37 faults `{CATASTROPHIC:1, CRITICAL:5, MAJOR:25, MINOR:6}`; the final
+round's output was never audited. A later Lab audit of the SHIPPED book
+(experiment #1229, `gemini-2.5-flash`) found 21 faults including 3 CRITICAL —
+p3 "a model of a boat, not a photograph as the text states", p6 "Maman and Ayan
+are entirely absent", p10 "wooden planks with autumn leaves, contradicting the
+established underwater setting". All three shipped to a paying customer.
+
+**Decision:**
+- The book audit now runs on **every** round the spend guard allows, including
+  the last one. `bookUnchanged` (a round where every repair failed leaves the
+  book byte-identical) still suppresses a pointless re-audit.
+- The FINAL round's audit may grant **exactly one** extra repair round. Pages
+  carrying a `CRITICAL` or `CATASTROPHIC` IMG fault are re-admitted to repair
+  even when their score says they are fine; the round budget (`roundLimit`) is
+  raised by one, once, guarded by `extraRoundUsed`. No loop, no recursion.
+- **Severity decides admission and nothing else.** Code never reads fault text,
+  never classifies it, never derives a fix. The fault lines reach the
+  consolidator unchanged via `readerFindingsByPage`, exactly as the mid-loop
+  findings already did, and the consolidator decides from its prompt what (if
+  anything) to fix. This is the narrow reading of the owner's
+  classification-belongs-to-the-prompt ruling.
+- Audit-admitted pages are appended AFTER the score-ranked bad pages (worst-first
+  order preserved) and pass through `applyRoundCap` like any other round's work,
+  so the 50%/30% per-round caps still hold.
+- Outcome is recorded on the existing `bookAuditRounds[]` entry —
+  `finalRound`, `extraRoundGranted`, `extraRoundAdmittedPages`. **Verified
+  consumer:** `storyJobPipeline.js` reads `bookAuditRounds` off the pipeline
+  result (~L5783) and writes `finalChecksReport.bookAuditRounds` (~L6350),
+  which is stored and displayed. That is the explicit fix for the 2026-09-01
+  removal reason: nothing is written to a field with no reader.
+
+**Rationale:** The audit is the only judge that reads a page's words and its
+picture together, so "the text says a photograph, the picture shows a model" has
+no other detector. Measuring it and then discarding the measurement was the worst
+of both: we paid for the judge and shipped the defects anyway. Admission-only
+keeps code out of the classification business while still giving a CRITICAL
+finding a route to a repair. Bounded at one extra round so spend cannot run away,
+and every failure path (audit error, audit returns nothing, the extra round's
+repairs all fail) leaves the story completing normally — `auditStoryBook` never
+throws, and the audit block swallows what it can't do. A quality gate never kills
+a paid run.
+
+**Known scope limits (deliberate, not defects):**
+- **Covers are not audited.** `auditStoryBook` iterates `storyData.sceneImages`;
+  covers live in `coverImages`. Out of scope for this change.
+- **Recall is imperfect.** In that story, the p14 defect was missed by 5 of the 7
+  judge configurations tested. The audit raises the floor; it is not a guarantee.
+
+**Touched:**
+- `server/lib/repairLogic.js` (`planBookAuditRound`, `admitPagesFromAudit`,
+  `AUDIT_ADMIT_SEVERITIES`)
+- `server/lib/repairPipeline.js` (mutable `roundLimit`, audit gate, audit-admitted
+  pages in the bad-page list)
+- `tests/unit/final-book-audit-round.test.ts`
+**Status:** ✅ active — supersedes the 2026-09-01 "final post-repair audit
+removed" entry (that audit's storage problem is fixed here, not reinstated).
+`docs/SETTLED.md` carries NO book-audit line, so no reversal protocol applied.
+
+## 2026-09-13 — R2 cohort GC scans EVERY database that writes to the bucket
+**Context:**   The cohort GC (entry above) built its referenced-set from
+`DATABASE_URL` alone. Staging stories live in the STAGING database while their
+images are written to the PRODUCTION bucket, so a production-only scan sees
+zero references to them, classifies the whole cohort dead, and deletes it. This
+already happened: benchmark story `job_1777923092665_wkhxd3mg9` lost 54 of its
+189 scene images (pages 1-10 entirely), and a 27-story sample found 5 more with
+objects gone, all created 2026-07-15 to 2026-08-25.
+**Decision:** The reference scan runs over every database that writes to the
+bucket — `DATABASE_URL` plus `STAGING_DATABASE_URL` when set and different. A
+configured staging URL that cannot be scanned is a FATAL stop, exactly as a
+table that fails to scan is: skipping it silently marks every staging-only
+cohort deletable.
+**Rationale:** The cohort rule was never wrong; its reference set was one
+database short. Measured on the real bucket the same day:
+- production reference set: `_wkhxd3mg9` 0 keys, `_q1fjbdzbx` 0, `_s980g4s9a` 0
+  — all three DEAD and sweepable.
+- staging reference set: the same three at 612, 8 and 4 keys — all LIVE.
+- staging contributes 31,276 distinct keys the production-only scan never saw.
+- the fixed audit over the whole production bucket: 0 dead cohorts, 366 live —
+  but so does the audit with staging hidden, and that is NOT evidence for the
+  fix. Every staging-only cohort had ALREADY been deleted in full (all three
+  ids list 0 objects under `stories/<id>/` in `magicalstory-images`), so they
+  no longer exist as cohorts to classify. The URLs that still answer 200 are
+  served from the SEPARATE staging bucket, which the production GC never
+  touches. The evidence for the fix is the reference-set comparison above plus
+  the unit test — not the audit.
+**Touched:** `scripts/lib/r2Cohorts.js`; `tests/unit/r2-cohort-gc.test.ts` +
+`tests/unit/fixtures/r2-gc-stub.cjs` (a cohort referenced only by the staging
+database is spared, while the genuinely dead cohort is still swept — 11/11)
+**Status:**    ✅ active
+
+## 2026-09-13 — The render-side cast rule lives in the PROTECTED TAIL
+**Context:**   The brief side of "pages drop a character the beat is about" was
+fixed (reviewer checks 5/5b, declared `REMOVED CAST:`), but
+`prompts/image-generation.txt` never told the model to draw every character in
+the reference list. Written first as a **Composition** bullet.
+**Decision:** It ships as a `**REQUIRED CAST:**` block at the very END of the
+template, after `**ART STYLE**`.
+**Rationale:** Position is the protection. `shrinkPromptForModel` holds back
+everything from `**REQUIRED OBJECTS` / `**ART STYLE` onward and LLM-compresses
+the head, where only REFERENCE CARD COLOURS and the opening rules block have
+verbatim carve-outs. Measured on a crowded-page prompt: 15,529 chars shrink to
+832 — so a Composition bullet is deleted precisely on the crowded pages that
+drop characters in the first place. With tail placement the rule survives that
+same shrink verbatim. Same reasoning, and the same remedy, as the baked-title
+block.
+**Touched:** `prompts/image-generation.txt`
+**Status:**    ✅ active
+
+## 2026-09-13 — D-16b: a held prop the prompt never names, while a required one lies unhandled
+**Context:**   `items_held` is now trustworthy (two-key schema, same day) but
+nothing compared it against the page's REQUIRED OBJECTS. D-16 fires only on
+DECLARED INTERACTIONS, so a closing page whose object is merely a required
+object, with no declared interaction, had no check at all.
+**Decision:** New rule D-16b in `prompts/image-evaluation.txt`, MAJOR, reusing
+the existing `action_interaction` type (no new scored type, so no vocabulary or
+scoring-table changes). It fires when a hand closes around an object the
+USER_PROMPT never names while a required object lies absent or unhandled, and
+carries the same grip test as the inventory: resting on, leaning against or
+overlapping is not holding, and anything hanging or strapped on belongs to what
+carries it. Skipped when no REQUIRED OBJECTS block exists, and skipped for an
+object D-16 already reports.
+**Rationale:** Classification belongs to the prompt (CLAUDE.md), and the
+severity is MAJOR rather than CRITICAL deliberately — a prop swap should not buy
+a repaint on its own, which is the failure this whole day started with.
+**Touched:** `prompts/image-evaluation.txt`
+**Status:**    🟡 conditional — NO FALSE POSITIVES measured (Lab #1260 baseline
+vs #1261, 5 pages; the pirate p9 control, where a lantern hangs in front of a
+hand that genuinely holds a chest, returns 0 findings on both arms). The
+POSITIVE case is UNPROVEN: none of the 5 pages carries an actual prop swap, so
+the rule was never given the chance to fire correctly. Needs a page with a known
+wrong prop in hand — the page that motivated the original report was never
+recorded.
+
+## 2026-09-13 — The bible is English end to end; only the story TEXT is German
+**Context:**   `job_1789301291267_ueh8h145m` (de-ch) page 1 asked the image model for
+
+    * **chest** (object)
+    * **tool** (object)     <- ART002 "Brass telescope"
+    * **tool** (object)     <- ART003 "Iron crowbar"
+    The attached reference images include rough images of: chest; tool; tool
+
+two different props under one word, with reference cells the model cannot match
+to either. Page 4 asked for a "tool" and rendered a featureless black pole — the
+render was FAITHFUL, the prompt was wrong — and the quality judge then charged it
+MAJOR `object_presence` for a defect the pipeline had specified.
+
+The labels come from the entry's `type`, which `englishEntityRef` prefers over
+the description for a non-English story. The field the author fills said only
+`"type": "[what kind of object]"`, which is answered with a CATEGORY, and
+`"name": "[Name]"`, with the English requirement a bullet ~100 lines earlier.
+`scene-expansion-all.txt` — the AD-authored bible, today's primary path — had the
+WEAKEST field-level wording of the four bible templates: `story-unified.txt` and
+`story-trial.txt` both inline "plain English description … never a proper noun"
+in the field itself. It also had no `properName`, so a story-given ship name had
+nowhere to go but `name`.
+
+Measured over the 60 most recent stored stories: 47 non-English element names
+(`Küchentopf`, `Emmas gelber Schal — getragen`, `La Nivéole`, `Höhlenritzung`),
+45 one-word `type` values, and 12 stories where two elements share one type
+string — including the story generating while this was written (`tool` for "Fish
+Bone Comb", beside `jewelry` and `box`).
+
+**Decision:** Fix it where it is authored, not where it is read. Owner, 2026-09-13:
+"Keep everything English as long as possible. Text is German, rest English."
+- `name` asks for a plain English noun phrase, English even for a non-English
+  story, never a proper noun and never a bare category.
+- `properName` added to the artifact schema (already carried by the code,
+  `visualBible.js:580`), so a named ship stops colonising `name`.
+- `type` must be specific enough to tell the object apart from every other
+  element in the bible — "iron crowbar", never "tool" — in all FOUR templates
+  (`scene-expansion-all`, `story-unified`, `story-unified-imagefirst`,
+  `story-trial`).
+
+**Rationale:** Classification belongs to the prompt (CLAUDE.md), and every
+code-side remedy broke something real:
+- Using the NAME whatever the language (dropping the `storyIsEnglish` gate in
+  `promptBuilders.js`) would have painted German and French into image prompts —
+  the hazard the settled 2026-07-31 English-only direction exists for. 47 of 60
+  stories would have hit it.
+- Falling back to the description for a one-word `type` reintroduced the label
+  fragments that `tests/unit/secondary-cast-appearance.test.ts:153` pins after a
+  prod incident (`job_1788698812047_q5b1vuds7` p2: "hat" beside "child-sized
+  tunic made of woven straw" — one list, two labelling rules). It failed that
+  test, and word count was the wrong test anyway: "hat" and "costume" are
+  single words and perfectly good labels. The defect is COLLISION, not brevity.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`
+**Status:**    🟡 conditional — new stories only; stored bibles keep their
+colliding labels, and no code-side disambiguation exists if an author still
+returns a duplicate `type`. Verify on the next generated story that two props
+never share a REQUIRED OBJECTS label.
+
+### Every story records which repair method worked and which did not (2026-09-13)
+**Context:** Repair runs up to N rounds and each bad page picks exactly ONE
+method (`iterate` / `inpaint` / `char-fix`, `decideRepairMethod`). Whether a
+round was worth running, and which method earned its money, was unanswerable
+without hand-querying JSONB: the raw data existed (every version carries
+`method` + `finalScore`; every failed attempt is written to `retryHistory` as
+`round_repair_failed`) but nothing aggregated it. On prod story
+`job_1789227389389_z18dmvnt6` three rounds ran for 21.5 minutes and five pages
+still shipped at ≤35 with open CRITICALs — with no record of which method had
+been tried on them or whether it helped.
+
+The motivating measurement, worth keeping: a repair that scores WORSE than the
+image it replaced is completely invisible today, because `selectBestVersion`
+keeps the best version per page. The money is spent, the page is unchanged, and
+no report mentions it. `regressed` is the count this record exists to surface.
+
+**Decision:** `summarizeRepairRound()` (`repairLogic.js`, pure, no I/O)
+aggregates each round into `{round, attempted, repaired, failed, improved,
+regressed, byMethod, pages}` and the pipeline stamps the array on
+`finalChecksReport.repairRounds` — same shape, same place and same lifecycle as
+`bookAuditRounds`. `before` is the `finalScore` `findBadPages` ranked the page
+on entering the round; `after` is the `finalScore` `applyScore` stamped on the
+new version. A page with either score missing is `unknown`, never counted as
+`unchanged`. A round also logs one `📈 [REPAIR-EFFECT]` line.
+
+**Rationale:** Pure aggregation over data the round already produced — no extra
+model calls, no added cost, no change to any repair decision. Considered and
+rejected: computing it after the fact in a `scripts/analysis/` tool. That would
+work retroactively on existing stories, but the verdict then lives outside the
+story and only exists when somebody remembers to run it; the owner chose the
+per-story record (2026-09-13).
+
+Note for anyone re-opening the cost question: the round loop does NOT re-evaluate
+untouched pages — `buildEvalInputs(roundSuccess)` and the entity check both run
+on the repaired set only (`repairPipeline.js`, and the merge comment saying so).
+The evaluation spend inside repair is the cost of measuring pages we DID repair.
+There is no "skip re-eval of untouched pages" saving available; it is already the
+behaviour.
+
+**Touched:** `server/lib/repairLogic.js` (`summarizeRepairRound`),
+`server/lib/repairPipeline.js` (before-snapshot, per-round emit, return value),
+`storyJobPipeline.js` (`finalChecksReport.repairRounds`),
+`tests/unit/repair-round-effectiveness.test.ts` (9 tests)
+**Status:** ✅ active
+
+## 2026-09-13 — The storyHelpers facade re-exports its domain modules by construction, never by a hand-written list
+**Context:** `parsePlanCheckRoster` was added to `promptBuilders.js` on 2026-09-11 (`df1eb1ff3`)
+and exported there correctly. `beatsPipeline.js:95` destructures it from `./storyHelpers` — the
+re-export facade — which listed every forwarded name by hand, twice (an import destructure and a
+`module.exports` list). The new name was in neither. Node reports nothing for a missing property,
+so the binding was `undefined`, `parsePlanCheckRoster is not a function` was thrown inside the plan
+check's `try`, and the roster it produces is what the ENTIRE plan-counter layer counts over. Every
+beats story on staging therefore shipped with no cast, invented-cast, shot-variety or focal-page
+counting for two days, behind a WARN (`job_1789304198359_y3n0euk3z`: "Plan counters did not run:
+the check's roster covers 0 of 15 page(s)", twice per run). It was not a require cycle:
+`promptBuilders`' 103-module dependency closure never reaches `beatsPipeline`. 42 promptBuilders
+exports were missing from the facade in total.
+**Decision:** the facade spreads the module objects of `promptBuilders`, `sceneMetadata` and
+`clothingResolve` into `module.exports`; the explicit list is kept after them as the documented
+surface and as the place local residue and the `buildSceneIterationPrompt` alias win.
+`tests/unit/story-helpers-facade.test.ts` pins two properties: every domain export is forwarded, and
+every name any module destructures from the facade resolves to something defined.
+**Rationale:** the class of bug, not the one name — a lazy require of the one function would leave
+the other 41 and every future export exposed. The destructure scan is the general guard: an import
+that silently binds `undefined` now fails a test instead of a story.
+**Touched:** `server/lib/storyHelpers.js`, `tests/unit/story-helpers-facade.test.ts`
+**Status:** ✅ active
+
+## 2026-09-13 — A skipped plan-counter layer is an ERROR, and the one per-page cast counter reads the configured cap
+**Context:** two faults the run above exposed. (1) Losing the roster degraded silently behind a
+WARN, which is why a dead counter layer survived two days of runs. (2) `CAST_OVER_3` asked for a
+justification above a hardcoded 3 while `CAST_OVER_CEILING` counted the configured
+`maxCharactersPerScene` — which went to 6 the same day (`678129944`), the day the scene reviewer's
+twin check was reframed from a hardcoded "three" to the cap read as a recommendation. (3) The
+roster parser kept a possessive as its own figure: replaying the stored plan of
+`job_1789304198359_y3n0euk3z`, "Ondine" and "Ondine's" entered the cast as two people and inflated
+pages 10 and 14.
+**Decision:** both the lost-roster and the skipped-counters paths log at ERROR level, in the run log
+and in the generation log, and neither aborts the run (`feedback_gates_are_guidelines`). `CAST_OVER_3`
+is retired; one counter, `CAST_OVER_CEILING`, fires past the configured cap and carries the
+justification clause. `parsePlanCheckRoster` strips a trailing possessive.
+**Rationale:** a counter layer that cannot run must be impossible to miss, and a plan counter
+contradicting the cap the rest of the pipeline was just given is noise the re-plan spends rounds on.
+**Touched:** `server/lib/beatsPipeline.js`, `server/lib/planCounters.js`, `server/lib/promptBuilders.js`,
+`tests/unit/plan-counters.test.ts`, `tests/unit/plan-replan-ranking.test.ts`
+**Status:** ✅ active
+
+### Unevaluated runs report not-measured, never a clean score (finding B4)
+**Context:** Trial stories skip quality eval by design (`skipQualityEval: true`
+in `server/routes/trial.js`; `storyJobPipeline.js` short-circuits the eval +
+repair pipeline). The analytics block nonetheless computed its quality
+aggregates over the resulting empty set. Prod trial
+`job_1789292742265_mgxmrkfpd` (6 pages, zero eval records — no `qualityScore`,
+`evaluation`, `semanticResult`, `entityReport` or `retryHistory` on any page,
+`finalChecksReport.sceneConsistency.pages` empty) therefore shipped
+`"firstAttemptPassRate": 100, "pagesWithIssues": 0, "totalRetries": 0,
+"pipelineConfig": {"enableFullRepair": true}` — which reads as "6 pages
+evaluated, all passed first try" while four of its six pages had real defects.
+Two separate faults: absent counters reported as a measured clean result, and
+a `enableFullRepair` value that contradicted how the run actually executed.
+**Decision:**
+1. Quality aggregates move into one exported helper,
+   `computeQualityAnalytics(images, { skipQualityEval })`
+   (`server/lib/storyMetrics.js`). When the run skipped evaluation it returns
+   `qualityEvaluated: false`, `qualityEvalSkipReason: 'skipQualityEval'` and
+   **null** for `avg/min/maxQualityScore`, `firstAttemptPassRate`,
+   `totalRetries` and `pagesWithIssues`. When the run WAS evaluated the real
+   numbers are reported, including a truthful `0` / `100`.
+   `contentBlocked` keys off the presence of a `retryHistory` array rather than
+   the flag, because the skip path never attaches one.
+2. `analytics.pipelineConfig` additionally records `skipQualityEval`, so the
+   row explains itself without a reader having to know that repair is
+   unreachable when eval is off.
+3. Root cause of the wrong `enableFullRepair`: the pipeline strips
+   developer-mode fields from every **non-admin** job, and trial users are not
+   admins — so the trial's deliberate `enableFullRepair: false` was deleted and
+   the run fell back to the default ON. Fixed at the source: a commission built
+   entirely server-side carries `serverAuthoredInput: true` and is exempt from
+   that strip. `POST /api/jobs/create-story` forces the marker to `false` after
+   its `req.body` spread (same pattern as `adminDraft`) so a client cannot set
+   it. The admin rerun endpoints set it too — they force `skipImages` /
+   `enableFullRepair` on jobs that run on the *source* story's (possibly
+   non-admin) account, where the strip was silently discarding them.
+4. The generation-log phase label no longer claims work that did not happen:
+   with `skipQualityEval` it reads "post-generation phase (text-space +
+   persistence only, NO evals/repair)" instead of "repair phase
+   (detection/evals/entity/rounds/covers)".
+**Rationale:** A dashboard, a query and a future agent must be able to tell
+"nothing was graded" from "graded, and clean" — the previous row was
+indistinguishable from a perfect full run, which is exactly the failure mode
+`feedback_measure_current_not_average.md` describes. Null alone would be
+ambiguous (a pre-flag story is also null), so the explicit
+`qualityEvaluated` boolean rides alongside; the pattern already exists in
+`server/lib/character2x4Sheet.js` (`evaluated` / `evalSkipped`). Nulling
+everything unconditionally was rejected: an evaluated story with genuinely zero
+issues must keep reporting `0` / `100`. Patching the stored `enableFullRepair`
+at the output would have left the pipeline still *running* with the wrong
+value; the strip is the single source of truth and was fixed there.
+Consumer audit: `server/lib/storyMetrics.js:364` and
+`server/services/database.js:898` already read these with `?? null`; no client
+code, admin dashboard or SQL column consumes them — nothing renders a null as
+`0` or crashes.
+**Touched:**
+- `server/lib/storyMetrics.js` (`computeQualityAnalytics`; `qualityEvaluated`
+  added to the metrics `detail.analytics` block)
+- `storyJobPipeline.js` (`skipQualityEval` hoisted to function scope; analytics
+  block calls the helper; phase label; non-admin strip exemption)
+- `server/routes/trial.js` (`serverAuthoredInput: true`)
+- `server/routes/jobs.js` (forces `serverAuthoredInput = false`)
+- `server/routes/admin/jobs.js` (rerun-text / rerun-full mark their commissions)
+- `tests/unit/quality-analytics-not-measured.test.ts`
+**Status:** ✅ active
+
+### The page text is not a checklist for the image — semantic eval judges image-vs-BRIEF (2026-09-13)
+**Context:** Sessions keep "discovering" that `prompts/image-semantic.txt`
+scores the image against SCENE_HINT + IMAGE_PROMPT and treats STORY_TEXT as
+narrative context only (lines 3, 5, 13, 94, and the `"source"` field at 126).
+It gets filed as a bug every time: on prod story
+`job_1789227389389_z18dmvnt6` page 6 scored **100/100 semantic** while two of
+the three things its text narrates are absent from the picture.
+
+**Decision:** This is intentional and stays. **A page's text may narrate two
+actions while the illustration depicts one** — the brief chooses the moment to
+draw, and that is the Art Director doing its job. A page scoring 100/100 while
+its text mentions something not in the picture is NOT a defect. Do not propose
+adding a text-vs-image comparison to the per-page evaluator, and do not re-open
+cast findings sourced from the text (see the standing "AD trims cast by design"
+ruling — fewer figures than the text names is correct behaviour).
+
+**Rationale:** The pipeline order is `beat → brief → image` and `beat → text`,
+with the text written AFTER the briefs. The two are siblings, not a spec and an
+implementation, and the brief is deliberately narrower than the prose: one page
+of text carries a sequence, one illustration carries a moment. An evaluator
+holding the image to the full text would fire on every page that compresses —
+which is every page. The character half of the rule additionally guards against
+"missing character" CRITICALs for people the text mentions but who are
+elsewhere, remembered, or only spoken about.
+
+The reader's-eye question — *do the words on this page describe this picture* —
+is real, and it IS asked, exactly once: by the **book audit**, which reads page
+text interleaved with the shipped image at the end of the run (and, since the
+2026-09-13 final-audit entry, on the book that actually ships). That is the
+right place for it: one judge, reading the finished book like a reader, rather
+than a per-page gate that would penalise normal compression on every page.
+
+Options weighed and rejected (owner, 2026-09-13): an action-only scored type in
+`image-semantic.txt`; an upstream brief↔text agreement check at page-text write
+time; promoting book-audit IMG faults to scored deductions. All rejected — the
+behaviour is not a defect, so none of them has a defect to fix.
+
+**Touched:** `prompts/image-semantic.txt` (unchanged — this entry documents why),
+`docs/SETTLED.md` (Prompts & evaluation)
+**Status:** ✅ active
+
+## 2026-09-13 — One authored `label` per Visual Bible element; ids stay internal
+**Context:**   Elements carried five identity fields (`name`, `properName`, `type`,
+`kind`, `description`) and NINE competing rules decided which string named an
+element at each consumer — the REQUIRED OBJECTS lead, the "rough images of:"
+sentence, `sanitizeVbIdsInPrompt`, the ref-sheet kind sentence, both cell gates,
+`resolveExpectedObjectLabels`, `formatElementsBlock`, `elementLabel`,
+`sceneBriefCheck`. A reference cell was keyed by id but NAMED by a different
+string than the checklist line pointing at it. On `job_1789301291267_ueh8h145m`
+(de-ch) that produced `**tool** (object)` twice on one page (see the entry above)
+and a MAJOR `object_presence` charged for a defect the prompt specified. The
+prompt-wording fix earlier today (`082afaf95`) asked for better types; it could
+not enforce anything.
+**Decision:** (owner, 2026-09-13: "we have the ID so that we have ID and one
+label together — fix it properly; keep everything English, text is German, rest
+English")
+- Every element carries `id` + ONE authored English `label` (1-4 words ending in
+  the noun, unique across the bible, never a bare category, never the proper
+  name, never a story-language word). Secondary characters, animals and real
+  landmarks keep `label = name`. A state `ART001.2` derives
+  `stateLabelOf = "<label>, <state name>"` — never authored.
+- `server/lib/vbLabel.js` is the single source of truth: `labelOf`,
+  `stateLabelOf`, `validateLabels` (7 codes), `repairLabels` (deterministic
+  ladder, never kills).
+- Enforced right after the AD bible is adopted (`beatsPipeline.js`
+  `runVisualBibleLabelRound`): validate → ONE fed-back model round
+  (`prompts/vb-label-repair.txt`, `usageLabel beats_vb_label_repair`) → re-validate
+  → deterministic repair → `gl.warn('beats_vb_label_unresolved')` → SHIP. The
+  round projects labels back into the transcript itself (`syncVisualBibleSection`).
+- Every consumer reads the label through two thin helpers: image-facing
+  `elementLeadLabel` (`promptBuilders.js`) and judge/sheet-facing
+  `elementDisplayLabel` (`vbIdGuard.js`). The detector's expected labels use the
+  same helper as the checklist lead, so detector == lead by construction.
+- **Ids never reach an image model** (settled: Grok painted `ART001` as
+  lettering, decisions.md:3298). The label is the only element string the image
+  model sees; ids remain the key for cells, briefs, detection and judges.
+**Rationale:** Two code-side patches were tried first and both broke something
+real (entry above). The invariant has to live where the data is born and be
+read through one function, or the tenth rule appears next month. The no-label
+FALLBACK is byte-identical to the pre-label derivation on purpose: the bold
+lead is the GroundingDINO key and the entity-consistency key, so stored bibles
+without a label must render exactly as before (pinned in
+`required-objects-label.test.ts`). Two fallbacks are deliberate — image-facing
+must be English, judge-facing may be the story-language `name`.
+**Touched:** `server/lib/vbLabel.js` (new), `visualBible.js` (parse whitelist
+keeps `label` on all six pools + new-entry parse; `englishEntityRef` returns the
+label first; `entryNamedByRow` matches label tokens; exports),
+`promptBuilders.js`, `bboxDetection.js`, `referenceSheets.js`, `vbIdGuard.js`,
+`vbElementBudget.js`, `sceneBriefCheck.js`, `beatsPipeline.js`,
+`services/prompts.js`; `prompts/vb-label-repair.txt` (new), the four
+bible-emitting templates (`label` field; `vehicles`/`clothing` gain a real
+authored schema in `scene-expansion-all.txt` — they were shown only as `[]`);
+tests: `vb-label.test.ts`, `vb-label-round.test.ts` (new) + five updated.
+**Status:**    🟡 conditional — unit-proven (1431 pass, the 7 pre-existing
+failures unchanged) and Lab-proven on the motivating story: `beats_scenes`
+#1262 re-authored `job_1789301291267_ueh8h145m` (de-ch) on `d09c3f2da` and the
+Art Director returned 9 elements with 8 authored labels (CHR001 exempt, label =
+name), 0 duplicates, 0 validator findings. The former "tool"/"tool" pair is now
+`brass spyglass` / `iron bar`; the broken handle Emma holds became its own
+element (`iron handle`) instead of a prop the model had to invent; the ship and
+the beach came back with English names. Note the Lab stage extracts the
+authored bible but does not run `runVisualBibleLabelRound` — the round is
+covered by its unit tests with a mocked model. Still owed: one real story
+showing zero `beats_vb_label_unresolved` and no shared REQUIRED OBJECTS lead
+end to end. Stored bibles are unaffected until re-authored.
+
+## 2026-09-13 — The same split-identity shape exists for CHARACTERS (code-proven; no damage confirmed)
+**Context:**   A read-only hunt for the element-label shape elsewhere found four
+incompatible "does this string name that entry?" matchers for characters and
+secondaries: exact-or-containment (`promptBuilders.js:429-457`), token overlap
+(`visualBible.js:191`), whole-word subset first-match-wins with no uniqueness
+test (`phantomCharacters.js:48`), and plain `toLowerCase()` equality
+(`charRepairTarget.js:71,239`, `entityConsistency.js:1494`,
+`evalPipeline.js:928,1053`, `bboxDetection.js:190` — the last with no id
+fallback). `promptBuilders.js:485` keys the roster by the METADATA name while
+the prose uses the VB name. CORRECTION on re-check of `job_1789163494908_kc2joi4ax`:
+the bible carries BOTH `CHR001 "Mother"` (a human) and `ANI002 "Mother Dragon"`,
+so p2's `"Mother"` resolving to CHR001 is an exact, correct match, and p9's
+`"Vendor"` → `"Marroni Vendor"` is the containment fallback doing its job. No
+mis-resolution is confirmed on that story. What IS real: `phantomCharacters.js:48`
+`isKnownName` merges nested names in either direction by its own admission, and
+that story has exactly such a pair — a latent hazard, not a measured defect.
+Also found: costume label built in two casings and
+looked up case-sensitively (`clothingCategories.js:101` vs
+`clothingResolve.js:869` vs `entityConsistency.js:2939`); judge and generator
+build the clothing contract independently and only WARN on divergence
+(`clothingResolve.js:559`); covers resolve entities by name in prose while pages
+resolve by id only; three location canonicalisers.
+**Decision:** Recorded, NOT fixed. Backlog. The remedy shape is the same as for
+elements: one `resolveEntityByName`, every roster/detector/repair keyed by
+`entry.id`.
+**Touched:** none (finding only)
+**Status:**    🟡 open
+
+## A divided object's markings do not multiply — a prompt rule, not an authored field (2026-09-13)
+**Context:** Prod trial `job_1789292742265_mgxmrkfpd` declared ONE artifact carrying ONE
+surface device, with a `broken` state splitting it into two halves. Pages 3 and 4 rendered
+the device complete and mirrored on EACH half; pages 5-6 (no split) rendered one. The page
+text itself described the single device as now facing two ways. Mechanism: the device is an
+attribute of the noun, so when the instruction multiplies the noun ("two halves") the
+attribute replicates per instance. Nothing in the prompt said the marking is one painting
+that the split runs through.
+**Decision:** One line appended to the REQUIRED OBJECTS block, after the element bullets:
+"A state that divides, opens or breaks an object does not multiply its markings: a device,
+emblem or pattern on the surface is one marking, and the split runs through it — each part
+shows only its share." Plain line, no `* **` prefix, so `parseVisualBibleObjects` cannot
+read it as an element.
+**Rationale:** The block starts the protected tail that `shrinkPromptForModel` reattaches
+verbatim, so the rule survives head compression — a placement in `image-generation.txt`'s
+head (where "Draw exactly one of each named object" lives) does not. It is emitted only
+when a page actually states an object, so it costs no budget on object-free pages, and it
+reaches the trial and full pipelines alike because both go through `buildImagePrompt`.
+The wording is state-agnostic on purpose: prod's parse path drops state ids (the state
+system is half-installed, `b8559256c` staging-only), so a rule gated on an emitted state
+clause would never fire on master.
+The structural alternative — an authored `markings` field on the artifact entry, letting
+the renderer be told explicitly how many markings exist — was considered and **declined by
+the owner** in favour of the cheap prompt rule. This rule is a nudge, not a guarantee: no
+evaluator checks marking multiplicity, and nothing fails a page that ignores it.
+**Touched:** `server/lib/promptBuilders.js` (REQUIRED OBJECTS block builder),
+`tests/manual/test-page-prompt-builder.js` (4 pins: rule reaches the BUILT prompt, sits
+past the `**REQUIRED OBJECTS` protected-tail marker, is a plain line, and is invisible to
+the object parser — pinned structurally, never on wording).
+**Status:** ✅ active
+
+## 2026-09-13 — The page plan owns the cast: a Visual Bible secondary may carry a `characters[]` row, and the composite trigger stops trusting that row
+
+**Context:** `prompts/scene-review.txt` contradicted itself. Rule 8bc ended with
+"A secondary character (a CHR id in `objects[]`) has no `characters[]` row";
+rules 5 (`cast_over_cap`) and 5a (`cast_not_in_plan`, both shipped 2026-09-10 in
+`75e8169a1`) tell the reviewer to reconcile `characters[]` against the PAGE PLAN
+line — and the plan line names the secondary. On `job_1789304198359_y3n0euk3z`
+the reviewer obeyed 5/5a and broke 8bc: it promoted the Visual Bible secondary
+Ondine into `characters[]` on pages 9, 10 and 14, and the iterate round did the
+same for `Yellow Fairy [ANI003]` on page 15.
+
+Downstream, `needsScaleRepair` — the composite's trigger — carried the
+2026-09-10 fix for the mirror-image failure: CHR-id secondaries read out of
+`objects[]` were counted as figures, the composite could not cast them, and the
+dragon vanished from four plates (`job_1789083667794`). That fix was "count
+`characters[]` only", which a promoted secondary now walks straight through.
+
+**Decision:** Two halves, one commit.
+1. Rules 5/5a win. The sentence asserting a secondary has no `characters[]` row
+   is deleted from `prompts/scene-review.txt`. Secondaries will carry
+   `characters[]` rows from now on. The useful half of 8bc survives, scoped to
+   how the figure is actually staged: a secondary staged **only** as a CHR id in
+   `objects[]` still needs a `watching` interaction naming its gaze.
+2. `needsScaleRepair(sceneMetadata, castableCharacters)` takes the story's
+   photo-backed cast and intersects `characters[]` against it **before** the
+   `< 2` gate. Only figures the composite can actually cast are counted. The
+   two production call sites pass it (`storyJobPipeline.js` → `inputData.characters`,
+   `server/routes/regeneration.js` → `storyData.characters`); an omitted list
+   keeps the previous behaviour for callers that have none.
+
+**Rationale:** The page plan line is already the authority for a page's cast
+everywhere else in the review prompt; leaving 8bc in place meant the reviewer
+was told to obey two rules that cannot both hold, and it picked one at random
+per page. Fixing it the other way (weakening 5/5a) would give the brief back the
+ability to drop a character the plan line stages.
+
+The trigger fix is not optional follow-up: half (1) reopens exactly the
+`job_1789083667794` hole through the other door. The trigger site already
+intersected against the real cast when it built its background refs, so before
+this a promoted secondary passed the count gate and then resolved to nothing —
+the composite would run on a page whose second figure it could not draw.
+Currently masked by `runtime.sceneCompositeEnabled === false`
+(`server/config/runtime.js`), so it was armed rather than firing; the fix holds
+whichever way the composite is configured.
+
+Replaying the trigger over the stored pages of `job_1789304198359_y3n0euk3z`
+showed no page changing verdict: pages 9 and 10 stage Ondine alone (one figure),
+page 14 has both figures at midground (no foreground, so the depth gate catches
+it) and page 15 has no depths at all. One depth label is all that separates it —
+the same page 14 with Ondine at `background` returns `true` before the fix and
+`false` after.
+
+The owner accepted as a consequence that plate generation for secondary-only
+pages changes; tracked separately.
+
+**Supersedes:** the "a secondary character has no `characters[]` row" clause of
+rule 8bc in `prompts/scene-review.txt`. The identical sentence in the Art
+Director authoring prompts (`prompts/scene-expansion.txt` rule 8j,
+`prompts/scene-expansion-all.txt` rule 8j, and the `characters[]`/clothing
+contracts in `prompts/story-unified-imagefirst.txt`) is deliberately left
+standing: it is the coherent authoring-side contract, and the clothing rule
+("a secondary character never carries a clothing category") depends on it.
+Aligning the authoring prompts is a separate decision.
+
+**Touched:** `prompts/scene-review.txt`, `server/lib/scaleRepair.js`,
+`storyJobPipeline.js`, `server/routes/regeneration.js`,
+`tests/unit/composite-secondary-cast.test.ts`
+**Status:** ✅ active
+
+### Two kinds of life-skill topic: a developmental skill has an age window, a life event does not
+**Context:** A 1-year-old with topic `moving-house` reached the writer with a
+contradiction inside one assembled prompt: `buildLifeSkillGuidelines` demanded
+"practical tips or coping strategies" and "End with a hopeful, empowering
+message" while the `routine` band (`prompts/age-band-routine.txt`) forbade a
+lesson. Measured offline on the trial prompt (both blocks present, ~70 lines
+apart) and on the legacy unified prompt (the demand present, no band block at
+all). Separately, the 59 topics were all treated as any-age, so `potty-training`
+at 1 and `body-changes` at 4 were written as if the child were in the middle of
+that phase.
+**Decision:** Three things.
+1. `buildLifeSkillGuidelines` emits a short variant for `SIMPLE_BANDS`
+   (`routine`/`quest`/`tries`, ages 0-3) that drops the coping-strategy and
+   empowering-ending clauses and reframes the teaching guide as background for
+   the writer rather than things to tell the child. Age four and up is
+   unchanged. The builder learns the band from a new optional `inputData` 4th
+   argument; both call sites already had it in scope.
+2. The three simple band files carry a pre-reflective life-event clause ("a life
+   event is weather, not a task") and a rewritten ending. **The ban is on the
+   coda, not on success** — the thing may go well, and the routine band now says
+   so explicitly ("a first taste, a first step up, a thing carried all the way —
+   shown happening and not remarked on"); what is banned is the prize, the
+   ceremony and the closing line about what it means.
+3. A topic either has a developmental window or it does not. Windowed topics
+   carry `suitableAges: [min, max]` (client) / `TOPIC_AGE_WINDOWS`
+   (`promptBuilders.js`); **absence means any-age**, which is the correct
+   semantic for every life event (a move, a new sibling, a hospital stay). A
+   child outside the window gets one terse line in the AGE_MODE block telling
+   the writer to write the topic as it reaches a child of that age (watching a
+   sibling, remembering it, being about to reach it). It never refuses and never
+   blocks — a gate is a guideline. `ageGroup` is untouched: it is the picker
+   shelf, a different thing.
+**Rationale:** Per-band treatment lives in the 5 band files, NOT in the 59 topic
+guides. Writing "how this topic works for a 1-year-old" into each guide is ~59 ×
+5 bands of prose; the band files cover the same ground in ~300 words apiece
+against the ~5000 words that per-topic-per-band text would cost, and they stay
+correct when a topic is added. The window map is deliberately the windowed
+topics only (~32 rows), never a mirror of the full 59-row table — a second copy
+of the topic list is a drift source.
+**Touched:** `server/lib/promptBuilders.js` (`buildLifeSkillGuidelines`,
+`TOPIC_AGE_WINDOWS`, `buildTopicWindowSection`, `buildAgeModeSection`),
+`prompts/age-band-routine.txt`, `prompts/age-band-quest.txt`,
+`prompts/age-band-tries.txt`, `client/src/types/story.ts`,
+`client/src/constants/storyTypes.ts`,
+`client/src/components/story/StoryCategorySelector.tsx`,
+`client/src/components/story/StorySettings.tsx`, `tests/unit/age-band.test.ts`
+**Status:** ✅ active
+
+### The prose may name what the picture shows — it may not recolour it (2026-09-13)
+**Context:** Prod `job_1789227389389_z18dmvnt6` p8 text reads «il change les
+jambes des enfants en **queues d'argent**» (silver tails) while the locked
+contract gives Liz a deep yellow tail and Ayan a red one, and all 7 rendered
+surfaces drew yellow and red. The images are correct; the text is not.
+
+Verified before fixing, because the obvious diagnosis was wrong: the writer was
+NOT missing the information. The stored `storyTextPrompts` (59,347 chars) for
+this run contains the per-page `ILLUSTRATION (already locked — what the reader
+will SEE on this page)` block carrying both "a fitted red mermaid tail with
+red-to-burgundy scales" and "a fitted deep yellow mermaid tail with
+yellow-to-gold scales". `buildTextRefinePrompt` likewise passes the full
+`sceneBrief` as `{SCENE_OUTLINES}`. Writer, reviewer and refiner each held both
+halves. No plumbing was missing, so no plumbing was added.
+
+**Decision:** The gap was in the RULES, which covered only two cases and not the
+one that occurred. Both prompts said appearance is "the picture's business, not
+the prose's" (don't mention it) and "never contradict" (read as being about
+events). Neither said what to do when the story legitimately must name the thing
+— a transformation, a gift, a thing found or lost is an EVENT, and the writer had
+every reason to name the tails. Added to `story-text-from-beats.txt` and
+`text-refine.txt`: naming such a thing is allowed, copying the brief's wording is
+not, and where the brief colours a thing the prose uses that colour or names none
+at all — never a different one. The refiner's rule is written as a flaggable
+condition so the page enters its ledger.
+
+**Rationale:** Prompt-side, per the standing "classification belongs to the
+PROMPT" rule — the alternative considered was a deterministic colour-word check
+against the brief fed through the mechanical REVIEW HINTS channel, which is code
+reading prose. Held in reserve; the rule gap is the cheaper and more honest fix
+first. No story-specific example is used in either prompt (the tail/silver case
+that motivated this is deliberately generalised).
+
+**Also corrected here:** the related finding "p3 text says photograph, image
+shows a model ship" was filed backwards. The p3 brief specifies "a photographic
+display of a flat-bottomed wooden sailing barque" — the TEXT is faithful and the
+IMAGE deviated. That is an image-vs-brief defect owned by the semantic evaluator,
+which scored the page and passed it; it is not a text fault.
+
+**Touched:** `prompts/story-text-from-beats.txt`, `prompts/text-refine.txt`
+**Status:** ✅ active
+
+## 2026-09-13 — One key per costume: `costumed:<x>` resolves through `utils/costumeKey.js` everywhere
+**Context:**   The `costumed:<x>` label was produced in two casings
+(`clothingCategories.js:101` lower-cases the costume, `clothingResolve.js:869`
+preserves it) and the `costumed: { <key>: … }` maps were written with the raw
+colon part (`styledAvatars.js` remember/write sites) but read with a
+case-sensitive lookup (`entityConsistency.js:2939`, `bboxDetection.js:1273`,
+`styledAvatars.js:646`). A costume written as "Zauberlehrling" was missed by a
+lookup for "zauberlehrling"; the prompt then fell back to "costume as shown in
+reference" while a different styled sheet was the reference attached. Found by
+the 2026-09-13 split-identity hunt; code-proven, not story-confirmed.
+**Decision:** `costumeSubKey(category, fallbackCostume)` is the one key
+(slugified colon part → story costume name → 'default'), and `pickCostumed(map,
+category, fallback)` is the one read (slug, then the raw colon part an older
+run may have written, then — one costume per character — the first entry).
+Every write and read of a costumed map goes through them.
+**Rationale:** Same shape as the element label fix: one canonical key, read
+through one function. The read tolerates raw keys so stored characters keep
+resolving without regeneration; writes converge on the slug from now on.
+**Touched:** `server/utils/costumeKey.js`, `server/lib/styledAvatars.js`,
+`server/lib/entityConsistency.js`, `server/lib/bboxDetection.js`,
+`tests/unit/costume-key.test.ts` (new)
+**Status:**    ✅ active
+
+## 2026-09-13 — The three "failing" `vb-object-states` tests were stale regexes
+**Context:**   Three assertions matched the `[VB-STATE]` clause-dropped
+warning in its pre-`39fc0d0ff` word order ("says the object is untouched but
+the brief's interactions put hands on it"). That commit reworded it to lead
+with the brief ("the brief's interactions put hands on it but the state says
+the object is untouched"); the logic — drop the contradicting delta, loudly —
+never changed. The suite carried them as "known failures" for the day.
+**Decision:** Regexes updated to the current wording; 69/69.
+**Touched:** `tests/unit/vb-object-states.test.ts`
+**Status:**    ✅ active
+
+### The trial FILTERS age-inappropriate life challenges; the full wizard DIMS them
+**Context:** `ded6831d5` gave 32 of the 59 life challenges a `suitableAges`
+window (absence of the field means any-age — a life event reaches a child at
+whatever age it happens). The full wizard uses that window to dim-and-sort:
+out-of-window topics stay clickable, greyed, with a "best for N-M" label. The
+owner then directed, verbatim: "for the trial mode we should show only age
+appropriate challenges. No dimming."
+**Decision:** Two surfaces, two behaviours, deliberately. `TrialTopicStep`
+renders `getTrialLifeChallenges(age, selectedTopic)` — out-of-window topics are
+absent, with no tooltip and no label. `StoryCategorySelector` (full wizard) is
+unchanged and keeps dimming. Both call the one shared `topicFitsAge()` in
+`client/src/constants/storyTypes.ts`, so the window rule has a single source of
+truth even though the two surfaces act on it differently.
+**Rationale:**
+- The trial is a 3-step funnel for a first-time visitor with no account. A
+  greyed-out tile with an explanatory tooltip is a decision to make; an absent
+  tile is not. The full wizard is used by an owner who already has characters
+  and may deliberately want an out-of-window topic — there, removing choice
+  would be a regression.
+- Filtering is only safe because absence means any-age. Measured over the 16
+  popular trial topics: the worst ages are 0-1 with 7/16 visible, 2 → 10/16,
+  3 → 13/16, 4 → 14/16, 5-6 → 16/16, 7 → 12/16, 8 → 11/16, 9 → 9/16,
+  10-12 → 8/16. Never empty, never below 7. (The old `ageGroup` shelf label
+  would have left age 1 with a single topic — that is why it is not the filter.)
+- The 33 adventure themes carry no age data at all, so every one of them is
+  any-age by the absence rule and the trial filter removes none of them. The
+  filter is life-challenge-only by construction, not by a special case.
+**No declared age → show everything.** Age is optional in the trial
+(`TrialCharacterStep` `canProceed` checks name, gender, photo; `trial.js`
+validates age only if present) and on prod 1 of 18 trial stories has a blank
+age. We did NOT make age required: the character step is the funnel's
+highest-friction step (photo upload + consent) and adding a mandatory field
+there to improve topic curation for ~6% of runs is a bad trade. A blank age
+filters nothing, which is the same "no data → no filtering" rule as a missing
+`suitableAges`.
+**Deep links stay intact.** `/try?category=…&topic=…` fixes the topic before
+the age is known, and 43 of the 59 life challenges are reachable ONLY that way
+(they are an SEO surface — see `project_ads_funnel_strategy`). A deep-linked
+topic is PINNED to the front of the trial list even when it is out of window or
+not one of the popular 16, so the selection is never invisible or inconsistent;
+the server-side age nudge from `ded6831d5` handles the mismatch in the story
+itself. This also fixes a pre-existing hole: a deep-linked non-popular topic
+previously rendered a grid with nothing highlighted.
+**Touched:** `client/src/constants/storyTypes.ts` (`topicFitsAge`,
+`parseChildAge`, `getTrialLifeChallenges`), `client/src/pages/trial/TrialTopicStep.tsx`,
+`client/src/pages/TrialWizard.tsx`, `client/src/components/story/StoryCategorySelector.tsx`
+(local `topicFitsAge` removed, now imports the shared one — behaviour unchanged),
+`tests/unit/trial-age-appropriate-topics.test.ts`
+**Status:** ✅ active
+
+## 2026-09-13 — Anatomy defects ship unguarded: closed by decision, not by fix
+**Context:**   Zero `anatomy` / `proportion` findings across 34 evaluated pages
+(two stories, 2026-09-13). The plumbing is intact — `evalBuckets.js` grades
+`anatomy` with `repair: 'regen'`, `proportion` aliases to it, it sits in the
+consolidator's closed vocabulary and carries no zero-point ceiling, so a
+finding WOULD bill 2/15/25 and repair. It never fires because the DETECTION
+does not work: the per-figure VLM anatomy check is recorded as tested and not
+viable (entry of 2026-08, decisions.md ~24100), and prompt-variant sweeps on
+2.5-flash are exhausted (~30436). The same day's grading saw both blind
+describers pass a smeared face and a crossbow mounted in the plane of the
+shot as `physics_ok: true`.
+**Decision:** (owner, 2026-09-13) Leave it unguarded. The one untried lever —
+cropping each detected figure at native resolution from the existing SAM masks
+and asking the anatomy question on the crop — is NOT pursued now. Anatomy
+defects are repaired on request via the Grok char-fix path, as today.
+**Rationale:** Every measured attempt at VLM anatomy detection returned zero
+precision; spending more Lab money without a new signal is the burn-loop the
+project rules forbid. Recorded so the item is not re-raised as a plumbing bug.
+**Touched:** none
+**Status:**    ✅ decided — reopen only with a new detection signal, not a new prompt variant
+
+## 2026-09-13 — Urgency is drawn, not judged: the plan line's stakes set faces and effort (generation side only)
+**Context:**   A page whose beat is a rising flood and hail on the sail can
+render as two children calmly standing by a box and score clean:
+`image-semantic.txt:46` treats a neutral or calm expression as SATISFYING the
+beat and `:73` lets any frozen pose satisfy a motion verb. The generation
+side already carries the channel — every character has a required
+`expression` (brows/eyes/mouth) and the built prompt re-anchors it in an
+EXPRESSIONS AND EYES block (`promptBuilders.js:4404`); on
+`job_1789301291267_ueh8h145m` p4 it read "focused, mouth slightly open, brows
+lowered". What no rule did was tie those faces and the bodies' effort to the
+plan line's STAKES, and `sceneIntent` sentence 3 invited a bare mood word
+("The mood is urgent" on p1).
+**Decision:** (owner, 2026-09-13: generation side only) Rule 5e in
+`scene-expansion-all.txt`: a plan line carrying threat, hurry or strain is
+drawn under it — expressions name the strain, bodies brace, lean or hurry,
+nothing in the frame rests; a calm plan line is drawn calm; mood is shown
+through faces, bodies, light and weather, never named. `sceneIntent`
+sentence 3 now asks for the mood as it shows, never as a mood word. The
+evaluator is unchanged: no `mood_mismatch` finding, nothing new deducts.
+**Rationale:** Expression judging on children's faces is noisy and
+calm-by-design pages exist, so a judge-side rule would fire on pages the
+owner considers fine and could buy repaints. The cheapest way to stop flat
+books is to stop authoring them. Not pinned by a wording test — prompt
+wording is not pinned by policy; the behaviour shows on the next story.
+**Touched:** `prompts/scene-expansion-all.txt`
+**Status:**    🟡 conditional — verify on the next real story that an urgent
+page's `expression` fields and prose carry strain.
+**Follow-up (2026-09-13):** the sibling template `prompts/scene-expansion.txt`
+carried the old `Sentence 3: setting, lighting, mood.` and no stakes rule. It
+is not dead: it is the live per-page shortfall fallback in production
+(`beatsPipeline.js:1468`, usage `beats_scene_expansion_fallback`) and the Test
+Lab `scene_expansion` stage template, so a shortfall retry could still emit a
+bare mood label and Lab experiments tested the old wording. Both changes are
+now ported in that file's own voice — it names the beat "the hint", not "the
+plan line", so the rule reads `5e. **The hint's stakes set the faces and the
+effort.**` beside its existing `5d` hint-verb rule. `story-unified.txt` and
+`story-unified-imagefirst.txt` are deliberately left on the old wording
+(owner-scoped as legacy). Still generation-side only; evaluator untouched.
+**Touched (follow-up):** `prompts/scene-expansion.txt`
+
+## 2026-09-13 — The reference sheet must state that the figure is shod (barefoot books)
+**Context:**   Staging trial `job_1789296188291_thezv15y1` ("…Kastanie…", 6
+pages, German, autumn, outdoors on paving stones) rendered its main character
+barefoot on all six pages AND both covers. The chain: his body reference photo
+wears blue trainers → the pass-1 identity sheet (`buildBodyRowPrompt`) came
+back barefoot in all four body cells → pass-2 style transfer copied that →
+the styled sheet IS the per-page reference cell, so all eight images faithfully
+drew bare feet. Nothing upstream could catch it. The trial path sets
+`standard: { used: true, signature: 'none' }` with no description by design
+(`trial.js:2392` — the body photo is the reference), so `clothingDescription`
+resolved `null`, the sheet prompt got `Costume: standard outfit`, and the page
+prompts carried no clothing text at all. And every mention of shoes in the
+sheet prompts and their evaluators (`character2x4Sheet.js`,
+`sheet-row-bodies-eval.txt:8`, `sheet-2x4-evaluation.txt:21`) was a FRAMING
+rule — "both feet with shoes are fully visible", "cropped at the ankle scores
+1-3" — which a barefoot figure satisfies.
+**Decision:** One `buildFootwearRule(redress)` in `character2x4Sheet.js`,
+appended to both JS sheet prompts and mirrored in
+`styled-costumed-avatar-2x4.txt`: footwear is part of the outfit; the figure
+wears what the body reference shows (same type and colour), or plain everyday
+shoes suiting the outfit when neither reference nor outfit shows any. On a
+redress sheet the costume names the footwear and the reference is ignored.
+Bare feet only when the outfit names them, or when the lower body is a tail,
+fin, or fused form with no feet.
+**Rationale:** Generation side only, at the one site where the footwear was
+lost. The alternative — synthesising a clothing `description` for trial
+characters so footwear text flows downstream — would mean deriving outfit text
+from the source photo, which the "description must match the avatar / never
+correct traits toward the photo" rule forbids, and would not help the
+non-trial redress case where the reference outfit is deliberately ignored.
+Evaluator untouched: adding a scored "is the figure shod" sub-check is a
+five-site change (evalBuckets, scoring tables, consolidator, subType, vocab)
+and needs its own ask.
+**Touched:** `server/lib/character2x4Sheet.js`,
+`prompts/styled-costumed-avatar-2x4.txt`,
+`tests/unit/sheet-footwear-rule.test.ts`
+**Status:**    🟡 conditional — needs one live sheet generation to confirm the
+sheet comes back shod; the fix is unverifiable from stored evidence alone.
+
+## 2026-09-13 — All 59 life challenges carry an age window; the trial grid ranks by fit and caps at six
+**Context:** The entry above ("The trial FILTERS age-inappropriate life
+challenges") shipped `suitableAges` on 32 of the 59 life challenges and made the
+trial filter on it. Two gaps were left open. (1) 27 topics had no window at all,
+so they were any-age by accident rather than by decision — a 10-year-old was
+still offered `going-to-bed` and a 2-year-old `telling-truth`, because neither
+had been rated. (2) What survived the filter came out in source-file order and
+uncapped, so the grid was both arbitrarily ordered and a different height at
+every age (7 tiles at 0-1, 16 at 5-6). The owner ruled, verbatim: *"First just
+label all with appropriate ages. Than rank them by age group and keep the top 5
+or so, what fits todays layout 4 or 6?"*
+
+**Decision — three parts, in that order.**
+
+**(a) Every one of the 59 is labelled.** 51 carry a `suitableAges` window;
+exactly **8 stay fieldless on purpose** — `moving-house`, `going-vacation`,
+`parents-splitting`, `visiting-doctor`, `staying-hospital`, `death-pet`,
+`grandparent-sick`, `new-sibling`. These are life EVENTS: they happen *to* a
+child at whatever age they happen, so there is no developmental window to state
+and no age at which the topic is wrong. Fieldless therefore now means "declared
+any-age", not "not yet rated" — the distinction the previous state could not
+make. Owner rulings inside this pass: `telling-truth` [4,12],
+`dealing-bully` [5,12], `going-to-bed` **[1,8] not [0,8]** (no developmental
+topic carries a 0 — age 0 is a baby and nothing is being *learned*), and
+`losing-game` widened [4,9] → **[4,12]** (losing badly does not stop mattering
+at 9). `ageGroup` was NOT touched: it is the wizard's picker shelf, a different
+axis from the window, and conflating them is what made the old shelf label
+unusable as a filter.
+
+**(b) The visible topics are ranked best-fit-first** (`trialRankKey`), three
+signals, decades apart so a lower-priority one can never outvote a higher one:
+1. **Window width** (×1000, max span 13) — dominant. A topic whose window is
+   [2,4] is *about* being two; one whose window is [2,12] merely tolerates it.
+   The narrower window containing the age is the more deliberate answer to
+   "what is this child working on right now". A fieldless life event counts as
+   the widest possible window (13): real at any age, therefore specific to none,
+   so it fills the grid only once the targeted topics run out.
+2. **Distance from the window's centre** (×100, bounded by 6). Between two
+   equally wide windows, the one centred on this age beats the one the child is
+   ageing out of — at 6, `first-school` [5,8] outranks `first-kindergarten`
+   [3,6] though both are width 4.
+3. **Commission frequency** — the pool's own index, which is the curated
+   popularity order. It breaks every remaining tie deterministically, so the
+   grid never reshuffles between renders.
+With no declared age there is no ranking signal, so the pool keeps source order
+and only the cap applies.
+
+**(c) The grid caps at 6** (`TRIAL_GRID_SIZE`), applied AFTER filtering and
+ranking. The number is geometry, not taste: `TrialTopicStep.tsx` renders
+`grid grid-cols-2 sm:grid-cols-3`, so six is 3 full rows of 2 on mobile and 2
+full rows of 3 on desktop. Four would leave a ragged 3+1 desktop row. The
+deep-link pin is inserted before the slice and so survives filter, rank and cap:
+it is always first and always visible, displacing the last-ranked topic rather
+than the best-fitting one.
+
+**The cap is what makes the wider pool safe.** 13 topics that the 16-topic
+popular list could never surface are added to a new `trialLifeChallengeIds`
+pool: `saying-goodbye`, `potty-training`, `no-pacifier`, `getting-dressed`,
+`washing-hands`, `whining`, `picky-eating`, `waiting-turn`, `being-patient`,
+`saying-sorry`, `new-sibling`, `visiting-doctor`, `going-vacation`. Before the
+cap this would have made the grid taller; with it, they compete for six slots
+and win only where they genuinely fit — a 2-year-old now sees `potty-training`
+first instead of `sibling-fighting`.
+
+**The pool is NOT `popularLifeChallengeIds`, deliberately.** The full wizard's
+Popular shelf shares that constant via `getLifeChallengesByGroup('popular')`,
+is always visible, dims rather than filters, and is never capped. Widening it to
+29 would put half the catalogue into a shelf whose entire job is to be a curated
+shortlist, sitting directly above the age shelves that already list the same
+topics — "Popular" would stop meaning anything, and it would get worse for the
+wizard to make the trial better. So the wizard keeps the curated 16 and the
+trial draws from its own 29. Nothing is lost in the wizard: all 59 remain
+reachable there through the age shelves, which is pinned by a test.
+
+**The four heavy life events stay deep-link-only.** `parents-splitting`,
+`death-pet`, `grandparent-sick` and `staying-hospital` are in no pool and reach
+no grid at any age. They are fieldless (any-age) and would therefore be
+*eligible* everywhere — which is exactly why they need the explicit exclusion:
+a parent who came to the trial to make a dinosaur book should not be offered
+"Parents Living Apart" as a suggestion. They remain fully reachable by deep link
+from their SEO landing pages, where the parent arrived looking for that topic.
+
+**Consequences visible in the table.** Age 0 yields 4 tiles, not 6, and that is
+correct: no developmental window opens at 0 (owner ruling (a)), so only the
+any-age life events remain. Ages 9-12 currently return an identical six, because
+the pool holds only one preteen-windowed topic (`screen-time`) — the preteen
+shelf (`peer-pressure`, `body-changes`, `managing-time`, `homework`,
+`money-saving`) was not among the 13 promoted. That is a pool-composition fact,
+not a ranking fault; widening the pool at the preteen end is a separate call for
+the owner.
+
+**Touched:** `client/src/constants/storyTypes.ts` (19 new `suitableAges`,
+`losing-game` widened, `trialLifeChallengeIds`, `TRIAL_GRID_SIZE`,
+`trialRankKey`, `getTrialLifeChallenges`), `server/lib/promptBuilders.js`
+(`TOPIC_AGE_WINDOWS` mirrored to all 51 — the client filters the picker with the
+window, the server nudges the writer with it, and a drift between the two would
+show a topic in the trial that the writer is then told is off-age),
+`tests/unit/trial-age-appropriate-topics.test.ts`, `tests/unit/age-band.test.ts`
+(new mirror test).
+**Status:** ✅ active
+
+### The lector quotes the whole SENTENCE, not the shortest faulty span (2026-09-13)
+**Context:** Prod `job_1789227389389_z18dmvnt6` p15 shipped «autour des deux
+enfants et **de le doudou** tout dégoulinant» — `de + le`, which French
+contracts to `du`. The proofreader was not absent and did not miss it: the
+stored `textRefineReport` shows the lector ran (`lectorApplied: 10`,
+`lectorDropped: 0`) and was fixing this very word on pages 1, 5, 6, 10 and 14.
+
+**The lector's own correction created the error.** Its p15 finding was
+`'la doudou toute dégoulinante'` → `'le doudou tout dégoulinant'` — a correct
+gender fix. The preposition sat one word to the LEFT of the quoted span, and
+the old contract asked for "the shortest span that contains the fault", with
+agreement corrected only "inside the span you quote". Substituting exactly as
+instructed turned `de la doudou` into `de le doudou`. The applier was faithful;
+the span was wrong.
+
+**Decision:** `story-text-proofread.txt` now asks for the WHOLE SENTENCE the
+fault stands in, quoted and returned corrected, with the neighbouring sentences
+read for judgement but never quoted. One line per SENTENCE, not per fault: a
+sentence with several faults comes back once with all of them fixed.
+
+**Rationale:** A gender, number or case fix forces agreement outward — article,
+preposition and its contraction, adjective, participle — and there is no way to
+know at authoring time how far that reach goes. A span that stops short of it
+cannot be applied safely by substitution, and `applyLectorFindings` is pure
+substitution by design (no model call, the quote doubling as the hallucination
+guard). The sentence is the smallest unit that always contains the agreement
+chain. The one-line-per-sentence rule is load-bearing rather than cosmetic:
+two findings inside one sentence overlap, and the applier's overlap guard drops
+all but the first — pinned by a test.
+
+Considered and held in reserve: a deterministic post-apply lint for `de le` /
+`de les` / `à le` / `à les`. It is safe (those are always wrong in French, no
+context needed) but it patches the symptom of a span contract that is wrong for
+every language, not just French.
+
+**Touched:** `prompts/story-text-proofread.txt`, `server/lib/textRefine.js`
+(contract comment on `locateQuote`), `tests/unit/lector-sentence-span.test.ts`
+(6 tests, including a regression test that reproduces the shipped `de le doudou`)
+**Status:** ✅ active
+
+## 2026-09-13 — Two silent-nothing bugs: Lab book_audit recorded no spend, and the push-idle gate reported nothing by hand
+
+**Context:** Both are "the code ran and told nobody" faults, found by reading.
+(1) `runBookAuditStage` in `server/lib/testlab.js` called `auditStoryBook()`
+without a `usageTracker`. `bookAudit.js` only reports spend inside
+`if (usageTracker && …)`, so every Lab book-audit run paid for a multimodal
+judge over the whole book and recorded zero — the stage returned token counts
+but nothing landed in the Lab's own cost accounting the way every other paid
+stage's does. (2) `scripts/admin/check-push-idle.js` resolved an empty ref list
+on a TTY and then returned early on `targets.length === 0`, printing nothing and
+exiting 0. CLAUDE.md advertises it as the manual status check
+("Check status any time with `node scripts/admin/check-push-idle.js`"), and
+silence there reads as "idle, all clear" — the opposite of useful when an
+environment is busy or unreachable.
+
+**Decision:** (1) The stage builds the same usage collector the composite stages
+already use and returns `modelCalls` + `cost` on both exits (including the
+audit-failed one — failed chunks are still billed). Token-only responses are
+priced with `calculateTextCost`; OpenRouter's `cost_usd` is taken verbatim.
+(2) The script now distinguishes hook mode from manual mode explicitly. Manual
+(TTY, no refs) probes EVERY environment in `ENVIRONMENTS` and reports each one;
+the verdict rendering moved into a pure `renderVerdict(target, probeResult,
+{ manual })` so both modes share one reporting path. Hook mode's wording, stream
+choice and exit code are unchanged byte for byte; a manual report never sets a
+non-zero exit code — it is a read, not a gate.
+
+**Rationale:** A gate that decides every push in the repo may not change
+behaviour as a side effect of a usability fix, so the split is by an explicit
+flag with the hook branch left verbatim and pinned by tests (feature branch and
+branch-deletion stay silent and ungated; busy/unknown still block on stderr with
+`--no-verify` named). The "PUSH BLOCKED" framing is deliberately dropped in
+manual mode: there is no push to block, and printing it on a status check is
+simply false. On the Lab side, copying the existing collector rather than
+inventing a ledger write keeps one convention for stage cost.
+
+**Touched:** `server/lib/testlab.js` (`runBookAuditStage`),
+`scripts/admin/check-push-idle.js` (`readRefs`, new `renderVerdict` /
+`resolveTargets`, `main`), `tests/unit/book-audit-usage-tracked.test.ts` (5),
+`tests/unit/push-idle-manual-report.test.ts` (12)
+**Status:** ✅ active
+
+## 2026-09-13 — One cast resolver: a character string becomes an entry only through `castResolver.resolveEntity`
+**Context:**   Characters come from three pools — the photo-backed cast, Visual
+Bible secondaries (CHR###) and animals (ANI###) — and briefs name them by
+string: full names, title-less short forms ("Vendor" for "Marroni Vendor"), or
+VB id placeholders. FIVE rules decided whether a string named an entry: exact
+`toLowerCase()` equality at ~20 sites, unique word-boundary containment
+(`promptBuilders.buildSecondaryCharacterDescriptions`), discriminating-token
+overlap (`entryNamedByRow`), whole-word subset with FIRST MATCH WINS
+(`phantomCharacters.isKnownName`), and four separate VB-id regexes. No site
+stripped diacritics. `charRepairTarget` also matched a figure by
+`label.includes(name)` — the mechanism behind the whited-out-wrong-head incident
+(a "Sarah" repair landing on Rossa).
+
+Measured over the 60 most recent staging stories (686 pages, 8,952 name
+references): **32 stored rosters carry one person twice**, in three collision
+shapes — `Name` beside `Name (CHR00N)`, short form beside full form
+(`Vendor` / `Marroni Vendor`, job_1789163494908_kc2joi4ax p9), and
+article-prefixed (`girl from the walk` / `The girl from the walk`). The cause
+is `reconcileDetectorCast` deduping by string. Under the new strict rule:
+unresolved 2 (0.02%, one bible-less crowd token "net mender"), ambiguous 0.
+**Decision:** `server/lib/castResolver.js` is the single source:
+`canonicalName` (trim, collapse, lowercase, NFD diacritics stripped, trailing
+parenthetical removed), `buildCastIndex` (pool order cast → secondary →
+animal), `resolveEntity` (VB id literal → exact canonical → unique whole-word
+subset either direction; 0 or ≥2 candidates → null + WARN, NEVER first-match),
+`sameEntity`, `dedupeByEntity`, `displayName` (always `entry.name`, never an
+id), `isNonHuman`, `kindLabel`, `lookupByName` (for the name-keyed
+`clothingRequirements` / `characterClothing` / `characterPositions` maps),
+`flushResolverStats` (one INFO line per page).
+Every consumer is one of two kinds, stated in its comment: RESOLVE (a brief or
+roster token → entity) or COMPARE (two stored names from the same run →
+`canonicalName` equality only). READ-TIME ONLY (owner): stored page data stays
+name-keyed, no new persisted field, no migration; `derivePresenceFinding` with
+no index is byte-identical to before.
+Deleted: the containment block and first-pass equality in
+`buildSecondaryCharacterDescriptions`; `isKnownName`'s subset loop;
+`charRepairTarget`'s `label.includes` branch; the local VB-id regex copies in
+`phantomCharacters`, `figureDetection`, `compositeCastBuilder` (→ `vbIdGuard`).
+**Rationale:** Same shape as the element `label` fix earlier today: one
+canonical identity, read through one function, or the sixth rule appears next
+month. Ambiguity refuses rather than guesses because a wrong guess repairs the
+wrong person; at 0 ambiguous references across 686 pages the strictness is
+free. The intended behaviour change: nested distinct names ("Mother",
+"Mother Dragon") no longer merge on first match; an ambiguous reference is
+treated as unknown and logged.
+**Touched:** `server/lib/castResolver.js` (new); RESOLVE/COMPARE migrations in
+`evalPipeline.js`, `promptBuilders.js`, `charRepairTarget.js`, `faceRepair.js`,
+`phantomCharacters.js`, `coverIterate.js`, `compositeCastBuilder.js`,
+`entityConsistency.js`, `bboxDetection.js`, `figureDetection.js`,
+`feedbackConsolidator.js`, `images.js`, `clothingCategories.js`,
+`clothingResolve.js`, `clothingCheck.js`, `beatsPipeline.js`,
+`characterFrames.js`, `routes/regeneration.js`, `routes/stories.js`; tests
+`cast-resolver.test.ts`, `cast-resolver-replay.test.ts`,
+`cast-lookup-by-name.test.ts` (new) + `one-roster`, `extra-character-type`,
+`char-repair-protection` extended.
+**Status:**    🟡 conditional — unit-proven and measured on stored data; one
+real story still owed to see `[CAST-RESOLVE]` stats on live pages and a
+single-spelling roster end to end.
+
+## 2026-09-13 — The TRIAL's avatar sheet is drawn for the story's season; the full path is untouched
+
+**Context:** A trial story states no outfit anywhere. `storyJobPipeline.js`
+builds the trial contract from config as `standard: { used: true, signature:
+'none' }`; `signature: 'none'` is explicitly discarded by every resolver
+(`clothingResolve.js:819,830`), so `buildClothingDescription` falls through its
+whole ladder to the hardcoded `categoryDefaults` (`entityConsistency.js:3013`,
+"Casual everyday clothing as shown in reference"). A full-text scan of all six
+scene briefs of staging `job_1789296188291_thezv15y1` for
+`wearing|t-shirt|shorts|shoes` returns zero hits, while the same briefs read
+"warm soft afternoon autumn light" and "fallen orange and yellow autumn leaves".
+The pixels therefore come entirely from the styled 2×4 sheet, which was built
+from the child's creation-time photo through a path with no season input — so a
+child photographed in summer clothes wears them through every autumn and winter
+trial book, deterministically.
+
+The FULL path does not have this gap: its outline writes a real
+`clothingRequirements[...].description` (the canonical outfit,
+`docs/SETTLED.md:71`) and, measured over stored data, already dresses the cast
+for the season it is given — 0 of 34 cold-season stories (22 staging, 12 prod)
+carry a summery non-costumed outfit with no warm layer.
+
+**Decision:** `server/lib/season.js` gains `seasonOutfitGuidance()`, the
+wardrobe-side sibling of `buildSeasonNote` (scenery) and
+`buildSeasonInstruction` (text), returning `{ season, label, outfit, footwear }`.
+It is threaded as an optional `seasonOutfit` through `prepareStyledAvatars` →
+`getOrCreateStyledAvatar` → `convertAvatarToStyle` → `generateCharacter2x4Sheet`
+and rendered into the body-row prompt. It is passed ONLY on trial call sites
+(`storyJobPipeline.js` `trialSeasonOutfit()`, and the `/api/trial/prepare-title`
+prewarm, which is where a no-costume trial's `standard` sheet is actually built).
+Suppressed whenever an outfit is already stated: a costumed sheet, and any
+`redress` sheet where a contract description drives the garments. Suppressed for
+`storyCategory === 'historical'`, mirroring the trial premise rule.
+
+**Rationale:** The sheet is the identity anchor, so the block names GARMENTS and
+then pins face, hair, skin tone, build and apparent age to the references — the
+season may change what the figure wears, never who it is. Warm seasons are as
+explicit as cold ones ("no outer layer at all" for summer), because a rule that
+only says "dress for the season" puts a child in a coat in July. Footwear is not
+a second rule: `buildFootwearRule(redress, seasonFootwear)` takes the seasonal
+kind instead of the "copy the body reference" carry-over, since the reference
+photo's sandals are exactly what a winter sheet must not copy; with no season
+passed it is byte-identical to the shipped rule.
+
+Nothing is written into `clothingRequirements` or `avatars.clothing`, so the
+judge and the generator keep resolving the same string they do today and the
+known judge/generator contract divergence (`tasks/BACKLOG.md`,
+`clothingResolve.js:559`) is not widened by a character. The consequence, which
+is the accepted cost of this shape, is that the trial's judge still has no
+clothing contract to check the sheet against (`image-evaluation.txt` N-16
+reports nothing on an empty contract, by design).
+
+**Cache:** not part of the styled-avatar cache key, deliberately. The key is
+`${cacheScope}${name}_${category}_${artStyle}` (`styledAvatars.js:273`) and the
+scope is per job (`trial-<userId>` for a trial), so it is already story-scoped
+and a story has exactly one season. Styled sheets are regenerated fresh per
+story by design (`styledAvatars.js:575-579, 616-620`), so season-dependence
+causes no extra generation. The one season-blind cross-story reuse of a sheet is
+`compositeCastBuilder.js:263-271`, which reads
+`characters.data.avatars.styledAvatars[artStyle][category]` and persists to it
+("for reuse across stories", `:304-309`) — that path is NOT made seasonal here.
+
+**Touched:** `server/lib/season.js`, `server/lib/character2x4Sheet.js`,
+`server/lib/styledAvatars.js`, `server/routes/trial.js`, `storyJobPipeline.js`;
+test `tests/unit/season-outfit-sheet.test.ts`.
+**Status:**    🟡 conditional — unit-proven and code-traced; no sheet has been
+generated with it (no paid calls were permitted), so warm/cold behaviour on real
+pixels is unverified. One `/try` run with the date in a cold season is the check.
+
+### Relationships reach every prompt through one renderer — the beats brief had lost names and type (2026-09-13)
+**Context:** Production runs the beats chain. `buildStoryBriefBody`
+(`server/lib/promptBuilders.js`) rendered `{STORY_BRIEF}` relationships from
+`inputData.relationshipTexts` alone, keyed by the raw id pair. The built brief
+for a three-character story read:
+
+```
+Relationships:
+  1-2: They share a room.
+  1-3: He visits every summer.
+  9-4: stale entry
+```
+
+The whole `inputData.relationships` map — which carries the relationship TYPE —
+was dropped, the character NAMES never appeared, and a stale pair whose ids no
+longer resolve to a character leaked through as an unreadable key. So the arc
+author, the retell, the panel, the hints, the beats planner and every review
+stage were told two anonymous numbers share a room. The named form existed in
+`buildUnifiedStoryPrompt` and in the legacy `buildBasePrompt` all along; the
+same id-pair rendering also sat in `buildTextRefinePrompt`.
+**Decision:** One renderer, `buildRelationshipLines(inputData)`, is the single
+source of truth for turning `relationships` + `relationshipTexts` into prose.
+All four sites read through it: the beats brief, the text-refine brief, the
+unified writer prompt and the legacy base prompt. It joins the type with the
+names ("Leo is Brother of Mia. They share a room."), renders both directions of
+a reciprocal pair, drops a `Not Known to` pair, and drops any pair whose ids do
+not resolve — a raw id key is never emitted again, and the `Relationships:`
+block is omitted entirely when nothing resolves. A note in `relationshipTexts`
+whose pair has no entry in `relationships` is still the user's own words about a
+real pair, so it renders with names and no invented type ("Leo and Mia: …"),
+deduped by unordered pair; previously the unified path silently discarded it.
+**Rationale:** The relationship type and the character names are the point of
+the field — a note like "They share a room" is meaningless without "brother".
+Four copies of one rendering is how the beats copy drifted in the first place,
+so the fix is extraction, not a fifth copy. Unresolvable ids fail by omission
+rather than by emitting a key, because a half-rendered `1-2:` is worse for the
+model than no line at all.
+**Touched:** `server/lib/promptBuilders.js` (`buildRelationshipLines`,
+`buildStoryBriefBody`, `buildTextRefinePrompt`, `buildUnifiedStoryPrompt`,
+`buildBasePrompt`), `tests/unit/beats-brief-relationships.test.ts`
+**Status:** ✅ active
+
+## 2026-09-13 — One landmark spec: the closed-world list is the only licence to tag `isRealLandmark`
+
+**Context:** Two contradictory landmark specs reached the writer. The injected
+`buildAvailableLandmarksSection` (`server/lib/promptBuilders.js`) is closed-world — only a
+listed entry may be tagged, a story set elsewhere uses none. The static block in
+`prompts/story-unified.txt` and `prompts/story-unified-imagefirst.txt` was open-world: "for
+famous buildings, monuments, or locations that exist in reality: set `isRealLandmark` … set
+`landmarkQuery` to the EXACT landmark name for photo lookup". "Locations that exist in
+reality" licenses a town name, a foreign square or a historical site — all real, none in the
+index, none resolvable. The builder returns the EMPTY STRING when no landmarks are available,
+so with an empty list the open-world block was the ONLY landmark instruction the model saw.
+Measured unresolvable tags: prod 9/240 entries (3.8%), staging 4/222 (1.8%); 8 of the 13 came
+from the unified path, and one prod case is later than the 2026-09-05 index-only routing.
+`prompts/story-trial.txt` pushed the same way from the other side — "when in doubt, mark it as
+real — false negatives waste the photo pipeline" — while the measured failure mode is false
+POSITIVES.
+
+**Decision:** The static block in both unified templates now states the closed-world rule
+only: a location may be tagged only if it is listed in an AVAILABLE LANDMARKS section;
+anything real but unlisted stays `isRealLandmark: false` / `landmarkQuery: null`; and **no
+AVAILABLE LANDMARKS section at all means every location is false**. The trial prompt's
+"when in doubt, mark it as real" is inverted to "when in doubt, leave it false", with the
+same empty-section clause.
+
+**Rationale:** The empty-list clause has to live in the STATIC template, because the injected
+section is exactly what disappears in that case — putting it in the builder would only repeat
+the rule in the case that already works. Prompt-side only: the classification logic in code is
+unchanged. The related flag-count issue (`storyJobPipeline.js:2628` counts the flag, not a
+successful resolution) is backlogged separately, not fixed here.
+
+**Touched:** `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/story-trial.txt`
+**Status:** ✅ active
+
+---
+
+## 2026-09-13 — Beats never inherited `CATEGORY_GUIDELINES`: swiss-stories got zero guidance, historical lost its accuracy and costumed rules
+
+**Context:** `storyJobPipeline.js:640` builds the unified writer prompt and the
+beats pipeline discards it. Of that prompt's 19 fill keys, 18 reach the beats
+chain by another route; `CATEGORY_GUIDELINES` — six per-category branches built
+in `buildUnifiedStoryPrompt` — is the only one with no route at all. Measuring
+the per-category `STORY_GUIDE_SECTION` that beats *does* receive showed what
+each branch lost:
+
+| category | STORY_GUIDE_SECTION on beats | lost with CATEGORY_GUIDELINES |
+|---|---|---|
+| life-challenge | 812 ch | 6 framing clauses — still open, see below |
+| educational | 501 ch | weave-naturally / accuracy / reinforcement / discovery |
+| historical | 3319 ch | the accuracy mandate and the `costumed:` clothing rule |
+| adventure | 1192 ch | setting-flavour framing |
+| swiss-stories | **0 ch** | everything — no city research, no story idea |
+
+`swiss-stories` was empty because `getTeachingGuide` had a `swiss-sagen` branch
+but never a `swiss-stories` one: Swiss local stories keep their guide in
+`docs/story-ideas/<city>.md` (parsed into `swissStories.js`), not in a
+`prompts/*-guides.txt` file, so the lookup had nothing to hit. A Swiss local
+story reached the arc author with no landmarks, no traditions, and not even the
+story idea the user picked.
+
+**Decision:** Repair the two branches that lost *content*, each at the beats
+stage that actually consumes it — not by re-porting the whole unified block.
+
+1. `getTeachingGuide('swiss-stories', '<city>-<n>')` now returns a guide built
+   by `buildSwissStoryGuide` from the real source: `getSwissStoryResearch` plus
+   `getSwissCityById`, with the same localized-field handling (`{en,de,fr}` or
+   plain string) the unified branch uses. No research for that city → `null`,
+   never a fabricated stand-in. This flows into `STORY_GUIDE_SECTION`, so it
+   reaches `arc-create.txt` and `story-arc-review.txt` with no new placeholder.
+   Measured: 0 → 4175 chars for `aarau-1`.
+2. The **accuracy mandate** is attached to the topic-guide header in
+   `buildStoryContextFields`, for `historical` and `swiss-stories`: one plain
+   line saying the facts in the guide are binding, placed ahead of the guide
+   body. It belongs where facts are authored and checked — the arc author and
+   the arc reviewer — which is exactly where `STORY_GUIDE_SECTION` already
+   goes. Measured: historical 3319 → 3447 chars.
+3. The **`costumed:`-not-`standard` rule** goes to `story-bible-from-beats.txt`
+   via a new `{ERA_CLOTHING_RULE}` placeholder, filled in
+   `buildStoryBibleFromBeatsPrompt`. That is the one beats stage that decides
+   the clothing variant; putting an outfit rule in the arc chain would only
+   have it restated by a stage that cannot act on it. Empty string for every
+   other category, so their contract is byte-identical to before.
+
+Deliberately NOT re-ported: the PRE-POPULATED LOCATIONS and OBJECTS blocks.
+Those are already handled code-side on beats — `injectHistoricalLocations`
+(`visualBible.js:2321`, called from `storyJobPipeline.js:2009` and `:3011`)
+repairs the dbKey/description linkage, and `beatsPipeline.js:1009` feeds the
+plan counters `getHistoricalLocations` / `getHistoricalObjects`. The reference
+photos and location data were never lost; only the two rules were.
+
+**Rationale:** The alternative was to spread the unified `CATEGORY_GUIDELINES`
+string into the beats templates wholesale. That fails twice: `story-beats.txt`
+declares no `{STORY_GUIDE_SECTION}` at all, so spreading a value into it is a
+silent no-op; and half the block (the locations/objects rules) would duplicate
+machinery that already runs, giving the model two sources for one contract.
+Routing each rule to the stage that can act on it keeps one source per contract.
+
+**Still open (not fixed here):**
+- **life-challenge** — the 6 framing clauses `buildLifeSkillGuidelines` adds on
+  top of the guide body still do not reach beats. This is an owner decision
+  about the framing, not a plumbing defect, and is deliberately left alone.
+- **educational** — its four clauses (weave naturally, age-appropriate
+  accuracy, repetition/reinforcement, discovery moments) still do not reach
+  beats. The guide body does.
+- **adventure** — its setting-flavour framing still does not reach beats.
+- `story-text-from-beats.txt` (prose writing) and `buildClothingReviewPrompt`
+  (wardrobe *review*) declare no guide placeholder, so neither rule reaches
+  them. The text stage writes from the arc and beats, which are authored under
+  the mandate; the clothing reviewer checks a contract written under the rule.
+  Adding placeholders there is a separate call.
+
+**Touched:** `server/lib/promptBuilders.js` (`getTeachingGuide`,
+`buildSwissStoryGuide`, `buildStoryContextFields`,
+`buildStoryBibleFromBeatsPrompt`), `prompts/story-bible-from-beats.txt`,
+`tests/unit/beats-category-guidance.test.ts`
+**Status:** ✅ active
+
+## The trial topic grid ranks by how LIVE a topic is, not by how narrow its window is (supersedes the 896895deb ranking)
+
+**Context:** The per-age grid shipped in `896895deb` ranked narrowest-window-first.
+The owner rejected three things about the result. (1) `potty-training [2,4]`
+ranked FIRST for a four-year-old — most children are trained well before four.
+(2) `first-kindergarten` and `first-school` both appeared at ages 5 and 6, but in
+Switzerland they are two years apart. (3) `visiting-doctor` and `going-vacation`
+filled ages 0-1 while `eating-vegetables` surfaced only at 8 — "feeding is a daily
+battle, a doctor visit is occasional; parental demand does not track window width
+at all."
+
+**Decision:** Three changes plus a catalogue addition.
+
+*Windows mark the live issue, not the plausible one.* Every bound was re-read as
+"is this still what the parent is dealing with", not "is this still conceivable".
+Eleven narrowed (`potty-training` [2,4]->[2,3] first among them), seven widened —
+`screen-time` [5,12]->[3,12] being the largest miss, since the tablet fight starts
+at three and a top-tier daily battle was invisible for two years of it.
+
+*School entry follows the Swiss calendar.* HarmoS sets an inter-cantonal Stichtag
+of 31 July and a minimum entry age of the completed fourth year; Kindergarten runs
+two mandatory years and children pass to the Primarschule after them. A Kindergarten
+entrant is therefore 4;0-5;1 on the first day and a first-Klaessler 6;0-7;1 — which
+is why each carries a TWO-year window rather than one: the Stichtag spread is
+exactly the year between an August-born and a July-born child. `first-kindergarten`
+[4,5], `first-school` [6,7], zero overlap at any age, pinned by a test.
+Sources: https://www.zh.ch/de/bildung/schulen/volksschule/kindergarten.html
+("Alle Kinder, die am 31. Juli vier Jahre alt sind, besuchen ab Schuljahresbeginn
+den Kindergarten" / "dauert zwei Jahre und ist obligatorisch" / "Nach zwei Jahren
+Kindergarten wechseln die Kinder in die Primarschule") and
+https://www.edk.ch/dyn/19795.php. `reading-alone`, `homework`, `money-saving` and
+`test-stress` are re-derived off the same calendar.
+
+*Ranking is `liveness` first, window fit second.* `liveness` (1-5) is how live a
+topic is for a family right now, IN EITHER DIRECTION — a current struggle, or a
+current milestone worth marking. It is not popularity and not how common the event
+is. `pole` ('friction' | 'milestone' | 'both') says which way it pulls; 'both' is a
+wildcard, because a new sibling is exciting AND produces jealousy and a first
+kindergarten day is proud AND frightening. The six tiles are then COMPOSED, not
+taken off the top: one seat reserved for a pure milestone, at most four friction
+tiles, at most one topic per `family` (so `eating-vegetables` never sits beside
+`picky-eating`).
+
+*Five infant topics, because ages 0-1 had none.* `AGE_BANDS` has always routed ages
+0 and 1 to the routine book; the catalogue had nothing to point it at, which is why
+the age-0 grid could not be filled at all. `first-foods`, `bath-time`,
+`first-steps`, `first-words` and `going-outside` are ordinary topics on the
+ordinary toddler shelf — the window does the age work, `ageGroup` stays a shelf
+label. Their guide sections are written in the age-band prompts' register (what the
+pages contain) with NO "Key messages:" line, because the routine band forbids a
+lesson and a coda. Teething and nappy-changes were considered and rejected: teething
+is a state with nothing happening and no resolution within a page, and nobody
+commissions a keepsake about nappies. `saying-goodbye` stays [1,5] rather than
+being narrowed, which is the alternative to a separate infant-separation topic.
+
+**Rationale:** Window width measures how age-SPECIFIC a topic is, which has nothing
+to do with whether a parent is living it — and it systematically buried fieldless
+life events, which are maximally wide by definition. That is a geometry artefact
+masquerading as a preference signal.
+
+**The weights are authored judgement, not measurement, and are documented as such
+in the type.** The repo was searched for real signal before falling back on
+judgement, and here is everything that exists: the only measured per-topic demand
+data is a 2026-08-26 CH Google Keyword Planner probe of four German problem queries
+(`project_ads_funnel_strategy.md`) — Trotzphase 210/mo head and 3,610 cluster,
+Schnuller abgewoehnen 110/1,720, Eingewoehnung Kindergarten 70/1,350,
+geschwisterstreit 40 head only. That probe RAISED `no-pacifier` to 5 and confirmed
+`managing-emotions` and `first-kindergarten`. `sibling-fighting` was kept at 5 on
+judgement despite measuring smallest, because 40 is a head figure and the other
+three are clusters — not comparable. Everything else was checked and rejected as
+signal: `popularLifeChallengeIds` is documented in-code as "the 16 that parents
+actually order" with NO data behind it; production holds 129 stories of which 14
+life-challenge stories come from external accounts across 10 topics (45 of 59
+topics have zero ever) — n too small to distinguish preference from noise; every
+`/themes/*` SEO URL is a hardcoded `priority: 0.6`; there is no Plausible or Umami;
+GA4 has no repo-side API client; the Search Console token is expired. The trial
+fires `topic_selected` but stores `meta = NULL`, so the funnel's highest-intent
+topic signal is discarded — closing that is tracked separately and would replace
+this judgement with measurement.
+
+**Touched:** `client/src/constants/storyTypes.ts` (windows, `liveness`/`pole`/
+`family`, `trialRankScore`, `composeTrialGrid`, pool 29->42, five new topics),
+`client/src/types/story.ts` (`LifeChallenge` fields), `server/lib/promptBuilders.js`
+(`TOPIC_AGE_WINDOWS` regenerated, 56 of 64), `prompts/life-challenge-guides.txt`
+(five sections), `tests/unit/trial-age-appropriate-topics.test.ts`,
+`tests/unit/age-band.test.ts`.
+
+**Status:** ✅ active — supersedes the ranking half of the 2026-09-13
+`896895deb` entry above. The window field, the eight fieldless life events, the
+cap of six and the uncapped wizard all stand unchanged from it.
+
+### The creature-tone band comes from the YOUNGEST main character (2026-09-13)
+**Context:** Prod `job_1789227389389_z18dmvnt6` p10 drew a crayfish gripping a
+wet, dead-looking mouse in a picture book whose younger lead is five. That is
+not a render defect — it is the brief working as written. `creatureToneLevel`
+read `pickMainCharacters(inputData).focus?.age`, and `focus` is `mains[0]` after
+a DESCENDING age sort, i.e. the OLDEST main. The story's mains were Liz 5 and
+Ayan 8, so focus was Ayan and every scene brief in the book carried the
+`formidable` band: "claws and teeth visible rather than hidden, real physical
+weight and presence … It may loom, and its size may be stated against a child."
+Liz alone would have produced `not-menacing` ("a neutral or gentle mouth that
+shows no teeth … claws are not raised or displayed").
+
+**Decision:** The band is picked from `youngestMainAge(inputData)`. Bands are
+unchanged (0-4 `cute`, 5-6 `not-menacing`, 7+ `formidable`), and so is the rule
+that a cast with no readable age emits no tone section at all — the fallback
+passed is `NaN`, not `youngestMainAge`'s own default of 5.
+
+**Rationale:** For a mixed-age cast the gentler band is the safe direction: an
+eight-year-old is not harmed by a non-menacing crayfish, a five-year-old is
+harmed by a formidable one. The picker was not deliberately choosing the oldest
+child — `focus` exists to decide whose name goes in the title and who the story
+follows, and reusing it for a safety band silently inherited a descending sort.
+`youngestMainAge` already existed for exactly this shape and is what the reading
+level clamps to; only the creature tone was not using it. Non-main characters do
+not lower the band — a toddler in the cast who is not who the book is for leaves
+an eight-year-old's book `formidable`, pinned by a test.
+
+**Touched:** `server/lib/promptBuilders.js` (`creatureToneLevel`),
+`tests/unit/creature-tone-youngest-main.test.ts` (7 tests)
+**Status:** ✅ active
+
+---
+
+## 2026-09-13 — The Test Lab's `outline_review` stage is retired: it measured a configuration that cannot ship
+
+**Context:** `runOutlineReviewStage` forced `splitOutlineReview: true` on the
+reconstructed creation input and benchmarked reviewer models against a
+`buildUnifiedStoryPrompt` writer draft via `buildOutlineReviewPrompt`. In
+production that pair of calls sits behind
+`if (!beatsMode && !inputData.trialMode && splitOutlineReviewEnabled)` in
+`storyJobPipeline.js`, and `server/config/runtime.js` sets
+`pipelineMode: 'beats'` in every environment. Beats is the pipeline everywhere
+(trials excepted, and trials are excluded by the same gate) — so no story has
+gone through that branch since beats became the default.
+
+**Decision:** Retire the Lab stage. Removed from `STAGE_RUNNERS` and from the
+client mirror `TESTLAB_STAGES`; the runner function, the stage's form controls
+(reviewer-model multi-select, writer-draft picker, aspect selector, repeated-
+rounds builder), its `start()` params branch and its cost estimate are deleted,
+along with the Stories-tab one-tap "Review" button and the `preset` plumbing
+that existed only to prefill this stage. The legacy production branch and
+`buildUnifiedStoryPrompt` / `buildOutlineReviewPrompt` themselves are NOT
+touched — only the Lab stage retires.
+
+**Rationale:** A Lab stage is a measuring instrument for something that can
+ship. This one measured a pipeline configuration production cannot reach, so
+every verdict it produced was about a dead path — worse than no measurement,
+because the numbers look authoritative. Its beats analogues already exist as
+their own stages (arc review, `text_refine`, scene review). Labelling it
+"legacy" was rejected (the Lab would still spend money on it); repointing it at
+the beats chain was rejected (those stages exist).
+
+Stored experiments keep working: 7 `outline_review` rows exist on staging, and
+the Lab's list and detail views render from the stored `stage` string and
+`result.stageKind`, never from the registry. The one degradation is deliberate:
+"Re-use params" on such a row can no longer restore its widgets (there are
+none), so `writerModel` / `aspect` / `mode` / `rounds` / `models` were dropped
+from `WIDGET_PARAM_KEYS` and now surface in the Params JSON box instead of
+being silently discarded. Starting the stage fails at
+`STAGE_RUNNERS[stage]` with "Unknown stage", which is correct.
+
+**Touched:** `server/lib/testlab.js` (runner + registry entry),
+`client/src/services/testlabService.ts` (`TESTLAB_STAGES`),
+`client/src/pages/TestLab.tsx` (form block, params branch, preset plumbing,
+Stories-tab Review button), `server/routes/admin/testlab.js` (comment),
+`tests/unit/testlab-outline-review-retired.test.ts` (4 tests)
+**Status:** ✅ active
+
+### A Visual Bible entry shaped like a person states its hair (2026-09-14)
+**Context:** Prod `job_1789227389389_z18dmvnt6` drew all four fairies bald and
+doll-like on every page they appear. The render is faithful; the spec was
+incomplete. `ART004 Yellow Fairy` reads: "A tiny winged girl standing about 4 cm
+tall, bright sunshine-yellow glowing skin, large anime eyes with white highlight
+dots, rounded petal wings slightly larger than her torso, emitting a warm yellow
+radiance…, dressed in a tiny petal gown of golden yellow; her glow visibly dims
+and contracts in cold dark water." Skin, eyes, wings, gown, glow, size and a
+state change — and nothing above the eyes. All four entries are authored the
+same way, and what reached the image model on p7 ("golden yellow petal wings,
+and a tiny golden gown") carries no hair either.
+
+Nothing downstream could catch it. The fairies are `artifacts`, so they get none
+of the character machinery — no avatar, no reference-sheet identity pass, no
+entity-consistency check. The creature-tone band does not reach them either (it
+is scoped to animals and creatures). `image-semantic.txt` grades the image
+against the brief, and the brief never asked for hair, so there was nothing to
+fail. The omission is also self-reinforcing: the entry has a
+`referenceImageUrl`, so a reference image was rendered FROM the hairless
+description and then anchored every page — which is why all four are
+consistently bald rather than varying.
+
+**Decision:** One authoring rule in `prompts/scene-expansion-all.txt`, in the
+entry-authoring block beside the existing secondary-character sex/age rule: an
+entry shaped like a person — an invented figure, a small winged being, a doll, a
+figurine, a statue, a puppet — states its hair in `description` (colour, length,
+how it is worn) or states plainly that it has none.
+
+**Rationale:** Prompt-side per the standing "classification belongs to the
+PROMPT" rule. The alternative was a `auditVisualBibleContract` code, which would
+require code to decide "is this entry humanoid?" by reading its prose — the
+pattern `docs/SETTLED.md` forbids, and the reason the mirror-guard regex was
+built and removed the same day. No test accompanies this: the change is a rule
+clarification, and the project rule is to pin behaviour, never prompt wording.
+
+Considered and deferred (owner, 2026-09-14): promoting recurring named humanoids
+to `secondaryCharacters`, which would give them identity treatment properly —
+the fairies appear on 8 of 15 pages and are named, so they are arguably cast
+rather than props. Much larger change; revisit if the authoring rule proves
+insufficient.
+
+**Touched:** `prompts/scene-expansion-all.txt`
+**Status:** ✅ active
+
+### A value spread into a template that never declares its placeholder is silently dropped (2026-09-14)
+
+**Context:** `fillTemplate` substitutes the placeholders a template declares
+and ignores every other key it is handed. Nothing warns. So a builder can
+compute an expensive block, spread it into a `fillTemplate` call, and have it
+discarded — the prompt builds, the stage runs, and the only symptom is output
+written without context nobody can see was missing. Three instances surfaced
+inside a week; the `swiss-stories` / `historical` `CATEGORY_GUIDELINES` loss
+(2026-09-13, above) was the same shape one layer up.
+
+Two more were confirmed by building the real prompts offline:
+
+- `prompts/arc-retell.txt` — the stage that RE-TELLS the whole story — received
+  `STORY_GUIDE_SECTION` (the topic guide: the facts and context for the
+  commissioned life skill) from `buildStoryContextFields`, which every arc
+  builder spreads, but declared no placeholder. Only `arc-create.txt` and
+  `story-arc-review.txt` did. The re-telling rewrote the arc with the guide out
+  of view, 610 characters of commissioned material dropped on the floor.
+- The legacy unified writer's templates carried `{CATEGORY_GUIDELINES}` and no
+  `{AGE_MODE}` — and `buildUnifiedStoryPrompt` passed no such key either, so
+  the age band AND the topic-age-window nudge reached that writer never. The
+  coping/empowering demand arrived with zero band restraint. Production runs
+  beats, so this was cosmetic on the day, but the path is still reachable
+  (`storyPromptVariant` / `STORY_PROMPT_VARIANT=textFirst`).
+
+**Decision:** Declare both placeholders, positioned rather than appended.
+`{STORY_GUIDE_SECTION}` goes into `arc-retell.txt` after `{CHARACTER_DETAILS}`
+and before `{STORY_SHAPE}`, the same slot `arc-create.txt` gives it: the guide
+is facts that constrain the telling, so it sits with the other facts, ahead of
+the shape, the budgets and the task. `{AGE_MODE}` goes into BOTH unified
+variants (`story-unified.txt` and the default `story-unified-imagefirst.txt`)
+directly AFTER `{CATEGORY_GUIDELINES}`, matching `story-trial.txt`, and
+`buildUnifiedStoryPrompt` now passes the key.
+
+**Rationale:** Order decides who wins. The age-band text states that its rules
+"override any instruction elsewhere", so it has to be the last word on how hard
+the category guidelines above it may push — the same reason the trial prompt
+puts it there. The guide is the opposite kind of block: context the stage reads
+before it works, so it belongs where `arc-create.txt` already proved it reads
+well, not appended at the end where the task instructions already live.
+
+Sweeping `prompts/arc-*.txt` and `prompts/story-*.txt` against what their
+builders actually spread turned up the rest of the class, left unfixed pending
+the owner's call on whether each stage wants the value:
+
+- `story-text-from-beats.txt` — drops `STORY_BRIEF` and `STORY_GUIDE_SECTION`.
+  This is the stage that writes the shipped page text in the production beats
+  pipeline; it sees neither the commission nor the topic guide.
+- `story-bible-from-beats.txt` — drops `STORY_GUIDE_SECTION`.
+- `arc-retell.txt` — also drops `LANGUAGE` and `CHARACTER_NAMES`, both of which
+  `arc-create.txt` declares.
+- `arc-create.txt`, `story-arc-review.txt`, `story-bible-from-beats.txt`,
+  `arc-retell.txt` — drop `MAX_CHARACTERS_PER_SCENE`, `LANGUAGE_INSTRUCTION`
+  and `LANGUAGE_NOTE`; `story-trial.txt` drops `LANGUAGE_NOTE`. These are
+  context-field noise spread everywhere by `buildStoryContextFields` and are
+  plausibly unwanted at an arc stage — listed for completeness, not as faults.
+
+`shrinkPromptForModel` is not a factor: its only call sites are image prompts
+(`grok.js:252`, `images.js:1072`, `images.js:1264`, `sceneComposite.js:3416`),
+re-verified on the day. Nothing truncates a story-text prompt.
+
+**Touched:**
+- `prompts/arc-retell.txt` (declares `{STORY_GUIDE_SECTION}`)
+- `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt` (declare `{AGE_MODE}`)
+- `server/lib/promptBuilders.js` (`buildUnifiedStoryPrompt` passes `AGE_MODE`)
+- `tests/unit/spread-values-reach-their-template.test.ts` (pins both, and that
+  neither prompt ships an unfilled `{PLACEHOLDER}`)
+
+**Status:** ✅ active
+
+---
+
+## The coping-strategy clause is restored to the ARC rules, scoped off the simple bands (2026-09-14)
+
+**Context:** The beats pipeline stopped inheriting the unified writer's
+`{CATEGORY_GUIDELINES}` block. Six clauses of the life-skill branch went with
+it; five are carried elsewhere in the beats chain. One is carried nowhere:
+*"Include practical tips or coping strategies woven into the narrative."* That
+clause is the therapeutic payload of the product — the arc critique asks
+whether the skill drives the climax, never whether a child learns anything
+usable. Two constraints sat against restoring it: `RULES OF THE TELLING`
+already forbids bookkeeping and a stated moral, and `SIMPLE_BANDS` (routine
+0-1, quest 2, tries 3) forbid a lesson outright — `buildLifeSkillGuidelines`
+says "no tips, no strategies, no moral" at those ages.
+
+**Decision:** One conditional line in `buildTellingRulesSection`, which fills
+`{TELLING_RULES}` in **both** arc templates (`arc-create.txt` and
+`arc-retell.txt` — both declare the placeholder, verified on the built prompt).
+It fires only when `storyCategory === 'life-challenge'` **and** the resolved
+band is not a simple band. Wording is shown-not-told: the thing the character
+does happens on the page, "never explained, recommended or named as a lesson".
+
+**Rationale:** The arc is where the story's *content* is decided; a rule about
+what the book must contain belongs with the author, not with the reviewer that
+grades it (`story-arc-review.txt` would only mark the absence of something no
+stage ever asked for). Scoping the clause OFF the simple bands beats wording it
+to be overridden: this whole section exists because four telling rules once
+demanded exactly what those bands forbid (escalation, a low point, an unyielding
+blocker, a rival thread), and a contradiction the model must resolve is a
+contradiction that sometimes resolves the wrong way. Gated on category so a
+coping strategy is never pushed into an adventure or historical story.
+
+**Touched:**
+- `server/lib/promptBuilders.js` (`buildTellingRulesSection` — `lifeSkillStrategy`)
+- `tests/unit/coping-strategy-and-page-openings.test.ts`
+
+**Status:** ✅ active
+
+---
+
+## The page-opening variety rule now ships in both unified variants (2026-09-14)
+
+**Context:** `prompts/story-text-from-beats.txt:50` tells the writer to vary how
+each page opens. Measured on the corpus: pre-beats unified opens 41% of pages
+with a character name, beats 31% — the presence of this one line is the
+difference. It was ported to `story-trial.txt` in `5dee460e0`; the unified
+templates were deliberately left out pending the owner's call, now given.
+
+**Decision:** The same sentence is added to the `TEXT LENGTH RULES` bullet list
+of **both** `story-unified.txt` and `story-unified-imagefirst.txt`. Both,
+because `storyPromptVariant` defaults to `imageFirst` — patching only
+`story-unified.txt` would have left the default production path unchanged.
+There is no third unified variant (`server/services/prompts.js` registers two).
+
+**Touched:**
+- `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`
+- `tests/unit/coping-strategy-and-page-openings.test.ts`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-14 — Spread-but-never-declared in the beats chain: one defect, three deliberate scopings
+
+**Context.** An instrumented `fillTemplate` sweep found four values that a
+builder computes and spreads, but whose template declares no placeholder — so
+they are dropped with no error, no warning and no log. Measured on one
+commission (historical / moon-landing / `de`, all four values non-empty):
+
+| stage | dropped value | verdict |
+|---|---|---|
+| `arc-retell.txt` | `LANGUAGE` | **defect** |
+| `arc-retell.txt` | `CHARACTER_NAMES` | by design |
+| `story-text-from-beats.txt` | `STORY_BRIEF` | by design |
+| `story-text-from-beats.txt` | `STORY_GUIDE_SECTION` | by design |
+| `story-bible-from-beats.txt` | `STORY_GUIDE_SECTION` | by design |
+
+**Decision.** Fix `LANGUAGE` on `arc-retell` only. The other four stay absent,
+and are now pinned absent.
+
+1. **`arc-retell` / `LANGUAGE` — defect.** `arc-create.txt:1` reads "Work in
+   ENGLISH. The finished book will be written in `{LANGUAGE}` — keep names,
+   places and cultural details as they will appear there." `arc-retell.txt:1`
+   read only "Work in ENGLISH." The re-telling is not a lesser stage: it
+   re-tells the arc **whole** every round ("Never edit or patch the old arc"),
+   so the FINAL arc that reaches the beats and the text writer is a *retell*
+   output, not the create output — and `TELLING_RULES` sends it off to invent
+   fresh vessel and place names. It was inventing them with no idea the book is
+   German. Fixed by appending arc-create's own sentence verbatim, in the same
+   position (line 1, after "Work in ENGLISH").
+
+2. **`arc-retell` / `CHARACTER_NAMES` — by design.** It is a bare roster line
+   ("Mira, Tobias"). `arc-retell` already carries `{CHARACTER_DETAILS}`, headed
+   *"source of truth"*, which names every character with age, gender and traits,
+   and `{STORY_BRIEF}` names the cast again. A third copy of the same names adds
+   nothing the invented-figure counting rule cannot already do.
+
+3. **`story-text-from-beats` / `STORY_BRIEF` — by design, already documented in
+   code.** `buildStoryTextFromBeatsPrompt` carries an explicit "NO COMMISSION
+   HERE" comment: by that stage the arc IS the story and has already ruled on
+   the idea's mechanics — which obstacles survive, which are dropped as unsuited
+   to the cast's age. Re-showing the raw idea re-opens those rulings, and it
+   took them: `job_1789147573901_m3uam0nxi`'s arc collapsed a three-way group
+   split and dropped a coded gate; the text stage, handed the idea a second
+   time, restored both. Subject, world and cast reach the writer through
+   `{STORY_ARC}`, `{PLAN_LINES}` and `{CHARACTER_DETAILS}` — verified present in
+   the built prompt, so this is scoping, not blindness.
+
+4. **`story-text-from-beats` / `STORY_GUIDE_SECTION` — by design**, already
+   stated in the 2026-09-13 entry: "The text stage writes from the arc and
+   beats, which are authored under the mandate." Independently: the guide is up
+   to 4000 chars of dates, figures and political context, carrying the header
+   *"Every fact … comes from this guide. Invent none."* The prose writer's own
+   contract is the opposite — "invent no character, creature, object, place or
+   turn of the plot the story does not carry". Handing it an encyclopedia is an
+   invitation to import facts the arc never settled.
+
+5. **`story-bible-from-beats` / `STORY_GUIDE_SECTION` — by design.** That stage
+   writes the WARDROBE contract and nothing else. The 2026-09-13 entry routed
+   the one wardrobe-relevant rule to it as `{ERA_CLOTHING_RULE}` precisely so
+   each rule lands at the stage that can act on it. The period it needs is
+   already in `{STORY_BRIEF}` (`Category: historical` / `Topic: moon-landing`,
+   verified in the built prompt); the rest of the guide is 3.4k chars of
+   non-wardrobe fact on a call whose whole output is a JSON clothing block.
+
+**Rationale.** Four drops, one defect. The instinct this entry exists to block
+is "declare all four placeholders and the sweep goes green" — three of these
+absences are load-bearing scoping decisions with job-ID evidence behind them,
+and re-adding them would undo two prior entries. A drop is only a defect when
+the value is not reaching that stage by another route.
+
+**Evidence.** Built offline, all four values non-empty (`STORY_BRIEF` 841 ch,
+`STORY_GUIDE_SECTION` 3447 ch, `LANGUAGE` 51 ch, `CHARACTER_NAMES` 12 ch).
+`arc-retell` before: `LANGUAGE` absent. After: present, 17353 ch, zero unfilled
+placeholders in all four built prompts. The new test fails on the un-fixed
+template (confirmed by reverting it), so the pin is not vacuous.
+
+**Touched files.** `prompts/arc-retell.txt`,
+`tests/unit/beats-dropped-fill-keys.test.ts` (new), `docs/decisions.md`.
+
+## 2026-09-14 — A re-plan round may not change the page count; repair summaries read the method a result carries; the label round is persisted
+**Context:**   Story A of the 09-14 validation run, `job_1789337998754_apslnsq1z`
+(18-page order, de-ch, watercolor, dragon), completed in 69 min with no crash
+and surfaced three deterministic defects in the stored data:
+1. **19 pages for an 18-page order.** The plan was 18/18; re-plan Round 1 came
+   back with 19 plan lines. The acceptance path guards duplicates
+   (`beats_replan_duplicate`) and omitted pages (`beats_replan_incomplete`) but
+   never compared the round's page count with the division that stands, so a
+   round that ADDS a page passes. Text, briefs and images followed: 19.
+2. **`finalChecksReport.repairRounds[].pages[].method` was `"unknown"` on every
+   entry.** The summary read `r.method`, but iterate / inpaint / char-fix results
+   carry the name in `source` (`iterate-round-1`, …); only the composite path
+   sets `method`. So 278e408ae ("every story records which repair method
+   worked") recorded nothing usable on its first real story.
+3. **`labelRound` reached no stored report.** `runVisualBibleLabelRound` writes
+   `meta.labelRound`, and neither persisted report carried it; the story had
+   valid, unique labels and a null `labelRound` everywhere.
+**Decision:**
+- `beats_replan_page_count`: a re-plan round whose page count differs from the
+  standing division is discarded and the previous division stands — same shape
+  and same fail-soft as the duplicate guard. The beats layer may still move,
+  split or merge instants; it may not change the size of the book.
+- `repairLogic.repairAttemptFromResult(r)` is the one mapping from a repair
+  result to a summary attempt: `method = r.method || r.source || null`. Unit
+  tested (repair-round-effectiveness).
+- The scene-review report carries `labelRound: meta.labelRound`.
+**Rationale:** All three are recording or guarding defects with a single
+correct behaviour; none needed an owner choice. Lab #1263 (quality_eval on p6,
+p14, p8 of the same story) was run BEFORE deciding on the two judge-side
+oddities and changed the diagnosis: the p6 "Levin wears Kiaan's outfit"
+CRITICAL was NOT a wrong contract — the judge received the correct
+per-character block and did not reproduce the finding — so it is judge noise,
+not code; and p14's −10 comes from the semantic judge's "rendered as a
+toddler instead of a school-age boy" findings, the cast-drawn-too-young class
+the owner has ruled out, now emitted judge-side. Both are recorded as open
+items, not changed here (classification belongs to the prompt).
+**Touched:** `server/lib/beatsPipeline.js` (re-plan guard; `labelRound` on the
+report), `server/lib/repairLogic.js` (`repairAttemptFromResult`),
+`server/lib/repairPipeline.js`, `tests/unit/repair-round-effectiveness.test.ts`
+**Status:**    ✅ active — the guard is situational (fires only when a re-plan
+changes the count); the two recording fixes show on the next story with a repair.
+
+## 2026-09-14 — The batch quality judge gets the whole cast as references again
+
+**Context:**   Since the character-storage normalisation (2158cc993, 2026-02-03)
+a character carries `photos[]` and `avatars.styledAvatars[<style>]`, never
+`photoUrl` or `avatars.styled`. Three sites still built the judge's whole-cast
+reference list from `c.photoUrl || c.avatars?.styled` (repairPipeline, and both
+re-evaluate endpoints in regeneration.js), so the list was empty for every
+story — and `(img.allCharacterPhotos || img.characterPhotos || [])` let the
+empty array win, because `[]` is truthy. The judge therefore saw ZERO reference
+images and, since the CLOTHING CONTRACT is built from the refs'
+`clothingDescription`, no contract. Staging story job_1789343124794_z2c779f7i:
+the N-16 "no clothing contract available" line on all 36 batch evals, every
+main-cast token logged unresolved, no `Character matches:` line on any page.
+
+**Decision:**  One builder, the same one generation uses:
+`buildWholeCastReferencePhotos(characters, artStyle, clothingRequirements)` =
+`getCharacterPhotoDetails(…, 'standard', …)` + `applyStyledAvatars`, called from
+all three sites. In `evaluateImageBatch` the reference list is composed by
+`composeEvalReferencePhotos(pagePhotos, wholeCastPhotos)`: the page's own photos
+first, the whole-cast entries appended only for names the page does not list,
+and an empty list never replaces a non-empty one. `evaluateImageBatch` also
+forwards `storyData` and `clothingRequirements` into the per-image `evalOptions`.
+
+**Rationale:** The page's photos hold the outfit the page was actually generated
+against (costumes, worn-item strips), so they outrank the story-level standard
+outfit in the contract — that is what the 2026-09-13 cover fix wanted the judge
+to score. The whole-cast entries exist for identity, so appending the missing
+names costs nothing and restores the cast the judge is meant to recognise.
+`storyData` is what `buildCastIndex` needs; without it the cast resolver has no
+main-cast index and every main-cast token resolves to nothing.
+
+**Touched:** `server/lib/clothingResolve.js` (new
+`buildWholeCastReferencePhotos`), `server/lib/storyHelpers.js` (facade
+re-export), `server/lib/repairPipeline.js` (whole-cast list + `storyData` at all
+five `evaluateImageBatch` call sites), `server/routes/regeneration.js` (both
+re-evaluate endpoints), `server/lib/images.js`
+(`composeEvalReferencePhotos`, `storyData`/`clothingRequirements` in
+`evalOptions`), `tests/unit/batch-eval-whole-cast-refs.test.ts`,
+`tests/unit/batch-eval-story-context.test.ts`
+**Status:**    ✅ active — visible on the next story run as a populated
+`Character matches:` list and no N-16 suppression line.
+
+### Three small faults from one staging run: the mask rider, the removal parser, the cast index (2026-09-14)
+**Context:** Staging story `job_1789348171785_9oxos7dwv` surfaced three
+independent faults in one live log. (1) `Cannot redefine property:
+_gdinoMasks` — the non-enumerable mask rider was defined without
+`configurable`, so the Gemini-extras merge could never attach SAM masks to the
+extra figures (p16, p18). (2) The scene reviewer declared its removals in the
+exact form `prompts/scene-review.txt` invites (`page 5 = Levin: …`) and the
+parser accepted a bare page number only, so every declared removal landed in
+`malformed` and came back as a false `beats_scene_review_removal_undeclared`
+ERROR. (3) After `f5a511730` the batch quality eval resolved the main cast, but
+three other call sites still built their index without `storyData` and logged
+every photo-backed character unresolved.
+
+**Decision:** Every `_gdinoMasks` writer declares `configurable: true` (it stays
+non-enumerable — JSONB persistence must never see the masks). `parseCastRemovals`
+accepts an optional `page`/`p`/`p.`/`seite` prefix before the number, in code
+only; the prompt's grammar line is unchanged. `resolveExpectedCastNames` and
+`reconcileDetectorCast` receive `storyData` at the Phase 5b-pre detection, in
+`buildCharRepairExpectedCast` and in `evaluateImageBatch`.
+
+**Rationale:** A rider that is written once and merged later must be
+redefinable; a `try/catch` that only logs made the failure look like an
+analyzer problem for weeks. The parser is the side that can be fixed without a
+prompt change and without asking a model to be more literal than its own
+grammar line — prompt wording is the owner's call. And `buildCastIndex` has no
+cast pool without `storyData`: a main character then resolves to nothing and
+two spellings of one person can never meet, which is the exact failure the ONE
+ROSTER rule exists to prevent.
+
+**Touched:** `server/lib/bboxDetection.js`, `server/lib/repairPipeline.js`,
+`server/lib/sceneReviewGuard.js`, `storyJobPipeline.js` (Phase 5b-pre),
+`server/lib/charRepairTarget.js`, `server/lib/images.js`,
+`tests/unit/gdino-mask-rider.test.ts`,
+`tests/unit/scene-review-removals.test.ts`, `tests/unit/one-roster.test.ts`
+**Status:**    ✅ active
+
+## 2026-09-14 — The scene review sees the Visual Bible and may correct a stated object's state page ranges
+**Context:** Staging `job_1789343124794_z2c779f7i`: the Art Director gave an
+artifact three states whose FIRST row was a change ("muddy and cracked")
+claiming pages 3-15, while the story finds the object clean on p3-p8, muddies
+it on p9 and cracks it on p10. `defaultObjectState` returns `states[0]` **by
+construction** (visualBible.js:111-124 — the authoring templates require the
+unaltered look first), so the bare citations on p3-p5 resolved to the mud
+state. The page-prompt path did catch the disagreement (`resolveObjectState`
+→ `contradicted`) and dropped the delta from the prose, but that runs AFTER
+the review and cannot swap the attached reference cell: p3-p5 rendered a dark,
+cracked, mud-crusted object six pages before the mud exists, and the cell
+identity gate had already answered NO twice ("dirt and rock, not a smooth
+eggshell") and shipped under the 2026-09-11 fail-open.
+Nothing reviewed the bible: `prompts/scene-review.txt` had no bible input at
+all, and `sceneBriefCheck` only verified that cited ids resolve.
+**Decision:** The bible reaches the scene review, which is the one stage with
+the plan lines in front of it, and the review may hand back corrected entries.
+- `sceneBriefCheck` emits `vb_state_contradicted` (reusing
+  `resolveObjectState(..., { silent: true })` — one resolver, two consumers)
+  and `vb_state_no_base`; both are REVIEWABLE, so they reach the prompt.
+- `scene-review.txt` gains a `{VISUAL_BIBLE}` block (entries with `states[]`
+  only), check `9f [vb_state_range]`, and an OPTIONAL `---VISUAL BIBLE---`
+  output section.
+- `beatsPipeline.applyReviewBibleCorrections` validates that section
+  strictly — known base ids only, `states[]` only, ids re-minted, pages inside
+  the book — then `syncVisualBibleSection` writes it back. Rejections are
+  logged, never thrown. Recorded on `sceneReviewReport.bibleCorrections`.
+- The Lab's `beats_scenes` passes the same bible, or it stops reproducing
+  production.
+**Rationale:** Owner's call, framed against a dedicated bible-review round:
+the review already runs, already holds the plan lines, and already rewrites
+briefs — the missing input was the bible itself. `applyBriefUsage` already
+rebuilds state-level pages from the final briefs and syncs them, so the
+correction survives downstream. Replayed on the stored story: the check fires
+on exactly p3, p4, p5.
+**Note:** `vb_state_no_base` fires on a first state that does not COVER the
+entry's earliest cited page. It does not fire on the motivating story (that
+state's range does include p3) — `vb_state_contradicted` is what catches it.
+Distinguishing "an opening state that is a change" mechanically would need an
+authored marker on the state; not built.
+**Touched:** `server/lib/sceneBriefCheck.js`, `prompts/scene-review.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`server/lib/testlab.js`, `tests/unit/vb-state-review.test.ts`
+**Status:** ✅ active — situational (fires only on a stated object whose ranges
+disagree with the pages).
+
+## 2026-09-14 — A reviewer's bible correction carries the entry's COMPLETE states[], and may not lose a look
+**Context:** Test Lab #1264 exercised the change above on the beats of
+`job_1789343124794_z2c779f7i`. It worked: the Art Director again left the
+pages before the first change unclaimed (states began at the page the mud
+arrives, so the five pages citing the bare id fell back to `states[0]` =
+mud-smeared), the new `vb_state_no_base` finding fired, and the reviewer
+returned a corrected entry inserting an "unaltered" first state over exactly
+those pages. That is the repair the stored story never got.
+It also broke something. The entry's fourth look, "broken" (pages [17], the
+page the egg opens), was absent from the returned list, and
+`applyReviewBibleCorrections` replaced `states[]` wholesale — so the climax
+look was deleted and page 17's `ART001.3` citation came to mean "cracked".
+The prompt had told the reviewer to "carry ONLY the entries you corrected"
+and never that a carried entry's `states[]` must be complete, so omitting the
+untouched states was a reasonable reading.
+**Decision:**
+- `prompts/scene-review.txt`: for an entry the reviewer carries, `states[]` is
+  its COMPLETE list of looks — every state repeated, untouched ones included —
+  and a state left out is deleted.
+- `applyReviewBibleCorrections` refuses the whole entry's correction (the
+  authored bible stands) when a page the current `states[]` covers is covered by
+  no incoming state, and when a dotted handle a brief already cites has no state
+  at that id after the correction. Both are reported through
+  `beats_scene_review_bible_rejected`, never thrown.
+- Names are deliberately not part of either rule. Renaming, merging and
+  re-ranging states is precisely what the reviewer is for — it is the only stage
+  holding the plan lines — so a look may change its name freely as long as its
+  pages stay covered, and a cited handle whose state changed name or delta is
+  the correction working.
+**Rationale:** The prompt makes the complete list the normal case; the
+validator makes the damaging case impossible rather than likely. Fail-safe in
+the direction the merge already chose — a rejected correction costs the repair,
+an accepted bad one costs a page its look. The first version of this validator
+matched on state NAMES, and Lab #1265 falsified it: the reviewer judged from the
+plan lines that the mud arrives later than the Art Director assumed and renamed
+"muddy" [9,10,11] to "unaltered" [3,4,7,8,9,10,11] — a legitimate merge losing
+no coverage, which the name rule rejected, leaving the repair net-zero.
+Regression fixtures are the exact Lab #1264 (reject) and Lab #1265 (accept)
+bibles and reviewer JSON.
+**Touched:** `prompts/scene-review.txt`, `server/lib/beatsPipeline.js`,
+`tests/unit/vb-state-review.test.ts`, `tasks/bugs.json`
+**Status:** ✅ active — the guard is situational; the prompt line applies to
+every review that corrects an entry.
+
+## 2026-09-14 — The Art Director could not author a stated object's opening look: the schema forbade it
+**Context:** Measured 3 times out of 3 (the stored bible of
+`job_1789343124794_z2c779f7i`, Lab #1264, Lab #1265): a stated object's
+`states[]` began with a CHANGE, the pages before that change were claimed by no
+state, and `defaultObjectState` (`visualBible.js:111-124`) handed those pages
+`states[0]` — so the object rendered muddy, cracked or broken on the page it is
+found. The scene review now repairs this, but the repair was papering over an
+authoring instruction that made the correct output impossible to write:
+1. **The schema defined every state as a change.** `"delta": "[the change to
+   the object itself ...]"`, and rule 139 said a delta "describes the object's
+   own ALTERED look". The unaltered look has no change, so the first row could
+   not be filled in. The model dropped it and listed only real changes — the
+   only coherent reading.
+2. **The appearance was pushed into `description`.** The schema said "never
+   material, colour or size, those stay in description", and rule 137 said
+   `description` "holds what is always true of it". The Art Director therefore
+   recorded the opening look in `description` and reasonably believed it was
+   recorded — but `description` is not a reference cell, so the PICTURE still
+   came from `states[0]`.
+3. **The citation rule blessed the gap.** "An object with no states, **or a
+   page before its first change**, keeps the bare `ART###`" told the model those
+   pages need no state — while the code maps a bare citation to `states[0]`.
+   Prompt and code meant opposite things by the same citation.
+4. Rule 237's own tail ("every page falls in exactly one state") contradicted 3.
+**Decision:** `prompts/scene-expansion-all.txt` now makes the first row
+writable and mandatory:
+- `description` holds how the object is BUILT — material, shape, size — the part
+  that survives every state; the first state is explicitly not implied by it.
+- A `delta` is a LOOK: on the first state how the object looks before anything
+  happens, on later states what changed.
+- Both stated-entry schemas spell the first row out literally
+  (`{"name": "unaltered", "delta": "[how it looks before any change …]"}`) and
+  say every page up to the first change belongs to it.
+- An object WITH states is always cited dotted, the pages before its first
+  change included. Only a stateless object keeps the bare id.
+**Rationale:** Three identical failures across three runs is compliance, not
+variance — the model was following the prompt. Fixing the reviewer alone would
+have left every story paying a correction for a fault the author was instructed
+to make. The code's invariant is unchanged; the prompt now describes it.
+**Touched:** `prompts/scene-expansion-all.txt` (rules 137, 139, the
+secondary-character and artifact state schemas, the citation rule)
+**Status:** ✅ active — verify on the next `beats_scenes` Lab run that a stated
+object's first state is the unaltered look and covers the pages before the
+first change.
+
+## 2026-09-14 — Naming whose something is does not put the owner in the frame
+**Context:** `job_1789348171785_9oxos7dwv` gave the unhatched egg the baby
+dragon's name on p7 ("it is called <name>"), and the prose then referred to the
+EGG by that name for ten pages. The Art Director cited the ANIMAL entry from
+p7 on — `objects[]` on p8, p10, p11, p13 and p16 carried both the egg and the
+creature (verified against the raw brief: the AD wrote both ids, no code
+injected either). `buildImagePrompt` then emits a REQUIRED OBJECTS line and
+attaches a reference cell for every cited id, so the image model was handed the
+egg AND the creature inside it as two things that must both be in frame — and
+drew a cat-sized dragon standing beside its own unhatched egg on p11, p13 and
+p16. The hatching reveal on p17 was spoiled three pages running; the judge
+flagged one of the three. `job_1789337998754_apslnsq1z` had the identical
+setup (egg named on p8, hatches p19) and kept the creature at `pages [19]`, so
+the prompt permitted both readings and the model picked one per story.
+**Decision:** One rule in `prompts/scene-expansion-all.txt`, beside "include
+every recurring visual element visible in the scene": an element named only to
+say whose it is — a character's bag, a creature's egg — puts THAT element in
+the scene, not its owner; the owner is cited only on a page where the owner is
+in the picture, and on the page the owner arrives or the creature comes out of
+its egg both are cited.
+**Rationale:** Owner's framing, and it is the general case — "we can have Tom's
+bag without having Tom in the same scene". Rejected as wrong or overbuilt:
+gating the emission on whether the prose writes the creature's face (a creature
+half out of its shell is in frame and must still be drawn); making an element
+and its container mutually exclusive (the hatching page needs both); and a
+visibility ladder in the prompt (too complicated for what is a reference rule,
+not a staging rule).
+**Touched:** `prompts/scene-expansion-all.txt` (the `objects[]` citation rules)
+**Status:** ✅ active — verify on a Lab `beats_scenes` run that a creature named
+before it appears is not cited until the page it is seen.
+
+## The text-refine join gets one budget for every reading level, plus a bounded grace for a round in flight (2026-09-14)
+**Context:** The pipeline joins the parallel text-refine stage against a
+deadline (`storyJobPipeline.js`, `joinTextRefinement`) and, on timeout, ships
+the last published snapshot or the ORIGINAL text. The budget was
+reading-level-split: 600s for `standard`/`advanced`, 300s for everything else,
+plus 10s per page beyond ten. Measured on the three 2026-09-14 validation
+stories, two of the three hit the wall. `job_1789343124794_z2c779f7i` — 18
+pages, young-reader level — got **380s**, no round finished
+(`text_refine_join_timeout`), the original text shipped, and with it the fault
+the audit checklist exists to catch: its page 10 text told page 11's instant
+and every page through 14 ran one ahead of its picture.
+**Decision:** One base for every reading level — 600s — keeping the per-page
+term and the `TEXT_REFINE_JOIN_TIMEOUT_MS` override. The same 18-page book now
+gets **680s**, not 380s. And when the deadline fires with a refine step
+actually in flight, the join waits a bounded extra 120s
+(`TEXT_REFINE_JOIN_GRACE_MS`) for it to land before taking what is published.
+Nothing in flight at the deadline → unchanged behaviour.
+**Rationale:** The decisive fact is that **nothing cancels the refine when the
+race is lost**. The chain runs to completion and bills in full regardless —
+`job_1789348171785_9oxos7dwv`'s ledger records `text_refine: claude-opus-5
+(21,012 in / 36,267 out) $1.0117` logged *after* its join had already given up.
+So the deadline never saved a franc; it only ever discarded work already paid
+for, and the only thing it buys is latency, on a stage that runs behind a
+~25-minute image phase. The reading-level split was measured on audit output
+TOKENS, which is a cost argument, not a latency one, and a short-level book
+runs the same two audits, the same repair and the same lector. The grace is
+bounded and conditional so a stalled provider still cannot hold a user's story.
+The in-flight signal is honest, not inferred: `refineStoryText` now publishes
+its snapshot with `inFlight: true` at the start of each model step
+(`beginStep()`) and clears it in the `publish()` after the step, so the join
+reads a live fact rather than guessing from round counts.
+Second, the two existing events under-reported the loss. `text_refine_join_timeout`
+said "original text kept" at WARN — a sentence that names a benign fallback and
+nothing that was lost, for an event that means the entire text-quality gate was
+discarded: twelve checks a page, two auditors, the text/picture MISMATCH check
+included. `avatar_guarantee_fallback` is an ERROR for losing one character's
+styled avatar. So: a total loss (nothing published) is now `genLog.error` /
+`log.error`, a partial loss stays at warn, and both messages name the
+consequence — the audit did not apply, those pages went unchecked, alignment
+among the faults — while keeping the numbers a later reader needs (the budget in
+seconds, rounds kept, pages rewritten). The event NAMES are unchanged: log
+searches and stored-story analyses match on them. One predicate,
+`isTotalTextAuditLoss(partial)`, decides the level at every site, including the
+expired grace, and it is what the tests assert — never the wording.
+**Touched:**
+- `storyJobPipeline.js` (`joinTextRefinement` — budget call, grace, the three
+  `text_refine_join_grace*` genLog events, the severity of
+  `text_refine_join_timeout` / `_grace_expired`)
+- `server/lib/textRefine.js` (`computeTextRefineJoinTimeoutMs`,
+  `selectJoinResult`, `shouldGraceJoin`, `isTotalTextAuditLoss`, `beginStep()` /
+  `inFlight` snapshot)
+- `tests/unit/text-refine-join.test.ts`
+**Status:** ✅ active — the next long story proves it: `text_refine_join_grace`
+in the generation log says the grace was entered, `…_grace_landed` /
+`…_grace_expired` says whether the round made it.
+
+## A reference-sheet element that ends up with no cell is re-rendered solo, and the identification reply is read tolerantly (2026-09-14)
+
+**Context:** In staging story `job_1789348171785_9oxos7dwv` the book's central
+prop — the egg the whole story is about — shipped with **no reference image at
+all**. Its bible entry carried no `referenceImageUrl`, its `cellGates` were
+empty, and not one page prompt carried the "The attached reference images
+include…" line for it. With nothing anchoring it, the image model re-invented
+it on every page: a dull mottled stone on p2, a smooth glossy red egg on p3,
+speckled on p5 and p7, darker on p16 — and on p7 it drew two of them.
+
+The chain: the sheet is requested as a single column for any element count
+except four, and image models routinely draw a square-ish grid instead —
+`vb_sheet_layout_mismatch` fired **five times across three stories** (9 cells
+drawn for 3 requested, 1 for 2, 4 for 2). A mismatch runs one
+`identifySheetCells` call to map the drawn cells onto the requested elements.
+That reply is parsed by `parseCellIdentification`, which threw
+`identification reply is not valid JSON: Unexpected non-whitespace character
+after JSON at position 94` — i.e. **valid JSON followed by prose**, the
+commonest reply shape there is. The old extraction took a greedy `{…}` span, so
+a brace anywhere in the trailing sentence swallowed it into the parse. The
+catch then did `return new Array(count).fill(null)`: **one unparseable reply
+cost every element in the batch its reference**, not just the unmappable one.
+There is a second, independent route to the same end —
+`rejectMultiPanelAssignments` drops a cell that itself splits into panels (it
+fired twice on the same story as `vb_sheet_cell_multi_element`), on the correct
+reasoning that no reference beats a wrong one. Either way the element is
+re-imagined page by page.
+
+**Decision:** Two changes, and the grid geometry is deliberately left alone.
+1. `parseCellIdentification` extracts the FIRST balanced JSON object instead of
+   a greedy span, so a fenced ```json block, leading prose and trailing prose
+   after valid JSON all parse the same. It reuses
+   `extractBalancedJsonObject` from `server/lib/outlineParser/shared.js` — the
+   repo's existing brace-balanced extractor, now exported — rather than adding
+   a third per-consumer JSON rule. If identification still fails,
+   `identifySheetCellsWithRetry` runs it once more before giving up
+   (`vb_sheet_identification_retry` / `…_retry_ok`); the call is flash-lite on
+   one image, trivially cheap against losing a whole batch's references.
+2. After identification and the multi-panel rejection, any element still
+   holding `null` gets ONE solo re-render through the existing one-element path
+   (`rerenderSolo` → `buildReferenceSheetPrompt` with `count === 1`, which drops
+   the gridline language) instead of shipping with nothing. Bounded by
+   `MAX_SOLO_REFERENCE_RERENDERS = 3` so a pathological sheet — identification
+   mapping nothing at all — cannot fire one paid image call per element.
+
+**Rationale:** The owner's call was to fix the RECOVERY, not the trigger: the
+requested `cols`/`rows` and the prompt's `GRID_SHAPE_PHRASE` are unchanged, so
+the layout mismatch that sends a batch down the identification path **still
+happens** exactly as often. What changes is what it costs. A tolerant parse
+handles the reply shape we measured; the retry handles the shapes we have not
+(a truncated reply, a transient error). And the solo re-render is the floor
+under both routes, including the multi-panel rejection, which stays as it is —
+dropping a three-object crop is right, shipping the element with nothing after
+it was not. Three is the cap because batches hold at most four cells and the
+measured losses were one or two elements, so it covers every real case while
+bounding the worst case at about one extra sheet's worth of spend. Everything
+is traceable in the next story's generation log: `vb_sheet_identification_retry`,
+`vb_sheet_solo_rerender` / `…_ok`, `vb_sheet_solo_rerender_capped`, and
+`vb_sheet_no_reference` at error level for an element that still ends with
+nothing — a real loss, logged as one.
+
+**Touched:**
+- `server/lib/sheetGrid.js` (`parseCellIdentification` — balanced extraction)
+- `server/lib/outlineParser/shared.js` (exports `extractBalancedJsonObject`)
+- `server/lib/referenceSheets.js` (`identifySheetCellsWithRetry`,
+  `fillMissingReferencesSolo`, `MAX_SOLO_REFERENCE_RERENDERS`, the call site in
+  `generateReferenceSheet`)
+- `tests/unit/reference-sheet-mismatch.test.ts`,
+  `tests/unit/sheet-grid-detection.test.ts`
+
+**Status:** ✅ active on staging — the next story with a
+`vb_sheet_layout_mismatch` proves it: no element in that batch should reach the
+pages without a `referenceImageUrl`.
+
+---
+
+## 2026-09-14 — A reference sheet is asked for in a shape models actually draw
+
+**Context:** Every reference-sheet batch except a 4-element one was requested as
+a SINGLE COLUMN (`cols = count === 4 ? 2 : 1`, in two places: the prompt's
+`GRID_SHAPE_PHRASE` and the sharp crop geometry). Image models routinely ignored
+it: five `vb_sheet_layout_mismatch` events across three stories on 2026-09-14 —
+9 cells drawn for 3 requested, 1 for 2, 4 for 2. Each mismatch costs an
+identification call to map drawn cells onto elements, and before `5c0dba8b0` a
+single unparseable reply cost the whole batch its reference pictures. The file's
+own comment already named the bad shape: a 4-state object pushed to 5 cells
+"lay[s] out as a 1x5 column of narrow, low-detail references instead of a 2x2".
+
+**Decision:** One helper, `referenceSheetLayout(count)`, is the single source of
+the requested shape, the crop geometry and the cell→element map. Requested
+shapes:
+
+| cells | shape |
+|---|---|
+| 1 | one cell, no gridlines (unchanged) |
+| 2 | 2 cols × 1 row |
+| 3 | 2×2 — element 0 drawn TWICE: top-left and bottom-right |
+| 4 | 2×2 (unchanged) |
+| 5–6 | 3 cols × 2 rows |
+| >6 | should not occur; 3 columns and a loud `log.error` |
+
+A partial row is never left blank (owner, 2026-09-14): a blank cell invites the
+model to fill it with an invented object or a stray duplicate that then has to
+be told apart from the real one. The spare cell repeats element 0 instead, named
+explicitly in the LAYOUT line ("the same element as Top-left, drawn a second
+time"). For a state batch element 0 is `states[0]`, the unaltered look by
+construction (`defaultObjectState`) — the most load-bearing cell on the sheet,
+which therefore gets two shots: `referencesFromCells` takes the first usable
+crop, so a duplicate cell is the fallback when the top-left crop is missing. The
+cell→element map for count 3 is `[0, 1, 2, 0]` and the batch still returns
+exactly three references — a repeat never adds an entry, which `isStateBatch`
+(`references.every(Boolean)`) depends on.
+
+An object authoring more than four states is WARNED, never clamped
+(`vb_sheet_state_overflow`, warn level, naming the object and its state count).
+The AD prompt asks for at most four states and nothing in code enforces it; with
+5–6 now laid out as a 3×2 the overflow is handled rather than catastrophic, but
+silently dropping an authored state would lose data the story then cites on a
+page.
+
+**Rationale:** `5c0dba8b0` fixed the RECOVERY and deliberately left the trigger
+alone. This is the trigger: a shape a model will draw produces no mismatch, no
+identification call, and no chance of a misaligned crop. The identification
+path, its one retry and the bounded solo re-render all stay exactly as they are
+— they remain the net for a model that ignores the new shapes too, and
+`rejectMultiPanelAssignments` is untouched. The two grid-computing sites were
+merged into the one helper because a requested shape that disagrees with the
+crop geometry mis-crops every cell in silence; the analyzer's
+`/split-reference-sheet` now also receives explicit `cols`/`rows` hints (its
+stale default was updated to mirror the table as a backstop).
+
+**Touched:**
+- `server/lib/referenceSheets.js` (`referenceSheetLayout`, `referencesFromCells`,
+  `cellPositionName`, `splitGridIntoReferences`, `buildReferenceSheetPrompt`,
+  `expandElementStateCells`)
+- `photo_analyzer.py` (`/split-reference-sheet` default layout)
+- `tests/unit/reference-sheet-mismatch.test.ts`,
+  `tests/unit/vb-element-cell-prompt.test.ts`
+
+**Status:** ✅ active on staging. **Watch the mismatch rate on the next
+stories** — this changes the requested geometry for every story, so
+`vb_sheet_layout_mismatch` should become rare; if it does not, the new shapes
+are wrong rather than the recovery.
+
+**Measured, 2026-09-14 (Test Lab 1268 / 1269, `grok-imagine-image`, two passes
+each).** The count-3 2×2 with map `[0, 1, 2, 0]` came out **exact 2/2**:
+`2x2 = 4 cell(s)` detected from the pixels on both passes, all three elements
+identified, no mismatch and no identification call. The count-2 **2×1 row was
+0/2** — both passes drew a `1x3` sheet, and the recovery path then lost
+references: pass 1 mapped one element to NONE, pass 2 mapped **both** to NONE
+with two cells "showing no requested element". A 2-element sheet was therefore
+losing one or both of its reference pictures. **Count 2 moves to the 2×2**, the
+shape the model demonstrably renders, with a MIRRORED map `[0, 1, 0, 1]` rather
+than the generic spares-repeat-element-0 rule: it is symmetric, so both elements
+get a fallback cell, and it avoids asking for three identical cells out of four
+— an instruction that invites variation rather than repetition. The spare-cell
+LAYOUT phrasing now names the cell a spare actually repeats (the bottom-right
+repeats the **Top-right** here), not a hardcoded top-left. The 2×1 row is no
+longer requested by any count.
+
+## Naming a garment's parts was not enough — the parts must be bound into ONE garment, and the head row must be told the garment at all (2026-09-14)
+**Context:** A character's styled watercolour 2×4 identity sheet drew dungarees
+incoherently: the body row showed blue shoulder straps over what read as a
+separate pair of jeans, and the head row showed no straps at all — the two rows
+of the SAME sheet disagreeing about the garment. The styled sheet is the
+identity reference handed to every page, so the fault propagated: page-level
+judge findings on `job_1789348171785_9oxos7dwv` p5 ("rendered as plain blue
+jeans, missing the bib panel and shoulder straps as specified in the clothing
+contract") and `job_1789343124794_z2c779f7i` p1/p5/p9/p11 ("brown trousers
+missing the square bib panel and shoulder straps") were CORRECT — the reference
+they were graded against already had the fault.
+
+The documented mitigation was already in force. `prompts/story-bible-from-beats.txt`
+requires structural parts to be named, and both contracts did name them
+verbatim — traced hop by hop, the string arrives at the Grok prompt unmangled
+(`resolveCharacterReqs` is a pure lookup, `styledAvatars.js` only `.trim()`s,
+nothing truncates, and the ~5 KB prompt is far under Grok's 7900 cap, so
+`shrinkPromptForModel` never runs). Spelling the parts out is therefore
+necessary but not sufficient: a parts list invites a parts ASSEMBLY.
+
+**Decision:** Three changes, all on the sheet's own path:
+1. One shared `buildGarmentRule()` states that a garment named with its parts is
+   ONE continuous piece — a bib-and-brace garment's bib and straps are cut in one
+   with its trousers, never straps laid over separate trousers — and that both
+   rows show that same garment. One clause, used by every sheet generator.
+2. `buildHeadRowPrompt` now receives the costume text. It previously took only
+   the character and said merely "wearing the costume", generating the head row
+   from the body IMAGE alone; a part the body row rendered ambiguously was simply
+   dropped, which is exactly "head row shows no straps".
+3. `evaluateSheetRow` fills `{REQUESTED_OUTFIT}` for the `heads` row, not only
+   `bodies`. The head-row garment check added by D15 (commit 9238f8230) shipped
+   **inert** — the judge received the literal `{REQUESTED_OUTFIT}` token and had
+   nothing to compare against. Both row evaluators now also penalise a NAMED part
+   that is MISSING, not only an invented one; the previous wording enumerated
+   invented trim ("a collar, placket, hood or trim the outfit does not name")
+   and a missing bib scored clean.
+
+**Rationale:** The contract text was innocent, so rewording it again would have
+been a symptom fix. The root is that nothing downstream bound the parts into one
+garment, and that the only two gates which could have caught the disagreement
+were unreachable in production — the heads check had no outfit, and the
+whole-sheet cross-row check (`sheet-2x4-evaluation.txt`) runs only in the Test
+Lab. Pass 2 is correctly innocent: style transfer is never told the garments and
+its evaluator deliberately does not score the outfit, so the fix belongs in
+pass 1.
+
+**Touched:**
+- `server/lib/character2x4Sheet.js` (`buildGarmentRule`, `buildHeadRowPrompt`,
+  `evaluateSheetRow`, `reviewHeadRow` + call sites, `_internal` exports)
+- `prompts/sheet-row-heads-eval.txt` (missing named part scores 1-3)
+- `prompts/sheet-2x4-evaluation.txt` (cross-row check covers any named part)
+- `tests/unit/sheet-row-garment-agreement.test.ts`
+
+**Status:** ✅ active
+
+**Not changed (flagged, needs a decision):** no gate compares the two rows
+against each other in PRODUCTION — the cross-row check lives only in the
+whole-sheet evaluator, which the Test Lab alone calls. Wiring it in would add a
+paid Gemini call per sheet, so it is a proposal, not part of this change.
+Separately, `buildClothingDescription` (`server/lib/entityConsistency.js`, the
+PAGE path) prefers `signature` over `description`, the inverse of
+`styledAvatars.js`. Harmless for these two stories (no `signature` key exists),
+but on an outline emitting both, pages would get the short signature while the
+sheet gets the full parts text.
+
+---
+
+## A prompt may not reach a model with a hole in it — the guard sits at the model-call boundary (2026-09-14)
+
+**Context:** Three checks shipped BLIND on 2026-09-14 and each failed silently
+rather than loudly:
+
+- **#51** — the batch quality judge was passed `[]` as its reference images and
+  had been dead since February: it was judging character consistency with
+  nothing to compare against.
+- **#61** — the reference-sheet identification reply was lost to a greedy
+  regex, so cells that *were* identified read as unidentified.
+- **#75** — `evaluateSheetRow` called `fillTemplate` only on its
+  `which === 'bodies'` branch. The head-row garment judge
+  (`prompts/sheet-row-heads-eval.txt`) was therefore handed the **literal
+  string `{REQUESTED_OUTFIT}`** and had nothing to compare against. The rule
+  added the previous day (`9238f8230`) could never fire on any story. Fixed for
+  that one call site in `b15600c49`.
+
+A guard for #75's class already existed and did not help. `fillTemplate`
+(`server/services/prompts.js`) matches `/\{[A-Z][A-Z0-9_]*\}/g`, **warns, then
+strips**. It fails twice over: warn-then-strip *hides* the damage — the prompt
+still ships, minus a whole instruction, and the warning is one line among
+thousands; and it is **bypassed entirely** by a caller that never calls
+`fillTemplate` at all, which is exactly what happened. A guard inside the
+filler cannot catch a caller who skips the filler.
+
+**Decision:** One shared assertion, `assertPromptFilled(prompt, context)` (and
+its string-returning sibling `guardPromptString`), defined next to
+`fillTemplate` in `server/services/prompts.js` and called at **the model-call
+boundary** — every function that actually issues the HTTP request to Anthropic,
+Gemini, xAI/Grok, OpenRouter or Runware. That is the one place every path must
+cross, whether or not it went through the template filler. It scans a plain
+prompt string, a Gemini `parts` array or an OpenAI-style message list, and
+never touches `inline_data` payloads.
+
+Behaviour splits by environment:
+- **In tests** (`VITEST` / `NODE_ENV=test`): **throw**, naming the surviving
+  token(s) and the calling function. A hole is a bug and the suite is where it
+  should surface.
+- **In production**: `log.error` plus a `prompt_unfilled_placeholder`
+  generation-log event naming the tokens, then **strip and continue**. It never
+  throws in production — the owner's standing rule is that a gate ships with a
+  warning and never kills a paid run.
+
+Exemptions are a named `PLACEHOLDER_EXEMPT` set with a comment per entry, never
+a loosened regex. It is empty: every `{TOKEN}` in `prompts/*.txt` as of
+2026-09-14 is a real fill, and JSON braces (`{"assignments": [...]}`),
+lowercase and mixed-case braces do not match the pattern in the first place.
+
+`fillTemplate`'s existing warn-then-strip is **unchanged** — it is still useful
+earlier in the chain, where it names the template rather than the HTTP call.
+
+**Rationale:** The alternative — tightening `fillTemplate` to throw — would not
+have caught #75 at all, because the buggy caller never invoked it. Only a check
+at the boundary is un-bypassable, and it covers future call sites for free.
+
+**Touched:**
+- `server/services/prompts.js` — `assertPromptFilled`, `guardPromptString`,
+  `PLACEHOLDER_EXEMPT`, `PLACEHOLDER_RE`
+- every model-call entry point in `server/lib/` and `server/routes/`
+- `tests/unit/prompt-placeholder-guard.test.ts`
+
+**Status:** ✅ active
+
+## Three tries means three DIFFERENT tries, the shape section reaches the trial and unified writers, and causality is a writer-side rule (2026-09-14)
+
+**Context:** Three measured gaps in the youngest band.
+1. A `tries`-band story shipped **four** attempts, every one a variation of
+   pulling harder, and was fully compliant: `prompts/age-band-tries.txt` asked
+   only that the second try be "different", and listed *"a bit more effort"* as
+   a legitimate reason the third one works. Nothing required the tries to differ
+   in kind. An earlier story that resolved on an insight was over-delivery, not
+   compliance.
+2. `buildStoryShapeSection()` carries the explicit arithmetic — "Challenges:
+   one, met three times — two tries fail, the third succeeds" — but its only
+   call sites were the arc/beats builders and the scorecard. A stored 21,451-char
+   trial `outlinePrompt` contains no "the three tries", no "Challenges:", no
+   "STORY SHAPE": the trial writer was told the band's prose and never its
+   arithmetic. Its page line also rendered as "Opening 1, the three tries 4,
+   ending 1" — the 4 is the page span, and reads as a count of tries.
+3. Nothing anywhere checks that a described solution *causes* its outcome. A
+   story resolved by tipping out a container and setting it beside the obstacle
+   "as a step", then had the character kneel on the ground anyway — the object
+   did no mechanical work, and the illustration drew it discarded because the
+   physics said so.
+
+**Decision:** Three writer-side changes, no new review or eval stage.
+- **A.** The tries band now requires each try to be a *different kind* of
+  attempt ("pulling harder after pulling is the same try twice"), and the third
+  to follow from the main character noticing something about the problem the
+  first two missed. *"A bit more effort"* is deleted — it was the licence that
+  was used. A third clause caps the noticing at three-year-old size (looking at
+  the thing from another side, moving what is in the way first) and forbids a
+  plan, a trick or a child who reasons like a grown-up.
+- **B.** `{STORY_SHAPE}` is declared in `story-trial.txt`, `story-unified.txt`
+  and `story-unified-imagefirst.txt`, positioned **after `{CATEGORY_GUIDELINES}`
+  and before `{AGE_MODE}`** so the band prose stays the last word, as
+  2026-09-13 settled. Both builders pass the **lean `{ arc: true }` variant**:
+  for a non-simple band that suppresses the page budget, the thread/split rule,
+  the secondary-moment quota and the entrance choreography, all of which would
+  fight the scene-count and structure instructions those two templates already
+  carry. The simple bands are unaffected by the flag — they return before it —
+  so `tries` gets its full arithmetic, which is the point. The tries page line
+  is reworded to name the span as pages ("Pages: 6 — page 1 opens, pages 2-5
+  carry the three tries, page 6 ends") and falls back to non-numeric wording
+  below four pages.
+- **C.** One `CAUSAL_COHERENCE_RULE` constant, emitted from **all four** return
+  paths of `buildStoryShapeSection` (routine, quest, tries, arc, full): what the
+  character does is what makes the outcome happen, and an object brought into
+  the solution does real mechanical work, never a prop set down that plays no
+  part.
+
+**Rationale:** The shape section is the only block every writer path now
+receives, which is why the causal rule lives there rather than in the five band
+files — the trial path runs **no** review at all (`outlineReview` null;
+scene-review, plan-check and child-critic are beats-only; book-audit is behind
+`enableFullRepair:false`), so a rule the trial writer does not get is a rule
+that is never applied to a trial story. Putting it in the band files would also
+have scoped it to under-six, and a prop that does no work is wrong at every age.
+Suppressing the full page-budget half of the section on the trial/unified path
+follows the same reasoning as the 2026-09-14 coping-strategy scoping: two page
+budgets in one prompt is a contradiction the model resolves, sometimes wrongly.
+The generic short-story shape line in `story-trial.txt` ("Introduce quickly
+(scene 1), build tension (2-3), resolve (4-5)") is left untouched and does not
+contradict the band arithmetic — one names dramatic function, the other names
+which pages the tries occupy, and the spans coincide.
+
+**Touched:** `prompts/age-band-tries.txt`, `prompts/story-trial.txt`,
+`prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`server/lib/promptBuilders.js` (`CAUSAL_COHERENCE_RULE`,
+`buildStoryShapeSection`, `buildTrialStoryPrompt`, `buildUnifiedStoryPrompt`),
+`tests/unit/age-band.test.ts`
+**Status:** ✅ active
+
+## 2026-09-14 — Page-score stacking measured and deliberately LEFT AS-IS
+**Context:** Low page scores (9oxos7dwv p5 = 5, p15 = 8, p11 = 15) looked like
+the judge stacking MAJORs onto acceptable renders. Measured across all 55 pages
+of the three 2026-09-14 validation stories by reimplementing the scoring
+arithmetic — it **reproduced all 99 stored version scores exactly (0
+mismatches)**, so the following are the mechanism, not an estimate.
+- `finalScore = 100 − Σ charges`, **no floor**, capped at 100. `SEVERITY_POINTS`
+  = catastrophic 60 / critical 25 / major 15 / moderate 5 / minor 2, fully
+  additive. The only bounding is one charge per `deductionClassKey()` (bucket +
+  subject): page-scoped buckets charge once per page, the rest once per
+  (class, character). Entity findings sum separately, capped at 40.
+- **Stacking confirmed.** On the 29 pages below the redo gate (`scoreThreshold:
+  60`) the dominant finding is only **32%** of the damage; two thirds comes from
+  the charges behind it. Mean page score 55.3.
+- **Double-counting refuted.** Every version scored through the consolidated
+  path; the `[three-stage]` duplicates visible in a finding list are a display
+  artefact (`composeDeductions` filters that source). Entity-vs-other
+  near-duplicates: 0. The 7 near-identical charged pairs are one sentence billed
+  per child — per-subject billing working as designed.
+- **The amplifier is one opinion billed once per character.** The age /
+  proportion class the owner ruled out on the generation side ("age-band clamp
+  is fine") reappears judge-side as bare `character_identity/major`: 13 winning
+  charges, **195 points, 7.9% of all deductions**; on p8 the identical sentence
+  charged 45 points across three boys. No evaluator emits an `age` type, so no
+  code-side ceiling can target the class without a prompt change first.
+- **Repair consequence:** 44 attempts, 23 improved, **21 regressed**; 9 of 30
+  repaired pages shipped their ORIGINAL. p11 and p15 each burned two char-fix
+  calls, regressed both times, and shipped v0.
+**Decision:** **Leave the scoring as it is** (owner, 2026-09-14).
+**Rationale:** The version picker shipped the original on all 9 regression
+cases, so no wrong book went out — the cost of the current behaviour is wasted
+repair attempts, not damaged product, and the mechanism reproduces every stored
+score. The measured alternatives were priced and rejected for now:
+- harmonic decay (2nd charge ÷2, 3rd ÷3): mean 55.3 → 68.8, pages under the
+  gate 29 → 17; monotonic, pure arithmetic.
+- two worst classes per page: 29 → 17, mean 67.7; non-monotonic above two
+  findings, so six real defects read like two.
+- page-scoping the age class: measured WORSE (31 pages under the gate) — it
+  frees the per-character slot for whatever sat behind the age finding.
+- capping or zero-pointing the age class: 29 → 28 / 27; both need a prompt-side
+  `age` type before any code ceiling.
+**Revisit if:** a regressed version ever ships (the picker stops protecting the
+book), or the wasted repair spend becomes material at volume.
+**Touched:** nothing — decision recorded, no code changed.
+**Status:** ✅ active — as-is by measurement, not by default.
+
+---
+
+## 2026-09-14 — A check that could not run says so in its RESULT, not only in a log line
+
+**Context:** Three checks shipped BLIND and every one of them failed silently:
+
+- **#51** — the batch quality judge received `[]` reference photos and no
+  clothing contract. Dead since the February character-storage normalisation,
+  i.e. seven months.
+- **#61 / #65** — a reference sheet's cell-identification reply was destroyed by
+  a greedy regex, costing the whole batch its reference pictures.
+- **#75** — the head-row garment evaluator was handed the literal string
+  `{REQUESTED_OUTFIT}`; a rule written the day before could never fire.
+
+The boundary guard in `4161d0562` stops the third shape. None of them addressed
+the **generator** of all three: **silence from a check that ran clean and
+silence from a check that could not run are the same signal.** That is why #51
+survived seven months, and why a log reader cannot tell a clean page from an
+unjudged one.
+
+The canonical instance was already warning and it still did not help.
+`server/lib/evalPipeline.js` logs
+`👕 [EVAL] <page>: no clothing contract available — clothing findings suppressed (N-16)`
+and the evaluation then returns a perfectly normal score, with nothing in the
+RESULT and nothing in the stored story saying that dimension was never judged.
+
+A survey of `evalPipeline`, `evalJudges`, `sceneBriefCheck`, `referenceSheets`,
+`bookAudit`, `textRefine`, `sceneValidator`, `entityConsistency` and
+`coverIterate` found **73** sites where a check suppresses itself, swallows its
+own failure, or is handed a placeholder input (`'(not available)'`,
+`'(none declared)'`, `'No reference photo available.'`) and grades anyway.
+
+**Decision:** "I had nothing to check" becomes a first-class part of a check's
+result and is persisted.
+
+- `server/lib/notEvaluated.js` — `createNotEvaluatedRecorder({ pageContext })`
+  collects `{ dimension, reason, detail, pageContext }` entries, deduped by
+  `(dimension, reason)`. `dimension` is the thing that went unjudged
+  (`clothing`, `identity`, `identity_attribution`, `semantic_fidelity`,
+  `judge_jury`); `reason` is a machine-stable snake_case cause so a grep over
+  stored stories survives wording changes; `detail` carries the human sentence.
+  `collectNotEvaluated(pages)` rolls per-page records up for the stored report.
+- Every `record()` also emits ONE generation-log event at warn level,
+  `check_not_evaluated`, so a live run is greppable too.
+- `evaluateThreeStage` and `evaluateImageQuality` now return `notEvaluated: []`
+  alongside their existing fields — existing fields untouched, no consumer
+  breaks. `evaluateImageQuality` merges the compliance judge's entries into its
+  own.
+
+Wired (five sites, chosen because they reach a persisted result):
+clothing contract absent or failed to build; reference photos partially
+unattachable (blind check #51's own shape); semantic fidelity never launched for
+want of a reference; the multi-judge jury merge failing so a 1-judge run reads
+like a consensus; and the compliance judge receiving `'(not available)'` instead
+of figures/matches — the canonical "judge ran with an empty input".
+
+**Where a reader finds it in a stored story** (`stories.data`):
+
+- `sceneImages[].imageVersions[].notEvaluated` — per set of image bytes.
+- `sceneImages[].notEvaluated` — the version that actually ships.
+- `finalChecksReport.notEvaluated` — `{ recordedAt, entryCount, dimensions[],
+  pages[{pageNumber, entries[]}] }`, the one place that answers "which
+  dimensions were never judged, on which pages".
+
+`null` means no evaluation ran at all; `[]` means it ran and judged everything.
+
+**Rationale:** RECORDING ONLY, deliberately. The owner measured page-score
+stacking the same day and decided to leave scoring as-is (see
+"Page-score stacking measured and deliberately LEFT AS-IS", above). A
+`notEvaluated` entry is therefore never a deduction: it does not change
+`finalScore`, does not change a severity, and does not change which pages enter
+repair. The unit test asserts the score is byte-identical with and without the
+missing input — that assertion is what protects the scoring decision from a
+later well-meaning edit. Nothing added here throws either: a check with no input
+ships with a warning and never kills a paid run.
+
+Recording in the RESULT rather than only in a log is the same lesson as
+`labelRound`, `repairRounds` and `shippedDefective`: a field that exists only
+in memory cannot be read back from a finished story, and a log line alone is
+what let two pages ship at finalScore 0 and 5 unremarked (D7).
+
+The other ~68 surveyed sites are left as they are for now, by proportionality —
+this is a recording change, not a restructure of the eval pipeline. The survey
+list is the backlog for them. The sharpest remaining ones:
+`validateEmptyScene` returning `{ pass: true, issues: [] }` from its outer catch
+(fail-open); `runExtraJudges` filtering dropped judges out of the array with no
+marker of who was dropped, while `agreement` is then computed over the
+survivors; `evalJudges.parseFixableIssues` returning `[]` on unparseable text
+with no log at any level; `bookAudit` listing a failed chunk's pages in
+`pagesRead`; `textRefine`'s "rewrite damage is unchecked" branch with no
+`rounds` ledger entry; `entityConsistency` initialising a character at
+`overallScore: 10` before skipping its clothing category; and `coverIterate`
+passing an empty `figures[]` into `restampCover` so figure-avoidance has nothing
+to avoid.
+
+**Touched:** `server/lib/notEvaluated.js` (new), `server/lib/evalPipeline.js`,
+`server/lib/repairPipeline.js`, `storyJobPipeline.js`,
+`tests/unit/batch-eval-whole-cast-refs.test.ts`.
+
+**Status:** ✅ active — recording only, scoring untouched by design.
+
+### Audit-admitted pages bypass the per-round repair cap, up to five (2026-09-14)
+**Context:** The first two staging stories to run with the final-audit grant
+(`job_1789348171785_9oxos7dwv`, `job_1789343124794_z2c779f7i`) showed the extra
+round buying almost nothing — book-audit faults went 26→24 on one story and
+29→29 on the other, and one extra round scored 0 improved / 3 regressed. The
+cause was not that extra rounds are worthless. **The audit admitted 7 pages on
+CATASTROPHIC/CRITICAL faults and six of them were never repaired.**
+
+Admitted pages were appended to `badPageNums` BEFORE `applyRoundCap`, which
+keeps 30% of bad pages on a later round ranked **worst-first by score**. An
+audit-admitted page is by definition not low-scoring — its score is precisely
+what failed to notice the fault. So the cap discarded exactly the pages the
+grant existed to rescue. Two dropped pages, both verified by eye:
+- Story A p16 shipped at **80**: the text has the egg still tapping from inside
+  the shell, the picture already shows it split open with the dragon hatched and
+  sitting on the pavement — the book's one reveal, spent a page early.
+- Story B p12 shipped at **85**: the picture is page 11's biscuit scene, with no
+  tipped sledge, no cave and no fallen trunk from p12's own text.
+
+Both are immaculate illustrations judged against their own brief, which is why
+the page scorer rated them highly and only a judge reading the words beside the
+picture could object.
+
+**Decision:** `applyRoundCap` runs on the score-ranked pages FIRST; audit-admitted
+pages are appended afterwards as a **reserved allowance on top of** the round's
+budget, not a share of it, bounded by `AUDIT_ADMIT_MAX = 5` (owner, 2026-09-14).
+Nothing the cap chose is displaced, and worst-first ordering is preserved because
+the admitted pages sit at the end.
+
+**Rationale:** The grant is worth nothing if the cap can throw it away, and the
+bound exists because the audit is a noisy judge (22.7% severity churn between
+identical runs — `tasks/eval-variance-backlog.md` C4): without a ceiling one
+noisy audit could turn a single extra round into a whole-book regeneration. Five
+is the owner's number and covers both measured stories (2 and 5 admitted pages).
+
+**Touched:** `server/lib/repairLogic.js` (`AUDIT_ADMIT_MAX`),
+`server/lib/repairPipeline.js` (admission moved after the cap),
+`tests/unit/final-book-audit-round.test.ts` (+6 tests)
+**Status:** ✅ active
+
+## 2026-09-14 — The trial showcase harness picks a story idea, like every real trial user
+
+**Context:** `scripts/admin/trial-showcase.js` posted `storyDetails: entry.storyDetails || ''`
+and never called the ideas endpoint. Every rotation entry in
+`tests/helpers/trial-rotation.json` leaves `storyDetails` empty, so the premise fell through
+to the literal `'A fun adventure'` fallback at `server/lib/promptBuilders.js:7464` — the writer
+received no premise at all. No real user can reach that state:
+`client/src/pages/TrialWizard.tsx:371-379` requires an idea selection and posts
+`selectedIdea.title + '\n' + selectedIdea.summary`. The harness also never sent `ideaKind`,
+which `server/routes/trial.js:1478-1480` reads to decide whether the landmark mandate applies,
+so the showcase exercised a different branch from the one users hit.
+
+The symptom that exposed it: two showcase runs of the same rotation entry
+(`job_1789296188291_thezv15y1`, `job_1789337873076_qf2at21ui`) came back as near-identical
+chestnut stories. With no premise, the writer had nothing to diverge on.
+
+**Decision:** The harness calls `POST /api/trial/generate-ideas-stream` between
+`create-anonymous-account` and `create-story`, parses the two cards exactly as
+`TrialIdeasStep.tsx` does, and posts the selected one in the wizard's shape, stamping
+`ideaKind` (`local` for card 1, `fantasy` for card 2) so the landmark mandate matches the card.
+New flag `--idea=grounded|makebelieve|first|random`, default `grounded` (card 1 = the child's
+real town with its indexed landmarks; card 2 = a make-believe world). Precedence:
+`--details=` → a non-empty `entry.storyDetails` → a generated idea card. An idea failure is
+fatal — the harness never silently falls back to the empty path.
+
+**Rationale:** A validation harness that cannot reach the state real users are in measures
+nothing about what users get. Cost is ~USD 0.02 per run (two `claude-sonnet-4-6` calls,
+~1.5k in / ~300 out each) and 5-10 s of setup, against a trial showcase of CHF 0.20-0.35 —
+negligible next to the alternative of judging story quality from a three-word placeholder.
+
+**Consequence for past findings:** every trial validation run before 2026-09-14 judged story
+quality from `'A fun adventure'`. **Story-quality conclusions drawn from
+`job_1789296188291_thezv15y1` and `job_1789337873076_qf2at21ui` — premise fidelity, plot
+variety, arc, text quality — are suspect and should not be cited.** Their speed, pipeline-mode
+and image findings are unaffected: those paths do not read the premise.
+
+**Touched:** `scripts/admin/trial-showcase.js` (commit `19f896fde`),
+`.claude/skills/running-trial-showcases/SKILL.md`
+**Status:** ✅ active
+
+## 2026-09-14 — Every model-facing prompt builder is pinned to the VALUE it carries (Guard C)
+
+**Context:** Three checks shipped blind on 2026-09-14, all one shape — a rule that LOOKS
+present in the template layer but receives nothing at runtime, and fails silently because
+"no findings" is indistinguishable from "nothing to find":
+
+- the batch quality judge was handed `[]` reference photos and no clothing contract (dead
+  since Feb 2026, `bugs.json` `batch-eval-whole-cast-refs-always-empty`, fixed f5a511730);
+- a reference sheet's cell-identification reply was destroyed by a greedy regex;
+- `evaluateSheetRow`'s heads branch handed the judge the literal string `{REQUESTED_OUTFIT}`
+  because `fillTemplate` ran on the bodies branch only (fixed b15600c49).
+
+Guard A (4161d0562) asserts at the model-call boundary that no `{PLACEHOLDER}` reaches a
+model. Guard B (dd6064f46) makes a check that could not run say so in its RESULT. Neither
+answers the remaining question: did the INPUT arrive at all? None of the three had a test
+asserting it.
+
+**Decision:** One unit case per model-facing prompt BUILDER, in
+`tests/unit/built-prompt-values.test.ts`. Each builds the prompt from realistic inputs
+carrying a distinctive probe value (a garment description, a place, a page of prose), then
+asserts (1) the substantive VALUE is in the built string, (2) no `{TOKEN}` survived, and
+(3) the probe is ABSENT when that input is withheld — the negative control that separates
+"the value arrived" from "the template's own boilerplate happens to contain those words".
+Everything is offline and free; the one builder reachable only through a model call
+(`evaluateSheetRow` — the actual bug site) runs against a stubbed `fetch`.
+
+24 builders are now pinned: `buildImagePrompt`, `buildCoverPrompt`, `buildEmptyScenePrompt`,
+`buildEvaluationPrompt`, `buildReferenceSheetPrompt`, `buildSceneExpansionPrompt`,
+`buildSceneExpansionAllPrompt`, `buildSceneReviewPrompt`, `buildBeatsPrompt`,
+`buildPlanCheckPrompt`, `buildArcCreatePrompt`, `buildArcRetellPrompt`,
+`buildStoryTextFromBeatsPrompt`, `buildStoryBibleFromBeatsPrompt`,
+`buildClothingReviewPrompt`, `buildTextProofreadPrompt`, `buildTextDiffPrompt`,
+`buildTextAuditPrompt`, `buildTextAuditBlindPrompt`, `buildOutlineReviewPrompt`,
+`buildTextRefinePrompt`, `buildUnifiedStoryPrompt`, `buildTrialStoryPrompt`,
+`buildStyleTransferPrompt`, plus the two 2×4 sheet row builders and the two sheet judges
+(`evaluateSheetRow`, `evaluateIdentity`) driven through a stubbed judge call.
+
+NOT pinned, and why: `faceRepair.js` `buildPrompt` (the four character-repair templates) is
+not exported and is `async` over image buffers — reaching it needs either a new export or a
+sharp/mask harness, and Guard C is tests only; the inline `fillTemplate` in `evalPipeline.js`
+(three-stage compliance) and in `entityConsistency.js` / `bookAudit.js` / `feedbackConsolidator.js`
+sits inside the network-calling function with no extractable builder, so pinning it would
+mean either a refactor or stubbing four more clients. Every one of those is a candidate for
+the same treatment if a builder is ever extracted.
+
+**Rationale:** Pin BEHAVIOUR — the value reaching the prompt — never the prompt's wording
+(memory rule "behaviour change ships with its tests"). A prompt may be reworded freely; it
+may not stop carrying its input. The negative control is what makes the assertion honest: a
+`toContain('clothing')` passes on template boilerplate alone, which is exactly how a blind
+check looks healthy.
+
+**Two coverage gaps found while inventorying (reported, NOT changed — runtime behaviour is
+the owner's call):**
+
+1. `fillTemplate`'s "Unfilled placeholder(s) stripped" warning and `assertPromptFilled`'s
+   `PLACEHOLDER_RE` both match `\{[A-Z][A-Z0-9_]*\}` — UPPERCASE only. The four
+   character-repair templates use camelCase tokens (`{charName}`, `{appearanceContext}`,
+   `{clothingContext}`, `{actionContext}`, `{issueContext}`, `{textPositionContext}`,
+   `{artStyleContext}`, `{sceneMediumLine}`), and `bbox-refine.txt` uses `{figuresSummary}`.
+   An unfilled camelCase token is neither warned, nor stripped, nor caught at the boundary —
+   it ships verbatim to the image model. Proposal: widen both regexes to accept a leading
+   lowercase letter, or rename those tokens to upper case.
+2. Two live sheet judges fill BARE-WORD tokens with `.replace(/WORD/g, …)`, entirely outside
+   `fillTemplate`: `sheet-2x4-style-eval.txt` (`REQUESTED_STYLE`, `CHARACTER_AGE`) and
+   `sheet-row-identity-eval.txt` (`CHARACTER_AGE`). No brace, so no guard can see an unfilled
+   one — the literal word `CHARACTER_AGE` would ship to the judge. This is the same family as
+   the `{REQUESTED_OUTFIT}` bug, one step further out of reach. `sheet-2x4-evaluation.txt` was
+   already converted to braces + `fillTemplate` for exactly this reason; these two were not.
+   Both are pinned by VALUE here so a regression is caught, but the fill mechanism is
+   unchanged. Proposal: brace the tokens and route them through `fillTemplate`.
+
+**Touched files:** `tests/unit/built-prompt-values.test.ts` (new, +32 tests),
+`docs/decisions.md`, `tasks/BACKLOG.md`
+**Status:** ✅ active
+
+### Attempt counts come from retryHistory; every run is stamped with its build
+**Context:** The 2026-09-13 honesty fix ("Unevaluated runs report not-measured")
+closed the hole for runs that SKIP quality eval, but left it open for runs that
+were evaluated. Staging `job_1789348171785_9oxos7dwv` (created 2026-09-14
+03:09:31 CH, 18 pages, beats, non-trial) stored
+`qualityEvaluated: true, pagesWithIssues: 7, firstAttemptPassRate: 100,
+totalRetries: 0` — while `runMetrics` on the same story recorded
+`redo_trigger: 17, consistency_regen: 7, char_repair_run: 7,
+shipped_defective_pages: 7`, and the pages' own `retryHistory` arrays are 1-3
+entries long (9 pages × 1 attempt, 4 × 2, 5 × 3 = 14 real retries, 50 % clean).
+Root cause: `computeQualityAnalytics` derived both numbers from
+`img.totalAttempts`, and **all 18 pages had `totalAttempts: undefined`** — an
+absent counter read as "1 attempt, passed first time". Sibling audit: no
+generation path writes page-level `totalAttempts` at all (quality-retry was
+deleted in the 2026-08 pipeline unification). It survives only on the
+regeneration/iterate endpoints (`server/routes/regeneration.js`,
+`server/lib/images.js`, `server/lib/coverIterate.js`,
+`server/lib/coverComposite.js`), where it means "provider attempts inside one
+regen call" — a different quantity. So the aggregate was wrong on EVERY
+evaluated run, not only beats. Separately, no story recorded which code
+produced it: `generationLog`, `analytics`, `runMetrics` and `metadata` carry no
+commit, so "did that fix hold?" meant reconstructing the deploy history from
+timestamps.
+**Decision:**
+1. Attempt counts come from `retryHistory` (new `pageAttemptCount()` in
+   `server/lib/storyMetrics.js`). The repair pipeline builds it with exactly
+   one entry per persisted version — `{attempt: idx+1, type:
+   'unified_pipeline', source: 'original' | 'inpaint-round-N' | 'char-fix-N'}`
+   (`server/lib/repairPipeline.js`) — verified against the stored story: its
+   lengths match `imageVersions` per page. `totalAttempts` is kept as a
+   fallback for pages that carry it and no history (the regen paths).
+2. When NEITHER exists, the aggregate is **null** and the new
+   `analytics.attemptsMeasured: false` says why; `attemptSource` names the
+   counter that was used. A run that genuinely passed every page first time
+   still reports a truthful `100` / `0`. Writing `totalAttempts` on the beats
+   path was rejected: it would overload one field with two meanings
+   (page renders vs provider attempts inside one call) across paths that
+   already read it.
+3. Every run is stamped: `analytics.build = {commit, commitFull, branch,
+   environment}` from `getBuildInfo()`, reading the SAME
+   `RAILWAY_GIT_COMMIT_SHA` (with the `SOURCE_VERSION` alias) that
+   `/api/health` and `/api/admin/diagnostics` already report — no second
+   mechanism. A local run has neither and records null, never throws.
+   `analytics.pipelineConfig.pipelineMode` records the pipeline actually taken.
+**Rationale:** Analytics, not the job row, is the right home: it already holds
+every other run-provenance value, it is snapshotted into `story_metrics.detail`
+by the collector, it survives independently of `story_jobs` (which is pruned),
+and it needs no migration (schema changes are migrations-only). Deriving from
+`retryHistory` rather than back-filling a counter means the number is read from
+the ledger the pipeline already keeps for debugging — one source of truth, and
+it works retroactively on every stored story (recomputing the evidence story
+yields 50 / 14, matching its runMetrics).
+**Touched files:** `server/lib/storyMetrics.js` (`pageAttemptCount`,
+`getBuildInfo`, `computeQualityAnalytics`, metrics `detail.analytics`),
+`storyJobPipeline.js` (analytics block: `attemptsMeasured`, `attemptSource`,
+`build`, `pipelineConfig.pipelineMode`),
+`tests/unit/quality-analytics-not-measured.test.ts`
+**Status:** ✅ active
+
+### A CRITICAL that survives repair is REPORTED, not rerouted (2026-09-14)
+**Context:** A CRITICAL finding does get a repair route — `chooseRepairStrategy`
+(`server/lib/repairPipeline.js`) sends any critical to `iterate`. But iterate is
+a re-roll, inpaint cannot add an absent person, and nothing verifies the person
+arrived, so a page can ship with the CRITICAL still recorded. Measured on Story A
+(`job_1789337998754_apslnsq1z`) p8: a CRITICAL `missing_character` went 15 →
+iterate −82 → inpaint-round-2 53, and shipped. The only trace of what had been
+tried was a log line; `unrepairedCritical` says a critical survived, and
+`shippedDefective` (D7) frames a page by its score — neither records the methods
+spent, and a page that clears the threshold while still carrying a CRITICAL is the
+case the score framing hides.
+**Decision:** The owner keeps the routing unchanged and closes the REPORTING gap
+instead. `collectSurvivingCriticals(results, repairRounds, regenThreshold)` (a
+pure function in `server/lib/repairLogic.js`, sibling to `collectShippedDefective`)
+rolls the survivors up per page with `aboveThreshold`, the findings, and the
+methods attempted — read from the round rows `summarizeRepairRound` already
+produces (`iterate-round-1`, `inpaint-round-2`), never a second derivation. It is
+counted in run metrics (`surviving_critical_pages` / `_findings` /
+`_above_threshold`, best-effort), carried on the pipeline result, and persisted as
+`finalChecksReport.survivingCriticals`. No routing constant, no severity and no
+score is touched; it never fails or blocks a run.
+**Rationale:** Rerouting a surviving CRITICAL (a verified-presence pass, a
+different method ladder) is a real option, but it costs money on every story and
+the evidence needed to judge it — which methods were spent on which surviving
+critical, and with what outcome — is exactly what this gap was throwing away.
+One story cannot answer it; the accumulated record across many can. Reporting
+first is also the cheap half: the routing change stays available, now with data
+behind it.
+**Touched:** `server/lib/repairLogic.js` (`collectSurvivingCriticals`),
+`server/lib/repairPipeline.js` (rollup + metrics + returned result),
+`storyJobPipeline.js` (`finalChecksReport.survivingCriticals`),
+`tests/unit/surviving-criticals.test.ts`
+**Status:** ✅ active
+
+---
+
+## 2026-09-14 — All 64 life-challenge guides moved to the age-band register; the advice voice is gone
+
+**Context:** `prompts/life-challenge-guides.txt` carried two registers at once.
+Five infant topics (`215a34d68`) were written as background for the writer —
+prose, bold lead-ins, no bullets. The other 59 were in an advice voice: a
+`Story guidance:` bullet list addressed to the reader, closed by a
+`Key messages:` line of morals. That line handed the writer the stated moral
+that `RULES OF THE TELLING` forbids at every age ("never bookkeeping, never a
+stated moral"), and that the simple bands (`routine` 0-1, `quest` 2, `tries` 3)
+forbid outright in their endings — the simple-band branch of
+`buildLifeSkillGuidelines` says "no tips, no strategies, no moral" and then
+appended a list of morals underneath it.
+
+**Decision:** All 59 converted to the register of the five: `**What the book
+is.**`, `**What happens.**`, `**The small thing that goes wrong.**`, `**What it
+is not.**`, `**Ending.**`, plus topic-specific lead-ins where a topic carries
+something the five headings have no home for. The substance is preserved —
+every situation, mechanic and owner-authored constraint in the old bullets is
+still in the prose (the realistic-preparation rule for vegetables, what counts
+as sharing and with whom, the hurt/danger test that separates telling from
+tattling). What was removed is the framing: the reader-facing tips and the
+morals. Register is uniform; reading age is not — a preteen topic is written at
+its own altitude.
+
+**Rationale:** A guide file is background, not a script. Two registers in one
+file meant the writer's instructions changed depending on which topic the user
+picked, and the advice half contradicted both the age bands and the telling
+rules. Converting rather than deleting keeps the therapeutic knowledge that
+makes these topics worth having; the one clause that legitimately carries the
+life-skill payload already lives in `buildTellingRulesSection`
+(`lifeSkillStrategy`, gated off for the simple bands), which is the right place
+for it — scoped, and applied once.
+
+**Touched:** `prompts/life-challenge-guides.txt` (59 sections rewritten, file
+header comment updated), `tests/unit/teaching-guide-parser.test.ts` (pins: 64
+topics parse, none empty, none banner-polluted, none contains `Key messages:`
+or `Story guidance:`)
+**Status:** ✅ active
+
+## Object size reaches the image as a relational anchor, and `foreground` no longer means "big" (2026-09-14)
+
+**Context:** A trial story drew a small held prop apple-sized on every page and
+larger than the child's head on the cover. Three separate causes, all measured:
+(a) `prompts/image-generation.txt` defined depth as size — "`foreground` is
+large and dominates the lower half" — which overrode the artifact `size` rider
+that WAS present on that story; composition beat physical size. (b) The artifact
+`size` field (added 2026-09-06, `793049e40`) was almost never emitted: staging
+9/193 artifacts (4.7%), prod 3/32 (9.4%), and on the FULL path specifically
+2/176 staging and 0/29 prod — because the two templates that author artifacts on
+that path, `story-unified-imagefirst.txt` and `scene-expansion-all.txt`, had no
+`size` field at all. Trial, whose template does have one, sat at 41% (7/17).
+(c) The trial path has no prose size anchor whatsoever — no Art Director, no
+rule 8g familiar-size calibration, no size rule in `story-trial.txt`.
+
+Two quality problems with the values that did get written: they collapsed onto
+the instruction's own exemplar (`"fits in one hand"` verbatim in 6 of 9 staging
+values), and some were metric ("body length approximately four metres"), which
+an image model cannot use. The effective ones were relational.
+
+**Decision:**
+1. `foreground` governs PLACEMENT and prominence, not physical size. The depth
+   bullet now says depth is distance from the camera, that a stated size always
+   wins over depth, and that an element with no stated size that is genuinely
+   large still dominates the foreground — so composition is not flattened on
+   pages where a large object should dominate.
+2. All four artifact-authoring templates carry `size`, with one shared
+   instruction that describes the FORM of the anchor (which body part it reaches
+   on a character beside it, or the part of a hand or arm it spans) and contains
+   no quoted exemplar to copy, forbids metric and imperial units, and states
+   English regardless of book language — matching the existing artifact
+   `name`/`description` English rule. A separate one-line rule makes the field
+   non-optional. `buildArtifactDescription()` now folds `size` into the artifact
+   description the way `buildAnimalDescription()` does, so it reaches the full
+   Visual Bible block and the cover's KEY STORY ELEMENTS, not only the
+   REQUIRED OBJECTS rider.
+3. The trial scene-hint `objects[]` schema gained an optional `size` slot, so
+   scale travels per object per page instead of depending on the writer
+   mentioning it in prose. `buildTextFromJson` renders it as a parenthetical.
+
+Classification was NOT touched: the existing `scale` finding type already fires
+where size reaches the prompt (60 findings in the sample). Detection was never
+the gap — supply was.
+
+**Rationale:** The size rider existed and worked; it lost to a composition rule
+that asserted foreground = large, and it was almost never populated on the path
+that generates most pages. Folding size through a builder mirrors the animal
+path that sits at 100% emission rather than inventing a second mechanism.
+Describing the anchor's form instead of showing an example is what stops the
+exemplar collapse — there is no longer a phrase in the instruction to copy.
+
+**Touched:** `prompts/image-generation.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/story-trial.txt`, `server/lib/visualBible.js`,
+`server/lib/sceneMetadata.js`, `tests/unit/artifact-size.test.ts`
+
+**Status:** ✅ active
+
+## 2026-09-14 — An unknown RSS stays unknown, and the analyzer's dev-server fallback binds the family the parent probes
+
+**Context:** Two local-dev defects in `photo_analyzer.py`, both invisible on
+Railway, both found while testing infant face detection on Windows / Python
+3.14.
+
+1. `GET /health` returned **500 TypeError: unsupported operand type(s) for +:
+   'NoneType' and 'float'** at the `python_total_rss_mb` line. `_rss_mb()` reads
+   `/proc/self/status` and returns `None` off-Linux *by design* — the same
+   no-op that makes `_boot_mark` skip on local dev. So `rss_mb` was present
+   holding `None`, and `body.get("rss_mb", 0)` handed back that `None`: a
+   `.get(k, default)` only defaults on a **missing** key, never on a present
+   null.
+2. `POST /analyze` returned **503 `face worker not ready within 120s`**. The
+   worker was healthy the whole time. `waitress` is not installed locally, so
+   the fallback `app.run(host='::')` ran — and `IPV6_V6ONLY` defaults to `0` on
+   Linux but **`1` on Windows**, so the worker bound `[::]:5001` and nothing on
+   `127.0.0.1`, which is the literal address `ensure_worker`'s readiness probe
+   uses. Measured: `netstat` showed only `[::]:5001 LISTENING`; `curl [::1]`
+   returned the health body, `curl 127.0.0.1` returned connection refused.
+   Diagnosing it was blocked by a third defect — the Windows UTF-8 rewrap
+   `io.TextIOWrapper(...)` is **block** buffered and discards `python -u`, so
+   the spawned worker's own `[START]` / traceback lines never reached the
+   parent console and the only visible symptom was the parent's 503.
+
+**Decision:**
+- `python_total_rss_mb` is `None` when the router's own RSS is unknown — **not**
+  `or 0`. A total that silently omits the router is the exact understatement
+  that field was added to remove.
+- The dev-server fallback binds `0.0.0.0` on `win32` and `::` elsewhere. The
+  waitress path (`listen='*:port'`) already binds both families and is
+  unchanged; only the fallback violated the invariant.
+- Both `sys.stdout` / `sys.stderr` rewraps set `line_buffering=True`.
+- Regression test `tests/manual/test_health_rss_null.py` (no ML, no subprocess).
+
+**Rationale, and the finding that matters more than either fix:** the MTCNN
+import chain genuinely cannot load on this box — `tensorflow` is absent and
+`mtcnn_cv2` imports `imghdr`, removed from the stdlib in Python 3.13 — so local
+face detection runs the MediaPipe Tasks fallback. That is **not** true in
+production, and it was checked rather than inferred: the Dockerfile builds on
+`node:22` (Debian bookworm, `python3` 3.11, `imghdr` present) and installs
+`mtcnn-opencv`, and the prod analyzer service's own logs carry
+`[OK] MTCNN face detector available (OpenCV version)` alongside
+`[START] ... (role=face)`, `MediaPipe available: True` and live
+`[MTCNN] Detected N faces` lines. **Production runs the MTCNN primary; it has
+not been silently on the fallback.** The detector fallback chain itself is
+correct and degrades cleanly at import (`detect_all_faces` → Tasks API when
+`MTCNN_AVAILABLE` is false) — the 120-second hang was never the fallback chain,
+it was the bind family.
+
+Left deliberately unfixed: `mtcnn_cv2` on Python 3.14. Installing `tensorflow`
+to get the other MTCNN backend is a multi-GB dependency for a local-dev
+convenience, and the package needs replacing or patching upstream. Local dev
+runs the MediaPipe Tasks fallback, which is now clearly logged.
+
+**Touched:** `photo_analyzer.py` (health totals, dev-server fallback host,
+stream line buffering), `tests/manual/test_health_rss_null.py`
+**Status:** ✅ active
+
+---
+
+## 2026-09-14 — An animal is a cast entry for people-judges and an OBJECT for the blind inventory; the judges that read both are told which
+
+**Context:** One story reported the same animal (a VB `animals[0]` entry) as
+`missing_character`, `extra_character` AND `duplicate_identity` — three
+contradictory verdicts about one entity. Prevalence: 24 of the 41 staging
+stories that have VB animals carried at least one finding naming the animal;
+the worst page set carried 14. The presence arithmetic was NOT the cause —
+every such finding stored `derivedBy: null`, and `derivePresenceFinding`
+correctly removes non-humans from both sides and stays silent.
+
+Three inputs disagreed instead. `prompts/image-evaluation.txt` tells the
+quality evaluator that `matches[]` references an EXPECTED CAST name and that
+D-04b covers "a person **or animal** figure", so the animal lands in
+`matches[]` as a FIGURE. `prompts/image-inventory-unified.txt` tells the blind
+inventory that `objects` holds "each notable object, **animal** or vehicle", so
+the same animal lands in `objects[]` as an OBJECT. The compliance judge
+(`image-prompt-compliance.txt`) receives both lists, had **no EXPECTED CAST
+roster at all**, and its STEP 1 says to pair each `matches[]` entry with a
+VISION_INVENTORY *figure* — so the animal had no partner and the judge
+improvised a label for the orphan. Worse, its copy of the prompt was cut at
+3,000 chars while real page prompts run 5,400–8,000 and the animal's own cast
+block sat at chars 3,914–5,565 on five of one story's six animal pages: the
+judge was asked to place a figure whose name its prompt never contained.
+
+**Decision:** Four changes, none of them a reclassification of the animal.
+
+1. **The blind judges get the roster.** `buildExpectedCastBlock`'s block — kind
+   labels (`(animal)`, `(secondary character)`) included — is now passed to the
+   compliance judge and the semantic judge, the same string the quality
+   evaluator already got. The compliance prompt's STEP 1 states that an
+   `(animal)` entry pairs against `VISION_INVENTORY.objects[]`, never
+   `figures[]`, and that failing to find it there is `unverified_absence` at
+   most — never `missing_character`, `extra_character` or `duplicate_identity`.
+   The semantic prompt states that an `(animal)` entry is never counted among
+   the named characters. The roster build was hoisted above the semantic launch
+   so all four judges read one roster.
+2. **The judge's prompt is no longer truncated.** `ORIGINAL_PROMPT` was
+   `imagePrompt.substring(0, 3000)`; it is now the whole prompt. Per the
+   owner's standing no-output-caps principle, an arbitrary input cut on a judge
+   is the same species of bug — removed, not enlarged. (ART STYLE and CLOTHING
+   are still passed separately; that was the 2026-08 patch for the same cut.)
+3. **The presence filter governs the record the consolidator reads.**
+   `PRESENCE_COUNT_TYPES` filtering pruned a local copy on its way into the
+   page's merged `fixableIssues`; the finding survived verbatim on
+   `threeStageResult.fixableIssues` and `complianceResult.fixable_issues`,
+   which is what `scoring.js` reads for the compliance bucket and for
+   `scoreBreakdown.threeStage.issues`, and from there it reached
+   `consolidatedPlan.deduped_issues` and the repair pipeline. Both lists are
+   now pruned in place by `supersedePresenceFindings`.
+4. **`creatures` deleted as a source.** `vbNonHumanNames` read
+   `visualBible.creatures`, a pool nothing writes: the Bible's collections are
+   mainCharacters / secondaryCharacters / animals / artifacts / vehicles /
+   locations / clothing, no prompt asks the Art Director for `creatures`, 0 of
+   122 staging stories carry the key, and even `resolveSceneCreatures` — which
+   paints "creatures" into the composite plate — reads `animals`. A dead read
+   that looks like coverage is worse than none.
+
+**Rationale:** The two alternatives were rejected. Making animals FIGURES
+everywhere hands a dog a schema built for people (`hair`, `eyewear`,
+`facial_hair`). Making them OBJECTS everywhere reverses the settled cast rule
+written after a cover evaluator accepted a fifth human child at 0.9 confidence
+in place of a named dog — a roster entry has to say what KIND it is, and an
+animal entry must be unsatisfiable by a person. So the split classification
+stays and the judge that reads both lists is told the mapping, which is the
+sanctioned shape: **classification is the prompt's job.** No finding
+description is pattern-matched anywhere in this change.
+
+`duplicate_identity` was deliberately NOT added to `PRESENCE_COUNT_TYPES`. That
+set is what the presence ARITHMETIC owns once it has spoken, and the arithmetic
+answers exactly one question — figure count vs roster count. It never emits
+`duplicate_identity` and has no substitute verdict for it, so adding it there
+would silently delete a real and unrelated finding class (an uncommissioned
+extra rendered with a named character's hair, face and contract garments) on
+every page where the count happened to balance. The animal's false
+`duplicate_identity` is fixed at its source instead — the compliance prompt may
+no longer use that code for an `(animal)` entry.
+
+**Touched:**
+- `prompts/image-prompt-compliance.txt` (EXPECTED CAST input; STEP 1 animal-pairing rule)
+- `prompts/image-semantic.txt` (EXPECTED CAST input; STEP 2 animal rule)
+- `server/lib/evalPipeline.js` (`expectedCast` option on `evaluateThreeStage`, untruncated `ORIGINAL_PROMPT`, roster hoisted above the semantic launch and passed to both blind judges, new `supersedePresenceFindings`)
+- `server/lib/sceneValidator.js` (`EXPECTED_CAST` fill; `buildSemanticPrompt` extracted so the BUILT prompt is assertable)
+- `server/lib/bboxDetection.js` (`vbNonHumanNames` reads `animals` only)
+- `scripts/analysis/rerun-eval-sonnet.js` (replay sends the same untruncated prompt production does)
+- `tests/unit/animal-cast-classification.test.ts`, `tests/unit/fixtures/animal-cast-job_1789348171785_9oxos7dwv.json`
+**Status:** ✅ active
+
+## An appearance word is ATTRIBUTED to an element before it may contradict that element's state (2026-09-14)
+**Context:**   `appearanceContradiction` (`server/lib/visualBible.js`) reads the sentences of
+`sceneIntent` that name a stated object, and fires `vb_state_contradicted` when they speak a
+sibling state's vocabulary. It filtered sentences by "this element is named in it" only. Lab
+experiment #1266 page 12 cites two stated objects — ART001.3 (a muddy egg) and ART002.1 (a jacket
+in its unaltered state) — and one sentence names both. "muddy" belongs to the egg; the check
+charged the JACKET's unaltered state with being contradicted. The scene reviewer examined the
+finding and correctly declined it ("muddy names the egg, not the jacket"), so nothing wrong
+reached the book — the cost is a wasted mechanical finding slot and a wasted reviewer round on
+every page where two stated objects co-occur.
+**Decision:** A sentence votes only when the page's cited elements put exactly ONE of them in it.
+Attribution comes from the brief's own structure — the entries cited by `objects[]`, matched by
+the naming tokens that are distinctive to a single cited element — never from reading the prose's
+meaning. When a clause names two cited elements the attribution is ambiguous and the check emits
+NOTHING for either.
+**Rationale:** Silence is the cheap side here: a false finding costs a reviewer round, while a
+missed one costs nothing new — the state guard is not the only protection on a page, and the check
+was already documented as under-firing by design. The alternative (an NLP heuristic that decides
+which noun an adjective attaches to) is forbidden by the eval-classification rule in CLAUDE.md and
+would not generalise past the story it was tuned on.
+**Touched:** `server/lib/visualBible.js` (`appearanceContradiction`),
+`tests/unit/vb-state-review.test.ts` (both the suppressed false positive and the still-firing true
+positive)
+**Status:**    ✅ active
+
+## Trial idea variety: the two arms differ by construction, not by being asked to (2026-09-14)
+**Context:**   Lab experiment **#1273** drew ten trial idea PAIRS on held-identical inputs and got
+ten of ten on the same premise. The prompt was 861 words in for 40 words out, of which
+`prompts/age-band-tries.txt` was 447 (57%) and not one word invited variety. Three mechanical
+causes, all measured: (a) the band file's worked-example menus were read as an answer key — 8 of 10
+ideas resolved with the phrasing of `age-band-tries.txt:15-16` verbatim; (b) the make-believe arm's
+only difference from the own-town arm was an appended sentence opening "Generate a DIFFERENT idea
+than the first one", a **dangling reference** — the two calls fire simultaneously in one
+`Promise.all`, so the model has never seen the first idea, and one sentence of framing cannot beat
+782 shared words that dictate the plot; (c) `prompts/trial-idea.txt` rendered `Story title: ` empty
+(`getTrialTitle` returns null for an untopic'd adventure) while still instructing "The idea must fit
+the title above" and "Do NOT repeat the title."
+**Decision:**  Four changes, no evaluator or scoring change (classification belongs to the prompt):
+1. **Three views of one band file.** `prompts/age-band-*.txt` tag their spans — `[[book]]` (book
+   craft and the example menus), `[[plot]]` (the band's plot mechanics), untagged (tone and safety).
+   `applyBandView()` slices; `buildAgeModeSection(input, { bandView })` serves `writer` (everything —
+   the default, so the writer is untouched), `premise` (drops `[[book]]`) and `tone` (drops both).
+   ONE file carries all three so no view can drift out of sync with the writer's.
+2. **The make-believe arm gets `tone`, the own-town arm gets `premise`.** The arms now differ in
+   plot licence, not in one appended sentence. The dangling "different than the first one" clause is
+   deleted. The arms stay parallel — `/try` latency is the point of that path.
+3. **The title line and its two rules are gated on a non-empty title.**
+4. **A rotated variety axis.** `nextIdeaVarietyAxis()` injects one line per arm naming the kind of
+   want and the sort of companion, rotated through two static coprime lists (7 × 4). Two draws
+   differ by construction. This follows the measured-good pattern from the beats 15-sample ruling
+   (`decisions.md` 2026-08, "oversupply + selection beats prohibition") — "choose a less obvious one"
+   adds no entropy. Archetypal wording only; ~20 tokens; no extra call.
+Assembly moved out of the SSE route into `buildTrialIdeaPrompts()`, which the `/try` route and the
+Lab's `trial_idea_variety` stage both call — the stage previously hand-copied it and could silently
+measure a prompt production does not send.
+**Rationale:** This implements the 2026-08-25 ruling that the two cards must differ in KIND
+(`decisions.md:19740`); it does not reverse it. `:14578` (premise not walkthrough) and `:33028`
+(name want/obstacle/cost concretely) are unaffected — the premise view keeps the plot mechanics that
+make a premise concrete and loses only the book-craft rules a 40-word premise cannot honour (per-turn
+feelings, food safety, life-event framing, ending tone). The challenge catalogue stays out of the
+trial path: the age-3 exclusion is an owner ruling (`decisions.md:26317`). `docs/SETTLED.md` carries
+no line on idea generation, so no reversal protocol applies.
+Measured: own-town arm 468 words (age 3) / 414 (age 5); make-believe arm 292 / 271 — down from 782
+shared. Band views at age 3: writer 446 words (unchanged), premise 240, tone 111.
+**Touched:** `prompts/age-band-{tries,routine,quest,fear-choice,journey}.txt` (scope tags; five
+sentence seams reworded so a removed menu leaves a whole sentence),
+`prompts/trial-idea.txt` (`{TITLE_LINE}`, `{TITLE_RULE}`, `{VARIETY_AXIS}`),
+`server/lib/promptBuilders.js` (`applyBandView`, `bandView` option, `nextIdeaVarietyAxis`,
+`buildTrialIdeaPrompts`), `server/routes/trial.js`, `server/lib/testlab.js`
+(`runTrialIdeaVarietyStage` rebuilds per draw so the rotation is exercised),
+`tests/unit/trial-idea-variety.test.ts`, `tests/unit/testlab-trial-variety-stages.test.ts`
+**Status:**    ✅ active
+
+## The Art Director's size rule states the obligation unconditionally (2026-09-14)
+**Context:** Rule 8f of the Art Director prompt asks for a size ratio in the
+brief prose ("the mast rises five times her height"). Measured over three
+finished stories, the AD emitted **one** ratio clause in 18 pages (and that one
+was about a rock, not the story's creature), **one** in 19 pages, and **zero**
+in 18 pages. The worst case: a page holding two same-species creatures whose
+Visual Bible entries differ ONLY in size, plus four implied child figures, got
+no ratio at all — both creatures were described with adjectives ("a massive
+emerald green creature", "a tiny baby dragon"). Adjectives do not survive into
+a render as scale: the larger creature shipped at roughly van size with its
+head equal to a child's full height.
+**Decision:** 8f is rewritten so the obligation is unconditional. The old
+opener "When such an element shares the frame with a figure, name the ratio"
+became "Every page that cites an element whose Visual Bible entry states a
+size, and holds a figure too, names that size as a ratio against a figure in
+the prose", with an explicit "an adjective is not a ratio — massive, tiny,
+huge, enormous carry no scale into the picture" and a clause covering two
+entries of one kind that differ in size. The correct carve-out is kept: an
+element alone on a page is measured against nothing. The same edit lands in
+`scene-expansion.txt`, the per-page fallback, which shares the PAGE rule set by
+design.
+**Rationale:** Position was investigated first and cleared: `shrinkPromptForModel`
+is an IMAGE-prompt path only (`images.js`, reached from `generateImage*` and
+`grok.js`), and the beats route hands `buildSceneExpansionAllPrompt`'s output
+straight to `callTextModelStreaming` with no shrink or truncation. Rule 8f
+therefore always reaches the model; what failed was the phrasing, which reads as
+a conditional the model can decide does not apply. No mechanical code check was
+added — that is a separate owner decision.
+**Honest limit:** an explicit ratio is **necessary but not sufficient**. On a
+page where a repair had injected a numeric ratio ("roughly one-sixth the height
+of the Mother Dragon"), the render came back at about one-third. This change
+raises the odds that a ratio is stated at all; it does not make the renderer
+obey it.
+**Unproven:** validating that the AD now emits more ratio clauses needs a paid
+Test Lab `beats_scenes` run on a set holding a sized creature or vessel plus
+figures. Not run.
+**Touched:** `prompts/scene-expansion-all.txt` (rule 8f),
+`prompts/scene-expansion.txt` (rule 8f),
+`tests/unit/built-prompt-values.test.ts` (both AD prompts carry the rule, worded
+identically; the rule is unconditional; no shrink path on the beats route)
+**Status:** ✅ active
+
+## A Visual Bible entity citation resolves from `objects[]` ∪ `characters[]` (2026-09-14)
+**Context:** Story B `job_1789343124794_z2c779f7i` p17. The v0 prompt, built
+from the Art Director's brief, carried three REQUIRED OBJECTS lines — the
+dragon egg, `ANI002` "Mother Dragon" *— about the size of a small house*,
+`ANI001` "Funkli" *— about the size of a school bag* — plus a reference-cell
+claim naming the egg and Mother Dragon. The v1 prompt, the image that SHIPPED,
+carried only the egg line and only the egg's reference image. Cause: the
+`iterate-round-1` repair — commissioned for a hammer artefact, a facing error
+and stray leaves, with no scale issue anywhere in its commission — re-authored
+the page metadata and moved both animals OUT of `objects[]` and INTO
+`characters[]`, leaving `objects[]` = `["LOC004","LOC003","ART003.3"]`. The
+REQUIRED OBJECTS builder walked `metadata.objects` only, so the paid render was
+generated with no size clause and no ANI reference cell, against the prose
+adjective "a massive emerald green creature" alone. Nothing logged it: a
+silent-loss class where reclassifying an entity between two metadata lists
+deletes a whole prompt channel.
+**Decision:** (1) The page's VB object citations are the UNION of `objects[]`
+and the VB-object ids filed in `characters[]`, resolved through one helper,
+`collectVbObjectCitations`, and deduped by resolved entity id so an entity in
+both lists emits one line. Only VB-id-shaped, non-CHR entries are taken from
+`characters[]` — a human cast member is a name (or a CHR id) and keeps its
+existing path untouched. (2) A rewrite that drops a VB id the ORIGINAL brief
+cited emits one warning naming the page and the dropped ids
+(`warnDroppedVbCitations`, wired into the iterate rewrite). LOG-ONLY: a gate is
+a guideline — the rewrite stands, the round is never failed, nothing is
+reverted.
+**Rationale:** The loss is structural, not a wording problem: no prompt rule
+can restore a channel the builder never walked. Widening WHERE an entity is
+found leaves WHAT is emitted untouched — the line stays name-only (2026-09-02,
+"Visual Bible element detail is Art-Director-mediated") and `size` still rides
+for animals (2026-09-11). Reverting a rewrite's classification was rejected:
+the rewrite may legitimately file an animal as cast, and a deterministic gate
+that kills a paid round is its own decision the owner has repeatedly declined.
+**Touched:** `server/lib/promptBuilders.js` (`vbObjectIdOf`,
+`collectVbObjectCitations`, `droppedVbCitations`, `warnDroppedVbCitations`, the
+REQUIRED OBJECTS loop + `pushRequired` dedupe), `server/lib/images.js`
+(`iteratePageCore`, after the anchored-object scrub),
+`tests/unit/vb-citation-union.test.ts`
+**Status:** ✅ active
+
+## VB contract audit: a numeric `age` satisfies the apparent-age rule (2026-09-14)
+**Context:** `prompts/scene-expansion-all.txt:131` mandates that every secondary-character
+entry carries `age` as a NUMBER of years (`8`, `34`), never prose. `auditVisualBibleContract`
+contradicted that contract twice over: `vbEntryProse` built the scanned text with
+`typeof entry[f] === 'string'`, so a compliant numeric `age` was dropped before matching, and
+`VB_AGE_INDICATOR` only matched digits followed by a `year`/`yr`/`aged` token, so a bare `34`
+would not have matched even if it had survived. An entry obeying the prompt EXACTLY was
+reported as "states no apparent age". Lab #1267 (CHR001 "Frau Brunner", no sex AND no apparent
+age) is the live instance: the sex half was a real Art Director miss, the age half was this
+false positive.
+**Decision:** Fix the bug, keep the finding WARN-only. `vbHasNumericAge()` accepts an `age`
+holding a plausible year count — finite, `> 0`, `<= 120` — as a statement of apparent age,
+numeric or a purely numeric string; the existing prose forms (`"8 years old"`, `"elderly"`,
+`"teenager"`) keep working for the other bible-emitting templates. `0`, negatives, out-of-range
+and non-numeric garbage still fail: an unset or defaulted field is exactly the omission the
+rule exists to catch. The finding is NOT routed into the scene review, its severity is
+unchanged, and it blocks nothing — that warn-only design is deliberate
+(`server/lib/outlineParser/unified.js:308-312`): classification belongs to the authoring
+prompt, and the warning is how we learn the prompt slipped.
+**Rationale:** Today's other findings were checks that stayed SILENT when they should have
+spoken. This one is the inversion — it spoke when it should have been silent, and that noise
+made its real half easy to dismiss. A check that fires on correct output trains the reader to
+ignore it, which costs more than the check earns. `name` stays excluded from the scanned prose
+(a title like "Mrs" or "Grandmother" must still not satisfy the sex rule), and the sex logic is
+untouched. `age` is the only contractually-numeric field among `VB_PROSE_FIELDS`; every other
+field in that list is authored as a string by all bible-emitting templates, so the
+`typeof === 'string'` filter drops nothing else, and only this one rule consumes `vbEntryProse`.
+**Touched:** `server/lib/outlineParser/shared.js` (`VB_AGE_YEARS_MAX`, `vbHasNumericAge`, the
+rule-1 condition), `tests/unit/vb-authoring-contract.test.ts`
+**Status:** ✅ active
+
+## The push gate's two readers reach ONE verdict, and never fail open (2026-09-14)
+**Context:** `scripts/admin/check-push-idle.js` is both gate 8 of `.githooks/pre-push` and
+the by-hand status check CLAUDE.md tells agents to trust. On 2026-09-13, twice, the by-hand
+run printed `✓ staging is idle` with `EXIT=0` and the hook refused the very next push with
+`✗ PUSH BLOCKED — staging is busy • testlab: 1 experiment(s) running`. Investigated: the two
+readers call the SAME URL with the SAME probe, the endpoint is uncached (Railway edge direct,
+no Cloudflare, no `cache-control`), and the server side (`/api/health/busy` →
+`busyReport()` in `server/lib/idleShutdown.js`) has one definition of busy. The divergence was
+in the FOLD, not the data: `process.exitCode = (!manual && blocked) ? 1 : 0` made a by-hand
+run exit 0 whatever it found, and manual mode wrote its busy/unknown lines to **stderr** while
+the `✓ idle` lines went to stdout — so a stdout-only capture, or anything reading `$?`, saw an
+all-clear over a busy environment. A second, independent fail-open sat in `probe()`:
+`ENOTFOUND` and `EAI_AGAIN` were classed with `ECONNREFUSED` as "container is down → idle",
+so a flaky local resolver reported a green tick over a production generation in flight.
+**Decision:** One shared resolver, `evaluateTargets()`, folds every per-environment
+`renderVerdict()` into a single `blocked` flag that both readers use; `main()` derives the exit
+code from that flag with **no mode in the expression**. Manual mode's busy/unknown lines move
+to stdout, alongside the ticks. DNS failures (`ENOTFOUND`, `EAI_AGAIN`) now return `unknown`,
+which blocks. Positive evidence of a stopped deployment still passes — Railway edge 502/503 and
+`ECONNREFUSED` mean the name resolved and nothing is running — because staging shuts itself
+down to save RAM and must stay pushable. `.githooks/pre-push` is unchanged: it was the reader
+that was already correct.
+**Rationale:** A safety gate that answers "idle" when it could not determine the answer is
+worse than one that errors — the hook exists because a push on 2026-08-05 killed a running Test
+Lab experiment, and on `master` the same mistake kills a user's paid, in-flight story. Matching
+the script to the hook by patching one branch would have left the same two-verdict shape, so
+the fold itself was extracted instead, with a wiring guard asserting the exit-code expression
+cannot regain a `manual` term and that every verdict blocks identically in both modes. Fixtures
+are the live response shape (`GET /api/health/busy` captured 2026-09-14) and the real `reasons`
+strings the server emits, not hand-built ones. NOTE: a by-hand check remains a point-in-time
+read — a run may start in the minute the hook's other seven gates take, and the hook rechecking
+at gate 8 is what makes that safe.
+**Touched:** `scripts/admin/check-push-idle.js` (`evaluateTargets`, `probe` DNS
+classification, manual-mode streams, exit code), `tests/unit/push-idle-gate-agreement.test.ts`
+**Status:** ✅ active
+
+---
+
+## `eval_findings` is the Lab registry ONLY; the eval stats sink is `eval_finding_stats` (2026-09-14)
+
+**Context:** Two different things in this repo were both called `eval_findings`,
+and the stats sink never wrote a single row in its entire lifetime — measured
+2026-09-14, staging and production both.
+
+1. The **Lab findings REGISTRY** — `migrations/013_eval_findings.sql`
+   (`slug / title / category / prompt_file / rule_text / rationale / evidence /
+   status`). Curated, hand-authored; seeded by
+   `scripts/admin/seed-eval-findings.js`, edited from the Test Lab
+   (`server/routes/admin/testlab.js`), read by the admin
+   `StoryStatsTab` findings panel. Live: **staging 25 rows**, **production 0 rows**.
+2. The **per-page eval STATS SINK** — `story_id / page_number / bucket /
+   severity / owner / agreement / eval_type / art_style / genre / language /
+   char_count / judges`, one row per merged eval bucket-hit, so "what goes wrong
+   per art style / per genre" is a plain `GROUP BY`. Written by
+   `db.recordEvalFindings`, read by `getEvalFindingsStats` /
+   `scripts/admin/eval-findings-stats.js`.
+
+The sink's table was declared **only** inside `initializeDatabase()` in
+`server/services/database.js` — a function that has not been on the boot path
+since `server.js:1608` (`REMOVED_initializeDatabase_DEAD`). So it was never
+created in any environment; migration 013 owned the name in both; and every
+`INSERT` from the sink targeted the registry's schema and could only fail on
+`column "story_id" does not exist`. The error was caught at `console.warn`
+level, and the call site in `evalPipeline.js` was `.catch(() => {})` — two
+layers of silence. It stayed invisible for a second reason: until the repair
+pipeline started threading `evalStoryMeta` (`server/lib/repairPipeline.js:337`),
+no caller passed `storyMeta`, so the block never ran at all. Production *does*
+now pass it (`server/lib/images.js:2491` → `evalPipeline.js` sink block); the
+Lab stages deliberately do not (pinned by `38e17173b`, see
+`evalReplayInputs.js` `NOT_MIRRORED_EVAL_OPTION_KEYS`) — that is correct and
+unchanged, a Lab re-eval must not pollute production statistics.
+
+This matters because CLAUDE.md makes the registry the first link in the
+evidence chain: *a `docs/decisions.md` entry born from a Lab run MUST cite its
+experiment/registry IDs*. The chain was broken at that first link.
+
+**Decision:**
+- `eval_findings` keeps its name and means **only** the curated Lab registry
+  (migration 013). No behaviour, schema or data of the registry is touched.
+- The statistics sink moves to its own table `eval_finding_stats`, created by
+  the new `migrations/037_eval_finding_stats.sql`. Nothing is dropped, renamed
+  or migrated — the sink table never existed, so there is no data to move.
+- One shared constant, `EVAL_FINDING_STATS_TABLE` in `database.js`, is the only
+  place the table name is spelled; writer and reader both interpolate it, so
+  the two can never drift.
+- The self-disabling schema probe is deleted. **A write failure is now LOUD**:
+  `console.error` naming the table, the error and the first failing row, once
+  per process (a broken table would otherwise log once per bucket per page —
+  hundreds of lines per story), with the running total exposed by
+  `getEvalFindingStatsFailureCount()`. It still never throws — per the owner's
+  standing rule a gate never kills a paid run.
+- The dead `initializeDatabase()` block no longer declares any table here, only
+  a comment pointing at the migration. Schema changes are migration files.
+
+**Rationale:** Renaming or dropping the live `eval_findings` table would touch
+25 rows of curated staging evidence for the benefit of a table with zero rows —
+the sink is the one with no users and no data, so the sink is the one that
+yields. A probe that silently disables a subsystem is worse than a crash: it
+converts a schema bug into permanent, invisible data loss, which is exactly how
+this survived from the day it was written. `warn` was not enough; `error` plus a
+countable failure total is. The guard test makes the collision structurally
+unrepeatable rather than relying on a comment.
+
+**Not done (needs owner approval):** nothing was DROPped, DELETEd or ALTERed.
+Migration 037 is additive and applies itself at boot via
+`server/services/migrate.js`; it has not been run by hand against either
+database.
+
+**Touched:** `migrations/037_eval_finding_stats.sql` (new),
+`server/services/database.js` (`EVAL_FINDING_STATS_TABLE`, `recordEvalFindings`,
+`getEvalFindingsStats`, `getEvalFindingStatsFailureCount`, dead-init block),
+`server/lib/evalPipeline.js` (sink call site no longer swallows),
+`server/lib/evalBuckets.js` + `server/lib/evalReplayInputs.js` +
+`scripts/admin/eval-findings-stats.js` (comments/messages name the right table),
+`tests/unit/eval-finding-stats-sink.test.ts` (new), `tasks/BACKLOG.md`.
+
+## REQUIRED OBJECTS parser terminated on its own first list entry — the prompt format was engineered around a consumer that never returned anything (2026-09-14)
+**Context:** `parseVisualBibleObjects` (`server/lib/bboxDetection.js`) reads the
+`**REQUIRED OBJECTS IN THIS SCENE …**` block out of a built page prompt and feeds the names
+into the eval/bbox expected-objects set (`server/lib/images.js:2605-2611`). Its section regex
+`/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\n\n|\*\*[A-Z]|$)/i` carried the `/i` flag,
+which makes `[A-Z]` match ANY letter — so the lookahead terminator `\*\*[A-Z]`, meant to stop at
+the next bold HEADING, fired on the opening `**` of the FIRST list entry. The capture was two
+characters (`"* "`) and the entry pattern matched nothing. Reproduced by execution against a real
+p17 block: `parseVisualBibleObjects(...) -> []`. The function has therefore returned `[]` for every
+prompt ever built, and the merge into `expectedObjects` has always been a no-op: every downstream
+consumer (`resolveExpectedObjectLabels` → GroundingDINO object pass → entity consistency) has only
+ever seen objects from `sceneMetadata.objects`.
+
+Dropping `/i` is NOT sufficient: `\*\*[A-Z]` then legitimately matches the second entry's
+`**Mother Dragon**` and truncates the list after one item. Entry names are arbitrary
+(`dragon egg`, `Mother Dragon`, `Funkli`), so no property of an entry's first letter can separate
+a heading from an entry.
+
+**Decision:** Terminate the section on a blank line or on a `**` at the START of a line
+(`(?=\r?\n[ \t]*\r?\n|\r?\n\*\*|$)`), and anchor the entry pattern to line start with `/gm`
+(`/^[ \t]*\*\s+\*\*([^*]+)\*\*\s*\((\w+)\)\s*:?/gm`). Every entry is written as `* **Name** (type)`,
+never bare `**` at column 0, so a list entry can no longer terminate its own section. `location`
+entries stay excluded; both the current name-only shape and the pre-2026-09-02
+`* **Name** (type): description` shape still parse. No gating or suppression was added on top of
+the newly-live path — that is the owner's call.
+
+**Rationale:** The prompt-side format contract was maintained in good faith for months against a
+consumer that could never observe it. Four comments in `server/lib/promptBuilders.js` name this
+parser explicitly and shaped the emitted text around it: `:3902` (image prompts are English-only
+because localized headers break `/REQUIRED OBJECTS/`), `:4009` (object STATE sits AFTER the type,
+never inside the bold name, because the parser captures what is between the asterisks and a state
+in the name would become the GroundingDINO grounding key), `:4018` and `:4025` (the trailing
+"attached reference images" line and the markings line are written as PLAIN lines with no `* **`
+prefix precisely so the entry regex never reads them as objects). All four remain accurate under the
+new regex, and `:4018`/`:4025` are now actually load-bearing rather than defensive.
+
+**Behaviour change (reported, not gated):** the expected-objects set now genuinely grows on pages
+that declare VB elements. The detector is asked to find more things, which can produce new
+`found:false` entries and new eval findings. `resolveExpectedObjectLabels` passes an
+already-natural-language name through unchanged (only a `^[A-Z]{3}\d{3}(\.\d+)?$` token is
+translated; a dotted facet resolves to its BASE entry's lead label) and deduplicates
+case-insensitively, so an ID from `sceneMetadata.objects` and the prompt lead for the same element
+normally collapse — both derive from `elementLeadLabel`. They can still diverge where the prompt
+lead appends a trailing `(qualifier)` to the bold name, or where an animal leads with `obj.name`
+instead of `elementLeadLabel`: that yields two expectations for one object. Nothing guards against
+that; the merge in `images.js` is an exact-string `includes` check.
+
+**Touched:** `server/lib/bboxDetection.js` (`parseVisualBibleObjects` section + entry regexes,
+comments), `tests/unit/parse-visual-bible-objects.test.ts` (new, 7 tests — 5 fail against the old
+regex), `tasks/BACKLOG.md`.
+**Status:** ✅ active
+
+
+## The re-plan returns only the pages a finding named (2026-09-14)
+**Context:**   The `# RE-DIVIDE` block contradicted itself inside one paragraph: "Return ONLY the pages a finding names, one line each ... and nothing else" sat next to "Output the full plan again." (`promptBuilders.js` `buildReplanSection`). A third signal broke the tie the wrong way — `prompts/story-beats.txt` OUTPUT FORMAT said "One line per page, through page {PAGE_COUNT}" on every build, re-plan included. Two of three instructions ordered the whole book, and that is what the planner delivered: `beats_replan_unnamed_pages` fired 4 times across two stories, one story rewriting 8 unnamed pages in round 1 and 9 in round 2.
+**Decision:**  Owner decision, 2026-09-14: the re-plan returns ONLY the pages a finding names. The full-plan demand is removed and replaced with "Every page number you return is already in the plan above." (the page-count brake, backlog #42 — a re-plan once delivered 19 pages for an 18-page order). The template's scope sentence became `{OUTPUT_SCOPE}`, filled by `buildBeatsPrompt` from the replan section: empty replan (first plan) → "One line per page, through page N."; non-empty → "One line for each page named under RE-DIVIDE, and for no other page."
+**Rationale:** The merge in `beatsPipeline.js:1283-1295` already supports a partial reply — unreturned pages are filled from the standing division and returned-but-unnamed pages are reverted with a warning — so no code change was needed on the consuming side; only the three conflicting instructions had to agree. Honest limit: the revert guard only ever protected UNNAMED pages. The named-page lines in already-shipped stories were produced during whole-book rewrites and this change does not retroactively fix them. Compliance is unverified — it needs a paid Lab round of the stage that calls `buildBeatsPrompt` with a non-empty replan section, measuring pages returned per round against pages named.
+**Open:**      The second RE-DIVIDE paragraph's count-neutral remedy ("Keep the page count by merging two pages ... or by dropping the weakest") assumes the whole division is in view; under a partial reply a merge would have to return — and renumber — pages no finding named, which the revert guard would undo. It is left in place unchanged as a brake against inventing pages; reworking it is an owner call.
+**Touched:**   `server/lib/promptBuilders.js` (`buildReplanSection`, `buildBeatsPrompt`), `prompts/story-beats.txt`, `tests/unit/built-prompt-values.test.ts`
+**Status:**    ✅ active
+
+## The writer's "---" page rule is trimmed off the END of a page's text (2026-09-14)
+**Context:**  Story `job_1789348171785_9oxos7dwv` (staging) shipped pages 1, 2 and 8
+with a bare `---` under the last sentence ("... beobachtete alles genau.
+
+---").
+This is READER-VISIBLE: `pageText` is rendered in the book and in the PDF. The text
+writer separates pages with a rule line; `parseRefinedText` cuts a page at the NEXT
+"## Page N" heading, so a rule the model wrote INSIDE the page body was never removed
+by anything — it was not "stripped only on its own line", it was not stripped at all.
+**Decision:** `stripTrailingSeparator()` (`server/lib/sceneMetadata.js`, the page-text
+helper module) removes ONE trailing delimiter, applied at the two sites that produce
+stored page text: the beats page assembly and the text-refine rewrite merge. A
+delimiter is, deliberately narrowly: a run of **two or more** dash characters
+(`-` `‐` `‑` `‒` `–` `—` `―`, mixed allowed), standing at the very end of the text
+with only whitespace after it, and preceded by whitespace (or being the whole
+string). Any leftover trailing whitespace goes with it. Everything else is returned
+byte-identical.
+**Rationale:** A **single** trailing dash is never touched — German and French
+children's prose legitimately ends a line on an em-dash ("Und dann —"), and dialogue
+uses dashes mid-clause; a two-dash run is not punctuation in any language we ship.
+Requiring the run to stand alone keeps word-attached typography ("Wort--") intact.
+The fix is applied at the page-text sites rather than inside `parseRefinedText`
+because that parser is also the SCENES/brief parser (briefs are not reader-visible)
+— and it lives in `promptBuilders.js`, which was locked by a concurrent session.
+Consolidating it into the parser is a fair later cleanup.
+**Touched files:** `server/lib/sceneMetadata.js`, `server/lib/beatsPipeline.js`,
+`server/lib/textRefine.js`, `tests/unit/page-text-trailing-separator.test.ts`
+
+## A single-instance object has one holder — two conflicting holder findings are a spec conflict, not two repair jobs (2026-09-14)
+**Context:**  Staging story `job_1789348171785_9oxos7dwv` page 7 shipped with TWO
+copies of the book's one plot prop. The v0 consolidated plan carried two
+`action_interaction` findings naming two DIFFERENT characters as the prop's holder
+(`[CRITICAL]` "declared to carry <prop> but hands empty" on one, `[MAJOR]` "holds
+<prop> with only left hand" on the other) and wrote a per-character fix for EACH.
+Round 2's inpaint instruction obeyed both verbatim — "Add red egg in this
+character's hands" AND "Adjust this character's pose so both arms encircle the red
+egg" — the render put the prop in two pairs of hands, the next eval returned a
+`[CRITICAL]` for exactly that, and it landed in `unrepairedCritical` and SHIPPED
+because `repairMaxPasses` was exhausted. `spec_conflicts` was `[]` in all three
+rounds. The declared spec was never ambiguous: the scene description's prose gives
+the prop to ONE character ("both arms wrapped around the <prop>") and the
+`sceneIntent` repeats it; the second finding simply contradicted the spec.
+**Decision:** Extend the consolidator's existing `## Spec check (required)` — the
+mechanism that already emits NO fixes for a listed pair and records both findings
+in `dropped_issues` with reason `"spec_conflict"` — to a third shape: a prop the
+scene description declares once, in the singular, and gives to one character has
+exactly one holder, so two findings naming two different characters as its holder,
+carrier or wearer are ONE conflict, not two jobs. The object is resolved through
+the DECLARED spec, never by matching the findings' wording, and the prompt says
+explicitly that the prose and the `sceneIntent` declare the holder as well as the
+`interactions` list.
+**Rationale:** A unique prop cannot be in two places at once any more than a body
+part can — the same class as the check's existing body-part shape, one case covered
+and the other not. Keying on the spec rather than the findings is not a style
+preference but a requirement of the evidence: the two real findings named the prop
+DIFFERENTLY (its story name in one, a plain description in the other), so a rule
+matching description wording would have caught nothing, and CLAUDE.md forbids
+working out what a finding means from its prose. The holder declaration is likewise
+NOT in `interactions[]` on this page (its one entry is "walking") — it is in the
+prose and the intent, which is why the deterministic `detectDeclaredSpecConflicts`
+body-part check in code could not have been extended to cover it as written.
+Prompt-side per owner decision; a code backstop was considered and left unbuilt.
+**Touched files:** `prompts/feedback-consolidator.txt` (spec-check section + a
+generic worked pair in the `spec_conflicts` output example),
+`tests/unit/single-instance-object-holder-conflict.test.ts`
+
+## The expected-object merge dedupes on the resolved ENTITY, not on the string (2026-09-14)
+**Context:** `server/lib/images.js:2605-2611` builds the eval/bbox expectation set from TWO
+sources: `sceneMetadata.objects` (Visual Bible ids — `ART003`, `LOC001.2`) and
+`parseVisualBibleObjects(img.prompt)` (the bold names in the page prompt's REQUIRED OBJECTS
+block). The merge filter was an exact, case-sensitive `Array.includes`; the real collapse
+happened later inside `resolveExpectedObjectLabels`, which lowercases into a `seen` set AFTER
+resolving ids to labels. Both sources usually derive from `elementLeadLabel`, so they usually
+collapsed. This was latent until 2026-09-14: `parseVisualBibleObjects` returned `[]` for every
+real prompt until commit 3f46e79bc fixed it (previous entry), so the second source was empty and
+the merge was a no-op. It can now fire on every page that declares Visual Bible elements.
+
+Two measured divergences where the two spellings do NOT collapse, both verified in source:
+1. **Trailing qualifier inside the bold name.** `promptBuilders.js:3961-3967` emits
+   `**${refName}${qualifier}** (${type})` — a two-sided prop's orientation (`(turned away)`)
+   rides *inside* the bold lead. The parser captures it as part of the name, while
+   `elementLeadLabel` strips a trailing parenthetical, so the id-resolved label and the parsed
+   name differ and BOTH survive.
+2. **Animals lead with `obj.name`, not the lead label.** Same site: `(obj.type === 'animal' &&
+   obj.name) ? obj.name : elementLeadLabel(...)`. This is DELIBERATE — an animal's proper name is
+   its identity anchor (the comment at that site and the one in `resolveExpectedObjectLabels` both
+   say so) — so it was NOT changed; the dedupe now works around it.
+
+**Failure mode (why it matters):** the detector is asked to find the same object twice under two
+spellings. One of the two comes back `found:false`. An absence is exactly what derives a
+missing-element finding, so a correct page produces a FALSE finding, and that finding commissions
+a repair round on an image that was right. Same shape as the false clothing CRITICAL on story A
+p6, whose two repair rounds destroyed the dragon egg.
+
+**Decision:** dedupe on the resolved entity inside `resolveExpectedObjectLabels`. No new
+normaliser was invented: the existing `elementLeadLabel` (already the single authority for this
+list, and the string the REQUIRED OBJECTS lead, GroundingDINO and entity-consistency all share)
+is reused as the identity key, following the `castResolver` precedent of one resolver keyed by
+entity. An alias index maps every spelling an entry can be named by — its label, its `name`, and
+each of those with a trailing parenthetical stripped — back to that entry's lead label. An
+unknown name keys as itself, so two genuinely different entries that share words (a mother
+creature and its young) stay two expectations; over-merging would hide a genuinely missing
+object, which is the worse failure. Only the dedupe KEY changed: the emitted string is still the
+first spelling to arrive, so the expectation set can only shrink or stay identical, never grow.
+
+**Measured blast radius:** replaying the merge over the stored page prompts and stored
+`sceneMetadata.objects` of `job_1789337998754_apslnsq1z`, `job_1789343124794_z2c779f7i` and
+`job_1789348171785_9oxos7dwv` (read-only, staging DB): **0 of 53 object-bearing pages** would
+have produced a duplicate expectation under today's fixed parser. Those three stories contain no
+two-sided prop (0 pages with a qualified bold name) and every animal's authored label equals its
+name (0 divergent animals across 13 animal-bearing pages), so the flaw is real but unexercised by
+this corpus — the guard is pre-emptive, not a repair of observed damage.
+
+**Touched files:** `server/lib/bboxDetection.js` (`resolveExpectedObjectLabels`),
+`tests/unit/expected-object-dedupe.test.ts` (new, 4 tests).
+
+## Findings record WHO said them — one field, `sources[]`, stamped by the emitter (2026-09-14)
+**Context:** A finding's ORIGIN is the first thing needed to judge it, and it was absent from
+most of them. Four diagnoses on 2026-09-14 each turned on reconstructing the emitter after the
+fact: (1) a false clothing CRITICAL that came from ONE judge grading one character against
+another character's outfit, which commissioned two repair rounds that destroyed a story's
+central prop; (2) a `missing_character` CRITICAL that turned out to come from the book-audit
+READER pass rather than the per-page brief checker — which flipped it from a bug into
+by-design; (3) a state contradiction charged to the wrong element; (4) a contract warning whose
+age half was a false positive. Lab #1263 shows the symptom directly: half the findings render
+as `[?]` and the rest as `three-stage`. Backlog #50.
+
+**Decision:** `sources: string[]` — the field that ALREADY existed — is the single source of
+truth for provenance, and every emitter now stamps it. No new field was added.
+- New `server/lib/findingSources.js` owns the closed vocabulary (`quality`, `semantic`,
+  `compliance`, `entity`, `reader`, `final_checks` — the same list
+  `prompts/feedback-consolidator.txt:104` already gives the model) plus `stampFindingSource`
+  (fills only where absent, never overwrites, throws on an unknown name), `sourcesOf` and
+  `mergeSources`.
+- Stamped at the emitters: the quality judge at the ONE chokepoint where the page's merged list
+  is finalised (so it also covers the coherence gate, the style gate and the multi-judge jury
+  rebuild, which reconstructs the list from bucket vectors and would have dropped an earlier
+  stamp); the three-stage compliance mapper; the semantic judge's parse; entity consistency's
+  per-character issue push; and the presence DERIVATION, which is stamped `final_checks`
+  because this file's own arithmetic authored it, not the judge whose list it joins.
+- Carried across the two merges that were dropping it: the consolidator's entity whitelists
+  (`flattenEntityIssues` and the pre-flattened path), and `repairPipeline`'s book-audit fan-out
+  into `readerFindingsByPage`, which rebuilt each fault as `{severity, line}` — that merge is
+  exactly why diagnosis (2) above was expensive.
+- The Lab panel (`ImageHistoryModal`) now READS the stamp instead of guessing. Its old rule was
+  literally "when `source` is missing, the issue is from the quality eval"; the legacy singular
+  `source` survives only as the fallback for versions stored before this change.
+
+**Rationale:** Why extend `sources` rather than add a provenance field: it is already the
+closest thing to an authority, and adding a second would have put a parallel truth next to a
+field that repair ROUTING reads. `repairLogic.js:114`/`:768` refuse automatic repair when
+`sources.every(s => s === 'entity')` (owner, 2026-09-04); `scoring.js:357` already passes it
+through into the stored deductions; `textRefine.js:91` already stamps it on every parsed
+book-audit finding; the consolidator prompt already defines the vocabulary. The gap was never
+the field — it was that most emitters wrote nothing into it.
+
+Routing is unchanged in both directions, and that is a deliberate property of the stamp, not a
+hope: it only ever ADDS the field where it was absent, and each call site passes its own pool.
+A quality/semantic/compliance/reader finding therefore goes from no `sources` to a one-entry
+list that is not `['entity']` — both guards test `sources.length && sources.every(...)`, false
+before (length 0) and false after. Entity findings are stamped `['entity']`, which is what the
+consolidator already wrote for them and what the raw path already bucketed them as.
+`server/lib/scoring.js` was NOT touched (protected by a same-day owner decision) and did not
+need to be — it already carries `sources` through `normalizeIssues`. No type, severity or
+deduction changed.
+
+Provenance is stamped by the EMITTER and never derived downstream, per docs/SETTLED.md:28 —
+nothing reads a finding's description prose to work out where it came from. The singular
+`source` is left exactly as it is and is NOT provenance: on an entity finding it is the
+detection channel, on a three-stage finding a display tag, and inside `scoring.normalizeIssues`
+the deduction bucket.
+
+**Touched files:** `server/lib/findingSources.js` (new), `server/lib/evalPipeline.js`,
+`server/lib/sceneValidator.js`, `server/lib/entityConsistency.js`,
+`server/lib/feedbackConsolidator.js`, `server/lib/repairPipeline.js`,
+`client/src/components/generation/story/ImageHistoryModal.tsx`,
+`tests/unit/finding-provenance.test.ts`
+**Status:** ✅ active
+
+## The text-refine join has no deadline — it waits for the chain (2026-09-14)
+**Context:** Two facts collided. (1) `2beda5425` moved the text-refine join
+from AFTER the repair pipeline to the end of pure page generation, so the
+mid-loop book audit inside that pipeline would judge the FINAL shipped prose
+instead of superseded text (97% of pages are rewritten by the refiner). That
+ordering is correct and stays. (2) That commit's own latency argument was
+**wrong**, and this entry exists so nobody re-derives it from the commit
+message: it claimed "the refiner measures ~184s against a ~25-min image phase,
+so it has long finished by the new join point". **Pure page generation is ~55s**
+(Grok, 18 pages, parallel); the ~25 minutes is the REPAIR phase — precisely
+what the join was moved in front of. The refiner's headroom fell from ~1460s to
+~99s. Measured on staging: before the commit 5 of 37 non-trial stories lost
+refine rounds (13.5%); after it, **3 of 3 (100%)** — two shipped
+`text_refine_join_timeout` with ZERO rounds and the original text, one shipped
+`text_refine_join_partial` with 1 round of 3. Round 1 alone measures 294.8s on
+`job_1789348171785_9oxos7dwv`; full chains measure 400-600s, with 743/770/841/878s
+all inside the last month. `8b23eacbe` raised the budget to 600s + 10s/page +
+a 120s grace, which covers the 600s case and not the 740-880s ones.
+**Decision:** Remove the deadline (owner's call, chosen over scaling the budget
+to the measured chain). `joinTextRefinement` now calls
+`awaitTextRefineJoin(promise, () => partial, { warnAfterMs, onSlow })`, which
+**awaits** the chain: it is never truncated, and because the join still sits
+before the repair pipeline, the book audit and every stage below it still read
+the FINAL refined text. Both requirements hold at once — the wait is at the
+point of use rather than a timer cutting the chain short. The old budget
+(`computeTextRefineJoinTimeoutMs` → `computeTextRefineJoinWarnMs`, env
+`TEXT_REFINE_JOIN_TIMEOUT_MS` → `TEXT_REFINE_JOIN_WARN_MS`) survives only as
+the point at which a still-running chain logs `text_refine_join_slow` and keeps
+waiting; `text_refine_join_grace*` and the grace helpers are gone. Salvage
+stays for a chain that FAILS partway (`text_refine_join_partial`, and
+`text_refine_join_failed` at error when nothing landed — renamed from
+`text_refine_join_timeout`, which can no longer happen).
+**Rationale:** Nothing cancels the refine when the race is lost — the chain
+finishes and bills in full either way (`job_1789348171785_9oxos7dwv` billed
+$1.01 of `text_refine` AFTER its join gave up) — so the deadline never saved
+money; it discarded paid work and, with it, the whole text-quality gate
+including the text/picture MISMATCH check. On the unbounded-hang question: the
+wait cannot be infinite. Every model call in the chain is bounded by
+`textModels`' streaming ceiling (>=1500s) plus its 120s inactivity abort, each
+audit additionally by its own 900s hostage guard (`AUDIT_DEADLINE_MS`), and
+every step catches its own failure, so `refineStoryText` always settles. What
+remains is latency, and per the gates-are-guidelines rule that ships as a
+warning, never as a kill on a paid run. Trials still skip refinement entirely
+(no repair phase to hide the chain behind) — which matters MORE now, not less.
+**Touched:** `storyJobPipeline.js` (`joinTextRefinement` — the race, the grace
+and the timeout events replaced by the awaited join + `text_refine_join_slow`;
+the "~25 min image phase" comments corrected), `server/lib/textRefine.js`
+(`awaitTextRefineJoin`, `computeTextRefineJoinWarnMs`; `shouldGraceJoin` and
+`TEXT_REFINE_JOIN_GRACE_MS` removed), `tests/unit/text-refine-join.test.ts`,
+`tests/unit/book-audit-reads-shipped-book.test.ts`
+**Status:** ✅ active — supersedes the 2026-09-14 "one budget for every reading
+level, plus a bounded grace" entry above. Verify on the next long story that
+`text_refine_complete` appears with all rounds and that no
+`text_refine_join_partial` is logged.
+
+### A cover stands somewhere its cast can stand, and carries only that place's props (2026-09-14)
+**Context:** The back cover of prod `job_1789227389389_z18dmvnt6` shows the
+family in winter coats on a dry cobbled quay beside a **lit** gas lamp, with
+open green water, descending light shafts and rising bubbles behind them — a
+flame burning underwater and dry scarves in a lake. It is not a failure to
+follow the brief. It is a faithful resolution of a brief that contradicted
+itself, and the stored prompt shows both halves:
+
+- the scene: *"A wide group portrait set before Lake Léman Underwater — Open
+  Water (**no floor visible**, only open dark green water in all directions…)"*
+- `cover-composition.txt`, in all three sections: *"All characters stand firmly
+  on solid ground — feet flat on a stable surface (floor, pavement,
+  **cobblestones**, grass, path). **Never standing in or on water**, never
+  floating, never mid-air."*
+
+The cast was not described as swimming, so no exception applied. Told the
+setting has no floor and that every figure must stand on solid ground with
+cobblestones named as valid, the renderer paved the lake. The same prompt also
+carried `ART009 Quay Lamp` verbatim — *"bolted to the stone paving; the lamp is
+lit"* — a land fixture, specified as lit, in open water.
+
+Note `prompts/image-generation.txt:14` has carried the exception all along
+("…unless the scene description has them swim, float, or fly"). Covers were
+strictly *stricter* than pages, which is what made the conflict unresolvable.
+
+**Decision:** Two prompt-side rules.
+1. `cover-composition.txt` — the canonical cover solid-ground bullet gains the
+   water/air exception, added identically to all three sections (front,
+   initialPage, back): in water or air the characters swim, float or fly, no
+   ground is invented under them, and no land fixture is planted in the scene.
+2. `scene-expansion-all.txt` — every cover backdrop is a LOC the cast can stand
+   in (the Title Page already had a narrower version of this; the Initial Page
+   and Back Cover had none), and a cover's `Objects:` hold only props belonging
+   to that backdrop — a fixture described as mounted, bolted or planted
+   elsewhere does not travel, and a light source is only lit where it would burn.
+
+**Rationale:** Rule 2 prevents the incoherent scene being requested at all; rule
+1 makes covers consistent with pages for the cases where water is genuinely
+right. Both are prompt-side per the standing "classification belongs to the
+PROMPT" rule — the rejected alternative was code validating a location against
+its props, which needs code to decide "is this location wet" from prose, the
+pattern `docs/SETTLED.md` forbids and that got a regex guard built and removed
+in a day.
+
+`docs/SETTLED.md` carries "SOLID-GROUND rule: one canonical wording per prompt
+layer" (decisions.md 2026-07-11). Adding the same clause to all three cover
+sections **preserves** that verdict rather than reversing it — it remains one
+wording for the cover layer — so no reversal protocol is triggered.
+
+**Also covered:** the front cover of the same story (mermaid tails on the dry
+quay) is the same assembly defect pointing the other way, not a separate
+finding.
+
+**Touched:** `prompts/cover-composition.txt`, `prompts/scene-expansion-all.txt`
+**Status:** ✅ active
+
+
+
+---
+
+## A thrown Pass-1 row call consumes one try, never the whole 2×4 sheet (2026-09-14)
+
+**Context:** `avatar_guarantee_fallback` fired on two of the three 2026-09-14
+staging validation runs — **Max** on `job_1789337998754_apslnsq1z`, **Julian**
+on `job_1789343124794_z2c779f7i` (`job_1789348171785_9oxos7dwv` clean). The
+stored `styledAvatarGeneration` audit named one reason both times:
+
+> `generation threw: [CHARACTER 2×4] pass-1 generation failed for <name>: The operation was aborted due to timeout`
+
+That is the 120 s `AbortSignal.timeout` on `editWithGrok`, i.e. a transient
+provider/network timeout. It is **neither** of the two causes this failure mode
+is usually assumed to have: not a Gemini `IMAGE_OTHER` safety refusal (Pass 2
+runs on Grok and was never reached), and not a gate/eval rejection (no Pass-2
+structural-check or verdict failure is stored for either character). It does not
+correlate with clothing, age band or art style either — both characters are the
+same age band, same 'standard' category, same watercolor story, and each
+succeeded in the runs where the other failed.
+
+The mechanism: `generateComposited2x4` runs each row (body, then head) in a
+`for (t = 1; t <= 2)` loop that keeps the least-bad result. The *eval* calls
+inside that loop are wrapped in try/catch with an explicit comment that losing
+the sheet costs the character its face on every page. The **generation** call was
+not. A throw on try 1 therefore propagated out of the loop, out of
+`generateComposited2x4`, and killed the sheet with the second try unused. Pass 2
+already had exactly this containment (`stage: 'gen-error'`, layer 1 of the
+2026-07-30 styled-avatar guarantee); Pass 1 was left out of it.
+
+**Decision:** a thrown row call is caught inside the loop, recorded in
+`attemptHistory` as `{ stage, try, error: 'gen-error: …' }`, logged at warn, and
+consumes ONE try. If every try of a row throws, the existing
+`… row produced no image for <name>` throw still fires and now carries the last
+provider error, so the failure reaches the avatar-guarantee backstop and its
+`avatar_guarantee_fallback` ERROR exactly as before.
+
+**Rationale:** nothing is silenced — the failed attempt is stored, the log line
+is loud, and the all-tries-failed path is unchanged. The retry the code already
+provisioned simply gets used against the failure mode that actually occurred.
+The measured downstream cost on these three runs was **zero pages**: the
+avatars-stage coverage top-up regenerated both sheets at score 9 before the
+images stage began (23:01:55 CH < 23:02:44 CH; 00:23:49 CH < 00:24:42 CH), so no
+page rendered against the seeded raw photo. The cost was ~13 min of latency and a
+duplicated paid sheet — and a narrower timing window would have put a degraded
+identity reference on every page of that character. Not re-litigated here: the
+Pass-2 backend default (Grok) and the guarantee backstop itself.
+
+**Touched:** `server/lib/character2x4Sheet.js` (`generateComposited2x4` body and
+head row loops), `tests/unit/avatar-sheet-row-gen-error.test.ts` (6 checks:
+retry-after-throw per row, attemptHistory record, both-tries-throw still throws,
+clean run unaffected).
+
+**Status:** ✅ active.
+
+---
+
+## A cover stores the same evaluation record a page does — the compliance judge was already running, only its verdict was dropped (2026-09-14)
+
+**Context.** A sweep of 40 staging stories found `threeStageResult` on 0 of 96 stored
+cover records, and the working theory was that the prompt-compliance evaluator — the
+stage that catches duplicated props and cast defects — does not run on covers. It does.
+`evalPipeline.evaluateImageQuality` launches it for `evaluationType === 'scene' || isCover`
+and has since `4e36d92fd` (2026-06-28), covers enter the repair pipeline as pseudo-pages
+(`pageNumber` -1/-2/-3) and go through the identical batch eval, and its findings already
+merge into each cover's `fixableIssues` and penalise its `finalScore`. Measured on staging
+job_1789348171785_9oxos7dwv and 24 sibling stories: 61 cover ROOT records carry a
+`threeStageResult` 0 times, while 78 of 78 of those same covers' `imageVersions` entries
+carry one, complete with `complianceResult` and a score (70 / 60 / 100 on one story's three
+covers).
+
+The loss was at persistence. Pages are stored as the repair pipeline's mapped record
+verbatim; covers were copied back into `data.coverImages[key]` by a hand-listed assignment
+block (`storyJobPipeline.js`, Phase 5 write-back) that had gone stale. Field diff against a
+real page record of the same story: pages carry 18 eval fields, cover roots 10. Missing:
+`threeStageResult`, `qualityRawOutput`, `evalTemplateHash`, `identityAgreement`,
+`unrepairedCritical`, `notEvaluated`. That block had already been patched once for exactly
+this (its own comment records `finalScore` having been dropped the same way).
+
+**Decision.** One shared mirror — `server/lib/coverEvalMirror.js`, exporting
+`COVER_EVAL_MIRROR_FIELDS` and `applyCoverEvalMirror(coverRecord, img)` — replaces the
+hand-listed block. Every eval field of the pipeline's mapped record is copied with
+`?? null`, so a field absent from a later round CLEARS the previous round's value instead
+of leaving a stale finding on a repaired cover. Cover-specific fields (`imageData`,
+`imageVersions`, `titleBaked`, prompt/description) stay with the caller, which has cover
+rules for them. A drift-guard test holds the field list against a REAL stored page record,
+and a wiring guard asserts no per-field `coverImages[coverKey].<field> =` assignment
+returns.
+
+**Rationale.** "Cover and normal pages must be the same." A cover is a page in this
+pipeline; a hand-maintained field whitelist between the two is a drift generator, and this
+is its second recorded instance. Cost of the change is **zero added API spend** — no new
+model call is made, on covers or anywhere; the compliance request was already paid for on
+every cover of every story and its answer was being thrown away at the last step. No new
+repair route opens either: the char-fix, clothing-repair and inpaint gates are all
+`pageNumber > 0`, and `extra_character` is in `NOT_INPAINTABLE_TYPES`, so a compliance
+finding on a cover remains reportable but never destructive — unchanged from before, since
+the findings themselves already existed in `fixableIssues`.
+
+**Not done, and why.** Giving cover prompts a REQUIRED OBJECTS block to enable rule D-16b
+(the held-object swap) was investigated and stopped. D-16b reads that block out of
+`ORIGINAL_PROMPT`, and the batch evaluator — the one that runs in the pipeline — is fed the
+scene DESCRIPTION rather than the built prompt, *deliberately*: `resolveEvalSceneDescription`
+(sceneMetadata.js) documents that `resolveEvalArtStyle` depends on ORIGINAL_PROMPT carrying
+no `**ART STYLE` block, and REQUIRED OBJECTS is emitted into the same prompt tail. So D-16b
+is inert on the batch path for PAGES too — it is not a cover-specific drift, and turning it
+on for covers means either changing what every page's judge is fed or flipping covers onto
+the prose+metadata template branch (`parseProseMetadataFormat` requires a `characters[]`
+block, which would change `isProseFormat` and therefore the cover GENERATOR's template).
+Both are generator-side changes with a recorded rationale behind the current shape; left
+for the owner to rule on.
+
+**Touched:** `server/lib/coverEvalMirror.js` (new), `storyJobPipeline.js` (cover write-back),
+`tests/unit/cover-eval-mirror.test.ts`,
+`tests/unit/fixtures/cover-eval-mirror-job_1789348171785_9oxos7dwv.json`.
+**Status:** ✅ active
+
+---
+
+## A story can be marked as EVIDENCE, and automatic cleanup skips it — by owner intent, with a written reason (2026-09-14)
+
+**Context.** A dozen findings and a dozen entries in this file, all written in the week of
+2026-09-08, rest on a handful of staging stories. Two of them (`job_1789296188291_thezv15y1`,
+`job_1789337873076_qf2at21ui`) are owned by ANONYMOUS trial accounts, and the abandoned-
+anonymous sweep in `server/routes/trial.js` runs unattended every 6 hours, deleting every
+anonymous account older than 48 hours together with its `story_jobs`, `characters`, `files`
+and `stories` — and then pruning the stories' R2 objects. Those two stories had a hard
+48-hour life. The second deleter, `scripts/admin/purge-test-data.js`, removes staging
+stories older than **30 days** with `ownerFilter = true` and `KEEP_EVERY = 0`, i.e. all of
+them; it already exempted ordered, shared and Test-Lab-referenced stories, but nothing else.
+The daily DB housekeeping (`server/lib/dbHousekeeping.js`) deletes no rows at all — it
+offloads and vacuums — so it was never the threat it looked like.
+
+A cross-reference of every `job_` id cited in `docs/decisions.md` and `tasks/` against both
+databases found **six recent cited stories already gone from staging AND production**:
+`job_1788285785501_sbpfd0i8s`, `job_1788698812047_q5b1vuds7`, `job_1788724538469_n6ylqxq7w`,
+`job_1788727744192_gxf6gbywo`, `job_1788763045123_z8so79ngb`, `job_1788802404497_i1mm4yn6h`
+(plus 14 older ones). The conclusions drawn from those are now unfalsifiable. This is the
+failure the mechanism exists to stop repeating.
+
+**Decision.** `stories.evidence_reason` + `stories.evidence_marked_at` (migration
+`038_story_evidence.sql`, which also seeds the currently-cited rows). Every automatic
+deleter consults it: the trial sweep holds back the whole ACCOUNT, `purge-test-data.js`
+adds `evidence` to its protected-ids list, and orphan cleanup shares one predicate,
+`ORPHAN_STORIES_WHERE`. The trial sweep now SELECTs its candidates, splits them in JS
+(`selectAnonSweepTargets`) and **logs every hold-back with its reason** before deleting by
+id list. `scripts/admin/evidence-stories.js list|mark|unmark` is the human view.
+
+**Rationale.** A column over a hardcoded id list in a script: the deleters are SQL and live
+in four places, so the exemption belongs on the row where all of them see it; it survives
+every redeploy; and it is discoverable by anyone who runs `SELECT id, evidence_reason FROM
+stories`. A reason string rather than a boolean because the owner's standing cleanup rule is
+**delete by OWNER, not by artefact type** — an exemption must say who wants the row kept and
+why, or nobody can tell later whether it has gone stale. Protection is per ACCOUNT, not per
+story: keeping a story row while deleting its owner, characters and jobs leaves unreadable
+evidence and an orphan, which orphan cleanup would then delete anyway.
+
+**Touched:** `migrations/038_story_evidence.sql`, `server/lib/evidenceStories.js`,
+`server/routes/trial.js`, `server/routes/admin/database.js`,
+`scripts/admin/purge-test-data.js`, `scripts/admin/cleanup-orphaned-data.js`,
+`scripts/admin/evidence-stories.js`, `tests/unit/evidence-stories-cleanup.test.ts`.
+
+**Status:** ✅ active — staging only until deployed; the seed applies at boot on both envs
+and is a no-op on production, where none of these ids exist.
+
+---
+
+## The iterate GENERATOR gets the page's beat; the JUDGE still must not (2026-09-14)
+
+**Context.** `iteratePageCore` rewrites a page's whole brief and regenerates the frame. It
+passed `null` for `rawOutlineContext`, and with that null `buildSceneDescriptionPrompt`
+filled BOTH beat-shaped slots — `{SCENE_SUMMARY}` and `{DRAFT_SCENE_DESCRIPTION}` ("your
+starting point — do not reinvent") — from `extractSceneMetadata(currentScene.description).imageSummary`,
+i.e. the previous brief's own one-line summary. `scene-iteration.txt` rule 1 told the
+rewriter "the scene hint and outline are authoritative" about an input it never received:
+no outline, no plan line, only a self-summary of the artefact being rewritten. A brief that
+had already drifted could only drift further, because the only narrative anchor in the
+prompt was the drift. The beat is stored on the page the whole time
+(`sceneDescriptions[].outlineExtract`, written by `beatsPipeline.js:2641`).
+
+**Decision.** The iterate prompt receives the page's plan line as `rawOutlineContext.planLine`,
+rendered into `{SCENE_SUMMARY}` as the authoritative statement of what happens and who is
+staged; the previous brief stays in `{DRAFT_SCENE_DESCRIPTION}` as the starting point. The
+semantic JUDGE is **not** touched: commit `3b3070dce` repointed it away from the plan line
+onto the reviewed brief and that stands.
+
+**Rationale — why the two are deliberately asymmetric, and why nobody should "unify" them.**
+The Art Director trims cast on purpose to keep an image readable, and the owner has ruled
+that legitimate. Judging a picture against the beat therefore manufactures false findings
+(that is what `3b3070dce` fixed), which is why the judge's expected roster comes from the
+brief's own `characters[]`/`objects[]` (`buildExpectedCastBlock`, `evalPipeline.js:1023`).
+The generator has the opposite need: it is rewriting the brief, so the brief cannot also be
+its authority. Feeding the beat to the generator alone opens exactly one hazard — the
+rewriter reinstates a trimmed figure in the PROSE, the judge reads the undeclared roster,
+and the reinstated figure scores as `extra_character`. The rule that closes it is
+**whatever the rewrite draws, the rewrite declares**: stated in `scene-iteration.txt` rule
+3a (and free-mode rule 18), and verified afterwards by `iterateBeat.checkRewrittenBrief`,
+which reuses `sceneBriefCheck.checkPage` with the page's plan line set — the
+owner-sanctioned non-fidelity use of the beat, and the two types (`cast_unlisted`,
+`element_uncited`) the first-generation path already runs and the iterate path ran neither
+of. One corrective re-ask, then ship with a loud warning: a gate is a guideline and an
+iterate round is paid.
+
+**Also fixed in the same change.** The "Cast is locked" list kept only `kind === 'cast'`
+entries, so visual-bible ANIMALS and SECONDARY characters staged on the page reached the
+rewriter only inside the bulk `RECURRING_ELEMENTS` dump while rule 3 said "no character
+outside the list may be added". Measured on staging `job_1789348171785_9oxos7dwv` p7, whose
+beat reads "all four boys and Nia": the rewrite kept the animal but stripped its identity
+("the scruffy terrier mix dog"), leaving the detector an unmatched figure. `collectStagedFigures`
+now names them in a `{STAGED_FIGURES}` block. Rare — 1 of 145 iterate versions in 30 days —
+but sharply evidenced. The plan line was also added to the anchored-object allow-list's
+haystack (`images.js`), so the scrub cannot undo a reinstatement the beat asked for.
+
+**Touched:** `server/lib/iterateBeat.js` (new), `server/lib/images.js` (`iteratePageCore`),
+`server/lib/promptBuilders.js` (`buildSceneDescriptionPrompt`), `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`, `tests/unit/iterateBeat.test.ts`.
+**Status:** ✅ active
+
+### MEASURED 2026-09-14: the cover water/air exception alone does NOT fix the underwater quay
+**Context:** Follow-up to the entry above. The back cover of
+`job_1789227389389_z18dmvnt6` was regenerated against the stored cover hint with
+the new exception in place (harness asserted 3/3 sections carry it before
+spending). **The defect reproduced exactly** — the family again stands dry on
+cobblestones with the lit gas lamp, underwater.
+
+**Why:** the fault is over-determined by the HINT, not by the composition rule.
+The stored hint reads `objects: ["LOC003", "ART009", "ART007", "ART001",
+"ART008"]` — open water with no floor, plus the quay lamp ("bolted to the stone
+paving; the lamp is lit"), plus the autumn leaf pile — and its character lines
+say "stands in the centre, facing viewer", "stands beside Liz", four times over.
+A rule that says "unless the scene is set in water, they swim or float" cannot
+win against a scene description that states everyone stands and names two land
+fixtures. The strict clause also leads and names "cobblestones" as a valid
+surface, which is what got drawn.
+
+**Verdict:** rule A (the exception) is necessary for consistency with pages but
+is NOT sufficient on its own. Rule B — the cover backdrop must be a LOC the cast
+can stand in, and its props must belong there — is the one that matters, and it
+acts when the Art Director authors the hint, so it cannot be tested without a
+fresh story generation. **Do not read the A entry above as validated.**
+
+**Open:** whether the cover scene builder should also stop writing "stands" into
+a water scene's character lines, and whether the cover plate prepares ground
+before the figures exist (`coverIterate` characterSpace, see the 2026-07-11
+SOLID-GROUND entry) — both untested.
+
+**Touched:** `tests/manual/redo-back-cover-water-rule.js` (the harness; one paid
+cover generation)
+**Status:** ✅ active (a measurement, not a behaviour change)
+
+---
+
+## An invented "declaration" shipped two of a one-of-a-kind object: STORY_TEXT dialogue is not staging, and a rename may not fabricate a duplicate (2026-09-14)
+
+**Context.** Staging story `job_1789348171785_9oxos7dwv` page 7 shipped with two of its
+one plot object. Traced end to end from stored data, two independent faults stacked:
+
+1. **The compliance judge mined STORY_TEXT for a declaration.** The page's printed prose
+   contains a line of DIALOGUE in which a character says they will carry the object. No
+   stored spec field declares that — `sceneIntent` and the brief prose both name a
+   *different* character as the carrier, twice, and the page's single `interactions[]`
+   entry declares only "walking down the stairs" for everyone. The judge nevertheless
+   filed CRITICAL `action_interaction`: *"<name> is declared to carry <object> but
+   inventory shows hands empty"*. `image-semantic.txt` has carried a STORY_TEXT authority
+   rule since Feb 2026 (SETTLED.md line 34, "the page TEXT is not a checklist") and the
+   semantic judge got this page right; `image-prompt-compliance.txt` never had the rule,
+   listed STORY_TEXT as a bare input, and asks for a `main_action_check.story_text_action`
+   — an open invitation to derive an action from prose.
+2. **The identity reconciler then relabelled the finding onto a third character.**
+   `checkIdentityAgreement` pairs evaluator and detector figures by greedy nearest centre
+   with no mutual exclusion, so two evaluator figures can land on one detector figure: one
+   agrees, the other becomes a conflict pointing at the name the first already owns.
+   `buildRenameMap` checked for name collisions only *within the conflict set*, so a
+   one-name map passed its "clean permutation" test and was applied. Stored result on p7:
+   `matches[]` went from five distinct names to `[Julian, Levin, Kiaan, Kiaan, Nia]` — one
+   child named twice, one erased — and both of that child's findings, the CRITICAL one
+   included, were rewritten (`identityCorrected: true`) onto a name the spec never put
+   near the object. That is why the finding read as invented from nowhere.
+
+The consolidator then turned the CRITICAL into "Add red egg in <name>'s hands", round 2's
+inpaint executed it verbatim, and the page shipped with two. The consolidator half was
+already fixed separately (`3546394d2`, single-instance object has one holder); this entry
+covers the two upstream causes.
+
+**Systemic rate (60 days of staging, measured, not estimated).** Fault 2 is not an
+anecdote: of 51 stored eval versions where a rename was applied, **35 (69%) produced a
+duplicate name in `matches[]` and erased another name**, across 20+ distinct stories,
+relabelling 28 findings onto the wrong character. Fault 1's exact "is declared to"
+phrasing appears in only 2 of 4,811 stored findings, so its measured rate is low — the
+phrasing varies, so treat that as a floor, not a ceiling.
+
+**Decision.**
+- `prompts/image-prompt-compliance.txt` gains a STORY_TEXT authority rule governing every
+  step: ORIGINAL_PROMPT and DECLARED INTERACTIONS are the only inputs that say who does
+  what; dialogue is an intention, not staging; STORY_TEXT may corroborate an action the
+  prompt already names in `main_action_check.story_text_action` and is never the sole
+  basis of a `fixable_issues[]` entry. This EXTENDS SETTLED.md line 34 to the compliance
+  judge — it does not reverse it, so no reversal protocol applies.
+- `buildRenameMap` now also refuses a rename whose target is already held by an AGREEING
+  match, unless that holder is itself being renamed away in the same map (a true swap).
+  `checkIdentityAgreement` reports `agreedNames` to make that checkable. A refused rename
+  is still measured and still logged as `uncorrectable` — the disagreement is surfaced,
+  just not acted on.
+
+**Rationale.** Classification belongs to the prompt (CLAUDE.md), so fault 1 is prompt
+work. Fault 2 is a wiring defect and the module's own docstring already stated the
+intended rule — *"renaming would fabricate a duplicate. Those stay flagged and
+uncorrected"* — the check was simply incomplete. Leaving the evaluator's own name in place
+is strictly better than writing a name onto two figures: a wrong name on one figure is one
+wrong finding, a duplicated name erases a character and misroutes every finding about
+them. Today's `9715cabef` (EXPECTED CAST roster, ORIGINAL_PROMPT de-truncation) did NOT
+close either fault — p7's real prompt is 8,002 chars and the carrier declaration sits at
+char 2,329 (and the sceneIntent restates it at char 113), well inside the old 3,000-char cut, so the judge saw the correct declaration and
+contradicted it anyway.
+
+**Touched:** `prompts/image-prompt-compliance.txt`, `server/lib/identityAgreement.js`,
+`tests/unit/identity-rename-duplicate.test.ts`,
+`tests/unit/fixtures/identity-rename-job_1789348171785_9oxos7dwv-p7.json`
+**Status:** ✅ active
+
+---
+
+## A scene brief that stops mid-sentence is not a delivered page (2026-09-14)
+
+**Context.** The Art Director expands every page in ONE call
+(`buildSceneExpansionAllPrompt` → `prompts/scene-expansion-all.txt`), which is the
+template every real beats story goes through. The all-pages path was reported as
+"truncating later pages". Measured on staging before touching anything: **no**. Across
+1035 stored briefs / 85 stories there is no cliff and no decay by page index — mean brief
+length by quartile is 3541 / 3501 / 3485 / 3920 characters, and the second half of a book
+is shorter than the first in 25 of 61 stories (below chance). The 2026-08-31 batch-retry
+guard plus the per-page fallback already recover a page the reply OMITS, and the no-caps
+rule is holding (`maxTokens=null`).
+
+What does still happen, once in 1035 pages: a page the reply cut MID-SENTENCE.
+`job_1789207854566_l43qgl34w` p7 — 1884 characters ending "a young adult young woman with
+dark", no metadata block at all — while p8 carried on normally. `parseRefinedText` counts
+any non-empty run of text under a `## Page N` heading as a page, so p7 merged exactly like
+a whole brief: no retry, no fallback, no warning. The generator rendered that page from
+half a spec, every metadata-driven supervisor (cast, objects, positions, worn items, text
+placement, empty-scene background) got nothing, and the eval then scored the render against
+the same half-spec — invisible to every judge.
+
+**Decision.** The merge tests each parsed page against the scene-brief CONTRACT — prose,
+parseable metadata, a `sceneIntent` — instead of "is it non-empty". A page that misses it is
+not merged, which hands it to the batch retry and the per-page fallback that already exist,
+and is reported at error level with the reason and the page number
+(`beats_scene_brief_incomplete`). The verdict is the one the iterate round already uses
+(`assessIterateBrief`, built from this very page), exported under the generic names
+`assessSceneBrief` / `partitionSceneBriefs` — one implementation, two callers.
+
+Two fail-soft rules, because a contract miss must never end a paid run:
+- **`formatWide`** — when NOT ONE page in the reply meets the contract, that is a reply in
+  a shape the parser does not know, not 18 truncations. Those briefs are taken as written
+  and the run says so loudly, rather than spending a paid call per page to get the same
+  shape back.
+- The per-page fallback keeps its best incomplete attempt as a **salvage**: after two cut
+  attempts it ships that brief with an error-level warning instead of throwing, because its
+  throw aborts the whole run (`Promise.all` over the missing pages).
+
+**Rationale.** The silence was the defect, not the cut itself — a model dropping a page
+mid-stream is rare and recoverable, but only if something notices. Measured against every
+stored brief the contract rejects 4 pages: p7, and three August pages that predate
+`sceneIntent`; no current story loses a page to it, so the recovery cost is ~0.1% of pages.
+No cap was raised or added.
+
+**Touched:** `server/lib/beatsPipeline.js` (the all-pages merge, `expandOnePage` salvage),
+`server/lib/iterateBriefGuard.js` (`partitionSceneBriefs` + generic aliases),
+`tests/unit/scene-expansion-all-incomplete.test.ts`,
+`tests/unit/fixtures/scene-brief-cut-job_1789207854566-p7.json`.
+
+**Status:** ✅ active.
+
+## The routing hub implied a production Qwen face-repair path that was never wired (doc fix, no code change)
+
+**Context:** `docs/image-routing.md` listed **Face repair → Qwen `qwen-image-edit@2511` (Runware) + SAM head mask, ✅ $0.008** in the decision matrix, in the same shape as every row that describes what production runs. Production has never called it. Verified 2026-09-14:
+- `resolveRepairAxes` defaults `model: 'grok'` (`server/lib/faceRepair.js:1339`).
+- `decideRepairMethod` calls it without a model on both char-fix routes (`server/lib/repairLogic.js:714`, `:781`).
+- `executeCharFixAction` hardcodes `imageBackend: 'grok'` in the `buildCharRepairRequest` payload (`server/lib/repairPipeline.js:1457`).
+- `repairCharacterMismatch` branches only grok / gemini — there is no qwen branch (`server/lib/images.js:4537`).
+- `model: 'qwen'` exists in `callModel` (`server/lib/faceRepair.js:546`); its only caller is the Test Lab `qwen_insert` stage (`server/lib/testlab.js:2722`, `params.backend || 'qwen'`).
+
+The ✅ came from Lab work, not from a shipped path: memory `project_image_model_tests.md` records the winning recipe and then states **"Production status: … REMAINING PORT (user-approved, staging only): qwen face-repair backend + hard-union blend into repairCharacterMismatch."** The port was approved and never done. `docs/SETTLED.md` carries **no** Qwen or face-repair-model line, so no settled verdict is touched (the row's "image_model_tests SETTLED" ref pointed at the memory file, not at SETTLED.md).
+
+**Decision:** Fix the doc, not the code (owner's ruling). The Face repair row now states three things separately: production runs **Grok** (with the four file:line facts), the Qwen result is a **Lab measurement** kept in full ($0.008, union-hard-pad6 blend), and that result has **never been wired to production** — wiring it is a new decision. Swept the rest of the matrix for the same class: the **Page (scene) image** row still claimed a prod `grok-imagine` / staging `grok-imagine-2` split, which `runtime.js:95` removed on 2026-09-06 (`pageRenderModel` is `grok-imagine-2` in every environment, no longer `perEnvironment`); corrected, with the Standard tier noted where it does still apply (plates, char repair). No other row contradicted the dispatch in `images.js` / `repairPipeline.js` / `repairLogic.js` / `grok.js`.
+
+**Rationale:** The hub exists so routing is trusted without re-deriving it; a row that reads as production behaviour but describes a Lab result is worse than no row. Deleting the Qwen measurement would lose a real verdict, so it stays recorded and is relabelled instead.
+
+**Touched:** `docs/image-routing.md` (Face repair row, Page (scene) image row).
+
+**Status:** ✅ active.
+
+---
+
+### Test Lab clothing/costume experiments predating `38e17173b` are not evidence
+
+**Date:** 2026-09-14
+
+**Context:** `38e17173b` proved that six Test Lab eval call sites handed
+`evaluateImageQuality` / `evaluateSemanticFidelity` a hand-spelled SUBSET of what
+production's one page-eval funnel (`images.js` `evaluateImagesBatch`) passes. The Lab
+omitted `visualBible`, `clothingRequirements`, `storyData` and `artStyle`; it hard-coded
+`evaluationType: 'scene'`, so a cover target skipped the cover fidelity reference, the
+gaze/flat-title exemptions and `textMode: 'appOverlay'`; and `semantic_eval` omitted the
+ENTIRE sixth argument (`artStyle`, `clothingContract`, `expectedCast`).
+
+The clothing consequence is mechanical, not speculative:
+`wornItems.resolveGeneratedOutfit` returns the outfit **unchanged** when `visualBible` is
+falsy, so every Lab judge was handed the unstripped story-level clothing contract from the
+stored reference photos. A garment the generator correctly omitted (worn-item state `off`)
+was still in the judge's contract, so the judge filed it as missing.
+
+**Decision:** Every Test Lab experiment on `image`, `quality_eval`, `eval_variance`,
+`semantic_eval`, `repair_round` or `scene_composite` created **before `38e17173b`
+(2026-09-14)** whose subject is clothing, costume, outfit, garment, worn items or attire is
+**annotated in place and may not be cited as evidence**. They are NOT re-run (owner's call,
+2026-09-14: annotate, do not spend). The annotation lives in `testlab_experiments.label`,
+which is the only stored field the Lab UI renders both in the experiment list
+(`TestLab.tsx:1361`, chip at `:641`) and in the detail header (`:1894`) — a note in a
+git-tracked doc alone would never reach someone reading the experiment.
+
+Affected experiments (15), verified present in `testlab_experiments`:
+
+| id | stage | date | subject |
+|----|-------|------|---------|
+| 44 | semantic_eval | 2026-07-18 | Spec-conflict v2 — semantic eval, first attempt |
+| 93 | semantic_eval | 2026-07-18 | Semantic calibration A/B — expression/gaze prominence |
+| 143 | image | 2026-07-19 | validate clothing backstop + EXPRESSIONS tail |
+| 144 | image | 2026-07-19 | validate clothing backstop + EXPRESSIONS tail |
+| 459 | image | 2026-08-09 | P8 redo — a character painted in another's striped shirt |
+| 501 | quality_eval | 2026-08-11 | compliance B: style+clothing inputs (deployed) |
+| 521 | image | 2026-08-12 | p9 redo — Art Director outfit-text fix |
+| 522 | image | 2026-08-12 | p9 redo v2 — real beat + outfit-text fix |
+| 540 | image | 2026-08-12 | p9 v5 — compression + budget + outfit fix |
+| 547 | quality_eval | 2026-08-13 | D-05c clothing_sex — p3 vs p10 control |
+| 590 | image | 2026-08-14 | costumedHead-Ref — head from the costumed panel |
+| 592 | image | 2026-08-14 | costumedHead via shared headOnly path |
+| 798 | quality_eval | 2026-08-21 | PROOF 3 — shorts colour must type `garment_colour` |
+| 1263 | quality_eval | 2026-09-13 | Story A repro — p6 clothing contract |
+| 1272 | image | 2026-09-14 | CLO001 off verify p14 (worn-item fix `3cec0bf4b`) |
+
+Both `semantic_eval` experiments ever run (44, 93) are on the list: that judge ran with no
+clothing contract, no art style and no cast roster at all, whatever its subject.
+
+**#1272 is superseded outright, not merely doubted.** Its recorded conclusion — that the
+worn-item fix `3cec0bf4b` did not take — is WRONG. The fix works: it is verified on the
+regenerated pixels and on the prompt actually sent, which correctly omits the garment. The
+Lab judge was blind to it, because its contract still carried the unstripped
+"red zip-up hoodie" from the stored reference photo.
+
+**#1263's clothing half is now unreliable in the entry that cites it.** The 2026-09-14
+`sources`/re-plan-guard entry above concluded from #1263 that the p6 "Levin wears Kiaan's
+outfit" CRITICAL was judge noise "because the judge received the correct per-character
+block". It did not — `quality_eval` passed neither `clothingRequirements` nor `visualBible`.
+That sub-conclusion is withdrawn; the finding's cause is **unknown**, not noise. The rest of
+that entry (the `[?]` provenance rendering symptom, the re-plan guard,
+`repairAttemptFromResult`) does not depend on the clothing inputs and stands.
+
+**Secondary class, not annotated:** all 9 `repair_round` experiments passed only three keys
+(`sceneMetadata`, `pageNumber`, `detectedFigures`) to the fresh eval that decides the repair
+ROUTE — no bible, no wardrobe, no cast index, no art style, no landmark protection. Their
+routing verdicts are weaker than production's, but none of the 9 is about clothing, so they
+are recorded here rather than relabelled.
+
+**Rationale:** Measured facts live in the repo where agents can see them, so the class is
+recorded here even though the operative annotation is a DB write that could later be lost.
+Re-running is the only way to recover the verdicts, and the owner declined the spend; an
+unreliable verdict left unmarked is worse than no verdict, because the next session acts on
+it — #1272 would have someone "re-fix" a working fix.
+
+**No SETTLED line rests on any of these.** `docs/SETTLED.md`'s clothing lines are the
+canonical-source rule (`clothingRequirements`, from the codebase audit) and the
+classification-belongs-to-the-prompt rule (from the regex mirror-guard incident); neither
+cites a Lab experiment. Nothing on SETTLED.md is reversed or annotated here.
+
+**Touched:** `docs/decisions.md` only. `testlab_experiments.label` for the 15 ids above is a
+data change proposed to the owner, not applied by this session. No code changed, so no test
+was added.
+
+**Status:** ✅ active.
+
+## An object's OWN light is a state; the world's lighting of it is not (2026-09-14)
+
+**Context:** The same object got opposite treatment depending on which template
+authored the Visual Bible. Three templates stated the rule three ways:
+
+- `prompts/scene-expansion-all.txt:139` — "How the WORLD lights it is not a
+  state — a lamp falling on it, a shadow crossing it, dusk: the scene decides
+  that, page by page. **Its OWN light is a state**: a thing that glows and goes
+  dark, lights up and goes out, changes what it gives off. Then the emission
+  lives in the states, never in `description`."
+- `prompts/story-unified.txt:609` — "**A change of light is not a state** —
+  emitting, glowing, dimming, lit or unlit leaves the thing itself unchanged;
+  the scene decides the light, page by page."
+- `prompts/story-trial.txt:166` — "**A change of light is not a state**; the
+  scene decides the light."
+
+A fourth site restated it in the `states[]` SCHEMA of `story-unified.txt:689`
+("never light, that belongs to the scene"), and `tests/unit/vb-authoring-contract.test.ts`
+pinned the old wording in both places.
+
+**Decision:** An object's own emission IS a state. `story-unified.txt` and
+`story-trial.txt` are brought into line with the beats template. The world
+lighting the object — a lamp, a shadow, dusk — stays NOT a state; the scene
+decides that, page by page. That exclusion is unchanged and stays sharp in all
+three. Owner verdict, 2026-09-14 (backlog #37), superseding the light half of
+the 2026-09-11 ruling (39fc0d0ff) for the object's own emission only.
+
+**Rationale:** A state is drawn as its own reference cell, and a reference cell
+is the only way a glowing look actually reaches the page. An emission described
+only in `description` is carried on every page or none — never on the pages the
+story turns it on. Story B `job_1789343124794_z2c779f7i` ART003 held the glow in
+`description` with no state for it, part of the chain that had pages 3, 4 and 5
+rendering the wrong object (backlog #63, closed). Two cells for one object under
+different SCENE light remain indistinguishable pictures, which is why the
+world-lighting exclusion survives intact.
+
+**Touched:**
+- `prompts/story-unified.txt` (state rule + `states[]` schema delta clause)
+- `prompts/story-trial.txt` (state rule)
+- `tests/unit/built-prompt-values.test.ts` (new cross-template drift guard)
+- `tests/unit/vb-authoring-contract.test.ts` (old wording unpinned, new pinned)
+- `docs/SETTLED.md`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-14 — D-16b was inert from birth; REQUIRED OBJECTS is now its own evaluator input
+
+**Context.** Eval rule D-16b (the held-object swap: a hand closes around a prop
+the brief never names while the commissioned one lies unhandled) was added
+2026-09-13 reading the page's REQUIRED OBJECTS checklist out of `ORIGINAL_PROMPT`,
+and skipping itself when that block is absent. On the batch evaluator — the one
+the production pipeline runs for pages AND covers — `ORIGINAL_PROMPT` is the
+scene DESCRIPTION, never the built prompt: `resolveEvalSceneDescription`
+(`server/lib/sceneMetadata.js` ~:2112) keeps it that way so `resolveEvalArtStyle`'s
+"ORIGINAL_PROMPT carries no `**ART STYLE` block" invariant holds, and the
+checklist is emitted into that same prompt tail. The block was therefore never
+present and the rule's own skip clause skipped it on every page of every story.
+The 2026-09-13 entry already recorded the POSITIVE case as unproven; this is why.
+
+The other paths were checked too, not assumed. The admin re-evaluate endpoint
+(`regeneration.js`) and the Test Lab stages pass a scene description, same as the
+batch path. The one family of call sites that DOES hand the judge the sent prompt
+(`callGeminiAPIForImage`'s `runEval` / inline eval, via `resolveEvalImagePrompt`)
+has no page callers left after the 2026-08 pipeline unification — its three
+surviving callers are reference-sheet and Lab avatar renders, and the `'avatar'`
+branch returns before the quality eval runs. Stored evidence agrees: a sweep of
+60 days of staging `fixableIssues` holds **599** `action_interaction` findings,
+184 of them phrased as a substitution ("instead of" / "rather than"), and every
+one reads against what "the prompt declares / requires" or "the interactions
+describe" — i.e. D-16 against DECLARED INTERACTIONS. Not one has D-16b's
+signature: an object named nowhere in the brief, in a hand, reported together
+with a required object left unhandled.
+
+**Decision.** REQUIRED OBJECTS becomes its own evaluator input (input 9,
+`{REQUIRED_OBJECTS}`), exactly as ART STYLE and the CLOTHING CONTRACT already
+are and for exactly the same reason — the prompt tail is not reachable from what
+the judge is fed. `buildEvalRequiredObjects` (`server/lib/evalPipeline.js`)
+resolves it from two sources in fidelity order: the page's stored built prompt
+via `parseVisualBibleObjects` (the verbatim checklist leads, locations already
+excluded), else the parsed `sceneMetadata.objects[]` VB ids through
+`resolveExpectedObjectLabels` with locations dropped to match. Empty resolves to
+an empty block and D-16b skips, and the absence is recorded as a `held_objects`
+/ `no_required_objects` notEvaluated entry rather than passing for silence.
+D-16b's wording now points at input 9.
+
+**Rationale.** Making it live is the cheap half of the owner's "we do not leave
+dead things in the code": no generator-side change, no change to what
+`ORIGINAL_PROMPT` contains, no `---METADATA---` block on covers — both of those
+were ruled out as disproportionate, and neither is needed. Deleting the rule
+would have lost a real check with a working precedent available. **This turns on
+a check that has never run**, on every page and cover: new MAJOR
+`action_interaction` findings are now possible. Route check —
+`action_interaction` is absent from `SAFE_REPAIRABLE_TYPES`, so it opens no
+inpaint; the char-fix and page-claim gates are CRITICAL-only and D-16b is MAJOR.
+Its only consequence is a normal MAJOR deduction, which can contribute to a page
+falling under the redo threshold. No destructive route opens.
+
+**Touched:** `prompts/image-evaluation.txt` (input 9 + D-16b wording),
+`server/services/prompts.js` (`buildEvaluationPrompt` requiredObjects),
+`server/lib/evalPipeline.js` (`buildEvalRequiredObjects`, both prompt builds,
+notEvaluated record), `server/lib/images.js` (batch site passes `pagePrompt`),
+`tests/unit/eval-required-objects.test.ts`,
+`tests/unit/fixtures/eval-required-objects-job_1789348171785_9oxos7dwv.json`.
+
+**Status:** ✅ active — live but unexercised; first real firing is still unseen.
+
+### MEASURED 2026-09-14: cover rule B — the prop half works, the backdrop half does not
+**Context:** Rule B (the entry two above) acts when the Art Director AUTHORS the
+cover hints, so it cannot be tested by regenerating a cover image. The Art
+Director was re-run on prod story `job_1789227389389_z18dmvnt6` with the same
+beats, cast and Visual Bible — only the new rules differ
+(`tests/manual/cover-backdrop-rule-b.js`, one Opus call, ~21k tokens in / ~17k
+out, roughly $1.50).
+
+**Result — authored cover hints:**
+```
+Title Page    Objects: LOC001, ART001.1, ART002.1     quay       ✅
+Initial Page  Objects: LOC001, ART003.2, ART001.4     quay       ✅
+Back Cover    Objects: LOC003, ART005.2, ART001.4     open water ❌
+```
+Before, the back cover was `LOC003, ART009, ART007, ART001, ART008` — open water
+**plus the lit quay lamp plus the autumn leaf pile**.
+
+- **The prop rule WORKS.** The lamp ("bolted to the stone paving; the lamp is
+  lit") and the pile of dry autumn leaves are gone from the underwater scene.
+  Only a fairy and the doudou remain, both of which genuinely belong there. This
+  removed the most absurd element of the shipped cover.
+- **The backdrop rule FAILS.** The back cover is still set in `LOC003`, whose own
+  description reads "no floor visible, only open dark green water in all
+  directions". The same failure mode as rule A: a constraint loses to the story's
+  pull toward its climactic setting.
+- **Residual:** the cast is still listed as `standard` clothing — dry winter
+  coats — in open water, so a render would still show dry clothes underwater,
+  just without a burning lamp beside them.
+
+**Verdict:** B is half effective and stays. The backdrop half likely needs the
+rule to state the CONSEQUENCE rather than the constraint ("the cover shows where
+the cast can stand, even when the climax happens somewhere they cannot"), and/or
+the cover scene builder to stop writing "stands"/`standard` into a water scene.
+Neither is built; re-testing costs ~$1.50 per Art Director call.
+
+**Touched:** `tests/manual/cover-backdrop-rule-b.js`
+**Status:** ✅ active (a measurement, not a behaviour change)
+
+## 2026-09-14 — Ages 6 and up get the `journey` band: there is no `standard` shape band, and no upper age cap
+
+**Supersedes the `6+ | standard | unchanged current behaviour` row of "Five whole-year age bands
+replace toddler-vs-standard" (2026-09-04, `bae4d540d`, `docs/decisions.md` line ~26416).** Every
+other line of that entry stands: the five whole-year bands below six, the oldest-main rule, the
+deleted `focusAge <= 5` soften.
+
+**Context:** `AGE_BANDS` was a six-element array, so every age from 6 up fell through to the band
+name `'standard'` — and `AGE_BAND_TEMPLATE_KEYS` has no `standard` key, so `buildAgeModeSection`
+returned `''`. **Ages 6 to adult — most of the product's readers — received no plot-shape rules of
+any kind.** That was never a stated intent. The 2026-09-04 entry's "6+ standard — unchanged current
+behaviour" meant *the pipeline's other machinery is unchanged*; it read as a deliberate band and was
+in fact the array simply running out at index 5. Nothing else in the codebase supplied the gap: the
+`journey` band file was one array index away and no other stage carries its rules.
+
+Measured on `job_1789420083330_5si0z6ze1`, an age-8 story: the father hands the child a key that
+removes the story's only obstacle, there is no low point, no emotional beat, and an approving close.
+`prompts/age-band-journey.txt` already forbids all four in as many words — *"never a grown-up
+arriving to fix it"*, *"never a power handed over at the last moment"*, *"They are never carried
+through their own story"*, *"A real low point is required"*. The same gap is named independently in
+today's risk-framing entry: *"The pattern recurs and clusters at ages 7-8 — exactly where `AGE_BANDS`
+resolves to `'standard'`, for which no band file exists."*
+
+**Decision:**
+
+1. **`resolveAgeBand` returns `journey` for every age from 6 up, with no upper cap.** Owner, verbatim:
+   *"No upper cap, what would a mother or grandmother get that try it out, should also work for them."*
+   A 38- or 68-year-old main character is a reader, not a gap. **There is no longer a `standard` SHAPE
+   band** — every age resolves to a band that has a template file.
+
+2. **A missing, unparseable or negative age also resolves to `journey`,** where it previously resolved
+   to `'standard'` and therefore to silence. The 2026-09-04 entry called `standard` "the safe
+   direction to be wrong in"; it is not, because it is the direction that shipped the failure above.
+   The journey rules are generic story craft — a real low point, the hero's own idea turns it, the
+   hero is never carried through their own story — and are wrong for nobody except a toddler, and a
+   toddler book is never commissioned without an age.
+
+3. **The band and the PACING tables are split into two axes.** The hero's-journey SHAPE suits a
+   6-year-old and a 16-year-old alike; the five-year-old's event budget does not. A new
+   `resolvePacingBand()` returns exactly what `resolveAgeBand` used to return (`standard` from 6 up)
+   and is what the four maturity tables now read: `EVENT_BUDGETS`, `INVENTED_FIGURE_BASE`,
+   `ACTION_SHAPE_STANDARD`/`READER_AGE_BY_BAND` in `buildArcBudgetSection`, the beats `READER_LINES`,
+   and `challengeCatalogueBands`. Without this split a 12-year-old's advanced book would have
+   inherited a five-year-old's budgets — verified by static render: at age 12 / advanced the budget
+   block is byte-identical before and after (8-11 events, three-to-four actions per page, 9 invented
+   figures), and `challengeCatalogueBands` still returns `['6','9']` rather than `journey`'s
+   `['3','6']`. `'standard'` survives ONLY as a pacing-band key, the name under which the tables hand
+   over to the reading level.
+
+4. **The journey band's age-specific framing scales; its rules do not change.** `age-band-journey.txt`
+   was hardcoded to five (`# MINI HERO'S JOURNEY (age 5)`, *"The child this book is for is five"*,
+   *"The full shape, in small"*). Three tokens — `{BAND_TITLE}`, `{READER_LINE}`, `{SHAPE_SCALE}` —
+   are filled by `fillBandTokens()` inside `buildAgeModeSection`:
+
+   | Age | Title | Reader line | Shape |
+   |---|---|---|---|
+   | 5, 6 | `MINI HERO'S JOURNEY (age N)` | "The child this book is for is five." | ", in small" |
+   | 7–12 | `HERO'S JOURNEY (age N)` | "The child this book is for is eight." | ", at full size" |
+   | 13–17 | `HERO'S JOURNEY (age N)` | "The reader … is sixteen … a young adult, not a small child." | ", at full size" |
+   | 18+ | `HERO'S JOURNEY (adult reader, age N)` | "…an adult of 38 … never a children's book about a grown-up." | ", at full size" |
+   | unknown | `HERO'S JOURNEY` | "No age is recorded…" | ", at full size" |
+
+   MINI and "in small" are kept for five and six on the owner's wording; from seven it reads as a
+   full hero's journey rather than a miniature one. **Filled in JS, not by the caller's
+   `fillTemplate`:** the band text is interpolated into ~8 parent templates, and any token reaching
+   `fillTemplate` unfilled is stripped to nothing with only a log warning. Only the journey file
+   carries tokens — the four bands below it are single-year files whose wording is already exact.
+
+**Rationale for scaling rather than forking the file:** the rules are the same rules at every age
+(a low point, the hero's own idea, competence, a real antagonist) — only how the reader is addressed
+differs. A second `age-band-journey-older.txt` would duplicate eight rules across two files and let
+them drift, which is the failure mode `BAND_VIEW_DROPS` exists to prevent one level down.
+
+**Knock-ons found and their disposition:**
+- `SIMPLE_BANDS` — `journey` is not in it and never was, so ages 6+ keep challenge budgeting and the
+  catalogue draw exactly as before. No change needed; `challengeCatalogueBands` is the one place that
+  needed the age-aware tweak, delivered by the pacing split above.
+- `buildStoryShapeSection` — `band === 'journey'` now fires for 6+, so the page-budget shape gains the
+  one line *"A real low point before the end is required … never a grown-up arriving to fix it."* The
+  page arithmetic, threads, subject and entrances are untouched. This is intended: the shape section
+  and the band file must not contradict each other.
+- `prompts/story-arc-judge.txt:40` — *"Where the BRIEF carries no age-band section the whole rubric
+  applies unchanged, and hard"* is now unreachable, because every brief carries a band section. **Left
+  unchanged deliberately.** It is dead prose, not wrong prose, and deleting judge text is a prompt
+  behaviour change that belongs to its own owner decision rather than riding along with this one.
+- `buildLifeSkillGuidelines`, `buildTellingRulesSection` — gated on `SIMPLE_BANDS` only; identical
+  under either axis, left on `resolveAgeBand`.
+- `server/services/prompts.js` band-registration comment and three table comments said "empty from
+  age 6 up" / "at 6+ no band applies"; corrected to name the pacing axis.
+
+**Touched:** `server/lib/promptBuilders.js` (`focusAge`, `resolveAgeBand`, new `resolvePacingBand`,
+`fillBandTokens`, `buildAgeModeSection`, `challengeCatalogueBands`, `arcInventedAllowance`,
+`buildArcBudgetSection`, beats `READER_LINES`, exports), `prompts/age-band-journey.txt`,
+`server/services/prompts.js` (comment), `tests/unit/age-band.test.ts`,
+`tests/unit/spread-values-reach-their-template.test.ts`,
+`tests/unit/coping-strategy-and-page-openings.test.ts`.
+
+**Status:** ✅ active — committed locally, NOT pushed (a story may be generating on staging).
+Verified statically: full unit suite 188 files / 2367 tests / 0 failures; the age-8 arc-create prompt
+renders the journey band whole with zero unfilled placeholders; ages 5/6/8/12/16/38/68 and a missing
+age each render their intended framing. No paid call and no story run was made.
+
+---
+
+## 2026-09-15 — Four faults in the idea prompts, measured over 56 rated trial ideas
+
+**Context:** 56 trial ideas were generated across 7 ages × 2 genders and rated. Four faults fell
+out of the ratings, all of them in what the model is TOLD rather than in the model:
+
+1. Six of the ten worst-rated ideas are make-believe-arm cards, and all six are solved by an object
+   or by an adult rather than by the main character.
+2. ~24 of 28 round-two ideas are autumn-with-leaves stories, although every cell had a distinct
+   setting.
+3. One item from an illustrative list becomes the default answer: "there is a way in from another
+   side" came back verbatim in 8 of 10 ideas; "wanted by two at once" became the obstacle in ~10 of
+   28; the artifact `size` instruction's "fits in one hand" was copied into 6 of 9 stored values and
+   was fixed earlier the same day by deleting the exemplar outright.
+4. Ages 8 and 12 rate 2.75/2.75 and 3.00/3.25 — every card resolving through a plush toy, a craft
+   project or a talking object — and routing 6+ to the journey SHAPE did not lift them.
+
+**Decision:**
+
+- **The agency rule is untagged.** `BAND_VIEW_DROPS` gives the own-town idea arm the `premise` view
+  and the make-believe arm the `tone` view, which drops `[[plot]]`. Every band's "who resolves it"
+  rule lived inside `[[plot]]`, so the fantasy arm was never told it — fault 1, exactly. It is a rule
+  about what KIND of story this is, not plot mechanics, so it moved to the untagged section every
+  view receives: journey's "The hero's own idea turns it", fear-choice's "The child's choice resolves
+  it", tries' "The child's own doing", quest's "The child does the finding". Nothing else moved out
+  of `[[plot]]`. `routine` (age 0-1) has no agency rule — that band forbids the child working
+  anything out — and its safety sentence, an orphan fragment in the tone view, became its own line.
+- **Illustrative lists in RULE positions are ranges, not menus.** Rewritten or deleted in
+  `age-band-tries.txt` (three), `age-band-quest.txt`, `age-band-fear-choice.txt`, and at all three
+  sites carrying the life-skill outside-event sentence (`routes/trial.js`, `lib/testlab.js`,
+  `story-trial.txt`). Deliberately left: prohibition lists and closed sets, trait-to-page mappings,
+  and lists long enough to read as a span rather than a choice. The `size` fix is the model — a rule
+  with no exemplar at all held.
+- **The season constrains DETAIL, not subject.** `buildSeasonInstruction` said "The story takes place
+  in Autumn. Include seasonal details like weather, activities, and atmosphere typical for this
+  season" — hard fact beside softer neighbours, and it took the premise with it (fault 2). It now
+  governs the light, the weather, what is underfoot and what the cast wears, and states outright that
+  it does not choose the subject. TEXT side only: its image-side sibling `buildSeasonNote` wants the
+  visual detail and is unchanged, as is the wardrobe-side `SEASON_OUTFIT` table.
+- **`AGE_OWNS_PROPS_RULE`** — one new constant emitted by `buildAgeModeSection`, the single chokepoint
+  the writer and BOTH idea arms read the band through. The bands govern plot SHAPE; nothing governed
+  props or subject, which is fault 4. Not a line in each of the five band files: five hand-kept
+  copies drift, and it is the same rule at every age. No per-age examples, on fault 3's evidence; it
+  points at the age the band header already states, so it holds at 1, at 12 and at an adult reader.
+
+**Rationale:** three of the four are one disease — an instruction that reaches only some of the
+readers that need it, or reaches them in a shape they answer literally. The structural answer in each
+case is the same one the repo already uses elsewhere: put the rule where every reader passes, as ONE
+constant, with no exemplar a model can copy.
+
+**Touched files:** `prompts/age-band-{routine,quest,tries,fear-choice,journey}.txt`,
+`prompts/story-trial.txt`, `server/lib/season.js`, `server/lib/promptBuilders.js`,
+`server/lib/testlab.js`, `server/routes/trial.js`, `tests/unit/age-band.test.ts`,
+`tests/unit/trial-idea-variety.test.ts`.
+
+**Not settled:** nothing in `docs/SETTLED.md` covers band view slicing, the season instruction,
+example-list style or an age-props rule. The prompt-genericity and no-test-story-names lines were
+checked and are honoured — every replacement is archetypal.
+
+## 2026-09-15 — `crowdExpected` must be declared by BOTH Art Director templates
+
+**Context:** staging story `job_1789420511893_zly5rcdej` (generated 2026-09-14 23:15 → 2026-09-15
+00:38 CH) shipped with a mean `finalScore` of **43**, against 62-69 on the three stories before it.
+The collapse was not a render regression. Nine of sixteen pages took an `extra_character` **CRITICAL**
+for harbour crowds that the brief had asked for and the renderer drew correctly (p1: 12 figures for a
+cast of 3; p2: 10/3; p4: 10/1; p8: 10/1).
+
+The crowd guard exists and is correct end to end: `sceneMetadata.js:883/921/1082` reads
+`metadata.crowdExpected === true`, `evalPipeline.js:1087` carries it into the cast roster, and
+`evalPipeline.js:1452` declines the finding (`decline('crowd_expected')`). It had simply never been
+handed a `true`. The field was declared in **`prompts/scene-expansion.txt`** only — the per-page
+FALLBACK Art Director template. The live beats path expands with **`prompts/scene-expansion-all.txt`**,
+which discusses crowds in five places and instructs the AD to populate backdrops, but carried no
+`crowdExpected` key in its metadata schema and no rule. An omitted key reads as `false`.
+
+**Measured:** `crowdExpected === false` on all 16 pages of the story; 11 of those briefs contain
+crowd / onlooker / quay / Hafen wording. `wasCharacterFixed === false` on all 16 — see the companion
+entry on `extra_character` having no repair route, which is why the false CRITICALs could only sit
+there and subtract.
+
+**Decision:** the field and its rule live in **both** Art Director templates, and the two templates
+are pinned to the same metadata key set by a test. A metadata field a guard reads is part of the
+contract of every template that can produce that metadata, not of the one it was written in.
+
+**Rationale:** this is the sibling-path failure class in its purest form — a correct guard, correct
+plumbing, a correct consumer, and a producer that was never asked for the value. Adding the key alone
+would fix this instance and nothing else; the parity test is what makes the next added key reach both
+sides. It would have caught `crowdExpected` on the day it was introduced.
+
+**Touched files:** `prompts/scene-expansion-all.txt` (metadata schema + rule, mirroring
+`scene-expansion.txt:175` verbatim), `tests/unit/scene-expansion-template-parity.test.ts` (new; also
+pins the shared rule set). Commit `f7979f824`.
+
+**Status:** ✅ active — committed on `staging`, NOT pushed. Verified against the stored briefs of
+`job_1789420511893_zly5rcdej`; no regeneration and no paid call was made.
+
+---
+
+## 2026-09-15 — MEASURED: the scores did not track picture quality on `job_1789420511893_zly5rcdej`
+
+**Context:** the same story was read end to end — full text plus all 19 images viewed — before any
+code was touched. The text is good (Swiss German clean, guillemets right, the moral turn dramatised,
+the chestnut payoff lands) and pages 1-7 are strong art. The scores say otherwise, and they say it in
+both directions:
+
+| Page | What the picture shows | Score |
+|---|---|---|
+| p10 | good page, no real defect | **35** |
+| p8 | a football-sized chestnut nearest to camera (a thumb-sized prop) | **68** |
+| p12 | an empty quay — the emotional climax, with no children in it | **33** |
+| p2 | a fine page | **-5** |
+
+An empty climax outscoring a correct page by 38 points, and a genuine scale defect outscoring a clean
+page by 33, is not a ranking anyone can act on. The cause of the depression is the `crowdExpected`
+gap above: nine pages were charged a CRITICAL each for drawing what they were asked to draw, and the
+charge landed on the pages with the most people in them — which on this book are the good ones.
+
+**Decision:** recorded as measured evidence, not as a behaviour change. It is the justification for
+the `crowdExpected` fix being treated as P0 rather than as a prompt tidy, and it is the reference case
+for any future claim that a score distribution means the art got worse.
+
+**Rationale:** a score that is depressed by a guard's missing input is worse than no score, because it
+routes repair effort at the wrong pages and it reads, at a glance, as a bad book. The first report of
+this run said exactly that from the numbers alone; the diagnosis inverted once the images were opened.
+
+**Real defects the read DID find on this story** (none of which the scores ranked highest):
+Captain Sarah wears a pirate tricorn instead of her navy cap with the golden anchor — the plot object
+— on p14, p15, the back cover and the initial page; Emma wears the tricorn on p13/p14 before she
+recovers it on p16; a red coat instead of her blouse on p16; the giant chestnut on p8; cloned faceless
+adults on p9; Kilian missing his tricorn on p11; p13 has Emma idle where the text has her pulling.
+
+**Touched files:** none (evidence). Written up per page in
+`tasks/staging-story-review-2026-09-15.md`.
+
+---
+
+## 2026-09-15 — `extra_character` has no repair route by design — and what that costs when the crowd flag is missing
+
+**Context:** while diagnosing the score collapse above, the obvious question was why nine CRITICALs
+produced zero repairs (`wasCharacterFixed === false` on all 16 pages). The answer is three
+independent, each individually deliberate, decisions that compose into a dead end:
+
+1. `extra_character` deliberately keeps **CRITICAL** severity (`server/lib/scoring.js` ~186) — a
+   phantom figure in a children's book is a serious defect and the severity reflects that.
+2. The inpaint route was **closed** for it on 2026-09-13 (`NOT_INPAINTABLE_TYPES`,
+   `server/lib/repairLogic.js` ~980, commit `0f25e7f25`) — removing a figure by inpainting reliably
+   damaged the figures around it.
+3. `selectCharRepairTasks` (`repairLogic.js:444`) keys its tasks on a **cast name**, and a surplus
+   figure is by definition nameless, so it can never be handed a task.
+
+**Decision:** the state is recorded as the documented state, not changed. Each of the three parts is
+right on its own terms; the composition means an `extra_character` CRITICAL is a pure score
+deduction with no path back into repair.
+
+**Rationale:** this is survivable exactly as long as the finding is rare and true. It stops being
+survivable the moment the finding fires falsely at scale, which is what the missing `crowdExpected`
+produced — nine unappealable CRITICALs on one book. The dependency runs the other way from how it
+looks: the crowd guard is not a nicety on top of the eval, it is the only thing standing between a
+correct crowd scene and an unrepairable CRITICAL. Anyone re-opening the inpaint route or the naming
+key should read this alongside the `crowdExpected` entry rather than re-deriving the mechanism.
+
+**Touched files:** none (documentation of existing behaviour at `scoring.js`, `repairLogic.js:444`,
+`repairLogic.js` `NOT_INPAINTABLE_TYPES`).
+
+---
+
+## 2026-09-15 — One owner for a missing limb; one schema for `items_held`
+
+**Context:** `prompts/image-evaluation.txt` contradicted itself three lines apart. D-09 classified
+"a missing hand, arm or leg" as `anatomy` → **CRITICAL**, while D-12 classified "a missing arm or leg
+inside the frame" as `figure_completeness` → **MAJOR**. Separately, the two-key
+`items_held: {left, right}` schema had landed in `prompts/image-inventory-unified.txt:10` but the
+evaluator still asked free-text for "every distinct object in that figure's hands" — and both
+inventories feed the same blind judge (`prompts/image-prompt-compliance.txt:5-6`).
+
+**Decision:** the completeness family owns the defect. "A missing hand, arm or leg inside the frame"
+is D-12 (`figure_completeness`, MAJOR); the clause is removed from D-09. The evaluator's JSON example
+and its prose both take the two-key `{left, right}` shape.
+
+**Rationale:** D-11 to D-13 carry the guard *"never fire for a figure cropped by the frame edge,
+occluded by scenery or another figure, shown from behind, or drawn in consistent loose brushwork"*.
+D-09 has no such guard, so filing a missing limb as `anatomy` routed it around the one safeguard
+written for exactly this false-positive class — and did so at CRITICAL. That is the wrong direction
+given the measured 0-precision of VLM anatomy checks (memory: anatomy-defect detection verdicts).
+D-09's "3+ distinct items in one figure's hands" test was unreachable once the schema has two keys,
+and is restated as "an object held by a hand the figure does not have". No code reads `items_held`
+(only a keyword list at `testlab.js:6368`), so no consumer changed.
+
+**Note for the owner:** this partially supersedes `675e1aa60` (2026-09-12), which introduced the
+D-09 clause. No `docs/SETTLED.md` line covers either half; nothing settled was reversed. Eval
+classification belongs to the prompt, which is where both halves landed.
+
+**Touched files:** `prompts/image-evaluation.txt`,
+`tests/unit/eval-taxonomy-consistency.test.ts`. Commit `da9b7cdb2`. NOT changed:
+`prompts/variants/image-evaluation-verbose-v1.txt:215,381` still escalates 3+ entries to
+`extra_limbs` CRITICAL — an inactive variant, stale but inert (backlog).
+
+---
+
+## 2026-09-15 — A bare `costumed` label must read the costumed MAP, not be mistaken for a sheet
+
+**Context:** `server/lib/compositeCastBuilder.js:245-247` built the costume cache key by hand with
+`slugifyCostume` only, and recognised the prefixed `costumed:<x>` form exclusively.
+`clothingResolve.js:237,457` collapse `costumed:<x>` to a bare `costumed` label, so on every story
+that took that path `costumeKey` came out `null`, and the lookup at `:265` read
+`styledForStyle['costumed']` — which is a **map** of costume slots — as if it were a sheet. The
+string test failed, a **paid** 2×4 sheet was regenerated, and the cache write at `:296-303` then
+stored a STRING over that map. After which every later `pickCostumed` returned `undefined` and the
+page fell through to the generic bbox fallback (`bboxDetection.js:1315-1329`); `:310` persisted it
+under the bare key, so `database.js:2708` was keyed wrong too. Live callers:
+`storyJobPipeline.js:5365`, `regeneration.js:1350`.
+
+**Decision:** one exported helper, `resolveStyledSheetSlot(styledForStyle, clothing, storyCostume)`,
+routes **both** label shapes through the shared `costumeSubKey` / `pickCostumed` utilities. The
+builder no longer knows how a costume key is spelled.
+
+**Rationale:** the label has two legitimate spellings produced by two legitimate resolvers; the fault
+was a second, private implementation of the key rule. A shared utility already existed
+(`server/utils/costumeKey.js`, 2026-09-13) — the builder simply did not use it. The cost of the bug
+was a paid regeneration per story plus a cache the run then corrupted for itself.
+
+**Touched files:** `server/lib/compositeCastBuilder.js`,
+`tests/unit/composite-costume-slot.test.ts`. Commit `3547bc1e3`.
+
+---
+
+## 2026-09-15 — The face-integrity gate is one module, guarding all three character-repair paths
+
+**Context:** the gate added at `repairPipeline.js:1513-1537` had never once acted. Three faults at
+the same time: (a) `MODEL_DEFAULTS.repairFaceCheck` did not exist in `server/config/models.js`, so it
+ran on a hardcoded `gemini-3.7-flash` fallback; (b) that model 400s on OpenRouter without a
+`reasoning` option — documented at `evalPipeline.js:255-261` — and the catch **accepted** the repair,
+so it failed open on every call; (c) it existed only inside `runUnifiedRepairPipeline`, while the
+single-page path (`entityConsistency.js:3214`) and the manual "Figur reparieren" button
+(`routes/regeneration.js:5842`) had no gate at all. The block's own comment still described a
+detector-count gate that had been deleted.
+
+**Decision:** a new `server/lib/faceIntegrityGate.js`, called from all three entry points. The model
+key names a proven vision tier — `repairFaceCheck: 'gemini-2.5-flash'`, the native Gemini path, which
+takes no reasoning option. **Fail-open is kept by design** (gates are guidelines; a gate must never
+kill a paid run), but every outcome is now counted: `repair_face_integrity_pass`,
+`repair_face_integrity_unavailable`, `repair_reject_face_integrity`.
+
+**Rationale:** a permanently-open gate that emits nothing is indistinguishable from a clean pass —
+the failure mode recorded in memory as "an absent counter is not a clean score". The counters are the
+part that makes the fail-open safe: it stays open, and it says so.
+
+**Touched files:** `server/lib/faceIntegrityGate.js` (new), `server/lib/repairPipeline.js`,
+`server/lib/entityConsistency.js`, `server/routes/regeneration.js`, `server/config/models.js`,
+`tests/unit/face-integrity-gate.test.ts`. Commit `79f1e3c44`.
+
+---
+
+## 2026-09-15 — The CALLER decides which book is final: the audit runs on every exit from the repair round loop
+
+**Context:** the repair round loop (`repairPipeline.js:1935`) breaks at `:2088`
+(`badPages.length === 0`) and at `:2189` (`repairableCount === 0`) — both **before** the book audit at
+`:2732`. A run that converged in round 2 of 3 therefore shipped a book that was never read as a whole.
+`planBookAuditRound` (`repairLogic.js:145`) derived finality from `round >= roundLimit`, which is
+false at an early exit, so the extra-round grant could not fire there. That grant is the only route
+back into repair for a CRITICAL the per-page judges missed — the symptom being a reader CRITICAL on a
+good-scoring page silently dropped.
+
+**Decision:** the audit tail is extracted to `runBookAuditRound()`, and both early exits call it with
+`finalRound: true`, continuing the loop instead of breaking when it grants a round.
+`planBookAuditRound` takes `finalRound` from the caller and keeps the old `round >= roundLimit`
+derivation when it is omitted.
+
+**Rationale:** finality is a property of the caller's situation, not of the round counter. The book in
+hand at an early exit IS the shipping book. The unit test could not see this because it called
+`planBookAuditRound` as a pure function — the fault was entirely in who calls it and when.
+
+**NOT changed:** `readerFindingsByPage` is still read at `:802`, for pages already in `badPages`. With
+the audit now running at convergence, a CRITICAL reader finding re-admits its page through
+`admitPagesFromAudit`, which is the intended route.
+
+**Touched files:** `server/lib/repairPipeline.js`, `server/lib/repairLogic.js`,
+`tests/unit/audit-runs-on-early-exit.test.ts`. Commit `82ea5db53`.
+
+---
+
+## 2026-09-15 — `account_created` fires when the account exists, not when an email is typed
+
+**Context:** `client/src/pages/TrialGenerationPage.tsx:562-563` emitted the funnel's terminal step
+`account_created` on a 200 from `POST /api/trial/link-email`. `server/routes/trial.js:1736-1743`
+leaves the user anonymous and unverified at that point — the account does not exist yet.
+
+**Decision:** `TrialGenerationPage` emits `email_submitted` only; `EmailVerified.tsx` emits
+`account_created` in the trial verification branch, after the auth token is stored.
+
+**Rationale:** a terminal funnel step must mean what it says, or every conversion number built on it
+is an upper bound of unknown looseness.
+
+**Consequence the next reader needs:** the measured trial conversion **will drop** on the email path,
+because it was counting typed addresses. This invalidates the comparison baseline in the memory note
+"trial funnel conversion is 50%" — that figure was measured on the old event and is not comparable to
+anything measured after this commit.
+
+**Touched files:** `client/src/pages/TrialGenerationPage.tsx`, `client/src/pages/EmailVerified.tsx`,
+`tests/unit/trial-funnel-account-created.test.ts`. Commit `38bab5a94`.
+
+---
+
+## 2026-09-15 — The sibling relationship becomes DATA: a registry, a pre-push gate, and a parity test
+
+**Context:** a verification sweep of the 173 behaviour commits from a 60-hour window (2026-09-13 to
+2026-09-15) found **27 PARTIAL fixes** — ~143 verified, 2 superseded, 0 broken. Every one of the 27
+had the same shape: the change landed on one code or prompt path and not on its sibling. The axes
+that recurred: per-page vs all-pages Art Director template, trial vs unified writer, lector vs diff
+pass, streaming vs non-streaming provider entry point, Gemini primary vs Grok fallback, production
+repair vs the regeneration route vs `entityConsistency`, Test Lab stage vs production call site,
+cover path vs page path.
+
+The story's root cause was one of them: `crowdExpected` declared only in
+`prompts/scene-expansion.txt` while the live beats path runs `prompts/scene-expansion-all.txt`, so
+the guard read `false` on all 16 pages and nine took an `extra_character` CRITICAL for
+correctly-drawn crowds (see the entry above).
+
+The `.claude/skills/fixing-sibling-paths` skill had described this exact failure class since
+2026-08-09 and prevented **none** of the 27.
+
+**Decision:** the sibling relationship stops being prose and becomes data with mechanical
+enforcement.
+
+1. `scripts/admin/sibling-registry.json` — 9 file sets plus 1 within-file set.
+2. `scripts/admin/check-sibling-paths.js`, wired as **gate 9** in `.githooks/pre-push`: a push whose
+   range touches some members of a set but not all is **blocked** for a `severity: "block"` set and
+   **warned** for a `severity: "warn"` set.
+3. `tests/unit/sibling-parity.test.ts` — registry-driven, so drift already in the tree is caught even
+   when no commit touches either side.
+4. Escape hatch: a line `Siblings-Checked: <reason>` anywhere in the commit message body,
+   case-insensitive. An empty marker is not accepted — the reason is the point. It is deliberately
+   **not** silenceable per-set: one marker excuses every set for that commit, because finer
+   granularity is a knob people learn to turn. The commonest honest use is a catch-up commit whose
+   sibling was fixed in an earlier, already-pushed commit, which the push range cannot see.
+5. The skill was rewritten to point at the registry first, and `CLAUDE.md` gained one paragraph.
+
+**Rationale:** prose is advisory and is read only by a session that chooses to invoke it; five weeks
+and 27 misses is the measurement. A registry is a control. The **block/warn split** exists because a
+gate that cries wolf gets bypassed, and a bypassed gate is worse than none — so one-to-many axes
+(the trial writer, the repair entry points, the cover builders, Lab-vs-prod) are `warn`, where a
+legitimate divergence is common, and the tight one-to-one pairs block. The parity test covers what a
+diff gate structurally cannot see: a field that only ever existed on one side.
+
+**Vouching (added the same day, `7a78e1d55`).** The marker is a **vouch**, not a dismissal: the
+author states, in the permanent commit message, that they read each sibling of the set and that the
+divergence is correct. Two forms:
+
+- `Siblings-Checked: <reason>` — excuses the commit that carries it.
+- `Siblings-Checked: <sha-prefix ≥ 7> — <reason>` — a **later commit in the same push vouches for an
+  earlier one by sha**. The gate prints `vouched by <sha>` beside the excused pair, so attribution is
+  never lost, and one `--allow-empty` commit can carry a line per blocked commit.
+
+The second form exists for the catch-up case, which gate 9 immediately produced: `1d418235a`
+(`story-text-diff.txt`, sibling fixed in the already-pushed `9a41a6c67`) and `da9b7cdb2`
+(`image-evaluation.txt`, sibling fixed in the already-pushed `62da2cdfa`) were both correctly blocked,
+and the push range cannot contain their counterparts. The only previous remedy was a rebase, which
+would have rewritten 33 unpushed hashes that three handoff notes cite. Vouching **adds** a commit
+instead of rewriting history. It fails closed on every loophole shape: a prefix resolving to nothing
+in the range, an ambiguous prefix, a self-vouch, and a missing reason are all errors, and a message
+carrying only vouches for other commits does not double as an excuse for its own siblings. The
+decision core is a pure exported `analyze(commits, sets)`, tested against synthetic history in
+`tests/unit/sibling-vouching.test.ts` (8 cases).
+
+What the mechanism cannot guard is an author who writes a reason without having read the siblings.
+That is deliberate: the reason is on the record and the next reader can hold it against the code.
+
+Additional touched files for the addendum: `scripts/admin/check-sibling-paths.js`,
+`tests/unit/sibling-vouching.test.ts` (new), `docs/sibling-paths.md`,
+`.claude/skills/fixing-sibling-paths/SKILL.md`. Commits `7a78e1d55`, `73b3ed7e8` (the vouch commit
+itself), `de49d0bfd`.
+
+2026-09-15 owner: every set blocks; warn tier removed (the gate now rejects any severity but
+`block`, and the Siblings-Checked marker — same-commit or vouching — is the one escape).
+
+**Touched files:** `scripts/admin/sibling-registry.json` (new),
+`scripts/admin/check-sibling-paths.js` (new), `scripts/admin/sibling-reminder-hook.js` (new),
+`.githooks/pre-push` (gate 9), `.claude/settings.json` (PostToolUse nudge),
+`tests/unit/sibling-parity.test.ts` (new), `tests/unit/test-include-guard.test.ts` (new),
+`docs/sibling-paths.md` (new), `CLAUDE.md`,
+`.claude/skills/fixing-sibling-paths/SKILL.md`. Commits `2f7f5dfde`, `4ae509b5f`, `336b246dd`.
+
+**Status:** ✅ active on `staging`, NOT pushed. Registry coverage is seeded from the 27 findings only
+— axes named in the sweep but not yet declared are the quality-eval Gemini-vs-Grok fallback branches
+inside `evalPipeline.js` and the `image-generation.txt`-vs-writer-prompt placement vocabulary
+(backlog). **Open owner decision:** whether every set should be `block`, dropping the warn tier.
+
+---
+
+## 2026-09-15 — People-free pages are a feature; interaction drama gets faces
+
+**Context.** Story `job_1789420511893_zly5rcdej` page 12 is the emotional climax: a ship pulls
+away, three children shout after it, Emma is in tears. The plan line read `wide — the Nebelmöwe
+sliding away from the stone edge, the slack stern line trailing toward the bollard, no one at the
+gangway place`. The Art Director expanded it to `characters: []`, the renderer drew an empty quay
+with a coil of rope, and the page shipped with no children. Nothing caught it:
+`NO_PEOPLELESS_PAGE` (planCounters.js) fires only when a book has ZERO people-free pages — so one
+is REQUIRED — and nothing constrained WHICH page; `NO_COMMISSIONED_ON_PAGE` filters `r.peopled`,
+so a zero-cast page is skipped by construction.
+
+**Decision.** People-free pages stay REQUIRED and are documented as a feature. A page with no
+characters is GOOD when the drama is environmental or spectacle — a ship tossed in a storm seen
+from far away, a landmark at dawn, an empty street after everyone has gone — and WRONG when the
+drama is interaction: dialogue, confrontation, tears, shouting, a promise, a handover. Two halves,
+per the mechanical-rules-and-fed-back-retries rule:
+1. A new plan counter `PEOPLELESS_ON_INTERACTION_PAGE` fires on a people-free page whose PLAN LINE
+   declares interpersonal drama, and travels structured to the re-plan naming the page.
+2. `prompts/story-beats.txt` item 2 now tells the planner at least one page earns a people-free
+   picture and which page qualifies.
+`NO_PEOPLELESS_PAGE` is unchanged; both counters carry a comment saying the empty page is by design.
+
+**Rationale.** The signal is read off the PLAN LINE because that is the only per-page text that
+exists at plan-check time — the beat prose was removed 2026-09-02 and a page IS its plan line. Two
+plan-declared clauses: (a) people named by their ABSENCE ("no one at the gangway", "nobody",
+"deserted", "after they have gone") — a page whose subject is a place describes the place; a page
+that has to say who is NOT there is a page about the people who left; (b) an interaction the line
+names outright (shouting, calling after, weeping, waving, a farewell, an embrace, a handover, a
+confrontation, a promise). Bare "empty" is deliberately NOT in the list: the same prompt allows an
+empty place as a page's subject. This is a plan-TIME check on the planner's own declaration, not a
+pattern match on the Art Director's prose after the fact.
+
+**Touched files.** `server/lib/planCounters.js` (INTERACTION_DRAMA_WORDS beside PERSON_WORDS,
+counter 4b, by-design comments on both counters), `prompts/story-beats.txt` (page-plan item 2),
+`tests/unit/plan-counters.test.ts`, `tests/unit/plan-replan-ranking.test.ts`. Commit `c7bd81263`
+(staging, NOT pushed).
+
+**2026-09-15 owner: promoted to must-fix** — `PEOPLELESS_ON_INTERACTION_PAGE` was added to
+`REPLAN_MUST_FIX_CODES` (`server/lib/promptBuilders.js`); the re-plan must resolve it, not note it.
+
+**Proposed SETTLED.md line (owner to confirm — NOT yet added to `docs/SETTLED.md`), under
+Prompts & evaluation:**
+
+> - **A people-free page is a FEATURE and stays required — but never on a page whose drama is between
+>   people** (owner, 2026-09-15). `NO_PEOPLELESS_PAGE` requires one; `PEOPLELESS_ON_INTERACTION_PAGE`
+>   constrains WHICH page. Do not propose deleting the requirement because one book spent it badly.
+>   See decisions.md 2026-09-15.
+
+**Open question for the owner — advisory or must-fix?** The new counter is ranked *"also noted"*, not
+must-fix: `REPLAN_MUST_FIX_CODES` (`promptBuilders.js:5925`) is currently reserved for "a commissioned
+character the division left out". This finding has the same shape — the climax has no faces — so
+promoting it is the plausible next step, and the owner is leaning that way. Deliberately NOT done,
+because it was outside the agreed scope of the change.
+
+---
+
+## The push gate's 404 allowance is removed — a missing route blocks (2026-09-15)
+
+**Context:** `scripts/admin/check-push-idle.js` answered a 404 from `/api/health/busy`
+with verdict `ungated`, `blocked: false` — the push went through with a warning. That
+was a deliberate bootstrap allowance in the 2026-08-04 entry ("HTTP 404 means the
+environment predates the gate; blocking there would deadlock, the fix can only ship by
+pushing"). The route has been live on staging and production ever since (both answered
+200 on 2026-09-15), and the 2026-09-14 rework ("the two readers reach ONE verdict, and
+never fail open") left this branch in place while its own header comment claimed the
+gate may never fail open. A 404 today means the route was lost or the wrong host
+answered — it says nothing about what is running inside the container.
+
+**Decision:** 404 is treated like every other non-200: verdict `unknown`, blocked, in
+both hook and manual mode. The `ungated` verdict and its "NOT CHECKED" rendering are
+deleted; `renderVerdict` lets only `idle` through. The deadlock argument no longer
+applies: `git push --no-verify` is the documented escape for a run you are willing to
+destroy, and a lost route is exactly the case to look at before pushing, not around.
+
+**Rationale:** Unknown is not idle. A fail-open verdict that survives after its
+bootstrap purpose is gone is a way to push over a running generation, which is the one
+thing the gate exists to prevent.
+
+**Touched:** `scripts/admin/check-push-idle.js` (`probe` 404 branch, `renderVerdict`),
+`tests/unit/push-idle-gate-agreement.test.ts`, `tests/unit/push-idle-manual-report.test.ts`,
+`tests/manual/test-push-idle-gate.js` (404 case, plus the stale DNS-failure expectation
+left behind by the 2026-09-14 change).
+**Status:** ✅ active
+
+## 2026-09-15 — Generator and critic are siblings: the registry enforces it
+
+**Context:** Owner, after the sibling-path gate shipped: *"Do we also ensure that creator and
+reviewer get same info? That is the other thing we keep chasing — we fix the reviewer, but we
+never told the creator the change."* An audit of seven generator↔critic prompt pairs found **38
+rules a judge can deduct for that the generator was never given**, 34 of them safe to close and 4
+requiring an owner decision. The worst: the empty-scene QC judges a plate against `mainScenePrompt`
+that `buildEmptyScenePrompt` is never passed; the cover EXPECTED CAST roster is built from the
+untrimmed brief while the generator is capped at five characters and explicitly told to exclude the
+rest; `plan-check.txt` demands every first appearance be staged as an arrival or a naming while
+`story-beats.txt` contains no entrance rule at all; `D-24 character_marking` is CATASTROPHIC/CRITICAL
+and the generator was told only not to write LETTERS.
+
+**Decision:** The sibling registry gains a `generator-vs-critic` axis with five sets (page image vs
+its three judges, Art Director vs scene-review, writer vs proofread/audit, avatar vs its judge,
+planner vs plan-check). Those sets declare `generators` and `critics` instead of a flat member list,
+and their rule is deliberately looser and directional: a commit must touch at least ONE of each
+side, not every member — three judges of one generator are not siblings of each other. The gate
+names which direction it caught, because the two are different mistakes. `parity.ruleAnchors` pins a
+critic rule to its generator-side counterpart in the normal test suite. Two gaps were migrated as
+the pattern to copy: one exported JS constant per rule, filled into a declared placeholder, pinned
+against the REAL builder. Everything that would move a severity, a type or a bucket was left for the
+owner.
+
+**Rationale:** A judge may only deduct for a rule the generator was given; otherwise the finding is
+real, the score is real, and no rewrite can satisfy it. Mirroring a sentence into both templates is
+the same disease one level down, so the shared-constant form is the enforced pattern — and the test
+must run the real builder, since `fillTemplate` strips an undeclared placeholder silently and the
+prompt ships with a hole. The four OWNER cases are classification questions, which belong to the
+prompt and to the owner, never to a quiet edit.
+
+**Touched files:** `scripts/admin/sibling-registry.json`, `scripts/admin/check-sibling-paths.js`,
+`scripts/admin/sibling-reminder-hook.js`, `server/lib/promptBuilders.js`,
+`prompts/image-generation.txt`, `tests/unit/sibling-parity.test.ts`,
+`tests/unit/generator-critic-rule-reach.test.ts` (new),
+`.claude/skills/syncing-generator-and-critic/SKILL.md` (new),
+`.claude/skills/fixing-sibling-paths/SKILL.md`, `docs/sibling-paths.md`, `CLAUDE.md`.
+Commits `f4976b408`, `002b5d2a2`, `3e40b75a5`.
+
+## 2026-09-15 — `scaleClass`: an authored, machine-facing scale band on every Visual Bible element
+
+**Context:** on staging `job_1789420511893_zly5rcdej`, ART004 "roasted chestnut" carried a correct
+free-text `size` ("the size of a thumb") and still rendered football-sized as the nearest object to
+camera; VEH001 "wooden sailing ship" had no `size` slot at all (the vehicle parse never had one) and
+rendered as a small open rowboat. A correct size sentence changed nothing, because nothing in CODE
+reads a sentence — every routing decision was keyed on the VB collection an entry happened to sit in.
+
+**Decision:** one new authored key on `artifacts`, `vehicles`, `animals`, `secondaryCharacters` and
+`locations` — `scaleClass`, a closed enum of `hand | arm | person | vehicle | building | landscape`,
+stated in the prompt as height against a standing adult. `size` STAYS: the two fields have different
+consumers, `size` is prose a model reads (`sizeNote` on REQUIRED OBJECTS) and `scaleClass` is a token
+only code reads. The parser normalises (lowercase, trim) and warns; an unknown token and a missing
+one both become `null`, never a nearest-band guess. `null` is a first-class route — every consumer
+falls back to its pre-2026-09-15 `type`-based behaviour — and there is NO backfill of stored bibles
+(owner, 2026-09-15): repair, iterate and cover paths re-read months-old bibles, and a guessed class
+would change a shipped book's routing on a repair.
+
+**Rationale:** the p8/p12 evidence says free text was *insufficient*, not wrong, so deleting `size`
+would reverse `e476ca314` and the 2026-09-11 animal extension with no case. Merging the two is worse
+than either: the enum stops being closed and `sizeNote` starts emitting a bare category into a page
+prompt, which the one-authored-label rule forbids. `scaleClass` is machine-facing and is never
+concatenated into `description`, `label`, `sizeNote` or any prompt string — pinned by a test that
+builds a real page prompt and asserts the token is absent while `size` is still present. A size/class
+contradiction check was proposed and CUT by the owner: no text inspection anywhere in this work.
+
+All four VB-authoring prompts move together and the sibling gate enforces it via a new
+`parity.anchors` entry (`"scaleClass"`) on the `vb-authoring-sites` set; the parity test was
+confirmed FAILING on all four members before the prompts were edited. `prompts/scene-expansion.txt`
+(consumes a VB, authors none) and `prompts/story-bible-from-beats.txt` (wardrobe contract only) are
+deliberately NOT authoring sites — recorded here so it is not re-derived.
+
+**Touched files:** `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`,
+`scripts/admin/sibling-registry.json`, `server/lib/visualBible.js`,
+`tests/unit/vb-scale-class.test.ts` (new), `tests/unit/artifact-size.test.ts`,
+`tasks/vb-scale-class-plan-2026-09-15.md`.
+
+## 2026-09-15 — The generic-vs-specific gate: an everyday instance buys no id, no entry, no render, no cell
+
+**Context:** a Visual Bible entry costs a paid reference render, an id a page can cite, one of the
+four page reference cells and a row in the element budget. An everyday instance of a thing — a cup,
+a broom, a crate any other crate could stand in for — was paying all four while contributing nothing
+a reader could notice, and on `job_1789420511893_zly5rcdej` p8 exactly such an object (a chestnut)
+took a cell and rendered as the page's hero.
+
+**Decision:** an authored `"generic": true` on `artifacts`, `animals` and `vehicles` that the PARSER
+DROPS. The dropped entry lands in `visualBible.genericObjects[]` with **no id**, which makes it
+invisible to every consumer at once — reference selection, reference-sheet batching, the element
+budget, entity consistency and bbox grounding are all keyed on the collection arrays or on an id.
+A page brief that cites one anyway is stripped with a `log.error` in
+`getElementReferenceImagesForPage`, before the `askedFor` map — the one path that could resurrect it
+into a cell. A generic object's look reaches the page through the scene prose, where an everyday
+object's look belongs.
+
+**Rationale:** the gate is an authored flag the parser drops, NOT an instruction to omit the entry.
+An omitted entry is indistinguishable from a forgotten one (the `crowdExpected` failure class):
+no log line, no counter, no way to audit whether the gate is being applied at all. A dropped
+`generic: true` leaves exactly one artefact per object — a log line and a count — which is the only
+version of this that can be measured on a real story without a paid re-run. `generic: false` and an
+absent key both behave exactly as before; only an explicit true drops.
+
+**Sibling gap closed en route:** `UnifiedStoryParser.extractVisualBible`
+(`server/lib/outlineParser/unified.js`) is the VB parse the pipeline actually runs, and it
+`JSON.parse`s the authored object raw. `visualBible.parseVisualBible` is the other one. The generic
+split AND the phase-1 `scaleClass` normalisation both had to exist in both, or an unknown
+`scaleClass` would have sailed through unchecked on the live path and a `generic: true` entry would
+have kept its id and its cell. Caught by the phase-2 test, fixed in the same commit.
+
+**Touched files:** `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`,
+`scripts/admin/sibling-registry.json`, `server/lib/visualBible.js`,
+`server/lib/outlineParser/unified.js`, `server/lib/referenceSheets.js`,
+`server/lib/vbElementBudget.js`, `tests/unit/vb-generic-gate.test.ts` (new),
+`tests/unit/vb-scale-class.test.ts`, `tests/unit/ad-authored-bible.test.ts`.
+
+## 2026-09-15 — Vehicle-class and larger belong to the PLATE, never to a page reference cell
+
+**Context:** on `job_1789420511893_zly5rcdej` p12, VEH001 "wooden sailing ship" was cited as a page
+reference cell and rendered as a small open rowboat although the plate prompt named the three-master
+— the cell won over the plate. A reference cell has exactly one size, its own, and nothing inside the
+cell says whether it depicts a thumb or a three-master; the plate sizes a structure against bollards,
+cobbles and quay height. A filter for this existed but was keyed on the VB collection, so a
+building-scale *artifact* (a monument, a mill, a bridge, a pole-with-banner) still competed for one
+of the page's four cells.
+
+**Decision:** routing is by the authored `scaleClass`, not by collection. `vehicle`, `building` and
+`landscape` are **plate-borne**: `getEmptySceneElementReferences` widens from "vehicles + non-landmark
+locations" to include any element in those bands from any collection, `buildEmptyScenePrompt`'s
+`**VEHICLES:**` block becomes `**STRUCTURES:**` on the same AD-`objects[]` authority gate and the same
+`aboardId` exception, and both page-side filter sites (`buildPageCompositeRefs` and Phase 5a-pre-grid)
+drop plate-borne elements through one shared predicate, `isPlateBorneElement`.
+
+**The drop is CONDITIONAL on a plate actually being sent** — not unconditional at selection time.
+A large element on a plateless page keeps its cell rather than travelling on nothing; the precedent is
+page 1 of `job_1788295892348_l028ggiq7a`, a cast-0 ship exterior that attached zero references while a
+finished plate of the ship existed and was discarded. `scaleClass === null` — every stored bible —
+falls back to the pre-2026-09-15 `type !== 'vehicle' && type !== 'location'` rule, which is kept
+inside the same predicate so the two can never disagree.
+
+**Ordering bug fixed in the same commit:** `storyJobPipeline.js` computed `vbRefElementIds` from the
+UNFILTERED selection while Phase 5a-pre-grid dropped cells afterwards, so a page prompt could tell the
+model "the attached reference images include a rough image of <X>" when that cell had been dropped —
+the model was told to match a reference it was never given. The page prompt is now built through a
+closure and rebuilt from the kept set after the filter, which is what the trial path
+(`trialVbGrid.rawElements`) and the iterate path (`images.js:4307`) already did.
+
+**Rationale:** a scale referent INSIDE the cell is REJECTED and is not the alternative
+(`feedback_no_scale_referent_in_vb_cell`) — anything sharing the cell leaks onto the page. This
+change only ever FREES page cells: `VB_SLOT_MAX_ELEMENTS` stays 4 and `VB_ELEMENT_BUDGET` stays 3;
+large elements leave the page grid, they never join it. It extends the settled
+"LOCATIONS ARE NOT ELEMENTS" logic rather than reversing it — the location is the plate the cast is
+composited into, and so is the structure standing in it.
+
+**Touched files:** `server/lib/visualBible.js`, `server/lib/referenceSheets.js`,
+`server/services/prompts.js`, `storyJobPipeline.js`, `docs/image-routing.md`,
+`docs/image-generation-methods.html`, `tests/unit/vb-plate-routing.test.ts` (new).
+
+## 2026-09-15 — The images.js facade forwards its two domain modules by construction, and shared client/server data lives in `shared/`
+**Context:** two loose ends from the 2026-09-15 review of the preceding three days' commits.
+(1) The 2026-09-13 ruling above ("The storyHelpers facade re-exports its domain modules by
+construction, never a hand-written list") was never applied to the other facade. `images.js`
+re-exports `evalPipeline.js` and `bboxDetection.js`, and CLAUDE.md documents it as re-exporting
+every name — but it listed them by hand, and had drifted 15 names behind. The first fix this
+session added the 15 by hand, which closes the instance and leaves the bug class: the next export
+added to either module binds `undefined` again for anyone who trusts the documented contract.
+(2) `TOPIC_AGE_WINDOWS` in `promptBuilders.js` was a 56-entry table typed by hand to mirror
+`suitableAges` in the client's `storyTypes.ts`, its comment calling itself a "GENERATED MIRROR"
+though nothing generated it.
+**Decision:** (1) `images.js` spreads `evalPipelineModule` and `bboxDetectionModule` into
+`module.exports` ahead of the explicit list, exactly as `storyHelpers.js` does; the explicit list
+stays after them as the documented surface and wins for any name this file defines locally.
+(2) the age windows move to `shared/topic-age-windows.json`, a new root-level `shared/` directory
+for plain data both runtimes read — the server `require()`s it, Vite bundles it, and neither side
+needs a build step. It is the first such directory; previous client/server sharing was done by
+hand-mirroring with "edit both" comments (`seoMeta.js`, `season.js`, `sceneComposite.js`), which is
+the practice this replaces for data of this shape.
+**Rationale:** both are the same move — delete the hand-maintained second copy rather than correct
+it. A parity test catches drift only after someone writes it and only for the table it names; a
+single source cannot drift at all. Verified for (1) by deleting one explicit entry and confirming
+the name still resolved through the spread, then restoring it.
+**Touched:** `server/lib/images.js`, `tests/unit/images-facade-complete.test.ts`,
+`shared/topic-age-windows.json`, `server/lib/promptBuilders.js`,
+`client/src/constants/storyTypes.ts`, `client/tsconfig.json`, `tests/unit/age-band.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — A page that ships on prose alone is marked in stories.data, not only in a log line
+
+**Context:** page 16 of `job_1789420511893_zly5rcdej` scored **-40**, the worst page in the book.
+Its stored `sceneMetadata` carries `isRecovered: true` with `objects: []`, `characters: []`,
+`clothing: null`, `interactions: null`, `textPosition: null` — the prose-only recovery path in
+`server/lib/sceneMetadata.js` ("Recovery path", ~:1150-1190), taken when the `---METADATA---`
+delimiter is present but every parser fails. The page went to the image model with no cast, no
+clothing contract, no props and no text placement; it rendered the main character in a red coat
+instead of her red blouse and sash and omitted the hat she had just caught, then took four
+CRITICAL findings (`clothing`, `accessory_missing`, `extra_character`, `face_destroyed`) judged
+against a brief that had been stripped before it was sent. Nothing downstream ever said
+"this page is known-degraded". Two traps made it hard to find: the degraded object sets
+`isJsonFormat: true`, so searching for `isJsonFormat === false` finds nothing (`isRecovered` is the
+only marker), and the parse-failure log line named "Sonnet" while the configured Art Director has
+been `gemini-3.1-pro` since 2026-08-29.
+
+Measured over 45 days: production 1 page in 288 (`job_1786905427999_hxk530n5s` p8), staging 3 in
+1,086. Zero pages have a missing `objects` field WITHOUT the marker, so `isRecovered` is the
+complete population — there is no quieter second failure mode.
+
+**Decision:** `describeDegradedSceneMetadata()` (exported from `sceneMetadata.js`, forwarded by the
+`storyHelpers` facade) turns the marker into `{recovered: true, emptyInputs: [...]}`. It is stamped
+as `degradedScene` in BOTH `sceneImages` whitelists in `storyJobPipeline.js` — the repair-pipeline
+branch and the `skipQualityEval` (trial) branch — because that whitelist is the single gate on what
+reaches `stories.data`. The rollup lands on `finalChecksReport.degradedScenes` next to
+`notEvaluated` / `shippedDefective`, with one `log.warn` per page. The fallback log line now states
+the CONSEQUENCES (which downstream inputs are empty) rather than only the fact, and names no model.
+
+**Rationale:** same contract as `notEvaluated` (2026-09-14): recording only — no score, no
+severity, no repair route changes. Whether a `clothing` CRITICAL should be suppressed when the
+clothing contract was null is a real question and it is the owner's call (classification belongs to
+the prompt); this change exists so that decision can be taken on evidence instead of on one page
+someone happened to notice.
+
+**Touched:** `server/lib/sceneMetadata.js`, `storyJobPipeline.js`,
+`tests/unit/degraded-scene-marker.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — `scene_review` joins the VB-id allow-list; beats header names config keys, not models
+
+**Context:** `isVbIdLegitimateLabel` (`server/lib/vbIdGuard.js`) strips a leading `testlab_` and
+prefix-matches `VB_ID_LEGITIMATE_LABELS`. The list had `beats_scene_review` but no bare
+`scene_review`, so production (`usageLabel: 'beats_scene_review'`) was silent while the Lab
+(`testlab_scene_review` → strips to `scene_review`) warned on every run. The ids BELONG in that
+prompt: the guard's own doc names the scene reviewer as a stage whose contract IS the id vocabulary,
+and the stored prompt carries `"looksAt": "VEH001"` citations the reviewer must read back.
+Separately, the `beatsPipeline.js` header comment listed a hardcoded model per stage and had said
+"Sonnet" for the Art Director for weeks after it moved to `gemini-3.1-pro` — it sent an
+investigator to the wrong model for ten minutes.
+
+**Decision:** add `'scene_review'` to the allow-list (an allow-list entry, not sanitisation). As a
+prefix it also covers `testlab_scene_review_replay`, same contract — intended. Audited every
+`usageLabel` in `server/` and `scripts/`: the only labels beginning `scene_review` are the scene
+reviewer and its replay, so the prefix sweeps in nothing unintended. The beats header now names the
+`server/config/models.js` key each stage resolves from (`MODEL_DEFAULTS.outline`,
+`.sceneDescription`, `.sceneReviewModel`, `.storyText`) so it cannot go stale on a model swap.
+
+**Rationale:** an UNKNOWN label warns by design — that is the guard working. A known-legitimate
+stage that warns is noise that trains readers to ignore it.
+
+**Touched:** `server/lib/vbIdGuard.js`, `server/lib/beatsPipeline.js` (header comment only),
+`tests/unit/vbid-allowlist-scene-review.test.ts`
+**Status:** ✅ active
+
+---
+
+## 2026-09-15 — The Lab's `beats_scenes` stage recovers from a truncated all-pages reply, and a partial run says so
+
+**Context:** Test Lab experiment 1275 (`beats_scenes`, story `job_1789420511893_zly5rcdej`,
+16 pages) had its Art Director all-pages call cut mid-JSON inside page 9 — the stored brief ends
+on an unterminated `"interactions":` — and pages 10-16 never arrived. The stage took every
+`## Page N` chunk verbatim (`parseRefinedText`), so it returned sixteen expansions: nine measured,
+one half a spec, seven carrying `error: 'page missing from the all-pages response'` — and the run
+still read as a success with `pageCount: 16`. Part of a verification run was drawn from it.
+Production never had that hole: `beatsPipeline.js` refuses a brief that fails the scene-brief
+contract, retries the batch once at full cap, and re-expands whatever is still missing page by page.
+
+**Decision:** give the Lab stage the same three guards, by CALLING production's helper rather than
+re-deriving it — `iterateBriefGuard.partitionSceneBriefs` decides which briefs count, in the Lab and
+in production alike. The loop itself could not be called from the stage (production's lives inside
+`processBeatsStory`, closed over a story, a DB and paid models), so it was EXTRACTED into
+`collectAllPagesBriefs` in `testlab.js` with the batch call, the parser and the per-page fallback
+injected — which is also what makes the recovery pinnable in a unit test with no story and no
+provider. A page with no brief after all of that is a NON-result (`ok:false`, no brief text), so the
+scene review and the comparison cannot mistake half a spec for a measurement, and the stage returns
+`sceneExpansionIncomplete` — "N of M pages measured", rendered as a red banner above everything else
+on the Test Lab card. The stage's own `ok` stays true: it is the runner's flag for "the stage ran",
+and forcing it false hides the very results the run did measure (`TestLab.tsx` gates the whole card
+on it).
+
+**Rationale:** an experiment that reports 16 and measured 9 produces conclusions nobody can trust,
+and the failure is invisible unless the reader opens each page. The retry costs money when it fires;
+that is the point, and it is production's number (two batch attempts), not a new speculative one.
+
+**Touched:** `server/lib/testlab.js`, `client/src/pages/TestLab.tsx`,
+`client/src/services/testlabService.ts`, `tests/unit/testlab-beats-scenes-recovery.test.ts`
+**Status:** ✅ active
+
+---
+
+## 2026-09-15 — The blanket-appearsInPages warning says what it means for a LOCATION
+
+**Context:** `auditVisualBibleContract` (`server/lib/outlineParser/shared.js`) reports any Visual
+Bible entry whose `appearsInPages` covers more than 90% of the book, across every category
+including `locations`. Its message says a blanket range "bakes the element into scenes that never
+contain it". For a location that harm cannot occur: `vbElementBudget.ELEMENT_COLLECTIONS` is
+secondary characters, animals, artifacts and vehicles — locations are excluded, per
+docs/SETTLED.md "LOCATIONS ARE NOT ELEMENTS" (2026-09-08), because a location is the plate the cast
+is composited into, never a reference cell. The one reader of a location's pages is the landmark
+page gate (`storyHelpers.js`), where a wide range is permissive, not harmful. The audit only
+REPORTS — one `log.warn` in `outlineParser/unified.js`, no failure, no regeneration, no edit — so
+the cost of the wrong wording is a reader chasing a defect that is not there.
+
+**Decision:** REWORD, do not exempt (owner's call). Locations stay in the check — the tripwire is
+worth keeping — but a location finding now reads "expected for a single-setting story; confirm the
+book really stays there". Every other category keeps the element-baking wording unchanged.
+
+**Rationale:** dropping locations from the check would remove a signal that costs nothing; keeping a
+claim that is false for the category trains readers to ignore the whole audit.
+
+**Touched:** `server/lib/outlineParser/shared.js`, `tests/unit/vb-authoring-contract.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — `scaleClass` is the SINGLE SOURCE OF SCALE TRUTH; the free-text `size` field is retired
+
+**Supersedes** (all five, and the morning's own entry on this page):
+- 2026-09-06 "A prop's `size` is a Visual Bible field and rides the REQUIRED OBJECTS line"
+- 2026-09-09 "Creature size in the VB is an age-scaled RECOMMENDATION, never a cap"
+- 2026-09-11 "A creature carries its stated size into every page prompt"
+- 2026-09-14 "Object size reaches the image as a relational anchor, and `foreground` no longer means 'big'"
+- 2026-09-14 "The Art Director's size rule states the obligation unconditionally"
+- 2026-09-15 "`scaleClass` is machine-facing and never reaches an image model" (reversed the same day, by the owner)
+
+**Context.** The morning of 2026-09-15 shipped `scaleClass` as a six-value, machine-facing enum
+(`hand | arm | person | vehicle | building | landscape`) used ONLY to route an element's reference to
+the plate or to a page cell, with a test pinning that it never reaches an image model; the free-text
+`size` sentence stayed as the only scale wording a model reads. The owner's intent was the opposite:
+*"Use the new enum for this and remove the size. That was the whole purpose and why the enum must be
+granular."*
+
+The free-text field was then measured across every stored Visual Bible on staging and production:
+**168 entries carrying a `size`, 151 distinct strings** (staging 87 entries / 73 distinct; production
+81 / 78). 90% of them are animals — artifacts contributed 23 and vehicles 1, so the sentence was
+barely authored on the collections that motivated it. What the strings contain:
+
+- **14 state metric units** the prompt explicitly banned ("approximately 15cm long", "etwa 60cm lang",
+  "roughly 65 cm body length", "body length approximately four metres"). A metric number is a value an
+  illustration has no way to act on.
+- **12 are German or Italian** where the prompt asked for English regardless of story language
+  ("mittelgross, sitzt auf der reling", "klein, passt in eine jackentasche",
+  "grande quanto un cavallo adulto").
+- **~10 are bare adjectives** that state no scale at all: "gross", "klein", "mittelgross",
+  "mittelgross, elegant", "mittelgross, schlank", "klein für ein pferd, robust".
+- The remainder are correct, and one of them is the motivating failure: ART004's
+  `"the size of a thumb"` on `job_1789420511893_zly5rcdej` p8, which rendered football-sized.
+
+That is the case against free text in one table: it is unverifiable, optional in practice, drifts
+across languages and units, and a *correct* value changed nothing because nothing could check it.
+
+**Decision.**
+1. `SCALE_CLASSES` becomes a **twelve-band, monotonic, body-referenced enum**:
+   `fingertip, palm, hand, forearm, arm, knee, hip, chest, head, double, house, landmark`.
+   Each band has exactly ONE canonical render phrase in `SCALE_PHRASES` (`visualBible.js`), from
+   "small enough to sit on a fingertip" to "fills the horizon behind everything". Bands are relative,
+   never metric — an illustration has no absolute scale.
+2. **The enum renders.** `elementScaleNote(entry)` is the single lookup: code reads the token, the
+   prompt gets the phrase, never both. It feeds the REQUIRED OBJECTS rider
+   (`promptBuilders.js`, the old `sizeNote`), the bbox rich description, `buildArtifactDescription`
+   and both parsers' animal descriptions.
+3. **`size` is dropped from the four VB-authoring prompt schemas** and from the
+   `vb-authoring-sites` parity anchors. story-trial.txt keeps its PER-PAGE scene-hint `size` — a
+   different field with a different consumer (`buildTextFromJson`), untouched.
+4. **Stored bibles are not migrated, not backfilled and not stripped.** `elementScaleNote` falls back
+   to a stored `size` whenever no band resolves, and the parsers still admit the key. This is what
+   preserves the capability the five superseded entries measured — above all the 2026-09-11 dragon
+   (`job_1789147573901_m3uam0nxi` ANI002, knee-high on two pages and house-sized on a fourth): a
+   repair, iterate or cover repaint re-reading that bible months from now still states the scale the
+   book shipped with.
+5. **The retired six-value tokens resolve** onto the granular list (`LEGACY_SCALE_CLASSES`:
+   person→hip, vehicle→double, building→house, landscape→landmark), so bibles authored during the
+   few hours the morning enum was live stay routable.
+6. **Plate routing is unchanged in behaviour.** `LARGE_SCALE_CLASSES` is re-derived as
+   `{double, house, landmark}`, which is exactly the image of the three retired large bands.
+
+**Rationale.** The two-field split the morning entry argued for ("different consumers — code cannot
+read a sentence") was right about the diagnosis and wrong about the remedy: it left the model reading
+the unverifiable half. One closed field that both routes and renders is always present, always
+checkable, and emits one wording per band instead of 151. The band names are deliberately the same
+body-part vocabulary the quality evaluator's D-21 `scale` rule already reasons in
+(`image-evaluation.txt:165` — apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ head, sword ≈ arm),
+so generator and critic speak one language without a judge-prompt change.
+
+Band granularity follows the corpus: the densest real cluster is hand-scale (~40 of 151 values), which
+gets three bands (`fingertip`/`palm`/`hand`); the cat-and-small-dog cluster (~37) gets
+`forearm`/`arm`/`knee`; the horse cluster (~15) gets `chest`; the dragon/bus/house cluster (~20) gets
+`double`/`house`. `head` is the one band the corpus does not populate directly and it is kept
+deliberately: it is the reference point the whole ladder is defined against, and it is the band every
+human `secondaryCharacters` entry takes.
+
+**Touched:** `server/lib/visualBible.js`, `server/lib/promptBuilders.js`,
+`server/lib/outlineParser/unified.js`, `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/vb-scale-class.test.ts`,
+`tests/unit/artifact-size.test.ts`, `tests/unit/vb-authoring-rule-parity.test.ts`,
+`docs/image-routing.md`, `tasks/vb-scale-class-plan-2026-09-15.md`
+**Status:** ✅ active
+
+## 2026-09-15 — Object counts: exact up to THREE, "more than three" above, on BOTH sides
+
+**Context.** A generator↔critic audit found the Art Director forbidden to state any exact number
+above TWO ("never with an exact number above two", `scene-expansion-all.txt` / `scene-expansion.txt`)
+while the quality judge's D-22 `object_count` scored a wrong count as MINOR/MAJOR. The judge was
+therefore checking the accuracy of a number the generator was structurally not allowed to pass down —
+a deduction no rewrite could satisfy.
+
+**Decision.** Owner ruling, verbatim: *"For the count increase limit to three. Judge also just gets
+more than three no exact nr."*
+- The Art Director may state an exact number up to and including three, and it is drawn exactly.
+- Above three, BOTH sides hold the non-numeric form ("more than three", a cluster, a row, a few,
+  several). The judge carries no exact expectation there and never deducts for the exact number.
+- The rule is ONE constant, `COUNTING_RULE` in `server/lib/promptBuilders.js`, filled into the
+  `{COUNTING_RULE}` placeholder both Art Director templates now declare — the wording is identical at
+  both sites, so two hand-kept copies would have drifted.
+- The illustrator carries the same limit as a `**COUNTS:**` line in the protected tail of
+  `image-generation.txt` (after `**REQUIRED OBJECTS`), where the prompt shrinker cannot delete it.
+
+**Rationale.** Severity and classification are untouched: `object_count` keeps its type and its
+MINOR/MAJOR ladder. What changes is the RANGE over which an exact number exists at all, which is the
+half both sides must agree on.
+
+**Touched:** `server/lib/promptBuilders.js`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/image-generation.txt`, `prompts/image-evaluation.txt`,
+`tests/unit/built-prompt-values.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — The empty-scene QC no longer grades the plate on a RESERVED CORNER
+
+**Context.** A generator↔critic audit found the empty-scene vision QC
+(`validateEmptyScene`, `server/lib/evalPipeline.js`) grading a plate against `mainScenePrompt` — the
+PAGE's scene prose. The plate generator never receives it: `buildEmptyScenePrompt` is handed the
+brief's `emptyScenePrompt` and a `characterSpace` line, nothing else. Check (c) of the geometry block
+required "open, uncluttered sky/ground/path" wherever the main scene places a distant composited
+target, so a correct plate could fail on a requirement its generator was structurally blind to.
+
+**Decision.** Owner ruling, verbatim: *"Why does the empty scene need a reserved corner that is wrong.
+Change the judge."* Check (c) is removed from the QC prompt. Nothing on the generator side changes —
+the page's text area is computed afterwards from the calmness map (`server/lib/textRegion.js`), so the
+plate reserves nothing for text either.
+
+**Rationale.** The plate cannot satisfy a requirement stated only to its judge, and no repair round
+can either: a re-roll of the plate is generated from the same blind input. Removing the check is the
+only fix that does not invent a new input contract.
+
+**Still open — NOT ruled on.** Checks (a) perspective/path direction, (b) vanishing point and
+(d, now c) lighting direction are judged against the same `mainScenePrompt` the generator never sees.
+They are left in place and raised for the owner: either feed the plate generator the main scene prose,
+or drop the checks. This entry does not decide it.
+
+**Touched:** `server/lib/evalPipeline.js`, `tests/unit/empty-scene-qc-reserved-corner.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — Avatars are drawn AND judged against the DECLARED age, not the photo
+
+**Context.** A generator↔critic audit measured a contradiction that no retry could resolve.
+`prompts/avatar-main-prompt.txt` ordered the generator to change the body: "age-appropriate body
+proportions based on the apparent age visible in the reference photo", then "athletic, fit body type
+by default", "Don't preserve overweight or heavy body proportions from the reference photo",
+"transform the body to be slim and athletic". `prompts/avatar-evaluation.txt` TASK 2 then scored
+"apparent age AND body proportions between IMAGE 1 and IMAGE 2" into a single `ageMatch.score`, and
+`finalScore` is the lowest of three. A generator obeying its own instruction was guaranteed a
+deduction, and the retry regenerated the same deliberate deviation into the same rejection — the same
+failure shape the declared trait/clothing overrides fixed in `server/lib/avatarOverrides.js`.
+
+**Decision.** Owner ruling, verbatim: *"We should draw and evaluate against the age the user enters."*
+- The user-entered age is the single source for both sides. `resolveDeclaredAvatarOverrides` now takes
+  `declaredAge` and emits it twice from one normalisation: `ageLine` (the GENERATOR's trait line, which
+  the existing trait-corrections block already carries into the prompt) and `ageFact` (the JUDGE's
+  line, filled into the new `{DECLARED_AGE}` placeholder in `avatar-evaluation.txt`).
+- Generator: the body, limb length and head-to-body ratio are built for the declared age; the photo's
+  apparent age is the fallback only when no age was entered.
+- Judge: TASK 2 is now AGE MATCH. `ageMatch.score` is a 1-10 number **for age alone**, scored against
+  the declaration, and the template says explicitly not to compare body proportions against IMAGE 1.
+  There is no proportions term left in that score.
+- Identity, face geometry, glasses and clothing stay judged against the photo, unchanged.
+
+**Plumbing added.** The age was NOT previously in scope at the judge. `age` is destructured from the
+request body at both avatar routes already (`server/routes/avatars.js`), so both now pass
+`declaredAge: age` into the resolver; `evaluateAvatarFaceMatch` takes a sixth argument
+`declaredAgeText` and all four call sites hand it over. The story-time dynamic-avatar path had no
+declared block at all and now builds one from `character.age` through the same resolver.
+
+**Rationale.** Same principle the 2×4 identity sheet settled on 2026-09-14 (`declaredAgeBlock`,
+`tests/unit/avatar-sheet-declared-age.test.ts`): the stated age outranks any impression of age taken
+from the photo. This extends it to the 2×2 avatar pair so the sheet and the avatar no longer anchor on
+different ages, and it removes the one axis on which compliance cost points.
+
+**Touched:** `server/lib/avatarOverrides.js`, `server/routes/avatars.js`,
+`prompts/avatar-main-prompt.txt`, `prompts/avatar-evaluation.txt`,
+`tests/unit/avatar-declared-age.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — The cover judge's EXPECTED CAST is the roster the cover GENERATOR was given
+
+**Context.** A generator↔critic audit found the cover cap and the cover judge disagreeing by
+construction. The generator trims a cover to five characters (`MAX_COVER_CHARACTERS`) and appends an
+explicit restriction block — "ONLY show these characters: … Do NOT include: …" — precisely because the
+cover PROSE still names everyone. The judge's `buildExpectedCastBlock` cover branch then read that same
+prose back through `matchVbEntitiesInText` and added every Visual Bible person it found. A cover drawn
+exactly to order was held to a roster the generator had been ordered to violate, and the gap scored as
+a missing/extra CRITICAL that no repair round could clear.
+
+**Decision.** Owner ruling, verbatim: *"Cover the author is correct max 5."* The cap stays; the judge
+is fixed. Both sides now read ONE module, `server/lib/coverCastRoster.js`:
+- `MAX_COVER_CHARACTERS` lives there. `coverIterate.js` and the first-generation path in
+  `storyJobPipeline.js` each held their own literal `5`; both now import it.
+- `resolveCoverCastRoster(selected, all)` returns the trimmed roster AND the exclusion list, compared
+  through `castResolver.canonicalName` (never raw equality). `iterateCover` builds its restriction
+  block from it and hands the same `excludedCastNames` to the cover eval.
+- The judge's cover branch drops any prose hit on the exclusion list, and stops adding CHARACTER hits
+  once the roster holds `MAX_COVER_CHARACTERS` people. Animals are unaffected: the cap governs
+  characters, and an animal the cover names is genuinely expected on the page.
+
+**Plumbing.** `excludedCastNames` travels: `iterateCover` → both `evaluateImageQuality` call sites
+(direct and composite); `storyJobPipeline`'s cover pseudo-page → `evaluateImagesBatch` → `evalOptions`;
+and `buildEvalReplayOptions` derives it for the admin/regen and Lab cover paths from the cover
+record's own reference photos. It is in `MIRRORED_EVAL_OPTION_KEYS`, so the Lab cannot drift from
+production on it.
+
+**Rationale.** The alternative — teaching the judge to forgive a missing character — would have made
+every genuine omission unscoreable. Deriving both lists from one function means the disagreement
+cannot be reintroduced by rewording a prompt.
+
+**Touched:** `server/lib/coverCastRoster.js` (new), `server/lib/coverIterate.js`,
+`server/lib/evalPipeline.js`, `server/lib/evalReplayInputs.js`, `server/lib/images.js`,
+`storyJobPipeline.js`, `tests/unit/cover-cast-roster-parity.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — `notEvaluated` is carried by ONE helper, not six hand-listed whitelists
+
+**Context:** a staging run's `generationLog` carried 8 `check_not_evaluated` events (e.g. page 16 of
+`job_1789420511893_zly5rcdej`, "was NOT evaluated (no_required_objects)"), yet `notEvaluated` was
+`null` on all 16 stored pages and absent from `finalChecksReport`, and `repairPipeline.js`'s
+roll-up warn never fired. The three downstream whitelists (`storyJobPipeline.js`,
+`repairPipeline.js` ×2) already listed the field. The drop was upstream: every provider branch of
+`generateImageOnly` plus `evaluateImagesBatch` rebuilds its own whitelisted object from the
+`evaluateImageQuality` return, and none of the six named `notEvaluated`. Five of six also dropped
+`threeStageResult` — the same leak `coverEvalMirror.js` documented for cover roots.
+
+**Decision:** one exported helper, `carryEvalEvidence(qualityResult)` in `server/lib/images.js`,
+spread into all six assemblies. Evidence fields that must survive every branch live in it; a new
+one is added once, not six times. `notEvaluated: []` (evaluated, nothing skipped) is preserved
+distinctly from `null` (record never arrived).
+
+**Rationale:** the sibling trio (Grok / Gemini / batch — here six branches) has leaked the same
+class of field twice before (`rawOutput`/`coherenceGate`, then cover roots). A hand-listed
+whitelist per branch guarantees the next evidence field goes missing in most of them.
+
+**Touched:** `server/lib/images.js`, `tests/unit/eval-evidence-whitelist.test.ts`,
+`tests/unit/eval-evidence-batch-record.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — The plate generator is told the geometry it is graded on (not the cast)
+
+**Context:** `validateEmptyScene`'s inline QC grades a background plate on three composition facts
+read out of `mainScenePrompt` (the page's scene description): path/perspective direction,
+vanishing point or opening position, and lighting direction. `buildEmptyScenePrompt` was handed
+only the brief's `emptyScenePrompt`, so the generator was structurally blind to all three and every
+geometry FAIL was a wasted plate regeneration. (The reserved-corner check was removed the same day
+in `1000bd484` for the same blindness; the owner's direction here is to fix the blindness and KEEP
+the three checks.)
+
+**Decision:** a new `server/lib/sceneGeometry.js` derives a geometry-ONLY block from the same
+`mainScenePrompt` the QC uses, and `buildEmptyScenePrompt` renders it into a new `{SCENE_GEOMETRY}`
+placeholder. `scene-expansion.txt` already tells the Art Director to mirror the geometry into the
+plate prose but the brief has no structured geometry FIELD, so there is nothing to forward
+verbatim: the derivation keeps a scene sentence only when it carries a geometry keyword AND names
+no cast member and no person/figure/animal word, capped at 3 sentences. The cast, the action and
+the props are never forwarded.
+
+**Rationale:** a plate that gains a figure is worse than a plate with a wrong path direction — the
+placement pass keeps the plate's pixels. Hence the conservative filter (a false negative costs one
+geometry fact; a false positive costs a painted character), plus the block's own closing
+people-free sentence and a strengthened people-free line in `prompts/empty-scene.txt`. The QC-side
+comment now records the coupling: a check added there that cannot be derived into this block
+re-creates the blind grade.
+
+**Touched:** `server/lib/sceneGeometry.js` (new), `server/services/prompts.js`,
+`prompts/empty-scene.txt`, `storyJobPipeline.js` (4 plate call sites: page + vantage, each with its
+QC retry), `server/lib/evalPipeline.js` (comment), `tests/unit/empty-scene-geometry.test.ts`
+**Status:** ✅ active
+
+## 2026-09-15 — The Visual Bible outranks the wardrobe contract when they dress the same body slot
+
+**Context:** staging `job_1789420511893_zly5rcdej` drew Captain Sarah in a pirate tricorn on the back
+cover, the initial page and interior pages 14-15, while `ART002` — a navy captain's cap with a gold
+anchor, the object the whole plot turns on — was assigned to nine of her pages. Three causes, all
+verified from stored data. (1) `clothingRequirements.Sarah.costumed.description` ended "a black
+tricorn hat with yellow braid trim" and never named her cap, so the story carried a THIRD hat that
+existed only in the wardrobe layer; nothing in the pipeline had ever compared
+`clothingRequirements[*].description` against the bible's wearables, and the clothing reviewer,
+which only checks garments within one outfit, reported "no fault". (2) The bible-authoring rule
+("Costumed is PREFERRED — when in doubt, mark `costumed.used` true") forced a real ship's captain in
+present-day Zürich into a pirate costume. (3) `applyCoverWornHeldDedupe` suppressed `ART002` because
+its tokens overlapped her "captain's coat" segment, so the cap's reference cell never entered the
+cover grid — the covers scored 100/90/81 while the interiors, which DID carry both, scored 50/60.
+A crude scan of 25 recent staging stories found the same collision in `job_1788983823620_csjcyp1q9`
+and false-negatived Sarah herself, so two is a floor.
+
+**Decision:** the Visual Bible WINS a same-slot contradiction, at both sites.
+`clothingCheck.checkWardrobeAgainstBible` reports the conflict and
+`applyWardrobeBibleCorrections` rewrites the losing outfit clause; `beatsPipeline` runs it the moment
+both exist, logs every swap (character, slot, both items) and re-merges the corrected contract into
+the bible transcript later consumers re-parse. In the cover dedupe the token matcher is UNCHANGED —
+tightening it would re-admit the duplicates that function exists to remove — and the verdict is
+decided on slot identity instead: duplicate → suppress the artifact as before, different item in the
+same slot → conflict, logged, artifact kept and the contradicting segment dropped, different slots →
+neither side moves. The wardrobe rule is relaxed so a character the story already dresses for their
+role (a working captain, a uniformed officer) stays `standard`.
+
+**Rationale:** the bible entry has a rendered, gated reference cell that the page grid carries and
+the prose cites by id; the wardrobe line is text nobody drew. Ownership is taken from the writer's
+own `wornAs` link whenever there is one — but in the failing story NEITHER hat carried one (verified:
+both `wornAs: undefined`, only `type: "headwear"`), so a purely declarative check would have found
+zero conflicts; name attribution (two significant tokens of the entry's name inside that outfit) is
+the fallback, and silence in a slot is never a contradiction. Scope is headwear/footwear/outer layer:
+tops and bottoms collide with ordinary prose nouns. Deterministic throughout — no judge, no new
+finding type. Giving the cover judge a "contract and bible disagree" finding type was deliberately
+NOT built: that is an eval classification change and the owner's call.
+
+**Touched:** `server/lib/clothingCheck.js`, `server/lib/beatsPipeline.js`, `server/lib/coverIterate.js`,
+`prompts/story-bible-from-beats.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `scripts/admin/sibling-registry.json`,
+`tests/unit/wardrobe-vs-bible.test.ts`, `tests/unit/cover-worn-held-slot-conflict.test.ts`,
+`tests/unit/costume-role-clothing.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — A plot-critical worn object is described IN FULL in the outfit, not left out of it
+
+**Context:** supersedes the same-day rule that told the wardrobe writer to leave a plot-critical slot
+empty for the story's own object to fill. The owner's ruling: *"why leave it open, why not put what
+is in the story there, use the captain's cap. And explain it in detail in the costume. The visual
+bible can then copy that."*
+
+**Decision:** the object the story turns on is described in the character's outfit with colour,
+material and what makes that one recognisable, in the slot it occupies; the Visual Bible copies those
+words into its own `wornAs` entry — the direction `scene-expansion-all.txt:138` already demands ("the
+same item in that slot, in the same words"). The reconciliation built earlier
+(`clothingCheck` kind `reconcile`) stays as the mechanism that keeps the two sets of words identical.
+The slot is filled, not reserved, and the outfit stays complete even on pages the character is
+without the item.
+
+**Rationale:** the moving-object problem — the cap is the captain's at the start and the end and
+another character wears it in between — is solved by the existing per-page machinery, not by
+emptying the slot. `scene-expansion-all.txt` rule 10d has the page state that the character is
+WITHOUT it and name where it now lies, `wornItems: {state: "off", location}` carries that
+structurally, and `removal_unstated` reports it when it is missing. The avatar wearing the cap while
+a mid-book page shows the owner bare-headed is correct and intended (owner). VERIFIED by test:
+the fault fires when the owner is on the page with no declared state, and when an `off` state names
+no place; it is satisfied by `off` + a place. **Two gaps, measured, not closed here:** (1) the guard
+needs the Art Director to write `wornAs` — in `job_1789420511893_zly5rcdej` neither hat carried one,
+and only 9 of 482 entries over 59 stories do, so the whole off-state path was inert for that story;
+(2) the model is owner-keyed, so a second wearer gets no worn state — "Emma has the cap now" is not
+representable. `tests/unit/worn-item-changes-hands.test.ts` pins both gaps.
+
+**Touched:** `prompts/story-bible-from-beats.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `tests/unit/costume-role-clothing.test.ts`,
+`tests/unit/worn-item-changes-hands.test.ts`
+**Status:** ✅ active — staging only, not on master; supersedes the "leave the slot empty" rule of the same day
+
+
+---
+
+## 2026-09-15 — The empty-scene judge and the plate author read one geometry source
+
+**Context:** `validateEmptyScene` (inline QC in `server/lib/evalPipeline.js`) grades a plate on
+three composition facts taken from the page's scene prose: path/perspective direction, vanishing
+point / opening position, and lighting direction. `f25a9f342` gave the plate AUTHOR a derived
+geometry block (`server/lib/sceneGeometry.js` → `{SCENE_GEOMETRY}` in `prompts/empty-scene.txt`),
+but the two sides still carried their own wording, and the extractor took the first three
+geometry sentences in prose order — so a lighting fact that sat fourth, or shared a sentence with
+a character, was silently dropped while the plate was still graded on it. Owner: "Align the empty
+scene judge, the author should know the lighting."
+
+**Decision:** `GEOMETRY_DIMENSIONS` in `sceneGeometry.js` is the single source for that pair. Each
+entry carries the author sentence rendered into the plate prompt and the judge sentence rendered
+into the QC prompt (`buildGeometryJudgeChecks`), so both sides name the same three dimensions in
+the same words; a fourth check is added there or not at all. Selection is per-dimension —
+lighting first, then path, then opening — before any remaining slot is filled in prose order. A
+sentence mixing geometry with a person is no longer discarded: its clauses are split and only the
+people-free geometry clauses survive, re-checked against the figure and cast-name filters. The
+stored `---METADATA---` tail and bracketed VB ids are cut before splitting (both name the cast;
+either would paint machine text onto a plate).
+
+**Rationale:** measured on the 16 pages of `job_1789420511893_zly5rcdej` (staging, read-only): a
+lighting fact now reaches the author on 14/16 pages (block or plate description); the remaining 2
+state no lighting anywhere in the brief, where the template's standing "consistent direction" line
+applies. Nothing is invented for a dimension the prose does not state. The people-free guarantee is
+pinned on the BUILT prompt, not on template text.
+
+**Sibling gate:** this is a generator↔critic pair with no registry set — the critic lives inline in
+`evalPipeline.js`, and `scripts/admin/sibling-registry.json` only covers prompt-file pairs plus
+`lab-vs-prod-eval`. The pair is currently unenforceable; proposed entry (registry file owned by
+another session): set `empty-scene-generator-vs-critic`, generator `prompts/empty-scene.txt`,
+critic `server/lib/evalPipeline.js`, axis generator-vs-critic. The Lab side needs no change —
+`testlab.js` calls the same `validateEmptyScene` and the same builder.
+
+**Touched:** `server/lib/sceneGeometry.js`, `server/lib/evalPipeline.js`,
+`tests/unit/empty-scene-geometry.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — A worn Visual Bible element must carry `wornAs`, and a missing link is a reported fault
+
+**Context:** the whole removable-worn-item path (per-page `wornItems` state, the off-state prompt
+clause, the reference-plate dedupe, the outfit strip, the `removal_unstated` check) is entered only
+through a VB entry's `wornAs: "Name.slot"` link. Measured over 59 staging stories, **9 of 482**
+clothing/artifact/vehicle entries carried one. On `job_1789420511893_zly5rcdej` neither hat had it
+— both were typed `headwear` and linked to nobody — so the guard built for that exact story was
+inert on every page of it. Nothing required the link.
+
+**Decision:** `wornAs` is REQUIRED wherever a character wears the element, stated at every VB
+authoring site that still exists (`scene-expansion-all.txt`, `scene-expansion.txt`,
+`story-trial.txt`; the two `story-unified*` writers are being deleted by a concurrent pipeline
+change and were not re-edited). Backing it is a deterministic code check, `worn_link_missing`, in
+the module that already owns this family and is already handed `artifacts` — no new module. Two
+triggers, no prose inference: the element's own `type` IS an outfit slot, or exactly one character's
+outfit names the same garment through the closed `SLOT_NOUNS` vocabulary of a slot the element's
+NAME also lands in.
+
+**Rationale:** the finding is NOT sent to the scene review (`REVIEWABLE` unchanged). The review
+rewrites pages and cannot add a field to the bible, so sending it would ask for a fix the reviewer
+has no way to make — the 2026-09-06 lesson about findings phrased as requests nobody can act on.
+It is returned to callers and logged once per element, so the miss is on the record.
+
+**Touched:** `server/lib/wornItems.js` (`slotFromType`, `unlinkedWornCandidates`),
+`server/lib/clothingCheck.js`, `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`prompts/story-trial.txt`, `tests/unit/worn-item-handover.test.ts`,
+`tests/unit/worn-handover-built-prompt.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — A worn item that changes hands: `wornAs` is its home, the page row names its wearer
+
+**Context:** `wornAs` names ONE owner and ONE slot, and that is the only place the model said who
+wears an item. In `job_1789420511893_zly5rcdej` the captain's cap belongs to one character and is
+worn by another for most of the book (found in the square, worn to the quay, returned at the end).
+The second wearer got no worn state at all: no prompt clause, no plate, no outfit text — every page
+where she wore it had no mechanical record of it.
+
+**Decision:** the per-page `wornItems` row gains `wearer`. `wornAs` stays the item's HOME and never
+changes; `wearer` is who carries it on THIS page, and is honoured only when that character is in the
+page cast. A resolved row now carries `wearer` + `handedOver`, and four sites branch on it:
+the prompt clause names the wearer and denies the owner in one sentence; the owner's outfit text is
+stripped exactly as for an `off` item (`isOffForCharacter`); the reference-plate dedupe KEEPS the
+plate (no reference in the call shows the item worn); REQUIRED OBJECTS keeps the item listed for the
+same reason. An `off` with no `location` stays a fault, except when a wearer is named — the wearer
+IS the place. The avatar still wears the owner's full outfit including the item; that mismatch is
+intended and is what the prompt clause exists to override.
+
+**Rationale:** backward compatible by construction — a row with no `wearer` resolves to
+`wearer === owner`, `handedOver === false`. Verified against the DB: all 9 shipped `wornAs` entries
+across 60 staging stories resolve byte-identically under the old and new resolver, and 0 rows
+anywhere are `handedOver`. `clothingCheck` would otherwise have faulted the CORRECT render as
+`outfit_misattributed` (a garment of A on B), so words belonging to an item this page's row puts on
+this character are excluded from that rule's evidence — pinned both ways: it fires without the row,
+it is silent with it. On this story's own words it is silent either way (its garment noun, "cap", is
+below the rule's 4-character evidence threshold); that is pinned too, so a future widening of the
+vocabulary cannot start faulting correct renders unnoticed.
+
+**Touched:** `server/lib/wornItems.js`, `server/lib/clothingCheck.js`,
+`server/lib/promptBuilders.js`, `server/lib/visualBible.js`,
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`tests/unit/worn-item-handover.test.ts`, `tests/unit/worn-handover-built-prompt.test.ts`,
+`tests/unit/worn-item-changes-hands.test.ts`, `tests/unit/worn-items.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — The high-action page grant is removed; plan-check 9 and 10 are universal
+
+**Context:** The generator↔critic gap audit (row 6) found `story-beats.txt` granting up
+to `{HIGH_ACTION_PAGES}` pages that "may stage a high-action instant the rules above
+forbid… a second figure off the ground" — a two-heights case by definition. Checks 9
+(deed and effect) and 10 (two heights) in `plan-check.txt` know nothing about the
+budget, so the planner spends an allowance it was given and is then charged for it.
+
+**Decision:** Drop the grant. Owner chose removal over teaching the checker, so checks 9
+and 10 hold on every page with no exemption. Removed `{HIGH_ACTION_PAGES}` from the
+template, its injection in `buildBeatsPrompt`, and the budget machinery that existed only
+for it — `highActionPageBudget`, `highActionPagesPhrase`, the `highActionPages` argument
+of `runPlanCounters` and `stats.highActionAllowance`. The two sub-bullets under the grant
+(a beat holding two forbidden actions splits; the main event wins the picture) are
+independently sound and stay, folded into the instant rules.
+
+**Rationale:** Nothing depended on the budget functionally. Verified before deleting: no
+counter in `planCounters.js` suppressed a finding with it — the module's own comment said
+so — and `stats.highActionAllowance` had exactly two consumers, both assertions in
+`plan-replan-ranking.test.ts`. Teaching `plan-check.txt` the budget would have meant
+exempting named pages, which changes which findings fire; removing it changes nothing but
+what the planner is permitted. Supersedes the budget half of the 2026-09-05 entry "The
+beats planner gets a high-action budget…"; the other two changes in that entry (the
+wanted-picture-per-act check and the ranked re-plan) are untouched.
+
+**Touched files:** `prompts/story-beats.txt`, `server/lib/planCounters.js`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`tests/unit/plan-replan-ranking.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — The pre-beats unified writer is deleted (`story-unified.txt`, `story-unified-imagefirst.txt`)
+
+**Context.** The Visual Bible was authored at FOUR prompt sites, and the sibling gate
+(`scripts/admin/check-sibling-paths.js`) blocked every push until a new VB rule — the
+`scaleClass` enum, the `generic` gate, the `states` field, the costume/`wornAs` rules — was
+copied into all four. Two of those four were the text-first / image-first arms of a story-writer
+A/B that predates the beats pipeline.
+
+**Decision.** Delete `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/outline-analysis-textfirst.txt`, `buildUnifiedStoryPrompt`, the
+`storyPromptVariant` / `STORY_PROMPT_VARIANT` / `useImageFirst` seam, and
+`SPLIT_REVIEW_ANALYSIS_STUB`. `resolvePipelineMode` now treats `'unified'` as TRIAL-ONLY: a
+non-trial job that asks for it (or for anything unrecognised) resolves to `'beats'`.
+
+**Evidence they were dead — checked before deleting, not assumed.**
+- `runtime.js:44` sets `pipelineMode: 'beats'`, so `storyJobPipeline.js:664` takes the beats
+  branch for every non-trial job and the unified prompt was built at line 668 and thrown away.
+- A TRIAL never reached them: `resolvePipelineMode` returns `'unified'` for `trialMode`, but the
+  builder at line 668 was already `trialMode ? buildTrialStoryPrompt(...) : ...` — the trial fills
+  `story-trial.txt` (owner decision 2026-08-15, funnel speed).
+- The Test Lab does not reach them: the `outline_review` stage — the one stage that measured
+  `buildUnifiedStoryPrompt` — was retired 2026-09-13 and its retirement is pinned by
+  `tests/unit/testlab-outline-review-retired.test.ts`. No other stage references them.
+- The only remaining entry was an ADMIN hand-crafted `inputData.pipelineMode: 'unified'` on
+  `create-story` (`storyJobPipeline.js:7951` strips it for non-admins). Nothing in the client,
+  any script, any Lab stage or any env default ever sets it. That escape hatch is now closed
+  explicitly rather than left as a crash.
+- **The trap that was checked FIRST and cleared:** the DO-NOT-WRITE list used to be SLICED out of
+  `story-unified-imagefirst.txt` at runtime, which would have made this deletion silently strip
+  the list from production. It was already moved to `prompts/do-not-write-list.txt`
+  (rule-survival audit 2026-09-03, item M2). `outline-analysis-imagefirst.txt` IS still live —
+  `buildTextRefinePrompt` slices its criteria on every beats run — so it was KEPT. Only the
+  `-textfirst` twin, reachable solely through the deleted variant flag, went with them.
+- The outline parsers (`outlineParser/legacy.js`, `progressive.js`, `unified.js`) survive: they
+  parse the BEATS transcript and the trial stream, not just the deleted templates' output.
+
+**Consequences accepted.** Two prompt rules existed ONLY in the deleted templates and therefore
+exist nowhere now: the `depth` "Depth does not set size" schema clause (the live statement is in
+`image-generation.txt`) and the "goes in `properName` and nowhere else" wording (the live sites
+still declare the `properName` key, which is a sibling-registry anchor). Their tests were narrowed
+to what actually holds rather than asserting the lost wording into the surviving templates.
+
+**Sibling registry.** `unified-writer-twins` and `trial-vs-full-writer` were DELETED (each would
+have been left a one-member set). `story-prose-writers` now carries the trial-vs-full axis with
+`story-text-from-beats.txt` + `story-trial.txt`, anchored on `{PAGE_OPENING_VARIETY}` only —
+`{RISK_FRAMING}` and `{AD_COMPOSITION}` are genuinely not declared by the beats text writer.
+`vb-authoring-sites` is down to the two live authoring sites. `story-text-generator-vs-critic`
+was retargeted from `story-unified.txt` to the two live prose writers. 15 sets → 13.
+
+**Touched files.** `prompts/story-unified.txt` (deleted), `prompts/story-unified-imagefirst.txt`
+(deleted), `prompts/outline-analysis-textfirst.txt` (deleted),
+`tests/manual/test-imagefirst-parser-compat.js` (deleted), `server/services/prompts.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `server/lib/beatsPipeline.js`,
+`storyJobPipeline.js`, `server.js`, `scripts/admin/sibling-registry.json`,
+`docs/prompt-inventory.md`, `docs/SETTLED.md`, and 13 test files.
+
+## 2026-09-15 — The generator↔critic gap audit: 26 undelivered rules are delivered
+
+**Context:** An audit of every generator/critic pair found 38 rules a judge enforces that
+its generator was never told (31 distinct rows after the shared cover/page template was
+counted once). 26 of them were undisputed: the judge's rule is sound and the message
+simply never reached the author. Frequency was ESTIMATED, not measured — none of these
+critics' prose findings are stored under a queryable typed path.
+
+**Decision:** Deliver all 26 as wording syncs on the GENERATOR side. No severity, type,
+bucket or classification changed anywhere. Where a rule must hold on both sides it went
+into ONE constant injected into every consumer rather than hand-kept copies. By pair:
+
+- **beats/plan** (rows 1/7/10/11/25/29) → `story-beats.txt`: entrances, the picture a child
+  most wants per act, the plan line carrying its own justification for a third character,
+  the plant-without-payoff half, a named animal counting toward the cast cap, the last page.
+- **scene expansion** (rows 3/4/5/21/22/30) → `scene-expansion-all.txt` /
+  `scene-expansion.txt`: the text-zone top/bottom floors, the same-half streak limit and the
+  full-width quota (all-pages template ONLY — it is the one site that sees the whole book);
+  picking the text half against declared `depth` rather than the lateral side; who may
+  occupy an `interactions[]` actor slot; figures on one small shared surface at one depth.
+- **story text** (rows 2/13/14/15/16/17/18/26/27/28) → `story-text-from-beats.txt`,
+  `text-refine.txt`, and two shared constants. The audit named the systemic cause as the
+  ANALYSIS stub under `splitOutlineReview`; that is MOOT — both unified writers were
+  deleted the same day (`7cd9ffabb`), so the live writers are the beats text writer and the
+  trial writer, and the rules go to them directly. Rows 16 and 28 extend
+  `CAUSAL_COHERENCE_RULE` (`promptBuilders.js`) — the idle plan/warning/promise half, and
+  the closed-easier-option clause — so every consumer of the story shape gets both from one
+  string. Row 17's quotation nesting and closure became `QUOTE_HYGIENE_RULE`
+  (`languages.js`), appended by `getLanguageInstruction`, so it reaches every language and
+  every path instead of being written into 20-odd per-language instructions.
+- **empty scene** (rows 23/24/31) → `empty-scene.txt`: the artefact ban extended from the
+  EDGE to anywhere in frame, the doubled-prop clause generalised past vehicles plus one
+  material/perspective coherence line, and a luminance floor beside the existing lighting
+  rule. The floor sits in the template rather than `GEOMETRY_DIMENSIONS`: that constant
+  pairs author and VISION-judge sentences, and the brightness floor is a PIXEL check with
+  no vision-judge twin.
+- **avatar** (rows 19/20) → `avatar-main-prompt.txt`, `avatar-retry-prompt.txt`: glasses
+  follow the reference photo on the DEFAULT path (previously stated only when the user
+  declared them, while `faceMatch` — the lowest of seven — caps at 3 either way), and the
+  safety-retry template, judged by the full evaluator, gained face fidelity, glasses and
+  age proportions. The retry stays short on purpose: it exists to get past a safety block.
+
+Two further rows came from the dead-writer deletion, which was the last carrier of both:
+**depth is distance and never states a size** (restored to both Art Director templates and
+`story-trial.txt`, matching the render side's DEPTH AND SIZE rule from `2adea0dd9`), and
+**a story-given proper name lives in `properName` and nowhere else** (restored to
+`scene-expansion-all.txt` and `story-trial.txt`; the settled VB-label rule already said ids
+and proper nouns never reach an image model).
+
+**Rationale:** These were undelivered messages, not disputes, so the cheap fix is the right
+one. Every rule is pinned on the BUILT prompt through its real builder, never on template
+text, and every new placeholder is declared (`fillTemplate` drops undeclared keys silently).
+
+**Touched files:** `prompts/story-beats.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/story-text-from-beats.txt`,
+`prompts/text-refine.txt`, `prompts/empty-scene.txt`, `prompts/avatar-main-prompt.txt`,
+`prompts/avatar-retry-prompt.txt`, `prompts/story-trial.txt`,
+`server/lib/promptBuilders.js`, `server/lib/languages.js`,
+`tests/unit/plan-critic-rules-reach-planner.test.ts`,
+`tests/unit/scene-brief-critic-rules-reach-ad.test.ts`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`,
+`tests/unit/eval-critic-rules-reach-generators.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — The PULL question is scoped to the bands whose books are one arc
+
+**Context:** `story-text-audit.txt` Q10 requires something to remain open at the end of
+every page that the next page answers. The simple age bands are designed the opposite way:
+`routine` is n self-contained moments and `quest` repeats one call, so PULL fired on every
+page of a correctly built book (audit row 8, owner-scoring).
+
+**Decision:** Make the question band-aware. `buildTextAuditPrompt` resolves the band with
+`resolveAgeBand` and fills a new declared `{PULL_QUESTION}` placeholder: the bands in
+`SIMPLE_BANDS` (routine, quest, tries) get "skip this question — this book is built from
+self-contained moments, so a page that leaves nothing open is correct"; every other band
+gets the question unchanged. No severity, type or bucket moved.
+
+**Rationale:** The band is already resolved in code, so passing it beats having the judge
+infer the book's shape from the pages. `SIMPLE_BANDS` is the existing definition of exactly
+this set — the bands whose books carry no budgeted challenge — rather than a second list
+that can drift from it. Owner's ruling C, 2026-09-15.
+
+**Touched files:** `prompts/story-text-audit.txt`, `server/lib/promptBuilders.js`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — D-10 (finger count, cross-eyes) is removed from the image evaluator
+
+**Context:** `image-evaluation.txt` D-10 scored six-or-more fingers, fused or melted
+fingers and cross-eyes as MAJOR `anatomy`. `project_anatomy_detection_verdicts` measured
+these VLM checks at ZERO precision, and no prompt makes a diffusion model draw five
+fingers — so every finding cost score and a repair attempt for a defect that either was not
+there or could not be fixed.
+
+**Decision:** Delete D-10. Nothing else moves: `anatomy` stays a live type through D-09, so
+no scoring entry is dead, and `prompts/variants/` holds no copy of the rule.
+
+**Rationale:** Checked before deleting, as the ruling asked. **D-09** (`anatomy`, CRITICAL)
+covers a limb or face the body does NOT have — extra limbs, merged faces; **D-12**
+(`figure_completeness`, MAJOR) covers a limb that is MISSING. They are complements, not
+duplicates, and D-10 was the tier between them ("detail within a limb that is whole").
+Removing it orphans neither: fused fingers keep a route through **D-13**
+(`figure_completeness`, MINOR — "fingers fused, soft fingertips" where the limb still
+reads), which is the severity such a finding is worth. The list keeps a gap at D-10 rather
+than renumbering, since the surrounding text refers to "D-11 to D-13" by name. NOTE, not
+acted on: `image-prompt-compliance.txt` still lists `cross-eyes` as MAJOR — the same
+zero-precision check on a different critic, outside this ruling.
+
+**Touched files:** `prompts/image-evaluation.txt`,
+`tests/unit/eval-critic-rules-reach-generators.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — The last two critic prompts leave the code, so every generator/critic pair is gate-enforceable
+
+**Context:** two critics were string literals inside `server/lib/evalPipeline.js`:
+the cover-only evaluator preamble (COVER NOTE, the app-overlay TEXT NOTE, the
+TEXT RULES block) and the empty-scene QC judge. The sibling gate matches file
+paths, so neither pair could be declared: pairing a template against a
+5,000-line module blocks on every unrelated edit to that module, which is the
+fastest way to teach everyone to write `Siblings-Checked:` without reading it.
+They were the last two generator/critic pairs the registry could not express.
+
+**Decision:** both move verbatim into `prompts/` —
+`prompts/cover-evaluation-notes.txt` and `prompts/empty-scene-qc.txt` — loaded
+like every other template and split into their conditional parts by a new
+`promptSections()` helper (`### KEY` sections). Every interpolated runtime value
+is a DECLARED placeholder filled through `fillTemplate`. Two registry sets are
+added, `cover-generator-vs-critic` and `empty-scene-generator-vs-critic`, both
+`severity: "block"`.
+
+**Rationale:** a move, not an edit — no wording changed, and that is asserted
+rather than asserted-to. Each extraction ships with a test that builds the REAL
+prompt (`buildEmptySceneQcPrompt`, newly exported for exactly that reason; the
+cover notes through `fillTemplate`) and compares it byte for byte against the
+pre-extraction literal for fixture inputs, plus an assertion that no `{TOKEN}`
+survives — `fillTemplate` drops an undeclared key silently, so a placeholder
+nobody fills is a rule that quietly stops existing. The empty-scene judge's
+geometry checks stay GENERATED from `GEOMETRY_DIMENSIONS` (`sceneGeometry.js`),
+the same source that writes the plate author's geometry block, and reach the
+template through the declared `{GEOMETRY_CHECK}` placeholder — a frozen copy in
+the template would have re-created the blind grade that source was built to end.
+
+**Touched files:** `prompts/cover-evaluation-notes.txt`,
+`prompts/empty-scene-qc.txt`, `server/services/prompts.js`,
+`server/lib/evalPipeline.js`, `scripts/admin/sibling-registry.json`,
+`tests/unit/cover-eval-notes-extraction.test.ts`,
+`tests/unit/empty-scene-qc-extraction.test.ts`
+**Status:** ✅ active — staging only, not on master
+
+## 2026-09-15 — A worn item keeps its reference plate unless a reference actually shows it on the wearer
+
+**Context.** Staging `job_1789420511893_zly5rcdej`: ART002, a navy captain's cap
+the child FINDS mid-story, was declared by the Art Director as
+`{id: "ART002", owner: "Emma", state: "worn"}` on nine pages and carried no
+`wornAs` link anywhere in the bible. Two sites read that row as "her avatar
+reference already carries it" and (a) dropped ART002's rendered, cell-gated
+plate from the element grid on all nine pages, (b) omitted it from REQUIRED
+OBJECTS. Emma's `clothingDescription` meanwhile still opened with her OWN black
+tricorn, and her attached cell showed her wearing it. The call therefore held
+one text line naming a cap and one picture of a tricorn; pages 13 and 14
+rendered a navy TRICORN — cap colour and gold anchor from the words, silhouette
+from the picture. Pages 5, 6 and 9 happened to come out right.
+
+**Decision.** The exemption is no longer `!handedOver` but
+`referenceCarriesItem(r)` = the item is `wornAs`-LINKED **and** its wearer is its
+owner. `wornAs` is the only promise in the pipeline that a character's avatar or
+outfit reference carries an item; a handover breaks it, and an Art-Director row
+against a bare bible element never made it. When the exemption does not hold,
+the plate stays in the grid and the item stays in REQUIRED OBJECTS — worded
+`— worn on <wearer>, not a separate free-standing copy`, never as a loose prop.
+
+**Rationale.** The omission rule exists for `job_1788641639919` p3, where a
+linked hat on its own owner was both worn by the avatar reference and listed as
+an object, and Grok painted two hats. That case is untouched: linked + own owner
+still drops. Everything else had no reference at all, which is the worse of the
+two failures — an unreferenced item is invented from the prompt's words against
+whatever the attached avatar happens to show. Cost is one grid CELL (not a Grok
+slot: the whole grid shares one slot, cap `VB_SLOT_MAX_ELEMENTS` = 4 elements +
+1 location). On the measured pages the widest, p14, claimed 3 elements + 1
+location, so nothing was displaced.
+
+**Touched files.** `server/lib/wornItems.js` (`wornAsLinked` on both resolver
+sources, `referenceCarriesItem`), `server/lib/visualBible.js` (worn-item
+dedupe), `server/lib/promptBuilders.js` (REQUIRED OBJECTS omission + `worn on`
+rider), `tests/unit/worn-unlinked-reference.test.ts`.
+
+## 2026-09-15 — The worn-item clause carries the bible's description, not just the name
+
+**Context.** The WORN ITEMS block named the item and nothing else: "Emma IS
+wearing this on this page: navy-blue captain's cap". The bible entry held the
+construction — "stiff black visor, flat crown, gold anchor emblem pinned to the
+front centre". On staging `job_1789420511893_zly5rcdej` p13/p14 the attached
+character cell showed the child's OWN black tricorn, and the render split the
+difference: navy colour and gold anchor from the words, tricorn silhouette from
+the picture.
+
+**Decision.** `buildWornStateLines` appends the entry's own
+`extractedDescription || description` after the item name — first sentence only,
+capped at 220 chars, dropped when the entry has none or when it merely repeats
+the name. All three clause shapes (worn, off, handed over) carry it.
+
+**Rationale.** A name is a label; a label loses a silhouette fight against an
+attached picture. The construction detail is the half that decides shape, and it
+already exists — nothing new is generated or inferred. First sentence + cap
+keeps a one-line instruction from regrowing into a second REQUIRED OBJECTS
+block. Complementary to the plate-attachment fix logged above, not a substitute:
+that one supplies the picture, this one the words.
+
+**Touched files.** `server/lib/wornItems.js` (`wornItemLook`),
+`tests/unit/worn-clause-carries-description.test.ts`,
+`tests/unit/worn-items.test.ts` (two pinned lines updated).
+
+## 2026-09-15 — A worn-item `wearer` who is not in the page cast means OFF, not "the owner wears it"
+
+**Context.** The `wearer` field added the same day fell back to the OWNER when
+the named wearer was not in the page cast, silently. That fallback asserts the
+defect the row exists to prevent: on staging `job_1789420511893_zly5rcdej` p13
+the correct row is `{ART001, owner: Emma, wearer: Kilian, state: worn}` with
+Kilian off-page, and the fallback built "Emma IS wearing this on this page:
+black tricorn hat" — the hat p13 and p14 in fact rendered.
+
+**Decision.** `resolveWearer()` (both resolver sources) coerces such a row to
+`state: 'off'` with the wearer as the location ("held by <name>, who is not in
+this page's cast"), keeps `wearer` = owner so `handedOver` stays false, and logs
+at ERROR. A wearer that merely re-states the owner, and a wearer who IS in the
+cast, are untouched.
+
+**Rationale.** Off-with-a-place is what the data means — the item is not on its
+owner and is in somebody else's hands, off-page — and it is the shape the Art
+Director would have written by hand. Logging alone was the weaker option: the
+wrong behaviour would still ship on every page, and this class of row is
+generated by the model, not by a human who reads logs. The coercion cannot
+invent a garment; the worst case is an item omitted for a page, which costs
+nothing next to drawing the wrong one.
+
+**Known adjacent gap (not fixed here).** `removeWornItemFromOutfit` leaves a
+clause like "a black felt tricorn hat with a red cockade" intact:
+`countGarments` reads "tricorn" and "hat" as two garments and the clause has no
+layering connective to split on, so it returns
+`slot-clause-carries-another-garment`. The explicit "is NOT wearing" prompt line
+still carries the instruction. Logged on the backlog rather than widened here.
+
+**Touched files.** `server/lib/wornItems.js`,
+`tests/unit/worn-offcast-wearer.test.ts`.
+
+## 2026-09-15 — An undeclared cast removal by the scene review is REVERTED, not merely reported
+
+**Context.** Since 2026-09-13 a review rewrite that drops names from a page's
+`characters[]` without a `REMOVED CAST:` declaration was detected and logged,
+deliberately without reverting ("a deterministic gate is its own decision").
+Measured cost on staging `job_1789420511893_zly5rcdej` p16:
+`beats_scene_review_removal_undeclared` fired at **error**
+("emma, noah, daniel"), with `beats_brief_unfixed` and `cast_unlisted` beside
+it — and the page rendered on the emptied cast anyway. The corrupt contract then
+produced a phantom CRITICAL `extra_character` against a child who IS in the
+prose; that critical funded three repair rounds, and the round-2 inpaint
+destroyed a correct original (v0 −45 correct → v2 −40 wrong, shipped) because
+all three versions were scored against the same corrupt cast.
+
+**Decision.** `revertUndeclaredRemovals()` restores that page's WHOLE brief to
+the version sent for review, clears `reviewRewrote`, and drops the page from
+`changed` and from `sceneDiffs` before the faulted-but-not-rewritten check reads
+them, so the page reports as unfixed — which it now is. Logged at error plus
+`beats_scene_review_removal_reverted`. A DECLARED removal is untouched.
+
+**Rationale.** The whole brief, not `characters[]` alone: a reviewer that drops
+a name usually rewrites the prose around it ("five soaked pirates" for five
+named children), so restoring the roster into the rewritten prose produces a
+brief whose roster and prose disagree — the same corrupt contract in a new
+shape. The pre-review brief is internally consistent by construction. The cost
+is that page's other review fixes; the trace shows what the alternative costs:
+one wrong cast, one phantom critical, three paid repair rounds and a destroyed
+correct page.
+
+**Touched files.** `server/lib/sceneReviewGuard.js`,
+`server/lib/beatsPipeline.js`, `tests/unit/scene-review-revert-undeclared.test.ts`.
+
+## 2026-09-15 — The outfit strip could not read a semicolon contract, and read "tricorn hat" as two hats
+
+**Context.** `removeWornItemFromOutfit` is the only thing that takes a garment out of a
+character's outfit text when a page declares it off (or handed over). On the real stored
+contract of staging `job_1789420511893_zly5rcdej` — "A black felt tricorn hat with a red
+cockade; a red long-sleeved cotton pirate shirt; …" — it returned `{removed:false}` for
+every slot, so nothing was ever stripped and every judge kept demanding the garment the
+brief had removed.
+
+**Decision.** Two independent causes, both fixed:
+- `splitClauses` split on commas only. The outline writes semicolon-delimited contracts,
+  so a six-garment outfit was one clause and Route 2 bailed with `single-clause-outfit`.
+  It now splits on `;` as well, and the rejoin keeps whichever delimiter the contract used.
+- `countGarments` counted "tricorn" and "hat" as two garments. With no layering connective
+  between them the clause was refused as `slot-clause-carries-another-garment`. Two
+  vocabulary hits now collapse into one garment when nothing but whitespace, a hyphen or a
+  possessive separates them AND both nouns belong to the same slot ("tricorn hat",
+  "captain's cap", "knee-high boots").
+
+**Rationale.** The counter exists to stop a strip from deleting a second real garment that
+shares a clause, so the merge is deliberately narrow: "a red hoodie and a blue t-shirt" and
+"a woollen hat and a scarf" still count as two and are still refused, pinned by tests.
+
+**Touched files.** `server/lib/wornItems.js`,
+`tests/unit/worn-strip-semicolon-contract.test.ts`.
+
+## 2026-09-15 — The cross-eyes check is removed; D-13 fused fingers is deliberately kept
+
+**Context.** Measured across both databases: 267 stories, 21,099 `story_images`, 1,308 Lab
+experiments. The compliance judge's `cross-eyes` MAJOR has fired **zero** times ever. The
+`rendering.cross_eyes` inventory field is emitted in 69 of 138 staging stories, is `true` in
+**zero** rows in either environment, and has **zero** JS consumers — only prompt files
+mention it. Six-plus fingers was the same shape and is already gone with D-10.
+
+**Decision.** Remove the `cross-eyes` MAJOR line from `image-prompt-compliance.txt` and the
+`rendering.cross_eyes` field from both live inventory schemas
+(`image-inventory-unified.txt`, `image-visual-inventory.txt`) and from the Lab variant copy
+(`variants/image-evaluation-verbose-v1.txt`, including its `matches.eyes_ok` rider, whose
+only purpose was to flag cross-eyes). **D-13 fused fingers (`image-evaluation.txt`, MINOR)
+is kept exactly as it is** — measured ACCURATE, ~24 findings over 11 stories, 3/3
+eye-verified real, 0 false positives. It is the one anatomy check that works.
+
+**Rationale.** A schema field the describer fills in on every page and nothing ever reads is
+tokens spent on noise; a severity line that has never fired in 21k images is not a guard, it
+is a way for a judge to invent one. Removing a dead check needs no generator-side change,
+which is why the generator siblings are vouched for rather than edited.
+
+**Touched files.** `prompts/image-prompt-compliance.txt`,
+`prompts/image-inventory-unified.txt`, `prompts/image-visual-inventory.txt`,
+`prompts/variants/image-evaluation-verbose-v1.txt`,
+`tests/unit/anatomy-checks-scope.test.ts`.
+
+## 2026-09-15 — The trial's declared age is MANDATORY (client and server)
+
+**Context.** Owner ruling: *"The age must be made mandatory in the trial run, otherwise this
+will not work."* Earlier the same day, `de8753cc1` made the USER-ENTERED age the single source
+for both halves of the avatar loop — `resolveDeclaredAvatarOverrides`
+(`server/lib/avatarOverrides.js`) emits `ageLine` to the generator and `ageFact` to the judge —
+and `character2x4Sheet.declaredAgeBlock()` states that age in every sheet prompt. The trial
+collected age as an OPTIONAL field: the client's `canProceed` asked only for name, gender and a
+photo; `create-anonymous-account` validated it only `if (age && …)` and stored `age: age || ''`.
+An ageless trial row therefore emits no `ageLine`, no `ageFact` and no `declaredAgeBlock` — it
+silently reverts to exactly the behaviour the ruling removed, and additionally loses the age band
+(`AGE_BANDS` / `focusAge`) and the topic age window.
+
+**Decision.** Age is required on both sides, whole years **1–18**, parsed by one module
+(`server/lib/trialAge.js`, `parseTrialAge`). The client blocks the Next button and shows a
+translated inline message (en/de/fr/it); the server rejects a missing or out-of-range age with
+400 *before* the anonymous account row is created, and stores the normalised whole-year value.
+The PATCH sync (`/api/trial/update-character-details`) now also rejects an invalid supplied age
+and never clears a stored one — and it is called on the RESTORED-session path too, so a trial
+already in progress without an age gets prompted for one and that age actually reaches the row.
+
+**Rationale / deliberate edges.**
+- Range 1–18 is the trial's own pre-existing bound; making the field mandatory is not the moment
+  to widen what is accepted. Age **0** stays rejected in the trial even though the band machinery
+  supports it (`youngestMainAge` filters `n >= 0`, `AGE_BANDS[0] = 'routine'`) — a newborn hero in
+  the /try funnel is a separate product decision.
+- `POST /api/trial/generate-preview-avatar` keeps its valid-if-present guard: it fires during the
+  photo phase, before the user has reached the age field, so it cannot require one. The
+  load-bearing consumer is the 2×4 sheet built later by `prepare-title` from the stored row.
+- **No new funnel event.** `character_saved` already fires exactly when the users row is created,
+  which is now impossible without an age, so the existing `trial_funnel` vocabulary reflects the
+  new gate without a step. A separate "age entered" step would measure a field, not a stage.
+
+**Touched files.** `server/lib/trialAge.js` (new), `server/routes/trial.js`,
+`client/src/pages/trial/TrialCharacterStep.tsx`, `tests/unit/trial-age-mandatory.test.ts` (new).
+
+## 2026-09-15 — One resolved outfit per page, read by the generator and both judges
+
+**Context.** The page's declared worn state and the character's clothing contract were
+separate strings and diverged. On staging `job_1789420511893_zly5rcdej` p13 the only worn row
+is `{ART002 "navy-blue captain's cap", owner: Emma, state: "worn"}` — and there is no `off`
+row for her tricorn, so `referencePhotos[0].clothingDescription` still opened "A black felt
+tricorn hat with a red cockade". The WORN ITEMS block told the generator and the semantic
+judge "cap"; the clothing contract told the compliance judge "tricorn". Two answers about
+one head — and, as the owner put it, if she is supposed to wear both hats there are only
+wrong answers.
+
+**Decision.** Resolve the outfit ONCE per page and hand that one string to everybody.
+`wornItems.resolveOutfitForPage` = the existing OFF/handover strip, plus a new
+`applyWornItemsToOutfit`: a `worn` item whose slot the contract fills with a DIFFERENT
+garment takes that clause's place, carrying the bible's own shape words. The page state wins
+because it is the per-page fact and the contract is the story-level default. No judge picks
+a winner; the disagreement is gone before anyone reads it.
+
+Consumers routed through the one resolver: the image prompt
+(`promptBuilders.buildImagePrompt` → `resolveOutfitForPage`); the quality, semantic and
+compliance judges (`evalPipeline.buildEvalClothingContract` → `resolveGeneratedOutfit`, one
+block for all three); the entity-consistency grid (multi-page, OFF-union only — a worn swap
+is deliberately NOT applied across pages, since an item worn on one page must not be written
+into the expected clothing of all of them); and all three character-repair entry points
+(`repairPipeline`, `routes/regeneration`, `entityConsistency`'s single-page repair) through
+the new `resolveOutfitForStoryPage`, which reads the page's brief out of `storyData`.
+
+**Rationale.** Bounded exactly like the strip: only a `worn` item on this character, only
+when exactly one contract clause owns that slot, only when it names a different garment, and
+only when the clause can be removed unambiguously. Anything else leaves the contract
+untouched and the WORN ITEMS block still carries the instruction in words. No per-page
+reference IMAGE is built — the plate work landed in 3fd7c3e8b/251df14f4; this is the TEXT,
+and the "the attached references are not authoritative for these" wording now agrees with it
+instead of contradicting it.
+
+**Touched files.** `server/lib/wornItems.js`, `server/lib/promptBuilders.js`,
+`server/lib/entityConsistency.js`, `server/lib/repairPipeline.js`,
+`server/routes/regeneration.js`, `tests/unit/worn-one-resolved-outfit.test.ts`.
+
+
+## 2026-09-15 — The page-cell drop and the plate inclusion read the SAME brief
+
+**Context:** `8763eab30` routed large-scale elements to the empty-scene plate and dropped their
+page reference cells. The two halves disagreed. The DROP (`storyJobPipeline` Phase 5a-pre-grid,
+`referenceSheets.buildPageCompositeRefs`) filtered on `scaleClass`/`type` alone; the plate
+INCLUSION (`visualBible.getEmptySceneElementReferences`) additionally requires the Art Director
+brief's `objects[]` to name the entry (AD IS THE AUTHORITY, 2026-09-04).
+
+**Decision:** one predicate answers for both. `isPlateBorneElement(ref, sceneObjects)` returns
+false when a brief is supplied and does not name the element, so a cell is only ever withdrawn from
+an element the plate actually takes. Callers with no AD metadata (covers, trial plates built before
+briefs exist) pass nothing and keep the previous behaviour on both sides.
+
+**Rationale:** an element present via `appearsInPages` but absent from `objects[]` was dropped from
+the page grid, never added to the plate, and never named in STRUCTURES — rendered with zero
+reference AND zero description on a paid page. Every test passed on each side individually because
+neither side tested the other's gate. The earlier plateless fallback (a large element on a page with
+NO plate keeps its cell) was intact and is a different hole.
+
+**Blast radius (measured, read-only):** 123 stored staging stories, 1,122 plated pages carrying an
+AD brief — **0 instances**. `scaleClass` was introduced the same day, so no stored bible carries the
+field yet and the type-only fallback never met the asymmetry. The defect was live on staging and
+would have started producing instances with the first story generated under the new bible schema.
+
+**Touched files.** `server/lib/visualBible.js`, `server/lib/referenceSheets.js`,
+`storyJobPipeline.js`, `tests/unit/vb-plate-routing.test.ts`.
+
+## 2026-09-15 — The cover's HELD branch classifies by slot identity, like its sibling
+
+**Context:** `566042c10` replaced a loose token match with slot-identity classification in the
+worn/held dedupe — but only in the NOT-held branch. The HELD branch (`coverIterate.js`) still
+dropped outfit segments on the token match alone.
+
+**Decision:** a held artifact removes a worn segment only when `classifyOverlap` returns
+`duplicate`. `unrelated` is a cross-slot token near-miss; `conflict` is a different item in the same
+slot, which a held artifact does not contradict — one can hold a cap while wearing a hat.
+
+**Rationale:** on a cover where a character HOLDS a plot artifact, a held cap was deleting the coat,
+the trousers and the boots from that character's clothing text, and the model dressed them freely —
+the exact bug the classification was written to fix, surviving on the sibling branch. Both branches
+are now pinned so the pair cannot drift again.
+
+**Touched files.** `server/lib/coverIterate.js`, `tests/unit/cover-worn-held-slot-conflict.test.ts`.
+
+## 2026-09-15 — A wardrobe correction re-renders its avatar; the early kickoff stays early
+
+**Context:** `applyWardrobeBibleCorrections` needs the Visual Bible, so it can only run after the
+all-pages Art Director call. The styled-avatar kickoff fires several stages earlier, at the
+story-bible stage. Page prompts therefore carried the corrected garment while the avatar reference
+cell still wore the old one. This is long-standing ordering, not a regression: the correction has
+needed the bible since `19bab45d7`.
+
+**Decision:** the kickoff is NOT moved. The correction now reports which characters' outfit text
+actually changed (`onWardrobeCorrected`), and the caller invalidates and re-renders exactly those
+avatar buckets, chained into `streamingAvatarStylingPromise` so downstream awaits wait for the
+corrected avatar rather than racing it.
+
+**Rationale (trade-off accepted):** styled avatars are the long pole in front of every cover and page
+image; delaying the kickoff until the bible exists would add minutes to EVERY story to serve a rare
+conflict. Re-rendering costs one avatar render per corrected character and nothing at all when
+nothing moved. Also fixed here: `corrected: applied.includes(f)` was always false (the corrector
+re-derives findings after every rewrite), so every landed correction was logged as uncorrected and
+`unresolved` never reached the report.
+
+**Touched files.** `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
+`tests/unit/wardrobe-vs-bible.test.ts`.
+
+## 2026-09-15 — A figure is never routed onto the empty-scene plate
+
+**Context:** the large-element plate routing fed `secondaryCharacters` and `animals` to a plate whose
+prompt says verbatim "never draw a figure named anywhere in this prompt"
+(`prompts/empty-scene.txt`) and whose STRUCTURES block calls what it lists a "vessel, vehicle or
+built structure".
+
+**Decision:** a figure-bearing entry is never plate-borne at any scale. It keeps its page reference
+cell. Three sites move together: the predicate, the plate grid selection (artifacts only) and the
+STRUCTURES prose in `server/services/prompts.js`.
+
+**Rationale:** a house-band creature lost its page cell, was forbidden on the plate that was supposed
+to carry it, and was mislabelled in the plate text — no cell, no plate, no consistency. The
+alternative (widening the plate wording to permit figures) was rejected: a backdrop that may paint
+figures re-opens the doubling the "no figures" rule exists to prevent.
+
+**Touched files.** `server/lib/visualBible.js`, `server/services/prompts.js`,
+`tests/unit/vb-plate-routing.test.ts`.

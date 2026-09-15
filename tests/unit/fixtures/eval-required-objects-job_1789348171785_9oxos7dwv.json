@@ -1,0 +1,569 @@
+{
+  "storyId": "job_1789348171785_9oxos7dwv",
+  "pageNumber": 3,
+  "prompt": "**THIS IMAGE DEPICTS:** Julian presses his cheek against the heavy red egg, hugging it to his chest. His eyes are narrowed and he smiles, feeling its warmth. Medium against the tree trunk.\n\nGenerate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.\n\nWhen the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.\n\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n- Julian: toddler proportions about 4 heads tall, large head relative to body, soft rounded features and a rounded belly, walking but unsteady — no longer a baby, clearly smaller than a preschooler\n\nJulian — the toddler in his yellow vest, white shirt, blue dungaree trousers, and white sneakers, his curly light blonde hair brushing his collar — sits back on his heels and holds the heavy stone-like rusty-red egg securely against his chest, leaning his head forward to press his right cheek flat against the smooth mottled shell. In this medium shot, Julian’s blue eyes narrow in quiet focus, a small warm smile touching his lips as he feels the heat radiating from the surface. His small hands grip the sides of the egg firmly, pulling it snug against his bib panel. The dark grooved bark of the old linden tree forms a solid wall directly behind him, catching the soft afternoon light.\n\n**Composition:**\n- Each character does a specific action (reaches, holds, walks toward, gazes at) and faces that target — not the camera — unless the scene declares a facing for them, which always wins. When the target is in the background and no facing is declared, the character faces away, back or side visible. Companions sharing a movement or destination all face the same way.\n- The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot. A medium shot keeps each figure whole inside the frame. A wide shot shows the full setting.\n- A standing character stands on visible standable ground — never on or over water, and never in the air — unless the scene description has them swim, float, or fly. Outside a close-up, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure — where several surfaces are named, a ledge above and a floor below, each figure stands on its own. A lower body may be hidden by an object in front of the figure, never by the figure ending.\n- A vessel, building or vehicle keeps its true size against the figures near it: a person reaches about to a boat's rail, a doorway lintel or a wheel hub — never eye-level with a masthead, a rooftop or a chimney. A held or carried object keeps the size stated for it against the hand or body holding it.\n- Depth: `foreground` is large and dominates the lower half; `midground` sits in the middle band, smaller and further back; `background` is small and distant. Foreground > midground > background in size.\n\n**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **dragon egg** (object)\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.\n\n**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.\n\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\n\n**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.\n\n\nEXACT POSES:\n- Julian: holds the egg against his chest and cheek\n\nEXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n- Julian: eyes narrowed in quiet focus, small warm smile; eyes on dragon egg",
+  "sceneMetadata": {
+    "era": "present day",
+    "aboard": null,
+    "objects": [
+      "LOC001",
+      "ART001"
+    ],
+    "setting": null,
+    "clothing": null,
+    "fullData": {
+      "shot": "medium",
+      "objects": [
+        "LOC001",
+        "ART001"
+      ],
+      "setting": null,
+      "wornItems": [],
+      "background": null,
+      "characters": [
+        {
+          "name": "Julian",
+          "depth": "foreground",
+          "looksAt": "ART001",
+          "clothing": "standard",
+          "position": "center foreground",
+          "expression": "eyes narrowed in quiet focus, small warm smile"
+        }
+      ],
+      "sceneIntent": "Julian presses his cheek against the heavy red egg, hugging it to his chest. His eyes are narrowed and he smiles, feeling its warmth. Medium against the tree trunk.",
+      "imageSummary": "Julian — the toddler in his yellow vest, white shirt, blue dungaree trousers, and white sneakers, his curly light blonde hair brushing his collar — sits back on his heels and holds the heavy stone-like rusty-red egg securely against his chest, leaning his head forward to press his right cheek flat against the smooth mottled shell. In this medium shot, Julian’s blue eyes narrow in quiet focus, a small warm smile touching his lips as he feels the heat radiating from the surface. His small hands grip the sides of the egg firmly, pulling it snug against his bib panel. The dark grooved bark of the old linden tree forms a solid wall directly behind him, catching the soft afternoon light.",
+      "interactions": [
+        {
+          "hands": true,
+          "where": "holds the egg against his chest and cheek",
+          "action": "hugging",
+          "object": "ART001",
+          "priority": "essential",
+          "character": "Julian",
+          "storyRelevant": true
+        }
+      ],
+      "crowdExpected": false
+    },
+    "thinking": null,
+    "wornItems": [],
+    "background": null,
+    "characters": [
+      "Julian"
+    ],
+    "sceneIntent": "Julian presses his cheek against the heavy red egg, hugging it to his chest. His eyes are narrowed and he smiles, feeling its warmth. Medium against the tree trunk.",
+    "imageSummary": "Julian — the toddler in his yellow vest, white shirt, blue dungaree trousers, and white sneakers, his curly light blonde hair brushing his collar — sits back on his heels and holds the heavy stone-like rusty-red egg securely against his chest, leaning his head forward to press his right cheek flat against the smooth mottled shell. In this medium shot, Julian’s blue eyes narrow in quiet focus, a small warm smile touching his lips as he feels the heat radiating from the surface. His small hands grip the sides of the egg firmly, pulling it snug against his bib panel. The dark grooved bark of the old linden tree forms a solid wall directly behind him, catching the soft afternoon light.",
+    "interactions": [
+      {
+        "hands": true,
+        "where": "holds the egg against his chest and cheek",
+        "action": "hugging",
+        "object": "ART001",
+        "priority": "essential",
+        "character": "Julian",
+        "storyRelevant": true
+      }
+    ],
+    "isJsonFormat": true,
+    "landmarkView": "exterior",
+    "textPosition": null,
+    "crowdExpected": false,
+    "isProseFormat": true,
+    "framingPattern": null,
+    "reuseEmptyScene": null,
+    "sceneComplexity": "simple",
+    "emptyScenePrompt": "The rough, deeply grooved dark bark of an ancient linden tree trunk, filling the background closely. A few bright yellow autumn leaves rest in the crevices of the bark.",
+    "landmarkVariants": null,
+    "characterClothing": {
+      "Julian": "standard"
+    },
+    "translatedSummary": null,
+    "characterPositions": {
+      "Julian": "center foreground"
+    },
+    "textZoneDescription": null,
+    "characterPerspectives": {
+      "Julian": {
+        "depth": "foreground"
+      }
+    }
+  },
+  "visualBible": {
+    "artifacts": [
+      {
+        "id": "ART001",
+        "name": "large stone-like egg",
+        "type": "egg",
+        "label": "dragon egg",
+        "pages": [
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          10,
+          11,
+          16
+        ],
+        "description": "An egg as big as a football, rusty red and brown mottled surface, smooth but resembling river stone. Heavy and solid.",
+        "appearsInPages": [
+          2,
+          3,
+          5,
+          6,
+          7,
+          8,
+          10,
+          11,
+          16
+        ]
+      },
+      {
+        "id": "ART002",
+        "name": "woven apple basket",
+        "type": "basket",
+        "label": "apple basket",
+        "pages": [
+          9,
+          12
+        ],
+        "states": [
+          {
+            "id": "ART002.1",
+            "held": null,
+            "name": "upright",
+            "delta": "standing upright, filled to the brim with red apples",
+            "pages": [
+              9,
+              12
+            ],
+            "referenceImageUrl": null,
+            "referenceImageData": null
+          },
+          {
+            "id": "ART002.2",
+            "held": null,
+            "name": "spilled",
+            "delta": "tipped on its side, empty",
+            "pages": [],
+            "referenceImageUrl": null,
+            "referenceImageData": null
+          }
+        ],
+        "description": "A large round woven wicker basket, about arm's length across, constructed of thick interlaced willow bands.",
+        "appearsInPages": [
+          9,
+          12
+        ]
+      },
+      {
+        "id": "ART003",
+        "name": "wooden pumpkin crate",
+        "type": "crate",
+        "label": "pumpkin crate",
+        "pages": [
+          9,
+          11
+        ],
+        "description": "A rectangular crate made of rough wooden slats, holding several large round orange pumpkins.",
+        "appearsInPages": [
+          9,
+          11
+        ]
+      },
+      {
+        "id": "ART004",
+        "name": "small cardboard sign",
+        "text": "SOLD",
+        "type": "sign",
+        "label": "sold card",
+        "pages": [
+          11
+        ],
+        "states": [
+          {
+            "id": "ART004.1",
+            "held": null,
+            "name": "back",
+            "delta": "plain brown cardboard back",
+            "pages": [
+              11
+            ],
+            "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/vb/ART004_1.jpg",
+            "referenceImageData": null
+          },
+          {
+            "id": "ART004.2",
+            "held": null,
+            "name": "face to camera",
+            "delta": "white face with black lettering",
+            "pages": [],
+            "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/vb/ART004_2.jpg",
+            "referenceImageData": null
+          }
+        ],
+        "cellGates": [
+          {
+            "at": "2026-09-14T01:51:53.121Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "ART004.1",
+            "reason": "The watercolor painting depicts a hand-sized cardboard sign with the word \"SOLD\" clearly legible in the described art style.",
+            "recheckOk": true,
+            "rerendered": true,
+            "recheckReason": "The image depicts a hand-sized cardboard sign with the word \"SOLD\" clearly legible, rendered in a watercolor style consistent with the description."
+          },
+          {
+            "at": "2026-09-14T01:51:53.121Z",
+            "ok": false,
+            "gate": "state_cells",
+            "cellId": "ART004.1",
+            "reason": "The material and color of the sign differ between the two cells.",
+            "recheckOk": false,
+            "rerendered": true,
+            "recheckReason": "The color of the cardboard is different in the two images."
+          }
+        ],
+        "description": "A small rectangular piece of heavy cardboard, the size of a hand.",
+        "appearsInPages": [
+          11
+        ],
+        "referenceImageGenerated": true
+      },
+      {
+        "id": "ART005",
+        "name": "picture book",
+        "type": "book",
+        "label": "open book",
+        "pages": [
+          4
+        ],
+        "cellGates": [
+          {
+            "at": "2026-09-14T01:51:24.039Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "ART005",
+            "reason": "The image depicts an open book with thick pages, rendered in a traditional watercolor style with visible brushstrokes and washes, matching the description.",
+            "rerendered": false
+          }
+        ],
+        "description": "A large square picture book with thick cardboard pages, open in the middle.",
+        "appearsInPages": [
+          4
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/vb/ART005.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      }
+    ],
+    "animals": [
+      {
+        "id": "ANI001",
+        "name": "Nia",
+        "size": "comes up to a preschooler's knee",
+        "pages": [
+          5,
+          7,
+          12,
+          13,
+          15,
+          17
+        ],
+        "species": "terrier mix dog",
+        "coloring": "scruffy light brown and white coat",
+        "features": "floppy ears, short tail, plain red collar, large round friendly eyes",
+        "cellGates": [
+          {
+            "at": "2026-09-14T01:51:07.614Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "ANI001",
+            "reason": "The image depicts a scruffy terrier mix dog with a red collar, large friendly eyes, and a watercolor style that matches the description.",
+            "rerendered": false
+          }
+        ],
+        "description": "terrier mix dog. comes up to a preschooler's knee. scruffy light brown and white coat. floppy ears, short tail, plain red collar, large round friendly eyes",
+        "appearsInPages": [
+          5,
+          7,
+          12,
+          13,
+          15,
+          17
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/vb/ANI001.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      },
+      {
+        "id": "ANI002",
+        "name": "Ofeli",
+        "size": "about the size of a large cat",
+        "pages": [
+          7,
+          8,
+          10,
+          11,
+          13,
+          16,
+          17,
+          18
+        ],
+        "species": "small dragon",
+        "coloring": "rusty red and gold scales",
+        "features": "soft rounded snout, large friendly round orange eyes, small blunt crest on the head, short rounded wings, upright friendly posture",
+        "cellGates": [
+          {
+            "at": "2026-09-14T01:51:06.712Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "ANI002",
+            "reason": "The image depicts a small, friendly dragon with rusty red and gold scales, matching the description of an Ofeli in the specified watercolor art style.",
+            "rerendered": false
+          }
+        ],
+        "description": "small dragon. about the size of a large cat. rusty red and gold scales. soft rounded snout, large friendly round orange eyes, small blunt crest on the head, short rounded wings, upright friendly posture",
+        "appearsInPages": [
+          7,
+          8,
+          10,
+          11,
+          13,
+          16,
+          17,
+          18
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/vb/ANI002.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      }
+    ],
+    "vehicles": [
+      {
+        "id": "VEH001",
+        "name": "wooden handcart",
+        "label": "market handcart",
+        "pages": [
+          13,
+          15
+        ],
+        "cellGates": [
+          {
+            "at": "2026-09-14T01:51:20.344Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "VEH001",
+            "reason": "The image depicts a rustic wooden handcart with two wheels and a handle, fitting the description of a market handcart and rendered in a traditional watercolor style.",
+            "rerendered": false
+          }
+        ],
+        "appearsInPages": [
+          13,
+          15
+        ],
+        "colorAndDetails": "A flatbed wooden cart on two large iron-rimmed spoked wheels, weathered brown wood, about two metres long.",
+        "signatureElement": "curved wooden push handles at the rear",
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/vb/VEH001.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      }
+    ],
+    "secondaryCharacters": [
+      {
+        "id": "CHR001",
+        "age": 55,
+        "face": "brown eyes, weathered cheeks, neutral chin",
+        "hair": "grey, straight, tied back in a low bun",
+        "name": "Frau Brunner",
+        "peer": "no",
+        "build": "a woman, average height, sturdy broad-shouldered build",
+        "pages": [
+          9,
+          13,
+          15,
+          16
+        ],
+        "clothing": "dark green long-sleeve thick sweater, thick grey wool apron, brown trousers, black sturdy boots",
+        "cellGates": [
+          {
+            "at": "2026-09-14T01:50:56.414Z",
+            "ok": true,
+            "gate": "character_cell",
+            "cellId": "CHR001",
+            "reason": "The watercolor painting accurately depicts a 55-year-old woman with a sturdy build, grey hair, and the described clothing and apron, adhering to the specified art style.",
+            "rerendered": false
+          }
+        ],
+        "description": "55. a woman, average height, sturdy broad-shouldered build. hair: grey, straight, tied back in a low bun. brown eyes, weathered cheeks, neutral chin. Signature: thick grey wool apron over her clothes. Clothing: dark green long-sleeve thick sweater, thick grey wool apron, brown trousers, black sturdy boots",
+        "signatureLook": "thick grey wool apron over her clothes",
+        "appearsInPages": [
+          9,
+          13,
+          15,
+          16
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/vb/CHR001.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      }
+    ],
+    "locations": [
+      {
+        "id": "LOC001",
+        "name": "Lindenhof square with big linden tree",
+        "label": "Lindenhof square",
+        "pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          18
+        ],
+        "colors": "autumn yellows, reds, greys",
+        "setting": "outdoor, public square",
+        "features": "large mature linden tree, autumn foliage on the ground, distant view of twin stone church towers",
+        "description": "outdoor, public square. Colors: autumn yellows, reds, greys. large mature linden tree, autumn foliage on the ground, distant view of twin stone church towers. Signature: massive gnarled roots of the old linden tree pushing up through the dirt",
+        "photoSource": "wikimedia",
+        "landmarkQuery": "Lindenhof (Zürcher Hügelzug)",
+        "photoVariants": [
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/248/d6f46ee63c42.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/d/dd/Chess_in_Lindenhof_park_2.JPG",
+            "attribution": "Ximeg, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+            "variantNumber": 1,
+            "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/debug/p1/landmark-0.jpg"
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/248/c8dfc9d8da3e.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/3/36/Ansicht_von_der_ETH_Z%C3%BCrich_auf_den_Lindenhof_2011-08-06.jpg",
+            "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[distant, green, day] Aerial urban cityscape of Zurich showing historic districts, modern high-rises, and surrounding Alpine foothills.",
+            "variantNumber": 2
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/248/a6fca970dbb3.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/27/Fraum%C3%BCnster_-_Zunfthaus_zur_Meisen_-_Lindenhof_-_M%C3%BCnsterbr%C3%BCcke_-_Limmat_-_Quaibr%C3%BCcke_2011-03-23_15-06-28_ShiftN.jpg",
+            "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[whole, green, day] Waterfront promenade with historic buildings, moored boats, and riverside architecture. Fraumünster and other period structures visible along water.",
+            "variantNumber": 3
+          }
+        ],
+        "appearsInPages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          18
+        ],
+        "isRealLandmark": true,
+        "swissLandmarkId": 210,
+        "photoAttribution": "Ximeg, CC BY-SA 3.0, via Wikimedia Commons",
+        "photoFetchStatus": "pending_lazy",
+        "signatureElement": "massive gnarled roots of the old linden tree pushing up through the dirt",
+        "isSwissPreIndexed": true,
+        "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/248/d6f46ee63c42.jpg",
+        "extractedDescription": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+        "firstAppearanceAnalyzed": true
+      },
+      {
+        "id": "LOC002",
+        "name": "Rathausbruecke bridge",
+        "label": "bridge market",
+        "pages": [
+          9,
+          10,
+          11,
+          12,
+          13,
+          15
+        ],
+        "colors": "grey stone, twilight blues, warm lamplight",
+        "setting": "outdoor, wide stone bridge",
+        "features": "wide pedestrian stone bridge spanning the river, wet flat paving stones, metal railings",
+        "description": "outdoor, wide stone bridge. Colors: grey stone, twilight blues, warm lamplight. wide pedestrian stone bridge spanning the river, wet flat paving stones, metal railings. Signature: flat grey bridge stones scattered with wet autumn leaves",
+        "photoSource": "wikimedia",
+        "landmarkQuery": "Rathausbrücke (Zürich)",
+        "photoVariants": [
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/269/d075e523f385.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b1/7340_-_Z%C3%BCrich_-_Limmat_at_Rathausbr%C3%BCcke.JPG",
+            "attribution": "Photo by Thisisbossi, Wikimedia Commons",
+            "description": "[whole, green, day] Stone bridge with yellow construction/loading equipment, spanning green river. City buildings with distinctive church tower in background.",
+            "variantNumber": 1,
+            "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/debug/p9/landmark-0.jpg"
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/269/05a05f7ee2f5.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2b/2008-07-25_Z%C3%BCrich_-_08.jpg",
+            "attribution": "Maksym Kozlenko, CC BY-SA 4.0, via Wikimedia Commons",
+            "description": "[whole, green, day] River landscape showing stone bridge structure and densely-built waterfront architecture. Pale stone and terracotta buildings cluster along the riverbank.",
+            "variantNumber": 2
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/269/93b2ab9b75bf.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/70/7356_-_Z%C3%BCrich_-_Limmat.JPG",
+            "attribution": "Andrew Bossi, CC BY-SA 2.5, via Wikimedia Commons",
+            "description": "[whole, green, day] Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City buildings and church tower visible beyond water.",
+            "variantNumber": 3
+          }
+        ],
+        "appearsInPages": [
+          9,
+          10,
+          11,
+          12,
+          13,
+          15
+        ],
+        "isRealLandmark": true,
+        "swissLandmarkId": 231,
+        "photoAttribution": "Andrew Bossi, CC BY-SA 2.5, via Wikimedia Commons",
+        "photoFetchStatus": "pending_lazy",
+        "signatureElement": "flat grey bridge stones scattered with wet autumn leaves",
+        "isSwissPreIndexed": true,
+        "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/269/93b2ab9b75bf.jpg",
+        "extractedDescription": "[whole, green, day] Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City buildings and church tower visible beyond water.",
+        "firstAppearanceAnalyzed": true
+      },
+      {
+        "id": "LOC003",
+        "name": "Levin's apartment",
+        "label": "apartment interior",
+        "pages": [
+          17
+        ],
+        "colors": "warm ochre, cream, green tiles",
+        "setting": "indoor, living room",
+        "features": "wooden floorboards, plain plaster walls",
+        "description": "indoor, living room. Colors: warm ochre, cream, green tiles. wooden floorboards, plain plaster walls. Signature: large antique green tiled stove built into the corner",
+        "landmarkQuery": null,
+        "appearsInPages": [
+          17
+        ],
+        "isRealLandmark": false,
+        "signatureElement": "large antique green tiled stove built into the corner"
+      }
+    ]
+  }
+}

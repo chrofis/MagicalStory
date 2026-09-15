@@ -40,13 +40,17 @@ const MAX_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
 };
 const MIN_SEVERITY_TYPES: Record<string, keyof typeof ENTITY_PENALTIES> = {
   composite_seam: 'catastrophic',
+  face_destroyed: 'critical',
 };
 
 /** Points one issue costs — severity points bounded by per-type ceiling/floor,
  *  mirroring scoring.js deductionPoints. Unknown severity defaults to minor
  *  (existing client convention; the server drops it). */
-export function entityIssuePoints(issue: { type?: string; severity?: string } | null | undefined): number {
-  const type = String(issue?.type || '').toLowerCase();
+export function entityIssuePoints(issue: { type?: string; subType?: string; severity?: string } | null | undefined): number {
+  // subType FIRST, mirroring deductionPoints in scoring.js: entity findings are
+  // normalised to a flat `type: 'consistency'` with the real classification in
+  // `subType`, so reading `type` alone made every ceiling and floor inert here.
+  const type = String(issue?.subType || issue?.type || '').toLowerCase();
   if (ZERO_POINT_TYPES.has(type)) return 0;
   const raw = ENTITY_PENALTIES[String(issue?.severity || '').toLowerCase() as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
   const ceiling = MAX_SEVERITY_TYPES[type];

@@ -64,6 +64,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { assertPromptFilled } = require('../services/prompts');
 
 /**
  * opts.model → the production IMAGE_MODELS id whose backend is that provider.
@@ -138,6 +139,7 @@ async function geminiStyleRepaint(prompt, pageImage, { retries = 3, refImages = 
       parts.push({ inlineData: { mimeType: rmime, data: r2.stripDataUriPrefix(ref) } });
     }
   }
+  assertPromptFilled(parts, 'geminiStyleRepaint');
   const body = { contents: [{ parts }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.7, imageConfig: { aspectRatio } } };
   let lastReason = 'unknown';
   for (let attempt = 1; attempt <= retries; attempt++) {

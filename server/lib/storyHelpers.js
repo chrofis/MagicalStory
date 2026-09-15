@@ -17,9 +17,27 @@
 
 const { log } = require('../utils/logger');
 const { loadLandmarkPhotoVariant, pickVariantForView } = require('./landmarkPhotos');
-const { parseClothingCategory, parseCharacterClothing, resolveClothingForPage, buildSceneClothingRequirements, buildAvailableAvatarsForPrompt, convertClothingToCurrentFormat, getCharacterPhotos, getCharacterPhotoDetails, prefetchAvatarBytesForCharacters, applyReferenceMode } = require('./clothingResolve');
-const { wrapUserInput, stripAgeWords, buildHairDescription, buildCharacterDescriptionsForBbox, buildSecondaryCharacterDescriptions, buildSecondaryExpectedCharacters, buildCastIdentityDescription, buildIdentityClothingText, buildIdentityLine, buildSecondaryExpectedForPage, buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, getAgeCategory, getAgeCategoryLabel, AGE_CATEGORY_ORDER, getAgeCategoryIndex, clampApparentAge, getTeachingGuide, preloadHistoricalLocations, getHistoricalLocations, preloadHistoricalObjects, getHistoricalObjects, getAdventureGuide, getSceneComplexityGuide, ART_STYLES, WORLD_ART_STYLES, buildStyleWardrobeBlock, resolveArtStyle, resolveArtStyleForEmptyScene, resolveArtStyleForSheet, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage, extractCharacterVisualProfile, buildCharacterPhysicalDescription, buildGroundingPrompt, buildCharacterPromptBlock, buildRelativeHeightDescription, buildCharacterRestriction, buildCharacterReferenceList, buildReferenceCardColours, buildCoverPrompt, buildBasePrompt, buildSceneExpansionAllPrompt, buildSceneExpansionPrompt, buildSceneDescriptionPrompt, textDeclaresNonWornPlacement, sceneDeclaresNonWornState, stripWornStateFromDescription, buildImagePrompt, sanitizeVbIdsInPrompt, buildOutlineReviewPrompt, buildTextRefinePrompt, parseRefinedText, buildBeatsPrompt, buildChallengeIdeasSection, buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, buildArcHintsPrompt, parseArcHints, parseArcCreate, parseArcRetell, critiqueMaxSeverity, buildPlanCheckPrompt, parsePlanCheck, buildReplanSection, buildArcReviewPrompt, buildArcAuditPrompt, buildTextAuditPrompt, buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt, countFaults, faultsByCategory, parseArcReview, buildStoryShapeSection, buildClothingReviewPrompt, parseClothingReview, parseBeats, parsePagePlan, parsePlanResponse, planBlocks, planInstant, buildSceneReviewPrompt, buildDoNotWriteSection, buildStoryTextFromBeatsPrompt, buildStoryBibleFromBeatsPrompt, buildUnifiedStoryPrompt, buildTrialStoryPrompt, buildAvailableLandmarksSection, buildPreviousScenesContext, buildChildCriticPrompt, youngestMainAge } = require('./promptBuilders');
-const { extractJsonFromText, parseProseMetadataFormat, POSITION_ABBREVIATIONS, expandPositionAbbreviations, stripEntityIds, stripSceneMetadata, parseCharacterDescriptions, enforceSpreadTextPosition, mirrorLeftRight, extractSceneMetadata, collectSceneCharacterNames, findCastMissingFromMetadata, getCharactersInScene, parseSceneHintMetadata, parseStoryPages, parseSceneDescriptions, extractShortSceneDescriptions, extractCoverScenes, extractPageClothing, getPrimaryVantageForPage, groupPagesByVantage, normalizePositionToLCR, getPageText, updatePageText } = require('./sceneMetadata');
+const { parseClothingCategory, parseCharacterClothing, resolveClothingForPage, buildSceneClothingRequirements, buildAvailableAvatarsForPrompt, convertClothingToCurrentFormat, getCharacterPhotos, getCharacterPhotoDetails, buildWholeCastReferencePhotos, prefetchAvatarBytesForCharacters, applyReferenceMode } = require('./clothingResolve');
+const { wrapUserInput, stripAgeWords, buildHairDescription, buildCharacterDescriptionsForBbox, buildSecondaryCharacterDescriptions, buildSecondaryExpectedCharacters, buildCastIdentityDescription, buildIdentityClothingText, buildIdentityLine, buildSecondaryExpectedForPage, buildTextZoneInstruction, buildEraGuard, buildLandmarkFidelityBlock, getAgeCategory, getAgeCategoryLabel, AGE_CATEGORY_ORDER, getAgeCategoryIndex, clampApparentAge, getTeachingGuide, preloadHistoricalLocations, getHistoricalLocations, preloadHistoricalObjects, getHistoricalObjects, getAdventureGuide, getSceneComplexityGuide, ART_STYLES, WORLD_ART_STYLES, buildStyleWardrobeBlock, resolveArtStyle, resolveArtStyleForEmptyScene, resolveArtStyleForSheet, LANGUAGE_LEVELS, getReadingLevel, getTokensPerPage, extractCharacterVisualProfile, buildCharacterPhysicalDescription, buildGroundingPrompt, buildCharacterPromptBlock, buildRelativeHeightDescription, buildCharacterRestriction, buildCharacterReferenceList, buildReferenceCardColours, buildCoverPrompt, buildBasePrompt, buildSceneExpansionAllPrompt, buildSceneExpansionPrompt, buildSceneDescriptionPrompt, textDeclaresNonWornPlacement, sceneDeclaresNonWornState, stripWornStateFromDescription, buildImagePrompt, sanitizeVbIdsInPrompt, buildOutlineReviewPrompt, buildTextRefinePrompt, parseRefinedText, buildBeatsPrompt, buildChallengeIdeasSection, buildArcCreatePrompt, buildArcPanelPrompt, buildArcRetellPrompt, buildArcHintsPrompt, parseArcHints, parseArcCreate, parseArcRetell, parseInventedFigures, arcInventedAllowance, critiqueMaxSeverity, buildPlanCheckPrompt, parsePlanCheck, buildReplanSection, replanRank, findingPages, buildArcReviewPrompt, buildArcAuditPrompt, buildTextAuditPrompt, buildTextAuditBlindPrompt, buildTextProofreadPrompt, buildTextDiffPrompt, countFaults, faultsByCategory, parseArcReview, buildStoryShapeSection, buildClothingReviewPrompt, parseClothingReview, parseBeats, parsePagePlan, parsePlanResponse, planBlocks, planInstant, buildSceneReviewPrompt, buildDoNotWriteSection, buildStoryTextFromBeatsPrompt, buildStoryBibleFromBeatsPrompt, buildTrialStoryPrompt, buildAvailableLandmarksSection, buildPreviousScenesContext, buildChildCriticPrompt, youngestMainAge } = require('./promptBuilders');
+const { extractJsonFromText, parseProseMetadataFormat, POSITION_ABBREVIATIONS, expandPositionAbbreviations, stripEntityIds, stripSceneMetadata, parseCharacterDescriptions, enforceSpreadTextPosition, mirrorLeftRight, extractSceneMetadata, collectSceneCharacterNames, findCastMissingFromMetadata, getCharactersInScene, unionPageCast, parseSceneHintMetadata, parseStoryPages, parseSceneDescriptions, extractShortSceneDescriptions, extractCoverScenes, extractPageClothing, getPrimaryVantageForPage, groupPagesByVantage, groupTrialPlatePagesByVantage, normalizePositionToLCR, getPageText, updatePageText } = require('./sceneMetadata');
+
+/*
+ * EXHAUSTIVE RE-EXPORT (2026-09-13). The facade used to list every forwarded
+ * name by hand, twice — once in the destructures above, once in
+ * `module.exports`. A function added to a domain module and NOT added to both
+ * lists is simply absent here, and every importer that destructures it from
+ * this facade binds `undefined` with no error at require time. That is exactly
+ * how `parsePlanCheckRoster` (promptBuilders.js, added 2026-09-11 in df1eb1ff3)
+ * reached `beatsPipeline.js:95` as undefined and killed the whole plan-counter
+ * layer on every beats run for two days — behind a WARN, so nothing failed.
+ * The module objects below are spread into `module.exports`, so a new domain
+ * export is forwarded automatically. The explicit list after them is kept as
+ * the documented surface and as the place local residue and the alias win.
+ * `tests/unit/story-helpers-facade.test.ts` pins both properties.
+ */
+const promptBuildersModule = require('./promptBuilders');
+const sceneMetadataModule = require('./sceneMetadata');
+const clothingResolveModule = require('./clothingResolve');
 
 /**
  * Calculate the actual page count for a story
@@ -233,12 +251,27 @@ async function resolveLandmarkPhotoForLocation(visualBible, loc, opts = {}) {
       return null;
     }
     log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${decision.variantNumber})`);
+    // Carry the indexer's own classification of THIS photo (photo_type:
+    // exterior | distant | close | interior | view-from) and its description
+    // through to the prompt. pickVariantForView selects on `kind` and then
+    // every consumer dropped it, so buildLandmarkFidelityBlock had only a name
+    // to go on and told the model "preserve the silhouette… never a tiny speck
+    // against a wide cityscape" even when the reference was a village panorama,
+    // which has no silhouette to preserve. The loader can return a different
+    // slot than was requested, so read the kind off the slot actually served.
+    const served = (loc.photoVariants || []).find(v => v.variantNumber === variant.variantNumber);
     return {
       name: loc.name,
       photoData: variant.photoData,
       attribution: variant.attribution,
       source: 'swiss-variant',
       variantNumber: variant.variantNumber,
+      // `photoType` is the ONLY thing read downstream: it selects which
+      // fidelity block buildLandmarkFidelityBlock emits. The photo's own
+      // description is deliberately NOT carried — nothing consumed it
+      // (removed 2026-09-15) — so do not diagnose a prompt as "having the
+      // photo's description": it does not.
+      photoType: served?.kind || null,
     };
   }
 
@@ -328,6 +361,57 @@ async function ensureLandmarkPhotoBytes(photos, opts = {}) {
 }
 
 /**
+ * page → landmark-photo promise for the TRIAL early background plates.
+ *
+ * Registered synchronously (the outline-stream callback that calls this cannot
+ * be async — an un-awaited promise on the stream handler), but every actual
+ * resolution is deferred behind `descriptionsPromise`.
+ *
+ * THAT AWAIT IS THE WHOLE POINT. `decideLandmarkPhotoSource` — the policy half
+ * of resolveLandmarkPhotoForLocation — runs on the resolver's first line,
+ * BEFORE any await. `loadLandmarkPhotoDescriptions` is what writes
+ * `loc.photoVariants`, and it is merely STARTED in the same tick as the plate
+ * block. Calling the resolver straight away therefore always decided on a
+ * variant-less location: the variant arm is skipped and the legacy arm needs
+ * `photoFetchStatus === 'success'`, which a variant-backed Swiss landmark never
+ * reaches. Result: null, i.e. a plate rendered with NO landmark photo and no
+ * fidelity / REFERENCE line, while the page itself (which awaits the same
+ * promise) got the photo. Measured on staging job_1789337873076_qf2at21ui p6.
+ *
+ * @param {Object} visualBible
+ * @param {Object} [opts]
+ * @param {Promise} [opts.descriptionsPromise] - loadLandmarkPhotoDescriptions()
+ * @returns {Object<number, Promise<Object|null>>} page number → photo promise
+ *   (never rejects; a failed resolve yields null)
+ */
+function trialPlateLandmarkPromisesByPage(visualBible, opts = {}) {
+  const byPage = {};
+  for (const loc of (visualBible?.locations || [])) {
+    if (!loc.isRealLandmark || !loc.pages?.length) continue;
+    const p = (async () => {
+      if (opts.descriptionsPromise) await opts.descriptionsPromise;
+      // No scene view exists here (the plate is built from the VB background,
+      // before any brief), so the resolver picks an exterior — which is what a
+      // background plate wants.
+      const photo = await resolveLandmarkPhotoForLocation(visualBible, loc, { sceneView: null });
+      if (!photo) return null;
+      // block ⇔ bytes: a legacy entry can resolve to a URL with no inline data,
+      // and the fidelity block must never ship without the photo it describes.
+      // Same guard the page path applies.
+      const [withBytes] = await ensureLandmarkPhotoBytes([photo]);
+      return withBytes || null;
+    })().catch(err => {
+      log.warn(`⚠️ [TRIAL] Landmark photo resolve failed for "${loc.name}": ${err.message}`);
+      return null;
+    });
+    for (const pn of loc.pages) {
+      if (!byPage[pn]) byPage[pn] = p;
+    }
+  }
+  return byPage;
+}
+
+/**
  * Age → head-to-body ratio lookup, used both at avatar-generation time
  * (prescribes the expected proportion) and at image-evaluation time (verifies
  * the generated figure matches). Returns a string like "1:6" or null if age
@@ -348,6 +432,11 @@ function getHeadBodyRatio(age) {
 }
 
 module.exports = {
+  // Everything the three domain modules export, forwarded by construction.
+  ...clothingResolveModule,
+  ...sceneMetadataModule,
+  ...promptBuildersModule,
+
   // Config
   ART_STYLES,
   resolveArtStyle,
@@ -368,10 +457,12 @@ module.exports = {
 
   // Character helpers
   getCharactersInScene,
+  unionPageCast,
   getCharacterPhotos,
   parseClothingCategory,
   parseCharacterClothing,
   getCharacterPhotoDetails,
+  buildWholeCastReferencePhotos,
   prefetchAvatarBytesForCharacters,
   buildCharacterPhysicalDescription,
   extractCharacterVisualProfile,
@@ -426,7 +517,6 @@ module.exports = {
   textDeclaresNonWornPlacement,
   sceneDeclaresNonWornState,
   stripWornStateFromDescription,
-  buildUnifiedStoryPrompt,
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,
   parseRefinedText,
@@ -439,10 +529,14 @@ module.exports = {
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
+  parseInventedFigures,
+  arcInventedAllowance,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
   buildReplanSection,
+  replanRank,
+  findingPages,
   buildArcReviewPrompt,
   buildArcAuditPrompt,
   buildChildCriticPrompt,
@@ -490,11 +584,13 @@ module.exports = {
   resolveLandmarkPhotoForLocation,
   decideLandmarkPhotoSource,
   ensureLandmarkPhotoBytes,
+  trialPlateLandmarkPromisesByPage,
   buildAvailableLandmarksSection,
 
   // Location vantages (canvas-per-vantage pipeline)
   getPrimaryVantageForPage,
   groupPagesByVantage,
+  groupTrialPlatePagesByVantage,
 
   // Position utilities
   expandPositionAbbreviations,

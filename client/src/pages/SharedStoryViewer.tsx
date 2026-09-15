@@ -466,7 +466,7 @@ export default function SharedStoryViewer() {
         )}
         <div className="mt-4 flex items-center gap-2 text-xs text-gray-500">
           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          <span>{language === 'de' ? 'Lade Seiten…' : language === 'fr' ? 'Chargement des pages…' : 'Loading pages…'}</span>
+          <span>{language === 'de' ? 'Lade Seiten…' : language === 'fr' ? 'Chargement des pages…' : language === 'it' ? 'Caricamento pagine…' : 'Loading pages…'}</span>
         </div>
       </div>
     );
@@ -671,7 +671,7 @@ export default function SharedStoryViewer() {
               ? 'Lesemodus — diese Geschichte kannst du nicht bearbeiten.'
               : language === 'fr'
                 ? 'Mode lecture — vous ne pouvez pas modifier cette histoire.'
-                : 'Read-only — you cannot edit this story.'}
+                : language === 'it' ? 'Modalità lettura — non puoi modificare questa storia.' : 'Read-only — you cannot edit this story.'}
           </p>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
@@ -682,14 +682,14 @@ export default function SharedStoryViewer() {
                 ? 'Eigene Geschichte erstellen'
                 : language === 'fr'
                   ? 'Créer votre histoire'
-                  : 'Create your own story'}
+                  : language === 'it' ? 'Crea la tua storia' : 'Create your own story'}
             </button>
             <button
               onClick={() => {
                 sessionStorage.setItem('notOwnerBannerDismissed', '1');
                 setNotOwnerDismissed(true);
               }}
-              aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
+              aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : language === 'it' ? 'Chiudi' : 'Dismiss'}
               className="p-1.5 rounded-md text-sky-700 hover:bg-sky-100 transition-colors"
             >
               <X className="w-4 h-4" />
@@ -702,7 +702,7 @@ export default function SharedStoryViewer() {
       {story.isOwner && !sharingEnabled && !bannerDismissed && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center justify-between gap-3 short:hidden">
           <p className="text-sm text-amber-800 min-w-0 flex-1">
-            {language === 'de' ? 'Diese Geschichte ist privat — nur du kannst sie sehen.' : language === 'fr' ? 'Cette histoire est privée — vous seul pouvez la voir.' : 'This story is private — only you can see it.'}
+            {language === 'de' ? 'Diese Geschichte ist privat — nur du kannst sie sehen.' : language === 'fr' ? 'Cette histoire est privée — vous seul pouvez la voir.' : language === 'it' ? 'Questa storia è privata — solo tu puoi vederla.' : 'This story is private — only you can see it.'}
           </p>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
@@ -710,14 +710,14 @@ export default function SharedStoryViewer() {
               disabled={sharingLoading}
               className="bg-amber-500 text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-amber-600 transition-colors disabled:opacity-50"
             >
-              {sharingLoading ? '...' : language === 'de' ? 'Teilen' : language === 'fr' ? 'Partager' : 'Share'}
+              {sharingLoading ? '...' : language === 'de' ? 'Teilen' : language === 'fr' ? 'Partager' : language === 'it' ? 'Condividi' : 'Share'}
             </button>
             <button
               onClick={() => {
                 sessionStorage.setItem('privateStoryBannerDismissed', '1');
                 setBannerDismissed(true);
               }}
-              aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : 'Dismiss'}
+              aria-label={language === 'de' ? 'Schliessen' : language === 'fr' ? 'Fermer' : language === 'it' ? 'Chiudi' : 'Dismiss'}
               className="p-1.5 rounded-md text-amber-700 hover:bg-amber-100 transition-colors"
             >
               <X className="w-4 h-4" />

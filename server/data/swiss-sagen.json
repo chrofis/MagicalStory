@@ -4,17 +4,20 @@
     "title": {
       "en": "Wilhelm Tell and the Apple",
       "de": "Wilhelm Tell und der Apfelschuss",
-      "fr": "Guillaume Tell et la pomme"
+      "fr": "Guillaume Tell et la pomme",
+      "it": "Guglielmo Tell e la mela"
     },
     "description": {
       "en": "A proud mountain man named Wilhelm Tell refuses to bow to the tyrant Gessler's hat in the town square. As punishment, he must shoot an apple from his own son's head with a crossbow. Tell makes the impossible shot — but hides a second arrow for Gessler. His courage sparks a rebellion that frees the Swiss people.",
       "de": "Ein stolzer Bergbewohner namens Wilhelm Tell weigert sich, vor dem Hut des Tyrannen Gessler auf dem Dorfplatz den Hut zu ziehen. Zur Strafe muss er mit der Armbrust einen Apfel vom Kopf seines eigenen Sohnes schiessen. Tell trifft — doch einen zweiten Pfeil hat er für Gessler versteckt. Sein Mut löst einen Aufstand aus, der die Schweizer befreit.",
-      "fr": "Un fier montagnard nommé Guillaume Tell refuse de s'incliner devant le chapeau du tyran Gessler sur la place du village. En punition, il doit tirer une pomme sur la tête de son propre fils avec une arbalète. Tell réussit le tir impossible — mais cache une seconde flèche pour Gessler. Son courage déclenche une rébellion qui libère le peuple suisse."
+      "fr": "Un fier montagnard nommé Guillaume Tell refuse de s'incliner devant le chapeau du tyran Gessler sur la place du village. En punition, il doit tirer une pomme sur la tête de son propre fils avec une arbalète. Tell réussit le tir impossible — mais cache une seconde flèche pour Gessler. Son courage déclenche une rébellion qui libère le peuple suisse.",
+      "it": "Un fiero montanaro di nome Guglielmo Tell rifiuta di inchinarsi davanti al cappello del tiranno Gessler sulla piazza del paese. Come punizione, deve colpire con la balestra una mela posta sulla testa del proprio figlio. Tell centra il colpo impossibile — ma nasconde una seconda freccia per Gessler. Il suo coraggio scatena una rivolta che libera il popolo svizzero."
     },
     "context": {
       "en": "Switzerland's most famous legend, set in 1307 in Altdorf, Canton Uri. Real locations include the Tellskapelle (Tell's Chapel) on Lake Lucerne, the Rütli meadow, and the Hohle Gasse (Hollow Lane). Friedrich Schiller's 1804 play made the story world-famous.",
       "de": "Die berühmteste Schweizer Sage, angesiedelt im Jahr 1307 in Altdorf, Kanton Uri. Reale Schauplätze sind die Tellskapelle am Vierwaldstättersee, die Rütliwiese und die Hohle Gasse. Friedrich Schillers Schauspiel von 1804 machte die Geschichte weltberühmt.",
-      "fr": "La légende suisse la plus célèbre, située en 1307 à Altdorf, canton d'Uri. Les lieux réels incluent la Tellskapelle (chapelle de Tell) au bord du lac des Quatre-Cantons, la prairie du Grütli et la Hohle Gasse (chemin creux). La pièce de Friedrich Schiller de 1804 a rendu l'histoire mondialement célèbre."
+      "fr": "La légende suisse la plus célèbre, située en 1307 à Altdorf, canton d'Uri. Les lieux réels incluent la Tellskapelle (chapelle de Tell) au bord du lac des Quatre-Cantons, la prairie du Grütli et la Hohle Gasse (chemin creux). La pièce de Friedrich Schiller de 1804 a rendu l'histoire mondialement célèbre.",
+      "it": "La leggenda svizzera più famosa, ambientata nel 1307 ad Altdorf, cantone di Uri. Luoghi reali sono la Tellskapelle (cappella di Tell) sul lago dei Quattro Cantoni, il prato del Rütli e la Hohle Gasse (via incassata). Il dramma di Friedrich Schiller del 1804 rese la storia famosa in tutto il mondo."
     },
     "themes": [
       "courage against tyranny",
@@ -30,17 +33,20 @@
     "title": {
       "en": "The Oath on the Rütli",
       "de": "Der Rütlischwur",
-      "fr": "Le Serment du Grütli"
+      "fr": "Le Serment du Grütli",
+      "it": "Il giuramento del Rütli"
     },
     "description": {
       "en": "On a secret meadow by Lake Lucerne, three brave men from Uri, Schwyz, and Unterwalden meet in the dead of night. They swear an oath to free their people from the cruel Habsburg rulers. With clasped hands under the stars, they vow to stand together — one for all, all for one. This legendary pact is the birth of Switzerland.",
       "de": "Auf einer geheimen Wiese am Vierwaldstättersee treffen sich drei mutige Männer aus Uri, Schwyz und Unterwalden in tiefer Nacht. Sie schwören einen Eid, ihr Volk von den grausamen Habsburger Herrschern zu befreien. Mit verschränkten Händen unter dem Sternenhimmel geloben sie zusammenzustehen — einer für alle, alle für einen. Dieser legendäre Schwur ist die Geburtsstunde der Schweiz.",
-      "fr": "Sur un pré secret au bord du lac des Quatre-Cantons, trois hommes courageux d'Uri, de Schwyz et d'Unterwald se retrouvent en pleine nuit. Ils prêtent serment de libérer leur peuple des cruels souverains Habsbourg. Les mains jointes sous les étoiles, ils jurent de rester unis — un pour tous, tous pour un. Ce pacte légendaire marque la naissance de la Suisse."
+      "fr": "Sur un pré secret au bord du lac des Quatre-Cantons, trois hommes courageux d'Uri, de Schwyz et d'Unterwald se retrouvent en pleine nuit. Ils prêtent serment de libérer leur peuple des cruels souverains Habsbourg. Les mains jointes sous les étoiles, ils jurent de rester unis — un pour tous, tous pour un. Ce pacte légendaire marque la naissance de la Suisse.",
+      "it": "Su un prato segreto in riva al lago dei Quattro Cantoni, tre uomini coraggiosi di Uri, Svitto e Untervaldo si incontrano nel cuore della notte. Giurano di liberare il loro popolo dai crudeli signori asburgici. Con le mani strette sotto le stelle, promettono di restare uniti — uno per tutti, tutti per uno. Questo patto leggendario è la nascita della Svizzera."
     },
     "context": {
       "en": "Set in 1291 on the Rütli meadow above Lake Lucerne. The Rütli is a real meadow accessible only by boat, now a Swiss national monument. The Federal Charter of 1291 is considered Switzerland's founding document. The oath is celebrated every August 1st (Swiss National Day).",
       "de": "Angesiedelt im Jahr 1291 auf der Rütliwiese oberhalb des Vierwaldstättersees. Das Rütli ist eine reale Wiese, die nur per Schiff erreichbar ist und heute ein Schweizer Nationaldenkmal. Der Bundesbrief von 1291 gilt als Gründungsurkunde der Schweiz. Der Schwur wird jeden 1. August (Schweizer Nationalfeiertag) gefeiert.",
-      "fr": "Situé en 1291 sur la prairie du Grütli au-dessus du lac des Quatre-Cantons. Le Grütli est une vraie prairie accessible uniquement par bateau, aujourd'hui monument national suisse. Le Pacte fédéral de 1291 est considéré comme le document fondateur de la Suisse. Le serment est célébré chaque 1er août (fête nationale suisse)."
+      "fr": "Situé en 1291 sur la prairie du Grütli au-dessus du lac des Quatre-Cantons. Le Grütli est une vraie prairie accessible uniquement par bateau, aujourd'hui monument national suisse. Le Pacte fédéral de 1291 est considéré comme le document fondateur de la Suisse. Le serment est célébré chaque 1er août (fête nationale suisse).",
+      "it": "Ambientato nel 1291 sul prato del Rütli sopra il lago dei Quattro Cantoni. Il Rütli è un prato reale raggiungibile solo in barca, oggi monumento nazionale svizzero. Il Patto federale del 1291 è considerato l'atto fondativo della Svizzera. Il giuramento è celebrato ogni 1° agosto (festa nazionale svizzera)."
     },
     "themes": [
       "unity against oppression",
@@ -56,17 +62,20 @@
     "title": {
       "en": "The Devil's Bridge",
       "de": "Die Teufelsbrücke",
-      "fr": "Le Pont du Diable"
+      "fr": "Le Pont du Diable",
+      "it": "Il ponte del diavolo"
     },
     "description": {
       "en": "Villagers desperately need a bridge across a dangerous gorge. The Devil offers to build it but demands the soul of the first to cross. The clever villagers trick him by sending a goat across first. The furious Devil throws a boulder but misses.",
       "de": "Dorfbewohner brauchen dringend eine Brücke über eine gefährliche Schlucht. Der Teufel bietet an, sie zu bauen, verlangt aber die Seele des Ersten, der sie überquert. Die schlauen Dorfbewohner überlisten ihn, indem sie eine Geiss vorausschicken. Der wütende Teufel wirft einen Felsen, verfehlt aber sein Ziel.",
-      "fr": "Des villageois ont désespérément besoin d'un pont au-dessus d'une gorge dangereuse. Le Diable propose de le construire mais exige l'âme du premier à le traverser. Les villageois rusés le dupent en envoyant une chèvre en premier. Le Diable furieux lance un rocher mais rate sa cible."
+      "fr": "Des villageois ont désespérément besoin d'un pont au-dessus d'une gorge dangereuse. Le Diable propose de le construire mais exige l'âme du premier à le traverser. Les villageois rusés le dupent en envoyant une chèvre en premier. Le Diable furieux lance un rocher mais rate sa cible.",
+      "it": "Gli abitanti del villaggio hanno disperatamente bisogno di un ponte su una gola pericolosa. Il diavolo si offre di costruirlo, ma pretende l'anima del primo a attraversarlo. Gli astuti abitanti lo ingannano mandando avanti una capra. Il diavolo furioso scaglia un macigno, ma manca il bersaglio."
     },
     "context": {
       "en": "Swiss folk legend from the Schöllenen Gorge, Canton Uri. Real locations include the Teufelsbrücke, the Devil's Stone (Teufelsstein), and the town of Andermatt.",
       "de": "Schweizer Volkssage aus der Schöllenenschlucht, Kanton Uri. Zu den realen Schauplätzen gehören die Teufelsbrücke, der Teufelsstein und die Ortschaft Andermatt.",
-      "fr": "Légende populaire suisse des gorges de Schöllenen, canton d'Uri. Les lieux réels comprennent le Teufelsbrücke, la Pierre du Diable (Teufelsstein) et la ville d'Andermatt."
+      "fr": "Légende populaire suisse des gorges de Schöllenen, canton d'Uri. Les lieux réels comprennent le Teufelsbrücke, la Pierre du Diable (Teufelsstein) et la ville d'Andermatt.",
+      "it": "Leggenda popolare svizzera dalla gola di Schöllenen, cantone di Uri. Luoghi reali sono la Teufelsbrücke, la Pietra del Diavolo (Teufelsstein) e il paese di Andermatt."
     },
     "themes": [
       "cleverness outwits power",
@@ -81,17 +90,20 @@
     "title": {
       "en": "Arnold von Winkelried at Sempach",
       "de": "Arnold von Winkelried bei Sempach",
-      "fr": "Arnold von Winkelried à Sempach"
+      "fr": "Arnold von Winkelried à Sempach",
+      "it": "Arnold von Winkelried a Sempach"
     },
     "description": {
       "en": "In the Battle of Sempach, the Swiss confederates face an impenetrable wall of Austrian lances. Arnold von Winkelried cries 'I will make a path!' and throws himself onto the enemy spears, gathering as many as he can in his arms. His sacrifice breaks open a gap, and the Swiss charge through to victory.",
       "de": "In der Schlacht bei Sempach stehen die Eidgenossen vor einer undurchdringlichen Wand aus österreichischen Lanzen. Arnold von Winkelried ruft «Ich will euch eine Gasse machen!» und wirft sich auf die feindlichen Speere, so viele er mit den Armen umfassen kann. Sein Opfer reisst eine Lücke, durch die die Schweizer zum Sieg stürmen.",
-      "fr": "Lors de la bataille de Sempach, les confédérés suisses font face à un mur impénétrable de lances autrichiennes. Arnold von Winkelried crie «Je vais vous ouvrir un passage!» et se jette sur les lances ennemies, en saisissant autant qu'il peut dans ses bras. Son sacrifice ouvre une brèche et les Suisses s'y engouffrent vers la victoire."
+      "fr": "Lors de la bataille de Sempach, les confédérés suisses font face à un mur impénétrable de lances autrichiennes. Arnold von Winkelried crie «Je vais vous ouvrir un passage!» et se jette sur les lances ennemies, en saisissant autant qu'il peut dans ses bras. Son sacrifice ouvre une brèche et les Suisses s'y engouffrent vers la victoire.",
+      "it": "Nella battaglia di Sempach, i confederati svizzeri si trovano davanti a un muro impenetrabile di lance austriache. Arnold von Winkelried grida «Vi aprirò un varco!» e si getta sulle lance nemiche, raccogliendone tante quante può abbracciare con le braccia. Il suo sacrificio apre una breccia, e gli svizzeri vi si lanciano fino alla vittoria."
     },
     "context": {
       "en": "Battle of Sempach, 9 July 1386. The Austrian Duke Leopold III was killed in the battle. Real locations include the Schlachtkapelle (Battle Chapel) near Sempach, Canton Lucerne. Winkelried's sacrifice became a symbol of Swiss heroism and self-sacrifice.",
       "de": "Schlacht bei Sempach, 9. Juli 1386. Der österreichische Herzog Leopold III. fiel in der Schlacht. Reale Schauplätze sind die Schlachtkapelle bei Sempach, Kanton Luzern. Winkelrieds Opfer wurde zum Symbol für Schweizer Heldenmut und Aufopferung.",
-      "fr": "Bataille de Sempach, 9 juillet 1386. Le duc autrichien Léopold III fut tué dans la bataille. Les lieux réels incluent la Schlachtkapelle (chapelle de la bataille) près de Sempach, canton de Lucerne. Le sacrifice de Winkelried est devenu un symbole de l'héroïsme et du sacrifice suisses."
+      "fr": "Bataille de Sempach, 9 juillet 1386. Le duc autrichien Léopold III fut tué dans la bataille. Les lieux réels incluent la Schlachtkapelle (chapelle de la bataille) près de Sempach, canton de Lucerne. Le sacrifice de Winkelried est devenu un symbole de l'héroïsme et du sacrifice suisses.",
+      "it": "Battaglia di Sempach, 9 luglio 1386. Il duca austriaco Leopoldo III morì nella battaglia. Luoghi reali sono la Schlachtkapelle (cappella della battaglia) vicino a Sempach, cantone di Lucerna. Il sacrificio di Winkelried divenne un simbolo dell'eroismo e dell'abnegazione svizzeri."
     },
     "themes": [
       "sacrifice for the greater good",
@@ -107,17 +119,20 @@
     "title": {
       "en": "Heidi",
       "de": "Heidi",
-      "fr": "Heidi"
+      "fr": "Heidi",
+      "it": "Heidi"
     },
     "description": {
       "en": "An orphan girl is sent to live with her gruff grandfather in the Swiss Alps. She befriends goatherd Peter and discovers the joy of mountain life. Later she helps heal a disabled girl named Klara who visits from Frankfurt.",
       "de": "Ein Waisenmädchen wird zu ihrem mürrischen Grossvater in die Schweizer Alpen geschickt. Sie freundet sich mit dem Geissenpeter an und entdeckt die Freude am Leben in den Bergen. Später hilft sie der gehbehinderten Klara aus Frankfurt, wieder gesund zu werden.",
-      "fr": "Une orpheline est envoyée vivre chez son grand-père bourru dans les Alpes suisses. Elle se lie d'amitié avec Peter, le chevrier, et découvre les joies de la vie en montagne. Plus tard, elle aide Klara, une jeune fille handicapée venue de Francfort, à guérir."
+      "fr": "Une orpheline est envoyée vivre chez son grand-père bourru dans les Alpes suisses. Elle se lie d'amitié avec Peter, le chevrier, et découvre les joies de la vie en montagne. Plus tard, elle aide Klara, une jeune fille handicapée venue de Francfort, à guérir.",
+      "it": "Una bambina orfana viene mandata a vivere con il burbero nonno sulle Alpi svizzere. Fa amicizia con il capraio Peter e scopre la gioia della vita in montagna. Più tardi aiuta a guarire una ragazza disabile di nome Klara, in visita da Francoforte."
     },
     "context": {
       "en": "Based on Johanna Spyri's 1881 novel. Set in the Alpine meadows above Maienfeld (GR), with the Heididorf museum and the Alp above Maienfeld as real locations.",
       "de": "Basierend auf dem Roman von Johanna Spyri aus dem Jahr 1881. Spielt auf den Alpweiden oberhalb von Maienfeld (GR), mit dem Heididorf-Museum und der Alp oberhalb von Maienfeld als reale Schauplätze.",
-      "fr": "Basé sur le roman de Johanna Spyri de 1881. Se déroule dans les alpages au-dessus de Maienfeld (GR), avec le musée Heididorf et l'alpage au-dessus de Maienfeld comme lieux réels."
+      "fr": "Basé sur le roman de Johanna Spyri de 1881. Se déroule dans les alpages au-dessus de Maienfeld (GR), avec le musée Heididorf et l'alpage au-dessus de Maienfeld comme lieux réels.",
+      "it": "Basato sul romanzo di Johanna Spyri del 1881. Ambientato negli alpeggi sopra Maienfeld (GR), con il museo Heididorf e l'alpe sopra Maienfeld come luoghi reali."
     },
     "themes": [
       "nature heals",
@@ -133,17 +148,20 @@
     "title": {
       "en": "The Dragons of Mount Pilatus",
       "de": "Die Drachen vom Pilatus",
-      "fr": "Les Dragons du Mont Pilate"
+      "fr": "Les Dragons du Mont Pilate",
+      "it": "I draghi del Monte Pilatus"
     },
     "description": {
       "en": "Friendly dragons with magical healing powers live in caves on Mount Pilatus. A farmer witnesses a great dragon fly into the mountain and discovers the legendary Dragon Stone, said to have the power to heal the sick.",
       "de": "Freundliche Drachen mit magischen Heilkräften leben in Höhlen am Pilatus. Ein Bauer beobachtet, wie ein grosser Drache in den Berg fliegt, und entdeckt den legendären Drachenstein, dem heilende Kräfte zugeschrieben werden.",
-      "fr": "Des dragons amicaux dotés de pouvoirs magiques de guérison vivent dans les grottes du Mont Pilate. Un fermier voit un grand dragon voler dans la montagne et découvre la légendaire Pierre du Dragon, réputée pour guérir les malades."
+      "fr": "Des dragons amicaux dotés de pouvoirs magiques de guérison vivent dans les grottes du Mont Pilate. Un fermier voit un grand dragon voler dans la montagne et découvre la légendaire Pierre du Dragon, réputée pour guérir les malades.",
+      "it": "Draghi amichevoli con poteri magici di guarigione vivono in caverne sul Monte Pilatus. Un contadino vede un grande drago volare dentro la montagna e scopre la leggendaria Pietra del Drago, a cui si attribuisce il potere di guarire i malati."
     },
     "context": {
       "en": "Swiss folk legend from the Lucerne region. Real locations include Mount Pilatus, Lake Lucerne, and Pilatus Kulm.",
       "de": "Schweizer Volkssage aus der Region Luzern. Zu den realen Schauplätzen gehören der Pilatus, der Vierwaldstättersee und Pilatus Kulm.",
-      "fr": "Légende populaire suisse de la région de Lucerne. Les lieux réels comprennent le Mont Pilate, le lac des Quatre-Cantons et Pilatus Kulm."
+      "fr": "Légende populaire suisse de la région de Lucerne. Les lieux réels comprennent le Mont Pilate, le lac des Quatre-Cantons et Pilatus Kulm.",
+      "it": "Leggenda popolare svizzera della regione di Lucerna. Luoghi reali sono il Monte Pilatus, il lago dei Quattro Cantoni e il Pilatus Kulm."
     },
     "themes": [
       "don't judge by appearances",
@@ -158,17 +176,20 @@
     "title": {
       "en": "St. Gall and the Bear",
       "de": "Sankt Gallus und der Bär",
-      "fr": "Saint Gall et l'Ours"
+      "fr": "Saint Gall et l'Ours",
+      "it": "San Gallo e l'orso"
     },
     "description": {
       "en": "Irish monk Gallus travels to the Swiss wilderness. He encounters a large bear but instead of fighting, shares his bread. The grateful bear helps carry logs and build a shelter. The town of St. Gallen grew around the monastery built on that spot.",
       "de": "Der irische Mönch Gallus reist in die Schweizer Wildnis. Er begegnet einem grossen Bären, doch anstatt zu kämpfen, teilt er sein Brot mit ihm. Der dankbare Bär hilft beim Tragen von Holzstämmen und beim Bau einer Unterkunft. Die Stadt St. Gallen entstand rund um das an dieser Stelle errichtete Kloster.",
-      "fr": "Le moine irlandais Gallus voyage dans la nature sauvage suisse. Il rencontre un grand ours mais au lieu de se battre, il partage son pain. L'ours reconnaissant l'aide à porter des bûches et à construire un abri. La ville de Saint-Gall s'est développée autour du monastère construit à cet endroit."
+      "fr": "Le moine irlandais Gallus voyage dans la nature sauvage suisse. Il rencontre un grand ours mais au lieu de se battre, il partage son pain. L'ours reconnaissant l'aide à porter des bûches et à construire un abri. La ville de Saint-Gall s'est développée autour du monastère construit à cet endroit.",
+      "it": "Il monaco irlandese Gallo viaggia nella natura selvaggia svizzera. Incontra un grande orso, ma invece di combattere, divide con lui il proprio pane. L'orso riconoscente lo aiuta a trasportare tronchi e a costruire un riparo. La città di San Gallo crebbe attorno al monastero eretto in quel luogo."
     },
     "context": {
       "en": "Swiss legend from the 7th century, Canton St. Gallen. Real locations include the Abbey of St. Gall (UNESCO World Heritage) and the St. Gallen old town.",
       "de": "Schweizer Legende aus dem 7. Jahrhundert, Kanton St. Gallen. Zu den realen Schauplätzen gehören die Stiftsbibliothek St. Gallen (UNESCO-Weltkulturerbe) und die Altstadt von St. Gallen.",
-      "fr": "Légende suisse du 7e siècle, canton de Saint-Gall. Les lieux réels comprennent l'Abbaye de Saint-Gall (patrimoine mondial de l'UNESCO) et la vieille ville de Saint-Gall."
+      "fr": "Légende suisse du 7e siècle, canton de Saint-Gall. Les lieux réels comprennent l'Abbaye de Saint-Gall (patrimoine mondial de l'UNESCO) et la vieille ville de Saint-Gall.",
+      "it": "Leggenda svizzera del VII secolo, cantone di San Gallo. Luoghi reali sono l'Abbazia di San Gallo (patrimonio mondiale dell'UNESCO) e il centro storico di San Gallo."
     },
     "themes": [
       "kindness tames wild creatures",
@@ -183,17 +204,20 @@
     "title": {
       "en": "Vogel Gryff of Basel",
       "de": "Der Vogel Gryff von Basel",
-      "fr": "Le Vogel Gryff de Bâle"
+      "fr": "Le Vogel Gryff de Bâle",
+      "it": "Il Vogel Gryff di Basilea"
     },
     "description": {
       "en": "Three magical creatures — the Vogel Gryff (griffin), the Wild Man, and the Lion — represent the guilds of Basel. Once a year they dance on the bridge over the Rhine, celebrating the spirit of the city.",
       "de": "Drei magische Wesen — der Vogel Gryff (Greif), der Wild Maa (Wilde Mann) und der Leu (Löwe) — vertreten die Zünfte von Basel. Einmal im Jahr tanzen sie auf der Brücke über den Rhein und feiern den Geist der Stadt.",
-      "fr": "Trois créatures magiques — le Vogel Gryff (griffon), l'Homme Sauvage et le Lion — représentent les corporations de Bâle. Une fois par an, ils dansent sur le pont au-dessus du Rhin, célébrant l'esprit de la ville."
+      "fr": "Trois créatures magiques — le Vogel Gryff (griffon), l'Homme Sauvage et le Lion — représentent les corporations de Bâle. Une fois par an, ils dansent sur le pont au-dessus du Rhin, célébrant l'esprit de la ville.",
+      "it": "Tre creature magiche — il Vogel Gryff (grifone), l'Uomo Selvatico e il Leone — rappresentano le corporazioni di Basilea. Una volta all'anno danzano sul ponte sopra il Reno, celebrando lo spirito della città."
     },
     "context": {
       "en": "Basel folk tradition, centuries old, still celebrated annually in January. Real locations include the Mittlere Brücke (Middle Bridge), Kleinbasel, and the Rhine.",
       "de": "Basler Volkstradition, jahrhundertealt, wird jedes Jahr im Januar noch gefeiert. Zu den realen Schauplätzen gehören die Mittlere Brücke, Kleinbasel und der Rhein.",
-      "fr": "Tradition populaire bâloise, vieille de plusieurs siècles, encore célébrée chaque année en janvier. Les lieux réels comprennent le Mittlere Brücke (Pont du Milieu), le Petit-Bâle et le Rhin."
+      "fr": "Tradition populaire bâloise, vieille de plusieurs siècles, encore célébrée chaque année en janvier. Les lieux réels comprennent le Mittlere Brücke (Pont du Milieu), le Petit-Bâle et le Rhin.",
+      "it": "Tradizione popolare di Basilea, vecchia di secoli, ancora celebrata ogni anno in gennaio. Luoghi reali sono la Mittlere Brücke (ponte di mezzo), Kleinbasel e il Reno."
     },
     "themes": [
       "community celebration",
@@ -208,17 +232,20 @@
     "title": {
       "en": "The White Chamois",
       "de": "Die weisse Gämse",
-      "fr": "Le Chamois Blanc"
+      "fr": "Le Chamois Blanc",
+      "it": "Il camoscio bianco"
     },
     "description": {
       "en": "A legendary white chamois lives on the highest peaks. Hunters who chase it selfishly are led to danger, but those with pure hearts are guided to safety by the magical creature.",
       "de": "Eine legendäre weisse Gämse lebt auf den höchsten Gipfeln. Jäger, die sie aus Gier verfolgen, werden in Gefahr geführt, doch Menschen mit reinem Herzen werden von dem magischen Tier in Sicherheit geleitet.",
-      "fr": "Un chamois blanc légendaire vit sur les plus hauts sommets. Les chasseurs qui le poursuivent par cupidité sont menés vers le danger, mais ceux au cœur pur sont guidés vers la sécurité par la créature magique."
+      "fr": "Un chamois blanc légendaire vit sur les plus hauts sommets. Les chasseurs qui le poursuivent par cupidité sont menés vers le danger, mais ceux au cœur pur sont guidés vers la sécurité par la créature magique.",
+      "it": "Un leggendario camoscio bianco vive sulle cime più alte. I cacciatori che lo inseguono per avidità vengono condotti verso il pericolo, mentre chi ha il cuore puro viene guidato in salvo dalla creatura magica."
     },
     "context": {
       "en": "Swiss Alpine folk legend. Set in various Swiss Alpine peaks, including the Bernese Oberland and Valais regions.",
       "de": "Schweizer Alpen-Volkssage. Spielt auf verschiedenen Schweizer Alpengipfeln, unter anderem im Berner Oberland und im Wallis.",
-      "fr": "Légende populaire des Alpes suisses. Se déroule sur divers sommets alpins suisses, notamment dans l'Oberland bernois et le Valais."
+      "fr": "Légende populaire des Alpes suisses. Se déroule sur divers sommets alpins suisses, notamment dans l'Oberland bernois et le Valais.",
+      "it": "Leggenda popolare alpina svizzera. Ambientata su varie cime delle Alpi svizzere, tra cui l'Oberland bernese e il Vallese."
     },
     "themes": [
       "respect nature",
@@ -234,17 +261,20 @@
     "title": {
       "en": "Frost Giants and Sunbeam Fairies",
       "de": "Die Frostriesen und die Sonnenelfen",
-      "fr": "Les Géants de Givre et les Fées du Soleil"
+      "fr": "Les Géants de Givre et les Fées du Soleil",
+      "it": "I giganti di ghiaccio e le fate del sole"
     },
     "description": {
       "en": "Switzerland was a frozen wasteland ruled by cruel Frost Giants. The Fairy Queen and the Sun send an army of Sunbeam Fairies to battle the giants, melting the ice and transforming the land into a green paradise with flowers and meadows.",
       "de": "Die Schweiz war eine gefrorene Einöde, beherrscht von grausamen Frostriesen. Die Feenkönigin und die Sonne senden eine Armee von Sonnenelfen, um gegen die Riesen zu kämpfen, das Eis zu schmelzen und das Land in ein grünes Paradies mit Blumen und Wiesen zu verwandeln.",
-      "fr": "La Suisse était un désert gelé gouverné par de cruels Géants de Givre. La Reine des Fées et le Soleil envoient une armée de Fées du Soleil combattre les géants, faisant fondre la glace et transformant le pays en un paradis verdoyant de fleurs et de prairies."
+      "fr": "La Suisse était un désert gelé gouverné par de cruels Géants de Givre. La Reine des Fées et le Soleil envoient une armée de Fées du Soleil combattre les géants, faisant fondre la glace et transformant le pays en un paradis verdoyant de fleurs et de prairies.",
+      "it": "La Svizzera era una landa ghiacciata governata da crudeli giganti di ghiaccio. La Regina delle Fate e il Sole inviano un esercito di fate del sole a combattere i giganti, sciogliendo il ghiaccio e trasformando la terra in un paradiso verde di fiori e prati."
     },
     "context": {
       "en": "From the William Elliot Griffis collection (1920). Set in frozen Swiss mountains, with glaciers turning into meadows and Alpine flower fields.",
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in den gefrorenen Schweizer Bergen, wo Gletscher sich in Wiesen und alpine Blumenfelder verwandeln.",
-      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les montagnes suisses gelées, où les glaciers se transforment en prairies et champs de fleurs alpines."
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les montagnes suisses gelées, où les glaciers se transforment en prairies et champs de fleurs alpines.",
+      "it": "Dalla raccolta di William Elliot Griffis (1920). Ambientata sulle montagne svizzere ghiacciate, con ghiacciai che si trasformano in prati e campi di fiori alpini."
     },
     "themes": [
       "light triumphs over cold",
@@ -259,17 +289,20 @@
     "title": {
       "en": "The Fairy in the Cuckoo Clock",
       "de": "Die Fee in der Kuckucksuhr",
-      "fr": "La Fée dans le Coucou"
+      "fr": "La Fée dans le Coucou",
+      "it": "La fata nell'orologio a cucù"
     },
     "description": {
       "en": "A mischievous fairy discovers Swiss woodworkers' clever clock mechanisms. She enchants a wooden bird to pop out and call \"cuckoo\" at every hour, delighting the villagers. This is how the first cuckoo clock was born.",
       "de": "Eine schelmische Fee entdeckt die raffinierten Uhrmechanismen der Schweizer Holzschnitzer. Sie verzaubert einen Holzvogel, sodass er jede Stunde herausspringt und «Kuckuck» ruft, zur Freude der Dorfbewohner. So entstand die erste Kuckucksuhr.",
-      "fr": "Une fée espiègle découvre les ingénieux mécanismes d'horlogerie des artisans suisses. Elle enchante un oiseau en bois pour qu'il sorte et crie « coucou » à chaque heure, ravissant les villageois. C'est ainsi que naquit le premier coucou."
+      "fr": "Une fée espiègle découvre les ingénieux mécanismes d'horlogerie des artisans suisses. Elle enchante un oiseau en bois pour qu'il sorte et crie « coucou » à chaque heure, ravissant les villageois. C'est ainsi que naquit le premier coucou.",
+      "it": "Una fata dispettosa scopre gli ingegnosi meccanismi orologiai degli intagliatori svizzeri. Incanta un uccello di legno affinché salti fuori e chiami «cucù» ad ogni ora, con grande gioia degli abitanti del villaggio. Così nacque il primo orologio a cucù."
     },
     "context": {
       "en": "From the William Elliot Griffis collection (1920). Set in a Swiss woodworker's workshop in a mountain village.",
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in der Werkstatt eines Schweizer Holzschnitzers in einem Bergdorf.",
-      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans l'atelier d'un artisan du bois suisse dans un village de montagne."
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans l'atelier d'un artisan du bois suisse dans un village de montagne.",
+      "it": "Dalla raccolta di William Elliot Griffis (1920). Ambientata nella bottega di un intagliatore svizzero in un villaggio di montagna."
     },
     "themes": [
       "magic and craftsmanship create wonder"
@@ -283,17 +316,20 @@
     "title": {
       "en": "The Fairy of the Edelweiss",
       "de": "Die Edelweissfee",
-      "fr": "La Fée de l'Edelweiss"
+      "fr": "La Fée de l'Edelweiss",
+      "it": "La fata della stella alpina"
     },
     "description": {
       "en": "A brave fairy is transformed by the Fairy Queen into the first Edelweiss flower to stand guard against the Frost King on the highest mountain peaks. The small fuzzy white flower grows where almost nothing else can, symbolizing courage and love.",
       "de": "Eine mutige Fee wird von der Feenkönigin in die erste Edelweissblume verwandelt, um auf den höchsten Berggipfeln gegen den Frostkönig Wache zu halten. Die kleine, weiss-pelzige Blume wächst dort, wo fast nichts anderes gedeihen kann — ein Symbol für Mut und Liebe.",
-      "fr": "Une fée courageuse est transformée par la Reine des Fées en la première fleur d'edelweiss pour monter la garde contre le Roi du Givre sur les plus hauts sommets. La petite fleur blanche et duveteuse pousse là où presque rien d'autre ne peut survivre, symbolisant le courage et l'amour."
+      "fr": "Une fée courageuse est transformée par la Reine des Fées en la première fleur d'edelweiss pour monter la garde contre le Roi du Givre sur les plus hauts sommets. La petite fleur blanche et duveteuse pousse là où presque rien d'autre ne peut survivre, symbolisant le courage et l'amour.",
+      "it": "Una fata coraggiosa viene trasformata dalla Regina delle Fate nel primo fiore di stella alpina, per fare la guardia contro il Re del Gelo sulle cime più alte. Il piccolo fiore bianco e peloso cresce dove quasi nient'altro può sopravvivere, simbolo di coraggio e amore."
     },
     "context": {
       "en": "From the William Elliot Griffis collection (1920). Set on high Alpine peaks, rocky mountain ledges, and snow-covered cliffs.",
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf hohen Alpengipfeln, felsigen Bergsimsen und schneebedeckten Klippen.",
-      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule sur les hauts sommets alpins, les corniches rocheuses et les falaises enneigées."
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule sur les hauts sommets alpins, les corniches rocheuses et les falaises enneigées.",
+      "it": "Dalla raccolta di William Elliot Griffis (1920). Ambientata su alte cime alpine, cornici rocciose e dirupi innevati."
     },
     "themes": [
       "bravery means standing firm in hard places",
@@ -308,17 +344,20 @@
     "title": {
       "en": "The Wonderful Alpine Horn",
       "de": "Das wunderbare Alphorn",
-      "fr": "Le Merveilleux Cor des Alpes"
+      "fr": "Le Merveilleux Cor des Alpes",
+      "it": "Il meraviglioso corno delle Alpi"
     },
     "description": {
       "en": "A young shepherd boy named Perrod receives a magical Alpine horn from mysterious mountain visitors. When he plays it, the sound echoes through the valleys, bringing joy to everyone and calling the cows safely home.",
       "de": "Ein junger Hirtenbub namens Perrod erhält ein magisches Alphorn von geheimnisvollen Bergbesuchern. Wenn er darauf spielt, hallt der Klang durch die Täler, bringt allen Freude und ruft die Kühe sicher nach Hause.",
-      "fr": "Un jeune berger nommé Perrod reçoit un cor des Alpes magique de mystérieux visiteurs de la montagne. Quand il en joue, le son résonne dans les vallées, apportant la joie à tous et ramenant les vaches saines et sauves."
+      "fr": "Un jeune berger nommé Perrod reçoit un cor des Alpes magique de mystérieux visiteurs de la montagne. Quand il en joue, le son résonne dans les vallées, apportant la joie à tous et ramenant les vaches saines et sauves.",
+      "it": "Un giovane pastorello di nome Perrod riceve un corno delle Alpi magico da misteriosi visitatori della montagna. Quando lo suona, il suono riecheggia per le valli, portando gioia a tutti e richiamando le mucche a casa sane e salve."
     },
     "context": {
       "en": "From the William Elliot Griffis collection (1920). Set in Alpine pastures, mountain valleys, and a Swiss village.",
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf Alpweiden, in Bergtälern und in einem Schweizer Dorf.",
-      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les alpages, les vallées montagneuses et un village suisse."
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les alpages, les vallées montagneuses et un village suisse.",
+      "it": "Dalla raccolta di William Elliot Griffis (1920). Ambientata su alpeggi, in valli di montagna e in un villaggio svizzero."
     },
     "themes": [
       "music brings people together",
@@ -333,17 +372,20 @@
     "title": {
       "en": "The Dwarf and His Confectionery",
       "de": "Der Zwerg und sein Süsswarenladen",
-      "fr": "Le Nain et sa Confiserie"
+      "fr": "Le Nain et sa Confiserie",
+      "it": "Il nano e la sua pasticceria"
     },
     "description": {
       "en": "A dairy farmer discovers that the Dwarf King has a secret underground workshop making wonderful candy and chocolate. The farmer tries to steal the recipe but is caught and learns about honesty and respect.",
       "de": "Ein Milchbauer entdeckt, dass der Zwergenkönig eine geheime unterirdische Werkstatt hat, in der wunderbare Süssigkeiten und Schokolade hergestellt werden. Der Bauer versucht das Rezept zu stehlen, wird aber erwischt und lernt etwas über Ehrlichkeit und Respekt.",
-      "fr": "Un fermier laitier découvre que le Roi des Nains possède un atelier souterrain secret fabriquant de merveilleux bonbons et chocolats. Le fermier tente de voler la recette mais est pris et apprend l'honnêteté et le respect."
+      "fr": "Un fermier laitier découvre que le Roi des Nains possède un atelier souterrain secret fabriquant de merveilleux bonbons et chocolats. Le fermier tente de voler la recette mais est pris et apprend l'honnêteté et le respect.",
+      "it": "Un allevatore scopre che il Re dei Nani ha un'officina segreta sotterranea dove produce meravigliosi dolciumi e cioccolato. Il contadino tenta di rubare la ricetta ma viene sorpreso e impara una lezione di onestà e rispetto."
     },
     "context": {
       "en": "From the William Elliot Griffis collection (1920). Set in Swiss mountain pastures and a hidden underground confectionery cavern. Connects to Switzerland's chocolate tradition.",
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf Schweizer Bergweiden und in einer verborgenen unterirdischen Süsswarenhöhle. Verbunden mit der Schweizer Schokoladentradition.",
-      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les pâturages de montagne suisses et une caverne souterraine cachée de confiserie. Lié à la tradition chocolatière suisse."
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les pâturages de montagne suisses et une caverne souterraine cachée de confiserie. Lié à la tradition chocolatière suisse.",
+      "it": "Dalla raccolta di William Elliot Griffis (1920). Ambientata su pascoli di montagna svizzeri e in una caverna sotterranea nascosta dedicata alla pasticceria. Legata alla tradizione cioccolatiera svizzera."
     },
     "themes": [
       "respect others' work",
@@ -358,17 +400,20 @@
     "title": {
       "en": "The Palace Under the Waves",
       "de": "Der Palast unter den Wellen",
-      "fr": "Le Palais sous les Vagues"
+      "fr": "Le Palais sous les Vagues",
+      "it": "Il palazzo sotto le onde"
     },
     "description": {
       "en": "The king of the water spirits invites a human princess into his crystal palace beneath a Swiss lake. She discovers an enchanted world of shimmering halls and water gardens, and must choose between the magical underwater world and her life above.",
       "de": "Der König der Wassergeister lädt eine menschliche Prinzessin in seinen Kristallpalast unter einem Schweizer See ein. Sie entdeckt eine verzauberte Welt aus schimmernden Hallen und Wassergärten und muss sich zwischen der magischen Unterwasserwelt und ihrem Leben an der Oberfläche entscheiden.",
-      "fr": "Le roi des esprits de l'eau invite une princesse humaine dans son palais de cristal sous un lac suisse. Elle découvre un monde enchanté de salles scintillantes et de jardins aquatiques, et doit choisir entre le monde magique sous-marin et sa vie à la surface."
+      "fr": "Le roi des esprits de l'eau invite une princesse humaine dans son palais de cristal sous un lac suisse. Elle découvre un monde enchanté de salles scintillantes et de jardins aquatiques, et doit choisir entre le monde magique sous-marin et sa vie à la surface.",
+      "it": "Il re degli spiriti dell'acqua invita una principessa umana nel suo palazzo di cristallo sotto un lago svizzero. Lei scopre un mondo incantato fatto di sale scintillanti e giardini acquatici, e deve scegliere tra il magico mondo sottomarino e la sua vita in superficie."
     },
     "context": {
       "en": "From the William Elliot Griffis collection (1920). Set at a Swiss lake shore, with a crystal palace underwater and water gardens.",
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt am Ufer eines Schweizer Sees, mit einem Kristallpalast unter Wasser und Wassergärten.",
-      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule au bord d'un lac suisse, avec un palais de cristal sous l'eau et des jardins aquatiques."
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule au bord d'un lac suisse, avec un palais de cristal sous l'eau et des jardins aquatiques.",
+      "it": "Dalla raccolta di William Elliot Griffis (1920). Ambientata sulla riva di un lago svizzero, con un palazzo di cristallo sott'acqua e giardini acquatici."
     },
     "themes": [
       "every world has its own beauty",
@@ -383,17 +428,20 @@
     "title": {
       "en": "Two Good-Natured Dragons",
       "de": "Zwei gutmütige Drachen",
-      "fr": "Deux Dragons Bienveillants"
+      "fr": "Deux Dragons Bienveillants",
+      "it": "Due draghi di buon cuore"
     },
     "description": {
       "en": "A man lost in a mountain storm stumbles into a cave and discovers two friendly dragons. Instead of being frightening, they keep him warm through the winter and share their food.",
       "de": "Ein Mann, der sich in einem Bergsturm verirrt hat, stolpert in eine Höhle und entdeckt zwei freundliche Drachen. Anstatt furchteinflössend zu sein, halten sie ihn den ganzen Winter über warm und teilen ihr Essen mit ihm.",
-      "fr": "Un homme perdu dans une tempête de montagne trébuche dans une grotte et découvre deux dragons amicaux. Au lieu d'être effrayants, ils le gardent au chaud tout l'hiver et partagent leur nourriture."
+      "fr": "Un homme perdu dans une tempête de montagne trébuche dans une grotte et découvre deux dragons amicaux. Au lieu d'être effrayants, ils le gardent au chaud tout l'hiver et partagent leur nourriture.",
+      "it": "Un uomo, smarritosi in una tormenta di montagna, inciampa in una caverna e scopre due draghi amichevoli. Invece di spaventarlo, lo tengono al caldo per tutto l'inverno e dividono con lui il cibo."
     },
     "context": {
       "en": "From the William Elliot Griffis collection (1920). Set in a Swiss mountain cave during a stormy Alpine landscape.",
       "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in einer Schweizer Berghöhle während eines stürmischen Alpenwetters.",
-      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans une grotte de montagne suisse lors d'une tempête alpine."
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans une grotte de montagne suisse lors d'une tempête alpine.",
+      "it": "Dalla raccolta di William Elliot Griffis (1920). Ambientata in una caverna di montagna svizzera durante un tempestoso paesaggio alpino."
     },
     "themes": [
       "don't judge by appearances",
@@ -408,17 +456,20 @@
     "title": {
       "en": "Gargantua of the Matterhorn",
       "de": "Gargantua vom Matterhorn",
-      "fr": "Gargantua du Cervin"
+      "fr": "Gargantua du Cervin",
+      "it": "Gargantua del Cervino"
     },
     "description": {
       "en": "A legendary giant named Gargantua shaped the Swiss landscape as he walked. His footprints became lakes, and when he lay down to rest, his body became the Matterhorn.",
       "de": "Ein legendärer Riese namens Gargantua formte die Schweizer Landschaft, während er umherwanderte. Seine Fussstapfen wurden zu Seen, und als er sich zur Ruhe legte, wurde sein Körper zum Matterhorn.",
-      "fr": "Un géant légendaire nommé Gargantua a façonné le paysage suisse en marchant. Ses empreintes de pas sont devenues des lacs, et lorsqu'il s'est couché pour se reposer, son corps est devenu le Cervin."
+      "fr": "Un géant légendaire nommé Gargantua a façonné le paysage suisse en marchant. Ses empreintes de pas sont devenues des lacs, et lorsqu'il s'est couché pour se reposer, son corps est devenu le Cervin.",
+      "it": "Un gigante leggendario di nome Gargantua plasmò il paesaggio svizzero mentre camminava. Le sue impronte divennero laghi, e quando si sdraiò per riposare, il suo corpo divenne il Cervino."
     },
     "context": {
       "en": "Swiss Alpine legend. Set around the Matterhorn, Swiss valleys and lakes.",
       "de": "Schweizer Alpensage. Spielt rund um das Matterhorn, Schweizer Täler und Seen.",
-      "fr": "Légende alpine suisse. Se déroule autour du Cervin, des vallées et des lacs suisses."
+      "fr": "Légende alpine suisse. Se déroule autour du Cervin, des vallées et des lacs suisses.",
+      "it": "Leggenda alpina svizzera. Ambientata attorno al Cervino, tra valli e laghi svizzeri."
     },
     "themes": [
       "even the mightiest things have a story behind them"
@@ -432,17 +483,20 @@
     "title": {
       "en": "St. Beatus and the Dragon",
       "de": "Sankt Beatus und der Drache",
-      "fr": "Saint Béat et le Dragon"
+      "fr": "Saint Béat et le Dragon",
+      "it": "San Beato e il drago"
     },
     "description": {
       "en": "The holy hermit Beatus climbs to a dragon's cave above Lake Thun. Armed only with a crucifix and his faith, he drives the fearsome beast into the lake. He makes the cave his home, living there as a hermit and preaching to the local people for many years.",
       "de": "Der heilige Eremit Beatus steigt zur Drachenhöhle über dem Thunersee hinauf. Bewaffnet nur mit einem Kruzifix und seinem Glauben, vertreibt er das furchtbare Tier in den See. Er macht die Höhle zu seinem Zuhause und lebt dort als Einsiedler, wo er viele Jahre lang den Einheimischen predigt.",
-      "fr": "L'ermite saint Béat monte jusqu'à la grotte d'un dragon au-dessus du lac de Thoune. Armé seulement d'un crucifix et de sa foi, il chasse la bête redoutable dans le lac. Il fait de la grotte sa demeure, y vivant en ermite et prêchant aux habitants pendant de longues années."
+      "fr": "L'ermite saint Béat monte jusqu'à la grotte d'un dragon au-dessus du lac de Thoune. Armé seulement d'un crucifix et de sa foi, il chasse la bête redoutable dans le lac. Il fait de la grotte sa demeure, y vivant en ermite et prêchant aux habitants pendant de longues années.",
+      "it": "Il santo eremita Beato sale fino alla caverna di un drago sopra il lago di Thun. Armato solo di un crocifisso e della sua fede, scaccia la belva spaventosa nel lago. Fa della caverna la sua dimora, vivendovi da eremita e predicando alla gente del luogo per molti anni."
     },
     "context": {
       "en": "Ancient legend from the Bernese Oberland. Real locations include the Beatushöhlen (St. Beatus Caves) near Beatenberg with spectacular stalactites and underground waterfalls, and Lake Thun.",
       "de": "Uralte Sage aus dem Berner Oberland. Zu den realen Schauplätzen gehören die Beatushöhlen bei Beatenberg mit spektakulären Stalaktiten und unterirdischen Wasserfällen sowie der Thunersee.",
-      "fr": "Légende ancienne de l'Oberland bernois. Les lieux réels comprennent les grottes de Saint-Béat près de Beatenberg avec des stalactites spectaculaires et des cascades souterraines, et le lac de Thoune."
+      "fr": "Légende ancienne de l'Oberland bernois. Les lieux réels comprennent les grottes de Saint-Béat près de Beatenberg avec des stalactites spectaculaires et des cascades souterraines, et le lac de Thoune.",
+      "it": "Antica leggenda dell'Oberland bernese. Luoghi reali sono le grotte di San Beato (Beatushöhlen) vicino a Beatenberg, con spettacolari stalattiti e cascate sotterranee, e il lago di Thun."
     },
     "themes": [
       "faith overcomes fear",
@@ -458,17 +512,20 @@
     "title": {
       "en": "The Ghost of Pontius Pilate",
       "de": "Der Geist des Pontius Pilatus",
-      "fr": "Le Fantôme de Ponce Pilate"
+      "fr": "Le Fantôme de Ponce Pilate",
+      "it": "Il fantasma di Ponzio Pilato"
     },
     "description": {
       "en": "The restless ghost of Pontius Pilate haunts a dark lake on Mount Pilatus. Every Good Friday he rises, washing his hands endlessly. Disturbing the lake brings terrible storms. For centuries, Lucerne forbade anyone from climbing the mountain — until brave scholars finally broke the spell.",
       "de": "Der ruhelose Geist des Pontius Pilatus spukt an einem dunklen Bergsee auf dem Pilatus. Jeden Karfreitag erhebt er sich und wäscht sich endlos die Hände. Wer den See stört, bringt schreckliche Stürme. Jahrhundertelang verbot Luzern das Besteigen des Berges — bis mutige Gelehrte den Bann endlich brachen.",
-      "fr": "Le fantôme agité de Ponce Pilate hante un lac sombre sur le Mont Pilate. Chaque Vendredi Saint, il se lève et se lave les mains sans fin. Déranger le lac provoque de terribles tempêtes. Pendant des siècles, Lucerne a interdit l'ascension de la montagne — jusqu'à ce que de courageux savants brisent enfin le sortilège."
+      "fr": "Le fantôme agité de Ponce Pilate hante un lac sombre sur le Mont Pilate. Chaque Vendredi Saint, il se lève et se lave les mains sans fin. Déranger le lac provoque de terribles tempêtes. Pendant des siècles, Lucerne a interdit l'ascension de la montagne — jusqu'à ce que de courageux savants brisent enfin le sortilège.",
+      "it": "L'inquieto fantasma di Ponzio Pilato infesta un lago scuro sul Monte Pilatus. Ogni Venerdì Santo si risveglia, lavandosi le mani senza fine. Disturbare il lago porta terribili tempeste. Per secoli, Lucerna proibì a chiunque di salire sulla montagna — finché coraggiosi studiosi non ruppero finalmente l'incantesimo."
     },
     "context": {
       "en": "Medieval legend from the Lucerne region. Mount Pilatus may take its name from this legend (or from Latin 'pileatus' meaning cloud-capped). The ban on climbing was real and lasted centuries until 1585.",
       "de": "Mittelalterliche Sage aus der Region Luzern. Der Name Pilatus stammt möglicherweise von dieser Sage (oder vom lateinischen «pileatus», wolkenverhüllt). Das Besteigungsverbot war real und dauerte Jahrhunderte bis 1585.",
-      "fr": "Légende médiévale de la région de Lucerne. Le Mont Pilate tire peut-être son nom de cette légende (ou du latin «pileatus», coiffé de nuages). L'interdiction d'ascension était réelle et a duré des siècles jusqu'en 1585."
+      "fr": "Légende médiévale de la région de Lucerne. Le Mont Pilate tire peut-être son nom de cette légende (ou du latin «pileatus», coiffé de nuages). L'interdiction d'ascension était réelle et a duré des siècles jusqu'en 1585.",
+      "it": "Leggenda medievale della regione di Lucerna. Il Monte Pilatus potrebbe trarre il nome da questa leggenda (oppure dal latino «pileatus», coperto di nuvole). Il divieto di salita fu reale e durò secoli, fino al 1585."
     },
     "themes": [
       "guilt seeks forgiveness",
@@ -484,17 +541,20 @@
     "title": {
       "en": "The Legend of the Blüemlisalp",
       "de": "Die Sage von der Blüemlisalp",
-      "fr": "La Légende de la Blüemlisalp"
+      "fr": "La Légende de la Blüemlisalp",
+      "it": "La leggenda della Blüemlisalp"
     },
     "description": {
       "en": "A wealthy Alpine dairyman wastes nature's gifts to impress his vain mistress — paving paths with cheese and bathing her in milk. When he turns away a starving beggar woman, she curses the pasture. That night, glaciers bury the once-lush meadow forever. On clear nights, the ghostly bells of buried cattle still ring.",
       "de": "Ein reicher Senn verschwendet die Gaben der Natur, um seine eitle Geliebte zu beeindrucken — er pflastert Wege mit Käse und badet sie in Milch. Als er eine hungrige Bettlerin abweist, verflucht sie die Alp. In jener Nacht begraben Gletscher die einst üppige Weide für immer. In klaren Nächten klingen noch die Geisterglocken der verschütteten Kühe.",
-      "fr": "Un riche vacher gaspille les dons de la nature pour impressionner sa maîtresse vaniteuse — pavant les chemins de fromage et la baignant dans le lait. Quand il refuse d'aider une mendiante affamée, elle maudit l'alpage. Cette nuit-là, les glaciers ensevelissent le pâturage autrefois luxuriant pour toujours. Les nuits claires, les cloches fantomatiques du bétail enseveli résonnent encore."
+      "fr": "Un riche vacher gaspille les dons de la nature pour impressionner sa maîtresse vaniteuse — pavant les chemins de fromage et la baignant dans le lait. Quand il refuse d'aider une mendiante affamée, elle maudit l'alpage. Cette nuit-là, les glaciers ensevelissent le pâturage autrefois luxuriant pour toujours. Les nuits claires, les cloches fantomatiques du bétail enseveli résonnent encore.",
+      "it": "Un ricco casaro alpino spreca i doni della natura per impressionare la sua vanitosa amante — lastricando i sentieri di formaggio e facendola fare il bagno nel latte. Quando respinge una mendicante affamata, lei maledice il pascolo. Quella notte, i ghiacciai seppelliscono per sempre il prato un tempo rigoglioso. Nelle notti serene, si sentono ancora suonare i campanacci fantasma del bestiame sepolto."
     },
     "context": {
       "en": "Legend from the Bernese Oberland. The Blüemlisalp massif (3,661m) between Lake Thun and Kandersteg is a real glacier-covered mountain group. The nearby Oeschinensee is a UNESCO World Heritage site.",
       "de": "Sage aus dem Berner Oberland. Das Blüemlisalp-Massiv (3661 m) zwischen Thunersee und Kandersteg ist eine reale, gletscherbedeckte Berggruppe. Der nahe Oeschinensee gehört zum UNESCO-Welterbe.",
-      "fr": "Légende de l'Oberland bernois. Le massif de la Blüemlisalp (3661 m) entre le lac de Thoune et Kandersteg est un vrai massif couvert de glaciers. Le lac d'Oeschinen tout proche est un site du patrimoine mondial de l'UNESCO."
+      "fr": "Légende de l'Oberland bernois. Le massif de la Blüemlisalp (3661 m) entre le lac de Thoune et Kandersteg est un vrai massif couvert de glaciers. Le lac d'Oeschinen tout proche est un site du patrimoine mondial de l'UNESCO.",
+      "it": "Leggenda dell'Oberland bernese. Il massiccio della Blüemlisalp (3661 m) tra il lago di Thun e Kandersteg è un gruppo montuoso reale coperto di ghiacciai. Il vicino lago di Oeschinen è un sito patrimonio mondiale dell'UNESCO."
     },
     "themes": [
       "respect nature's gifts",
@@ -510,17 +570,20 @@
     "title": {
       "en": "The Venetianer — Secret Treasure Hunters",
       "de": "Die Venetianer — Geheimnisvolle Schatzsucher",
-      "fr": "Les Vénitiens — Chasseurs de Trésors Secrets"
+      "fr": "Les Vénitiens — Chasseurs de Trésors Secrets",
+      "it": "I Veneziani — misteriosi cacciatori di tesori"
     },
     "description": {
       "en": "Mysterious Italians called the Venetianer appear in remote Alpine villages carrying ancient maps and strange instruments. They know secret paths to hidden gold and crystal caves. They mine by night, vanish by dawn, and the Mountain Spirit punishes those who grow too greedy.",
       "de": "Geheimnisvolle Italiener, Venetianer genannt, tauchen in abgelegenen Bergdörfern auf, mit alten Karten und seltsamen Instrumenten. Sie kennen geheime Pfade zu verstecktem Gold und Kristallhöhlen. Sie schürfen bei Nacht, verschwinden bei Morgengrauen, und der Berggeist bestraft die Gierigen.",
-      "fr": "De mystérieux Italiens appelés Vénitiens apparaissent dans des villages alpins reculés, portant d'anciennes cartes et d'étranges instruments. Ils connaissent des chemins secrets vers l'or caché et les grottes de cristaux. Ils exploitent la nuit, disparaissent à l'aube, et l'Esprit de la Montagne punit ceux qui deviennent trop avides."
+      "fr": "De mystérieux Italiens appelés Vénitiens apparaissent dans des villages alpins reculés, portant d'anciennes cartes et d'étranges instruments. Ils connaissent des chemins secrets vers l'or caché et les grottes de cristaux. Ils exploitent la nuit, disparaissent à l'aube, et l'Esprit de la Montagne punit ceux qui deviennent trop avides.",
+      "it": "Misteriosi italiani chiamati Veneziani compaiono in remoti villaggi alpini portando antiche mappe e strani strumenti. Conoscono sentieri segreti verso oro nascosto e caverne di cristallo. Scavano di notte, svaniscono all'alba, e lo Spirito della Montagna punisce chi diventa troppo avido."
     },
     "context": {
       "en": "Widespread legend cycle found across the Swiss Alps, especially in Graubünden, Valais, and Uri. May have a historical basis — Italian mining experts did travel to the Alps during medieval and Renaissance periods.",
       "de": "Weitverbreiteter Sagenzyklus in den Schweizer Alpen, besonders in Graubünden, Wallis und Uri. Möglicherweise historisch fundiert — italienische Bergbauexperten reisten im Mittelalter und der Renaissance tatsächlich in die Alpen.",
-      "fr": "Cycle de légendes répandu dans les Alpes suisses, surtout dans les Grisons, le Valais et Uri. Pourrait avoir un fondement historique — des experts miniers italiens ont effectivement voyagé dans les Alpes au Moyen Âge et à la Renaissance."
+      "fr": "Cycle de légendes répandu dans les Alpes suisses, surtout dans les Grisons, le Valais et Uri. Pourrait avoir un fondement historique — des experts miniers italiens ont effectivement voyagé dans les Alpes au Moyen Âge et à la Renaissance.",
+      "it": "Ciclo di leggende diffuso in tutte le Alpi svizzere, specialmente nei Grigioni, in Vallese e a Uri. Potrebbe avere un fondamento storico — esperti minerari italiani viaggiarono davvero verso le Alpi durante il medioevo e il rinascimento."
     },
     "themes": [
       "respect the mountains' secrets",
@@ -536,17 +599,20 @@
     "title": {
       "en": "The White Lady of Wimmis",
       "de": "Die weisse Frau von Wimmis",
-      "fr": "La Dame Blanche de Wimmis"
+      "fr": "La Dame Blanche de Wimmis",
+      "it": "La dama bianca di Wimmis"
     },
     "description": {
       "en": "A kind noblewoman was unjustly killed by her cruel husband in Wimmis Castle. Her ghost — the White Lady — now haunts the castle corridors, but she is not fearsome. She appears to warn of coming danger and watches over children and the innocent.",
       "de": "Eine gütige Edelfrau wurde von ihrem grausamen Gemahl auf Schloss Wimmis zu Unrecht getötet. Ihr Geist — die weisse Frau — spukt nun in den Schlossgängen, doch sie ist nicht furchteinflössend. Sie erscheint, um vor Gefahren zu warnen, und wacht über Kinder und Unschuldige.",
-      "fr": "Une noble femme bienveillante fut injustement tuée par son cruel époux au château de Wimmis. Son fantôme — la Dame Blanche — hante désormais les couloirs du château, mais elle n'est pas effrayante. Elle apparaît pour avertir du danger et veille sur les enfants et les innocents."
+      "fr": "Une noble femme bienveillante fut injustement tuée par son cruel époux au château de Wimmis. Son fantôme — la Dame Blanche — hante désormais les couloirs du château, mais elle n'est pas effrayante. Elle apparaît pour avertir du danger et veille sur les enfants et les innocents.",
+      "it": "Una nobildonna gentile fu ingiustamente uccisa dal suo crudele marito nel castello di Wimmis. Il suo fantasma — la Dama Bianca — infesta ora i corridoi del castello, ma non è spaventoso. Appare per avvertire di un pericolo imminente e veglia sui bambini e sugli innocenti."
     },
     "context": {
       "en": "Legend from the Bernese Oberland. Wimmis Castle (Schloss Wimmis) is a real castle dating to the 10th century, perched on rock above the village at the entrance to the Simmental valley.",
       "de": "Sage aus dem Berner Oberland. Schloss Wimmis ist eine reale Burg aus dem 10. Jahrhundert, auf einem Felsen über dem Dorf am Eingang zum Simmental thronend.",
-      "fr": "Légende de l'Oberland bernois. Le château de Wimmis est un vrai château datant du Xe siècle, perché sur un rocher au-dessus du village à l'entrée de la vallée du Simmental."
+      "fr": "Légende de l'Oberland bernois. Le château de Wimmis est un vrai château datant du Xe siècle, perché sur un rocher au-dessus du village à l'entrée de la vallée du Simmental.",
+      "it": "Leggenda dell'Oberland bernese. Il castello di Wimmis (Schloss Wimmis) è un castello reale risalente al X secolo, arroccato su una roccia sopra il villaggio all'ingresso della valle del Simmental."
     },
     "themes": [
       "innocence endures",
@@ -562,17 +628,20 @@
     "title": {
       "en": "The Dragon of Bern",
       "de": "Der Lindwurm von Bern",
-      "fr": "Le Dragon de Berne"
+      "fr": "Le Dragon de Berne",
+      "it": "Il drago di Berna"
     },
     "description": {
       "en": "A fearsome Lindwurm — a serpent-like dragon — terrorizes the forests around young Bern. A brave knight tracks it to its lair and, after a fierce battle, slays the beast. Only then can the city grow and prosper in safety.",
       "de": "Ein furchtbarer Lindwurm — ein schlangenartiger Drache — terrorisiert die Wälder rund um das junge Bern. Ein tapferer Ritter spürt ihn in seiner Höhle auf und erschlägt das Untier nach einem erbitterten Kampf. Erst dann kann die Stadt in Sicherheit wachsen und gedeihen.",
-      "fr": "Un redoutable lindwurm — un dragon serpentin — terrorise les forêts autour de la jeune Berne. Un brave chevalier le traque jusqu'à son repaire et, après un combat acharné, terrasse la bête. C'est seulement alors que la ville peut croître et prospérer en sécurité."
+      "fr": "Un redoutable lindwurm — un dragon serpentin — terrorise les forêts autour de la jeune Berne. Un brave chevalier le traque jusqu'à son repaire et, après un combat acharné, terrasse la bête. C'est seulement alors que la ville peut croître et prospérer en sécurité.",
+      "it": "Un temibile Lindwurm — un drago dalla forma di serpente — terrorizza le foreste attorno alla giovane Berna. Un cavaliere coraggioso lo rintraccia fino alla sua tana e, dopo un'aspra battaglia, uccide la bestia. Solo allora la città può crescere e prosperare in sicurezza."
     },
     "context": {
       "en": "Legend connected to the early history of Bern. The old town of Bern (UNESCO World Heritage) is built on the Aare River peninsula. The Lindwurm is a type of dragon from Germanic legend — serpent-bodied with two front legs but no wings.",
       "de": "Sage verbunden mit der Frühgeschichte Berns. Die Altstadt von Bern (UNESCO-Welterbe) ist auf der Aareschleife erbaut. Der Lindwurm ist ein Drachentyp der germanischen Sage — schlangenartig mit zwei Vorderbeinen, aber ohne Flügel.",
-      "fr": "Légende liée à l'histoire ancienne de Berne. La vieille ville de Berne (patrimoine mondial de l'UNESCO) est construite sur la presqu'île de l'Aar. Le lindwurm est un type de dragon de la légende germanique — au corps de serpent avec deux pattes avant mais sans ailes."
+      "fr": "Légende liée à l'histoire ancienne de Berne. La vieille ville de Berne (patrimoine mondial de l'UNESCO) est construite sur la presqu'île de l'Aar. Le lindwurm est un type de dragon de la légende germanique — au corps de serpent avec deux pattes avant mais sans ailes.",
+      "it": "Leggenda legata alla storia antica di Berna. Il centro storico di Berna (patrimonio mondiale dell'UNESCO) è costruito sulla penisola dell'Aar. Il Lindwurm è un tipo di drago della leggenda germanica — dal corpo di serpente con due zampe anteriori ma senza ali."
     },
     "themes": [
       "courage conquers fear",
@@ -588,17 +657,20 @@
     "title": {
       "en": "The Pastor of Bürglen",
       "de": "Der Pfarrer von Bürglen",
-      "fr": "Le Pasteur de Bürglen"
+      "fr": "Le Pasteur de Bürglen",
+      "it": "Il pastore di Bürglen"
     },
     "description": {
       "en": "When Habsburg soldiers come to Bürglen searching for Swiss rebels, the brave pastor stands at his church door and refuses to hand over the people sheltering inside. He invokes the right of sanctuary, and his courage inspires the whole village to stand firm.",
       "de": "Als habsburgische Soldaten nach Bürglen kommen, um Schweizer Aufständische zu suchen, stellt sich der mutige Pfarrer an die Kirchentür und weigert sich, die dort Schutz suchenden Menschen auszuliefern. Er beruft sich auf das Asylrecht, und sein Mut inspiriert das ganze Dorf zum Widerstand.",
-      "fr": "Quand les soldats des Habsbourg viennent à Bürglen chercher des rebelles suisses, le courageux pasteur se tient à la porte de son église et refuse de livrer les gens qui s'y sont réfugiés. Il invoque le droit d'asile, et son courage inspire tout le village à tenir bon."
+      "fr": "Quand les soldats des Habsbourg viennent à Bürglen chercher des rebelles suisses, le courageux pasteur se tient à la porte de son église et refuse de livrer les gens qui s'y sont réfugiés. Il invoque le droit d'asile, et son courage inspire tout le village à tenir bon.",
+      "it": "Quando i soldati asburgici arrivano a Bürglen in cerca di ribelli svizzeri, il coraggioso pastore si pianta davanti alla porta della sua chiesa e rifiuta di consegnare le persone che vi si sono rifugiate. Invoca il diritto d'asilo, e il suo coraggio ispira tutto il villaggio a resistere."
     },
     "context": {
       "en": "Part of the Tell legend cycle. Bürglen in Canton Uri is the traditional birthplace of Wilhelm Tell. The Tell Museum Bürglen preserves the Tell tradition.",
       "de": "Teil des Tell-Sagenkreises. Bürglen im Kanton Uri gilt als traditioneller Geburtsort von Wilhelm Tell. Das Tell-Museum Bürglen pflegt die Tell-Tradition.",
-      "fr": "Fait partie du cycle de légendes de Tell. Bürglen dans le canton d'Uri est le lieu de naissance traditionnel de Guillaume Tell. Le musée Tell de Bürglen préserve la tradition."
+      "fr": "Fait partie du cycle de légendes de Tell. Bürglen dans le canton d'Uri est le lieu de naissance traditionnel de Guillaume Tell. Le musée Tell de Bürglen préserve la tradition.",
+      "it": "Parte del ciclo leggendario di Tell. Bürglen, nel cantone di Uri, è il luogo di nascita tradizionale di Guglielmo Tell. Il Museo Tell di Bürglen custodisce la tradizione di Tell."
     },
     "themes": [
       "protecting the vulnerable",
@@ -614,17 +686,20 @@
     "title": {
       "en": "The Beggar at Lake Sempach",
       "de": "Der Bettler am Sempachersee",
-      "fr": "Le Mendiant du Lac de Sempach"
+      "fr": "Le Mendiant du Lac de Sempach",
+      "it": "Il mendicante del lago di Sempach"
     },
     "description": {
       "en": "A mysterious beggar wanders along Lake Sempach seeking shelter. The wealthy slam their doors, but a poor fisherman shares his meager supper. The beggar warns the fisherman to move to higher ground. That night, the lake floods and destroys the houses of those who refused kindness.",
       "de": "Ein geheimnisvoller Bettler wandert am Sempachersee entlang und sucht Unterschlupf. Die Reichen schlagen ihre Türen zu, doch ein armer Fischer teilt sein karges Abendessen. Der Bettler warnt den Fischer, auf höheres Gelände zu ziehen. In jener Nacht tritt der See über die Ufer und zerstört die Häuser derer, die keine Güte zeigten.",
-      "fr": "Un mendiant mystérieux erre le long du lac de Sempach cherchant un abri. Les riches claquent leurs portes, mais un pauvre pêcheur partage son maigre souper. Le mendiant avertit le pêcheur de monter sur les hauteurs. Cette nuit-là, le lac déborde et détruit les maisons de ceux qui ont refusé la bonté."
+      "fr": "Un mendiant mystérieux erre le long du lac de Sempach cherchant un abri. Les riches claquent leurs portes, mais un pauvre pêcheur partage son maigre souper. Le mendiant avertit le pêcheur de monter sur les hauteurs. Cette nuit-là, le lac déborde et détruit les maisons de ceux qui ont refusé la bonté.",
+      "it": "Un misterioso mendicante vaga lungo il lago di Sempach in cerca di rifugio. I ricchi gli sbattono la porta in faccia, ma un povero pescatore divide con lui la sua magra cena. Il mendicante avverte il pescatore di trasferirsi in un luogo più alto. Quella notte, il lago straripa e distrugge le case di chi ha negato la gentilezza."
     },
     "context": {
       "en": "Legend from the Lucerne region. Lake Sempach (Sempachersee) is a real lake in Canton Lucerne, also famous as the site of the Battle of Sempach (1386).",
       "de": "Sage aus der Region Luzern. Der Sempachersee ist ein realer See im Kanton Luzern, auch bekannt als Schauplatz der Schlacht bei Sempach (1386).",
-      "fr": "Légende de la région de Lucerne. Le lac de Sempach est un vrai lac du canton de Lucerne, également célèbre comme lieu de la bataille de Sempach (1386)."
+      "fr": "Légende de la région de Lucerne. Le lac de Sempach est un vrai lac du canton de Lucerne, également célèbre comme lieu de la bataille de Sempach (1386).",
+      "it": "Leggenda della regione di Lucerna. Il lago di Sempach (Sempachersee) è un lago reale nel cantone di Lucerna, famoso anche come luogo della battaglia di Sempach (1386)."
     },
     "themes": [
       "kindness is rewarded",

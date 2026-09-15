@@ -1,11 +1,13 @@
 #!/usr/bin/env node
-// Per-style / per-genre eval failure stats from the eval_findings table.
+// Per-style / per-genre eval failure stats from the `eval_finding_stats` table
+// (migration 037) — NOT `eval_findings`, which is the Lab's curated findings
+// registry (migration 013). The two were one name until 2026-09-14.
 //
 //   node scripts/admin/eval-findings-stats.js                 # by art_style
 //   node scripts/admin/eval-findings-stats.js --by=genre
 //   node scripts/admin/eval-findings-stats.js --by=bucket --since=2026-07-01
 //
-// Answers "what goes wrong per style / story type" once eval_findings has data
+// Answers "what goes wrong per style / story type" once eval_finding_stats has data
 // (populated when evaluateImageQuality is called with evalOptions.storyMeta).
 const { getEvalFindingsStats, closePool } = require('../../server/services/database');
 
@@ -20,7 +22,7 @@ function arg(name, def = null) {
   try {
     const rows = await getEvalFindingsStats({ groupBy, since });
     if (!rows.length) {
-      console.log(`No eval_findings rows yet${since ? ` since ${since}` : ''}. ` +
+      console.log(`No eval_finding_stats rows yet${since ? ` since ${since}` : ''}. ` +
         `Rows populate when evaluateImageQuality runs with evalOptions.storyMeta.`);
       return;
     }

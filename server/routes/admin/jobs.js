@@ -259,6 +259,10 @@ router.post('/:jobId/rerun-text', authenticateToken, requireAdmin, async (req, r
 
     // Text-only: never generate images/covers.
     inputData.skipImages = true;
+    // Same reason as /rerun-full: the run lands on the SOURCE account, and the
+    // pipeline deletes skipImages for a non-admin owner — which would turn a
+    // text-only Lab rerun into a full paid image run.
+    inputData.serverAuthoredInput = true;
     // Strip idempotency so repeated reruns each create a distinct job.
     delete inputData.idempotencyKey;
 
@@ -351,6 +355,11 @@ router.post('/:jobId/rerun-full', authenticateToken, requireAdmin, async (req, r
     inputData.skipCovers = false;
     inputData.skipText = false;
     if (inputData.enableFullRepair === undefined) inputData.enableFullRepair = true;
+    // requireAdmin gates this endpoint, but the job may run on a NON-admin
+    // account (the source story's owner). Mark the commission server-authored
+    // so the pipeline's non-admin strip does not delete the flags set right
+    // here — otherwise a rerun of a trial silently drops them.
+    inputData.serverAuthoredInput = true;
     // The job runs on the SOURCE story's account (characters live there) — which
     // may be a real customer. The pipeline skips the story-complete email for
     // adminRerun jobs; without this flag a rerun of a customer's story mails

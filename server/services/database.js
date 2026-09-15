@@ -690,30 +690,12 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_historical_locations_event ON historical_locations(event_id)`);
 
-    // eval_findings — one row per merged eval BUCKET-hit per page, flattened for
-    // per-style / per-genre stats (a plain GROUP BY). Written best-effort by the
-    // eval path; never blocks generation. No FK on story_id (eval can run for
-    // trials / before the story row is persisted). See server/lib/evalBuckets.js.
-    await dbPool.query(`
-      CREATE TABLE IF NOT EXISTS eval_findings (
-        id SERIAL PRIMARY KEY,
-        story_id VARCHAR(255),
-        page_number INT,
-        bucket VARCHAR(50) NOT NULL,
-        severity VARCHAR(20) NOT NULL,
-        owner VARCHAR(20),
-        agreement VARCHAR(10),
-        eval_type VARCHAR(20),
-        art_style VARCHAR(60),
-        genre VARCHAR(60),
-        language VARCHAR(10),
-        char_count INT,
-        judges VARCHAR(120),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_eval_findings_style_bucket ON eval_findings(art_style, bucket)`);
-    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_eval_findings_story ON eval_findings(story_id)`);
+    // The eval stats sink lives in migrations/037_eval_finding_stats.sql as
+    // `eval_finding_stats`. It used to be declared HERE as `eval_findings`,
+    // which collided with the Lab registry of that name (migration 013) — and
+    // since this whole function is dead (server.js:1608), the sink table was
+    // never created at all and recorded zero rows for its entire lifetime.
+    // Never re-add a CREATE TABLE here; schema changes are migration files.
 
     console.log('✓ Database tables initialized');
 
@@ -737,26 +719,78 @@ function isDatabaseMode() {
   return process.env.STORAGE_MODE === 'database' && getPool();
 }
 
+// ONE NAME, ONE MEANING (resolved 2026-09-14). `eval_findings` is the Lab's
+// curated findings REGISTRY (migrations/013_eval_findings.sql —
+// slug/title/category/rationale/evidence), and nothing else. The per-page
+// statistics sink below is `eval_finding_stats`
+// (migrations/037_eval_finding_stats.sql). Both writer and reader take the name
+// from this one constant so the two can never drift apart again; the guard test
+// tests/unit/eval-finding-stats-sink.test.ts fails if a second definition
+// of either name appears.
+const EVAL_FINDING_STATS_TABLE = 'eval_finding_stats';
+
 // Record merged eval bucket-hits for stats. Best-effort: never throws, never
-// blocks generation. `findings` = [{ story_id, page_number, bucket, severity,
-// owner, agreement, eval_type, art_style, genre, language, char_count, judges }].
+// blocks generation (a gate never kills a paid run). `findings` =
+// [{ story_id, page_number, bucket, severity, owner, agreement, eval_type,
+// art_style, genre, language, char_count, judges }].
+//
+// FAILURE IS LOUD. This sink recorded zero rows from the day it was written
+// because its table did not exist and the insert error was swallowed at
+// console.warn level. Any failure now goes to console.error with the table
+// name and the failing row, ONCE per process (a broken table would otherwise
+// log once per bucket per page — hundreds of lines per story), and the
+// suppressed-count is reported so the silence is never mistaken for success.
+let evalFindingStatsFailures = 0;
+
+// Columns match migrations/037_eval_finding_stats.sql (minus id / created_at).
+const EVAL_FINDING_STATS_COLUMNS = [
+  'story_id', 'page_number', 'bucket', 'severity', 'owner', 'agreement',
+  'eval_type', 'art_style', 'genre', 'language', 'char_count', 'judges',
+];
+
+function evalFindingRowValues(f) {
+  return [f.story_id || null, f.page_number ?? null, f.bucket, f.severity, f.owner || null,
+    f.agreement || null, f.eval_type || null, f.art_style || null, f.genre || null,
+    f.language || null, f.char_count ?? null, f.judges || null];
+}
+
 async function recordEvalFindings(findings) {
   if (!Array.isArray(findings) || !findings.length) return;
+  // One multi-row INSERT: a page's bucket-hits land together or not at all.
+  // The former per-row loop left partial batches behind on a mid-batch error.
+  const rows = findings.filter(f => f && f.bucket && f.severity);
+  if (!rows.length) return;
   try {
-    for (const f of findings) {
-      if (!f || !f.bucket || !f.severity) continue;
-      await dbQuery(
-        `INSERT INTO eval_findings
-           (story_id, page_number, bucket, severity, owner, agreement, eval_type, art_style, genre, language, char_count, judges)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-        [f.story_id || null, f.page_number ?? null, f.bucket, f.severity, f.owner || null,
-         f.agreement || null, f.eval_type || null, f.art_style || null, f.genre || null,
-         f.language || null, f.char_count ?? null, f.judges || null]
-      );
-    }
+    const width = EVAL_FINDING_STATS_COLUMNS.length;
+    const params = [];
+    const tuples = rows.map((f, i) => {
+      params.push(...evalFindingRowValues(f));
+      const ph = Array.from({ length: width }, (_, j) => `$${i * width + j + 1}`);
+      return `(${ph.join(',')})`;
+    });
+    await dbQuery(
+      `INSERT INTO ${EVAL_FINDING_STATS_TABLE}
+         (${EVAL_FINDING_STATS_COLUMNS.join(', ')})
+       VALUES ${tuples.join(',')}`,
+      params
+    );
   } catch (e) {
-    console.warn('[eval_findings] record failed (non-blocking):', e.message);
+    evalFindingStatsFailures++;
+    if (evalFindingStatsFailures === 1) {
+      console.error(
+        `❌ [${EVAL_FINDING_STATS_TABLE}] eval stats NOT recorded — the evidence registry is losing rows. ` +
+        `Check that migrations/037_eval_finding_stats.sql applied. Error: ${e.message}. ` +
+        `First failing row: ${JSON.stringify(findings[0])}`
+      );
+      console.error(`   Further ${EVAL_FINDING_STATS_TABLE} failures in this process are suppressed; ` +
+        `the running total is reported by getEvalFindingStatsFailureCount().`);
+    }
   }
+}
+
+/** How many recordEvalFindings calls failed in this process (0 = healthy). */
+function getEvalFindingStatsFailureCount() {
+  return evalFindingStatsFailures;
 }
 
 // Aggregate eval findings for reporting: counts per (groupBy, bucket). groupBy is
@@ -769,7 +803,7 @@ async function getEvalFindingsStats({ groupBy = 'art_style', since = null } = {}
   if (since) { params.push(since); where = 'WHERE created_at >= $1'; }
   const res = await dbQuery(
     `SELECT ${col} AS group_key, bucket, severity, COUNT(*)::int AS n
-       FROM eval_findings ${where}
+       FROM ${EVAL_FINDING_STATS_TABLE} ${where}
       GROUP BY ${col}, bucket, severity
       ORDER BY ${col} NULLS LAST, n DESC`,
     params
@@ -1093,7 +1127,11 @@ async function extractInlineImagesToR2(storyId, data) {
   // upload the same bytes twice AND race two apply()s on the same field,
   // potentially leaving the base64 stale in the blob when the sweep's
   // apply() lands AFTER the per-field walker's apply() that cleared it.
-  const queuedInputs = new Set();
+  // Keyed by the byte string itself: identical content means the semantic
+  // upload the walker already queued IS this image, so a second PUT of the
+  // same bytes buys nothing. The value is the owning task, so the sweep can
+  // hand a still-inline sibling slot the semantic URL once it is known.
+  const queuedInputs = new Map();
   /**
    * Queue one R2 upload. No-op if `input` isn't actual byte data.
    * @param {string} input  — base64 / data: URI, or anything else (skipped).
@@ -1102,8 +1140,9 @@ async function extractInlineImagesToR2(storyId, data) {
    */
   const upload = (input, key, apply) => {
     if (!looksLikeBytes(input)) return;
-    queuedInputs.add(input);
-    tasks.push({ input, key, apply });
+    const task = { input, key, apply, url: null };
+    if (!queuedInputs.has(input)) queuedInputs.set(input, task);
+    tasks.push(task);
   };
 
   // sceneImages — per-page debug images
@@ -1118,6 +1157,21 @@ async function extractInlineImagesToR2(storyId, data) {
         for (let k = 0; k < s.grokRefImages.length; k++) {
           const idx = k;
           upload(s.grokRefImages[idx], r2.keyForGrokRef(storyId, pageNum, 0, idx), (url) => { s.grokRefImages[idx] = url; });
+        }
+      }
+      // Refs packed into the empty-scene PLATE call (the landmark photo, the
+      // VB element grid). One plate per page, so no version index — same key
+      // shape as the page's grok refs, under an empty-scene- prefix. The
+      // generic Phase 1.5 sweep would catch these too, but only under an
+      // opaque /aux/ key; an explicit walker keeps them grouped with the page.
+      if (Array.isArray(s.emptySceneGrokRefImages)) {
+        for (let k = 0; k < s.emptySceneGrokRefImages.length; k++) {
+          const idx = k;
+          upload(
+            s.emptySceneGrokRefImages[idx],
+            `stories/${storyId}/debug/p${pageNum}/empty-scene-ref-${idx}.jpg`,
+            (url) => { s.emptySceneGrokRefImages[idx] = url; }
+          );
         }
       }
       if (Array.isArray(s.imageVersions)) {
@@ -1471,25 +1525,45 @@ async function extractInlineImagesToR2(storyId, data) {
   // <img src> contexts work unchanged.
   //
   // Three guards keep it safe:
-  // - skips strings already queued by per-field walkers (looksLikeBytes
-  //   uses the same predicate; queued tasks' apply() clears the source)
+  // - skips bytes already queued by a per-field walker (consulting
+  //   `queuedInputs`; such a slot is resolved to the walker's SEMANTIC url
+  //   after the queue drains, and only if it still holds the base64). Until
+  //   2026-09-13 this guard was populated but never read, so every
+  //   explicitly-walked image was PUT twice and the /aux/ apply — queued
+  //   later, so usually landing last — overwrote the semantic URL.
   // - skips known-already-URL fields (looksLikeBytes returns false for http*)
   // - bounds key length (R2 limit 1024 bytes)
   const sanitizeKeySegment = (s) =>
     String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
   const sweptKeys = new Set(tasks.map(t => t.key));
   const seenObjects = new WeakSet();
+  // Slots holding bytes an explicit walker already owns. They are NOT queued
+  // again (that was the double-upload); instead they are resolved after the
+  // queue drains — and only if the slot still holds the base64 at that point.
+  // A walker that deliberately cleared its source field (landmarkPhotos moves
+  // photoData → photoUrl and undefines photoData) must stay cleared, while a
+  // genuinely separate field that happens to carry the same image gets the
+  // semantic URL instead of stale bytes the strip would drop.
+  const aliasSlots = [];
   const queueLeak = (parent, key, child, pathSegments) => {
+    const owner = queuedInputs.get(child);
+    if (owner) {
+      aliasSlots.push({ parent, key, input: child, owner });
+      return;
+    }
     const keyBase = `stories/${storyId}/aux/${[...pathSegments, sanitizeKeySegment(key)].join('-')}`;
     let k = `${keyBase}.jpg`;
     let suffix = 1;
     while (sweptKeys.has(k)) k = `${keyBase}__${suffix++}.jpg`;
     sweptKeys.add(k);
-    tasks.push({
+    const task = {
       input: child,
       key: k,
       apply: (url) => { parent[key] = url; },
-    });
+      url: null,
+    };
+    queuedInputs.set(child, task);   // a later slot with the same bytes aliases here
+    tasks.push(task);
   };
   function sweep(node, pathSegments) {
     if (!node || typeof node !== 'object') return;
@@ -1528,13 +1602,20 @@ async function extractInlineImagesToR2(storyId, data) {
       const t = tasks[myIdx];
       try {
         const url = await r2.uploadImage(t.input, t.key);
-        if (url) t.apply(url);
+        if (url) { t.url = url; t.apply(url); }
       } catch (err) {
         log.warn(`[R2-extract] upload failed for ${t.key}: ${err.message}`);
       }
     }
   });
   await Promise.all(workers);
+
+  // Resolve the sweep's alias slots against the upload that actually happened.
+  // Guarded on the slot still holding the bytes: a walker that cleared its
+  // own source field must not have it resurrected.
+  for (const a of aliasSlots) {
+    if (a.owner.url && a.parent[a.key] === a.input) a.parent[a.key] = a.owner.url;
+  }
 }
 
 /**
@@ -1551,6 +1632,7 @@ async function extractInlineImagesToR2(storyId, data) {
  *   - sceneImages[*].imageVersions[*].grokRefImages[*]            (Grok inputs)
  *   - sceneImages[*].imageVersions[*].inpaintReferenceImages[*]   (inpaint refs)
  *   - sceneImages[*].grokRefImages[*]
+ *   - sceneImages[*].emptySceneGrokRefImages[*]                   (plate inputs)
  *   - sceneImages[*].bboxOverlayImage                             (debug overlay)
  *   - sceneImages[*].visualBibleGrid                              (debug grid)
  *   - sceneImages[*].landmarkPhotos[*].photoData                  (Wikimedia bytes)
@@ -1637,6 +1719,10 @@ function stripInlineImagesFromStoryData(data, { keepDisplayBytes = false } = {})
       if (!s || typeof s !== 'object') continue;
       s.bboxOverlayImage = keepUrl(s.bboxOverlayImage);
       s.grokRefImages = filterUrlArray(s.grokRefImages);
+      // Same treatment for the empty-scene plate's packed refs — R2 URLs are
+      // kept, anything still inline after extract (R2 unreachable) is dropped
+      // rather than persisted as base64 in the JSONB blob.
+      s.emptySceneGrokRefImages = filterUrlArray(s.emptySceneGrokRefImages);
       s.originalImage = undefined;
       s.preEntityRepairImage = undefined;
       s.visualBibleGrid = keepUrl(s.visualBibleGrid);
@@ -3808,6 +3894,8 @@ module.exports = {
   logActivity,
   recordEvalFindings,
   getEvalFindingsStats,
+  getEvalFindingStatsFailureCount,
+  EVAL_FINDING_STATS_TABLE,
   buildStoryMetadata,
   saveStoryData,
   saveScenePageData,

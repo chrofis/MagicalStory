@@ -26,6 +26,7 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { editWithGrok, GROK_MODELS } = require('./grok');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('../config/models');
 const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 const r2 = require('./r2');
@@ -38,6 +39,7 @@ const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
 async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', model = 'gemini-2.5-flash-image' } = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY missing for avatar style transfer');
+  prompt = guardPromptString(prompt, 'editWithGeminiImage');
   const parts = [{ text: prompt }, ...refImages.map(img => ({
     inlineData: { mimeType: (String(img).match(/^data:(image\/\w+);base64,/)?.[1]) || 'image/jpeg', data: r2.stripDataUriPrefix(img) },
   }))];
@@ -232,9 +234,58 @@ async function phantomRow(phantomDataUrl, which) {
   return `data:image/png;base64,${out.toString('base64')}`;
 }
 
+// Footwear is part of the outfit, and nothing upstream guarantees it is named.
+// A trial character's `standard` entry carries no outfit text at all (the body
+// photo IS the reference), so the sheet prompt was the only thing standing
+// between "the reference shows shoes" and a barefoot figure — and every mention
+// of shoes in these prompts was a FRAMING rule ("both feet with shoes are
+// visible inside the cell"), which a barefoot figure satisfies. The sheet then
+// becomes the styled avatar and the per-page reference cell, so one barefoot
+// sheet renders a whole book barefoot (staging job_1789296188291_thezv15y1: the
+// body reference wore trainers, the sheet dropped them, all pages and both
+// covers followed). Stated once here, used by every sheet generation prompt.
+//
+// `seasonFootwear` (from season.js `seasonOutfitGuidance().footwear`) replaces
+// the carry-over source on a seasonal sheet: the reference photo's sandals are
+// exactly what a winter sheet must not copy. Absent it the rule is byte-identical
+// to the shipped one, so the non-seasonal paths are untouched.
+function buildFootwearRule(redress = false, seasonFootwear = null) {
+  const source = redress
+    ? 'Footwear is part of the costume: every cell wears what the costume names on the feet, or plain everyday shoes suiting it when the costume names none — never the footwear in the body reference, which is the wrong outfit.'
+    : seasonFootwear
+      ? `Footwear is part of the outfit: every cell wears ${seasonFootwear} — the footwear the body reference shows when it is already of that kind, otherwise footwear of that kind in a colour that suits the outfit.`
+      : 'Footwear is part of the outfit: every cell wears the footwear the body reference shows, same type and colour, or plain everyday shoes suiting the outfit when neither the reference nor the outfit shows any.';
+  return `${source} Bare feet only when the outfit names them, or when the lower body is a tail, fin, or single fused form with no feet at all.`;
+}
+
+// A garment named with its PARTS is still one garment. The story bible spells
+// structural parts out ("... — square bib panel over the chest held by two
+// shoulder straps — ...") because a garment named alone renders as a plain one;
+// but a parts list invites a parts ASSEMBLY — straps laid over a separate pair
+// of trousers — and the two rows are generated separately, so each row picks its
+// own reading. One clause owns both halves: the parts are cut in one, and both
+// rows show that same garment. Generic by design — no story nouns.
+function buildGarmentRule() {
+  return 'A garment named with its parts is ONE continuous piece, not separate items worn together: a bib-and-brace garment has its bib panel and shoulder straps cut in one with its trousers, same fabric and same colour, never straps laid over a separate pair of trousers. Every named part is present in every cell whose crop reaches it, and both rows of the sheet show that same garment.';
+}
+
+// The season reaches the sheet as an OUTFIT instruction and nothing else. The
+// sheet is the identity anchor: the season may change what the figure wears,
+// never who the figure is — so the block names the garments and then pins face,
+// hair, skin tone, build and apparent age to the references.
+//
+// Suppressed on a redress sheet: there the costume IS the outfit and owns it
+// whole (a pirate does not gain a parka in December). Suppressed when no
+// guidance is passed, which is every non-seasonal caller.
+function buildSeasonOutfitBlock(seasonOutfit = null, redress = false) {
+  if (!seasonOutfit?.outfit || redress) return '';
+  const label = seasonOutfit.label || '';
+  return `\nSeason: ${label}. The figure is dressed for ${label.toLowerCase()} outdoors in a temperate climate: ${seasonOutfit.outfit}. Adapt the GARMENTS only, keeping the reference's own colours and character wherever the season allows them — face, hair, hairstyle, skin tone, build and apparent age are exactly as the references show and never change. The same outfit appears in every cell.`;
+}
+
 // Body-row prompt (call 1): one row of 4 full bodies, tall cells. Keeps the
 // outer layer in the profile (validated wording). Generic — no story specifics.
-function buildBodyRowPrompt(costumeDescription, character = null, redress = false, costumeName = null) {
+function buildBodyRowPrompt(costumeDescription, character = null, redress = false, costumeName = null, seasonOutfit = null) {
   const hairBlock = buildHairBlock(character);
   const bodyRef = redress
     ? `Image 2 shows the character's body shape, build, and identity ONLY — IGNORE the clothing in Image 2, it is the wrong outfit. Image 3 is the character's face.`
@@ -251,25 +302,34 @@ The figure reads as a ${costumeName} at a glance. Each garment is worn the way t
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The output contains no arrows.
 ${bodyRef}
 
-${outfitRule}${readsAs}${hairBlock}
+${outfitRule}${readsAs}${buildSeasonOutfitBlock(seasonOutfit, redress)}${hairBlock}
 Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions matching the person's apparent age in Image 3. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
 
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
-Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).
+Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).${declaredAgeBlock(character)}
+${buildFootwearRule(redress, seasonOutfit?.footwear)}
+${buildGarmentRule()}
 The outfit is identical in all four cells, layers included. When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
 }
 
 // Head-row prompt (call 2): one row of 4 head-shots that match the body sheet.
 // Refs: Image 1 = mannequin head row (angles), Image 2 = face photo (identity),
 // Image 3 = the body row from call 1 (match its rendered face/hair).
-function buildHeadRowPrompt(character = null) {
+function buildHeadRowPrompt(character = null, costumeDescription = '') {
   const hairBlock = buildHairBlock(character);
+  // The costume text reaches this call at all only since the dungaree fault
+  // (2026-09-14): the row was generated from the body IMAGE alone, so a part
+  // that the body row rendered ambiguously — a bib panel and its straps — was
+  // simply dropped here, and the two rows disagreed about the garment.
+  const outfitLine = costumeDescription ? `
+Costume: ${costumeDescription} — the same garment the body sheet wears. Every part of it that the head-and-shoulders crop reaches, straps and neckline included, is drawn.` : '';
   return `Image 1 shows the four camera angles for a head-shot row — use it ONLY for facing direction; ignore its face and features, and never draw arrows.
 Image 2 is the character's face photo — the identity; match this exact face.
-Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${hairBlock}
+Image 3 is the character's full-body reference sheet — match the SAME face, hair colour, hairstyle, and skin tone shown there so the heads belong to that body.${outfitLine}
+${buildGarmentRule()}${hairBlock}
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background. Each cell is a HEAD-AND-SHOULDERS close-up of the SAME PERSON — the head, neck, and the top of the shoulders wearing the costume; a little of the shoulders and collar showing is good, no bare skin below the neck. Never crop the top of the head. Cell 1 front, cell 2 three-quarter, cell 3 profile.
 Cell 4 is a REAR TURN, distinct from cell 3's profile: shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are clearly visible. Cell 4 is never a second profile and never a flat back of the head with no face showing — Image 1's cell 4 is a plain placeholder silhouette, ignore its exact head angle entirely.
-Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3. No text, numbers, labels, arrows, or symbols.`;
+Photographic / lifelike; identity from Image 2; hair, skin tone, and costume consistent with Image 3.${declaredAgeBlock(character)} No text, numbers, labels, arrows, or symbols.`;
 }
 
 // Composite the head row (top) over the body row (bottom) into one 2×4 sheet,
@@ -340,6 +400,7 @@ function applyPoseHeadGate(bodies, poseHeads) {
     bodies.outfit?.outfitScore ?? 10,
     bodies.costumeReads?.costumeReadsScore ?? 10,
     bodies.proportions?.score ?? 10,
+    bodies.solo?.soloScore ?? 10,
     bodies.background?.backgroundScore ?? 10,
   );
   bodies.valid = bodies.finalScore >= 6;
@@ -359,10 +420,10 @@ async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = nu
 }
 
 // Review the 1×4 head row: heads-structure eval + identity vs face photo/avatar.
-async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker, declaredAge = null }) {
+async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usageTracker, declaredAge = null, costumeDescription = '' }) {
   const hasRefs = !!(facePhoto || avatarFaces);
   const [headsR, identityR] = await Promise.all([
-    evaluateSheetRow(headRowData, 'heads', { model, usageTracker }),
+    evaluateSheetRow(headRowData, 'heads', { costumeDescription, model, usageTracker }),
     hasRefs ? evaluateIdentity(headRowData, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker, declaredAge }) : Promise.resolve(null),
   ]);
   const heads = headsR.report;
@@ -378,7 +439,7 @@ async function reviewHeadRow(headRowData, { facePhoto, avatarFaces, model, usage
 // keep least-bad. Then composite. Rejected rows are discarded. Returns a verdict
 // in the evaluateSheetSplit shape so generateCharacter2x4Sheet / styledAvatars
 // consume it unchanged. skipReview → 1 try each, no eval (fast path for tests).
-async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false } = {}) {
+async function generateComposited2x4(character, { costumeDescription, costumeName = null, redress = false, usageTracker = null, skipReview = false, seasonOutfit = null } = {}) {
   const facePhoto = await resolveFacePhoto(character);
   if (!facePhoto) throw new Error(`No face photo for ${character?.name || 'character'}.`);
   const standardAvatar = await resolveStandardAvatar(character);
@@ -387,21 +448,43 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   const headPhantom = await phantomRow(loadPhantomVariant(character?.age, 'axes'), 'top');
   const model = MODEL_DEFAULTS.sheetEvalModel;
   const bodyRefs = standardAvatar ? [bodyPhantom, standardAvatar, facePhoto] : [bodyPhantom, facePhoto];
-  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName);
-  const headPrompt = buildHeadRowPrompt(character);
+  const bodyPrompt = buildBodyRowPrompt(costumeDescription, character, redress, costumeName, seasonOutfit);
+  const headPrompt = buildHeadRowPrompt(character, costumeDescription);
   const attemptHistory = [];
   let usage = { input_tokens: 0, output_tokens: 0 };
   const addUsage = (u, fn, id) => { if (u) { usage.input_tokens += u.input_tokens || 0; usage.output_tokens += u.output_tokens || 0; if (usageTracker) usageTracker('grok', u, fn, id); } };
 
   // ── Stage 1: body row (max 1 retry, keep least-bad) ──
   let bestBody = null;
+  let bodyGenError = null;
   for (let t = 1; t <= 2; t++) {
     // skipOutputCrop — see styleTransferGenerate: cropping a 16:9 row back to
     // 16:9 from a squarer output would slice the figures' heads/feet off.
-    const res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    // A THROWN backend call consumes ONE try — it must never escape this loop.
+    // The 120s AbortSignal timeout in editWithGrok used to propagate straight
+    // out of generateComposited2x4, killing the whole sheet on try 1 and
+    // leaving the provisioned retry unused (measured: staging runs
+    // job_1789337998754_apslnsq1z / job_1789343124794_z2c779f7i, "The
+    // operation was aborted due to timeout"). Same containment Pass 2 already
+    // has (stage 'gen-error'); the eval calls below are wrapped for the same
+    // reason. If BOTH tries throw, the sheet still fails loudly at the throw
+    // after the loop, carrying the last provider error.
+    let res;
+    try {
+      res = await editWithGrok(bodyPrompt, bodyRefs, { aspectRatio: '16:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    } catch (err) {
+      bodyGenError = err?.message || String(err);
+      attemptHistory.push({ stage: 'body', try: t, error: `gen-error: ${bodyGenError}` });
+      log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t}/2 threw: ${bodyGenError}${t < 2 ? ' — retrying' : ''}`);
+      continue;
+    }
     if (!res?.imageData) { attemptHistory.push({ stage: 'body', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_body_row', res.modelId);
-    let review = { valid: true, score: 10, bodies: null };
+    // A SKIPPED review is UNKNOWN, never a 10 (staging job_1788763045123_z8so79ngb:
+    // a sheet with three strangers merged across its cells was stored at 10/10 on
+    // every axis without a single judge call). score null = unscored; valid stays
+    // true so the sheet still ships (the caller asked for no reviews).
+    let review = { valid: true, score: null, evaluated: false, bodies: null };
     if (!skipReview) {
       try {
         review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker });
@@ -414,11 +497,12 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
       }
     }
     attemptHistory.push({ stage: 'body', try: t, score: review.score, valid: review.valid, reasons: review.bodies?.failureReasons || [] });
-    if (!bestBody || review.score > bestBody.review.score) bestBody = { row: res.imageData, review };
+    const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
+    if (!bestBody || rank(review.score) > rank(bestBody.review.score)) bestBody = { row: res.imageData, review };
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} body try ${t} invalid (score=${review.score}) — ${skipReview ? '' : (review.bodies?.failureReasons || []).join('; ')}`);
   }
-  if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}`);
+  if (!bestBody) throw new Error(`[CHARACTER 2×4] body row produced no image for ${character?.name}${bodyGenError ? ` (last provider error: ${bodyGenError})` : ''}`);
 
   // ── Stage 2: head row on the accepted body (max 1 retry, keep least-bad) ──
   // Head row uses 20:9 — the widest/shortest ratio in Grok's aspect enum
@@ -427,48 +511,64 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   // no padding/squeeze; full-width, no side margins. See stackRowsInto2x4.
   const headRefs = [headPhantom, facePhoto, bestBody.row]; // exactly 3
   let bestHead = null;
+  let headGenError = null;
   for (let t = 1; t <= 2; t++) {
     // skipOutputCrop — 20:9 is the extreme end of Grok's enum and drift is
     // common; cropping a near-square output down to 20:9 would decapitate the
     // head row. stackRowsInto2x4 resizes by width and keeps the full row.
-    const res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    // A thrown backend call consumes ONE try — see the body row above.
+    let res;
+    try {
+      res = await editWithGrok(headPrompt, headRefs, { aspectRatio: '20:9', model: GROK_MODELS.STANDARD, skipOutputCrop: true });
+    } catch (err) {
+      headGenError = err?.message || String(err);
+      attemptHistory.push({ stage: 'head', try: t, error: `gen-error: ${headGenError}` });
+      log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t}/2 threw: ${headGenError}${t < 2 ? ' — retrying' : ''}`);
+      continue;
+    }
     if (!res?.imageData) { attemptHistory.push({ stage: 'head', try: t, error: 'no image' }); continue; }
     addUsage(res.usage, 'character_2x4_head_row', res.modelId);
-    let review = { valid: true, score: 10, heads: null, identity: null };
+    let review = { valid: true, score: null, evaluated: false, heads: null, identity: null };
     if (!skipReview) {
       try {
-        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age });
+        review = await reviewHeadRow(res.imageData, { facePhoto, avatarFaces, model, usageTracker, declaredAge: character?.age, costumeDescription });
       } catch (err) {
         log.error(`[CHARACTER 2×4] ${character?.name} head eval FAILED (${err.message}) — keeping the unscored row`);
         review = { valid: true, score: 0, heads: null, identity: null, evalFailed: err.message };
       }
     }
     attemptHistory.push({ stage: 'head', try: t, score: review.score, valid: review.valid });
-    if (!bestHead || review.score > bestHead.review.score) bestHead = { row: res.imageData, review };
+    const rank = (v) => (typeof v === 'number' ? v : -1); // unscored ranks below any judged attempt
+    if (!bestHead || rank(review.score) > rank(bestHead.review.score)) bestHead = { row: res.imageData, review };
     if (review.valid) break;
     log.warn(`[CHARACTER 2×4] ${character?.name} head try ${t} invalid (score=${review.score})`);
   }
-  if (!bestHead) throw new Error(`[CHARACTER 2×4] head row produced no image for ${character?.name}`);
+  if (!bestHead) throw new Error(`[CHARACTER 2×4] head row produced no image for ${character?.name}${headGenError ? ` (last provider error: ${headGenError})` : ''}`);
 
   // ── Composite + build the evaluateSheetSplit-shape verdict from the reviews ──
   const { imageData, splitY } = await stackRowsInto2x4(bestHead.row, bestBody.row);
   const bodies = bestBody.review.bodies;
   const heads = bestHead.review.heads;
   const identity = bestHead.review.identity;
-  const idScore = identity?.identityScore ?? 10;
-  const finalScore = skipReview ? 10 : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
+  // skipReview → nothing was judged: every axis is null (unknown), not 10.
+  const sc = (v) => (skipReview ? null : v);
+  const idScore = skipReview ? null : (identity?.identityScore ?? 10);
+  const finalScore = skipReview ? null : Math.min(heads?.finalScore ?? 0, bodies?.finalScore ?? 0, idScore);
   // When a row judge threw, its sub-report is null and the ?? defaults below
   // read as a perfect 10. Carry the failure so consumers show "unscored", not
   // a fake pass — the sheet still ships, it just wasn't judged.
   const evalFailed = bestBody.review.evalFailed || bestHead.review.evalFailed || null;
   const verdict = {
-    split: true, splitY, finalScore, valid: finalScore >= 6, evalFailed,
+    split: true, splitY, finalScore,
+    // Unevaluated is not a failure: the sheet ships, it is simply unjudged.
+    valid: skipReview ? true : finalScore >= 6,
+    evaluated: !skipReview, evalSkipped: skipReview ? 'skipQualityEval' : null, evalFailed,
     failureReasons: [...(heads?.failureReasons || []), ...(bodies?.failureReasons || [])],
-    layout: { layoutScore: bodies?.fullBody?.fullBodyScore ?? 10 },
+    layout: { layoutScore: sc(bodies?.fullBody?.fullBodyScore ?? 10) },
     identity: { identityScore: idScore, reason: identity?.reason },
-    outfit: { outfitScore: bodies?.outfit?.outfitScore ?? 10 },
+    outfit: { outfitScore: sc(bodies?.outfit?.outfitScore ?? 10) },
     sourceMatch: { sourceMatchScore: idScore },
-    cleanRender: { cleanScore: heads?.cleanRender?.cleanScore ?? 10 },
+    cleanRender: { cleanScore: sc(heads?.cleanRender?.cleanScore ?? 10) },
     heads, bodies, identityReport: identity,
   };
   return {
@@ -479,7 +579,40 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
   };
 }
 
-function buildPrompt(_artStyle, costumeDescription, character = null, redress = false, costumeName = null) {
+/**
+ * The DECLARED age, as a proportion instruction (2026-09-14).
+ *
+ * The sheet prompt used to carry the age only as "match the person's apparent
+ * age in Image 3", plus a four-row table whose child rows are "a young child
+ * about 5 to 6 [heads], a toddler about 4". Two consequences, both measured on
+ * prod job_1789227389389_z18dmvnt6: a declared 5-year-old and a declared
+ * 11-year-old produce a BYTE-IDENTICAL prompt, and the only thing separating
+ * them is what the model reads off a photograph — against an adult yardstick.
+ * Liz (5) came back reading 7-9 and Ayan (8) reading 12-14, and every page
+ * then copied those sheets faithfully.
+ *
+ * The declared age never reached this prompt at all: a grep of the stored
+ * 4,511-char prompt found zero occurrences of "preschool", "school-age",
+ * "Age cues", "years old", "apparentAge" — or even the word "child".
+ *
+ * This injects the SAME getAgeCategory → getAgeMarkers text the page prompts
+ * and the commissioned reference sheets already use (six child buckets between
+ * infant and preteen, at 3.5 / 4 / 4.5 / 5 / 5.5 / 6 head-heights) so the sheet
+ * is anchored on the age the parent typed rather than inferred from a photo.
+ *
+ * Lazy require: promptBuilders pulls in services/prompts at load.
+ */
+function declaredAgeBlock(character) {
+  const raw = character?.age ?? character?.declaredAge;
+  const age = parseInt(raw, 10);
+  if (!Number.isFinite(age) || age < 0) return '';
+  const { getAgeCategory, getAgeMarkers } = require('./promptBuilders');
+  const markers = getAgeMarkers(getAgeCategory(age));
+  if (!markers) return '';
+  return ` This person is ${age} years old: ${markers}. That stated age decides the proportions in every cell — it outranks any impression of age taken from the photo, and the figure is never drawn older or taller than it.`;
+}
+
+function buildPrompt(_artStyle, costumeDescription, character = null, redress = false, costumeName = null, seasonOutfit = null) {
   const hairBlock = buildHairBlock(character);
   // redress=true: the story dressed this character in an outfit that DIFFERS
   // from the clothing shown in Image 2 (the stored avatar). Image 2's clothing
@@ -497,16 +630,19 @@ function buildPrompt(_artStyle, costumeDescription, character = null, redress = 
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The coloured arrows (red, green, blue) on each head in Image 1 are direction guides ONLY — never render, copy, or paint them onto the character, the face, the hair, or anywhere in the output. The output contains no arrows.
 ${bodyRef}
 
-${outfitRule}
+${outfitRule}${buildSeasonOutfitBlock(seasonOutfit, redress)}
 ${hairBlock}
-Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, with natural proportions matching the person's apparent age in Image 3. No cartoon stylisation, no chibi, no anime, no watercolour — those treatments are applied later by downstream steps. This sheet is an identity anchor.
+Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, with natural proportions matching the person's apparent age in Image 3.${declaredAgeBlock(character)} No cartoon stylisation, no chibi, no anime, no watercolour — those treatments are applied later by downstream steps. This sheet is an identity anchor.
 
 Output a 2×4 grid with thin black dividing lines and pure white background, in the same cell layout as Image 1.
 
 The horizontal mid-row divider must be drawn as one unbroken thin black line running edge to edge. The three vertical column dividers must be drawn the same way. Nothing crosses any divider: every figure stays fully inside its own cell, surrounded by white space on all four sides. No head, no hair, no hand, no foot, no shadow, no clothing detail extends beyond the cell's borders. If a figure would not fit inside its cell, scale it down so it fits.
 
-Cells 1-4 (top row): head and neck only, no shoulders, no torso, no clothing. Cell 1 front, cell 2 three-quarter, cell 3 profile. Cell 4 is a REAR TURN, distinct from cell 3's profile: shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are clearly visible — never a second profile, never a flat back of the head with no face showing. The head occupies roughly the middle of the cell with white margin above the hairline and below the neck — the neck stops cleanly, it never continues into the bottom row.
-Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile. Cell 8 matches cell 4's rear-turn pose: shoulders and body fully away from camera, head rotated back over the right shoulder so one eye and the near cheek are visible — never a second profile, never a flat back view with no face showing. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row, and both feet with their shoes are fully visible with a strip of white margin below the shoes. Never crop a bottom-row figure at the thigh, knee, or ankle; if it does not fit, scale the whole figure down until head and both feet sit inside the cell. Body proportions must match the person's apparent age in Image 3: an adult is roughly 7 to 8 heads tall, a teenager about 7, a young child about 5 to 6, a toddler about 4. Do NOT render an adult with child-like short/stubby proportions or an oversized head on a small body — the full-body figures must read as the same age as the head cells.
+Cells 1-4 (top row): head and shoulders, no full torso and no arms. Where the neckline or collar shows, it is the same garment cells 5-8 wear, in the same colour and with the same neckline — never a collar, placket, hood or trim the costume does not name. Cell 1 front, cell 2 three-quarter, cell 3 profile. Cell 4 is a REAR TURN, distinct from cell 3's profile: shoulders fully away from camera, head rotated back over the right shoulder toward camera so one eye and the near cheek are clearly visible — never a second profile, never a flat back of the head with no face showing. The head occupies roughly the middle of the cell with white margin above the hairline and below the neck — the neck stops cleanly, it never continues into the bottom row.
+Cells 5-8 (bottom row): full body from head to feet wearing the costume. Cell 5 front, cell 6 three-quarter, cell 7 profile. Cell 8 matches cell 4's rear-turn pose: shoulders and body fully away from camera, head rotated back over the right shoulder so one eye and the near cheek are visible — never a second profile, never a flat back view with no face showing. The full figure fits entirely between the mid-row divider and the bottom edge — the head of a bottom-row body never extends up into the top row, and both feet with their shoes are fully visible with a strip of white margin below the shoes. Never crop a bottom-row figure at the thigh, knee, or ankle; if it does not fit, scale the whole figure down until head and both feet sit inside the cell. Body proportions must match the person's apparent age in Image 3: an adult is roughly 7 to 8 heads tall, a teenager about 7, a young child about 5 to 6, a toddler about 4.${declaredAgeBlock(character)} Do NOT render an adult with child-like short/stubby proportions or an oversized head on a small body — the full-body figures must read as the same age as the head cells.
+
+${buildFootwearRule(redress, seasonOutfit?.footwear)}
+${buildGarmentRule()}
 
 Every cell faces in the same direction as the matching cell in Image 1, except cells 4 and 8 — Image 1's cells 4 and 8 are plain placeholder silhouettes; ignore their exact head angle and render the rear-turn pose described above instead. Every head in cells 1-4 and every body in cells 5-8 shows THE SAME PERSON as Image 3 — same face structure, same hair, same skin tone, same apparent age. The same costume — every accessory — appears in cells 5, 6, 7, and 8. No text, no numbers, no labels, no arrows, no symbols, no coloured direction markers anywhere in the output.`;
 }
@@ -704,19 +840,24 @@ const SHEET_JUDGE_SAFETY = [
 // so the google branch stays byte-identical to the old inline fetch. Grok/Qwen
 // reuse the SAME `parts` array (images + prompt) via the existing vision
 // helpers. Returns { text, usageMetadata }.
-async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
+// `_maxOutputTokens` is unused since 2026-09-11 (owner rule: no output caps) —
+// kept in the signature so the call sites read unchanged; every judge runs at
+// the model's own ceiling.
+async function callSheetJudge(model, parts, _maxOutputTokens, geminiApiKey) {
   const { TEXT_MODELS } = require('../config/models');
   const cfg = TEXT_MODELS[model];
   const provider = cfg?.provider || 'google';
   const modelId = cfg?.modelId || model;
+  assertPromptFilled(parts, 'callSheetJudge');
   if (provider === 'google') {
     const body = {
       contents: [{ parts }],
       // thinkingBudget: 0 — these are structured scoring judges at temp 0, not
       // open reasoning. Thinking tokens counted against maxOutputTokens and
       // truncated the JSON; disabling them removes that failure mode at the
-      // source (and is faster/cheaper). maxOutputTokens stays high as headroom.
-      generationConfig: { temperature: 0, maxOutputTokens, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      // source (and is faster/cheaper). No maxOutputTokens (owner rule: no
+      // output caps) — Gemini's default is the model's own ceiling.
+      generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       safetySettings: SHEET_JUDGE_SAFETY,
     };
     const resp = await fetch(
@@ -731,7 +872,7 @@ async function callSheetJudge(model, parts, maxOutputTokens, geminiApiKey) {
     // cryptic "Expected ',' or '}' at position N". Name the real cause instead —
     // the retry loop then re-runs, and the caller's fail-open keeps the sheet.
     if (cand?.finishReason === 'MAX_TOKENS') {
-      throw new Error(`Gemini eval truncated (finishReason=MAX_TOKENS at ${maxOutputTokens}-tok cap) — raise maxOutputTokens`);
+      throw new Error('Gemini eval truncated (finishReason=MAX_TOKENS at the model ceiling)');
     }
     return { text: cand?.content?.parts?.[0]?.text, usageMetadata: j?.usageMetadata };
   }
@@ -819,7 +960,7 @@ async function evaluateSheetWithGemini(imageData, costumeDescription, geminiApiK
   parts.push({ inline_data: { mime_type: sheetMime, data: sheetB64 } });
   parts.push({ text: prompt });
 
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 4000, geminiApiKey);
+  const { text, usageMetadata } = await callSheetJudge(model, parts, null, geminiApiKey);
   if (!text) throw new Error(`sheet eval (${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', {
@@ -890,7 +1031,7 @@ function loadStyleAnchor(artStyle) {
 
 /**
  * Pass 2 evaluator — verifies the style-transferred sheet preserves identity
- * + costume + layout, AND that the requested style was actually applied
+ * + layout, AND that the requested style was actually applied
  * (rather than the model returning the source unchanged, as Gemini tends to).
  *
  * Receives THREE images in order: source face photo, Pass 1 realistic sheet,
@@ -899,32 +1040,27 @@ function loadStyleAnchor(artStyle) {
  */
 async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styledSheet, artStyle, geminiApiKey, usageTracker = null, declaredAge = null, opts = {}) {
   // model / promptOverride: Test Lab A/B only; production passes neither.
-  const { model = 'gemini-2.5-flash', promptOverride = null, costumeDescription = null } = opts;
+  // Pass 2 is a STYLE TRANSFER: the restyler is never told which garments to
+  // produce (buildStyleTransferPrompt takes no costume), so the judge must not
+  // ask. The outfit is decided and scored on pass 1 — no costume input here.
+  const { model = 'gemini-2.5-flash', promptOverride = null } = opts;
   const styleLabel = resolveStyleLineForSheet(artStyle);
 
   let prompt = promptOverride || PROMPT_TEMPLATES.sheet2x4StyleEval;
   if (!prompt) throw new Error('sheet2x4StyleEval prompt template not loaded');
   prompt = prompt.replace(/REQUESTED_STYLE/g, `REQUESTED_STYLE: ${styleLabel}`);
-  // TASK 7 age gate — style transfer is where kids drift younger (the art
+  // TASK 6 age gate — style transfer is where kids drift younger (the art
   // style's cute prior). Unknown age disables the task (prompt scores it 10).
   const ageNum = parseInt(declaredAge, 10);
   prompt = prompt.replace(/CHARACTER_AGE/g, Number.isFinite(ageNum) ? `${ageNum} years old` : 'unknown');
-  // TASK 4 spec conformance (owner, 2026-09-01): the outfit is judged against
-  // the character's clothing description, not only against Image 2. Source is
-  // the canonical clothingRequirements prose the sheet was generated from;
-  // "none" disables the check (prompt-side skip).
-  const clothingDesc = (typeof costumeDescription === 'string' && costumeDescription.trim()) ? costumeDescription.trim() : 'none';
-  prompt = prompt.replace(/CLOTHING_DESCRIPTION/g, clothingDesc);
-
   const toInlinePart = (dataUri) => {
     const b64 = r2.stripDataUriPrefix(dataUri);
     const mime = dataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg';
     return { inline_data: { mime_type: mime, data: b64 } };
   };
 
-  // 8000 not 2500: gemini-2.5 internal thinking counts toward maxOutputTokens —
-  // the TASK-5 colour enumeration makes it think longer, and a 2500 cap
-  // truncated the JSON mid-string (parse failures).
+  // No output cap (owner rule): a 2500 cap once truncated this JSON mid-string
+  // when the TASK-5 colour enumeration made the model think longer.
   const parts = [
     toInlinePart(sourcePhoto),
     toInlinePart(realisticSheet),
@@ -938,7 +1074,7 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
   // <placeholder> reasons, so an echoed verdict is detectable; re-ask once,
   // then fail the eval so the retry loop treats the attempt as unjudged.
   for (let evalTry = 1; evalTry <= 2; evalTry++) {
-    const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, geminiApiKey);
+    const { text, usageMetadata } = await callSheetJudge(model, parts, null, geminiApiKey);
     if (!text) throw new Error(`style-eval (${model}) returned no text`);
     if (usageTracker && usageMetadata) {
       usageTracker('gemini_quality', {
@@ -957,12 +1093,11 @@ async function evaluateStyledSheetWithGemini(sourcePhoto, realisticSheet, styled
 // never judged. Two signatures: an unfilled "<placeholder>" (current template)
 // or the pre-2026-08-12 worked example's distinctive reason strings.
 const LEGACY_EXAMPLE_REASONS = [
-  'Navy shirt + tan pants + brown loafers preserved across cells 5-8',
   'Same 4×2 grid as Image 2, no figure crosses gutters',
   'Only the target character appears; no other or extra people in any cell',
 ];
 function isEchoedStyleVerdict(verdict) {
-  const reasons = ['layout', 'identity', 'style', 'outfit', 'clean', 'bodyFace', 'age', 'solo']
+  const reasons = ['layout', 'identity', 'style', 'clean', 'bodyFace', 'age', 'solo']
     .map(k => verdict?.[k]?.reason)
     .filter(r => typeof r === 'string');
   if (reasons.length === 0) return false;
@@ -1062,17 +1197,16 @@ async function evaluateSheetRow(rowImageData, which, opts = {}) {
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
-  if (which === 'bodies') {
-    prompt = fillTemplate(prompt, {
-      REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
-      REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '',
-    });
-  }
+  prompt = fillTemplate(prompt, {
+    REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
+    ...(which === 'bodies'
+      ? { REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '' }
+      : {}),
+  });
   const parts = [inlinePartOf(rowImageData), { text: prompt }];
-  // 8000 not 4000: gemini-2.5 thinking counts toward maxOutputTokens, and the
-  // costumeReads enumeration lengthened the bodies JSON — a 4000 cap truncated
-  // it mid-string, and the throw cost three characters their whole ref sheet.
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, process.env.GEMINI_API_KEY);
+  // No cap (owner rule: no output caps): a 4000 cap once truncated the bodies
+  // JSON mid-string, and the throw cost three characters their whole ref sheet.
+  const { text, usageMetadata } = await callSheetJudge(model, parts, null, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`row eval (${which}, ${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, `character_2x4_${which}_eval`, model);
@@ -1097,9 +1231,8 @@ async function evaluateIdentity(headsCrop, opts = {}) {
   if (avatarFaces) parts.push(inlinePartOf(avatarFaces));
   parts.push(inlinePartOf(headsCrop));
   parts.push({ text: prompt });
-  // 8000: same gemini-2.5 thinking-token trap as the row/style evals — a low
-  // cap truncates the JSON. maxOutputTokens is a ceiling, not a charge.
-  const { text, usageMetadata } = await callSheetJudge(model, parts, 8000, process.env.GEMINI_API_KEY);
+  // No cap (owner rule: no output caps) — a low cap truncated the JSON.
+  const { text, usageMetadata } = await callSheetJudge(model, parts, null, process.env.GEMINI_API_KEY);
   if (!text) throw new Error(`identity eval (${model}) returned no text`);
   if (usageTracker && usageMetadata) {
     usageTracker('gemini_quality', { input_tokens: usageMetadata.promptTokenCount || 0, output_tokens: usageMetadata.candidatesTokenCount || 0 }, 'character_2x4_identity_eval', model);
@@ -1120,7 +1253,7 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
   const { topHeads, bottomBody, splitY } = await splitSheetRows(sheetImageData);
   const hasRefs = !!(facePhoto || avatarFaces);
   const [headsR, bodiesR, identityR, poseHeads] = await Promise.all([
-    evaluateSheetRow(topHeads, 'heads', { model, promptOverride, usageTracker }),
+    evaluateSheetRow(topHeads, 'heads', { costumeDescription, model, promptOverride, usageTracker }),
     // Bodies row (flash): feet / angles / outfit / proportions / background. It
     // does NOT judge head presence — a VLM hallucinates a head on a headless torso
     // (POPE-adversarial co-occurrence) — so the head axis is owned by pose
@@ -1174,7 +1307,10 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
  *                             judged SEPARATELY (this is the only place the
  *                             "does each body have a head" check runs).
  *   pass 2 (styled)         → evaluateStyledSheetWithGemini: holistic identity /
- *                             style / outfit. Style transfer re-renders an
+ *                             style. The outfit is pass 1's axis and is not
+ *                             re-judged here — pass 2 is a style transfer and
+ *                             is never told which garments to draw. Style
+ *                             transfer re-renders an
  *                             existing good sheet and cannot lose heads, so no
  *                             per-cell head/body check is run here.
  *
@@ -1197,7 +1333,7 @@ async function evaluateAvatarSheet(sheet, opts = {}) {
   }
   const styled = await evaluateStyledSheetWithGemini(
     facePhoto, realisticSheet, sheet, artStyle, process.env.GEMINI_API_KEY,
-    usageTracker, declaredAge, { model: model || undefined, promptOverride, costumeDescription }
+    usageTracker, declaredAge, { model: model || undefined, promptOverride }
   );
   return { verdict: styled, split: null };
 }
@@ -1239,6 +1375,13 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
     // dress the body cells purely from costumeDescription and ignore Image 2's
     // (old) clothing. Set by the caller when clothingRequirements ≠ stored.
     redress = false,
+    // seasonOutfit = { season, label, outfit, footwear } from season.js
+    // `seasonOutfitGuidance`, or null. Governs the GARMENTS the body cells wear
+    // when nothing else states an outfit — the trial path, where the contract is
+    // `signature: 'none'` and the sheet is the only thing that decides what the
+    // child is wearing. Never touches identity; ignored on a redress sheet,
+    // where the costume owns the outfit.
+    seasonOutfit = null,
   } = opts;
 
   const facePhoto = await resolveFacePhoto(character);
@@ -1258,7 +1401,7 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
   let composed;
   try {
     composed = await generateComposited2x4(character, {
-      costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval,
+      costumeDescription, costumeName, redress, usageTracker, skipReview: skipQualityEval, seasonOutfit,
     });
   } catch (err) {
     throw new Error(`[CHARACTER 2×4] pass-1 generation failed for ${character?.name}: ${err.message}`);
@@ -1310,10 +1453,6 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
         artStyle,
         characterName: character?.name,
         characterAge: character?.age,
-        // Spec-conformance check in the Pass-2 eval judges the outfit against
-        // this prose (same canonical clothingRequirements text the sheet was
-        // generated from).
-        costumeDescription,
         usageTracker,
         skipQualityEval,
       });
@@ -1379,10 +1518,10 @@ async function generateCharacter2x4Sheet(character, opts = {}) {
  * Pass 2 — take the realistic Pass 1 sheet and re-render it in the story's
  * art style via Grok edit. Best-of-N retry. Eval via
  * evaluateStyledSheetWithGemini: layout + identity (vs source photo) +
- * style match + costume preserved. Returns the same shape as Pass 1's
+ * style match. Returns the same shape as Pass 1's
  * collected fields so the dev panel can render both passes uniformly.
  */
-async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, costumeDescription = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
+async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, characterName, characterAge = null, usageTracker, promptOverride = null, backendOverride = null, skipQualityEval = false }) {
   // Optional per-style anchor image (Image 2). The prompt references it only
   // when present; styleTransferGenerate passes it as the 2nd reference.
   const styleAnchor = loadStyleAnchor(artStyle);
@@ -1396,6 +1535,13 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
   let best = null;
+  // Unscored (null) ranks below any judged attempt, so a skipped or failed eval
+  // can never win best-of-N by pretending to be a perfect score.
+  const rank = (v) => (typeof v === 'number' ? v : -1);
+  // Can this run act on a verdict at all? Both retries and the Gemini judge
+  // are off in a trial, and both of the anchor-contamination defences below
+  // hang off them — see the anchor comment in the loop.
+  const canJudge = !!process.env.GEMINI_API_KEY && !skipQualityEval;
 
   const trackUsage = (result) => {
     if (usageTracker && result.usage) {
@@ -1426,9 +1572,21 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     // promptOverride is a Test Lab A/B: that run is measuring one exact prompt
     // against one exact reference set, so the anchor-drop stays off there —
     // changing the inputs under the experiment would corrupt its own result.
-    const anchorForAttempt = (attempt === 1 || promptOverride) ? styleAnchor : null;
+    //
+    // AND THE ANCHOR IS NEVER ATTACHED WHEN NOTHING CAN JUDGE THE RESULT
+    // (2026-09-07). Both defences above — the reject-and-fall-back-to-Pass-1
+    // gate and the anchor-dropping retry — key off the Gemini verdict. A trial
+    // passes skipQualityEval, so the loop breaks on attempt 1 with no verdict:
+    // the dice are rolled once, with the contaminant attached, and whatever
+    // comes back ships as the character's identity reference on every page.
+    // That is staging job_1788763045123_z8so79ngb — Pass 1 was a clean 8-cell
+    // sheet, Pass 2 came back as one merged crowd carrying the watercolor
+    // anchor's boy, woman and elderly man, and each page then got a mis-cropped
+    // slice of it (four pages a HEADLESS torso). Style fidelity is worth a
+    // re-roll; it is not worth an unguarded one.
+    const anchorForAttempt = promptOverride ? styleAnchor : ((attempt === 1 && canJudge) ? styleAnchor : null);
     const prompt = anchorForAttempt ? promptWithAnchor : promptNoAnchor;
-    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}${styleAnchor && !anchorForAttempt ? ' — anchor dropped after failed attempt' : ''}`);
+    log.info(`[CHARACTER 2×4] ${characterName} Pass 2 (style=${artStyle}, backend=${MODEL_DEFAULTS.avatarStyleTransferBackend}) attempt ${attempt}/${totalAttempts}${styleAnchor && !anchorForAttempt ? (canJudge ? ' — anchor dropped after failed attempt' : ' — anchor dropped: nothing can judge or retry this sheet') : ''}`);
     // A thrown backend call consumes ONE attempt — it must never escape this
     // loop. Previously this line was unprotected: one Gemini IMAGE_OTHER
     // safety refusal (photorealistic ADULT face on the Pass-1 sheet) threw
@@ -1447,13 +1605,43 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     }
     trackUsage(result);
 
+    // STRUCTURAL CHECK ON THE STYLED SHEET — LOUD, NOT A GATE (2026-09-07).
+    // Pass 1 has run quickLayoutCheck since the split-sheet bug; Pass 2 ran
+    // nothing deterministic, so a sheet whose cells had merged into one crowd
+    // shipped in silence (job_1788763045123_z8so79ngb). It is recorded and
+    // log.error'd here so no such sheet is ever quiet again.
+    //
+    // It does NOT decide anything. docs/image-routing.md: quickLayoutCheck
+    // measures gutter WHITENESS, so painterly styles false-positive on a
+    // structurally correct sheet (measured: oil sheets at 25.3% and 57.4% were
+    // fine) — "do NOT wire it as a hard gate on Pass-2 / styled sheets".
+    // Making it decisive would ship realistic sheets into painted stories.
+    // `layoutValid` rides the audit record; the ship/reject decision stays with
+    // the Gemini styled-sheet eval, and the contamination itself is prevented
+    // upstream by not attaching the anchor on an unjudgeable run.
+    let layoutValid = true;
+    try {
+      const layout = await quickLayoutCheck(result.imageData);
+      layoutValid = layout.valid !== false;
+      if (!layoutValid) {
+        log.error(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} FAILED the structural check — ${layout.reason}. The 2×4 grid may be gone; a merged sheet cannot serve as an identity reference. ADVISORY (painterly styles false-positive here) — the verdict below decides.`);
+      }
+    } catch (err) {
+      // Unknown, never a pass — and never a reason to lose the style transfer.
+      log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 structural check threw: ${err.message} — layout unknown`);
+      layoutValid = null;
+    }
+
     // skipQualityEval covers pass 2 as well: the caller asked for no reviews
     // (trial has no repair stage and cannot act on a verdict), so accept the
     // first style transfer instead of scoring and retrying it.
     if (!process.env.GEMINI_API_KEY || skipQualityEval) {
       if (!process.env.GEMINI_API_KEY) log.warn('[CHARACTER 2×4] GEMINI_API_KEY missing — accepting Pass 2 after first attempt');
-      best = { result, attempt, score: 10, verdict: null, prompt };
-      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: 10, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
+      // score null, NOT 10 — an unjudged style transfer must not be stored as a
+      // perfect one (job_1788763045123_z8so79ngb shipped a corrupt sheet at 10/10
+      // this way). `valid` below stays true, so the sheet still ships.
+      best = { result, attempt, score: null, evaluated: false, verdict: null, prompt, layoutValid };
+      attempts.push({ attempt, stage: skipQualityEval ? 'no-eval-requested' : 'no-eval-key', score: null, evaluated: false, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt, layoutValid });
       break;
     }
 
@@ -1467,18 +1655,18 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
     let verdict = null;
     try {
       ({ verdict } = await evaluateAvatarSheet(result.imageData, {
-        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, costumeDescription, usageTracker,
+        pass: 2, facePhoto, realisticSheet: pass1ImageData, artStyle, declaredAge: characterAge, usageTracker,
       }));
-      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} outfit=${verdict.outfitScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
+      log.info(`[CHARACTER 2×4]   Pass 2 eval: layout=${verdict.layoutScore} identity=${verdict.identityScore} style=${verdict.styleScore} clean=${verdict.cleanScore} bodyFace=${verdict.bodyFaceScore} age=${verdict.ageScore ?? '-'} final=${verdict.finalScore} valid=${verdict.valid}`);
     } catch (err) {
       // Mirror Pass-1 behaviour: a Gemini eval failure must NOT lock in this
       // attempt at the maximum score and break the retry loop. Score it
       // neutrally and continue so a later attempt that DOES eval successfully
       // can win the best-of-N comparison.
       log.warn(`[CHARACTER 2×4] Pass 2 eval error attempt ${attempt}: ${err.message} — counting as neutral (score=5) and continuing retries`);
-      const candidate = { result, attempt, score: 5, verdict: null, prompt };
+      const candidate = { result, attempt, score: 5, verdict: null, prompt, layoutValid };
       attempts.push({ attempt, stage: 'eval-error', score: 5, reason: err.message, imageData: result.imageData, sentToGrok: result.sentToGrok || null, usedAnchor: !!anchorForAttempt });
-      if (!best || candidate.score > best.score) best = candidate;
+      if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
       continue;
     }
 
@@ -1490,16 +1678,16 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
       layoutScore: verdict.layoutScore,
       identityScore: verdict.identityScore,
       styleScore: verdict.styleScore,
-      outfitScore: verdict.outfitScore,
       cleanScore: verdict.cleanScore,
       bodyFaceScore: verdict.bodyFaceScore,
       reasons: verdict.failureReasons || [],
       imageData: result.imageData,
       sentToGrok: result.sentToGrok || null,
       usedAnchor: !!anchorForAttempt,
+      layoutValid,
     });
-    const candidate = { result, attempt, score, verdict, prompt };
-    if (!best || candidate.score > best.score) best = candidate;
+    const candidate = { result, attempt, score, verdict, prompt, layoutValid };
+    if (!best || rank(candidate.score) > rank(best.score)) best = candidate;
     if (verdict.valid) break;
     log.warn(`[CHARACTER 2×4] ${characterName} Pass 2 attempt ${attempt} score=${score} (valid=false)`);
   }
@@ -1545,6 +1733,11 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
 
 module.exports = {
   generateCharacter2x4Sheet,
+  // Exported for tests: the declared-age proportion block must reach the prompt.
+  declaredAgeBlock,
+  buildPrompt,
+  buildBodyRowPrompt,
+  buildHeadRowPrompt,
   loadPhantom,
   // Standalone Pass 2 (style transfer from an existing realistic sheet) +
   // face-photo resolver — used by Test Lab to reuse one realistic anchor
@@ -1553,5 +1746,5 @@ module.exports = {
   resolveFacePhoto,
   buildStyleTransferPrompt,
   // exposed for tests
-  _internal: { parseJudgeJson, buildPrompt, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
+  _internal: { parseJudgeJson, buildPrompt, buildBodyRowPrompt, buildHeadRowPrompt, buildFootwearRule, buildGarmentRule, buildSeasonOutfitBlock, buildStyleTransferPrompt, resolveFacePhoto, resolveStandardAvatar, quickLayoutCheck, evaluateSheetWithGemini, evaluateStyledSheetWithGemini, runStyleTransferPass, splitSheetRows, evaluateSheetRow, evaluateIdentity, evaluateSheetSplit, evaluateAvatarSheet },
 };

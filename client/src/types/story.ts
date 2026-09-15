@@ -53,7 +53,7 @@ export interface StoryCategory {
 
 // Swiss Stories types
 // Multilingual string for story ideas (title, description, context)
-export type SwissLocalizedString = { en: string; de: string; fr: string; it?: string };
+export type SwissLocalizedString = { en: string; de: string; fr: string; it: string };
 
 export interface SwissStoryIdea {
   id: string;      // 'bern-1'
@@ -112,6 +112,46 @@ export interface LifeChallenge {
   name: LocalizedString;
   emoji: string;
   ageGroup: 'toddler' | 'preschool' | 'early-school' | 'family' | 'preteen';
+  /**
+   * The child ages this topic actually lands for, inclusive. Absent means
+   * any-age — a life event (a move, a new sibling, a hospital stay) reaches a
+   * child at whatever age it happens. `ageGroup` is the picker shelf and is a
+   * different thing.
+   */
+  suitableAges?: [number, number];
+  /**
+   * How LIVE this topic is for a family right now, in either direction, 1-5.
+   * High means the parent is either currently struggling with it (the
+   * refusing, the fighting, the not-sleeping, the not-listening) or currently
+   * marking it (a first day, a new baby, a thing just mastered). Low means the
+   * topic is real but not live: it happens TO the family rather than being what
+   * the family is in the middle of.
+   *
+   * This is NOT topic popularity and NOT how common the event is. A doctor's
+   * appointment is common and near-zero liveness — nobody goes looking for a
+   * book because an appointment exists.
+   *
+   * The values are AUTHORED JUDGEMENT, not measurement. The only measured
+   * signal that touches them is a 2026-08-26 CH Keyword Planner probe of four
+   * German problem queries (docs/decisions.md 2026-09-13).
+   */
+  liveness?: number;
+  /**
+   * Which way the topic pulls. `friction` is a current struggle, `milestone` a
+   * current joy or thing worth marking, `both` a topic that is genuinely each
+   * at once — a new sibling is exciting AND produces jealousy; a first
+   * kindergarten day is proud AND frightening. In the trial grid (`composeTrialGrid`)
+   * `both` counts toward NEITHER side: it is exempt from the friction quota, and
+   * it does not fill the reserved milestone seat, which only a `milestone` topic
+   * takes. Documented as "counts toward whichever side is short" until 2026-09-15;
+   * the code has never done that.
+   */
+  pole?: 'friction' | 'milestone' | 'both';
+  /**
+   * Near-duplicate grouping. At most one topic per family reaches the trial
+   * grid, so a parent never sees two tiles that read as the same book.
+   */
+  family?: string;
 }
 
 export interface LifeChallengeGroup {
@@ -468,7 +508,8 @@ export interface FinalChecksTextCheck {
 
 // Entity consistency check issue (from entity grid evaluation)
 export type EntityIssueSubType =
-  | 'face_mismatch' | 'face_drift' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
+  | 'face_mismatch' | 'face_drift' | 'face_destroyed' | 'hair_change' | 'hair_nuance' | 'skin_tone' | 'age_shift'
+  | 'cutout_artifact'
   | 'clothing_inconsistent' | 'garment_colour' | 'color_change' | 'shape_change';
 
 export interface EntityConsistencyIssue {
@@ -970,14 +1011,59 @@ export interface TokenUsage {
  * (with its fix ledger), and whether the review rewrote it. The APPROVED arc
  * itself travels on beatsReviewReport.arc and in the outline transcript.
  */
-export interface ArcReviewReport {
+/** One panelist's answer in an arc round — the arc's reviewers. */
+export interface ArcPanelist {
+  letter?: string;
   model?: string | null;
-  planModel?: string | null;
+  text?: string;
+}
+
+/** One panel + re-tell round of the arc machine. */
+export interface ArcRound {
+  round?: number;
+  panel?: ArcPanelist[];
+  failedPanelists?: string[];
+  retellModel?: string | null;
+  finalArc?: string;
+  critique?: string;
+  fixing?: string;
+  keeping?: string;
+  used?: string;
+  maxSeverity?: string | null;
+  /** Dev-mode inspection: what this round actually asked (2026-09-11). */
+  panelPrompt?: string | null;
+  retellPrompt?: string | null;
+}
+
+/**
+ * The arc machine's record: create (two arcs, one committed) → panel → re-tell.
+ *
+ * This replaced a single draft-and-review shape, and the old field names
+ * (`drafted`, `analysis`, `planModel`, `changed`) were left behind here while
+ * the pipeline moved on — so the dev-mode panel rendered nothing from a report
+ * that was full of data. Every field below is one the pipeline writes.
+ */
+export interface ArcReviewReport {
+  machine?: string;
+  creatorModel?: string | null;
+  panelModels?: string[];
+  roundsConfigured?: number;
+  roundsRun?: number;
   durationMs?: number;
-  changed?: boolean;
-  drafted?: string;
-  analysis?: string;
-  prompt?: string | null;
+  /** Raw creation output: both arcs, both critiques, the commitment line. */
+  create?: string;
+  createPrompt?: string | null;
+  /** Which arc won (1 or 2), and the two arcs as separate blocks. */
+  committedArc?: number;
+  committed?: string;
+  discarded?: string;
+  rounds?: ArcRound[];
+  finalArc?: string;
+  critique?: string;
+  fixing?: string;
+  keeping?: string;
+  maxSeverity?: string | null;
+  arcHints?: string;
 }
 
 export interface ReviewDiffReport {

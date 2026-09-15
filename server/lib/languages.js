@@ -315,9 +315,16 @@ LANGUAGES['de'] = LANGUAGES['de-ch'];
  * @param {string} langCode - German: 'de-ch', 'de-de', 'de-at', 'de-it', 'de-de-north', 'de-de-south', 'de' | French: 'fr-fr', 'fr-ch', 'fr-be', 'fr-ca', 'fr-af', 'fr' | 'en'
  * @returns {string} Full instruction for AI
  */
+// Language-agnostic quotation hygiene. story-text-audit.txt Q7 and
+// story-text-proofread.txt both fault an unclosed or self-nested quotation
+// mark; no per-language instruction stated it, so no writer was told. One
+// clause here reaches every path that builds {LANGUAGE_INSTRUCTION}.
+const QUOTE_HYGIENE_RULE =
+  ' QUOTATION MARKS: never open one of a kind inside another of the same kind, and never leave one unclosed.';
+
 function getLanguageInstruction(langCode) {
   const lang = LANGUAGES[langCode] || LANGUAGES.en;
-  return lang.instruction;
+  return lang.instruction + QUOTE_HYGIENE_RULE;
 }
 
 /**
@@ -397,6 +404,7 @@ function getAvailableLanguages() {
 module.exports = {
   LANGUAGES,
   getLanguageInstruction,
+  QUOTE_HYGIENE_RULE,
   getLanguageNote,
   getLanguageName,
   getLanguageNameEnglish,

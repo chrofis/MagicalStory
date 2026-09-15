@@ -156,9 +156,12 @@ check(/Flocke/.test(vbSection), 'animal keeps its given name in fallback section
   // (1) worn-vs-held: the held cape is never re-attached by a wears-line
   const wearsLine = (prompt.match(/- Hero wears: .*/i) || [''])[0];
   console.log(`  wears-line: "${wearsLine}"`);
-  check(wearsLine.length > 0, 'wears-line backstop still fires for garments the prose omits');
+  // THE BACKSTOP IS GONE (2f860fb2f and after): the scene prose is the only
+  // clothing description the image model gets, and a brief that fails to dress a
+  // character is reported as an ERROR rather than patched downstream. What still
+  // has to hold is that nothing re-attaches the HELD cape to the body.
+  check(wearsLine.length === 0, 'no page-level wears-line backstop is injected');
   check(!/cape|Umhang|tied|neck/i.test(wearsLine), 'wears-line does not re-attach the held cape');
-  check(/blue t-shirt/.test(wearsLine), 'wears-line keeps the genuinely worn garments');
 
   // (4) state-aware REQUIRED OBJECTS: no worn-state contradiction
   const reqSection = (prompt.match(/\*\*REQUIRED OBJECTS[\s\S]*?(?=\n\n)/) || [''])[0];
@@ -168,19 +171,41 @@ check(/Flocke/.test(vbSection), 'animal keeps its given name in fallback section
   check(/red superhero cape/i.test(reqSection), 'cape still listed (as English ref) in REQUIRED OBJECTS');
   check(/silver scissors/i.test(reqSection), 'artifact listed via English ref');
 
+  // (5) markings do not multiply with a divided object. Pinned structurally,
+  // not by wording: the rule must reach the BUILT prompt and sit at or after
+  // the '**REQUIRED OBJECTS' marker, which is where shrinkPromptForModel's
+  // protected tail begins — a head placement would be compressed away.
+  // Evidence: prod trial job_1789292742265_mgxmrkfpd.
+  const markingIdx = prompt.search(/multiply its markings/i);
+  check(markingIdx >= 0, 'markings rule reaches the built page prompt');
+  const tailIdx = prompt.indexOf('**REQUIRED OBJECTS');
+  check(tailIdx >= 0 && markingIdx > tailIdx, 'markings rule sits inside the protected tail');
+  check(!/^\s*\*\s+\*\*.*multiply its markings/mi.test(prompt),
+    'markings rule is a plain line, not a checklist entry the object parser would read');
+
+  // The object parser must not read the plain rule line as an element.
+  const { parseVisualBibleObjects } = require('../../server/lib/bboxDetection');
+  const parsedNames = parseVisualBibleObjects(prompt).map(o => o.name || '').join(' | ');
+  check(!/multiply|marking/i.test(parsedNames), 'object parser does not treat the markings rule as an element');
+
   // Scene's declared facing survives in the prose
   check(/facing the camera/.test(prompt), 'scene-declared facing retained in prose');
 
   // (3) template subordination text
   const { PROMPT_TEMPLATES } = require('../../server/services/prompts');
-  check(/UNLESS the scene description explicitly declares a facing/.test(PROMPT_TEMPLATES.imageGeneration),
+  // The RULE, not its wording: 2f860fb2f trimmed the sentence ("unless the
+  // scene declares a facing for them, which always wins") without changing what
+  // it says, and the old verbatim match then failed for a year.
+  check(/unless the scene declares a facing/i.test(PROMPT_TEMPLATES.imageGeneration),
     'image-generation.txt subordinates the facing boilerplate to declared facings');
-  check(/declared facing always wins/.test(PROMPT_TEMPLATES.imageGeneration),
+  check(/which always wins/i.test(PROMPT_TEMPLATES.imageGeneration),
     'image-generation.txt states the declared facing wins');
 
   // Root fix: unified templates mandate English VB fields
   const fs = require('fs');
-  for (const tpl of ['prompts/story-unified.txt', 'prompts/story-unified-imagefirst.txt']) {
+  // story-unified*.txt were the subjects here until 2026-09-15 (deleted as
+  // unreachable); the live bible-authoring writer is the trial template.
+  for (const tpl of ['prompts/story-trial.txt']) {
     const text = fs.readFileSync(tpl, 'utf8');
     check(/ENGLISH `name` and `description` for artifacts, locations, vehicles, and clothing/.test(text),
       `${tpl} mandates English VB name/description fields`);

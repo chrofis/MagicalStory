@@ -12,11 +12,11 @@ One line per page: shot — who is in frame — the instant the picture shows �
 
 {PAGE_PLAN}
 
-# ALREADY COUNTED
+# THE ROSTER
 
-Counters have measured the division; these are their results, for reference. Do not repeat them.
+Before the checks, read each page's who column and say who is in frame. A PERSON is a human or a named animal that acts in the story; a THING is everything else the column names — a prop, a vehicle, a building, a place, a river. A name carried by a possessive or an article ("his lit lamp", "their bikes", "the stone railing") is a thing however the sentence is shaped, and a commissioned name is always a person.
 
-{COUNTER_FINDINGS}
+Report every name the who column carries, on every page, under one of the two headings — a name you leave out is counted as absent.
 
 # YOUR TASK
 
@@ -31,8 +31,16 @@ Answer only these eight:
 7. Plants and payoffs. Name every object or flaw a page plants and the later page where it pays off, and for every payoff the earlier page that planted it. A plant no later page pays off, and a payoff no earlier page planted, are findings.
 8. The last page. When the story's ending has an event of its own, say whether the last page stages that event as its instant. A last page staging a different moment while the ending's event happened earlier, off the page, or not at all is a finding.
 
+9. Deed and effect. Name every page whose instant shows an action and the result of that action together. A deed, its effect, and where the effect goes are three actions; the instant shows one, and what follows it belongs in what is true after. Watching, standing and being present are not actions.
+
+10. Two heights. Name every page whose instant puts two named characters at different heights — deck and water, ledge and ground, roof and street. Such a page is staged from one level with the other character out of frame, or split into a page per level. A whole cast carried together on one back or one boat is one level.
+
 # OUTPUT FORMAT
 
-Numbered findings, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
+The roster first, one line per page, every page present and in order:
 
-When nothing is wrong anywhere, output exactly: NONE
+ROSTER <page>: people = <names, comma separated, or none>; things = <names, comma separated, or none>
+
+Then the findings: numbered, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
+
+When the roster is complete and nothing is wrong anywhere, write the roster and then exactly: NONE

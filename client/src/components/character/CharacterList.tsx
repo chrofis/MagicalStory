@@ -40,9 +40,9 @@ export function CharacterList({
 
   // Role labels for 3-state buttons
   const roleLabels = {
-    out: language === 'de' ? 'Nicht dabei' : language === 'fr' ? 'Absent' : 'Out',
-    in: language === 'de' ? 'Dabei' : language === 'fr' ? 'Présent' : 'In',
-    main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : 'Main',
+    out: language === 'de' ? 'Nicht dabei' : language === 'fr' ? 'Absent' : language === 'it' ? 'Assente' : 'Out',
+    in: language === 'de' ? 'Dabei' : language === 'fr' ? 'Présent' : language === 'it' ? 'Presente' : 'In',
+    main: language === 'de' ? 'Hauptrolle' : language === 'fr' ? 'Principal' : language === 'it' ? 'Principale' : 'Main',
   };
 
   const handleDeleteClick = (char: Character) => {
@@ -78,6 +78,8 @@ export function CharacterList({
                 ? 'Charakter erfolgreich erstellt!'
                 : language === 'fr'
                 ? 'Personnage créé avec succès!'
+                : language === 'it'
+                ? 'Personaggio creato con successo!'
                 : 'Character Created Successfully!'}
             </h3>
           </div>
@@ -142,7 +144,7 @@ export function CharacterList({
                         </h4>
                         <p className="text-xs text-gray-500">
                           {char.gender === 'male' ? t.male : char.gender === 'female' ? t.female : t.other},{' '}
-                          {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : 'y'}
+                          {char.age} {language === 'de' ? 'J' : language === 'fr' ? 'ans' : language === 'it' ? 'a' : 'y'}
                         </p>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
@@ -169,7 +171,7 @@ export function CharacterList({
                         <button
                           onClick={() => onCharacterRoleChange(char.id, 'out')}
                           disabled={isLastInStory}
-                          title={isLastInStory ? (language === 'de' ? 'Mindestens ein Charakter muss in der Geschichte sein' : language === 'fr' ? 'Au moins un personnage doit être dans l\'histoire' : 'At least one character must be in the story') : undefined}
+                          title={isLastInStory ? (language === 'de' ? 'Mindestens ein Charakter muss in der Geschichte sein' : language === 'fr' ? 'Au moins un personnage doit être dans l\'histoire' : language === 'it' ? 'Almeno un personaggio deve essere nella storia' : 'At least one character must be in the story') : undefined}
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors ${
                             isOut
                               ? 'bg-gray-500 text-white'
@@ -226,6 +228,8 @@ export function CharacterList({
                 ? 'Weiteren Charakter erstellen'
                 : language === 'fr'
                 ? 'Créer un autre personnage'
+                : language === 'it'
+                ? 'Crea un altro personaggio'
                 : 'Create Another Character'}
             </span>
           </button>
@@ -244,6 +248,8 @@ export function CharacterList({
                   ? 'Charakter löschen?'
                   : language === 'fr'
                   ? 'Supprimer le personnage?'
+                  : language === 'it'
+                  ? 'Eliminare il personaggio?'
                   : 'Delete Character?'}
               </h3>
             </div>
@@ -252,6 +258,8 @@ export function CharacterList({
                 ? `Möchtest du "${deleteConfirm.name}" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`
                 : language === 'fr'
                 ? `Voulez-vous vraiment supprimer "${deleteConfirm.name}"? Cette action est irréversible.`
+                : language === 'it'
+                ? `Vuoi davvero eliminare "${deleteConfirm.name}"? Questa azione non può essere annullata.`
                 : `Are you sure you want to delete "${deleteConfirm.name}"? This action cannot be undone.`}
             </p>
             <div className="flex gap-3">
@@ -259,13 +267,13 @@ export function CharacterList({
                 onClick={cancelDelete}
                 className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
               >
-                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : language === 'it' ? 'Annulla' : 'Cancel'}
               </button>
               <button
                 onClick={confirmDelete}
                 className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium"
               >
-                {language === 'de' ? 'Löschen' : language === 'fr' ? 'Supprimer' : 'Delete'}
+                {language === 'de' ? 'Löschen' : language === 'fr' ? 'Supprimer' : language === 'it' ? 'Elimina' : 'Delete'}
               </button>
             </div>
           </div>

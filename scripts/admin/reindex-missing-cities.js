@@ -166,7 +166,7 @@ Respond with just one word.`;
           { text: prompt },
           { inlineData: { mimeType, data: buf.toString('base64') } },
         ] }],
-        generationConfig: { maxOutputTokens: 20, temperature: 0.0 },
+        generationConfig: { temperature: 0.0 },
       }),
       signal: AbortSignal.timeout(20000),
     });

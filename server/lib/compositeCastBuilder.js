@@ -28,9 +28,41 @@
 
 const { generateCharacter2x4Sheet } = require('./character2x4Sheet');
 const { persistStyledAvatar } = require('../services/database');
-const { slugifyCostume } = require('../utils/costumeKey');
+const { costumeSubKey, pickCostumed } = require('../utils/costumeKey');
 const { stripDataUriPrefix } = require('./r2');
+
+const { parseHoldsId } = require('./coverHolds');
 const { resolveCellPose } = require('./storyAvatars');
+const { buildCastIndex, resolveEntity, canonicalName, lookupByName } = require('./castResolver');
+
+/**
+ * Which styled-avatar slot a clothing label reads, and under which key a freshly
+ * generated sheet is cached.
+ *
+ * A costume label arrives EITHER as `costumed:<x>` or already collapsed to bare
+ * `costumed` (clothingResolve.js does that). Both are costumes and both resolve
+ * through the shared costumeKey helpers, the same ones every writer uses. Reading
+ * a bare `costumed` label as a non-costume returned the whole `costumed` MAP as
+ * if it were a sheet: the cache missed, a fresh 2×4 sheet was paid for, and the
+ * map was then overwritten with a string so every later pickCostumed came back
+ * undefined and the page fell to the generic bbox fallback.
+ *
+ * @param {Object} styledForStyle - character.avatars.styledAvatars[artStyle]
+ * @param {string} clothing - lower-cased clothing label
+ * @param {string|null} storyCostume - the story's costume name, when the label is bare
+ * @returns {{isCostumed: boolean, costumeKey: string|null, cachedSheet: any}}
+ */
+function resolveStyledSheetSlot(styledForStyle, clothing, storyCostume = null) {
+  const label = String(clothing || '').toLowerCase();
+  const slots = styledForStyle && typeof styledForStyle === 'object' ? styledForStyle : {};
+  const isCostumed = label === 'costumed' || label.startsWith('costumed:');
+  if (!isCostumed) return { isCostumed: false, costumeKey: null, cachedSheet: slots[label] };
+  return {
+    isCostumed: true,
+    costumeKey: costumeSubKey(label, storyCostume),
+    cachedSheet: pickCostumed(slots.costumed, label, storyCostume),
+  };
+}
 
 /**
  * Split an interaction's `character` field into the names it actually refers
@@ -48,6 +80,83 @@ function splitInteractionNames(raw) {
     .filter(Boolean);
 }
 
+/**
+ * `looksAt` for a cast entry. A Visual Bible id becomes the element's name
+ * (the plate prompt is read by an image model; an id there is noise);
+ * `camera` / `away` and plain names pass through.
+ */
+function resolveLooksAt(raw, visualBible) {
+  const t = String(raw || '').trim();
+  if (!t) return null;
+  // RESOLVE: the VB-id grammar has ONE definition (vbIdGuard) — a local copy
+  // here missed the dotted vantage form and let `LOC005.1` through as a name.
+  const { baseVbId } = require('./vbIdGuard');
+  const base = baseVbId(t);
+  if (!base) return t;
+  for (const pool of ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations']) {
+    const hit = (visualBible?.[pool] || []).find(e => String(e?.id || '').toUpperCase() === base);
+    if (hit?.name) return String(hit.name);
+  }
+  return null;
+}
+
+/**
+ * Secondary characters the brief stages but never lists in `characters[]`.
+ *
+ * The Art Director schema forbids secondaries in characters[] (they have no
+ * avatar, so no clothing category applies); they appear as a CHR id in
+ * objects[] and as the `character` of an interaction. Until 2026-09-10 the
+ * composite read characters[] only, so a schema-correct brief lost the second
+ * figure of a two-figure page (Lab exp 1101: the main character was pasted
+ * into the other character's empty boat). Each CHR id here becomes a seed:
+ * the bible entry, its action (the interaction's `where`), what it looks at
+ * (a `watching` row's object; a `looksAt` on the row if the AD wrote one),
+ * and a midground depth - the plate decides the real distance, and the
+ * depth-spread gate measures what was painted.
+ *
+ * @param {Object} fullData - the page's parsed metadata (characters, objects, interactions)
+ * @param {Object|null} visualBible
+ * @param {Set<string>} [alreadyCast] - lowercased names already in the cast
+ * @returns {Array<{id, name, entry, action, looksAt, depth}>}
+ */
+function secondaryCastSeeds(fullData, visualBible, alreadyCast = new Set()) {
+  const secondaries = visualBible?.secondaryCharacters || [];
+  if (!secondaries.length) return [];
+  const ids = new Set();
+  const idOf = (v) => { const m = String(v || '').trim().match(/^CHR(\d+)/i); return m ? ('CHR' + m[1]).toUpperCase() : null; };
+  for (const o of (fullData?.objects || [])) { const id = idOf(typeof o === 'string' ? o : (o?.id || o?.name)); if (id) ids.add(id); }
+  const rows = Array.isArray(fullData?.interactions) ? fullData.interactions : [];
+  for (const it of rows) { const id = idOf(it?.character); if (id) ids.add(id); }
+  const seeds = [];
+  for (const id of ids) {
+    const entry = secondaries.find(e => String(e?.id || '').toUpperCase() === id);
+    if (!entry?.name) continue;
+    const name = String(entry.name);
+    if (alreadyCast.has(name.toLowerCase())) continue;
+    const row = rows.find(it => idOf(it?.character) === id) || null;
+    const looksAt = row?.looksAt || (row && String(row.action || '').toLowerCase() === 'watching' ? row.object : null) || null;
+    seeds.push({ id, name, entry, action: row?.where || null, looksAt, depth: 'midground' });
+  }
+  return seeds;
+}
+
+/**
+ * Secondary characters staged on the page (CHR ids in objects[] / interactions)
+ * that have NO Visual Bible reference image. The cast builder cannot render
+ * them from anything, so it leaves them out - and nothing else paints them:
+ * the plate's creature block reads visualBible.animals only. Measured on
+ * job_1789083667794 p6/p7/p17/p18: CHR001 (a dragon) has referenceImageUrl
+ * null, so every composited plate lacked the dragon (2026-09-11).
+ *
+ * Returns them in the plate-creature shape ({ id, name, description }) so the
+ * plate can paint them from their description, the only door they have.
+ */
+function unreferencedSecondaryCreatures(fullData, visualBible) {
+  return secondaryCastSeeds(fullData, visualBible)
+    .filter(seed => !(seed.entry.referenceImageUrl || seed.entry.referenceImageData))
+    .map(seed => ({ id: seed.id, name: seed.name, description: String(seed.entry.extractedDescription || seed.entry.description || '').trim() }));
+}
+
 async function buildCompositeCast(pageData, inputData, deps = {}) {
   const { userId, addUsage, log, storyCharacterAvatars = null, visualBible = null } = deps;
   if (!log) throw new Error('buildCompositeCast: deps.log is required');
@@ -57,7 +166,9 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
     || pageData.sceneCharacters
     || [];
   const sceneChars = Array.isArray(metaChars) ? metaChars : [];
-  if (!sceneChars.length) return null;
+  const fullDataForSeeds = pageData.sceneMetadata?.fullData || pageData.sceneMetadata || {};
+  const seedCount = secondaryCastSeeds(fullDataForSeeds, visualBible).length;
+  if (!sceneChars.length && !seedCount) return null;
 
   // Action lookup from interactions[] — essential > normal > low.
   const interactionsList = pageData.sceneMetadata?.fullData?.interactions
@@ -84,11 +195,16 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
   }
 
   const artStyleKey = inputData.artStyle || 'watercolor';
+  // ONE cast index per build — every name below resolves through it (RESOLVE).
+  const castIdx = buildCastIndex({ characters: inputData.characters || [] }, visualBible);
   const out = [];
   for (const sc of sceneChars) {
     const name = typeof sc === 'string' ? sc : (sc.name || '');
     if (!name) continue;
-    const character = (inputData.characters || []).find(c => (c.name || '').toLowerCase() === String(name).toLowerCase());
+    // RESOLVE: one resolver decides which entry a scene name refers to; a
+    // photo-backed character is the `cast` pool.
+    const resolved = resolveEntity(name, castIdx, { log });
+    const character = resolved && resolved.kind === 'cast' ? resolved.entry : null;
     if (!character) {
       // Not a user character — a Visual Bible SECONDARY character (a story's
       // captain, guard, antagonist). These never have an avatar sheet, and
@@ -105,17 +221,10 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       // exact first, then one name's tokens being a subset of the other's, so
       // a title or an epithet does not break the link but two different people
       // who merely share a word do not collide.
-      const { significantEntityTokens } = require('./visualBible');
-      const wantTokens = significantEntityTokens(name);
-      const secondaries = visualBible?.secondaryCharacters || [];
-      const vbEntry = secondaries.find(sc =>
-        (sc.name || '').toLowerCase() === String(name).toLowerCase())
-        || (wantTokens.size ? secondaries.find(sc => {
-          const have = significantEntityTokens(sc.name);
-          if (!have.size) return false;
-          const subset = (a, b) => [...a].every(t => b.has(t));
-          return subset(wantTokens, have) || subset(have, wantTokens);
-        }) : null);
+      // RESOLVE: the short-form/title mismatch ("Rossa" vs "Kapitänin Rossa")
+      // is the resolver's rule 3 now — and unlike the old first-match subset
+      // it refuses an ambiguous reference instead of picking a namesake.
+      const vbEntry = resolved && resolved.kind === 'secondary' ? resolved.entry : null;
       const vbRef = vbEntry?.referenceImageUrl || vbEntry?.referenceImageData || null;
       if (!vbRef) {
         // No avatar AND no VB sheet — an unnamed walk-on the story never drew
@@ -145,6 +254,7 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         pose: 'threeQuarter',
         flip: sc.flip === true,
         action: actionsByChar.get(String(name).toLowerCase()) || null,
+        looksAt: resolveLooksAt(sc.looksAt, visualBible),
         position: sc.position || 'in the scene',
         depth: sc.depth || null,
         sizeHint: sc.depth || null,
@@ -162,9 +272,10 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       throw new Error(`[COMPOSITE CAST] ${name}: no clothing category on the page or the scene character. Refusing to default to 'standard'.`);
     }
     const clothing = String(rawClothing).toLowerCase();
-    const costumeKey = clothing.startsWith('costumed:')
-      ? slugifyCostume(clothing.slice('costumed:'.length))
-      : null;
+    const storyCostume = inputData.clothingRequirements?.[name]?.costumed?.costume || null;
+    const styledForStyle = character.avatars?.styledAvatars?.[artStyleKey] || {};
+    const { isCostumed, costumeKey, cachedSheet } =
+      resolveStyledSheetSlot(styledForStyle, clothing, storyCostume);
 
     // Step 1: try the story-scoped sheet first (Phase 4 — the canonical
     // source). When the story already has a costumed/styled-<clothing>
@@ -181,10 +292,6 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
         storySlot = entry[`styled-${clothing}`] || entry.costumed || null;
       }
     }
-    const styledForStyle = character.avatars?.styledAvatars?.[artStyleKey] || {};
-    const cachedSheet = costumeKey
-      ? styledForStyle.costumed?.[costumeKey]
-      : styledForStyle[clothing];
     let sheetUri = storySlot
       ? (typeof storySlot === 'string' ? storySlot : (storySlot.imageUrl || storySlot.imageData || storySlot.data || null))
       : (cachedSheet
@@ -268,6 +375,7 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       pose,
       flip,
       action: actionsByChar.get(name.toLowerCase()) || null,
+      looksAt: resolveLooksAt(sc.looksAt, visualBible),
       position: sc.position || 'in the scene',
       // Preserve raw depth flag for downstream stratum split. sizeHint is the
       // human-readable string the prompt builders consume; depth is the rank
@@ -282,6 +390,37 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       gender: character.gender || null,
     });
   }
+  // Secondary characters named only as CHR ids (objects[] / interactions).
+  {
+    const have = new Set(out.map(c => String(c.name || '').toLowerCase()));
+    for (const seed of secondaryCastSeeds(fullDataForSeeds, visualBible, have)) {
+      const vbRef = seed.entry.referenceImageUrl || seed.entry.referenceImageData || null;
+      if (!vbRef) { log.warn(`[COMPOSITE CAST] ${seed.name} (${seed.id}): staged by the brief but no Visual Bible reference sheet — left out of the composite`); continue; }
+      let vbBuf;
+      try {
+        vbBuf = /^https?:\/\//i.test(String(vbRef))
+          ? Buffer.from(await (await fetch(vbRef)).arrayBuffer())
+          : Buffer.from(stripDataUriPrefix(String(vbRef)), 'base64');
+      } catch (err) { log.warn(`[COMPOSITE CAST] ${seed.name}: Visual Bible sheet unreadable (${err.message}) — left out`); continue; }
+      out.push({
+        name: seed.name,
+        sheetBuf: vbBuf,
+        singleImage: true,
+        pose: 'threeQuarter',
+        flip: false,
+        action: seed.action,
+        looksAt: resolveLooksAt(seed.looksAt, visualBible),
+        position: seed.action ? 'where the action places them' : 'in the scene',
+        depth: seed.depth,
+        sizeHint: seed.depth,
+        description: seed.entry.extractedDescription || seed.entry.description || null,
+        fromVisualBible: true,
+        fromObjects: true,
+      });
+      log.info(`[COMPOSITE CAST] ${seed.name} (${seed.id}): secondary character staged as a CHR id — added to the cast from the Visual Bible sheet`);
+    }
+  }
+
   return out;
 }
 
@@ -414,6 +553,10 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
   const artNames = (coverHint._artifactNames && typeof coverHint._artifactNames === 'object')
     ? coverHint._artifactNames
     : {};
+  const coverIdx = buildCastIndex(
+    { characters: Array.isArray(characters) ? characters : [] },
+    storyData && storyData.visualBible ? storyData.visualBible : (deps.visualBible || null)
+  );
 
   // Map holds → action phrase. Same wording as coverComposite so the two
   // paths produce comparable cast actions. Cover gaze is code-owned
@@ -424,9 +567,9 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
     const parts = [];
     const holds = String(d.holds || '').trim();
     if (holds && holds.toLowerCase() !== 'nothing') {
-      const m = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-      if (m && artNames[m[1].toUpperCase()]) {
-        parts.push(`holds the ${artNames[m[1].toUpperCase()]}, both hands visibly gripping it`);
+      const heldId = parseHoldsId(holds);
+      if (heldId && artNames[heldId]) {
+        parts.push(`holds the ${artNames[heldId]}, both hands visibly gripping it`);
       } else {
         parts.push(`holds ${holds}`);
       }
@@ -468,7 +611,10 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
         return resolved;
       })(),
     });
-    const detail = details[c.name] || Object.values(details).find(d => d?.name?.toLowerCase() === nameLower);
+    // RESOLVE: cover-hint detail blocks are keyed by whatever spelling the
+    // hint used; the value's own `name` stays a COMPARE-only last resort.
+    const detail = (lookupByName(details, c.name, coverIdx) || {}).value
+      || Object.values(details).find(d => canonicalName(d?.name) === canonicalName(c.name));
     const action = buildAction(detail);
     if (detail && action) {
       interactions.push({
@@ -494,4 +640,4 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
   return buildCompositeCast(fakePageData, fakeInputData, deps);
 }
 
-module.exports = { buildCompositeCast, buildCoverCompositeCast, splitCastByStratum };
+module.exports = { buildCompositeCast, resolveStyledSheetSlot, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds, unreferencedSecondaryCreatures };
