@@ -4491,6 +4491,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
             // Pull landmark photos for the LOC if real — used as a strict
             // visual reference for the Wikimedia-photo case.
+            // NOT resolveLandmarkPhotoForLocation: this is the per-vantage plate
+            // path and the photo is the LOC's own legacy referencePhotoData, not a
+            // variant slot. It therefore carries no `photoType`, and
+            // buildLandmarkFidelityBlock falls to its close/exterior wording —
+            // correct for a single legacy landmark photo, and the reason a wide
+            // curated view must not be routed here.
             const landmarkPhotos = (v.location?.isRealLandmark && v.location?.referencePhotoData)
               ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
               : (repPageData.landmarkPhotos || []);

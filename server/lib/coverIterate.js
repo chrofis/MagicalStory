@@ -1693,6 +1693,11 @@ async function buildCoverReferences({
           photoUrl,
           photoData,
           source: 'curated-non-landmark',
+          // A curated non-landmark photo has no indexed slot, so no photoType:
+          // buildLandmarkFidelityBlock falls to its close/exterior wording. This
+          // is the one case that cannot come from resolveLandmarkPhotoForLocation,
+          // which gates on isRealLandmark.
+          photoType: null,
           attribution: loc.attribution || loc.photoAttribution || null,
         });
         log.info(`🔗 [COVER-REFS] ${label}: using curated photo from ${loc.id} (${loc.name}) — not a real landmark but has a usable photo`);
