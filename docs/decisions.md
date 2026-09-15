@@ -39855,3 +39855,42 @@ thing the gate exists to prevent.
 `tests/manual/test-push-idle-gate.js` (404 case, plus the stale DNS-failure expectation
 left behind by the 2026-09-14 change).
 **Status:** ✅ active
+
+## 2026-09-15 — Generator and critic are siblings: the registry enforces it
+
+**Context:** Owner, after the sibling-path gate shipped: *"Do we also ensure that creator and
+reviewer get same info? That is the other thing we keep chasing — we fix the reviewer, but we
+never told the creator the change."* An audit of seven generator↔critic prompt pairs found **38
+rules a judge can deduct for that the generator was never given**, 34 of them safe to close and 4
+requiring an owner decision. The worst: the empty-scene QC judges a plate against `mainScenePrompt`
+that `buildEmptyScenePrompt` is never passed; the cover EXPECTED CAST roster is built from the
+untrimmed brief while the generator is capped at five characters and explicitly told to exclude the
+rest; `plan-check.txt` demands every first appearance be staged as an arrival or a naming while
+`story-beats.txt` contains no entrance rule at all; `D-24 character_marking` is CATASTROPHIC/CRITICAL
+and the generator was told only not to write LETTERS.
+
+**Decision:** The sibling registry gains a `generator-vs-critic` axis with five sets (page image vs
+its three judges, Art Director vs scene-review, writer vs proofread/audit, avatar vs its judge,
+planner vs plan-check). Those sets declare `generators` and `critics` instead of a flat member list,
+and their rule is deliberately looser and directional: a commit must touch at least ONE of each
+side, not every member — three judges of one generator are not siblings of each other. The gate
+names which direction it caught, because the two are different mistakes. `parity.ruleAnchors` pins a
+critic rule to its generator-side counterpart in the normal test suite. Two gaps were migrated as
+the pattern to copy: one exported JS constant per rule, filled into a declared placeholder, pinned
+against the REAL builder. Everything that would move a severity, a type or a bucket was left for the
+owner.
+
+**Rationale:** A judge may only deduct for a rule the generator was given; otherwise the finding is
+real, the score is real, and no rewrite can satisfy it. Mirroring a sentence into both templates is
+the same disease one level down, so the shared-constant form is the enforced pattern — and the test
+must run the real builder, since `fillTemplate` strips an undeclared placeholder silently and the
+prompt ships with a hole. The four OWNER cases are classification questions, which belong to the
+prompt and to the owner, never to a quiet edit.
+
+**Touched files:** `scripts/admin/sibling-registry.json`, `scripts/admin/check-sibling-paths.js`,
+`scripts/admin/sibling-reminder-hook.js`, `server/lib/promptBuilders.js`,
+`prompts/image-generation.txt`, `tests/unit/sibling-parity.test.ts`,
+`tests/unit/generator-critic-rule-reach.test.ts` (new),
+`.claude/skills/syncing-generator-and-critic/SKILL.md` (new),
+`.claude/skills/fixing-sibling-paths/SKILL.md`, `docs/sibling-paths.md`, `CLAUDE.md`.
+Commits `f4976b408`, `002b5d2a2`, `3e40b75a5`.
