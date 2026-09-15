@@ -28,6 +28,30 @@ const { sanitizeIssueForInpaint, stripCharacterNames } = require('./imageComposi
 const { blackoutIssueRegions } = require('./imageInpainting');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
+
+/**
+ * The evaluator-derived EVIDENCE fields that every result-assembly whitelist in
+ * this module must carry.
+ *
+ * Each provider branch of `generateImageOnly` (and `evaluateImagesBatch`)
+ * rebuilds its own whitelisted object from the `evaluateImageQuality` return —
+ * "a field not listed here never reaches the stored version, however faithfully
+ * the evaluator produced it." `notEvaluated` (the per-dimension "could not be
+ * judged" record) and `threeStageResult` (the prompt-compliance judge's raw
+ * record) are produced by the evaluator and listed by all three DOWNSTREAM
+ * whitelists, yet no assembly here named them — so every stored page had
+ * `notEvaluated: null` while the run's generationLog showed the recorder
+ * firing. One helper spread into every branch so the next evidence field added
+ * cannot go missing from four of five siblings.
+ */
+function carryEvalEvidence(qualityResult) {
+  return {
+    // null = the dimension record never reached us; [] = evaluated, nothing skipped.
+    notEvaluated: qualityResult?.notEvaluated ?? null,
+    // Stage-1 vision inventory + Stage-2 compliance JSON, verbatim.
+    threeStageResult: qualityResult?.threeStageResult ?? null,
+  };
+}
 // Eval cluster now lives in evalPipeline.js (verbatim move; see its header).
 // Destructured here both to re-export (facade — external top-level destructures
 // in server.js / regeneration.js / entityConsistency.js depend on it) and
@@ -1495,6 +1519,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       verdict: qualityResult?.verdict || null,
       usage: raw.usage
@@ -1540,6 +1565,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       verdict: qualityResult?.verdict || null,
       // `imageUsage` is the field provider-style usage trackers read.
@@ -1574,6 +1600,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       qualityModelId: qualityResult?.qualityModelId ?? null,
       imageUsage: raw.usage,
@@ -1601,6 +1628,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       qualityModelId: qualityResult?.qualityModelId ?? null,
       imageUsage: raw.usage,
@@ -1765,6 +1793,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           objectMatches, // Object/animal/landmark matches from evaluation
           semanticResult: qualityResult?.semanticResult || null,
           semanticScore: qualityResult?.semanticScore ?? null,
+          ...carryEvalEvidence(qualityResult),
           issuesSummary: qualityResult?.issuesSummary || null,
           verdict: qualityResult?.verdict || null,
           modelId,  // Include which model was used for image generation
@@ -2771,7 +2800,7 @@ async function evaluateImageBatch(images, options = {}) {
         // verbatim so the dev panel can show Stage-1's free-form "what I see"
         // text and Stage-2's raw compliance JSON. Was being dropped before
         // this — only the score + issuesSummary survived.
-        threeStageResult: qualityResult?.threeStageResult || null,
+        ...carryEvalEvidence(qualityResult),
         // Text error info for covers
         textIssue: qualityResult?.textIssue || null,
         expectedText: qualityResult?.expectedText || null,
@@ -5240,6 +5269,7 @@ async function applyStyleTransfer(imageData, artStyle, options = {}) {
 }
 
 module.exports = {
+  carryEvalEvidence,
   // Everything the two domain modules export, forwarded by construction. The
   // explicit list below keeps the documented surface and wins for any name this
   // file defines locally.

@@ -40377,3 +40377,27 @@ cannot be reintroduced by rewording a prompt.
 `server/lib/evalPipeline.js`, `server/lib/evalReplayInputs.js`, `server/lib/images.js`,
 `storyJobPipeline.js`, `tests/unit/cover-cast-roster-parity.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — `notEvaluated` is carried by ONE helper, not six hand-listed whitelists
+
+**Context:** a staging run's `generationLog` carried 8 `check_not_evaluated` events (e.g. page 16 of
+`job_1789420511893_zly5rcdej`, "was NOT evaluated (no_required_objects)"), yet `notEvaluated` was
+`null` on all 16 stored pages and absent from `finalChecksReport`, and `repairPipeline.js`'s
+roll-up warn never fired. The three downstream whitelists (`storyJobPipeline.js`,
+`repairPipeline.js` ×2) already listed the field. The drop was upstream: every provider branch of
+`generateImageOnly` plus `evaluateImagesBatch` rebuilds its own whitelisted object from the
+`evaluateImageQuality` return, and none of the six named `notEvaluated`. Five of six also dropped
+`threeStageResult` — the same leak `coverEvalMirror.js` documented for cover roots.
+
+**Decision:** one exported helper, `carryEvalEvidence(qualityResult)` in `server/lib/images.js`,
+spread into all six assemblies. Evidence fields that must survive every branch live in it; a new
+one is added once, not six times. `notEvaluated: []` (evaluated, nothing skipped) is preserved
+distinctly from `null` (record never arrived).
+
+**Rationale:** the sibling trio (Grok / Gemini / batch — here six branches) has leaked the same
+class of field twice before (`rawOutput`/`coherenceGate`, then cover roots). A hand-listed
+whitelist per branch guarantees the next evidence field goes missing in most of them.
+
+**Touched:** `server/lib/images.js`, `tests/unit/eval-evidence-whitelist.test.ts`,
+`tests/unit/eval-evidence-batch-record.test.ts`
+**Status:** ✅ active
