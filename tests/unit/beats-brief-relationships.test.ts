@@ -117,14 +117,8 @@ describe('the beats STORY_BRIEF', () => {
   });
 });
 
-describe('the unified writer prompt is unchanged by the shared renderer', () => {
-  it('still renders its named lines and still drops the stale pair', async () => {
-    const { buildUnifiedStoryPrompt } = require('../../server/lib/promptBuilders');
-    const built = await buildUnifiedStoryPrompt(inputData);
-    const text = typeof built === 'string' ? built : JSON.stringify(built);
-    expect(text).toContain('- Leo is Brother of Mia. They share a room.');
-    expect(text).toContain('- Mia is Sister of Leo');
-    expect(text).toContain('- Leo is Grandson of Oma Ruth. He visits every summer.');
-    expect(text).not.toContain('stale entry');
-  });
-});
+// The fourth case here pinned buildUnifiedStoryPrompt, the pre-beats unified
+// writer. That builder and its two templates were deleted 2026-09-15 as
+// unreachable (docs/decisions.md); the renderer contract it exercised is
+// already pinned by the buildStoryContextFields cases above, which is where
+// every live writer stage reads STORY_BRIEF from.

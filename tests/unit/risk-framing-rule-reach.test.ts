@@ -6,7 +6,6 @@ const {
   RISK_FRAMING_RULE,
   buildTellingRulesSection,
   buildTrialStoryPrompt,
-  buildUnifiedStoryPrompt,
 } = require('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
 
@@ -39,12 +38,8 @@ describe('risk-framing rule reaches every stage that writes story prose', () => 
     expect(buildTrialStoryPrompt(input({ trialMode: true }), 5)).toContain(RISK_FRAMING_RULE);
   });
 
-  it('reaches both unified variants — image-first (default) and text-first', () => {
-    for (const storyPromptVariant of ['imageFirst', 'textFirst']) {
-      const prompt = buildUnifiedStoryPrompt(input({ storyPromptVariant }), 12);
-      expect(prompt, storyPromptVariant).toContain(RISK_FRAMING_RULE);
-    }
-  });
+  // The two unified variants were pinned here until 2026-09-15, when both
+  // templates and buildUnifiedStoryPrompt were deleted as unreachable.
 
   it('sits beside the peril rule without replacing it', () => {
     const rules = buildTellingRulesSection(input());
@@ -55,8 +50,6 @@ describe('risk-framing rule reaches every stage that writes story prose', () => 
   it('leaves no unfilled placeholder in any writer prompt', () => {
     const built = [
       buildTrialStoryPrompt(input({ trialMode: true }), 5),
-      buildUnifiedStoryPrompt(input({ storyPromptVariant: 'imageFirst' }), 12),
-      buildUnifiedStoryPrompt(input({ storyPromptVariant: 'textFirst' }), 12),
     ];
     for (const prompt of built) expect(prompt).not.toContain('{RISK_FRAMING}');
   });

@@ -40648,3 +40648,61 @@ wanted-picture-per-act check and the ranked re-plan) are untouched.
 `server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
 `tests/unit/plan-replan-ranking.test.ts`
 **Status:** ✅ active — staging only, not on master
+
+---
+
+## 2026-09-15 — The pre-beats unified writer is deleted (`story-unified.txt`, `story-unified-imagefirst.txt`)
+
+**Context.** The Visual Bible was authored at FOUR prompt sites, and the sibling gate
+(`scripts/admin/check-sibling-paths.js`) blocked every push until a new VB rule — the
+`scaleClass` enum, the `generic` gate, the `states` field, the costume/`wornAs` rules — was
+copied into all four. Two of those four were the text-first / image-first arms of a story-writer
+A/B that predates the beats pipeline.
+
+**Decision.** Delete `prompts/story-unified.txt`, `prompts/story-unified-imagefirst.txt`,
+`prompts/outline-analysis-textfirst.txt`, `buildUnifiedStoryPrompt`, the
+`storyPromptVariant` / `STORY_PROMPT_VARIANT` / `useImageFirst` seam, and
+`SPLIT_REVIEW_ANALYSIS_STUB`. `resolvePipelineMode` now treats `'unified'` as TRIAL-ONLY: a
+non-trial job that asks for it (or for anything unrecognised) resolves to `'beats'`.
+
+**Evidence they were dead — checked before deleting, not assumed.**
+- `runtime.js:44` sets `pipelineMode: 'beats'`, so `storyJobPipeline.js:664` takes the beats
+  branch for every non-trial job and the unified prompt was built at line 668 and thrown away.
+- A TRIAL never reached them: `resolvePipelineMode` returns `'unified'` for `trialMode`, but the
+  builder at line 668 was already `trialMode ? buildTrialStoryPrompt(...) : ...` — the trial fills
+  `story-trial.txt` (owner decision 2026-08-15, funnel speed).
+- The Test Lab does not reach them: the `outline_review` stage — the one stage that measured
+  `buildUnifiedStoryPrompt` — was retired 2026-09-13 and its retirement is pinned by
+  `tests/unit/testlab-outline-review-retired.test.ts`. No other stage references them.
+- The only remaining entry was an ADMIN hand-crafted `inputData.pipelineMode: 'unified'` on
+  `create-story` (`storyJobPipeline.js:7951` strips it for non-admins). Nothing in the client,
+  any script, any Lab stage or any env default ever sets it. That escape hatch is now closed
+  explicitly rather than left as a crash.
+- **The trap that was checked FIRST and cleared:** the DO-NOT-WRITE list used to be SLICED out of
+  `story-unified-imagefirst.txt` at runtime, which would have made this deletion silently strip
+  the list from production. It was already moved to `prompts/do-not-write-list.txt`
+  (rule-survival audit 2026-09-03, item M2). `outline-analysis-imagefirst.txt` IS still live —
+  `buildTextRefinePrompt` slices its criteria on every beats run — so it was KEPT. Only the
+  `-textfirst` twin, reachable solely through the deleted variant flag, went with them.
+- The outline parsers (`outlineParser/legacy.js`, `progressive.js`, `unified.js`) survive: they
+  parse the BEATS transcript and the trial stream, not just the deleted templates' output.
+
+**Consequences accepted.** Two prompt rules existed ONLY in the deleted templates and therefore
+exist nowhere now: the `depth` "Depth does not set size" schema clause (the live statement is in
+`image-generation.txt`) and the "goes in `properName` and nowhere else" wording (the live sites
+still declare the `properName` key, which is a sibling-registry anchor). Their tests were narrowed
+to what actually holds rather than asserting the lost wording into the surviving templates.
+
+**Sibling registry.** `unified-writer-twins` and `trial-vs-full-writer` were DELETED (each would
+have been left a one-member set). `story-prose-writers` now carries the trial-vs-full axis with
+`story-text-from-beats.txt` + `story-trial.txt`, anchored on `{PAGE_OPENING_VARIETY}` only —
+`{RISK_FRAMING}` and `{AD_COMPOSITION}` are genuinely not declared by the beats text writer.
+`vb-authoring-sites` is down to the two live authoring sites. `story-text-generator-vs-critic`
+was retargeted from `story-unified.txt` to the two live prose writers. 15 sets → 13.
+
+**Touched files.** `prompts/story-unified.txt` (deleted), `prompts/story-unified-imagefirst.txt`
+(deleted), `prompts/outline-analysis-textfirst.txt` (deleted),
+`tests/manual/test-imagefirst-parser-compat.js` (deleted), `server/services/prompts.js`,
+`server/lib/promptBuilders.js`, `server/lib/storyHelpers.js`, `server/lib/beatsPipeline.js`,
+`storyJobPipeline.js`, `server.js`, `scripts/admin/sibling-registry.json`,
+`docs/prompt-inventory.md`, `docs/SETTLED.md`, and 13 test files.

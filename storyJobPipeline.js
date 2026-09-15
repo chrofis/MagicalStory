@@ -72,7 +72,6 @@ const {
   extractPageClothing,
   buildSceneExpansionPrompt,
   buildImagePrompt,
-  buildUnifiedStoryPrompt,
   buildOutlineReviewPrompt,
   buildTrialStoryPrompt,
   buildAvailableAvatarsForPrompt,
@@ -665,10 +664,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const beatsMode = pipelineMode === 'beats';
     if (beatsMode) log.info(`🪜 [PIPELINE] pipelineMode=beats — unified writer + outline review are skipped`);
 
+    // The single-call writer is the TRIAL writer and nothing else. The
+    // pre-beats unified writer (buildUnifiedStoryPrompt + story-unified*.txt)
+    // was deleted 2026-09-15 — see docs/decisions.md. resolvePipelineMode
+    // guarantees a non-trial job is always 'beats', so this stays null there.
     const unifiedPrompt = inputData.trialMode
       ? buildTrialStoryPrompt(inputData, sceneCount)
-      : buildUnifiedStoryPrompt(inputData, sceneCount);
-    log.debug(`📖 [UNIFIED] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages${inputData.trialMode ? ' (trial mode)' : ''}`);
+      : null;
+    if (unifiedPrompt) log.debug(`📖 [TRIAL] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages`);
 
     // Art style for avatar generation
     const artStyle = inputData.artStyle || 'pixar';
@@ -2676,6 +2679,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (beatsMode) {
       await runBeatsWriterWithLandmarkGuideline();
     } else {
+      // Trial only (resolvePipelineMode returns 'unified' for trialMode alone).
+      if (!unifiedPrompt) throw new Error('No writer prompt: a non-trial job reached the single-call branch');
       const unifiedResult = await callTextModelStreaming(unifiedPrompt, null, (chunk, fullText) => {
         progressiveParser.processChunk(chunk, fullText);
         unifiedHeartbeat();  // throttled — fires at most every 30s

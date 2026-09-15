@@ -28,7 +28,7 @@ const {
   buildAgeModeSection,
   buildArcCreatePrompt,
   buildArcRetellPrompt,
-  buildUnifiedStoryPrompt,
+  buildTrialStoryPrompt,
 } = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 
@@ -90,24 +90,22 @@ describe('values spread into a prompt actually reach it', () => {
     expect(ageMode).toContain(bandLine);
     expect(nudge).toContain('ages 5-12');
 
-    for (const variant of ['imageFirst', 'textFirst']) {
-      const prompt = lf(buildUnifiedStoryPrompt({ ...base, storyPromptVariant: variant }, 12));
-      expect(prompt, variant).toContain(bandLine);
-      expect(prompt, variant).toContain(nudge);
+    // The two unified variants were the subjects here until 2026-09-15, when
+    // both templates and buildUnifiedStoryPrompt were deleted as unreachable.
+    const prompt = lf(buildTrialStoryPrompt({ ...base, trialMode: true }, 12));
+    expect(prompt).toContain(bandLine);
+    expect(prompt).toContain(nudge);
 
-      // The band claims to override instructions elsewhere, so it must come
-      // after the category guidelines it is allowed to restrain.
-      expect(prompt.indexOf(bandLine), variant)
-        .toBeGreaterThan(prompt.indexOf('# Story Category Guidelines'));
-    }
+    // The band claims to override instructions elsewhere, so it must come
+    // after the category guidelines it is allowed to restrain.
+    expect(prompt.indexOf(bandLine))
+      .toBeGreaterThan(prompt.indexOf('# Story Category Guidelines'));
   });
 
   it('no prompt in the family ships an unfilled placeholder', () => {
     expect(unfilled(buildArcCreatePrompt(base, 12))).toEqual([]);
     expect(unfilled(buildArcRetellPrompt(base, 12, COMMITTED_ARC, 'Panelist A: x'))).toEqual([]);
-    for (const variant of ['imageFirst', 'textFirst']) {
-      expect(unfilled(buildUnifiedStoryPrompt({ ...base, storyPromptVariant: variant }, 12))).toEqual([]);
-    }
+    expect(unfilled(buildTrialStoryPrompt({ ...base, trialMode: true }, 12))).toEqual([]);
   });
 
   it('an in-window topic still reaches the writer with the band and no nudge', () => {
@@ -123,7 +121,7 @@ describe('values spread into a prompt actually reach it', () => {
     // Not every band carries the same opening sentence, so pin the band this
     // age actually resolves to: its own first line must reach the prompt.
     const firstLine = ageMode.split('\n')[0];
-    expect(lf(buildUnifiedStoryPrompt(inWindow, 12))).toContain(firstLine);
+    expect(lf(buildTrialStoryPrompt({ ...inWindow, trialMode: true }, 12))).toContain(firstLine);
   });
 
   it('an older reader gets the journey band, and it reaches the prompt whole', () => {
@@ -138,7 +136,7 @@ describe('values spread into a prompt actually reach it', () => {
     const ageMode = String(buildAgeModeSection(older) || '').trim();
     expect(ageMode).toContain("# HERO'S JOURNEY (age 9)");
     expect(ageMode).not.toMatch(/\{[A-Z][A-Z0-9_]*\}/);
-    expect(lf(buildUnifiedStoryPrompt(older, 12))).toContain(ageMode.split('\n')[0]);
-    expect(unfilled(buildUnifiedStoryPrompt(older, 12))).toEqual([]);
+    expect(lf(buildTrialStoryPrompt({ ...older, trialMode: true }, 12))).toContain(ageMode.split('\n')[0]);
+    expect(unfilled(buildTrialStoryPrompt({ ...older, trialMode: true }, 12))).toEqual([]);
   });
 });

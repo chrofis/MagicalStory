@@ -230,7 +230,6 @@ const {
   buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
   buildImagePrompt,
-  buildUnifiedStoryPrompt,
   buildOutlineReviewPrompt,
   buildTrialStoryPrompt,
   buildPreviousScenesContext,

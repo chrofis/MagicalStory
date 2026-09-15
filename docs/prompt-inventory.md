@@ -20,10 +20,7 @@ Three loading mechanisms feed these templates:
 
 | Template | Consumer | Stage |
 |---|---|---|
-| story-unified.txt | storyHelpers.js `buildUnifiedStoryPrompt` | Unified story call (outline + VB + text + hints) |
-| story-unified-imagefirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` (when `inputData.storyPromptVariant === 'imageFirst'`) | Image-first variant of the unified call — authoring order arc → scene designs → ALL scene authoring (`---SCENE PAGES---`: SCENE prose + METADATA per page) → text-only STORY DRAFT. Parsers detect the `---SCENE PAGES---` marker (scene-first format); original format parses byte-identically (2026-07-31 restructure) |
-| outline-analysis-textfirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` + `buildOutlineReviewPrompt` | ANALYSIS instruction body for story-unified.txt (`{ANALYSIS_INSTRUCTIONS}` placeholder). Single-call mode injects it into the writer prompt; split mode injects it into the reviewer prompt instead |
-| outline-analysis-imagefirst.txt | storyHelpers.js `buildUnifiedStoryPrompt` + `buildOutlineReviewPrompt` | ANALYSIS instruction body for story-unified-imagefirst.txt — same dual use as above |
+| outline-analysis-imagefirst.txt | promptBuilders.js `buildOutlineReviewPrompt` + `buildTextRefinePrompt` | Shared ANALYSIS instruction body. LIVE on the beats path: `buildTextRefinePrompt` slices its review CRITERIA out of it on every beats run. Fed the deleted unified writers too until 2026-09-15 |
 | outline-review.txt | storyHelpers.js `buildOutlineReviewPrompt`; server.js split-review seam | External outline review (split mode, default ON): Opus receives the writer's full output + the same analysis instructions + REVIEW HINTS (deterministic scene-consistency findings) and emits ANALYSIS + FIXES REQUIRED + STORY PAGES patches; owns all SEMANTIC scene-consistency judgment (decisions.md 2026-07-31) |
 | story-beats.txt | storyHelpers.js `buildBeatsPrompt` | Beats-first pipeline step 1 (`pipelineMode: 'beats'`) + Test Lab `beats_scenes`: the PAGE PLAN, one plan line per page (no beat prose since 2026-09-02) |
 | plan-check.txt | storyHelpers.js `buildPlanCheckPrompt` | Beats-first step 2: the ONE model call over a page division — emotional highlights, entrances, 3+-cast justifications. Counters (server/lib/planCounters.js) do the arithmetic |
@@ -47,7 +44,7 @@ Three loading mechanisms feed these templates:
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
 | vb-label-repair.txt | (new) Visual Bible label repair | One fed-back round to fix Visual Bible label faults |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
-| — | — | **Bible `label` field (2026-09-13):** story-unified.txt, story-unified-imagefirst.txt, story-trial.txt and scene-expansion-all.txt all author a `label` beside each element's `id` — the one English name every prompt uses for that element |
+| — | — | **Bible `label` field (2026-09-13):** story-trial.txt and scene-expansion-all.txt both author a `label` beside each element's `id` — the one English name every prompt uses for that element |
 | age-band-routine.txt | promptBuilders.js `buildAgeModeSection` → `{AGE_MODE}` in arc-create, arc-retell, story-arc-review, story-beats, story-trial, trial-idea, generate-story-idea(s) | Plot shape when the oldest MAIN character is 0–1: a day's rhythm, no plot, naming and repetition |
 | age-band-quest.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 2: one tiny goal, one search place per page, a repeated phrase, cosy close |
 | age-band-tries.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 3: one problem, try-fail / try-fail / try-succeed by the child's own doing |
@@ -203,3 +200,6 @@ These act like templates but can only be edited in code:
 | `sceneComposite.js` `buildDepopulatePrompt` | Removes the silhouettes to leave a clean background plate (hardcoded) |
 | `sceneComposite.js` `buildBlendEditPrompt` | The composite BLEND prompt: goal + scene overview + cast (clothing/action) + interactions + emotions from metadata. **Never the page prompt** — that relocates characters (decisions.md 2026-08-15). Built from `buildBlendMetadata` (hardcoded) |
 | `premiseWorld.js` `detectPremiseNamedWorld()` | YES/NO utility-model classification: does the premise name its own world/location (other than the reader's home town)? Fallback rung only — structured wizard signals (`ideaWorld`, `selectedIndex`) are consulted first (decisions.md 2026-08-31, named location binding) |
+
+
+**Deleted 2026-09-15** (unreachable — beats replaced the unified writer for every full story, and the trial writes its own single call): `story-unified.txt`, `story-unified-imagefirst.txt`, `outline-analysis-textfirst.txt`, and the `buildUnifiedStoryPrompt` builder. See `docs/decisions.md`.

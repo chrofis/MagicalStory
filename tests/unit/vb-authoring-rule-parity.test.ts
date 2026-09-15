@@ -7,14 +7,14 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 /**
  * The Visual Bible is authored in four places: the Art Director on the beats
- * path, the two unified writers, and the trial writer. A rule about what a VB
+ * path and the trial writer. A rule about what a VB
  * entry must STATE has to exist at every site that writes one — the trial path
  * has repeatedly lagged the full path by weeks.
  */
+// The two pre-beats unified writers were members until 2026-09-15, when they
+// were deleted as unreachable (docs/decisions.md).
 const VB_AUTHORING_TEMPLATES = [
   'prompts/scene-expansion-all.txt',
-  'prompts/story-unified.txt',
-  'prompts/story-unified-imagefirst.txt',
   'prompts/story-trial.txt',
 ];
 
@@ -44,9 +44,12 @@ describe('shared Visual-Bible authoring rules reach every authoring site', () =>
 
   // A proper noun in `name` reaches the image model as the thing to draw.
   it('a prop name is a plain description; the story name goes in properName', () => {
-    for (const rel of ['prompts/story-unified.txt', 'prompts/story-unified-imagefirst.txt']) {
+    // The "goes in `properName` and nowhere else" WORDING lived only in the two
+    // unified writers, deleted 2026-09-15. What the live sites share is the
+    // schema key itself (also a sibling-registry anchor) — asserting the
+    // deleted prose here would assert a parity into existence.
+    for (const rel of VB_AUTHORING_TEMPLATES) {
       const text = read(rel);
-      expect(/goes in `properName` and nowhere else/.test(text), path.basename(rel)).toBe(true);
       expect(/"properName": /.test(text), path.basename(rel) + ' schema').toBe(true);
     }
   });

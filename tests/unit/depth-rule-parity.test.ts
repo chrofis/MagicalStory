@@ -12,14 +12,12 @@ const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
  * was written up into a frame-filling one.
  */
 describe('depth is camera distance, on every path that defines it', () => {
-  for (const rel of ['prompts/story-unified.txt', 'prompts/story-unified-imagefirst.txt']) {
-    it(`${path.basename(rel)} does not define depth by frame height`, () => {
-      const text = read(rel);
-      expect(/filling ~1\/3\+? of frame height/.test(text)).toBe(false);
-      expect(/Depth does not set size/.test(text)).toBe(true);
-    });
-  }
-
+  // The two unified writers were the only templates that ever defined `depth`
+  // in their scene-hint schema, and both were deleted 2026-09-15 as
+  // unreachable (docs/decisions.md). The beats Art Director does not restate
+  // depth, so the only live statement of the rule is the render template
+  // below — asserting it at the brief sites would assert a parity into
+  // existence that has never held there.
   it('the render template states the rule', () => {
     expect(/Depth is distance from the camera, not size/.test(read('prompts/image-generation.txt'))).toBe(true);
   });

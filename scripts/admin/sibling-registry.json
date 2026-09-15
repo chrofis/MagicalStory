@@ -61,54 +61,19 @@
       }
     },
     {
-      "id": "unified-writer-twins",
-      "axis": "text-first vs image-first unified writer",
-      "reason": "story-unified-imagefirst.txt is a near-copy of story-unified.txt with the beat order swapped; every shared rule must exist in both or one ordering ships without it.",
-      "members": [
-        "prompts/story-unified.txt",
-        "prompts/story-unified-imagefirst.txt"
-      ],
-      "severity": "block",
-      "parity": {
-        "anchors": [
-          "{RISK_FRAMING}",
-          "{PAGE_OPENING_VARIETY}",
-          "{AD_COMPOSITION}"
-        ]
-      }
-    },
-    {
-      "id": "trial-vs-full-writer",
-      "axis": "trial writer vs full writer",
-      "reason": "story-trial.txt is the live writer for the /try funnel and carries its own copy of the shared story rules; the trial path has repeatedly lagged the full path by weeks.",
-      "members": [
-        "prompts/story-trial.txt",
-        "prompts/story-unified.txt"
-      ],
-      "severity": "block",
-      "parity": {
-        "anchors": [
-          "{RISK_FRAMING}",
-          "{PAGE_OPENING_VARIETY}",
-          "{AD_COMPOSITION}"
-        ]
-      }
-    },
-    {
       "id": "story-prose-writers",
-      "axis": "beats text writer vs unified writer vs trial writer",
-      "reason": "story-text-from-beats.txt (live beats path), story-unified.txt / story-unified-imagefirst.txt (pre-beats unified) and story-trial.txt all write page prose under the same shared rules; a prose rule that becomes a promptBuilders constant reaches a path only through the placeholder that path declares, so a new one is declared at every site or it silently reads as absent there.",
+      "axis": "beats text writer vs trial writer",
+      "reason": "story-text-from-beats.txt (the live beats path, every full story) and story-trial.txt (the live /try funnel writer) both write page prose under the same shared rules; a prose rule that becomes a promptBuilders constant reaches a path only through the placeholder that path declares, so a new one is declared at both sites or it silently reads as absent there. This set now also carries the retired trial-vs-full-writer axis: the trial path has repeatedly lagged the full path by weeks. story-unified.txt / story-unified-imagefirst.txt were members until 2026-09-15, when both were deleted as unreachable (docs/decisions.md).",
       "members": [
         "prompts/story-text-from-beats.txt",
-        "prompts/story-unified.txt",
-        "prompts/story-unified-imagefirst.txt",
         "prompts/story-trial.txt"
       ],
       "severity": "block",
       "parity": {
         "anchors": [
           "{PAGE_OPENING_VARIETY}"
-        ]
+        ],
+        "anchorsNote": "only {PAGE_OPENING_VARIETY} is genuinely declared by both live prose writers. {RISK_FRAMING} and {AD_COMPOSITION} were anchors of the deleted unified-writer sets and are NOT declared by story-text-from-beats.txt — the beats chain carries risk framing inside {TELLING_RULES} on the arc prompts and composition on the Art Director. Asserting them here would assert a parity into existence that does not hold."
       }
     },
     {
@@ -134,11 +99,9 @@
     {
       "id": "vb-authoring-sites",
       "axis": "Art Director VB authoring vs writer VB authoring",
-      "reason": "the Visual Bible is authored at four sites — the Art Director on the beats path and the three writer prompts — and a rule about what a VB entry must state has to exist at every site that writes one. story-unified-imagefirst.txt authors artifacts, vehicles and animals exactly like its twin and was missing from this set until 2026-09-15, so the set under-enforced by a quarter.",
+      "reason": "the Visual Bible is authored at two LIVE sites — the all-pages Art Director on the beats path (every full story) and the trial writer — and a rule about what a VB entry must state has to exist at both. The two pre-beats unified writers were members until 2026-09-15, when they were deleted as unreachable (docs/decisions.md).",
       "members": [
         "prompts/scene-expansion-all.txt",
-        "prompts/story-unified.txt",
-        "prompts/story-unified-imagefirst.txt",
         "prompts/story-trial.txt"
       ],
       "severity": "block",
@@ -153,7 +116,7 @@
           "\"generic\"",
           "\"states\""
         ],
-        "anchorsNote": "the VB entry keys all four authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15: story-unified-imagefirst.txt was the one site that did not declare it, so a story on the image-first ordering could never give an altered object its own reference cell — owner ruling, all bible-authoring sites declare it. `\"vantages\"` stays deliberately NOT anchored: it is absent from scene-expansion-all.txt, which is a real divergence, not a parity target to assert into existence."
+        "anchorsNote": "the VB entry keys both live authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15 — owner ruling, every bible-authoring site declares it. `\"vantages\"` stays deliberately NOT anchored: it is absent from scene-expansion-all.txt, which is a real divergence, not a parity target to assert into existence."
       }
     },
     {
@@ -230,9 +193,10 @@
     {
       "id": "story-text-generator-vs-critic",
       "axis": "generator-vs-critic",
-      "reason": "story-text-proofread.txt and story-text-audit.txt judge prose written under story-unified.txt; a style or structure rule the auditor enforces must be a rule the writer was given, or every story is corrected after the fact instead of written right.",
+      "reason": "story-text-proofread.txt and story-text-audit.txt judge prose written under story-text-from-beats.txt (the live writer on every full story) and story-trial.txt (the /try funnel); a style or structure rule the auditor enforces must be a rule the writer was given, or every story is corrected after the fact instead of written right. The generator was story-unified.txt until 2026-09-15, when that template was deleted as unreachable — it had not been the live prose writer since the beats pipeline shipped.",
       "generators": [
-        "prompts/story-unified.txt"
+        "prompts/story-text-from-beats.txt",
+        "prompts/story-trial.txt"
       ],
       "critics": [
         "prompts/story-text-proofread.txt",

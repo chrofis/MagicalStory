@@ -245,27 +245,23 @@ async function loadPromptTemplates() {
     ['characterRepairCutout', 'character-repair-cutout.txt'],
     ['characterRepairInpaint', 'character-repair-inpaint.txt'],
     ['bboxRefine', 'bbox-refine.txt'],
-    ['storyUnified', 'story-unified.txt'],
-    ['storyUnifiedImageFirst', 'story-unified-imagefirst.txt'],
     // THE canonical DO-NOT-WRITE list — banned gestures, phrases, page-1
     // openings, trait labels, buzzwords, plot formulas, the gesture re-use cap.
     // Body only; each consuming template keeps its own heading. Read by
-    // buildDoNotWriteSection (beats text writer + refiner), by the split-review
-    // reviewer, and by the two unified writer templates through their
-    // {DO_NOT_WRITE_LIST} placeholder — so there is exactly one copy.
-    // It used to be SLICED out of story-unified-imagefirst.txt at runtime,
-    // which made deleting that "legacy" template a silent way to strip the
-    // whole list from production (rule-survival audit 2026-09-03, item M2).
+    // buildDoNotWriteSection (beats text writer + refiner) and by the
+    // split-review reviewer — so there is exactly one copy. It used to be
+    // SLICED out of story-unified-imagefirst.txt at runtime, which made
+    // deleting that "legacy" template a silent way to strip the whole list
+    // from production (rule-survival audit 2026-09-03, item M2). That template
+    // is gone (2026-09-15); the list is a file of its own, so it cannot recur.
     ['doNotWriteList', 'do-not-write-list.txt'],
-    // Shared ANALYSIS instruction bodies — injected into the {ANALYSIS_INSTRUCTIONS}
-    // placeholder of the matching unified template (single-call mode) AND into the
-    // external reviewer prompt (split outline review). One source per variant so the
-    // self-critique and the external review can never drift apart.
-    // NOT dead code when the unified pipeline is off: buildTextRefinePrompt
-    // slices its review CRITERIA out of the imageFirst body on every BEATS run
-    // (sliceAnalysisAspect, aspect 'text'), so deleting these files strips the
-    // refiner's criteria and it returns null. Verified 2026-09-03.
-    ['outlineAnalysisTextFirst', 'outline-analysis-textfirst.txt'],
+    // The shared ANALYSIS instruction body — injected into the external
+    // reviewer prompt (split outline review) and sliced by buildTextRefinePrompt.
+    // LIVE ON THE BEATS PATH: buildTextRefinePrompt slices its review CRITERIA
+    // out of this body on every beats run (sliceAnalysisAspect, aspect 'text'),
+    // so deleting this file strips the refiner's criteria and it returns null.
+    // Verified 2026-09-03, re-verified 2026-09-15 when the unified writer
+    // templates it also fed were deleted.
     ['outlineAnalysisImageFirst', 'outline-analysis-imagefirst.txt'],
     ['outlineReview', 'outline-review.txt'],
     // Iterative text refinement (Lab): full text in, full text out, one round

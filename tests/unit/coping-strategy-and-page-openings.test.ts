@@ -83,16 +83,18 @@ describe('coping-strategy clause in the arc rules', () => {
 });
 
 describe('page-opening variety rule', () => {
-  it('reaches both unified variants, the default one included', () => {
-    for (const storyPromptVariant of ['imageFirst', 'textFirst']) {
-      const prompt = String(
-        pb.buildUnifiedStoryPrompt(
-          base(9, { storyCategory: 'adventure', storyTheme: 'pirate', storyPromptVariant }),
-          8
-        )
-      );
-      expect(prompt, storyPromptVariant).toContain(OPENING);
-      expect(unfilled(prompt), `${storyPromptVariant} unfilled`).toEqual([]);
-    }
+  // The two unified variants were the subjects here until 2026-09-15, when both
+  // templates and buildUnifiedStoryPrompt were deleted as unreachable. The live
+  // writers are the trial writer and the beats text writer; their reach is
+  // pinned in tests/unit/writer-shared-rules-reach.test.ts.
+  it('reaches the trial writer', () => {
+    const prompt = String(
+      pb.buildTrialStoryPrompt(
+        base(9, { storyCategory: 'adventure', storyTheme: 'pirate', trialMode: true }),
+        5
+      )
+    );
+    expect(prompt).toContain(OPENING);
+    expect(unfilled(prompt)).toEqual([]);
   });
 });

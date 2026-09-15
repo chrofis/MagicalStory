@@ -35,9 +35,9 @@ const buildPagePrompt = (vb: any) => {
 /** The bands every authoring site must offer, ascending. */
 const BANDS = ['fingertip', 'palm', 'hand', 'forearm', 'arm', 'knee', 'hip', 'chest', 'head', 'double', 'house', 'landmark'];
 
+// The two pre-beats unified writers were members until 2026-09-15, when they
+// were deleted as unreachable (docs/decisions.md).
 const ARTIFACT_AUTHORING_TEMPLATES = [
-  'story-unified.txt',
-  'story-unified-imagefirst.txt',
   'story-trial.txt',
   'scene-expansion-all.txt'
 ];

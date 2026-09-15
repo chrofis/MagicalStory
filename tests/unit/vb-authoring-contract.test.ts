@@ -327,7 +327,6 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   // reaches the page. All three templates now carry the same split.
   it.each([
     ['sceneExpansionAll'],
-    ['storyUnified'],
     ['storyTrial'],
   ])("%s excludes the WORLD light from the state test, keeps the object own light in", (key) => {
     expect(templates[key]).toBeTruthy();
@@ -348,9 +347,6 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
 
   it("sceneExpansionAll states schema: the object's own light may be a delta, the scene's light never", () => {
     expect(templates['sceneExpansionAll']).toMatch(/the object's own light belongs here when the story turns it on or off, how the scene lights it never does/);
-  });
-  it("storyUnified states schema: the object's own light may be a delta, the scene's light never", () => {
-    expect(templates['storyUnified']).toMatch(/the object's own light belongs here, how the scene lights it never does/);
   });
 
   it('carries the recognisability requirement into the artifact schema field', () => {
@@ -375,9 +371,9 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   });
 
   // Every emitter of a VB character entry has to carry the sex+age rule, or a
-  // story routed down the other pipeline ships the same defect. The four
+  // story routed down the other pipeline ships the same defect. The live
   // template emitters, plus the phantom-patch prompt built in JS.
-  it.each(['storyUnified', 'storyUnifiedImageFirst', 'storyTrial'])(
+  it.each(['storyTrial'])(
     '%s states sex and apparent age in the character scaffold',
     (key) => {
       expect(templates[key], `template ${key} not loaded`).toBeTruthy();
@@ -385,11 +381,8 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     }
   );
 
-  it.each(['storyUnified', 'storyUnifiedImageFirst'])('%s carries all three authoring rules', (key) => {
-    expect(templates[key]).toMatch(/sex and apparent age in its first sentence/);
-    expect(templates[key]).toMatch(/its own `vehicles` entry/);
-    expect(templates[key]).toMatch(/`pages` is earned/);
-  });
+  // The two unified writers carried these three rules and were the subjects
+  // here until 2026-09-15, when both were deleted as unreachable.
 
   it('the phantom-patch prompt asks for sex, not a bare age category', () => {
     // server/lib/phantomCharacters.js mints CHR entries from a JS-built prompt,
@@ -431,10 +424,10 @@ describe('the authored `label` — one English name per element', () => {
     }
   });
 
-  it('is authored by all four bible-emitting templates', async () => {
+  it('is authored by both bible-emitting templates', async () => {
     await cjs('../../server/services/prompts.js').loadPromptTemplates();
     const templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
-    for (const key of ['storyUnified', 'storyUnifiedImageFirst', 'storyTrial', 'sceneExpansionAll']) {
+    for (const key of ['storyTrial', 'sceneExpansionAll']) {
       expect(templates[key], key).toBeTruthy();
       expect(templates[key], key).toMatch(/"label":\s*"\[the one English name every prompt uses/);
     }

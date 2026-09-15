@@ -260,12 +260,6 @@ const CASES: Case[] = [
     blind: () => PB.buildTextRefinePrompt(inputData, [{ pageNumber: 1, text: 'She walked home.', sceneBrief: BRIEF_PROSE }], 'FAULT: the lamp is never lit', ARC_LINE),
   },
   {
-    name: 'buildUnifiedStoryPrompt (unified writer)',
-    probe: PLACE,
-    build: () => PB.buildUnifiedStoryPrompt(inputData, 4),
-    blind: () => PB.buildUnifiedStoryPrompt({ ...inputData, storyDetails: 'A quiet afternoon.' }, 4),
-  },
-  {
     name: 'buildTrialStoryPrompt (trial writer)',
     probe: PLACE,
     build: () => PB.buildTrialStoryPrompt(inputData, 4),
@@ -487,7 +481,7 @@ describe('the re-plan asks for only the pages a finding named', () => {
 //
 // The same object got opposite treatment depending on which template authored
 // the bible: the beats Art Director called its own emission a state, while
-// `story-unified.txt` and `story-trial.txt` said a change of light never is.
+// `story-trial.txt` said a change of light never is.
 // A state is drawn as its own reference cell, and a reference cell is the only
 // way a glowing look actually reaches the page — an emission carried only in
 // `description` is on every page or none. Story B
@@ -504,7 +498,8 @@ describe('the light rule agrees across every template that states it', () => {
   const fs = require('fs');
   const path = require('path');
   const PROMPTS = path.join(__dirname, '../../prompts');
-  const FILES = ['scene-expansion-all.txt', 'story-unified.txt', 'story-trial.txt'];
+  // story-unified.txt was a member until 2026-09-15 (deleted as unreachable).
+  const FILES = ['scene-expansion-all.txt', 'story-trial.txt'];
 
   const lightLine = (file: string) =>
     fs.readFileSync(path.join(PROMPTS, file), 'utf8')

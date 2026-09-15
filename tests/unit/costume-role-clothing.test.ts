@@ -18,9 +18,10 @@ const PROMPTS = path.join(__dirname, '..', '..', 'prompts');
 const read = (f: string) => fs.readFileSync(path.join(PROMPTS, f), 'utf-8');
 
 // The three templates that author clothingRequirements.
-const WARDROBE_SITES = ['story-bible-from-beats.txt', 'story-unified.txt', 'story-unified-imagefirst.txt'];
+// story-unified*.txt were members until 2026-09-15 (deleted as unreachable).
+const WARDROBE_SITES = ['story-bible-from-beats.txt'];
 // The four templates that author a Visual Bible entry.
-const VB_SITES = ['scene-expansion-all.txt', 'story-unified.txt', 'story-unified-imagefirst.txt', 'story-trial.txt'];
+const VB_SITES = ['scene-expansion-all.txt', 'story-trial.txt'];
 
 const beats = [{ page: 1, beat: 'the child boards the ship' }, { page: 2, beat: 'the captain loses her cap' }];
 const inputData = {
@@ -81,11 +82,4 @@ describe('states parity across the bible-authoring sites', () => {
     for (const f of VB_SITES) expect(read(f), f).toContain('"states"');
   });
 
-  it('the image-first twin declares it the same way its sibling does', () => {
-    // Trailing comma and line ending differ between the two files; the clause does not.
-    const clause = (t: string) =>
-      ((t.match(/"states": "\[OMIT unless the story alters this object[^\n]*/) || [''])[0]).replace(/[\s,]+$/, '');
-    expect(clause(read('story-unified-imagefirst.txt')).length).toBeGreaterThan(0);
-    expect(clause(read('story-unified-imagefirst.txt'))).toBe(clause(read('story-unified.txt')));
-  });
 });
