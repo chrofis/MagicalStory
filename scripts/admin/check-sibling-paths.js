@@ -81,6 +81,19 @@ function loadRegistry() {
   }
   if (!reg || !Array.isArray(reg.sets)) die('registry has no `sets` array.');
   for (const s of reg.sets) {
+    // A generator-vs-critic set declares two ROLES instead of a flat member list.
+    // Its rule is looser and directional: touch at least one of each, not all of
+    // both. Three judges of one generator are not siblings of each other.
+    if (Array.isArray(s.generators) || Array.isArray(s.critics)) {
+      if (!s.id || !Array.isArray(s.generators) || !Array.isArray(s.critics)
+          || s.generators.length === 0 || s.critics.length === 0) {
+        die(`registry set ${s && s.id ? `"${s.id}"` : '(unnamed)'} declares roles but needs a non-empty \`generators\` AND \`critics\`.`);
+      }
+      s.kind = 'generator-critic';
+      s.members = [...s.generators, ...s.critics];
+    } else {
+      s.kind = 'all-move';
+    }
     if (!s.id || !Array.isArray(s.members) || s.members.length < 2) {
       die(`registry set ${s && s.id ? `"${s.id}"` : '(unnamed)'} needs an id and at least two members.`);
     }
@@ -190,14 +203,33 @@ function analyze(commits, sets) {
 
     for (const set of sets) {
       const hit = set.members.filter(m => touched.has(m));
-      if (hit.length === 0 || hit.length === set.members.length) continue;
-      const missing = set.members.filter(m => !touched.has(m));
-      // Covered elsewhere in the same push? Then the push is complete.
-      if (missing.every(m => rangeFiles.has(m))) continue;
-      const entry = {
-        sha: c.sha.slice(0, 9), subject, set,
-        changed: hit, missing: missing.filter(m => !rangeFiles.has(m)),
-      };
+      if (hit.length === 0) continue;
+
+      let missing;
+      let note = null;
+      if (set.kind === 'generator-critic') {
+        // Touch at least one generator AND at least one critic. Which side is
+        // absent decides what the gate says — the two failures are different
+        // mistakes, and the critic-without-generator one is the disease.
+        const gen = set.generators.filter(m => touched.has(m) || rangeFiles.has(m));
+        const crit = set.critics.filter(m => touched.has(m) || rangeFiles.has(m));
+        if (gen.length > 0 && crit.length > 0) continue;
+        if (gen.length === 0) {
+          missing = set.generators;
+          note = 'a rule added to a judge is a rule the generator must be told — otherwise the page is penalised for something it was never asked to do';
+        } else {
+          missing = set.critics;
+          note = 'the generator learned something its judge does not know — the judge will score the new behaviour as a defect';
+        }
+      } else {
+        if (hit.length === set.members.length) continue;
+        missing = set.members.filter(m => !touched.has(m));
+        // Covered elsewhere in the same push? Then the push is complete.
+        if (missing.every(m => rangeFiles.has(m))) continue;
+        missing = missing.filter(m => !rangeFiles.has(m));
+      }
+
+      const entry = { sha: c.sha.slice(0, 9), subject, set, changed: hit, missing, note };
       // Every set blocks (owner, 2026-09-15). `warns` now holds only EXCUSED
       // pairs, kept visible so an escape is never silent.
       if (selfExcused) warns.push({ ...entry, excused: true });
@@ -226,7 +258,12 @@ function main() {
     console.log(`sibling registry — ${reg.sets.length} file sets, ${(reg.withinFile || []).length} within-file sets\n`);
     for (const s of reg.sets) {
       console.log(`  ${s.id}  [block]  axis: ${s.axis}`);
-      for (const m of s.members) console.log(`      ${m}`);
+      if (s.kind === 'generator-critic') {
+        for (const m of s.generators) console.log(`      generator  ${m}`);
+        for (const m of s.critics) console.log(`      critic     ${m}`);
+      } else {
+        for (const m of s.members) console.log(`      ${m}`);
+      }
       console.log(`      ${s.reason}\n`);
     }
     for (const w of reg.withinFile || []) {
@@ -262,6 +299,7 @@ function main() {
     console.error(`    set:     ${e.set.id}   (axis: ${e.set.axis})`);
     console.error(`    changed: ${e.changed.join(', ')}`);
     console.error(`    MISSING: ${e.missing.join(', ')}`);
+    if (e.note) console.error(`    ${e.note}`);
     if (e.vouch) console.error(`    vouched by ${e.vouch.by}: ${e.vouch.reason}`);
     console.error(`    why they move together: ${e.set.reason}`);
     console.error('');

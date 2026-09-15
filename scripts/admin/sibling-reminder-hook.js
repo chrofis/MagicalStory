@@ -31,6 +31,16 @@ process.stdin.on('end', () => {
 
   const lines = [];
   for (const set of reg.sets || []) {
+    // A generator-vs-critic set is directional: editing a judge names the
+    // generator that must be told, and editing a generator names its judges.
+    if (Array.isArray(set.generators) && Array.isArray(set.critics)) {
+      if (set.critics.includes(rel)) {
+        lines.push(`- you just edited a CRITIC. A rule added to a judge is a rule the generator must be told, or the page is penalised for something it was never asked to do. Generator: ${set.generators.join(', ')} — ${set.reason}`);
+      } else if (set.generators.includes(rel)) {
+        lines.push(`- you just edited a GENERATOR. Its judges will score the new behaviour without knowing about it. Critics: ${set.critics.join(', ')} — ${set.reason}`);
+      }
+      continue;
+    }
     if (!set.members.includes(rel)) continue;
     const others = set.members.filter(m => m !== rel);
     lines.push(`- ${set.axis}: also check ${others.join(', ')} — ${set.reason}`);
@@ -49,7 +59,8 @@ process.stdin.on('end', () => {
       additionalContext:
         `SIBLING PATHS: ${rel} is a declared sibling. Before calling this fix done, apply it to (or rule out) each counterpart:\n` +
         lines.join('\n') +
-        '\nThe pre-push gate blocks a commit that moves one side only; the escape is `Siblings-Checked: <reason>` in the commit message. See docs/sibling-paths.md.',
+        '\nWhere a rule must hold on both sides, prefer ONE JS constant injected into both templates over two hand-kept copies. ' +
+        'The pre-push gate blocks a commit that moves one side only; the escape is `Siblings-Checked: <reason>` in the commit message. See docs/sibling-paths.md.',
     },
   }) + '\n');
 });

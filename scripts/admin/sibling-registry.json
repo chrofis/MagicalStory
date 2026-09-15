@@ -23,52 +23,81 @@
     "            day; the owner retired it on 2026-09-15: EVERY set blocks, and the",
     "            Siblings-Checked marker (same-commit or vouching) is the one escape.",
     "            The gate rejects any other value rather than reading it as block.",
+    "  generators / critics",
+    "            A set may declare these INSTEAD of `members` (axis",
+    "            generator-vs-critic). The rule is different and looser on purpose:",
+    "            a commit touching the set must touch at least ONE generator AND at",
+    "            least ONE critic, not every member. Three judges of one generator",
+    "            are not siblings of each other; each is a sibling of the generator.",
+    "            The disease this treats: a rule is added to a judge and the",
+    "            generator is never told, so the page is penalised for something it",
+    "            was never asked to do.",
+    "",
     "  parity    optional structural assertions for tests/unit/sibling-parity.test.ts:",
     "              metadataKeys: true  -> the ---METADATA--- JSON example in every",
     "                                     member declares the same top-level keys",
     "              anchors: [\"...\"]     -> every member contains each literal string",
+    "              ruleAnchors: [{critic, generator, note}] -> for a generator-vs-critic",
+    "                                     set, a rule named on the critic side must have",
+    "                                     its counterpart instruction on the generator side",
     "",
     "ESCAPE HATCH — put `Siblings-Checked: <reason>` in the commit message when the",
     "siblings genuinely need no change. It is a statement, not a silencer: write why.",
     "A push whose FULL range covers every member passes without a marker, so a fix",
     "split across two commits in one push is fine."
   ],
-
   "sets": [
     {
       "id": "art-director-templates",
       "axis": "per-page vs all-pages Art Director",
       "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-expansion-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
-      "members": ["prompts/scene-expansion.txt", "prompts/scene-expansion-all.txt"],
+      "members": [
+        "prompts/scene-expansion.txt",
+        "prompts/scene-expansion-all.txt"
+      ],
       "severity": "block",
-      "parity": { "metadataKeys": true }
+      "parity": {
+        "metadataKeys": true
+      }
     },
     {
       "id": "unified-writer-twins",
       "axis": "text-first vs image-first unified writer",
       "reason": "story-unified-imagefirst.txt is a near-copy of story-unified.txt with the beat order swapped; every shared rule must exist in both or one ordering ships without it.",
-      "members": ["prompts/story-unified.txt", "prompts/story-unified-imagefirst.txt"],
+      "members": [
+        "prompts/story-unified.txt",
+        "prompts/story-unified-imagefirst.txt"
+      ],
       "severity": "block"
     },
     {
       "id": "trial-vs-full-writer",
       "axis": "trial writer vs full writer",
       "reason": "story-trial.txt is the live writer for the /try funnel and carries its own copy of the shared story rules; the trial path has repeatedly lagged the full path by weeks.",
-      "members": ["prompts/story-trial.txt", "prompts/story-unified.txt"],
+      "members": [
+        "prompts/story-trial.txt",
+        "prompts/story-unified.txt"
+      ],
       "severity": "block"
     },
     {
       "id": "lector-and-diff-pass",
       "axis": "lector prompt vs diff-pass prompt",
       "reason": "story-text-proofread.txt (the lector) and story-text-diff.txt (the diff pass) feed the SAME parser and applier (parseLectorFindings / applyLectorFindings, textRefine.js:996-999), so a change to the quoting or span contract on one breaks the other's output against the shared applier.",
-      "members": ["prompts/story-text-proofread.txt", "prompts/story-text-diff.txt"],
+      "members": [
+        "prompts/story-text-proofread.txt",
+        "prompts/story-text-diff.txt"
+      ],
       "severity": "block"
     },
     {
       "id": "inventory-schema",
       "axis": "quality-eval inventory vs unified inventory",
       "reason": "image-evaluation.txt and image-inventory-unified.txt both describe the per-figure inventory the blind judge (image-prompt-compliance.txt) consumes; a schema change on one makes the two inventories incomparable.",
-      "members": ["prompts/image-evaluation.txt", "prompts/image-inventory-unified.txt"],
+      "members": [
+        "prompts/image-evaluation.txt",
+        "prompts/image-inventory-unified.txt"
+      ],
       "severity": "block"
     },
     {
@@ -97,18 +126,86 @@
       "id": "cover-cast-builders",
       "axis": "cover path vs page path cast assembly",
       "reason": "coverComposite.js and compositeCastBuilder.js both resolve a hint-string name to a character and both hand-roll parts of it; a resolver or costume-key fix on one leaves the other resolving by raw name.",
-      "members": ["server/lib/coverComposite.js", "server/lib/compositeCastBuilder.js"],
+      "members": [
+        "server/lib/coverComposite.js",
+        "server/lib/compositeCastBuilder.js"
+      ],
       "severity": "block"
     },
     {
       "id": "lab-vs-prod-eval",
       "axis": "Test Lab stage vs production call site",
       "reason": "testlab.js re-implements the call that evalPipeline.js makes in production; when they drift the Lab measures something production never runs (version pinning, cast lists, model ids).",
-      "members": ["server/lib/testlab.js", "server/lib/evalPipeline.js"],
+      "members": [
+        "server/lib/testlab.js",
+        "server/lib/evalPipeline.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "page-image-generator-vs-critics",
+      "axis": "generator-vs-critic",
+      "reason": "image-generation.txt is the only instruction the illustrator receives; image-evaluation.txt, image-semantic.txt and image-prompt-compliance.txt are the three judges that score the result. A rule added to a judge and not to the generator penalises a page for something it was never asked to do.",
+      "generators": [
+        "prompts/image-generation.txt"
+      ],
+      "critics": [
+        "prompts/image-evaluation.txt",
+        "prompts/image-semantic.txt",
+        "prompts/image-prompt-compliance.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "scene-brief-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "scene-review.txt critiques the briefs scene-expansion-all.txt authors; a check the reviewer applies that the Art Director was never given produces a finding no rewrite can satisfy.",
+      "generators": [
+        "prompts/scene-expansion-all.txt"
+      ],
+      "critics": [
+        "prompts/scene-review.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "story-text-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "story-text-proofread.txt and story-text-audit.txt judge prose written under story-unified.txt; a style or structure rule the auditor enforces must be a rule the writer was given, or every story is corrected after the fact instead of written right.",
+      "generators": [
+        "prompts/story-unified.txt"
+      ],
+      "critics": [
+        "prompts/story-text-proofread.txt",
+        "prompts/story-text-audit.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "avatar-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "avatar-evaluation.txt gates avatars generated from avatar-main-prompt.txt; a criterion the judge rejects on must be an instruction the generator carries, or the retry loop burns paid calls chasing a rule nobody stated.",
+      "generators": [
+        "prompts/avatar-main-prompt.txt"
+      ],
+      "critics": [
+        "prompts/avatar-evaluation.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "plan-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "plan-check.txt checks the page plan story-beats.txt produces; a constraint the checker counts must be a constraint the planner was told to satisfy.",
+      "generators": [
+        "prompts/story-beats.txt"
+      ],
+      "critics": [
+        "prompts/plan-check.txt"
+      ],
       "severity": "block"
     }
   ],
-
   "withinFile": [
     {
       "id": "textmodel-prompt-guard",
@@ -117,7 +214,9 @@
       "file": "server/lib/textModels.js",
       "blockPattern": "(?:async\\s+)?function\\s+(call\\w*API)\\s*\\(",
       "mustContain": "guardPromptString",
-      "exclude": ["callClaudeAPI"],
+      "exclude": [
+        "callClaudeAPI"
+      ],
       "excludeReason": "callClaudeAPI is a dispatcher over the provider entry points, not one itself — it guards nothing because the callee does.",
       "severity": "block"
     }

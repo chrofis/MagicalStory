@@ -27,6 +27,11 @@ This skill existed for five weeks and did not prevent a single one of the 27
 partial fixes found in the 2026-09-15 sweep of a 60-hour window. A skill is
 advisory; the registry is a control. Use both, and trust the registry.
 
+**Editing a judge or evaluator?** That axis has its own skill:
+`syncing-generator-and-critic` — a rule a judge can deduct for is a rule the
+generator was given. Registry sets with `axis: "generator-vs-critic"` are enforced
+the same way, directionally.
+
 ## Procedure
 
 1. Root-cause the reported site first (systematic-debugging skill).

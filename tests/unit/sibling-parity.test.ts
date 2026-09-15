@@ -25,6 +25,12 @@ const registry = JSON.parse(
 
 const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
+/** A set declares either a flat `members` list or the two roles of a
+ *  generator-vs-critic pair. Everything structural applies to the union. */
+const membersOf = (set: any): string[] =>
+  set.members || [...(set.generators || []), ...(set.critics || [])];
+
+
 /**
  * Top-level keys of the JSON example that follows the last ---METADATA--- marker
  * in a prompt template. The example is illustrative JSON with placeholders and
@@ -47,7 +53,7 @@ describe('sibling registry', () => {
   it('every declared member exists on disk', () => {
     const missing: string[] = [];
     for (const set of registry.sets) {
-      for (const m of set.members) if (!fs.existsSync(path.join(ROOT, m))) missing.push(`${set.id}: ${m}`);
+      for (const m of membersOf(set)) if (!fs.existsSync(path.join(ROOT, m))) missing.push(`${set.id}: ${m}`);
     }
     for (const w of registry.withinFile || []) {
       if (!fs.existsSync(path.join(ROOT, w.file))) missing.push(`${w.id}: ${w.file}`);
@@ -80,7 +86,7 @@ for (const set of registry.sets) {
   describe(`sibling parity: ${set.id} (${set.axis})`, () => {
     if (parity.metadataKeys) {
       it('every member declares the same metadata schema keys', () => {
-        const byMember = set.members.map((m: string) => ({ m, keys: metadataKeys(read(m)) }));
+        const byMember = membersOf(set).map((m: string) => ({ m, keys: metadataKeys(read(m)) }));
         const union = new Set<string>(byMember.flatMap((e: any) => e.keys));
         const gaps: string[] = [];
         for (const { m, keys } of byMember) {
@@ -96,7 +102,7 @@ for (const set of registry.sets) {
     if (Array.isArray(parity.anchors) && parity.anchors.length) {
       it('every member contains each declared rule anchor', () => {
         const gaps: string[] = [];
-        for (const m of set.members) {
+        for (const m of membersOf(set)) {
           const text = read(m);
           for (const a of parity.anchors) if (!text.includes(a)) gaps.push(`${m} is missing the anchor: ${a}`);
         }
