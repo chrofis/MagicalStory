@@ -1181,8 +1181,10 @@ decisions → `docs/decisions.md` (ten entries dated 2026-09-15).
 - [ ] **The whole batch is pending owner approval for a push.** 36 agent commits sit on local
       `staging` (`f7979f824` … `de49d0bfd`), unpushed. Two earlier commits are on the branch but not
       yet DEPLOYED to staging — `8473482ce` (age bands: ages 6+ had no plot-shape rules) and
-      `387cf67ee` (risk framing) — staging was serving `8c20d457`. And `master` head is `8f3a3ae9e`
-      (2026-07-10): **none** of the 224 commits in the window is in production. Nothing here may be
+      `387cf67ee` (risk framing) — staging was serving `8c20d457`. And `origin/master` is `a79c8bee8`
+      (2026-09-06; production `/api/health` confirms it serves a79c8bee — a local `master` ref reading
+      `8f3a3ae9e` 2026-07-10 is STALE, always `git fetch` and read `origin/master`): **none** of the 224
+      commits in the window is in production. Nothing here may be
       pushed to `master` without an explicit per-push yes → `tasks/staging-story-review-2026-09-15.md`,
       `docs/compliance-and-todo.html:81` (the promotion line)
 - [x] **RESOLVED 2026-09-15 (`7a78e1d55` + `73b3ed7e8`) — gate 9 blocked two legitimate catch-up
