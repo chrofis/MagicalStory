@@ -136,6 +136,7 @@ Don't include the main character ({MAIN_CHARACTER_NAME}) — they have reference
 Only include characters that you invent (friends, shopkeepers, etc.) as `secondaryCharacters`.
 Use empty arrays `[]` for categories with no elements.
 Every artifact carries `size`, and every animal too. The field is never omitted.
+An entry shaped like a person — an invented figure, a small winged being, a doll, a figurine, a statue, a puppet — states its HAIR in `description`: colour, length and how it is worn, or plainly that it has none. Such an entry reaches the image model as its description and nothing else, and a head described only by its eyes is drawn bald. State the head the same way a face is stated: hair, then whatever else the figure's head carries.
 
 **Real-world landmarks:** Any location whose name comes from (or is recognisably) an entry in the LANDMARKS section above is a real-world landmark. For every such location:
 - `"isRealLandmark": true` (not false — if you wrote the landmark's name, you picked it from the list, so it is real)
