@@ -5791,10 +5791,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // story's clothingRequirements first — raw avatars.clothing is
           // character-level metadata that can be stale across stories and
           // redressed repairs in an old outfit.
-          const clothingDesc = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements) || '';
+          const storyClothingDesc = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements) || '';
 
           // Get scene description for context (what is the character doing?)
           const sceneDesc = sceneImage.description || sceneImage.translatedDescription || '';
+          // …resolved against THIS PAGE's worn state, through the same one
+          // resolver the image prompt and every judge use (2026-09-15). A
+          // manual repair is a page path like the automatic one.
+          const clothingDesc = require('../lib/wornItems')
+            .resolveOutfitForStoryPage(storyClothingDesc, characterName, storyData, pageNumber, sceneDesc);
 
           // Get face bbox for head whiteout (separate from repair bbox which may be full body)
           let faceBbox = null;

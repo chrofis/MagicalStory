@@ -1433,6 +1433,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return character.avatars?.clothing?.[clothingCategory] || '';
     })();
     const sceneDesc = img.sceneDescription || img.text || '';
+    // …and then THIS PAGE's worn state on top (2026-09-15). A repaint dresses
+    // the character the way the page did, through the same one resolver the
+    // image prompt and every judge use — otherwise it paints the story-level
+    // contract back onto a page that took a garment off or swapped it.
+    const pageClothingDesc = require('./wornItems')
+      .resolveOutfitForStoryPage(clothingDesc, charName, storyData, pageNumber, sceneDesc);
     const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
     // Appearance text for the repair prompt (face/hair/build). The Lab passed
     // this; PRODUCTION did not, so every live repair rendered the appearance
@@ -1456,7 +1462,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, buildCharRepairRequest({
         imageBackend: 'grok',
         issueDescription: decision.issueDescription,
-        clothingDescription: clothingDesc,
+        clothingDescription: pageClothingDesc,
         characterDescription: charDescForPrompt,
         photoType: avatarPhotoType,
         sceneDescription: sceneDesc,

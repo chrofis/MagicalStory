@@ -714,6 +714,78 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
 }
 
 /**
+ * A `worn` item the character's own outfit contract CONTRADICTS — the other
+ * half of the disagreement, and the one nothing resolved before (2026-09-15).
+ *
+ * Measured on staging job_1789420511893_zly5rcdej p13: the page declares
+ * `{ART002 "navy-blue captain's cap", owner: Emma, state: "worn"}` while Emma's
+ * stored contract opens "A black felt tricorn hat with a red cockade; …". Two
+ * hats, one head, and every reader picked a different one — the WORN STATE
+ * block told the generator and the semantic judge "cap", the clothing contract
+ * told the compliance judge "tricorn". Owner's ruling: there are only wrong
+ * answers if she is supposed to wear both, so the disagreement is removed
+ * rather than adjudicated.
+ *
+ * The page's declared state wins, because it is the per-page fact and the
+ * contract is the story-level default: the contract's clause for that slot is
+ * dropped and the declared item takes its place, with the bible's own shape
+ * words (`wornItemLook`) so the resolved text is not a bare label.
+ *
+ * Bounded exactly like the strip:
+ *   - only a `worn` item whose wearer IS this character;
+ *   - only when the contract's clause for that slot names a DIFFERENT garment
+ *     (if the contract already names this item, nothing happens);
+ *   - only when `removeWornItemFromOutfit` can take that one clause out
+ *     unambiguously. Otherwise the contract is left exactly as it was — a
+ *     wrong deletion is worse than a redundant mention, and the WORN ITEMS
+ *     block still carries the instruction in words.
+ */
+function applyWornItemsToOutfit(description, resolved, characterName) {
+  let text = String(description || '');
+  const swaps = [];
+  for (const r of (resolved || [])) {
+    if (!r || r.state !== 'worn' || !r.slot) continue;
+    if (!sameName(r.wearer || r.owner, characterName)) continue;
+    const nouns = SLOT_NOUNS[r.slot];
+    if (!nouns) continue;
+    const clauses = splitClauses(text);
+    const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
+    const hits = clauses.filter(c => nounRe.test(c));
+    if (hits.length !== 1) continue; // no clause, or an ambiguous slot — leave it
+    // Already the same garment? Then there is no disagreement to remove.
+    const mineNouns = garmentNounsIn(r.name, nouns);
+    if (mineNouns.length > 0 && mineNouns.every(n => new RegExp(`\\b${n}\\b`, 'i').test(hits[0]))) continue;
+    const res = removeWornItemFromOutfit(text, r.slot, null);
+    if (!res.removed) {
+      swaps.push({ id: r.id, slot: r.slot, applied: false, reason: res.reason });
+      continue;
+    }
+    const look = wornItemLook(r);
+    const item = look ? `${r.name} — ${look}` : r.name;
+    const joiner = /;(?![^()]*\))/.test(text) ? '; ' : ', ';
+    const body = res.text.replace(/[.\s]+$/, '');
+    text = `${body}${joiner}${item}${/[.!?]$/.test(String(description || '')) ? '.' : ''}`;
+    swaps.push({ id: r.id, slot: r.slot, applied: true, reason: 'slot-conflict-resolved' });
+  }
+  return { text, swaps };
+}
+
+/**
+ * THE ONE RESOLVED OUTFIT OF A PAGE — contract + this page's worn rows.
+ *
+ * Every reader of a character's clothing on a page path goes through here: the
+ * image prompt (promptBuilders.buildImagePrompt), the compliance judge and the
+ * semantic judge (evalPipeline.buildEvalClothingContract, one block for all
+ * three evaluators) and the entity grid. One string, so there is nothing to
+ * adjudicate between them.
+ */
+function resolveOutfitForPage(description, resolvedWorn, characterName) {
+  const { text: stripped, removals } = stripOffItemsFromOutfit(description, resolvedWorn, characterName);
+  const { text, swaps } = applyWornItemsToOutfit(stripped, resolvedWorn, characterName);
+  return { text, removals, swaps };
+}
+
+/**
  * THE OUTFIT THIS PAGE WAS ACTUALLY GENERATED AGAINST — one resolver for every
  * eval-side clothing contract.
  *
@@ -754,17 +826,50 @@ function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sce
   if (metas.length === 0) return text;
   const seen = new Set();
   const off = [];
+  const worn = [];
   for (const meta of metas) {
     if (!meta) continue;
     for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta, { pageNumber: pageNumber || undefined })) {
-      if (!isOffForCharacter(r, ownerName) || seen.has(r.id)) continue;
-      seen.add(r.id);
-      off.push(r);
+      if (seen.has(r.id)) continue;
+      if (isOffForCharacter(r, ownerName)) { seen.add(r.id); off.push(r); continue; }
+      // A `worn` row that contradicts the contract is resolved only for a
+      // SINGLE page. Across a multi-page group (the entity grid) an item worn
+      // on some pages would otherwise be written into the expected clothing of
+      // all of them — the union rule below goes the other way on purpose.
+      if (metas.length === 1 && r.state === 'worn') { seen.add(r.id); worn.push(r); }
     }
   }
-  if (off.length === 0) return text;
-  const { text: stripped } = stripOffItemsFromOutfit(text, off, ownerName);
-  return stripped;
+  if (off.length === 0 && worn.length === 0) return text;
+  const { text: resolved } = resolveOutfitForPage(text, [...off, ...worn], ownerName);
+  return resolved;
+}
+
+/**
+ * The same one resolved outfit, for a caller that holds a whole `storyData` and
+ * a page number rather than a parsed brief — the three character-repair entry
+ * points (repairPipeline, routes/regeneration, entityConsistency's single-page
+ * repair). A repaint is a page path: it must dress the character the way the
+ * page did, not the way the story-level contract does.
+ *
+ * Reads the page's brief out of `storyData.sceneImages` and parses it with the
+ * same `extractSceneMetadata` the entity grid uses. Unparsable or missing →
+ * the outfit comes back untouched, exactly as before.
+ */
+function resolveOutfitForStoryPage(outfitText, characterName, storyData, pageNumber, sceneDescription = null) {
+  try {
+    const sd = (storyData && Array.isArray(storyData.sceneImages) ? storyData.sceneImages : [])
+      .find(s => s && s.pageNumber === pageNumber);
+    const desc = sceneDescription || (sd && (sd.sceneDescription || sd.description)) || null;
+    if (!desc) return String(outfitText || '');
+    const { extractSceneMetadata } = require('./sceneMetadata');
+    return resolveGeneratedOutfit(outfitText, characterName, {
+      visualBible: (storyData && (storyData.visualBible || storyData.wornItemsVisualBible)) || null,
+      sceneMetadata: extractSceneMetadata(desc),
+      pageNumber,
+    });
+  } catch {
+    return String(outfitText || '');
+  }
 }
 
 module.exports = {
@@ -788,6 +893,9 @@ module.exports = {
   buildWornStateBlock,
   removeWornItemFromOutfit,
   stripOffItemsFromOutfit,
+  applyWornItemsToOutfit,
+  resolveOutfitForPage,
+  resolveOutfitForStoryPage,
   resolveGeneratedOutfit,
   sameName,
 };

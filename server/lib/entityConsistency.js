@@ -3117,8 +3117,27 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     const hairStyle = builtHair || 'as shown in reference';
 
     // Build clothing description for this scene — pass clothingRequirements
-    // so the current-story signature wins over stale avatars.clothing.
-    const clothingDescription = buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements);
+    // so the current-story signature wins over stale avatars.clothing, then
+    // resolve THIS PAGE's worn state on top of it (2026-09-15). A repaint is a
+    // page path like any other: without this it repaints the story-level
+    // contract back onto a character the page took a garment off, or dressed in
+    // a different one.
+    const pageWornMeta = (() => {
+      try {
+        const sd = (storyData?.sceneImages || []).find(s => s && s.pageNumber === pageNumber);
+        const desc = sd && (sd.sceneDescription || sd.description);
+        return desc ? extractSceneMetadata(desc) : null;
+      } catch { return null; }
+    })();
+    const clothingDescription = require('./wornItems').resolveGeneratedOutfit(
+      buildClothingDescription(character, clothingCategory, artStyle, storyData.clothingRequirements),
+      charName,
+      {
+        visualBible: storyData?.visualBible || storyData?.wornItemsVisualBible || null,
+        sceneMetadata: pageWornMeta,
+        pageNumber,
+      }
+    );
 
     // Format issues found for this page (if provided in options)
     let issuesFoundText = '';

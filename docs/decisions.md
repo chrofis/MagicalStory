@@ -41073,3 +41073,42 @@ already in progress without an age gets prompted for one and that age actually r
 
 **Touched files.** `server/lib/trialAge.js` (new), `server/routes/trial.js`,
 `client/src/pages/trial/TrialCharacterStep.tsx`, `tests/unit/trial-age-mandatory.test.ts` (new).
+
+## 2026-09-15 — One resolved outfit per page, read by the generator and both judges
+
+**Context.** The page's declared worn state and the character's clothing contract were
+separate strings and diverged. On staging `job_1789420511893_zly5rcdej` p13 the only worn row
+is `{ART002 "navy-blue captain's cap", owner: Emma, state: "worn"}` — and there is no `off`
+row for her tricorn, so `referencePhotos[0].clothingDescription` still opened "A black felt
+tricorn hat with a red cockade". The WORN ITEMS block told the generator and the semantic
+judge "cap"; the clothing contract told the compliance judge "tricorn". Two answers about
+one head — and, as the owner put it, if she is supposed to wear both hats there are only
+wrong answers.
+
+**Decision.** Resolve the outfit ONCE per page and hand that one string to everybody.
+`wornItems.resolveOutfitForPage` = the existing OFF/handover strip, plus a new
+`applyWornItemsToOutfit`: a `worn` item whose slot the contract fills with a DIFFERENT
+garment takes that clause's place, carrying the bible's own shape words. The page state wins
+because it is the per-page fact and the contract is the story-level default. No judge picks
+a winner; the disagreement is gone before anyone reads it.
+
+Consumers routed through the one resolver: the image prompt
+(`promptBuilders.buildImagePrompt` → `resolveOutfitForPage`); the quality, semantic and
+compliance judges (`evalPipeline.buildEvalClothingContract` → `resolveGeneratedOutfit`, one
+block for all three); the entity-consistency grid (multi-page, OFF-union only — a worn swap
+is deliberately NOT applied across pages, since an item worn on one page must not be written
+into the expected clothing of all of them); and all three character-repair entry points
+(`repairPipeline`, `routes/regeneration`, `entityConsistency`'s single-page repair) through
+the new `resolveOutfitForStoryPage`, which reads the page's brief out of `storyData`.
+
+**Rationale.** Bounded exactly like the strip: only a `worn` item on this character, only
+when exactly one contract clause owns that slot, only when it names a different garment, and
+only when the clause can be removed unambiguously. Anything else leaves the contract
+untouched and the WORN ITEMS block still carries the instruction in words. No per-page
+reference IMAGE is built — the plate work landed in 3fd7c3e8b/251df14f4; this is the TEXT,
+and the "the attached references are not authoritative for these" wording now agrees with it
+instead of contradicting it.
+
+**Touched files.** `server/lib/wornItems.js`, `server/lib/promptBuilders.js`,
+`server/lib/entityConsistency.js`, `server/lib/repairPipeline.js`,
+`server/routes/regeneration.js`, `tests/unit/worn-one-resolved-outfit.test.ts`.

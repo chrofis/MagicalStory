@@ -3550,7 +3550,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // the Art Director declared in `wornItems[]`: worn, or off with the place it
   // now lies. Read structurally — nothing here infers a state from prose.
   const {
-    resolveWornItemsForPage, wornStateById, stripOffItemsFromOutfit, buildWornStateBlock,
+    resolveWornItemsForPage, wornStateById, resolveOutfitForPage, buildWornStateBlock,
     referenceCarriesItem,
   } = require('./wornItems');
   const wornResolved = (visualBible && metadata)
@@ -3561,15 +3561,23 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // The item is identified by its `wornAs` SLOT, and exactly that one clause is
   // dropped — this is not the rejected 2026-08-08 filterWornClothingAgainstScene,
   // which sieved every clause of every outfit against prose.
+  // ONE RESOLVED OUTFIT PER PAGE (owner ruling 2026-09-15). `off` or handed
+  // over → the owner's outfit text loses the clause; `worn` in a slot the
+  // contract fills with a different garment → the contract's clause yields to
+  // the declared item. wornItems.resolveOutfitForPage is the single resolver,
+  // and the eval side reaches the identical string through
+  // resolveGeneratedOutfit — the compliance judge and the semantic judge can no
+  // longer be handed two different answers about the same head.
   let effectiveReferencePhotos = referencePhotos;
-  // `off`, or worn by someone else this page (handover) — either way the
-  // OWNER's outfit text must lose the clause.
-  if (wornResolved.some(w => w.state === 'off' || w.handedOver) && Array.isArray(referencePhotos)) {
+  if (wornResolved.length > 0 && Array.isArray(referencePhotos)) {
     effectiveReferencePhotos = referencePhotos.map((photo) => {
       if (!photo || !photo.clothingDescription) return photo;
-      const { text, removals } = stripOffItemsFromOutfit(photo.clothingDescription, wornResolved, photo.name);
+      const { text, removals, swaps } = resolveOutfitForPage(photo.clothingDescription, wornResolved, photo.name);
       for (const r of removals) {
         log.info(`[WORN] Page ${pageNumber}: ${photo.name}'s ${r.slot} (${r.id}) is OFF this page — outfit text ${r.removed ? 'phrase removed' : `left intact (${r.reason})`}`);
+      }
+      for (const s of swaps) {
+        log.info(`[WORN] Page ${pageNumber}: ${photo.name}'s ${s.slot} (${s.id}) is WORN this page and the contract named another garment — contract clause ${s.applied ? 'replaced by the declared item' : `left intact (${s.reason})`}`);
       }
       return text === photo.clothingDescription ? photo : { ...photo, clothingDescription: text };
     });
