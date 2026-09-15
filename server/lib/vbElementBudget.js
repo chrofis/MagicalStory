@@ -79,7 +79,10 @@ const { getRecurringCreatureIds, entryNamedByRow } = require('./visualBible');
  */
 const VB_ELEMENT_BUDGET = 4;
 
-/** Selection's priority order, by collection. Locations are not elements (header). */
+/** Selection's priority order, by collection. Locations are not elements (header).
+ *  Keyed on the COLLECTION arrays, which is what keeps `visualBible.genericObjects[]`
+ *  invisible to the budget: a generic entry was dropped at parse time and has no id,
+ *  so it can never be ranked, cited or counted (owner, 2026-09-15). */
 const ELEMENT_COLLECTIONS = [
   { key: 'secondaryCharacters', type: 'character', priority: 1, viaObjects: true },
   { key: 'animals', type: 'animal', priority: 2, viaObjects: true },

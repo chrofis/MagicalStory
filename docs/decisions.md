@@ -39932,3 +39932,41 @@ deliberately NOT authoring sites — recorded here so it is not re-derived.
 `scripts/admin/sibling-registry.json`, `server/lib/visualBible.js`,
 `tests/unit/vb-scale-class.test.ts` (new), `tests/unit/artifact-size.test.ts`,
 `tasks/vb-scale-class-plan-2026-09-15.md`.
+
+## 2026-09-15 — The generic-vs-specific gate: an everyday instance buys no id, no entry, no render, no cell
+
+**Context:** a Visual Bible entry costs a paid reference render, an id a page can cite, one of the
+four page reference cells and a row in the element budget. An everyday instance of a thing — a cup,
+a broom, a crate any other crate could stand in for — was paying all four while contributing nothing
+a reader could notice, and on `job_1789420511893_zly5rcdej` p8 exactly such an object (a chestnut)
+took a cell and rendered as the page's hero.
+
+**Decision:** an authored `"generic": true` on `artifacts`, `animals` and `vehicles` that the PARSER
+DROPS. The dropped entry lands in `visualBible.genericObjects[]` with **no id**, which makes it
+invisible to every consumer at once — reference selection, reference-sheet batching, the element
+budget, entity consistency and bbox grounding are all keyed on the collection arrays or on an id.
+A page brief that cites one anyway is stripped with a `log.error` in
+`getElementReferenceImagesForPage`, before the `askedFor` map — the one path that could resurrect it
+into a cell. A generic object's look reaches the page through the scene prose, where an everyday
+object's look belongs.
+
+**Rationale:** the gate is an authored flag the parser drops, NOT an instruction to omit the entry.
+An omitted entry is indistinguishable from a forgotten one (the `crowdExpected` failure class):
+no log line, no counter, no way to audit whether the gate is being applied at all. A dropped
+`generic: true` leaves exactly one artefact per object — a log line and a count — which is the only
+version of this that can be measured on a real story without a paid re-run. `generic: false` and an
+absent key both behave exactly as before; only an explicit true drops.
+
+**Sibling gap closed en route:** `UnifiedStoryParser.extractVisualBible`
+(`server/lib/outlineParser/unified.js`) is the VB parse the pipeline actually runs, and it
+`JSON.parse`s the authored object raw. `visualBible.parseVisualBible` is the other one. The generic
+split AND the phase-1 `scaleClass` normalisation both had to exist in both, or an unknown
+`scaleClass` would have sailed through unchecked on the live path and a `generic: true` entry would
+have kept its id and its cell. Caught by the phase-2 test, fixed in the same commit.
+
+**Touched files:** `prompts/scene-expansion-all.txt`, `prompts/story-unified.txt`,
+`prompts/story-unified-imagefirst.txt`, `prompts/story-trial.txt`,
+`scripts/admin/sibling-registry.json`, `server/lib/visualBible.js`,
+`server/lib/outlineParser/unified.js`, `server/lib/referenceSheets.js`,
+`server/lib/vbElementBudget.js`, `tests/unit/vb-generic-gate.test.ts` (new),
+`tests/unit/vb-scale-class.test.ts`, `tests/unit/ad-authored-bible.test.ts`.

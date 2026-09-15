@@ -90,6 +90,21 @@ describe('an AD response carrying a bible plus pages parses both halves', () => 
     expect(parsed.pages[0].text).not.toContain('secondaryCharacters');
   });
 
+  // 2026-09-15: the generic gate runs on this real parse path too, not only on
+  // the standalone parser. An everyday instance buys no id, so no page can cite
+  // it and no reference cell can be spent on it.
+  it('drops an entry the Art Director marked generic, and it leaves a trace', () => {
+    const withGeneric = JSON.parse(JSON.stringify(VB));
+    withGeneric.artifacts.push({
+      id: 'ART002', name: 'tin cup', pages: [2], type: 'tableware',
+      scaleClass: 'hand', generic: true, description: 'a plain dented tin cup'
+    });
+    const body = extractBibleSections(bibleBlock(withGeneric) + pageBlock(1, ['LOC001']), AD_BIBLE_MARKERS).body;
+    const vb = new UnifiedStoryParser(body).extractVisualBible();
+    expect(vb.artifacts.map((a: any) => a.id)).toEqual(['ART001']);
+    expect(vb.genericObjects.map((g: any) => g.name)).toEqual(['tin cup']);
+  });
+
   it('every id a page cites exists in the bible the same response declared', () => {
     const vb = new UnifiedStoryParser(extractBibleSections(fullResponse, AD_BIBLE_MARKERS).body).extractVisualBible();
     const declared = new Set(

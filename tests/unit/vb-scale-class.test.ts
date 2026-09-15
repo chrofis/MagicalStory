@@ -162,3 +162,37 @@ describe('scaleClass is machine-facing — it never reaches an image model', () 
     expect(prompt).toContain('the size of a thumb');
   });
 });
+
+/**
+ * THE LIVE PARSE. `visualBible.parseVisualBible` is one of two VB parsers;
+ * `UnifiedStoryParser.extractVisualBible` is the one the beats and unified
+ * paths actually run, and it JSON.parses the authored object raw. A field
+ * contract that exists in only one of the two reaches no story — this case is
+ * the sibling half, and it was added because the generic gate was caught
+ * missing here (2026-09-15).
+ */
+describe('scaleClass — the parser the pipeline actually runs', () => {
+  // @ts-ignore - CommonJS
+  const { UnifiedStoryParser } = require('../../server/lib/outlineParser/unified.js');
+  const NL = String.fromCharCode(10);
+
+  const parse = (data: any) => new UnifiedStoryParser(
+    ['---VISUAL BIBLE---', '```json', JSON.stringify(data), '```'].join(NL)
+  ).extractVisualBible();
+
+  it('normalises the authored value on every collection', () => {
+    const vb = parse({
+      artifacts: [{ id: 'ART001', name: 'chestnut', pages: [1], scaleClass: ' Hand ' }],
+      vehicles: [{ id: 'VEH001', name: 'ship', pages: [1], scaleClass: 'BUILDING' }],
+      locations: [{ id: 'LOC001', name: 'quay', pages: [1], scaleClass: 'landscape' }],
+    });
+    expect(vb.artifacts[0].scaleClass).toBe('hand');
+    expect(vb.vehicles[0].scaleClass).toBe('building');
+    expect(vb.locations[0].scaleClass).toBe('landscape');
+  });
+
+  it('drops an unknown token here too rather than letting it sail through', () => {
+    const vb = parse({ artifacts: [{ id: 'ART001', name: 'chestnut', pages: [1], scaleClass: 'enormous' }] });
+    expect(vb.artifacts[0].scaleClass).toBeNull();
+  });
+});

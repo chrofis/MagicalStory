@@ -1067,6 +1067,10 @@ function assertStateCellsCoLocated(batches) {
   }
 }
 
+// `needsReference` comes from `getElementsNeedingReferenceImages`, which walks the
+// VB collection arrays. A generic entry never entered one (it lives in
+// `visualBible.genericObjects[]` with no id), so it can never reach a paid render
+// here — which is the whole point of the generic gate (owner, 2026-09-15).
 function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4) {
   const { vbDeclaredLetteringNames } = require('./promptBuilders');
   const letteringNames = vbDeclaredLetteringNames(visualBible);

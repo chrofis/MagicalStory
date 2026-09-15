@@ -630,6 +630,70 @@ function normaliseScaleClass(raw, id) {
   return value;
 }
 
+/**
+ * GENERIC vs SPECIFIC (owner, 2026-09-15) — the authoring-time gate.
+ *
+ * An everyday instance of a thing — a cup, a broom, a crate that any other
+ * crate could stand in for — must not buy a Visual Bible id, an entry, a paid
+ * reference render or one of the page's four reference cells. Its look belongs
+ * in the page's scene prose, which is where an everyday object's look belongs.
+ *
+ * The gate is an AUTHORED `generic: true` that the parser DROPS, not an
+ * instruction to omit the entry: an omitted entry is indistinguishable from a
+ * forgotten one (the `crowdExpected` failure class), so it leaves no log line
+ * and no counter and there is no way to audit whether the gate is applied at
+ * all. A dropped `generic: true` leaves exactly one artefact per object.
+ *
+ * Dropped entries land in `visualBible.genericObjects[]` with NO id, which is
+ * what makes them invisible to every consumer at once: reference selection,
+ * reference-sheet batching, the element budget, entity consistency and bbox
+ * grounding are all keyed on the collection arrays or on an id.
+ */
+function isGenericEntry(raw) {
+  if (!raw) return false;
+  if (raw.generic === true) return true;
+  return typeof raw.generic === 'string' && raw.generic.trim().toLowerCase() === 'true';
+}
+
+/**
+ * Split an authored collection into the entries that keep their id and the
+ * generic ones. `describe` renders the dropped entry's prose so the log (and
+ * anyone auditing a story later) can see what was given up.
+ */
+function splitGenericEntries(list, collection, describe, bucket) {
+  const keep = [];
+  for (const raw of Array.isArray(list) ? list : []) {
+    if (!isGenericEntry(raw)) { keep.push(raw); continue; }
+    bucket.push({
+      // NO id, deliberately: an id is what a page cites to buy a cell.
+      collection,
+      label: typeof raw.label === 'string' && raw.label.trim() ? raw.label.trim() : null,
+      name: raw.name || null,
+      description: describe(raw),
+      scaleClass: normaliseScaleClass(raw.scaleClass, raw.id || raw.name),
+      pages: raw.pages || []
+    });
+  }
+  return keep;
+}
+
+/**
+ * Every name a generic object answers to — its `name`, its `label`, and any
+ * id the author wrote on it before the entry was dropped. A page brief that
+ * cites one of these is citing an element that no longer exists; the citation
+ * is stripped and logged loudly rather than resurrecting the entry.
+ */
+function genericCitationTokens(visualBible) {
+  const tokens = new Map();
+  for (const g of (visualBible && visualBible.genericObjects) || []) {
+    for (const raw of [g.name, g.label]) {
+      const s = String(raw || '').trim().toLowerCase();
+      if (s) tokens.set(s, g);
+    }
+  }
+  return tokens;
+}
+
 function tryParseVisualBibleJSON(outline) {
   // Look for JSON code block in the Visual Bible section
   // Match ```json ... ``` after "Visual Bible" header
@@ -657,6 +721,10 @@ function tryParseVisualBibleJSON(outline) {
       locations: [],
       vehicles: [],
       clothing: [],
+      // Entries the author marked `generic: true`. They carry no id and are
+      // invisible to every reference, budget and grounding consumer; they exist
+      // so the drop is auditable (see splitGenericEntries).
+      genericObjects: [],
       changeLog: []
     };
 
@@ -681,7 +749,8 @@ function tryParseVisualBibleJSON(outline) {
 
     // Animals
     if (jsonData.animals && Array.isArray(jsonData.animals)) {
-      visualBible.animals = jsonData.animals.map(animal => ({
+      const animalsKept = splitGenericEntries(jsonData.animals, 'animals', buildAnimalDescription, visualBible.genericObjects);
+      visualBible.animals = animalsKept.map(animal => ({
         id: animal.id || generateId('ANI', visualBible.animals.length),
         label: typeof animal.label === 'string' && animal.label.trim() ? animal.label.trim() : null,
         name: animal.name,
@@ -699,7 +768,8 @@ function tryParseVisualBibleJSON(outline) {
 
     // Artifacts
     if (jsonData.artifacts && Array.isArray(jsonData.artifacts)) {
-      visualBible.artifacts = jsonData.artifacts.map(artifact => {
+      const artifactsKept = splitGenericEntries(jsonData.artifacts, 'artifacts', buildArtifactDescription, visualBible.genericObjects);
+      visualBible.artifacts = artifactsKept.map(artifact => {
         const id = artifact.id || generateId('ART', visualBible.artifacts.length);
         return {
         id,
@@ -774,7 +844,9 @@ function tryParseVisualBibleJSON(outline) {
 
     // Vehicles
     if (jsonData.vehicles && Array.isArray(jsonData.vehicles)) {
-      visualBible.vehicles = jsonData.vehicles.map(veh => ({
+      const vehiclesKept = splitGenericEntries(jsonData.vehicles, 'vehicles',
+        veh => `${veh.colorAndDetails}. Signature: ${veh.signatureElement}`, visualBible.genericObjects);
+      visualBible.vehicles = vehiclesKept.map(veh => ({
         id: veh.id || generateId('VEH', visualBible.vehicles.length),
         label: typeof veh.label === 'string' && veh.label.trim() ? veh.label.trim() : null,
         name: veh.name,
@@ -809,6 +881,11 @@ function tryParseVisualBibleJSON(outline) {
         referenceImageGenerated: false
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.clothing.length} clothing items from JSON`);
+    }
+
+    if (visualBible.genericObjects.length > 0) {
+      log.info(`[VISUAL BIBLE] ${visualBible.genericObjects.length} entr(ies) dropped as GENERIC — no id, no entry, no reference render, no page cell: `
+        + visualBible.genericObjects.map(g => `${g.name || g.label || '(unnamed)'} (${g.collection})`).join(', '));
     }
 
     const totalEntries = visualBible.secondaryCharacters.length +
@@ -2975,10 +3052,25 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4, 
   // `characters[]`; a human cast member is a name or a CHR id and resolves to
   // null, so the cast path is untouched and no cell is ever gained by a name.
   const { collectVbObjectCitations } = require('./promptBuilders');
+  // GENERIC CITATION GUARD (2026-09-15). A generic entry was dropped at parse
+  // time and has no id, but a brief can still name it. Strip the citation here,
+  // loudly: the `askedFor` map below is exactly the path that would hand a
+  // resurrected entry a reference cell, and a generic object's look belongs in
+  // the page prose and nowhere else.
+  const genericTokens = genericCitationTokens(visualBible);
+  const stripGeneric = (raw) => {
+    if (genericTokens.size === 0) return true;
+    const asText = String((raw && typeof raw === 'object' ? (raw.name || raw.id) : raw) || '').trim().toLowerCase();
+    const hit = genericTokens.get(asText);
+    if (!hit) return true;
+    log.error(`[VB-REF] Page ${pageNumber}: the brief cites "${asText}", which the bible marked GENERIC`
+      + ' — citation stripped, the object stays in the scene prose and gets no reference cell');
+    return false;
+  };
   const citedHandles = [
     ...(Array.isArray(sceneObjectIds) ? sceneObjectIds : []),
     ...collectVbObjectCitations(sceneMetadata ? { characters: sceneMetadata.characters, fullData: sceneMetadata.fullData } : null)
-  ];
+  ].filter(stripGeneric);
   const askedFor = new Map();
   for (const raw of citedHandles) {
     const handle = String((raw && typeof raw === 'object' ? raw.id : raw) || '').trim().toUpperCase();
@@ -3331,6 +3423,9 @@ module.exports = {
   recordElementCellGate,
   SCALE_CLASSES,
   normaliseScaleClass,
+  isGenericEntry,
+  splitGenericEntries,
+  genericCitationTokens,
   // Parsing
   parseVisualBible,
   filterMainCharactersFromVisualBible,

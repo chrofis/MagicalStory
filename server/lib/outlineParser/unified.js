@@ -201,18 +201,43 @@ class UnifiedStoryParser {
         // object on ANY page (staging job_1788763045123_z8so79ngb: the story's
         // central prop referenced on none of its 5 pages). The other parse
         // path that calls it, `visualBible.parseVisualBible`, has no callers.
-        const { normaliseObjectStates } = require('../visualBible');
+        // THIS IS THE LIVE VB PARSE. `visualBible.parseVisualBible` is the
+        // other one; every field contract has to exist in BOTH or it reaches no
+        // story. `scaleClass` and the generic gate are normalised here for that
+        // reason — this path JSON.parses the authored object raw, so an
+        // unknown `scaleClass` token would otherwise sail through unchecked and
+        // a `generic: true` entry would keep its id and its cell.
+        const { normaliseObjectStates, normaliseScaleClass, splitGenericEntries } = require('../visualBible');
         const normalizeVisualBibleEntries = (entries) => {
           if (!entries || !Array.isArray(entries)) return entries;
           return entries.map(entry => {
             const out = {
               ...entry,
               appearsInPages: entry.appearsInPages || entry.pages || [],
+              scaleClass: normaliseScaleClass(entry.scaleClass, entry.id),
             };
             if (entry.states !== undefined) out.states = normaliseObjectStates(entry.states, entry.id);
             return out;
           });
         };
+
+        // GENERIC GATE (owner, 2026-09-15). An everyday instance buys no id, no
+        // entry, no paid reference render and no page cell. The dropped entries
+        // are kept in `genericObjects[]` — no id — so the drop is
+        // auditable instead of indistinguishable from a forgotten entry.
+        this._cache.visualBible.genericObjects = [];
+        for (const key of ['artifacts', 'animals', 'vehicles']) {
+          const list = this._cache.visualBible[key];
+          if (!Array.isArray(list)) continue;
+          this._cache.visualBible[key] = splitGenericEntries(
+            list, key, (e) => e.description || e.colorAndDetails || e.name || null,
+            this._cache.visualBible.genericObjects
+          );
+        }
+        if (this._cache.visualBible.genericObjects.length > 0) {
+          log.info(`[UNIFIED-PARSER] ${this._cache.visualBible.genericObjects.length} entr(ies) dropped as GENERIC — no id, no reference render, no page cell: `
+            + this._cache.visualBible.genericObjects.map(g => `${g.name || g.label || '(unnamed)'} (${g.collection})`).join(', '));
+        }
 
         // Apply normalization to all entry arrays
         if (this._cache.visualBible.secondaryCharacters) {
