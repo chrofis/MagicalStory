@@ -680,6 +680,13 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
  * Never the default for German story prose until an A/B proves quality.
  */
 async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
+  // Guarded HERE as well as in the streaming implementation below. The
+  // delegation means the prompt is checked either way, but the context label is
+  // what a placeholder alarm names, and the entry point a caller used is the
+  // one worth naming. guardPromptString is idempotent, so the second pass is
+  // free. (tests/unit/sibling-parity.test.ts requires every provider entry
+  // point to carry it.)
+  prompt = guardPromptString(prompt, 'textModels.callOpenRouterAPI');
   // Delegates to the streaming implementation with no onChunk. Identical result
   // shape, and it inherits the two things this path could never have on its own:
   //   - immunity to undici's 300s headersTimeout, which killed any completion
