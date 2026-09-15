@@ -27,6 +27,7 @@ const {
   runInCacheScope,
   clearStyledAvatarCache,
   getStyledAvatarCacheStats,
+  invalidateStyledAvatarForCategory,
   exportStyledAvatarsForPersistence,
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
@@ -1962,6 +1963,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     //    of waiting for the whole pipeline.
     // Idempotent: the `!streamingAvatarStylingPromise` guard means a second
     // caller is a no-op, and the awaits downstream (line ~4870) are unchanged.
+    // The used-category derivation for a set of characters, in one place: the
+    // early kickoff and the post-correction re-render must ask for the SAME
+    // buckets or the second one renders a different avatar than it replaces.
+    const avatarRequirementsFor = (chars, requirements) => (chars || []).flatMap(char => {
+      const charNameTrimmed = char.name?.trim();
+      const charNameLower = charNameTrimmed?.toLowerCase();
+      const charReqs = requirements?.[char.name] ||
+                       requirements?.[charNameTrimmed] ||
+                       requirements?.[charNameLower] ||
+                       (requirements && Object.entries(requirements)
+                         .find(([k]) => k.trim().toLowerCase() === charNameLower)?.[1]);
+      let usedCategories = charReqs
+        ? Object.entries(charReqs)
+            .filter(([cat, config]) => config?.used)
+            .map(([cat, config]) => cat === 'costumed' && config?.costume
+              ? `costumed:${config.costume.toLowerCase()}`
+              : cat)
+        : ['standard'];
+      if (usedCategories.length === 0) usedCategories = ['standard'];
+      return usedCategories.map(cat => ({
+        pageNumber: 'pre-cover',
+        clothingCategory: cat,
+        characterNames: [char.name],
+      }));
+    });
+
     const onClothingRequirementsReady = (requirements) => {
         streamingClothingRequirements = requirements;
         // Bug #13 fix: Log completeness check for clothing requirements
@@ -1982,33 +2009,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.debug(`🎨 [STREAM] Starting early avatar styling (${reqCharCount} characters, ${artStyle} style)...`);
           streamingAvatarStylingPromise = (async () => {
             try {
-              const basicRequirements = (inputData.characters || []).flatMap(char => {
-                const charNameTrimmed = char.name?.trim();
-                const charNameLower = charNameTrimmed?.toLowerCase();
-                const charReqs = requirements?.[char.name] ||
-                                 requirements?.[charNameTrimmed] ||
-                                 requirements?.[charNameLower] ||
-                                 (requirements && Object.entries(requirements)
-                                   .find(([k]) => k.trim().toLowerCase() === charNameLower)?.[1]);
+              const basicRequirements = avatarRequirementsFor(inputData.characters || [], requirements);
 
-                let usedCategories = charReqs
-                  ? Object.entries(charReqs)
-                      .filter(([cat, config]) => config?.used)
-                      .map(([cat, config]) => cat === 'costumed' && config?.costume
-                        ? `costumed:${config.costume.toLowerCase()}`
-                        : cat)
-                  : ['standard'];
-
-                if (usedCategories.length === 0) {
-                  usedCategories = ['standard'];
-                }
-
-                return usedCategories.map(cat => ({
-                  pageNumber: 'pre-cover',
-                  clothingCategory: cat,
-                  characterNames: [char.name]
-                }));
-              });
               await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
               earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
@@ -2017,6 +2019,41 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           })();
         }
+    };
+
+    // THE AVATAR IS RENDERED BEFORE THE WARDROBE CORRECTION EXISTS.
+    // The kickoff above fires at the story-bible stage; the wardrobe-vs-Visual-
+    // Bible correction can only run once the bible exists, several stages later
+    // (beatsPipeline). The early kickoff is deliberate — avatars are the long
+    // pole in front of every image — so the fix is not to delay it but to
+    // re-render exactly the characters whose outfit text actually changed.
+    // Corrections are rare (a genuine contract/bible contradiction), so this is
+    // one avatar render per corrected character and nothing when nothing moved.
+    const onWardrobeCorrectedReady = (characterNames, requirements) => {
+      if (inputData.trialMode || skipImages) return;
+      const names = (characterNames || []).filter(Boolean);
+      if (names.length === 0) return;
+      const affected = (inputData.characters || []).filter(c =>
+        names.some(n => String(n).trim().toLowerCase() === String(c.name || '').trim().toLowerCase()));
+      if (affected.length === 0) return;
+      const reqs = avatarRequirementsFor(affected, requirements);
+      // Chained onto the in-flight styling promise, and put BACK into it, so the
+      // downstream awaits wait for the corrected avatar rather than racing it.
+      const prior = streamingAvatarStylingPromise || Promise.resolve();
+      streamingAvatarStylingPromise = (async () => {
+        try { await prior; } catch { /* the kickoff owns its own failure */ }
+        try {
+          for (const r of reqs) {
+            invalidateStyledAvatarForCategory(r.characterNames[0], r.clothingCategory,
+              affected.find(c => c.name === r.characterNames[0]) || null);
+          }
+          log.info(`🧥 [STREAM] Wardrobe corrected for ${names.join(', ')} — re-rendering ${reqs.length} styled avatar(s) against the Visual Bible`);
+          await prepareStyledAvatars(affected, artStyle, reqs, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: false, seasonOutfit: trialSeasonOutfit(inputData) });
+          earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
+        } catch (error) {
+          log.warn(`⚠️ [STREAM] Post-correction avatar re-render failed: ${error.message} — the avatar keeps the pre-correction outfit`);
+        }
+      })();
     };
 
     // Progressive parser with callbacks for streaming updates AND parallel task initiation
@@ -2601,6 +2638,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // so kick them off there instead of after the whole pipeline. Same
         // trigger the unified stream uses; the awaits downstream are unchanged.
         onClothingRequirements: onClothingRequirementsReady,
+        onWardrobeCorrected: onWardrobeCorrectedReady,
         // Per-stage progress (2-7%): without it the bar sits at 1% for the
         // whole ~10-minute text phase; heartbeat never moves the percent.
         onStage: async (pct, msg, hint = null) => {

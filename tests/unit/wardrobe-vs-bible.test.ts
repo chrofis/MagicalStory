@@ -98,3 +98,71 @@ describe('wardrobe contract vs Visual Bible', () => {
     expect(checkWardrobeAgainstBible(reqs(), { artifacts: [] })).toEqual([]);
   });
 });
+
+/**
+ * THE `corrected` FLAG WAS ALWAYS FALSE (fixed 2026-09-15). The corrector
+ * re-derives the findings after every rewrite, so the objects in `applied` are
+ * never the objects in `findings` — `applied.includes(f)`, the identity test
+ * beatsPipeline used to build wardrobeBibleReport, could not be true even for a
+ * correction that landed. Every successful correction was reported as
+ * uncorrected and `unresolved` was dropped on the floor.
+ */
+describe('the applied set is identified by value, never by object identity', () => {
+  it('a landed correction is NOT the same object as its finding', () => {
+    const r: any = reqs();
+    const { findings, applied, unresolved } = applyWardrobeBibleCorrections(r, bible(), { log: { warn: () => {} } });
+    expect(findings).toHaveLength(1);
+    expect(applied).toHaveLength(1);
+    expect(unresolved).toHaveLength(0);
+    expect(applied.includes(findings[0])).toBe(false);       // the bug
+    const key = (f: any) => [f.character, f.category, f.slot, f.elementId || ''].join('|');
+    expect(new Set(applied.map(key)).has(key(findings[0]))).toBe(true);   // the fix
+  });
+
+  it('beatsPipeline reports it by key and carries the applied names to the caller', () => {
+    const fs = require('fs');
+    const path = require('path');
+    const src = fs.readFileSync(path.join(__dirname, '..', '..', 'server', 'lib', 'beatsPipeline.js'), 'utf8');
+    expect(src).toContain('corrected: appliedKeys.has(correctionKey(f))');
+    expect(src).not.toContain('corrected: applied.includes(f)');
+    expect(src).toContain('onWardrobeCorrected(names, clothingRequirements)');
+  });
+});
+
+/**
+ * THE AVATAR IS RENDERED BEFORE THE CORRECTION EXISTS (fixed 2026-09-15).
+ * The styled-avatar kickoff fires at the story-bible stage — deliberately, it is
+ * the long pole in front of every image — while this correction can only run
+ * once the Visual Bible exists, several stages later. Page prompts then carried
+ * the corrected garment while the avatar reference cell still wore the old one.
+ * The kickoff is NOT moved; the affected characters are re-rendered.
+ */
+describe('a corrected outfit re-renders its avatar', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const root = path.join(__dirname, '..', '..');
+  const beats = fs.readFileSync(path.join(root, 'server', 'lib', 'beatsPipeline.js'), 'utf8');
+  const pipeline = fs.readFileSync(path.join(root, 'storyJobPipeline.js'), 'utf8');
+
+  it('the kickoff still runs BEFORE the correction — the ordering is the constraint, not the bug', () => {
+    expect(beats.indexOf('onClothingRequirements(clothingRequirements)'))
+      .toBeLessThan(beats.indexOf('applyWardrobeBibleCorrections(clothingRequirements, visualBible)'));
+  });
+
+  it('the correction fires the re-render hook only for characters actually corrected', () => {
+    expect(beats).toContain("if (applied.length > 0 && typeof onWardrobeCorrected === 'function')");
+    expect(beats).toContain('applied.map(f => f.character)');
+  });
+
+  it('the caller wires it, invalidates those avatars and re-renders only them', () => {
+    expect(pipeline).toContain('onWardrobeCorrected: onWardrobeCorrectedReady');
+    expect(pipeline).toContain('invalidateStyledAvatarForCategory(r.characterNames[0], r.clothingCategory');
+    expect(pipeline).toContain('await prepareStyledAvatars(affected, artStyle, reqs, requirements');
+    expect(pipeline).toContain('streamingAvatarStylingPromise = (async () => {');
+  });
+
+  it('both call sites derive the avatar buckets from ONE helper', () => {
+    expect(pipeline).toContain('const avatarRequirementsFor = (chars, requirements) =>');
+    expect((pipeline.match(/avatarRequirementsFor\(/g) || []).length).toBeGreaterThanOrEqual(2);
+  });
+});

@@ -707,6 +707,12 @@ async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
  *   generation (the long pole in front of every image) while scene expansion and
  *   page text are still running. Same callback the unified stream's progressive
  *   parser fires; it must be non-blocking and own its own error handling.
+ * @param {Function} [opts.onWardrobeCorrected] - fired when the wardrobe/bible
+ *   check actually REWROTE an outfit clause, with the affected character names.
+ *   The avatars for those characters were kicked off from the pre-correction
+ *   text (the kickoff is deliberately early — the Visual Bible does not exist
+ *   yet at that point), so the caller re-renders exactly those and nothing else.
+ *   Non-blocking, owns its own error handling.
  * @returns {Promise<{title, beats, pages, scenes, rawOutline, meta, beatsReviewReport, clothingReviewReport, sceneReviewReport}>}
  *   pages[]  mirrors UnifiedStoryParser.extractPages() output consumed by server.js
  *   scenes[] mirrors the resolved value of startSceneExpansion() (expandedScenes)
@@ -722,6 +728,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     modelOverrides = {},
     heartbeat = null,
     onClothingRequirements = null,
+    onWardrobeCorrected = null,
     // Per-stage progress reporter (percent, message). Without it the job sits
     // at 1% "Starting story generation..." for the entire ~10-minute text
     // phase — heartbeat only bumps updated_at, never the visible bar.
@@ -1938,13 +1945,19 @@ ${bibleBody}` : bibleBody;
   if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
     try {
       const { applyWardrobeBibleCorrections } = require('./clothingCheck');
-      const { findings, applied } = applyWardrobeBibleCorrections(clothingRequirements, visualBible);
+      const { findings, applied, unresolved } = applyWardrobeBibleCorrections(clothingRequirements, visualBible);
+      // `applied` holds RE-DERIVED finding objects (the corrector re-checks
+      // after every rewrite), so identity comparison against `findings` was
+      // always false and every successful correction logged as uncorrected.
+      // Compare on what identifies a finding instead.
+      const correctionKey = (f) => `${f.character} ${f.category} ${f.slot} ${f.elementId || ''}`;
+      const appliedKeys = new Set(applied.map(correctionKey));
       if (findings.length > 0) {
         wardrobeBibleReport = {
           conflicts: findings.map(f => ({
             character: f.character, category: f.category, slot: f.slot,
             elementId: f.elementId, elementLabel: f.elementLabel,
-            wardrobeClause: f.wardrobeClause, corrected: applied.includes(f),
+            wardrobeClause: f.wardrobeClause, corrected: appliedKeys.has(correctionKey(f)),
           })),
         };
         gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible wardrobe conflict(s): ${findings.map(f => `${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
@@ -1959,6 +1972,27 @@ ${bibleBody}` : bibleBody;
           } else {
             bibleSections = rewritten;
           }
+        }
+        if (unresolved.length > 0) {
+          wardrobeBibleReport.unresolved = unresolved.map(f => ({
+            character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel, wardrobeClause: f.wardrobeClause,
+          }));
+        }
+      }
+      // THE AVATAR WAS RENDERED FROM THE PRE-CORRECTION TEXT. The styled-avatar
+      // kickoff fires at the story-bible stage, long before the Visual Bible
+      // this check needs exists — deliberately, because avatars are the long
+      // pole in front of every image. So page prompts would carry the corrected
+      // garment while the avatar reference cell still wore the old one: the
+      // words-vs-picture split, one layer upstream. The affected characters —
+      // and only those — are re-rendered by the caller.
+      if (applied.length > 0 && typeof onWardrobeCorrected === 'function') {
+        const names = [...new Set(applied.map(f => f.character).filter(Boolean))];
+        try {
+          onWardrobeCorrected(names, clothingRequirements);
+        } catch (err) {
+          log.warn(`🚨 [BEATS] onWardrobeCorrected threw (${err.message}) — avatars keep the pre-correction outfit`);
         }
       }
     } catch (err) {
