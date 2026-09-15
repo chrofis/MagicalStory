@@ -40247,3 +40247,31 @@ human `secondaryCharacters` entry takes.
 `tests/unit/artifact-size.test.ts`, `tests/unit/vb-authoring-rule-parity.test.ts`,
 `docs/image-routing.md`, `tasks/vb-scale-class-plan-2026-09-15.md`
 **Status:** ✅ active
+
+## 2026-09-15 — Object counts: exact up to THREE, "more than three" above, on BOTH sides
+
+**Context.** A generator↔critic audit found the Art Director forbidden to state any exact number
+above TWO ("never with an exact number above two", `scene-expansion-all.txt` / `scene-expansion.txt`)
+while the quality judge's D-22 `object_count` scored a wrong count as MINOR/MAJOR. The judge was
+therefore checking the accuracy of a number the generator was structurally not allowed to pass down —
+a deduction no rewrite could satisfy.
+
+**Decision.** Owner ruling, verbatim: *"For the count increase limit to three. Judge also just gets
+more than three no exact nr."*
+- The Art Director may state an exact number up to and including three, and it is drawn exactly.
+- Above three, BOTH sides hold the non-numeric form ("more than three", a cluster, a row, a few,
+  several). The judge carries no exact expectation there and never deducts for the exact number.
+- The rule is ONE constant, `COUNTING_RULE` in `server/lib/promptBuilders.js`, filled into the
+  `{COUNTING_RULE}` placeholder both Art Director templates now declare — the wording is identical at
+  both sites, so two hand-kept copies would have drifted.
+- The illustrator carries the same limit as a `**COUNTS:**` line in the protected tail of
+  `image-generation.txt` (after `**REQUIRED OBJECTS`), where the prompt shrinker cannot delete it.
+
+**Rationale.** Severity and classification are untouched: `object_count` keeps its type and its
+MINOR/MAJOR ladder. What changes is the RANGE over which an exact number exists at all, which is the
+half both sides must agree on.
+
+**Touched:** `server/lib/promptBuilders.js`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/image-generation.txt`, `prompts/image-evaluation.txt`,
+`tests/unit/built-prompt-values.test.ts`
+**Status:** ✅ active

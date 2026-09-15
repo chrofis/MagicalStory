@@ -2467,7 +2467,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // production pipeline — did not, so the Art Director wrote every book
     // season-blind. `inputData` is the job's inputData; the resolver falls
     // back to the date.
-    SEASON: seasonLabel(inputData || {})
+    SEASON: seasonLabel(inputData || {}),
+    // ONE counting rule for both Art Director templates — see COUNTING_RULE.
+    COUNTING_RULE,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -2709,7 +2711,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // prose and of `emptyScenePrompt` (the background plate), so this is the
     // one place a season can reach the pixels. `options.story` is the job's
     // inputData where a caller has it; the resolver falls back to the date.
-    SEASON: seasonLabel(options.story || {})
+    SEASON: seasonLabel(options.story || {}),
+    // ONE counting rule for both Art Director templates — see COUNTING_RULE.
+    COUNTING_RULE,
   });
   // Text-zone rule family, same gate as the all-pages builder. A cover call
   // (pageNumber <= 0) never gets it; a page call follows the story's layout,
@@ -6289,6 +6293,16 @@ const NO_CHARACTER_MARKING_RULE = "**NO MARKS ON A CHARACTER:** No arrow, symbol
 
 const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests, gestures, or touches what the scene describes.";
 
+/**
+ * COUNTING — one string for both Art Director templates (owner, 2026-09-15:
+ * "For the count increase limit to three. Judge also just gets more than three
+ * no exact nr."). Exact counts up to three may reach the image model; above
+ * three both the brief and the judge hold the non-numeric form, so no judge
+ * ever checks an exact number the generator was not allowed to receive.
+ * Pinned in tests/unit/built-prompt-values.test.ts against the real builders.
+ */
+const COUNTING_RULE = 'Counting rule: an exact number for a group of like things may be stated only up to three, and then it is drawn exactly. Above three the group is staged as more than three, a cluster, a row, a few or several — never an exact number, in the prose, `sceneIntent` or `emptyScenePrompt`. A group that recurs across pages holds the same size impression, role and placement.';
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -8245,6 +8259,7 @@ module.exports = {
   buildArcBudgetSection,
   buildTellingRulesSection,
   RISK_FRAMING_RULE,
+  COUNTING_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
   PAGE_OPENING_VARIETY_RULE,

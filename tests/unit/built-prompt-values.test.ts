@@ -537,3 +537,57 @@ describe('the light rule agrees across every template that states it', () => {
     expect(offenders, 'a template still carries the reversed light rule').toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Object counts: exact up to THREE, "more than three" above (owner, 2026-09-15:
+// "For the count increase limit to three. Judge also just gets more than three
+// no exact nr.").
+//
+// The generator-side limit used to be TWO while the judge scored a wrong count
+// as MAJOR — accuracy checked on a number the Art Director was never allowed to
+// write. What is pinned here is the CONTRACT, not the wording: both Art
+// Director templates carry the SAME counting rule string (one constant), the
+// rule permits three and refuses an exact number above it, the illustrator is
+// told the same in the protected tail, and the judge holds no exact expectation
+// above three.
+// ---------------------------------------------------------------------------
+describe('object counts are exact up to three and non-numeric above', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const PROMPTS = path.join(__dirname, '../../prompts');
+  const countingLineOf = (prompt: string) =>
+    (String(prompt).split('\n').find((l) => l.startsWith('Counting rule:')) || '');
+
+  it('both Art Director prompts carry the rule from ONE constant', () => {
+    const all = countingLineOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    const one = countingLineOf(
+      PB.buildSceneExpansionPrompt(1, PAGE_TEXT, CHARACTERS, 'en', VISUAL_BIBLE, '', null, {}));
+    expect(all, 'the all-pages Art Director prompt lost the counting rule').toBe(PB.COUNTING_RULE);
+    expect(one, 'the per-page Art Director fallback drifted from the all-pages counting rule').toBe(all);
+  });
+
+  it('the rule allows three and refuses an exact number above it', () => {
+    const rule = countingLineOf(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}));
+    expect(rule).toMatch(/only up to three/i);
+    expect(rule).toMatch(/more than three/i);
+    expect(rule, 'the old limit of two is back').not.toMatch(/above two/i);
+  });
+
+  it('the illustrator is told the same limit, in the protected tail', () => {
+    const tpl = fs.readFileSync(path.join(PROMPTS, 'image-generation.txt'), 'utf8');
+    const idx = tpl.indexOf('**REQUIRED OBJECTS');
+    const counts = tpl.indexOf('**COUNTS:**');
+    expect(counts, 'the illustrator carries no counting rule').toBeGreaterThan(-1);
+    expect(counts, 'the counting rule sits ahead of the protected tail').toBeGreaterThan(idx);
+    expect(tpl.slice(counts, counts + 400)).toMatch(/three or fewer/i);
+    expect(tpl.slice(counts, counts + 400)).toMatch(/more than three/i);
+  });
+
+  it('the judge checks no exact number above three', () => {
+    const tpl = fs.readFileSync(path.join(PROMPTS, 'image-evaluation.txt'), 'utf8');
+    const rule = tpl.split('\n').find((l: string) => l.startsWith('**D-22 `object_count`')) || '';
+    expect(rule, 'D-22 is gone').not.toBe('');
+    expect(rule).toMatch(/three or fewer/i);
+    expect(rule).toMatch(/no exact expectation/i);
+  });
+});

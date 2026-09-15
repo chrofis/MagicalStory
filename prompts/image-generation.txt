@@ -32,6 +32,8 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 
 **DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.
 
+**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.
+
 {NO_CHARACTER_MARKING}
 
 {HANDS_HOLD_ONLY_NAMED}
