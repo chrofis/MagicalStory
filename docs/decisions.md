@@ -40341,3 +40341,39 @@ different ages, and it removes the one axis on which compliance cost points.
 `prompts/avatar-main-prompt.txt`, `prompts/avatar-evaluation.txt`,
 `tests/unit/avatar-declared-age.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — The cover judge's EXPECTED CAST is the roster the cover GENERATOR was given
+
+**Context.** A generator↔critic audit found the cover cap and the cover judge disagreeing by
+construction. The generator trims a cover to five characters (`MAX_COVER_CHARACTERS`) and appends an
+explicit restriction block — "ONLY show these characters: … Do NOT include: …" — precisely because the
+cover PROSE still names everyone. The judge's `buildExpectedCastBlock` cover branch then read that same
+prose back through `matchVbEntitiesInText` and added every Visual Bible person it found. A cover drawn
+exactly to order was held to a roster the generator had been ordered to violate, and the gap scored as
+a missing/extra CRITICAL that no repair round could clear.
+
+**Decision.** Owner ruling, verbatim: *"Cover the author is correct max 5."* The cap stays; the judge
+is fixed. Both sides now read ONE module, `server/lib/coverCastRoster.js`:
+- `MAX_COVER_CHARACTERS` lives there. `coverIterate.js` and the first-generation path in
+  `storyJobPipeline.js` each held their own literal `5`; both now import it.
+- `resolveCoverCastRoster(selected, all)` returns the trimmed roster AND the exclusion list, compared
+  through `castResolver.canonicalName` (never raw equality). `iterateCover` builds its restriction
+  block from it and hands the same `excludedCastNames` to the cover eval.
+- The judge's cover branch drops any prose hit on the exclusion list, and stops adding CHARACTER hits
+  once the roster holds `MAX_COVER_CHARACTERS` people. Animals are unaffected: the cap governs
+  characters, and an animal the cover names is genuinely expected on the page.
+
+**Plumbing.** `excludedCastNames` travels: `iterateCover` → both `evaluateImageQuality` call sites
+(direct and composite); `storyJobPipeline`'s cover pseudo-page → `evaluateImagesBatch` → `evalOptions`;
+and `buildEvalReplayOptions` derives it for the admin/regen and Lab cover paths from the cover
+record's own reference photos. It is in `MIRRORED_EVAL_OPTION_KEYS`, so the Lab cannot drift from
+production on it.
+
+**Rationale.** The alternative — teaching the judge to forgive a missing character — would have made
+every genuine omission unscoreable. Deriving both lists from one function means the disagreement
+cannot be reintroduced by rewording a prompt.
+
+**Touched:** `server/lib/coverCastRoster.js` (new), `server/lib/coverIterate.js`,
+`server/lib/evalPipeline.js`, `server/lib/evalReplayInputs.js`, `server/lib/images.js`,
+`storyJobPipeline.js`, `tests/unit/cover-cast-roster-parity.test.ts`
+**Status:** ✅ active

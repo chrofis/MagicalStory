@@ -1633,8 +1633,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const defaultClothingCategory = 'standard';
 
         // Cap characters at 5 — more than 5 almost always produces bad results
-        // Main characters appear on ALL covers, non-main are split across initial/back
-        const MAX_COVER_CHARACTERS = 5;
+        // Main characters appear on ALL covers, non-main are split across initial/back.
+        // ONE constant with the iterate path and with the cover JUDGE
+        // (server/lib/coverCastRoster.js).
+        const { MAX_COVER_CHARACTERS } = require('./server/lib/coverCastRoster');
         let charactersForCover;
         if (coverCharacters.length > 0) {
           // Scene description contained character names - use exactly those
@@ -5770,6 +5772,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               referencePhotos: coverData.referencePhotos || [],
               grokRefImages: coverData.grokRefImages || null,
               sceneCharacters: coverSceneCharacters,
+              // THE JUDGE GETS THE GENERATOR'S TRIM (owner, 2026-09-15: "Cover
+              // the author is correct max 5"). The cover was rendered from a
+              // roster capped at MAX_COVER_CHARACTERS; every other story
+              // character is excluded, and the EXPECTED CAST must not rebuild
+              // them from the cover prose. One resolver with the iterate path.
+              excludedCastNames: require('./server/lib/coverCastRoster')
+                .resolveCoverCastRoster(coverSceneCharacters, inputData.characters || []).excluded,
               scene: { outlineExtract: coverData.description },
               evaluationType: 'cover', // Use cover evaluation (includes text checks)
             });

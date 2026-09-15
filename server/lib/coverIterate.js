@@ -20,7 +20,9 @@ const { canonicalName, buildCastIndex, sameEntity } = require('./castResolver');
 const { getUsedClothingCategories } = require('./clothingCategories');
 
 // Hard cap on figures a cover may declare (title page is narrowed to mains).
-const MAX_COVER_CHARACTERS = 5;
+// ONE constant with the cover JUDGE and with the first-generation path — see
+// server/lib/coverCastRoster.js.
+const { MAX_COVER_CHARACTERS, resolveCoverCastRoster } = require('./coverCastRoster');
 
 function getStoryHelpers() {
   return require('./storyHelpers');
@@ -830,6 +832,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
 
   let coverCharacterPhotos;
   let selectedCoverCharacters;
+  // The generator's exclusion list, computed once with the restriction block
+  // below and handed to the cover judge so both hold the same roster.
+  let coverCastExcludedNames = [];
   // Hint-derived casts are authoritative (owner rule — see narrowCoverCastToMains):
   // the main-only narrowing below must never drop a hint-listed character.
   let castFromHint = false;
@@ -1046,8 +1051,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
   // on a back cover the user regenerated without them). Same restriction the
   // scene-page regen uses — exclude anyone not in the final cover cast.
   {
-    const selectedNames = selectedCoverCharacters.map(c => c.name).filter(Boolean);
-    const excludedNames = mergedCharacters.map(c => c.name).filter(n => n && !selectedNames.includes(n));
+    // ONE trim for the prompt AND for the judge below: the same cap and the
+    // same exclusion list reach both, so the EXPECTED CAST cannot hold a
+    // character the generator was ordered to leave off.
+    const roster = resolveCoverCastRoster(selectedCoverCharacters, mergedCharacters);
+    const selectedNames = roster.selected;
+    const excludedNames = roster.excluded;
+    coverCastExcludedNames = excludedNames;
     const restriction = buildCharacterRestriction(selectedNames, excludedNames);
     if (restriction) {
       coverPrompt += restriction;
@@ -1355,6 +1365,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
           // the dedupe only rewrites clothingDescription.
           clothingDedupedPhotos, 'cover', null,
           iterateLabel, null, sceneDescription, selectedCoverCharacters, {
+            // The cap + exclusion list the generator was given (RULING,
+            // 2026-09-15) — without it the cover's EXPECTED CAST is rebuilt
+            // from the untrimmed brief prose.
+            excludedCastNames: coverCastExcludedNames,
             // DETECT-THEN-EVAL (2026-09-13). The detection below this block used
             // to run after the eval, so the EXPECTED CAST roster on a cover was
             // never given a figure count — and the originating evidence for the
@@ -1451,6 +1465,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
           // only consumer still holding the pre-dedupe phrasing.
           imageResult.imageData, coverPrompt, clothingDedupedPhotos, 'cover', null,
           iterateLabel, null, sceneDescription, selectedCoverCharacters, {
+            // The cap + exclusion list the generator was given (RULING,
+            // 2026-09-15) — without it the cover's EXPECTED CAST is rebuilt
+            // from the untrimmed brief prose.
+            excludedCastNames: coverCastExcludedNames,
             // Same reorder as the direct path above.
             detectedFigures: compBbox?.figures || null,
             sceneMetadata: coverSceneMetadata || null,

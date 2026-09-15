@@ -2511,6 +2511,12 @@ async function evaluateImageBatch(images, options = {}) {
           // The page's PARSED metadata, so the EXPECTED CAST roster reads the
           // brief's `objects[]` even when sceneHint is a plan line.
           sceneMetadata: img.sceneMetadata || null,
+          // Covers only: the characters the generator was ORDERED to leave off
+          // (cap + exclusion list, server/lib/coverCastRoster.js). The cover
+          // branch of buildExpectedCastBlock reads the cover prose, which still
+          // names them — without this the judge holds a roster the generator
+          // was told to violate.
+          excludedCastNames: img.excludedCastNames || null,
           // Detector figure count for the EXPECTED CAST block — present on
           // repair-round re-evaluations that carry the previous detection;
           // null on a first-round eval, which runs before detection.

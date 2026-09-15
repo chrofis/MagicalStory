@@ -74,6 +74,9 @@ const MIRRORED_EVAL_OPTION_KEYS = Object.freeze([
   'detectedFigures',
   'expectedText',
   'textMode',
+  // Covers only: the characters the generator was ordered to leave off (cap +
+  // exclusion list, server/lib/coverCastRoster.js). Non-covers pass null.
+  'excludedCastNames',
 ]);
 
 /** Keys production passes that a Lab replay deliberately does NOT — see header. */
@@ -134,6 +137,7 @@ function buildEvalReplayOptions(ctx, opts = {}) {
     detectedFigures: detectedFigures || null,
     expectedText: null,
     textMode: null,
+    excludedCastNames: null,
   };
 
   if (coverKey) {
@@ -148,6 +152,17 @@ function buildEvalReplayOptions(ctx, opts = {}) {
     });
     options.expectedText = contract.expectedText;
     options.textMode = contract.textMode;
+    // THE JUDGE GETS THE GENERATOR'S TRIM (owner, 2026-09-15). The cover was
+    // rendered from a roster capped at MAX_COVER_CHARACTERS with every other
+    // story character excluded by name; the cover PROSE still names them, so
+    // without this list the EXPECTED CAST rebuilds the cast the generator was
+    // ordered to violate. Derived from what was actually attached to the
+    // render — the cover record's reference photos.
+    const { resolveCoverCastRoster } = require('./coverCastRoster');
+    options.excludedCastNames = resolveCoverCastRoster(
+      (Array.isArray(scene.referencePhotos) ? scene.referencePhotos : []).map(ph => ph && ph.name),
+      Array.isArray(ctx && ctx.characters) ? ctx.characters : []
+    ).excluded;
   }
 
   const overridden = [];

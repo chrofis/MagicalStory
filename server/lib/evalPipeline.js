@@ -1046,9 +1046,10 @@ function buildExpectedCastBlock({
   pageNumber = null,
   extraNames = [],
   storyData = null,
+  excludedCastNames = null,
 } = {}) {
   // RESOLVE. One index for every name question this builder asks.
-  const { buildCastIndex, resolveEntity, kindLabel, dedupeByEntity, canonicalName, flushResolverStats } = getCastResolver();
+  const { buildCastIndex, resolveEntity, kindLabel, dedupeByEntity, canonicalName, isNonHuman, flushResolverStats } = getCastResolver();
   const idx = buildCastIndex(storyData, visualBible);
   const names = [];
   const labels = [];
@@ -1124,8 +1125,31 @@ function buildExpectedCastBlock({
   if (evaluationType === 'cover' && visualBible) {
     try {
       const { matchVbEntitiesInText } = require('./coverIterate');
+      // THE JUDGE GETS THE GENERATOR'S TRIM (owner, 2026-09-15: "Cover the
+      // author is correct max 5"). The cover cast is capped at
+      // MAX_COVER_CHARACTERS and every other story character is handed to the
+      // model as an explicit exclusion — but the cover PROSE still names them,
+      // which is why the restriction block exists at all. Reading the prose
+      // back into the roster held the cover to a cast the generator was
+      // ordered to violate, and the gap scored CRITICAL. One resolver produces
+      // both lists: server/lib/coverCastRoster.js.
+      const { MAX_COVER_CHARACTERS } = require('./coverCastRoster');
+      const excluded = new Set((Array.isArray(excludedCastNames) ? excludedCastNames : [])
+        .map(n => canonicalName(String(n || ''))).filter(Boolean));
+      // People count against the cap; an animal the prose names is not a
+      // character the cap ever governed.
+      let people = names.filter(n => !isNonHuman(resolveEntity(n, idx))).length;
       for (const hit of matchVbEntitiesInText(sceneHint || originalPrompt, visualBible)) {
-        if (hit.type === 'character' || hit.type === 'animal') add(hit.name, vbKind(hit.name));
+        if (hit.type !== 'character' && hit.type !== 'animal') continue;
+        if (excluded.has(canonicalName(String(hit.name || '')))) continue;
+        const before = names.length;
+        if (hit.type === 'character') {
+          if (people >= MAX_COVER_CHARACTERS) continue;
+          add(hit.name, vbKind(hit.name));
+          if (names.length > before) people++;
+        } else {
+          add(hit.name, vbKind(hit.name));
+        }
       }
     } catch { /* cover keeps its commissioned cast */ }
   }
@@ -1157,7 +1181,6 @@ function buildExpectedCastBlock({
   // RESOLVE, tolerant: the resolver catches the short-form token the exact-name
   // list cannot ("Rossa" for the Bible's "Kapitänin Rossa"), and `vbNonHumanNames`
   // stays the authority for everything it does name.
-  const { isNonHuman } = getCastResolver();
   const nonHumanSet = new Set(require('./bboxDetection').vbNonHumanNames(visualBible).map(n => canonicalName(n)));
   const nonHumanNames = names.filter(n =>
     nonHumanSet.has(canonicalName(n)) || isNonHuman(resolveEntity(n, idx, { pageLabel })));
@@ -1830,6 +1853,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       pageLabel: pageContext ? `${pageContext} ` : '',
       sceneMetadata: evalOptions.sceneMetadata || null,
       storyData: evalOptions.storyData || null,
+      // The cover generator's exclusion list (cap + excluded names) — see the
+      // cover branch of buildExpectedCastBlock.
+      excludedCastNames: evalOptions.excludedCastNames || null,
       // ONE ROSTER: the two inputs only the detector-side builder used to have.
       pageNumber: evalOptions.pageNumber ?? null,
       extraNames: evalOptions.outlineCharacters || [],
