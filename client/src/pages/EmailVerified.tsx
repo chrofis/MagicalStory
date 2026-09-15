@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import storage, { STORAGE_KEYS } from '@/services/storage';
+import { trackTrialStep } from '@/utils/trialFunnel';
 import { Navigation } from '@/components/common';
 import { Button } from '@/components/common/Button';
 import { CheckCircle, Loader2, Monitor, Sparkles, LogIn } from 'lucide-react';
@@ -125,6 +126,10 @@ export default function EmailVerified() {
         })
         .catch(() => {}) // Best-effort — AuthContext will still try to refresh
         .finally(() => {
+          // THE TERMINAL FUNNEL STEP. A verified account now exists — this is
+          // the first moment it does on the email path, and the auth token is
+          // already in storage so the server can attach the user id.
+          trackTrialStep('account_created', { method: 'email' });
           // Full page reload to reset AuthContext
           window.location.href = '/stories';
         });

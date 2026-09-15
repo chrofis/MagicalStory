@@ -559,8 +559,12 @@ export default function TrialGenerationPage() {
       setEmailLinked(true);
       trackEmailLead();
       trackEvent('trial_email_lead');
+      // NOT account_created: POST /api/trial/link-email stores the address and a
+      // verification token and leaves the user anonymous and unverified
+      // (routes/trial.js). The terminal step is emitted when the verification
+      // link is followed (EmailVerified.tsx); claiming it here counted every
+      // address typed as a conversion.
       trackTrialStep('email_submitted');
-      trackTrialStep('account_created', { method: 'email' });
     } catch {
       setAuthError(t.error);
     } finally {
