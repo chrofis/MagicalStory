@@ -1303,4 +1303,4 @@ decisions → `docs/decisions.md` (ten entries dated 2026-09-15).
       `7e35c083a` prints SKIPPED for an unset `STAGING_DATABASE_URL` (only configured-but-unscannable
       is fatal); `fdf30adf1`'s drift guard iterates a frozen 18-key fixture so it catches removals but
       not ADDED page fields → `tasks/staging-story-review-2026-09-15.md`
-- [ ] **VB scale class + generic gate + large-element plate routing** — 3 phases approved in principle (scaleClass enum; AD marks generic objects → no VB entry/cell; vehicle-class and larger → plate only), 1 optional unapproved (mechanical scale finding). 4 open questions for the owner inside. → `tasks/vb-scale-class-plan-2026-09-15.md`
+- [x] **VB scale class + generic gate + large-element plate routing** — phases 1-3 SHIPPED to staging 2026-09-15 (`590433735`, `7f072ee03`, `8763eab30`); phase 4 (mechanical scale finding) NOT approved, not built. Not on master. → `tasks/vb-scale-class-plan-2026-09-15.md`
