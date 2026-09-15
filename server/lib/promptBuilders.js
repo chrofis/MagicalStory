@@ -4042,7 +4042,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // third and house-sized on a fourth. The pages that restated the size
         // in their prose were the ones that came closest; the pages that did
         // not (p8, p18) had nothing to go on, because this line dropped it.
-        const sizeNote = elementScaleNote(obj.entry) ? ` — ${elementScaleNote(obj.entry)}` : '';
+        const scaleNote = elementScaleNote(obj.entry);
+        const sizeNote = scaleNote ? ` — ${scaleNote}` : '';
         // OBJECT STATE - the fourth rider on this line, beside `size`, the
         // clothing `(worn by X)` suffix and a two-sided prop's orientation
         // parenthetical. It says WHICH variant of the object this page shows;
