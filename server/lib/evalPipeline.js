@@ -539,12 +539,18 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
           const placementsCheck = placementsBlock
             ? `\n4. Given the character placements above, does the empty scene have open, flat, usable ground at EACH of those frame positions? FAIL if a character position (e.g. "far-left background") maps to a frame region that is blocked by a wall, a building facade, a large prop, or the very edge of a receding corridor. Name the blocked position in the issue.`
             : '';
-          // Composition geometry fidelity — the main scene will composite characters,
-          // aim lines, and distant targets onto this empty scene. If the path
-          // direction, vanishing point, or reserved distant-target spot in the
-          // empty scene doesn't match what the main scene prose describes, the
-          // composite will be broken (e.g. character aims toward a target corner
-          // where the empty scene has a wall instead of an opening).
+          // Composition geometry fidelity — the main scene will composite
+          // characters and aim lines onto this empty scene. If the path
+          // direction or vanishing point in the empty scene doesn't match what
+          // the main scene prose describes, the composite will be broken.
+          //
+          // NO RESERVED CORNER (owner, 2026-09-15: "Why does the empty scene
+          // need a reserved corner that is wrong. Change the judge."). The
+          // plate generator is never handed mainScenePrompt — buildEmptyScenePrompt
+          // receives the brief's emptyScenePrompt only — so a reserved-space
+          // requirement graded a plate against prose it could not read. The
+          // page's text area is computed later from the calmness map
+          // (server/lib/textRegion.js), so the plate reserves nothing.
           const mainSceneBlock = mainScenePrompt
             ? `\n\nMAIN SCENE PROSE (what will be composited onto this empty scene):\n"${mainScenePrompt.substring(0, 800)}"`
             : '';
@@ -552,9 +558,8 @@ async function validateEmptyScene(imageData, textPosition, pageContext = '', opt
             ? `\n5. Composition geometry — does this empty scene support the main scene's geometry? Check:
    a. Any path, river, road, corridor, shoreline, horizon, or major perspective line — does it run in the same direction the main scene prose describes (e.g. "stretches to the right background", "diagonal from lower-left to upper-right")?
    b. Vanishing point / opening location — is it at the frame position the main scene implies (e.g. main scene says "sliver of light at far right background" → empty scene must have that opening/light at the upper-right, not centered or on the left)?
-   c. Reserved open space for distant composited targets — if the main scene places a "tiny figure" or small object at a specific corner, the empty scene must have open, uncluttered sky/ground/path there, not a wall or tree trunk.
-   d. Lighting direction — consistent with the main scene's time of day and declared light source.
-   FAIL with a specific fix instruction if any of (a)–(d) disagree. The issue description must name WHAT geometry is wrong AND the corrected direction/position. Example: "path runs front-to-center instead of diagonally to the upper-right; regenerate with the path angled toward the upper-right corner where the target will be composited".`
+   c. Lighting direction — consistent with the main scene's time of day and declared light source.
+   FAIL with a specific fix instruction if any of (a)–(c) disagree. The issue description must name WHAT geometry is wrong AND the corrected direction/position. Example: "path runs front-to-center instead of diagonally to the upper-right; regenerate with the path angled toward the upper-right corner".`
             : '';
 
           const visionUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;

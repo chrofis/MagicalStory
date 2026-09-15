@@ -40275,3 +40275,29 @@ half both sides must agree on.
 `prompts/scene-expansion.txt`, `prompts/image-generation.txt`, `prompts/image-evaluation.txt`,
 `tests/unit/built-prompt-values.test.ts`
 **Status:** ✅ active
+
+## 2026-09-15 — The empty-scene QC no longer grades the plate on a RESERVED CORNER
+
+**Context.** A generator↔critic audit found the empty-scene vision QC
+(`validateEmptyScene`, `server/lib/evalPipeline.js`) grading a plate against `mainScenePrompt` — the
+PAGE's scene prose. The plate generator never receives it: `buildEmptyScenePrompt` is handed the
+brief's `emptyScenePrompt` and a `characterSpace` line, nothing else. Check (c) of the geometry block
+required "open, uncluttered sky/ground/path" wherever the main scene places a distant composited
+target, so a correct plate could fail on a requirement its generator was structurally blind to.
+
+**Decision.** Owner ruling, verbatim: *"Why does the empty scene need a reserved corner that is wrong.
+Change the judge."* Check (c) is removed from the QC prompt. Nothing on the generator side changes —
+the page's text area is computed afterwards from the calmness map (`server/lib/textRegion.js`), so the
+plate reserves nothing for text either.
+
+**Rationale.** The plate cannot satisfy a requirement stated only to its judge, and no repair round
+can either: a re-roll of the plate is generated from the same blind input. Removing the check is the
+only fix that does not invent a new input contract.
+
+**Still open — NOT ruled on.** Checks (a) perspective/path direction, (b) vanishing point and
+(d, now c) lighting direction are judged against the same `mainScenePrompt` the generator never sees.
+They are left in place and raised for the owner: either feed the plate generator the main scene prose,
+or drop the checks. This entry does not decide it.
+
+**Touched:** `server/lib/evalPipeline.js`, `tests/unit/empty-scene-qc-reserved-corner.test.ts`
+**Status:** ✅ active
