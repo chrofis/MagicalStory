@@ -114,6 +114,9 @@ Sizes measured 2026-08-09.
 | image-semantic.txt | 16,061 | 151 | images.js `evaluateThreeStage`; sceneValidator.js `evaluateSemanticFidelity` | Semantic fidelity eval |
 | image-vision-inventory.txt | 2,039 | 32 | images.js `evaluateThreeStage` | Three-stage eval: vision inventory |
 | image-prompt-compliance.txt | 15,268 | 155 | images.js `evaluateThreeStage` | Three-stage eval: prompt compliance (never sees the image) |
+| image-inventory-unified.txt | 6,644 | 81 | evalPipeline.js (unified visual inventory) | Per-figure inventory the blind compliance judge consumes |
+| cover-evaluation-notes.txt | 1,353 | 17 | evalPipeline.js `evaluateImageQuality` (cover path) | Cover-only preamble: COVER_NOTE / TEXT_NOTE_APP_OVERLAY / TEXT_RULES. Extracted from JS string literals 2026-09-15 |
+| empty-scene-qc.txt | 2,889 | 18 | evalPipeline.js `buildEmptySceneQcPrompt` | Plate judge: BODY / ERA_CHECK / PLACEMENTS_CHECK. Extracted from JS string literals 2026-09-15 |
 | image-visual-inventory.txt | 5,377 | 138 | images.js `runVisualInventory`; regeneration.js | Visual inventory pass |
 | image-inspection.txt | 2,457 | 52 | images.js `inspectImageForErrors` | Image error inspection |
 | generated-image-analysis.txt | 1,106 | 39 | sceneValidator.js `analyzeGeneratedImage` | Generated-image analysis |
