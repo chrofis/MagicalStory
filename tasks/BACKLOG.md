@@ -387,6 +387,13 @@ measurement, is lost).
 
 ## Refactor + tech debt
 
+- [ ] **GDPR erasure and orphan cleanup bypass the failed-prune ledger built for them (review 2026-09-15).** `delete-user-data.js:684-687` calls raw `r2.deleteByPrefix`/`deleteObject`; `cleanup-orphaned-data.js:72` calls `r2.deleteStoryArtefacts` inside a warn-only catch. Neither records a failed prune to `r2_pending_deletions`, so the daily retry never sees it. Swap to `r2Pending.prunePrefix`/`pruneObject`/`pruneStory` → `scripts/admin/delete-user-data.js:684`, `scripts/admin/cleanup-orphaned-data.js:72`
+- [ ] **`images.js` facade is stale — ~15 newer `evalPipeline`/`bboxDetection` exports (presence derivation, `reconcileDetectorCast`, `isMicroFigure`, …) are not re-exported** although CLAUDE.md says it re-exports every name. No live caller today; add them or narrow the documented contract → `server/lib/images.js`
+- [ ] **`TOPIC_AGE_WINDOWS` is a hand-typed "generated mirror" of the client `suitableAges` table** (56 entries, parity test only). Make it real codegen or one imported constant → `server/lib/promptBuilders.js:5264`
+- [ ] **Test Lab stage ids are string literals in three places with no shared constant** (`STAGE_RUNNERS`, routes cost-bucket map, client `TESTLAB_STAGES`) → `server/lib/testlab.js`, `server/routes/admin/testlab.js:139`, `client/src/services/testlabService.ts:575`
+- [ ] **Trial-writer page-opening / AD-composition rules were copied as prose into `story-trial.txt`** instead of one shared constant like `RISK_FRAMING_RULE`; `story-unified.txt` still lacks them → `prompts/story-trial.txt`, `server/lib/promptBuilders.js`
+- [ ] **`recordEvalFindings` inserts N rows in a loop with no transaction** — a mid-batch failure leaves partial stats rows; use one multi-row INSERT → `server/services/database.js:745`
+- [ ] **Push gate 404 branch is `ungated`/fail-open** while the code comment claims never-fail-open; document the bootstrap exception or fail closed → `scripts/admin/check-push-idle.js`
 - [ ] **17 of 128 production stories are owned by a `user_id` with no `users` row** — stories
       outliving their owner. Found during the 2026-09-13 R2 audit, independent of R2, NOT fixed.
       Decide the rule (adopt to an owner / soft-delete / leave and document) and add a constraint
