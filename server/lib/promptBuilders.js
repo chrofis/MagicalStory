@@ -6732,10 +6732,15 @@ function readerAge(inputData) {
   return Math.min(8, youngestMainAge(inputData, 8));
 }
 
+// AGE 0 IS AN AGE (2026-09-15). `n > 0` here dropped it, so an age-0-only cast
+// read as "no readable age" and fell to the caller's fallback: the creature-tone
+// band went from `cute` to no section at all when age 0 became a live band
+// (6416cc326). `focusAge` — the sibling reader of the same field — has always
+// accepted `>= 0`.
 function youngestMainAge(inputData, fallback = 5) {
   const mainIds = inputData?.mainCharacters || [];
   const chars = (inputData?.characters || []).filter(c => c && (!mainIds.length || mainIds.includes(c.id)));
-  const ages = chars.map(c => parseInt(c.age, 10)).filter(n => Number.isFinite(n) && n > 0);
+  const ages = chars.map(c => parseInt(c.age, 10)).filter(n => Number.isFinite(n) && n >= 0);
   return ages.length ? Math.min(...ages) : fallback;
 }
 

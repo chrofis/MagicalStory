@@ -79,6 +79,17 @@ describe('creature tone band comes from the youngest main character', () => {
     expect(band(p)).toBe('formidable');
   });
 
+  it('an age-0 cast gets the cute band - zero is an age, not a missing one', () => {
+    expect(band(build(story([{ id: 1, name: 'Baby', age: 0 }])))).toBe('cute');
+    expect(youngestMainAge(story([{ id: 1, name: 'Baby', age: 0 }]), 5)).toBe(0);
+  });
+
+  it('an age-0 main lowers the band for a mixed cast', () => {
+    expect(band(build(story([
+      { id: 1, name: 'Baby', age: 0 },
+      { id: 2, name: 'Ayan', age: 8 },
+    ])))).toBe('cute');
+  });
   it('a cast with no readable age emits no tone section at all', () => {
     const p = build(story([{ id: 1, name: 'Nobody', age: NaN as any }]));
     expect(band(p)).toBe('none');
