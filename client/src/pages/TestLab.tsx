@@ -824,6 +824,28 @@ function ExperimentsTab() {
   const loadTemplate = async () => {
     try {
       const res = await testlabService.getTemplates();
+      const variant = res.variants?.[stage];
+      if (variant) {
+        // The template key is chosen at run time from a param, so read the
+        // params JSON the user has typed and load the matching option.
+        let value: unknown;
+        if (paramsJson.trim()) {
+          try { value = (JSON.parse(paramsJson) as Record<string, unknown>)[variant.param]; }
+          catch { alert('Params JSON is not valid JSON — fix it, then load the template.'); return; }
+        }
+        const valid = Object.keys(variant.options).join(', ');
+        if (value === undefined || value === null || value === '') {
+          alert(`This stage picks its template from params.${variant.param}. Set it in the params JSON to one of: ${valid}`);
+          return;
+        }
+        const tplV = variant.options[String(value)];
+        if (!tplV) {
+          alert(`No template for params.${variant.param} = "${String(value)}". Valid values: ${valid}`);
+          return;
+        }
+        setOverride(tplV);
+        return;
+      }
       const tpl = res.templates[stage];
       if (tpl) setOverride(tpl);
       else alert('No overridable template for this stage.');
@@ -1296,9 +1318,13 @@ function ExperimentsTab() {
           <div className="mb-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm font-medium text-gray-700">
-                {(stageInfo as { noTemplate?: boolean }).noTemplate ? 'Instruction text' : 'Prompt override (empty = current template)'}
+                {(stageInfo as { noTemplate?: boolean }).noTemplate
+                  ? 'Instruction text'
+                  : (stageInfo as { builtPromptOverride?: boolean }).builtPromptOverride
+                    ? 'Prompt override — replaces the whole BUILT prompt (no template to load)'
+                    : 'Prompt override (empty = current template)'}
               </div>
-              {!(stageInfo as { noTemplate?: boolean }).noTemplate && (
+              {!(stageInfo as { noTemplate?: boolean }).noTemplate && !(stageInfo as { builtPromptOverride?: boolean }).builtPromptOverride && (
                 <button className="text-xs text-indigo-600 hover:underline" onClick={loadTemplate}>Load current template</button>
               )}
             </div>

@@ -119,9 +119,11 @@ const STAGE_TEMPLATE_KEYS = {
   book_audit: 'bookAudit',
   scene_hazard_count: 'sceneHazardAudit',
   beats_scenes: 'storyBeats',
-  // Cover prefill shows the front-cover template; the override replaces
-  // whichever cover template the target's coverType selects.
-  cover: 'frontCover',
+  // A cover is built from the SAME image-generation template a page uses
+  // (buildCoverPrompt → promptTemplateOverride || PROMPT_TEMPLATES.imageGeneration),
+  // so that is what the override replaces. The old 'frontCover' key here was
+  // stale — front-cover.txt retired 2026-08-26, so the prefill loaded null.
+  cover: 'imageGeneration',
   // Avatar sheet eval prefill shows the pass-1 realistic evaluator; pass-2
   // (styled) uses sheet-2x4-style-eval.txt — paste that manually when A/B-ing
   // the styled eval prompt.
@@ -138,6 +140,39 @@ const STAGE_TEMPLATE_KEYS = {
   // trial's one-call story template.
   trial_idea_variety: 'trialIdea',
   trial_challenge_draw: 'storyTrial',
+  // Scene review replay runs the scene-review critic over frozen briefs.
+  scene_review_replay: 'sceneReview',
+  // Story bible replay re-authors the VB from the locked beats.
+  story_bible_replay: 'storyBibleFromBeats',
+  // Story text replay re-writes the page text from the locked beats.
+  story_text_replay: 'storyTextFromBeats',
+  // Wardrobe review — the critic that has to catch the bad costume.
+  clothing_review: 'clothingReview',
+  // Arc panel replay runs the panel over a stored committed arc.
+  arc_panel_replay: 'arcPanel',
+};
+
+// Stages whose template key is chosen at RUN time from a param, so no single
+// static entry can express it. Shape: stage -> { param, options: value -> key }.
+// GET /templates resolves every option to its text, and the UI picks the one
+// matching the param the user typed in the params JSON.
+const STAGE_TEMPLATE_VARIANTS = {
+  // runAuditReplayStage switches the audit prompt on params.level.
+  audit_replay: {
+    param: 'level',
+    options: {
+      arc: 'storyArcAudit',
+      text: 'storyTextAudit',
+      'text-blind': 'storyTextAuditBlind',
+    },
+  },
+  // scoreArtifactsWithJudge takes the prompt key from the evaluator that
+  // params.evalVersion resolves to — derived from the EVALUATORS registry in
+  // server/lib/storyScorecard.js so a new evaluator version needs no edit here.
+  story_scorecard: {
+    param: 'evalVersion',
+    options: require('../../lib/storyScorecard').EVALUATOR_PROMPT_KEYS,
+  },
 };
 
 // GET /api/admin/testlab/templates — current template text per overridable stage
@@ -149,7 +184,16 @@ router.get('/templates', async (req, res) => {
     for (const [stage, key] of Object.entries(STAGE_TEMPLATE_KEYS)) {
       templates[stage] = PROMPT_TEMPLATES[key] || null;
     }
-    res.json({ templates });
+    const variants = {};
+    for (const [stage, { param, options }] of Object.entries(STAGE_TEMPLATE_VARIANTS)) {
+      variants[stage] = {
+        param,
+        options: Object.fromEntries(
+          Object.entries(options).map(([value, key]) => [value, PROMPT_TEMPLATES[key] || null])
+        ),
+      };
+    }
+    res.json({ templates, variants });
   } catch (err) {
     res.status(500).json({ error: 'Failed to load templates', details: err.message });
   }

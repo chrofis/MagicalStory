@@ -550,7 +550,10 @@ export const TESTLAB_STAGES = [
   // still pay" and "does rotating the reviewer beat repeating one" are
   // measurable. params.variants asks for N arcs in ONE call plus a merge pass,
   // to compare best-of-N against sequential review.
-  { id: 'arc_rounds', label: 'Arc rounds (plan the arc, review it N times / best-of-N, scored each round)', producesImage: false, overridable: true, storyLevel: true },
+  // builtPromptOverride: the override replaces the fully BUILT plan prompt
+  // (buildArcCreatePrompt, story data already filled in), not a template — so
+  // there is nothing to prefill and no template key for this stage.
+  { id: 'arc_rounds', label: 'Arc rounds (plan the arc, review it N times / best-of-N, scored each round)', producesImage: false, overridable: true, storyLevel: true, builtPromptOverride: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.
@@ -586,7 +589,12 @@ export const testlabService = {
   },
 
   getTemplates() {
-    return api.get<{ templates: Record<string, string | null> }>('/api/admin/testlab/templates');
+    return api.get<{
+      templates: Record<string, string | null>;
+      // Stages whose template is chosen at run time from a param: the param
+      // name plus value -> template text.
+      variants: Record<string, { param: string; options: Record<string, string | null> }>;
+    }>('/api/admin/testlab/templates');
   },
 
   getTextModels() {
