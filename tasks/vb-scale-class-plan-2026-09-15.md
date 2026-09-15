@@ -1,6 +1,20 @@
 # VB scale class, generic gate, and plate routing for large elements — 2026-09-15
 
-Status: PLAN — owner reviewed 2026-09-15. Phases 1-3 APPROVED for implementation; phase 4 NOT NOW (owner). Open questions answered below.
+Status: SHIPPED (staging, not master) — phases 1-3 implemented 2026-09-15 in commits `590433735` (scaleClass), `7f072ee03` (generic gate) and `8763eab30` (plate routing). Phase 4 NOT BUILT (owner: not now).
+
+Deviations from the plan as written, both deliberate:
+
+1. **The page-side drop is CONDITIONAL on a plate being sent**, not "unconditionally, at selection time" as the
+   Design section says. The Risks section of this same plan requires the no-plate fallback, and the owner restated it
+   as mandatory; the two halves of the plan contradicted each other and the Risks half wins. `getElementReferenceImagesForPage`
+   therefore still SELECTS large elements (carrying `scaleClass` on each reference) and the drop happens at the two
+   filter sites that know whether a plate was sent, through one shared predicate `isPlateBorneElement`.
+2. **A second parser had to move with the first.** `UnifiedStoryParser.extractVisualBible` (`server/lib/outlineParser/unified.js`) is the VB parse the pipeline actually runs; `visualBible.parseVisualBible` is
+   the other one. Both `scaleClass` normalisation and the generic split exist in both, or the change reaches no story.
+   Caught by the phase-2 test, not by reading.
+
+Registry proof: the `vb-authoring-sites` parity anchors `"scaleClass"` and `"generic"` were each added BEFORE the
+prompts were edited and `tests/unit/sibling-parity.test.ts` was confirmed FAILING on all four members each time.
 
 ## Goal
 
@@ -58,11 +72,11 @@ So: **`scaleClass` is added everywhere; `size` is kept where it exists (artifact
 
 **Parser behaviour** (`server/lib/visualBible.js`, the JSON whitelist parse at `:666` artifacts, `:713` locations, `:738` vehicles, plus the animals and secondaryCharacters branches):
 
-- [ ] Add `scaleClass` to each whitelist (the parse is a WHITELIST — an unlisted field is dropped silently; that is documented at `:688`).
-- [ ] Normalise: lowercase, trim. **Unknown value → `null` + `log.warn`.** Never coerce to a nearest class; a guessed class routes an object to the wrong pipeline.
-- [ ] Missing value → `null` + `log.warn` naming the id. Not an error: old stored bibles have none (see Risks).
+- [x] Add `scaleClass` to each whitelist (the parse is a WHITELIST — an unlisted field is dropped silently; that is documented at `:688`).
+- [x] Normalise: lowercase, trim. **Unknown value → `null` + `log.warn`.** Never coerce to a nearest class; a guessed class routes an object to the wrong pipeline.
+- [x] Missing value → `null` + `log.warn` naming the id. Not an error: old stored bibles have none (see Risks).
 - [x] ~~Consistency check, warn-only~~ — CUT by owner 2026-09-15 (open question 2). Was: when both `size` and `scaleClass` exist and the `size` text obviously contradicts the class, log it. This is the one place a text check is acceptable *because it decides nothing* — it emits a log line for a human, never a finding and never a route. Keep it to an exact-token list (`hand`/`palm`/`thumb`/`fist` vs `building`/`landscape`) or skip it entirely if that feels like the thin end of the pattern-matching wedge; the owner's call (open question 2).
-- [ ] `scaleClass` is **never** concatenated into `description`, `label`, `sizeNote` or any prompt string.
+- [x] `scaleClass` is **never** concatenated into `description`, `label`, `sizeNote` or any prompt string.
 
 **Prompt-rule wording draft** (identical at every authoring site — one canonical wording):
 
@@ -86,10 +100,10 @@ And one line in each site's rules block:
 
 **Parser behaviour:**
 
-- [ ] `generic === true` → the entry is NOT pushed into `visualBible.artifacts` (or animals/vehicles). It is pushed into a new `visualBible.genericObjects[]` with `{ label, description, scaleClass, pages }` and **no `id`**.
-- [ ] `genericObjects[]` is invisible to: `getElementReferenceImagesForPage`, `getEmptySceneElementReferences`, `buildReferenceSheetBatches` (no paid render), `ELEMENT_COLLECTIONS` / `VB_ELEMENT_BUDGET`, `entityConsistency`, `bboxDetection` grounding.
-- [ ] **Citation guard.** If a page's AD `objects[]` names a generic entry (by id or by name), `log.error` and strip the citation before it reaches `collectVbObjectCitations` (`visualBible.js:2932`) — otherwise the citation path would resurrect the entry through the `askedFor` map and hand it a cell. Fails loud, never silently.
-- [ ] **A SPECIFIC object keeps its entry and its cell whatever its class.** The owner rejected "drop all hand-sized cells"; nothing in this plan drops a cell on size grounds alone.
+- [x] `generic === true` → the entry is NOT pushed into `visualBible.artifacts` (or animals/vehicles). It is pushed into a new `visualBible.genericObjects[]` with `{ label, description, scaleClass, pages }` and **no `id`**.
+- [x] `genericObjects[]` is invisible to: `getElementReferenceImagesForPage`, `getEmptySceneElementReferences`, `buildReferenceSheetBatches` (no paid render), `ELEMENT_COLLECTIONS` / `VB_ELEMENT_BUDGET`, `entityConsistency`, `bboxDetection` grounding.
+- [x] **Citation guard.** If a page's AD `objects[]` names a generic entry (by id or by name), `log.error` and strip the citation before it reaches `collectVbObjectCitations` (`visualBible.js:2932`) — otherwise the citation path would resurrect the entry through the `askedFor` map and hand it a cell. Fails loud, never silently.
+- [x] **A SPECIFIC object keeps its entry and its cell whatever its class.** The owner rejected "drop all hand-sized cells"; nothing in this plan drops a cell on size grounds alone.
 
 **How the page prompt still names a generic object without an id.** It already does — the AD's SCENE prose is the channel. The added rule at the authoring site:
 
@@ -107,11 +121,11 @@ The REQUIRED OBJECTS block (`promptBuilders.js:4060`) is a presence checklist bu
 
 **The change:**
 
-- [ ] `getEmptySceneElementReferences`: widen from "vehicles + non-landmark locations" to "vehicles + non-landmark locations + **any element whose `scaleClass` is `vehicle`, `building` or `landscape`**". A building-scale *artifact* — a monument, a mill, a bridge, a pole-with-banner — reaches the plate it belongs to instead of competing for a page cell. Same AD-`objects[]` authority gate, same `aboardId` skip, same cap 9.
-- [ ] `buildEmptyScenePrompt`: widen the `**VEHICLES:**` block to `**STRUCTURES:**`, same gate, same aboard exception, same "render only the part the camera sees" tail. Wording draft for the header: *"Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute:"*
-- [ ] `getElementReferenceImagesForPage`: drop any entry with `scaleClass` in `{vehicle, building, landscape}` — **unconditionally, at selection time**, not gated on whether a plate was sent. This is the p12 fix: the current filter only fires when `hasPlate`, so a plateless page still spends a cell on a three-master, and the cell wins over the prose. One `log.info` per dropped element naming id + class + "routed to plate". **See Risks: the drop is conditional on the element actually reaching a plate.**
-- [ ] The existing `type !== 'vehicle' && type !== 'location'` filters in `buildPageCompositeRefs:1574` and `storyJobPipeline.js:5071` become redundant for classed bibles but **stay** as the `scaleClass === null` fallback for stored bibles.
-- [ ] **Bug found en route, fix in the same commit:** `storyJobPipeline.js:4313` computes `vbRefElementIds` from the **unfiltered** `elementReferences`, before Phase 5a-pre-grid (`:5047`) drops cells. So `promptBuilders.js:4062-4067` can tell the model *"the attached reference images include a rough image of <the ship>"* when that cell was dropped — the model is told to match a reference it was never given. Move the `vbRefElementIds` computation to after 5a-pre-grid, or recompute it from `kept`.
+- [x] `getEmptySceneElementReferences`: widen from "vehicles + non-landmark locations" to "vehicles + non-landmark locations + **any element whose `scaleClass` is `vehicle`, `building` or `landscape`**". A building-scale *artifact* — a monument, a mill, a bridge, a pole-with-banner — reaches the plate it belongs to instead of competing for a page cell. Same AD-`objects[]` authority gate, same `aboardId` skip, same cap 9.
+- [x] `buildEmptyScenePrompt`: widen the `**VEHICLES:**` block to `**STRUCTURES:**`, same gate, same aboard exception, same "render only the part the camera sees" tail. Wording draft for the header: *"Any vessel, vehicle or built structure in this backdrop is one of those described below — match its colour, construction and named parts, never a generic substitute:"*
+- [x] `getElementReferenceImagesForPage`: drop any entry with `scaleClass` in `{vehicle, building, landscape}` — **unconditionally, at selection time**, not gated on whether a plate was sent. This is the p12 fix: the current filter only fires when `hasPlate`, so a plateless page still spends a cell on a three-master, and the cell wins over the prose. One `log.info` per dropped element naming id + class + "routed to plate". **See Risks: the drop is conditional on the element actually reaching a plate.**
+- [x] The existing `type !== 'vehicle' && type !== 'location'` filters in `buildPageCompositeRefs:1574` and `storyJobPipeline.js:5071` become redundant for classed bibles but **stay** as the `scaleClass === null` fallback for stored bibles.
+- [x] **Bug found en route, fix in the same commit:** `storyJobPipeline.js:4313` computes `vbRefElementIds` from the **unfiltered** `elementReferences`, before Phase 5a-pre-grid (`:5047`) drops cells. So `promptBuilders.js:4062-4067` can tell the model *"the attached reference images include a rough image of <the ship>"* when that cell was dropped — the model is told to match a reference it was never given. Move the `vbRefElementIds` computation to after 5a-pre-grid, or recompute it from `kept`.
 
 **`docs/image-routing.md` — new row for the decision matrix:**
 
