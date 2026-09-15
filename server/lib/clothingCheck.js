@@ -480,7 +480,161 @@ function missingGarments(clothingDescription, prose, requiredSlots = ['top', 'bo
     .map(clause => clause.split(/\s+/).slice(0, 3).join(' '));
 }
 
+/**
+ * ── Wardrobe contract vs Visual Bible ────────────────────────────────────────
+ *
+ * The wardrobe (`clothingRequirements[name].<category>.description`) and the
+ * Visual Bible are two independent descriptions of the same body. Nothing
+ * compared them, so a story could carry a THIRD garment in a slot the bible
+ * already owns: staging job_1789420511893_zly5rcdej dressed a ship's captain
+ * in "a black tricorn hat" while ART002, a navy captain's cap with a gold
+ * anchor, was the object the plot turns on and was assigned to nine of her
+ * pages. Every page carried both, the clothing review said "no fault" (it only
+ * checks garments WITHIN one outfit), and the covers hid it entirely because
+ * the cover dedupe suppressed the artifact as a duplicate of the coat.
+ *
+ * The bible WINS. It has a rendered reference cell the page grid carries and it
+ * is what the prose cites; the wardrobe line is text nobody drew. So the
+ * conflicting outfit clause is rewritten to the bible entry and the swap is
+ * logged loudly, naming character, slot and both items.
+ *
+ * Deterministic, no API call. Scope is deliberately narrow:
+ *   - only headwear / footwear / outer layer — the slots whose items are named
+ *     as whole objects. Tops and bottoms collide with every prose noun.
+ *   - only an entry ATTRIBUTED to that character: an explicit `wornAs` link, or
+ *     two significant tokens of its name inside that character's outfit text
+ *     (one is noise — "black" alone attributes nothing).
+ *   - only when the wardrobe actually STATES that slot. Silence is not a
+ *     contradiction; the bible simply adds the item.
+ *   - not when the two name the same garment noun ("tricorn hat" vs "black
+ *     tricorn hat" is one hat, described twice).
+ */
+
+const { WORN_SLOTS, SLOT_NOUNS, parseWornAs, deriveSlotFromName, sameName } = require('./wornItems');
+
+// The slots this check arbitrates. See the scope note above.
+const ARBITRATED_SLOTS = ['headwear', 'footwear', 'outer layer'];
+
+// VB pools whose entries can be worn on a body.
+const WEARABLE_POOLS = ['artifacts', 'clothing'];
+
+/** The outfit description as garment clauses (semicolon shape, comma fallback). */
+function outfitClauses(description) {
+  const raw = String(description || '').trim();
+  if (!raw) return [];
+  let parts = raw.split(/\s*;\s*/).map(s => s.trim()).filter(Boolean);
+  if (parts.length < 2) parts = raw.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
+  return parts.map(s => s.replace(/\.\s*$/, '').trim()).filter(Boolean);
+}
+
+/** Garment nouns of one slot present in a piece of text. */
+function slotNounsIn(slot, text) {
+  const nouns = SLOT_NOUNS[slot] || [];
+  const lower = String(text || '').toLowerCase();
+  return nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(lower));
+}
+
+/** Which slot a VB entry occupies — its declared `type` first, then its name. */
+function bibleEntrySlot(entry) {
+  const declared = String(entry?.type || '').trim().toLowerCase();
+  if (WORN_SLOTS.includes(declared)) return declared;
+  return deriveSlotFromName(entry?.label || entry?.name);
+}
+
+/** Every wearable bible entry, across the pools that can hold one. */
+function wearableBibleEntries(visualBible) {
+  const out = [];
+  for (const pool of WEARABLE_POOLS) {
+    for (const entry of (Array.isArray(visualBible?.[pool]) ? visualBible[pool] : [])) {
+      if (!entry || !(entry.name || entry.label)) continue;
+      const slot = bibleEntrySlot(entry);
+      if (!slot || !ARBITRATED_SLOTS.includes(slot)) continue;
+      out.push({ entry, slot });
+    }
+  }
+  return out;
+}
+
+/**
+ * Contradictions between the wardrobe contract and the Visual Bible.
+ *
+ * @param {Object} clothingRequirements  {Name: {category: {used, description}}}
+ * @param {Object} visualBible
+ * @returns {Array<{character, category, slot, elementId, elementLabel, elementText, wardrobeClause, before, after}>}
+ */
+function checkWardrobeAgainstBible(clothingRequirements, visualBible) {
+  const findings = [];
+  if (!clothingRequirements || !visualBible) return findings;
+  const wearables = wearableBibleEntries(visualBible);
+  if (wearables.length === 0) return findings;
+
+  for (const [character, categories] of Object.entries(clothingRequirements)) {
+    for (const [category, entry] of Object.entries(categories || {})) {
+      if (!entry || !entry.used || !entry.description) continue;
+      const description = String(entry.description);
+      const outfitTokens = tokens(description);
+      const clauses = outfitClauses(description);
+
+      for (const { entry: el, slot } of wearables) {
+        const link = parseWornAs(el.wornAs);
+        if (link && !sameName(link.owner, character)) continue;      // someone else's item
+        const elName = el.label || el.name;
+        // Name AND label: the authored label is the short image-facing string
+        // ("captain's cap") and carries too few tokens to attribute on its own.
+        const elText = `${el.name || ''} ${el.label || ''}`;
+        if (!link) {
+          const hits = [...tokens(elText)].filter(t => outfitTokens.has(t)).length;
+          if (hits < 2) continue;                                     // not this character's
+        }
+        // The clause of THIS outfit that occupies the same slot.
+        const clause = clauses.find(c => deriveSlotFromName(c) === slot);
+        if (!clause) continue;                                        // wardrobe silent — the bible just adds it
+        const elNouns = slotNounsIn(slot, elText);
+        const clauseNouns = slotNounsIn(slot, clause);
+        if (elNouns.some(n => clauseNouns.includes(n))) continue;     // the same garment, twice
+
+        const replacement = String(el.description || elName).trim().replace(/\.\s*$/, '');
+        findings.push({
+          character,
+          category,
+          slot,
+          elementId: el.id || null,
+          elementLabel: elName,
+          elementText: replacement,
+          wardrobeClause: clause,
+          before: description,
+          after: description.split(clause).join(replacement),
+        });
+      }
+    }
+  }
+  return findings;
+}
+
+/**
+ * Run the check and CORRECT the wardrobe toward the bible, in place.
+ * Loud by construction: every swap logs character, slot and both items.
+ *
+ * @returns {{findings: Array, applied: Array}}
+ */
+function applyWardrobeBibleCorrections(clothingRequirements, visualBible, opts = {}) {
+  const findings = checkWardrobeAgainstBible(clothingRequirements, visualBible);
+  const applied = [];
+  const logger = opts.log || log;
+  for (const f of findings) {
+    const entry = clothingRequirements?.[f.character]?.[f.category];
+    if (!entry || entry.description !== f.before) {
+      logger.warn(`⚠️ [WARDROBE-BIBLE] ${f.character}/${f.slot}: contract and bible disagree (${f.elementId || '?'} "${f.elementLabel}" vs "${f.wardrobeClause}") and the outfit moved under us — NOT corrected`);
+      continue;
+    }
+    entry.description = f.after;
+    applied.push(f);
+    logger.warn(`🧥 [WARDROBE-BIBLE] ${f.character}/${f.slot}: the wardrobe said "${f.wardrobeClause}" while ${f.elementId || 'the bible'} says "${f.elementLabel}" on the same body — the Visual Bible wins, outfit clause rewritten`);
+  }
+  return { findings, applied };
+}
+
 // slotStated + missingGarments are exported so the image-prompt clothing check
 // (storyHelpers buildImagePrompt) uses THIS definition of "is this garment in
 // the prose" rather than growing a second one.
-module.exports = { checkPage, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };
+module.exports = { checkPage, checkWardrobeAgainstBible, applyWardrobeBibleCorrections, outfitClauses, checkScenes, renderFindingsBlock, splitSlots, slotStated, missingGarments, characterProse, characterWindow, tokens, contractPairs, colourBefore };

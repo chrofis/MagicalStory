@@ -1918,6 +1918,46 @@ ${bibleBody}` : bibleBody;
     }
   }
 
+  // ── Wardrobe contract vs Visual Bible ────────────────────────────────────
+  // The two describe the same body and nothing compared them: a costume line
+  // could put a hat on a character the bible already dresses with a different
+  // one, on every page she appears (staging job_1789420511893_zly5rcdej,
+  // ART002). The bible wins — it has a rendered reference cell — so the outfit
+  // clause is rewritten here, the first moment both exist, and every swap is
+  // logged. Contained like every other check: a throw ships the contradiction
+  // rather than killing the run, but never silently.
+  let wardrobeBibleReport = null;
+  if (visualBible && clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+    try {
+      const { applyWardrobeBibleCorrections } = require('./clothingCheck');
+      const { findings, applied } = applyWardrobeBibleCorrections(clothingRequirements, visualBible);
+      if (findings.length > 0) {
+        wardrobeBibleReport = {
+          conflicts: findings.map(f => ({
+            character: f.character, category: f.category, slot: f.slot,
+            elementId: f.elementId, elementLabel: f.elementLabel,
+            wardrobeClause: f.wardrobeClause, corrected: applied.includes(f),
+          })),
+        };
+        gl.warn('beats_wardrobe_bible_conflict', `${findings.length} wardrobe/bible wardrobe conflict(s): ${findings.map(f => `${f.character}/${f.slot} "${f.wardrobeClause}" vs ${f.elementId || '?'} "${f.elementLabel}"`).join('; ')}`, null, {
+          conflicts: wardrobeBibleReport.conflicts,
+        });
+        // The transcript is what every later consumer re-parses the contract
+        // out of; correcting only the object leaves them on the old outfit.
+        if (applied.length > 0 && bibleSections) {
+          const rewritten = replaceClothingSection(bibleSections, clothingRequirements);
+          if (rewritten === bibleSections) {
+            gl.warn('beats_wardrobe_bible_unmerged', `${applied.length} outfit(s) corrected against the Visual Bible but the transcript has no CLOTHING REQUIREMENTS section to update`);
+          } else {
+            bibleSections = rewritten;
+          }
+        }
+      }
+    } catch (err) {
+      log.error(`🚨 [BEATS] Wardrobe-vs-bible check failed: ${err.message} — a contract/bible contradiction would ship unnoticed`);
+    }
+  }
+
   // Deliberately OUTSIDE every try/catch above: a throw from the caller's hook
   // must abort the run (the landmark-shortfall retry uses exactly that), not be
   // swallowed into "ships with an empty bible".
