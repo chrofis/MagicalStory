@@ -40138,3 +40138,28 @@ that is the point, and it is production's number (two batch attempts), not a new
 **Touched:** `server/lib/testlab.js`, `client/src/pages/TestLab.tsx`,
 `client/src/services/testlabService.ts`, `tests/unit/testlab-beats-scenes-recovery.test.ts`
 **Status:** ✅ active
+
+---
+
+## 2026-09-15 — The blanket-appearsInPages warning says what it means for a LOCATION
+
+**Context:** `auditVisualBibleContract` (`server/lib/outlineParser/shared.js`) reports any Visual
+Bible entry whose `appearsInPages` covers more than 90% of the book, across every category
+including `locations`. Its message says a blanket range "bakes the element into scenes that never
+contain it". For a location that harm cannot occur: `vbElementBudget.ELEMENT_COLLECTIONS` is
+secondary characters, animals, artifacts and vehicles — locations are excluded, per
+docs/SETTLED.md "LOCATIONS ARE NOT ELEMENTS" (2026-09-08), because a location is the plate the cast
+is composited into, never a reference cell. The one reader of a location's pages is the landmark
+page gate (`storyHelpers.js`), where a wide range is permissive, not harmful. The audit only
+REPORTS — one `log.warn` in `outlineParser/unified.js`, no failure, no regeneration, no edit — so
+the cost of the wrong wording is a reader chasing a defect that is not there.
+
+**Decision:** REWORD, do not exempt (owner's call). Locations stay in the check — the tripwire is
+worth keeping — but a location finding now reads "expected for a single-setting story; confirm the
+book really stays there". Every other category keeps the element-baking wording unchanged.
+
+**Rationale:** dropping locations from the check would remove a signal that costs nothing; keeping a
+claim that is false for the category trains readers to ignore the whole audit.
+
+**Touched:** `server/lib/outlineParser/shared.js`, `tests/unit/vb-authoring-contract.test.ts`
+**Status:** ✅ active

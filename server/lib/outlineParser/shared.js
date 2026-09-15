@@ -795,8 +795,20 @@ function auditVisualBibleContract(visualBible, options = {}) {
   // (2) A range covering nearly the whole book was almost certainly not earned.
   // A genuinely single-setting story can trip this on its one location; the
   // warning is a prompt for a human look, not a defect claim.
+  //
+  // The HARM differs by category, so the message does too. For an ELEMENT
+  // (secondary character, animal, artifact, vehicle, clothing) a blanket range
+  // is what bakes it into scenes that never contain it — those are the
+  // collections `vbElementBudget.ELEMENT_COLLECTIONS` ranks and the page
+  // references are drawn from. A LOCATION is not an element (docs/SETTLED.md,
+  // 2026-09-08): it is the plate the cast is composited into, never a reference
+  // cell, and the one reader of a location's pages is the landmark page gate
+  // (storyHelpers.js), where a wide range is permissive rather than harmful. So
+  // a location keeps the tripwire but is told what it actually means — usually
+  // a single-setting book, worth one look to confirm it really stays there.
   if (pageCount >= 4) {
     for (const cat of VB_CATEGORIES) {
+      const isLocation = cat === 'locations';
       for (const entry of entriesOf(cat)) {
         const pages = pagesOf(entry);
         const covered = new Set(pages.filter(p => Number.isFinite(p))).size;
@@ -805,7 +817,9 @@ function auditVisualBibleContract(visualBible, options = {}) {
             code: 'blanket-appears-in-pages',
             id: entry?.id || entry?.name || '(unnamed)',
             category: cat,
-            message: `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — a blanket range bakes the element into scenes that never contain it`,
+            message: isLocation
+              ? `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — expected for a single-setting story; confirm the book really stays there`
+              : `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — a blanket range bakes the element into scenes that never contain it`,
           });
         }
       }

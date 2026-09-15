@@ -194,6 +194,36 @@ describe('auditVisualBibleContract — earned appearsInPages', () => {
     expect(found).toHaveLength(0);
   });
 
+  it('tells a LOCATION what a blanket range means for it, not the element-baking claim', () => {
+    // Locations are not elements (docs/SETTLED.md, 2026-09-08): nothing composites
+    // a location from a reference cell, so a wide range cannot bake it into a
+    // scene. The tripwire stays; the wording says what the reader should check.
+    const found = auditVisualBibleContract(
+      { locations: [{ id: 'LOC001', name: 'the workshop', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }] },
+      { pageCount: 8 }
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].category).toBe('locations');
+    expect(found[0].code).toBe('blanket-appears-in-pages');
+    expect(found[0].message).toContain('8 of 8 pages');
+    expect(found[0].message).toContain('single-setting');
+    expect(found[0].message).not.toContain('bakes the element');
+  });
+
+  it('keeps the element-baking wording for every non-location category', () => {
+    const found = auditVisualBibleContract(
+      {
+        animals: [{ id: 'ANI001', name: 'the cat', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        artifacts: [{ id: 'ART001', name: 'the lantern', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        vehicles: [{ id: 'VEH001', name: 'the cart', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        clothing: [{ id: 'CLO001', name: 'the red cloak', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+      },
+      { pageCount: 8 }
+    );
+    expect(found).toHaveLength(4);
+    for (const f of found) expect(f.message).toContain('bakes the element into scenes that never contain it');
+  });
+
   it('audits every category, not just vehicles', () => {
     const found = auditVisualBibleContract(
       {
