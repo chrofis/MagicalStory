@@ -42,6 +42,15 @@ describe('shared Visual-Bible authoring rules reach every authoring site', () =>
     }
   });
 
+  // A proper noun in `name` reaches the image model as the thing to draw.
+  it('a prop name is a plain description; the story name goes in properName', () => {
+    for (const rel of ['prompts/story-unified.txt', 'prompts/story-unified-imagefirst.txt']) {
+      const text = read(rel);
+      expect(/goes in `properName` and nowhere else/.test(text), path.basename(rel)).toBe(true);
+      expect(/"properName": /.test(text), path.basename(rel) + ' schema').toBe(true);
+    }
+  });
+
   it('every artifact and animal carries a size', () => {
     for (const rel of VB_AUTHORING_TEMPLATES) {
       expect(/Every artifact carries `size`, and every animal too/.test(read(rel)), path.basename(rel)).toBe(true);
