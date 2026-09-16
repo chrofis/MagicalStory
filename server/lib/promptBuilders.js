@@ -2479,6 +2479,10 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     SEASON: seasonLabel(inputData || {}),
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
+    // ONE cast contract and ONE multi-picture prop contract, shared with the
+    // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
+    PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+    MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -2726,6 +2730,10 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     SEASON: seasonLabel(options.story || {}),
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
+    // ONE cast contract and ONE multi-picture prop contract, shared with the
+    // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
+    PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+    MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -6412,6 +6420,29 @@ const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only wha
  */
 const COUNTING_RULE = 'Counting rule: an exact number for a group of like things may be stated only up to three, and then it is drawn exactly. Above three the group is staged as more than three, a cluster, a row, a few or several — never an exact number, in the prose, `sceneIntent` or `emptyScenePrompt`. A group that recurs across pages holds the same size impression, role and placement.';
 
+/**
+ * ONE cast-from-the-plan-line contract for the Art Director (both templates,
+ * rule 3) and the scene review (check 5a). Staging job_1789506283204_3kxqshifx
+ * p3: the plan line named two characters, the all-pages Art Director gave a
+ * tracked animal that page in its Visual Bible entry and then staged it there
+ * through objects[] and the prose -- rule 3 spoke of "characters", the animal
+ * reached it as an element, and the review's 5a reported none. The contract
+ * closes both channels. The VB-authoring consequence (which pages such an
+ * entry may claim) lives generator-side in the pages-is-earned rule.
+ */
+const PLAN_LINE_CAST_RULE = "A tracked animal — one with a Visual Bible entry — counts as a character for this rule: it is in a page's frame only when that page's plan line names it, whichever way it enters — `characters[]`, `objects[]` or the prose — and its entry's `pages` never claims a page whose plan line leaves it out.";
+
+/**
+ * ONE contract for an object that shows a different picture on different
+ * pages, for the Art Director (both templates, the two-sided-prop rule) and the
+ * scene review (check 9f). Same job, p5: the plan line said the object was
+ * open to one picture, the arc had a second one for a later page, and the
+ * one-face-state convention left the Art Director a single face state whose
+ * delta was the later picture -- cited on p5, overriding the plan line. The
+ * review's 9f checked page ranges only.
+ */
+const MULTI_PICTURE_PROP_RULE = "An object that shows a different picture on different pages — a book, an album, a board, a screen — has one face-to-camera state per distinct picture the plan lines call for. Each such state's `delta` restates what its page's plan line says the object shows, its `pages` is that page alone, and a page cites only the state whose `delta` is the picture its own plan line names.";
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -7322,6 +7353,10 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // stage that can correct a state's page range. Empty for a story with no
     // stated object, same convention as the two blocks above.
     VISUAL_BIBLE: buildSceneReviewBibleBlock(options.visualBible),
+    // ONE cast contract and ONE multi-picture prop contract, shared with the
+    // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
+    PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+    MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
   });
 }
 
@@ -8036,6 +8071,8 @@ module.exports = {
   buildTellingRulesSection,
   RISK_FRAMING_RULE,
   COUNTING_RULE,
+  PLAN_LINE_CAST_RULE,
+  MULTI_PICTURE_PROP_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
   PAGE_OPENING_VARIETY_RULE,

@@ -354,6 +354,75 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-16 — A tracked animal is plan-line cast, and a prop that shows two pictures gets one face state per picture
+
+**Context.** Two faults on staging `job_1789506283204_3kxqshifx` ("Das Ei unter den Wurzeln",
+18 pages), both the same shape: a contract stated for one channel while the fault arrived through
+another.
+
+- **p3 — the animal.** The plan line is `ultra-wide — Max and Kiaan — Max and Kiaan kneel at the
+  far side of the linden trunk…`. It names two boys and no animal. The brief's `objects[]` is
+  `["LOC001","ART001.1","ANI001"]`, and `ANI001` is the dog, whose Visual Bible `pages` is
+  `[3,9,16]`. The first plan line that names the dog is **p9** — six pages later. Art Director
+  rule 3 governs "characters", and the animal never entered `characters[]`: it came in through its
+  own VB entry's `pages`, then through `objects[]` and the prose. The reviewer's 5a, which reads
+  `characters[]` and the prose, reported nothing.
+- **p5 — the prop.** The plan line is `close-up — Levin — Levin holds up his dragon book open to a
+  picture of an egg just like Lindi…`. `ART003` ("picture book") carries the two-sided
+  convention's single face state, and its `delta` is `spread wide open, showing a colorful page
+  with a drawing of a small red baby dragon sneezing sparks` — a different picture, authored for
+  the story's later reveal. The page cites `ART003.2`, so the frame showed the dragon, not the egg
+  the plan line called for. The text then followed the frame: the shipped p5 prose keeps the plan
+  line's claim in dialogue («In meinem Buch ist genau so ein Ei») and adds a sentence for the
+  picture that was actually painted («Auf der Seite war ein kleiner Drache abgebildet»). The
+  reviewer's 9f checks state PAGE RANGES only — no state claimed a page it should not, so 9f was
+  silent.
+
+**Decision.** Two JS constants in `promptBuilders.js`, each reaching three prompts through one
+placeholder — both Art Director templates AND the scene review, so generator and critic hold the
+identical string:
+
+1. `PLAN_LINE_CAST_RULE` → `{PLAN_LINE_CAST}` in AD rule 3 (both templates) and scene-review 5a
+   (`[cast_not_in_plan]`). A tracked animal — one with a Visual Bible entry — counts as a
+   character for that rule: it is in a page's frame only when that page's plan line names it,
+   whichever way it enters (`characters[]`, `objects[]` or the prose), and its entry's `pages`
+   never claims a page the plan line leaves out. 5a's rewrite now strips the import from
+   `characters[]`, `objects[]` and the prose alike. The authoring half is stated where entries are
+   written: the all-pages template's `pages` is earned rule now says a character's or a tracked
+   animal's entry claims only pages whose plan line names it.
+2. `MULTI_PICTURE_PROP_RULE` → `{MULTI_PICTURE_PROP}` in the two-sided-prop rule (both templates)
+   and scene-review 9f. An object that shows a different picture on different pages gets one
+   face-to-camera state per DISTINCT PICTURE the plan lines call for; each such state's `delta`
+   restates what its page's plan line says the object shows, its `pages` is that page alone, and a
+   page cites only the state whose `delta` is the picture its own plan line names. 9f gains the
+   content check under its EXISTING `[vb_state_range]` type — no new finding type, no new severity
+   — and corrects the `delta` or splits the entry. A single-picture prop keeps the turned-away /
+   face-to-camera convention unchanged.
+
+**Rationale.** Neither fault is a missing rule; both are a channel gap. The cast contract existed
+for `characters[]` and the state contract existed for page RANGES, while the damage arrived through
+`objects[]` and through a state's CONTENT. A rule the critic applies that the generator was never
+given produces a finding no rewrite can satisfy, so each contract is ONE constant injected into
+both sides — the generator-vs-critic shape `scene-brief-generator-vs-critic` exists to enforce.
+The p5 class is the more expensive of the two: a face state carrying the wrong picture does not
+merely mis-paint a frame, it pulls the page TEXT after it, because the later text passes read the
+shipped image as ground truth.
+
+`vb-authoring-sites` pairs `scene-expansion-all.txt` with `story-trial.txt`, and the trial writer
+needs no mirror: it takes no plan line at all — it authors the arc, the Visual Bible and the page
+scenes in one call, so it is itself the authority on what each page shows and there is no upstream
+line for an entry's `pages` to contradict. It also has no turned-away/face-to-camera convention to
+split, and already carries the generic form of the state rule ("`states[]` lists every look it
+wears — the unaltered one first — each a short delta, because each state is drawn as its own
+reference cell"). Vouched with `Siblings-Checked:` on the commit.
+(`story-bible-from-beats.txt` is not a third authoring site: since 2026-09-11 it writes the
+wardrobe only — the bible moved to the all-pages Art Director.)
+
+**Touched.** `server/lib/promptBuilders.js`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-expansion.txt`, `prompts/scene-review.txt`,
+`tests/unit/plan-line-cast-and-multi-picture-prop.test.ts`.
+**Status:** ✅ active
+
 ## 2026-09-16 — The iterate length budget is gone; the declared id set is the guard, and the page range gates BOTH staging sites
 
 **Context.** `fa2cb3696` (entry below) shipped two mechanical guards on an iterate rewrite beside
