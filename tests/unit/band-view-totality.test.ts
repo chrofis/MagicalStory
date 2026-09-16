@@ -122,3 +122,59 @@ describe('T3 — the band files are totally tagged', () => {
     expect(() => pb.applyBandView('a rule nobody tagged', 'writer')).toThrow(/[Uu]ntagged/);
   });
 });
+
+/**
+ * T1 — declared premise slots (the class-level test).
+ *
+ * Every band declares its premise obligations as NAMED spans against the JS
+ * manifest, and every premise-shaped reader must receive each required slot's
+ * text. This is the test the three misses needed: agency inside [[mechanics]],
+ * resolution inside [[mechanics]], subject inside [[mechanics]] each fail it at
+ * commit time, for free, in every band and every view at once — no list of rule
+ * names to keep up to date.
+ *
+ * `routine` declares agency: 'none' POSITIVELY (the band forbids the child
+ * working anything out), so a legitimate absence never reads as silence.
+ */
+describe('T1 — every premise slot reaches every premise-shaped reader', () => {
+  const slotSpans = (file: string, slot: string) =>
+    pb.parseBandSpans(file).filter((s: any) => s.role === 'premise' && s.slot === slot);
+
+  for (const [band, key] of BANDS) {
+    it(`${band}: declares exactly the slots the manifest names`, () => {
+      const file = String(PROMPT_TEMPLATES[key] || '');
+      const manifest = pb.BAND_PREMISE_SLOTS[band];
+      expect(manifest, `no manifest for band ${band}`).toBeTruthy();
+      for (const [slot, need] of Object.entries(manifest) as Array<[string, string]>) {
+        const spans = slotSpans(file, slot);
+        if (need === 'none') {
+          expect(spans.length, `${band}: declares [[premise:${slot}]] but the manifest says 'none'`).toBe(0);
+          continue;
+        }
+        expect(spans.length, `${band}: expected exactly one [[premise:${slot}]] span`).toBe(1);
+      }
+    });
+
+    it(`${band}: every required slot survives every view`, () => {
+      const file = String(PROMPT_TEMPLATES[key] || '');
+      const manifest = pb.BAND_PREMISE_SLOTS[band];
+      for (const [slot, need] of Object.entries(manifest) as Array<[string, string]>) {
+        if (need !== 'required') continue;
+        const span = slotSpans(file, slot)[0];
+        expect(span, `${band}: no [[premise:${slot}]] span is declared at all`).toBeTruthy();
+        const text = span.inner.trim();
+        for (const view of views()) {
+          expect(render(key, view), `${band} / ${view}: the ${slot} rule is missing`).toContain(text);
+        }
+      }
+    });
+  }
+
+  it('the manifest covers every band, and names no slot outside the three', () => {
+    expect(Object.keys(pb.BAND_PREMISE_SLOTS).sort()).toEqual(BANDS.map(([b]) => b).sort());
+    for (const slots of Object.values(pb.BAND_PREMISE_SLOTS) as any[]) {
+      expect(Object.keys(slots).sort()).toEqual(['agency', 'resolution', 'subject']);
+      for (const v of Object.values(slots)) expect(['required', 'none']).toContain(v);
+    }
+  });
+});

@@ -1,6 +1,7 @@
 # Age-band view split — first-principles audit (2026-09-15)
 
-**Status:** design only. Nothing implemented. No paid calls made; every finding below is from
+**Status:** steps 1-3 IMPLEMENTED 2026-09-16 (see §8 and `docs/decisions.md`, 2026-09-16
+entry); step 4, the measured idea run, is the owner's and has not run. Originally: design only. No paid calls made; every finding below is from
 the repo (`prompts/age-band-*.txt`, `server/lib/promptBuilders.js:5175-5300`, `:7788-7845`) and
 from the measurements already recorded in `docs/decisions.md`.
 
@@ -414,14 +415,17 @@ here.
 
 This is a medium-sized change, and it should not be one commit.
 
-1. **T2 + T3 against today's files** (no retag). Lands as failing-then-passing evidence of the
-   dangling antecedents; costs nothing; proves the shape of the problem in CI rather than in a
-   paid run.
-2. **Role tags + allow-list views + T1**, retag per §2, no wording changes. `writer` output must be
-   byte-identical to today (assert it) — R1 is untouched, so this is statically verifiable.
-3. **R4 → `blurb` and R5 → the artefact's view**, with the sibling-registry generator-vs-critic
-   pair declared.
-4. **One measured idea run** across bands × arms, judged the same way the 28-idea run was, before
+1. [x] **T2 + T3 against today's files** (no retag) — `41438ac32`, committed failing on four bands
+   (dangling antecedents) and on every band (untagged prose).
+2. [x] **Role tags + allow-list views** — `40d026e16`. `writer` verified byte-identical in all five
+   bands. One deviation from §2: "Three tries, no more." and the six-beat enumeration are
+   `[[premise]]`, not `[[mechanics]]` — they are the antecedents T2 demands, and a premise can
+   honour them; only the per-try / per-page machinery stays writer-side.
+3. [x] **T1**, the declared-premise-slot test, with `BAND_PREMISE_SLOTS` and `routine`'s positive
+   `agency: 'none'`. Proven to catch all three historical misses.
+   [ ] **R4 → `blurb` and R5 → the artefact's view** — NOT done: owner chose "log, decide later"
+   (2026-09-16). Both are in `tasks/BACKLOG.md`.
+4. [ ] **One measured idea run** across bands × arms, judged the same way the 28-idea run was, before
    any of this is called good. That is the only step that costs money and it needs its own
    mandate.
 

@@ -7,6 +7,83 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-16 — Age-band spans are tagged by what a rule IS; views compose by allow-list
+
+**Context.** `prompts/age-band-*.txt` sliced one band file into three reader views by SUBTRACTING
+tagged spans: `[[book]]` (book craft + example menus), `[[plot]]` (plot mechanics), untagged
+("tone and safety", every reader). Three consecutive misses, each found only by paying for a
+measured idea run: `fdc85a290` (the AGENCY rule sat inside `[[plot]]`, so the make-believe idea arm
+was never told who resolves the story — 6 of the 10 worst-rated ideas were fantasy cards resolved by
+an object or an adult); `862432a85` (the RESOLUTION rule, same tag, same arm — journey band 3/6
+against the own-town arm's 6/6, ratings 3.39→3.32 child / 3.29→3.18 parent); and the
+premise-defining sentence ("what the book is *of*"), `[[plot]]` in all five bands. Three misses of
+one shape is a mechanism finding. Audit: `tasks/band-view-audit-2026-09-15.md`.
+
+**Decision.**
+1. **Four ROLE tags** replace the two reader tags: `[[premise]]` (what the book is of — subject, who
+   resolves it, that it resolves, what kind of story is forbidden, whether magic is allowed, where it
+   opens and closes), `[[craft]]` (book craft a 40-word premise cannot express), `[[mechanics]]`
+   (page arithmetic), `[[example]]` (worked menus — dropped for a different reason: at premise size a
+   menu is read as the answer, Lab #1273, 8/10).
+2. **Every line of every band file sits inside exactly one span**, and `applyBandView` THROWS on
+   untagged prose, an unknown role, a nested span or a stray tag.
+3. **`BAND_VIEW_DROPS` → `BAND_VIEW_KEEPS`**: `writer` = all four roles, `premise` (own-town idea
+   arm) = premise + mechanics, `premise-open` (the make-believe arm) = premise.
+4. **`tone` is renamed `premise-open`.** The name is not cosmetic: "tone and safety" is *how*
+   `**Topic.**` was excluded from it by three separate authors.
+5. **Three premise spans are NAMED slots** — `[[premise:subject]]`, `[[premise:agency]]`,
+   `[[premise:resolution]]` — declared per band in `BAND_PREMISE_SLOTS`. `routine` declares
+   `agency: 'none'` POSITIVELY, because that band forbids the child working anything out.
+
+**Rationale.** Subtraction failed three times for four reasons, all structural rather than
+authorial: the tag names asked "does the WRITER need this", which is not the question that decides a
+reader; untagged meant "everyone" silently, so the most consequential authoring act in the file had
+no syntax; the unit was a span, not a rule, with tags opening mid-sentence and nesting; and removing
+a span cannot remove the references to it — four of the five bands shipped the make-believe arm
+prose with an undefined referent ("the third try", "the fear", "the wanted thing", "the turn").
+`[[plot]]` meant BOTH premise-defining and machinery, and every one of the three misses was a
+premise rule filed under a tag whose other members were machinery.
+
+**No rule wording changed.** The `writer` view is byte-identical to before in all five bands
+(verified against the pre-retag files and asserted in T3), so R1 — the beats/arc/trial writers — is
+untouched. What changes is that every band's subject, agency and resolution rule now reaches the
+make-believe arm, and one deliberate deviation from the audit's table: the band SHAPE
+("Three tries, no more.", the six-beat enumeration) is `[[premise]]`, not `[[mechanics]]`, because it
+is both premise-honourable and the ANTECEDENT the surviving prose refers to. Only the per-page
+machinery ("Each try is a different kind of attempt...", "Every one of those beats is on the page, in
+that order.") stays writer-side.
+
+**The tests that now catch the class.** Previous band tests pin rules BY NAME, which is exactly why
+each miss needed a paid run — a test asserting "the narrow view contains *The hero's own idea turns
+it*" cannot fail for a rule nobody thought to list. `tests/unit/band-view-totality.test.ts` adds
+three tests that need no such list:
+- **T1** iterates every band × every view and asserts each manifest-required premise slot's text is
+  present. Demonstrated to fail for all three historical misses by moving `tries`' agency, resolution
+  and subject spans back inside `[[mechanics]]` one at a time.
+- **T2** declares the definite noun phrases each band introduces; if a render contains the phrase it
+  must contain the introducing span. It failed on quest, tries, fear-choice and journey before the
+  retag.
+- **T3** totality: zero untagged bytes, only known roles, and `writer` loses nothing.
+
+**Still open, deliberately (owner: "log, decide later", 2026-09-16).** R4, the full-wizard idea
+generator (`routes/storyIdeas.js:214`), still reads `writer` although it is a premise generator; the
+designed `blurb` view was NOT built. R5, `buildArcReviewPrompt` and `storyScorecard.js:284`, still
+judge from `writer` artefacts written from narrower views — a generator-vs-critic asymmetry not
+declared in `sibling-registry.json`. Both are in `tasks/BACKLOG.md`.
+
+**This is a behaviour change on two production arms and is NOT yet measured.** Steps 1-3 are static
+and testable; the measured idea run across bands × arms (step 4 of the audit) is the owner's and had
+not run when this landed. `docs/SETTLED.md` carries no line on age bands, band views, idea arms or
+prompt layering — confirmed independently against the file — so no reversal protocol applies; the
+audit's alternative (both arms reading the same view) WOULD contradict the 2026-09-14 "the arms
+differ in plot licence" decision and was not taken.
+
+**Touched files.** `prompts/age-band-{routine,quest,tries,fear-choice,journey}.txt` (retag only),
+`server/lib/promptBuilders.js` (`BAND_ROLES`, `BAND_VIEW_KEEPS`, `BAND_PREMISE_SLOTS`,
+`parseBandSpans`, `applyBandView`, the `premise-open` arm at `buildTrialIdeaPrompts`),
+`tests/unit/band-view-totality.test.ts` (new), `tests/unit/age-band.test.ts`,
+`tests/unit/trial-idea-variety.test.ts`.
+
 ## 2026-09-14 — Real physical risk must be FRAMED, not forbidden: the endorsement-without-caution rule
 
 **Context:** a story had an 8-year-old climb a bell tower alone ahead of a storm. The owner's
