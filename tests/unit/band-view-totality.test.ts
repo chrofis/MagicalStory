@@ -29,11 +29,9 @@ const BANDS: Array<[string, string]> = [
 
 const KNOWN_ROLES = ['premise', 'craft', 'mechanics', 'example'];
 
-// The view map is renamed from BAND_VIEW_DROPS to BAND_VIEW_KEEPS in step 2 of
-// the migration; these tests are written first, against today's files, and must
-// name the views without caring which mechanism composes them.
-const views = (): string[] =>
-  (pb.BAND_VIEW_KEEPS ? Object.keys(pb.BAND_VIEW_KEEPS) : ['writer', 'premise', 'tone']);
+// Every view, whatever the view map holds — a new view is checked the day it is
+// added, without anyone remembering to list it here.
+const views = (): string[] => Object.keys(pb.BAND_VIEW_KEEPS);
 
 const render = (key: string, view: string) =>
   pb.applyBandView(String(PROMPT_TEMPLATES[key] || ''), view);

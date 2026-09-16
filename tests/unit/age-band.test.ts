@@ -474,14 +474,14 @@ describe('every band view carries the age rules', () => {
 
   it('the props-and-subject rule reaches all three views at every age', () => {
     for (const age of [1, 2, 3, 4, 8, 12, 38]) {
-      for (const view of ['writer', 'premise', 'tone']) {
+      for (const view of ['writer', 'premise', 'premise-open']) {
         expect(buildAgeModeSection(solo_(age), { bandView: view }), `age ${age} / ${view}`)
           .toContain(AGE_OWNS_PROPS_RULE);
       }
     }
   });
 
-  it('the agency rule survives the tone view in every band that has one', () => {
+  it('the agency rule survives the premise-open view in every band that has one', () => {
     const agency: Record<number, string> = {
       2: 'The child does the finding',
       3: "The child's own doing",
@@ -489,20 +489,25 @@ describe('every band view carries the age rules', () => {
       8: "The hero's own idea turns it",
     };
     for (const [age, rule] of Object.entries(agency)) {
-      const tone = buildAgeModeSection(solo_(Number(age)), { bandView: 'tone' });
+      const tone = buildAgeModeSection(solo_(Number(age)), { bandView: 'premise-open' });
       expect(tone, `age ${age}`).toContain(rule);
     }
     // three of the four also name what may NOT resolve it; quest's "they look
     // and they find" is the whole rule at that age.
     for (const age of [3, 4, 8]) {
-      expect(buildAgeModeSection(solo_(age), { bandView: 'tone' }), `age ${age}`)
+      expect(buildAgeModeSection(solo_(age), { bandView: 'premise-open' }), `age ${age}`)
         .toMatch(/grown-up/);
     }
   });
 
-  it('the tone view still drops the plot mechanics', () => {
-    expect(buildAgeModeSection(solo_(3), { bandView: 'tone' })).not.toContain('Three tries, no more');
-    expect(buildAgeModeSection(solo_(8), { bandView: 'tone' })).not.toContain('Ordinary world, then a call');
+  // Page arithmetic only. The SHAPE of the band ("three tries", "then the turn")
+  // is premise-defining and reaches every reader from 2026-09-16 — what a premise
+  // cannot honour is how each try differs and that every beat is on the page.
+  it('the premise-open view still drops the page machinery', () => {
+    expect(buildAgeModeSection(solo_(3), { bandView: 'premise-open' }))
+      .not.toContain('Each try is a different kind of attempt');
+    expect(buildAgeModeSection(solo_(8), { bandView: 'premise-open' }))
+      .not.toContain('Every one of those beats is on the page');
   });
 
   it('no band file offers an example menu the measured collapses came from', () => {

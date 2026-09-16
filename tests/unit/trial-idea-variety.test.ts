@@ -32,12 +32,14 @@ describe('age-band views — one file, three readers', () => {
   const bands: Array<[number, string]> = [[0, 'routine'], [2, 'quest'], [3, 'tries'], [4, 'fear-choice'], [5, 'journey']];
 
   for (const [age, name] of bands) {
-    it(`${name}: writer ⊃ premise ⊃ tone, and no view leaks a marker`, () => {
-      const views = (['writer', 'premise', 'tone'] as const).map(v =>
+    it(`${name}: writer ⊃ premise ⊇ premise-open, and no view leaks a marker`, () => {
+      const views = (['writer', 'premise', 'premise-open'] as const).map(v =>
         pb.buildAgeModeSection({ characters: chars(age) }, { bandView: v }));
       const [writer, premise, tone] = views.map(s => s.length);
       expect(writer).toBeGreaterThan(premise);
-      expect(premise).toBeGreaterThan(tone);
+      // fear-choice has no [[mechanics]] rule at all, so its two premise-shaped
+      // views are legitimately the same text.
+      expect(premise).toBeGreaterThanOrEqual(tone);
       for (const v of views) expect(v).not.toMatch(/\[\[/);
     });
   }
@@ -45,20 +47,23 @@ describe('age-band views — one file, three readers', () => {
   // "Who resolves it" and "that it resolves" are one pair and belong to every
   // reader. fdc85a290 moved only the first out of [[plot]]; measured at b0ffa352
   // over 28 ideas, the journey band's fantasy arm still resolved 3/6 against the
-  // own-town arm's 6/6, and 9 of 28 cards stopped on the problem. The BEAT
-  // STRUCTURE stays writer/plot machinery — a 40-word premise cannot honour it.
+  // own-town arm's 6/6, and 9 of 28 cards stopped on the problem. From
+  // 2026-09-16 the tags name the ROLE, so both halves are [[premise]] in every
+  // band; what stays writer-only is the page machinery a 40-word premise cannot
+  // honour (how each try differs, that every beat is on the page).
   const resolution: Array<[number, string, string, string]> = [
-    // age, agency rule (routine has none — its storyline line carries both), resolution rule, beat structure
-    [0, 'comes right', 'it is put right within a page or two', 'A day, not a plot'],
-    [2, '**The child does the finding.**', '**It resolves.** The wanted thing is found before the last page.', 'One tiny goal, and nothing else'],
-    [3, "**The child's own doing.**", '**It resolves.** The third try works', 'Three tries, no more'],
-    [4, "**The child's choice resolves it.**", '**It resolves.** The fear is real enough to feel', 'Something scary, faced and grown past'],
+    // age, agency rule (routine has none — its storyline line carries both),
+    // resolution rule, and one writer-only span (page machinery or book craft)
+    [0, 'comes right', 'it is put right within a page or two', 'A new thing on every page'],
+    [2, '**The child does the finding.**', '**It resolves.** The wanted thing is found before the last page.', 'The search is the story'],
+    [3, "**The child's own doing.**", '**It resolves.** The third try works', 'Each try is a different kind of attempt'],
+    [4, "**The child's choice resolves it.**", '**It resolves.** The fear is real enough to feel', '**Feelings on the page.**'],
     [5, "**The hero's own idea turns it.**", '**It resolves.** The turn comes before the last page', 'Every one of those beats is on the page'],
   ];
 
   for (const [age, agency, resolves, beats] of resolution) {
-    it(`age ${age}: the tone view carries agency AND resolution, never the beat structure`, () => {
-      const tone = pb.buildAgeModeSection({ characters: chars(age) }, { bandView: 'tone' });
+    it(`age ${age}: the premise-open view carries agency AND resolution, never the machinery`, () => {
+      const tone = pb.buildAgeModeSection({ characters: chars(age) }, { bandView: 'premise-open' });
       expect(tone).toContain(agency);
       expect(tone).toContain(resolves);
       expect(tone).not.toContain(beats);
@@ -82,7 +87,7 @@ describe('age-band views — one file, three readers', () => {
   it('the writer keeps every rule of the band file — the views cost it nothing', () => {
     const file = PROMPT_TEMPLATES.ageBandTries as string;
     const writer = pb.applyBandView(file, 'writer');
-    expect(writer).toBe(file.replace(/\[\[\/?(?:book|plot)\]\]/g, ''));
+    expect(writer).toBe(file.replace(/\[\[\/?(?:premise|craft|mechanics|example)(?::[a-z-]+)?\]\]/g, ''));
     // the book-craft rules a 40-word premise cannot honour
     for (const rule of ['One feeling per turn', '**Food.**', '**Ending.**', 'A life event is weather']) {
       expect(writer).toContain(rule);
@@ -101,12 +106,16 @@ describe('age-band views — one file, three readers', () => {
 });
 
 describe('the two idea arms differ by construction', () => {
-  it('the fantasy arm carries the band tone but not its plot mechanics', () => {
+  it('the fantasy arm carries every premise rule but not the page machinery', () => {
     const { local, fantasy } = pb.buildTrialIdeaPrompts(args(3));
-    // plot mechanics: own-town arm only
-    expect(local).toContain('Three tries, no more');
-    expect(fantasy).not.toContain('Three tries, no more');
-    expect(fantasy).not.toContain('Small noticing, not cleverness');
+    // page machinery: own-town arm only
+    expect(local).toContain('Each try is a different kind of attempt');
+    expect(fantasy).not.toContain('Each try is a different kind of attempt');
+    // the band SHAPE and what kind of noticing it allows are premise-defining
+    for (const p of [local, fantasy]) {
+      expect(p).toContain('Three tries, no more');
+      expect(p).toContain('Small noticing, not cleverness');
+    }
     // tone rules: both arms
     for (const p of [local, fantasy]) {
       expect(p).toContain('A gentle obstacle, never a villain');
@@ -131,7 +140,7 @@ describe('the two idea arms differ by construction', () => {
 
   it('the fantasy arm is materially shorter than the own-town arm', () => {
     const { local, fantasy } = pb.buildTrialIdeaPrompts(args(3));
-    expect(fantasy.length).toBeLessThan(local.length * 0.8);
+    expect(fantasy.length).toBeLessThan(local.length * 0.95);
   });
 
   it('never asks for a difference from an idea it cannot have seen', () => {

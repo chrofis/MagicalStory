@@ -5177,36 +5177,111 @@ const AGE_BAND_TEMPLATE_KEYS = {
 };
 
 /**
- * The three readers of an age-band file want three different slices of it, and
- * ONE file carries all three so they cannot drift apart. Spans are tagged in
- * prompts/age-band-*.txt:
- *   [[book]] — book craft and the worked example menus. Writer only.
- *   [[plot]] — the plot mechanics of the band. Writer and the own-town premise.
- *   untagged — tone and safety. Every reader.
- * A 40-word premise cannot honour a per-turn feeling rule or a book-craft ending
- * rule, and a menu read at premise size is read as the answer (Lab 1273). It CAN
- * and must honour the pair "who resolves it" and "that it resolves" — both are
- * untagged in every band file (2026-09-15).
+ * ONE band file carries every reader's slice of it so they cannot drift apart.
+ * Spans in prompts/age-band-*.txt are tagged by what the rule IS, never by who
+ * drops it — the earlier [[book]]/[[plot]] names asked the author "does the
+ * writer need this", which is not the question that decides a reader, and three
+ * premise-defining rules in a row were filed under [[plot]] and never reached
+ * the make-believe idea arm (fdc85a290, 862432a85, 2026-09-16).
+ *
+ *   [[premise]]    what the book is OF: subject, who resolves it, that it
+ *                  resolves, what kind of story is forbidden, whether magic is
+ *                  allowed, where it opens and closes. A 40-word premise can
+ *                  honour every one of these and is wrong without them.
+ *   [[craft]]      book craft a premise cannot express: per-page feeling, ending
+ *                  register, food safety, the low point as a written page.
+ *   [[mechanics]]  page-count arithmetic: enumerated beats in order, one place
+ *                  per page, a new thing on every page.
+ *   [[example]]    worked-example menus. Dropped for a different reason: at
+ *                  premise size a menu is read as the answer (Lab 1273, 8/10).
+ *
+ * Three premise spans are NAMED slots ([[premise:subject]], [[premise:agency]],
+ * [[premise:resolution]]) and declared per band in BAND_PREMISE_SLOTS, so a band
+ * that legitimately has no agency rule says so positively rather than silently.
+ *
+ * Views COMPOSE by allow-list rather than subtracting drops: a new role reaches
+ * a narrow view only when someone adds it here.
  */
-const BAND_VIEW_DROPS = {
-  writer: [],
-  premise: ['book'],
-  tone: ['book', 'plot'],
+const BAND_ROLES = new Set(['premise', 'craft', 'mechanics', 'example']);
+
+const BAND_VIEW_KEEPS = {
+  writer: ['premise', 'craft', 'mechanics', 'example'],
+  premise: ['premise', 'mechanics'],
+  // Renamed from `tone` 2026-09-16: the name itself taught three authors that
+  // subject rules do not belong in it, which is how **Topic.** stayed excluded.
+  'premise-open': ['premise'],
 };
+
+/**
+ * What each band must declare. 'none' is a POSITIVE declaration: the routine
+ * band forbids the child working anything out, so it has no agency rule, and
+ * that absence must never look like a missing tag.
+ */
+const BAND_PREMISE_SLOTS = {
+  routine: { subject: 'required', agency: 'none', resolution: 'required' },
+  quest: { subject: 'required', agency: 'required', resolution: 'required' },
+  tries: { subject: 'required', agency: 'required', resolution: 'required' },
+  'fear-choice': { subject: 'required', agency: 'required', resolution: 'required' },
+  journey: { subject: 'required', agency: 'required', resolution: 'required' },
+};
+
+const BAND_TAG_RE = /\[\[(\/)?([a-z-]+)(?::([a-z-]+))?\]\]/g;
+
+/**
+ * Parse a band file into its tagged spans, refusing anything ambiguous: an
+ * unknown role, a nested or unclosed span, or — the one that mattered — prose
+ * sitting outside every span. Untagged used to mean "every reader", silently,
+ * which made forgetting to tag the most consequential act in the file and the
+ * only one with no syntax.
+ */
+function parseBandSpans(text) {
+  const spans = [];
+  let open = null;
+  let cursor = 0;
+  let m;
+  BAND_TAG_RE.lastIndex = 0;
+  while ((m = BAND_TAG_RE.exec(text))) {
+    const [raw, closing, role, slot] = m;
+    if (!BAND_ROLES.has(role)) throw new Error(`Unknown age-band tag "${raw}"`);
+    const between = text.slice(cursor, m.index);
+    if (!open && between.trim()) {
+      throw new Error(`Untagged age-band prose: "${between.trim().slice(0, 60)}"`);
+    }
+    if (closing) {
+      if (!open) throw new Error(`Stray closing age-band tag "${raw}"`);
+      if (open.role !== role || open.slot !== (slot || null)) {
+        throw new Error(`Mismatched age-band tag "${raw}" closing "[[${open.role}${open.slot ? ':' + open.slot : ''}]]"`);
+      }
+      spans.push({ role, slot: slot || null, start: open.start, end: m.index + raw.length, inner: text.slice(open.innerStart, m.index) });
+      open = null;
+    } else {
+      if (open) throw new Error(`Nested age-band tag "${raw}" inside "[[${open.role}]]"`);
+      open = { role, slot: slot || null, start: m.index, innerStart: m.index + raw.length };
+    }
+    cursor = m.index + raw.length;
+  }
+  if (open) throw new Error(`Unclosed age-band tag "[[${open.role}]]"`);
+  if (text.slice(cursor).trim()) {
+    throw new Error(`Untagged age-band prose: "${text.slice(cursor).trim().slice(0, 60)}"`);
+  }
+  return spans;
+}
 
 function applyBandView(text, view = 'writer') {
   if (!text) return '';
-  const drops = BAND_VIEW_DROPS[view];
-  if (!drops) throw new Error(`Unknown age-band view "${view}"`);
+  const keeps = BAND_VIEW_KEEPS[view];
+  if (!keeps) throw new Error(`Unknown age-band view "${view}"`);
+  const src = String(text);
+  const spans = parseBandSpans(src);
+  const keep = new Set(keeps);
+  const dropped = spans.filter(s => !keep.has(s.role));
   // The writer reads the file whole: strip the tags and change nothing else, so
   // no view can quietly cost the writer a rule.
-  if (!drops.length) return String(text).replace(/\[\[\/?(?:book|plot)\]\]/g, '');
-  let out = String(text);
-  for (const tag of drops) {
-    out = out.replace(new RegExp(`\\[\\[${tag}\\]\\][\\s\\S]*?\\[\\[\\/${tag}\\]\\]`, 'g'), '');
-  }
+  if (!dropped.length) return src.replace(BAND_TAG_RE, '');
+  let out = src;
+  for (const s of dropped.slice().reverse()) out = out.slice(0, s.start) + out.slice(s.end);
   return out
-    .replace(/\[\[\/?(?:book|plot)\]\]/g, '')
+    .replace(BAND_TAG_RE, '')
     .replace(/[ \t]+$/gm, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -7786,9 +7861,10 @@ function nextIdeaVarietyAxis() {
  *
  * The arms differ in KIND (owner, 2026-08-25): own town at real landmarks vs a
  * make-believe world entered from home. They fire in parallel, so neither can
- * refer to the other — the fantasy arm gets the band's TONE only, never its
- * plot mechanics, which is what makes it a different story rather than the same
- * story relocated.
+ * refer to the other — both arms get every PREMISE rule of the band, and only
+ * the own-town arm also gets its MECHANICS (the page arithmetic that helps a
+ * concrete local premise), which is what makes it a different story rather than
+ * the same story relocated.
  */
 function buildTrialIdeaPrompts({
   template,
@@ -7832,7 +7908,7 @@ function buildTrialIdeaPrompts({
 
   return {
     local: base('premise', axes.local) + localIdea,
-    fantasy: base('tone', axes.fantasy) + fantasyIdea,
+    fantasy: base('premise-open', axes.fantasy) + fantasyIdea,
     axes,
   };
 }
@@ -7998,5 +8074,8 @@ module.exports = {
   AGE_OWNS_PROPS_RULE,
   nextIdeaVarietyAxis,
   applyBandView,
+  BAND_VIEW_KEEPS,
+  BAND_PREMISE_SLOTS,
+  parseBandSpans,
   buildPreviousScenesContext
 };

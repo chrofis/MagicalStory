@@ -1,30 +1,30 @@
-# {BAND_TITLE}
+[[premise]]# {BAND_TITLE}[[/premise]]
 
-{READER_LINE}
+[[premise]]{READER_LINE}[[/premise]]
 
-[[plot]]**The full shape{SHAPE_SCALE}.** Ordinary world, then a call that pulls the main character out of it,
+[[premise:subject]]**The full shape{SHAPE_SCALE}.** Ordinary world, then a call that pulls the main character out of it,
 then challenges that get harder, then a moment where all seems lost, then the turn, then home —
-changed. Every one of those beats is on the page, in that order.
+changed. [[/premise:subject]][[mechanics]]Every one of those beats is on the page, in that order.[[/mechanics]]
 
-[[book]]**A real low point is required.** Before the end there is a page where the plan has failed, the thing
+[[craft]]**A real low point is required.** Before the end there is a page where the plan has failed, the thing
 is lost, or the friend is gone, and it looks like it will stay that way. Do not soften it into a
-small setback and do not skip past it in a line.[[/book]][[/plot]]
+small setback and do not skip past it in a line.[[/craft]]
 
-**The hero's own idea turns it.** What saves the day comes out of the main character — something they
+[[premise:agency]]**The hero's own idea turns it.** What saves the day comes out of the main character — something they
 noticed earlier, a strength of theirs, a thing they were told and remembered. Never luck, never a
-grown-up arriving to fix it, never a power handed over at the last moment.
+grown-up arriving to fix it, never a power handed over at the last moment.[[/premise:agency]]
 
-**It resolves.** The turn comes before the last page and they come home changed. Never a story that
-stops on the problem.
+[[premise:resolution]]**It resolves.** The turn comes before the last page and they come home changed. Never a story that
+stops on the problem.[[/premise:resolution]]
 
-**A real antagonist is allowed.** Someone who wants something opposed to what the main character
-wants, with a reason of their own.[[book]] A twist, a sidekick who earns their place, and a setup on an early
-page that pays off at the end all belong here.[[/book]]
+[[premise]]**A real antagonist is allowed.** Someone who wants something opposed to what the main character
+wants, with a reason of their own.[[/premise]][[craft]] A twist, a sidekick who earns their place, and a setup on an early
+page that pays off at the end all belong here.[[/craft]]
 
-**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried
-through their own story.
+[[premise]]**Competence.** The main character does things: decides, tries, fails, adapts. They are never carried
+through their own story.[[/premise]]
 
-**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,
-nothing cruel, nobody the reader likes is really harmed.
+[[premise]]**Humour and mild peril.** A chase, a close call, a night out in the cold are fine. Nothing gory,
+nothing cruel, nobody the reader likes is really harmed.[[/premise]]
 
-[[book]]**Ending.** They come back to where they started and it reads differently, because they are different.[[/book]]
+[[craft]]**Ending.** They come back to where they started and it reads differently, because they are different.[[/craft]]
