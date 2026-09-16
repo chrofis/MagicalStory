@@ -616,11 +616,12 @@ function parseVisualBible(outline) {
  * always checkable, and renders the same phrase every time.
  *
  * The bands are RELATIVE, never metric — an illustration has no absolute
- * scale — and every one is a phrase about a standing adult. The band names are
- * the same body-part vocabulary the quality evaluator's D-21 `scale` rule
- * already reasons in (apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ a
- * head — the `melon` band, sword ≈ arm), so generator and critic speak one
- * language.
+ * scale — and every one is a phrase about a standing adult. The band TOKENS
+ * are deliberately NOT the evaluator's D-21 anatomical reference list
+ * (fist/palm/forearm/a human head): that list is the judge's own way of
+ * reasoning about a depicted object and stays prose (decisions.md 2026-09-16,
+ * commit b59cb751b). What the two share is the rendered PHRASE, which is the
+ * only thing either side ever reads.
  *
  * `null` is a first-class value: a bible stored before the field existed has
  * none, and every consumer falls back to its pre-2026-09-15 behaviour — for
@@ -651,19 +652,44 @@ function parseVisualBible(outline) {
  * the behaviour every stored bible already has; a stored token is never
  * reinterpreted on a guess about what its author meant.
  */
+/**
+ * EVERY TOKEN SAYS ITS OWN MODE (owner, 2026-09-16, third pass).
+ *
+ * The 09-16 morning fix renamed only the one token that had collided (`head`
+ * -> `adult`) and gave the head-SIZED object its own band (`melon`). The flaw
+ * it fixed was not local to that rung: EVERY height band was a bare body-part
+ * noun, and a bare body-part noun in this ladder is ambiguous by construction
+ * — `knee` reads as "knee-sized" exactly as readily as "knee-high", which is
+ * the misreading that oversized a dragon egg on four pages. Two names were
+ * worse still: `chest` is a homonym, and the generator writes children's
+ * stories full of treasure chests; `double` is opaque on its own, its meaning
+ * living only in the example beside it.
+ *
+ * So every token is now self-describing and carries its group in its own name:
+ * the SIZE bands end `-sized`, the HEIGHT bands end `-high` / `-height`. An
+ * author who reads only the token, with the spec out of view, still cannot
+ * pick a size band for a stature question. `hip` also became `waist-high`:
+ * the everyday English word for that height.
+ *
+ * `landmark` is unchanged — it names no body part and claims no size.
+ *
+ * THE PHRASES ARE BYTE-IDENTICAL to what each band rendered before the rename.
+ * Only the token names moved, so every stored bible renders exactly the
+ * sentence it rendered the day it shipped.
+ */
 const SCALE_PHRASES = Object.freeze({
-  fingertip: 'small enough to sit on a fingertip',
-  palm: 'small enough to close one hand around',
-  hand: 'fills an open hand',
-  melon: 'about as big as a human head, like a lantern or a football',
-  forearm: "about as long as an adult's forearm",
-  arm: "about as long as an adult's whole arm",
-  knee: 'stands knee-high to an adult',
-  hip: 'stands hip-high to an adult',
-  chest: 'stands chest-high to an adult',
-  adult: 'as tall as a standing adult',
-  double: 'twice the height of a standing adult',
-  house: 'several adults high, the size of a house',
+  'fingertip-sized': 'small enough to sit on a fingertip',
+  'palm-sized': 'small enough to close one hand around',
+  'hand-sized': 'fills an open hand',
+  'melon-sized': 'about as big as a human head, like a lantern or a football',
+  'forearm-sized': "about as long as an adult's forearm",
+  'arm-sized': "about as long as an adult's whole arm",
+  'knee-high': 'stands knee-high to an adult',
+  'waist-high': 'stands hip-high to an adult',
+  'chest-high': 'stands chest-high to an adult',
+  'adult-height': 'as tall as a standing adult',
+  'twice-adult-height': 'twice the height of a standing adult',
+  'house-height': 'several adults high, the size of a house',
   landmark: 'fills the horizon behind everything'
 });
 
@@ -681,7 +707,7 @@ const SCALE_PHRASES = Object.freeze({
  * question in the author's own terms and each band carrying everyday
  * examples.
  */
-const SCALE_CLASS_SPEC = "[the element's scale band, one of: fingertip, palm, hand, melon, forearm, arm, knee, hip, chest, adult, double, house, landmark. Two questions, two groups — answer one of them, never both. HOW BIG IS IT, for a thing someone could pick up and hold; these bands say nothing about how tall it stands: fingertip — a pea, a ring; palm — an apple, a mouse; hand — a book, a loaf; melon — a football, a lantern, a helmet; forearm — a rolling pin, a small cat; arm — a broom, a shovel. HOW TALL DOES IT STAND, for a thing that rests on the ground and has a height; these bands say nothing about how bulky it is: knee — a dog, a stool; hip — a young child, a barrel; chest — a counter, a pony; adult — a doorway, a grown-up standing; double — a market stall with its roof; house — a house, a full-grown tree; landmark — a cliff, a mountain, the horizon behind everything. A band never carries the other group's meaning: a head-sized thing is melon, never adult. Judge the element's largest dimension, not how the story feels about it. This is the only place the element's size is stated. Never omitted.]";
+const SCALE_CLASS_SPEC = "[the element's scale band, one of: fingertip-sized, palm-sized, hand-sized, melon-sized, forearm-sized, arm-sized, knee-high, waist-high, chest-high, adult-height, twice-adult-height, house-height, landmark. Two questions, two groups — answer one of them, never both. HOW BIG IS IT, for a thing someone could pick up and hold; these bands say nothing about how tall it stands: fingertip-sized — a pea, a ring; palm-sized — an apple, a mouse; hand-sized — a book, a loaf; melon-sized — a football, a lantern, a helmet; forearm-sized — a rolling pin, a small cat; arm-sized — a broom, a shovel. HOW TALL DOES IT STAND, for a thing that rests on the ground and has a height; these bands say nothing about how bulky it is: knee-high — a dog, a stool; waist-high — a young child, a barrel; chest-high — a counter, a pony; adult-height — a doorway, a grown-up standing; twice-adult-height — a market stall with its roof; house-height — a house, a full-grown tree; landmark — a cliff, a mountain, the horizon behind everything. A band never carries the other group's meaning: a head-sized thing is melon-sized, never adult-height. Judge the element's largest dimension, not how the story feels about it. This is the only place the element's size is stated. Never omitted.]";
 
 /** Ascending. The order IS the contract — a reader must be able to tell any two apart. */
 const SCALE_CLASSES = Object.keys(SCALE_PHRASES);
@@ -698,16 +724,33 @@ const SCALE_CLASSES = Object.keys(SCALE_PHRASES);
  * bands map so that `isLargeScaleClass` is unchanged in behaviour.
  */
 const LEGACY_SCALE_CLASSES = Object.freeze({
-  person: 'hip',
-  vehicle: 'double',
-  building: 'house',
+  // The 2026-09-15 morning six-value enum.
+  person: 'waist-high',
+  vehicle: 'twice-adult-height',
+  building: 'house-height',
   landscape: 'landmark',
-  // 2026-09-16: the height ladder's top rung was renamed `head` -> `adult`.
-  // Stored bibles carry `head`, and it resolves to the phrase it has always
-  // rendered. A stored token is NEVER reinterpreted: an author who meant
-  // head-sized cannot be told apart from one who meant adult-height, and
+  // 2026-09-16 morning: the height ladder's top rung was renamed `head` ->
+  // `adult`. Stored bibles carry `head`, and it resolves to the phrase it has
+  // always rendered. A stored token is NEVER reinterpreted: an author who
+  // meant head-sized cannot be told apart from one who meant adult-height, and
   // guessing would change a shipped story's scale on a repaint.
-  head: 'adult'
+  head: 'adult-height',
+  // 2026-09-16 afternoon: every band token became self-describing. Each old
+  // token maps onto the band that carries ITS OWN former phrase, so a stored
+  // bible renders the identical sentence. Live stored entries using `head`,
+  // `knee`, `hand`, `forearm`, `landmark` and `house` exist on staging.
+  fingertip: 'fingertip-sized',
+  palm: 'palm-sized',
+  hand: 'hand-sized',
+  melon: 'melon-sized',
+  forearm: 'forearm-sized',
+  arm: 'arm-sized',
+  knee: 'knee-high',
+  hip: 'waist-high',
+  chest: 'chest-high',
+  adult: 'adult-height',
+  double: 'twice-adult-height',
+  house: 'house-height'
 });
 
 /**
@@ -3048,7 +3091,7 @@ function sceneObjectsNameEntry(sceneObjects, entry) {
  * UNCHANGED in behaviour: the morning enum's `vehicle`/`building`/`landscape`
  * resolve to `double`/`house`/`landmark`, which is exactly this set.
  */
-const LARGE_SCALE_CLASSES = new Set(['double', 'house', 'landmark']);
+const LARGE_SCALE_CLASSES = new Set(['twice-adult-height', 'house-height', 'landmark']);
 
 function isLargeScaleClass(value) {
   const token = resolveScaleClass(value);

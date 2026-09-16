@@ -61,9 +61,19 @@ const FULL = {
 describe('scaleClass — the closed enum', () => {
   it('is the thirteen bands, ascending, each with exactly one render phrase', () => {
     expect(SCALE_CLASSES).toEqual([
-      'fingertip', 'palm', 'hand', 'melon', 'forearm', 'arm',
-      'knee', 'hip', 'chest', 'adult', 'double', 'house', 'landmark'
+      'fingertip-sized', 'palm-sized', 'hand-sized', 'melon-sized', 'forearm-sized', 'arm-sized',
+      'knee-high', 'waist-high', 'chest-high', 'adult-height', 'twice-adult-height',
+      'house-height', 'landmark'
     ]);
+    // EVERY token says its own mode (owner, 2026-09-16): a bare body-part noun
+    // is ambiguous by construction, `chest` is a homonym in a generator that
+    // writes treasure chests, and `double` carried its meaning only in its
+    // example. BEHAVIOURAL: an author reading the token alone must be unable
+    // to mistake its group.
+    for (const band of SCALE_CLASSES) {
+      if (band === 'landmark') continue;
+      expect(band, band).toMatch(/-sized$|-high$|-height$/);
+    }
     // ONE source of truth: the token list IS the phrase map's key list, so a
     // band can never exist without a wording or carry two of them.
     expect(Object.keys(SCALE_PHRASES)).toEqual(SCALE_CLASSES);
@@ -88,18 +98,20 @@ describe('scaleClass — the closed enum', () => {
    * must render a phrase that does.
    */
   it('a head-sized object has a band of its own, and it is not an adult-height phrase', () => {
-    expect(SCALE_CLASSES).toContain('melon');
-    const melon = scalePhrase('melon') as string;
+    expect(SCALE_CLASSES).toContain('melon-sized');
+    const melon = scalePhrase('melon-sized') as string;
     expect(melon).toMatch(/head/i);           // it is the head-SIZED band
     expect(melon).not.toMatch(/tall|stands|high/i);
     // and it sorts below the limb bands, above the hand bands
-    expect(SCALE_CLASSES.indexOf('melon')).toBeGreaterThan(SCALE_CLASSES.indexOf('hand'));
-    expect(SCALE_CLASSES.indexOf('melon')).toBeLessThan(SCALE_CLASSES.indexOf('forearm'));
+    expect(SCALE_CLASSES.indexOf('melon-sized')).toBeGreaterThan(SCALE_CLASSES.indexOf('hand-sized'));
+    expect(SCALE_CLASSES.indexOf('melon-sized')).toBeLessThan(SCALE_CLASSES.indexOf('forearm-sized'));
   });
 
   it('every SIZE band says size and every HEIGHT band says height', () => {
-    const SIZE = ['fingertip', 'palm', 'hand', 'melon', 'forearm', 'arm'];
-    const HEIGHT = ['knee', 'hip', 'chest', 'adult', 'double', 'house', 'landmark'];
+    const SIZE = ['fingertip-sized', 'palm-sized', 'hand-sized', 'melon-sized',
+      'forearm-sized', 'arm-sized'];
+    const HEIGHT = ['knee-high', 'waist-high', 'chest-high', 'adult-height',
+      'twice-adult-height', 'house-height', 'landmark'];
     expect([...SIZE, ...HEIGHT]).toEqual(SCALE_CLASSES);
     for (const band of SIZE) {
       // a size band never claims stature — that is the sentence that oversized
@@ -112,7 +124,12 @@ describe('scaleClass — the closed enum', () => {
     // the top of the height ladder is named for the adult, never for a body
     // part that doubles as a size referent
     expect(SCALE_CLASSES).not.toContain('head');
-    expect(scalePhrase('adult')).toMatch(/as tall as a standing adult/);
+    expect(SCALE_CLASSES).not.toContain('adult');
+    // and no live token is a bare body-part noun any more
+    for (const bare of ['knee', 'hip', 'chest', 'fingertip', 'palm', 'hand', 'forearm', 'arm']) {
+      expect(SCALE_CLASSES, bare).not.toContain(bare);
+    }
+    expect(scalePhrase('adult-height')).toMatch(/as tall as a standing adult/);
   });
 
   it('states every band against a standing adult, never in units', () => {
@@ -125,15 +142,15 @@ describe('scaleClass — the closed enum', () => {
   });
 
   it('lowercases and trims an authored value', () => {
-    expect(normaliseScaleClass('  Forearm ', 'ART001')).toBe('forearm');
-    expect(normaliseScaleClass('HAND', 'ART001')).toBe('hand');
+    expect(normaliseScaleClass('  Forearm-Sized ', 'ART001')).toBe('forearm-sized');
+    expect(normaliseScaleClass('HAND-SIZED', 'ART001')).toBe('hand-sized');
     expect(normaliseScaleClass('Landmark', 'LOC001')).toBe('landmark');
   });
 
   it('never coerces an unknown token to a nearest band', () => {
     // Adjectives name no band, and neither does a near-miss spelling. Every
     // string here is one the stored corpus actually contained as a `size`.
-    for (const bad of ['huge', 'massive', 'tiny', 'ship', 'hand-sized', 'houses', 'gross', 'mittelgross', '']) {
+    for (const bad of ['huge', 'massive', 'tiny', 'ship', 'thumb-sized', 'houses', 'gross', 'mittelgross', '']) {
       expect(normaliseScaleClass(bad, 'ART001'), bad).toBeNull();
     }
   });
@@ -155,11 +172,16 @@ describe('scaleClass — the closed enum', () => {
 describe('scaleClass — the retired six-value enum still resolves', () => {
   it('maps each legacy band onto exactly one granular band', () => {
     expect(LEGACY_SCALE_CLASSES).toEqual({
-      person: 'hip', vehicle: 'double', building: 'house', landscape: 'landmark', head: 'adult'
+      person: 'waist-high', vehicle: 'twice-adult-height', building: 'house-height',
+      landscape: 'landmark', head: 'adult-height',
+      fingertip: 'fingertip-sized', palm: 'palm-sized', hand: 'hand-sized',
+      melon: 'melon-sized', forearm: 'forearm-sized', arm: 'arm-sized',
+      knee: 'knee-high', hip: 'waist-high', chest: 'chest-high',
+      adult: 'adult-height', double: 'twice-adult-height', house: 'house-height'
     });
-    // `hand` and `arm` survived the rewrite under their own names
-    expect(resolveScaleClass('hand')).toBe('hand');
-    expect(resolveScaleClass('arm')).toBe('arm');
+    // `landmark` never changed name, so it stays a LIVE token, not an alias
+    expect(resolveScaleClass('landmark')).toBe('landmark');
+    expect(LEGACY_SCALE_CLASSES).not.toHaveProperty('landmark');
     for (const [legacy, granular] of Object.entries(LEGACY_SCALE_CLASSES)) {
       expect(resolveScaleClass(legacy), legacy).toBe(granular);
       expect(resolveScaleClass(String(legacy).toUpperCase()), legacy).toBe(granular);
@@ -170,17 +192,50 @@ describe('scaleClass — the retired six-value enum still resolves', () => {
   it("a stored `head` keeps the phrase it has always rendered, never a reinterpretation", () => {
     // An author who meant head-sized cannot be told apart from one who meant
     // adult-height, so the stored token is NOT re-pointed at `melon`.
-    expect(resolveScaleClass('head')).toBe('adult');
-    expect(scalePhrase('head')).toBe(SCALE_PHRASES.adult);
+    expect(resolveScaleClass('head')).toBe('adult-height');
+    expect(scalePhrase('head')).toBe(SCALE_PHRASES['adult-height']);
+  });
+
+  /**
+   * THE RENAME IS A RENAME, NOT A REINTERPRETATION (2026-09-16 afternoon).
+   * Every pre-rename token must still render the EXACT sentence it rendered
+   * before the rename. The literal phrases below are those of commit
+   * b59cb751b; if a rename ever re-points one of them, this table fails.
+   */
+  it('renders every pre-rename token as the exact phrase it rendered before', () => {
+    const BEFORE: Record<string, string> = {
+      fingertip: 'small enough to sit on a fingertip',
+      palm: 'small enough to close one hand around',
+      hand: 'fills an open hand',
+      melon: 'about as big as a human head, like a lantern or a football',
+      forearm: "about as long as an adult's forearm",
+      arm: "about as long as an adult's whole arm",
+      knee: 'stands knee-high to an adult',
+      hip: 'stands hip-high to an adult',
+      chest: 'stands chest-high to an adult',
+      adult: 'as tall as a standing adult',
+      head: 'as tall as a standing adult',
+      double: 'twice the height of a standing adult',
+      house: 'several adults high, the size of a house',
+      landmark: 'fills the horizon behind everything'
+    };
+    for (const [token, phrase] of Object.entries(BEFORE)) {
+      expect(scalePhrase(token), token).toBe(phrase);
+      expect(scalePhrase(token.toUpperCase()), token).toBe(phrase);
+      expect(elementScaleNote({ scaleClass: token }), token).toBe(phrase);
+    }
   });
 
   it('leaves plate routing unchanged for a legacy-classed element', () => {
     // The whole point of the mapping: the three large legacy bands are exactly
     // the three large granular bands, so nothing already stored changes route.
-    for (const large of ['vehicle', 'building', 'landscape', 'double', 'house', 'landmark']) {
+    for (const large of ['vehicle', 'building', 'landscape', 'double', 'house', 'landmark',
+      'twice-adult-height', 'house-height', 'HOUSE-HEIGHT']) {
       expect(isLargeScaleClass(large), large).toBe(true);
     }
-    for (const small of ['hand', 'arm', 'person', 'fingertip', 'palm', 'melon', 'forearm', 'knee', 'hip', 'chest', 'head', 'adult']) {
+    for (const small of ['hand', 'arm', 'person', 'fingertip', 'palm', 'melon', 'forearm', 'knee',
+      'hip', 'chest', 'head', 'adult', 'hand-sized', 'arm-sized', 'melon-sized', 'knee-high',
+      'waist-high', 'chest-high', 'adult-height']) {
       expect(isLargeScaleClass(small), small).toBe(false);
     }
     expect(isLargeScaleClass(null)).toBe(false);
@@ -191,11 +246,11 @@ describe('scaleClass — the retired six-value enum still resolves', () => {
 describe('scaleClass — the Visual Bible whitelist parse', () => {
   it('admits the field on all five element collections', () => {
     const vb = parseVisualBible(bible(FULL));
-    expect(vb.secondaryCharacters[0].scaleClass).toBe('adult'); // stored 'head', the legacy alias
-    expect(vb.animals[0].scaleClass).toBe('knee');
-    expect(vb.artifacts[0].scaleClass).toBe('fingertip');
+    expect(vb.secondaryCharacters[0].scaleClass).toBe('adult-height'); // stored 'head', legacy alias
+    expect(vb.animals[0].scaleClass).toBe('knee-high');
+    expect(vb.artifacts[0].scaleClass).toBe('fingertip-sized');
     expect(vb.locations[0].scaleClass).toBe('landmark');
-    expect(vb.vehicles[0].scaleClass).toBe('house');
+    expect(vb.vehicles[0].scaleClass).toBe('house-height');
   });
 
   it('admits it on entries the story text adds mid-book too', () => {
@@ -204,8 +259,8 @@ describe('scaleClass — the Visual Bible whitelist parse', () => {
       vehicles: [{ id: 'VEH009', name: 'hay cart', pages: [5], colorAndDetails: 'a cart', signatureElement: 'a wheel', scaleClass: 'double' }],
     }) + '\n```';
     const entries = parseNewVisualBibleEntries(section);
-    expect(entries.artifacts[0].scaleClass).toBe('palm');
-    expect(entries.vehicles[0].scaleClass).toBe('double');
+    expect(entries.artifacts[0].scaleClass).toBe('palm-sized');
+    expect(entries.vehicles[0].scaleClass).toBe('twice-adult-height');
   });
 
   it('leaves a stored bible that predates the field at null, not at a guess', () => {
@@ -247,8 +302,8 @@ describe('scaleClass — the Visual Bible whitelist parse', () => {
  */
 describe('elementScaleNote — the enum renders, the token never does', () => {
   it('renders the band as its one canonical phrase', () => {
-    expect(elementScaleNote({ scaleClass: 'fingertip' })).toBe('small enough to sit on a fingertip');
-    expect(elementScaleNote({ scaleClass: 'house' })).toBe('several adults high, the size of a house');
+    expect(elementScaleNote({ scaleClass: 'fingertip-sized' })).toBe('small enough to sit on a fingertip');
+    expect(elementScaleNote({ scaleClass: 'house-height' })).toBe('several adults high, the size of a house');
     // the raw token is never the note
     for (const band of SCALE_CLASSES) {
       expect(elementScaleNote({ scaleClass: band }), band).not.toBe(band);
@@ -266,8 +321,8 @@ describe('elementScaleNote — the enum renders, the token never does', () => {
   });
 
   it('prefers the band over a stored size when a bible carries both', () => {
-    expect(elementScaleNote({ scaleClass: 'palm', size: 'the size of a thumb' }))
-      .toBe(SCALE_PHRASES.palm);
+    expect(elementScaleNote({ scaleClass: 'palm-sized', size: 'the size of a thumb' }))
+      .toBe(SCALE_PHRASES['palm-sized']);
   });
 
   it('is null when an element states no scale at all', () => {
@@ -364,12 +419,12 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
 
   it('normalises the authored value on every collection', () => {
     const vb = parse({
-      artifacts: [{ id: 'ART001', name: 'chestnut', pages: [1], scaleClass: ' Fingertip ' }],
-      vehicles: [{ id: 'VEH001', name: 'ship', pages: [1], scaleClass: 'HOUSE' }],
+      artifacts: [{ id: 'ART001', name: 'chestnut', pages: [1], scaleClass: ' Fingertip-Sized ' }],
+      vehicles: [{ id: 'VEH001', name: 'ship', pages: [1], scaleClass: 'HOUSE-HEIGHT' }],
       locations: [{ id: 'LOC001', name: 'quay', pages: [1], scaleClass: 'landmark' }],
     });
-    expect(vb.artifacts[0].scaleClass).toBe('fingertip');
-    expect(vb.vehicles[0].scaleClass).toBe('house');
+    expect(vb.artifacts[0].scaleClass).toBe('fingertip-sized');
+    expect(vb.vehicles[0].scaleClass).toBe('house-height');
     expect(vb.locations[0].scaleClass).toBe('landmark');
   });
 
@@ -378,8 +433,8 @@ describe('scaleClass — the parser the pipeline actually runs', () => {
       vehicles: [{ id: 'VEH001', name: 'ship', pages: [1], scaleClass: 'building' }],
       animals: [{ id: 'ANI001', name: 'dog', pages: [1], species: 'dog', scaleClass: 'person' }],
     });
-    expect(vb.vehicles[0].scaleClass).toBe('house');
-    expect(vb.animals[0].scaleClass).toBe('hip');
+    expect(vb.vehicles[0].scaleClass).toBe('house-height');
+    expect(vb.animals[0].scaleClass).toBe('waist-high');
   });
 
   it('drops an unknown token here too rather than letting it sail through', () => {

@@ -7,6 +7,58 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-16 — Every scale band token says its own mode: `knee-high`, `chest-high`, `melon-sized`
+
+**Context.** Two earlier passes the same day fixed the scale ladder one token at a time. The
+first renamed the height ladder's top rung `head` → `adult` and gave the head-SIZED object its
+own band `melon`, after a writer classed a football-sized dragon egg `head` (meaning head-sized)
+and every page carrying it was told it was as tall as a standing adult. The second split the
+writer-facing spec into two labelled groups. Neither touched the other eleven tokens, and the
+owner identified that the SAME flaw lives in all of them: a bare body-part noun in this ladder is
+ambiguous by construction — `knee` reads as *knee-sized* exactly as readily as *knee-high*. Two
+names were worse than ambiguous. `chest` is a homonym, and this is a generator that writes
+children's stories full of treasure chests, so the token collides with a common story object
+rather than with another band. `double` is opaque on its own: its meaning existed only in the
+example printed beside it, so an author who skimmed the list had nothing to go on.
+
+**Decision.** Every token is now self-describing and carries its group in its own name. SIZE
+bands end `-sized`: `fingertip-sized`, `palm-sized`, `hand-sized`, `melon-sized`,
+`forearm-sized`, `arm-sized`. HEIGHT bands end `-high` / `-height`: `knee-high`, `waist-high`
+(the everyday English word for the old `hip`), `chest-high`, `adult-height`,
+`twice-adult-height`, `house-height`. `landmark` is unchanged — it names no body part and claims
+no size. Hyphens, not underscores: the tokens are only ever trimmed, lowercased and compared
+whole (`resolveScaleClass`), never split, and they are printed as prose inside the authoring
+prompt, where a hyphenated English compound reads as language and an underscore reads as a code
+identifier.
+
+**THE PHRASES DID NOT MOVE.** `SCALE_PHRASES` renders byte-identical sentences to the ones each
+band rendered before the rename, and every pre-rename token is a `LEGACY_SCALE_CLASSES` alias of
+the band carrying ITS OWN former phrase — `head` → `adult-height` (not `melon-sized`: an author
+who meant head-sized cannot be told apart from one who meant adult-height, and guessing would
+change a shipped story's scale on a repaint). Live stored entries using `head`, `knee`, `hand`,
+`forearm`, `landmark` and `house` exist on staging; none on production. `LARGE_SCALE_CLASSES`
+moved to the new tokens, and because `isLargeScaleClass` resolves through the alias table first,
+a stored `double` / `vehicle` still routes as large.
+
+**Rationale.** The 09-16 morning fix treated the collision as local to one word. It was not: the
+vocabulary itself was the defect, and renaming only the token that had already failed leaves
+twelve more waiting. A token that states its own mode makes the misreading unavailable even to an
+author who never reads the spec around it — which is the state an LLM is usually in by the time it
+fills the field. The spec text is still generated from the single `SCALE_CLASS_SPEC` constant and
+injected into both VB-authoring sites, so no hand-typed copy exists to drift.
+
+**NOT unified with the judge.** `prompts/image-evaluation.txt` D-21 carries an ANATOMICAL
+reference list (fist / palm / forearm / a human head) that is deliberately NOT the band enum —
+commit b59cb751b. The judge reasons about a depicted object in its own terms; what generator and
+critic share is the rendered PHRASE, which is the only thing either side reads. The stale comment
+in `visualBible.js` claiming the two vocabularies were the same was corrected here.
+
+**Touched files.** `server/lib/visualBible.js` (`SCALE_PHRASES`, `SCALE_CLASS_SPEC`,
+`LEGACY_SCALE_CLASSES`, `LARGE_SCALE_CLASSES`), `tests/unit/vb-scale-class.test.ts`,
+`tests/unit/artifact-size.test.ts`, `tests/unit/vb-generic-gate.test.ts`,
+`tests/unit/vb-plate-routing.test.ts`. No prompt template changed: both authoring sites carry the
+`{SCALE_CLASS_SPEC}` placeholder and receive the new spec automatically.
+
 ## 2026-09-16 — The writer-facing scale spec is two labelled groups, filled from one constant
 
 **Context.** `scaleClass` mixes two comparison modes under one vocabulary: six bands answer

@@ -36,7 +36,7 @@ const buildPagePrompt = (vb: any) => {
 // 2026-09-16: the height ladder's top rung is `adult`, and `melon` is the
 // head-SIZED band it used to be confused with. `head` survives only as a
 // stored-bible alias — it is no longer OFFERED to an author.
-const BANDS = ['fingertip', 'palm', 'hand', 'melon', 'forearm', 'arm', 'knee', 'hip', 'chest', 'adult', 'double', 'house', 'landmark'];
+const BANDS = ['fingertip-sized', 'palm-sized', 'hand-sized', 'melon-sized', 'forearm-sized', 'arm-sized', 'knee-high', 'waist-high', 'chest-high', 'adult-height', 'twice-adult-height', 'house-height', 'landmark'];
 
 // The two pre-beats unified writers were members until 2026-09-15, when they
 // were deleted as unreachable (docs/decisions.md).

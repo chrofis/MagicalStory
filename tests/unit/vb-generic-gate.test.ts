@@ -50,7 +50,7 @@ describe('generic gate — the entry is dropped, not hidden', () => {
     expect(vb.genericObjects[0].collection).toBe('artifacts');
     // the drop is auditable: what was given up is still written down
     expect(vb.genericObjects[0].description).toContain('dented tin cup');
-    expect(vb.genericObjects[0].scaleClass).toBe('hand');
+    expect(vb.genericObjects[0].scaleClass).toBe('hand-sized'); // stored 'hand', the legacy alias
   });
 
   it('applies to animals and vehicles on the same terms', () => {

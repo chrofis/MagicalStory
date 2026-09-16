@@ -119,7 +119,7 @@ describe('the page loses them — but only when a plate is actually sent', () =>
     expect(ids).toContain('ART002');
     expect(ids).toContain('VEH001');
     // and the class rides along so the filter sites can read it
-    expect(sel().find((r: any) => r.id === 'ART001').scaleClass).toBe('building');
+    expect(sel().find((r: any) => r.id === 'ART001').scaleClass).toBe('building'); // raw, unparsed fixture: selection passes the authored token through
   });
 
   it('WITH a plate: every large element drops, the hand-scale prop stays', async () => {
