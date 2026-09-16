@@ -25,16 +25,13 @@
 const SEGMENT_SPLIT = /\s+[—–]\s+|\s+--\s+/;
 
 /**
- * Shot vocabulary, longest-first: "ultra-wide" contains "wide", and "close-up"
- * must win over a bare "close". Anything unrecognised counts as 'other' and is
- * reported rather than silently folded into medium.
+ * Shot vocabulary, longest-first. The table used to live here; it is now one
+ * declaration (server/lib/shotVocabulary.js) shared with the two Art Director
+ * templates and the image prompt, so a word this file counts is a word those
+ * stages can define. Anything unrecognised counts as 'other' and is reported
+ * rather than silently folded into medium.
  */
-const SHOT_PATTERNS = [
-  ['ultra-wide', /\b(?:ultra[-\s]?wide|extreme[-\s]?wide|establishing[-\s]?wide)\b/i],
-  ['close-up', /\b(?:extreme[-\s]?close[-\s]?up|close[-\s]?up|closeup|portrait)\b/i],
-  ['wide', /\bwide\b/i],
-  ['medium', /\b(?:medium|mid)\b/i],
-];
+const { SHOT_PATTERNS } = require('./shotVocabulary');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([

@@ -28,7 +28,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, AUDIT_ADMIT_MAX } = require('./repairLogic');
+const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
@@ -441,11 +441,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       characterPhotos: orig.characterPhotos,
       allCharacterPhotos,
       sceneDescription: entry.description || orig.sceneDescription,
-      // The post-shrink scene block from the ORIGINAL render — the description
-      // the image model actually received when the built prompt was over its
-      // character cap. An entry with its OWN description (an iterate rewrite)
-      // was rendered from a different contract, so it must not inherit it.
-      compressedScene: entry.description ? null : (orig.compressedScene || null),
+      // The post-shrink prose THIS version's render actually received, by
+      // lineage — its own when it was compressed, the page's when it is
+      // original-lineage, null when it authored a brief that fit. One rule,
+      // shared with the promotion at final assembly (resolveVersionCompressedScene).
+      compressedScene: resolveVersionCompressedScene(entry, orig),
       // An ARRAY on the entry is that version's own declaration (an iterate
       // rewrite can legitimately empty the cast); anything else inherits the
       // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
@@ -904,6 +904,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           grokRefImages: img.grokRefImages || null,
           referencePhotos: img.referencePhotos || null,
           prompt: img.prompt || null,
+          // The page's post-shrink prose: this IS the original render, and
+          // every repair layered on it inherits from here.
+          compressedScene: img.compressedScene || null,
           entityPenalty: 0,
           entityIssues: [],
           // Step 1 ran on the scale-repair OUTPUT, never on these pixels.
@@ -927,6 +930,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           modelId: img.modelId,
           grokRefImages: img.grokRefImages || null,
           referencePhotos: img.referencePhotos || null,
+          // The page's post-shrink prose: this IS the original render, and
+          // every repair layered on it inherits from here.
+          compressedScene: img.compressedScene || null,
           entityPenalty: baseEntityPenalty,
           entityPenaltyRaw: baseEntityPenaltyRaw,
           entityIssues: baseEntityIssues,
@@ -2489,6 +2495,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 // the wrong text and hides whether feedback was actually
                 // appended.
                 prompt: result.imagePrompt || null,
+                // The rewrite's own post-shrink prose, when ITS prompt went over
+                // the model's cap. Its brief differs from the page's, so the
+                // page's sent prose can never stand in for it.
+                compressedScene: result.compressedScene || null,
                 description: result.newScene || null,
                 // The iterate's rewritten scene contract — evaluation of this
                 // version MUST use these, not the original page metadata (a
@@ -3618,6 +3628,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // the scene level at final assembly.
       description: v.description || img.sceneDescription || null,
       prompt: v.prompt || img.prompt || null,
+      // The prose the model received for THIS version's bytes. Persisted so a
+      // repair rerun from the stored story resolves the same lineage.
+      compressedScene: resolveVersionCompressedScene(v, img),
       sceneMetadata: v.sceneMetadata || null,
       // Declared-or-unknown, never a coincidence of truthiness: `|| null`
       // leaves an empty array intact (it is truthy), so a version could ship
@@ -3682,6 +3695,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneDescription: best?.description || img.sceneDescription,
       scene: img.scene,
       prompt: best?.prompt || img.prompt,
+      // …and the prose that prompt was SHRUNK to, by the same lineage rule the
+      // evaluation used. This whitelist carried no such key, so the field the
+      // generation path had stamped was dropped here and storyJobPipeline wrote
+      // `null` for every page of every story that ran the repair pipeline.
+      compressedScene: resolveVersionCompressedScene(best, img),
       characterPhotos: img.characterPhotos,
       landmarkPhotos: img.landmarkPhotos,
       visualBibleGrid: img.visualBibleGrid,

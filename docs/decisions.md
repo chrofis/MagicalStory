@@ -354,6 +354,109 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-16 — The shot rule lives in the protected tail, from one vocabulary; and `compressedScene` survives the repair pipeline
+
+**Context.** Two faults measured on staging `job_1789506283204_3kxqshifx` ("Das Ei unter den
+Wurzeln", 18 pages, story id = job id).
+
+- **The shot rule was the first thing cut.** Grok's page-prompt cap is 7,900 chars
+  (`server/config/models.js:911`). Over it, `shrinkPromptForModel` → `sectionAwareCut`
+  (`server/lib/images.js`) drops whole HEAD blocks in `CUT_DROP_ORDER`, and `**Composition:**`
+  was **first** in that order — 1,479 chars, and the only place the illustrator was told
+  "The scene description declares the shot. A close-up ends at the waist… A medium shot keeps
+  each figure whole… A wide shot shows the full setting."
+  **Nine of the eighteen pages lost it**: p1, p3, p4, p6, p7, p9, p13, p15, p18 store a prompt
+  with no Composition block and the cut's single-newline fingerprint (`head.trimEnd()` + one
+  newline + `tail`) immediately before the protected tail, while the nine that kept it show a
+  blank line there. Stored (post-shrink) length + 1,479 reconstructs the pre-cut build:
+  p1 7,607→9,086, p3 7,122→8,601, p7 7,322→8,801, p13 7,286→8,765. Only solo p5 (7,872) fit and
+  kept the rule. On every multi-character page the model was handed a declared shot and no
+  definition of it — p3's plan line asked for `ultra-wide` and rendered as a medium two-shot.
+- **`ultra-wide` existed at two stages and was defined at neither.** It is produced by the beats
+  planner (`prompts/story-beats.txt`: "about two close-ups and two ultra-wides") and counted by
+  `server/lib/planCounters.js` (`SHOT_PATTERNS`, `SHOT_ULTRAWIDE_COUNT`). The Art Director enum
+  (`prompts/scene-expansion.txt:176` and its sibling `scene-expansion-all.txt:394`) offered
+  `close-up | medium | wide`, and the image prompt defined those same three. The fourth word
+  arrived at the Art Director and the illustrator undefined.
+- **`compressedScene` was null on every page, and it was not a generation bug.** All 18 pages,
+  all 30 versions: `null`. `prompt_compress` ran 38 times on this story and nine pages carry the
+  cut fingerprint, so the prompt demonstrably changed. `shrinkPromptForModel` stamps the sent head
+  on all three branches (dedupe / LLM compression / section-aware cut) and `generateImageOnly`
+  returns it — `tests/unit/stored-prompt-is-sent-prompt.test.ts` passes against that path, and the
+  same commit's sibling field (`prompt: genResult.prompt || pageData.prompt`, c9b4eb9c2, deployed
+  2026-09-14, a day before this run) **did** store post-shrink text. The loss is one hop later:
+  the repair pipeline's per-page OUTPUT whitelist — the per-page `return` in
+  `server/lib/repairPipeline.js` that carries `prompt: best?.prompt || img.prompt` — had **no
+  `compressedScene` key at all**, so `storyJobPipeline.js`'s `compressedScene: img.compressedScene
+  || null` wrote `null` for every page of every story that ran the repair pipeline. The
+  `skipQualityEval` branch, which maps straight from `rawImages`, was unaffected — which is why the
+  field worked in trials and nowhere else. Consequence: `resolveEvalSceneDescription`
+  (`server/lib/sceneMetadata.js`) fell back to the pre-shrink brief, so judges scored nine pages
+  against prose the model never received, and the text actually sent for those renders is
+  unrecoverable.
+
+**Decision.**
+
+1. **The shot rule moves to the protected tail END** of `prompts/image-generation.txt`, after
+   `{HANDS_HOLD_ONLY_NAMED}`, as `{SHOT_DEFINITIONS}`. It is removed from `**Composition:**`, so
+   there is exactly one statement of it. The tail (everything from `**REQUIRED OBJECTS` /
+   `**ART STYLE`) is never cut and is reattached verbatim past the LLM compressor.
+2. **One shot vocabulary**, `server/lib/shotVocabulary.js`, owns the words, their recognition
+   patterns and their definitions. `planCounters.js` imports `SHOT_PATTERNS` from it instead of
+   declaring its own; the two Art Director templates render `{SHOT_ENUM}` (close-up, medium, wide,
+   or ultra-wide) and the image prompt renders `{SHOT_DEFINITIONS}`, which now defines
+   `ultra-wide` as well.
+3. **`compressedScene` is a lineage-resolved contract field.** `resolveVersionCompressedScene`
+   (`server/lib/repairLogic.js`) answers it once for both read sites: a version compressed at its
+   own render keeps its own prose; a version that authored its own brief and was *not* compressed
+   carries none; an original-lineage version inherits the page's. `inheritSceneContract` propagates
+   it parent-version → child-repair, coupled to the brief it was cut from. The original version is
+   seeded from the page, the iterate path carries its own out of `iteratePageCore`, and the
+   per-page output whitelist promotes the picked version's. No fallback masking: a version that was
+   never shrunk still stores `null`.
+
+**Rationale.**
+
+- *Move, don't demote.* Demoting `**Composition:**` in `CUT_DROP_ORDER` would only shift the loss
+  onto `**HEIGHT ORDER` / `AGE & PROPORTIONS` — the per-character proportion blocks — and would
+  leave the shot rule droppable on a longer page. Moving the ~330-char sentence out of the head and
+  into the tail **moves budget rather than adding it**: the head shrinks by what the tail gains, so
+  no other must-survive block is pushed over. Measured on this story's shape, the tail grows
+  ~3,780 → ~4,220 chars and `headBudget` (`maxLen − tail − 5`) stays near 3,700, far above the
+  500-char floor at which `sectionAwareCut` degrades to blunt truncation. Proven both ways: with
+  the rule in `**Composition:**` a 9,794-char fixture sends 3,732 chars with the rule **gone**;
+  with the rule in the tail a 10,155-char fixture sends 4,240 chars with the rule **kept**.
+- *One vocabulary because the word travels four stages.* A word that a counter can score and a
+  planner can emit must be a word the Art Director may declare and the illustrator can draw. Four
+  separate declarations is how `ultra-wide` came to be counted by one stage and unknown to two.
+- *Lineage, not a truthiness chain.* The middle case is why: an iterate rewrite that fit under the
+  cap must carry **no** compressed prose, because inheriting the page's would hand the judge the
+  prose of the scene the rewrite superseded.
+
+**O7 (2026-09-16) declined — the critics do not score shot class.** This change gives the
+generator a definition the three page critics (`image-evaluation.txt`, `image-semantic.txt`,
+`image-prompt-compliance.txt`) deliberately cannot deduct for. The `page-image-generator-vs-critics`
+sibling set is therefore knowingly one-sided here; no judge template was touched.
+
+**Touched:**
+- `server/lib/shotVocabulary.js` (new — the one vocabulary)
+- `server/lib/planCounters.js` (imports `SHOT_PATTERNS`; no longer declares it)
+- `server/lib/promptBuilders.js` (`SHOT_ENUM` into both AD fills, `SHOT_DEFINITIONS` into the image fill)
+- `prompts/image-generation.txt` (shot rule out of `**Composition:**`, into the tail end)
+- `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt` (`{SHOT_ENUM}`)
+- `server/lib/repairLogic.js` (`resolveVersionCompressedScene`; `inheritSceneContract` propagates it)
+- `server/lib/repairPipeline.js` (version seed, iterate stamp, stored version entry, per-page output)
+- `server/lib/images.js` (`iteratePageCore` carries its own `compressedScene`)
+- `tests/unit/shot-vocabulary-reach.test.ts`, `tests/unit/compressed-scene-lineage.test.ts` (new),
+  `tests/unit/eval-scene-description-source.test.ts` (re-pinned to the resolver)
+
+**Status:** ✅ active
+
+**Open, not fixed here:** the three COVER records of the same story carry `compressedScene`
+*absent* (not null) — `server/lib/coverIterate.js:1485` and `:1576` build their own record
+whitelists with `prompt` and no such key, so the cover path never stamped it at all. That is a
+missing stamp rather than the drop fixed above, and is tracked in `tasks/BACKLOG.md`.
+
 ## 2026-09-16 — A tracked animal is plan-line cast, and a prop that shows two pictures gets one face state per picture
 
 **Context.** Two faults on staging `job_1789506283204_3kxqshifx` ("Das Ei unter den Wurzeln",

@@ -13,6 +13,7 @@ const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
+const { SHOT_ENUM, SHOT_DEFINITIONS } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -2486,6 +2487,10 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
+    // ONE shot vocabulary for every stage that writes or reads a `shot` — the
+    // beats planner produces it, planCounters counts it, and the image prompt
+    // defines it. See server/lib/shotVocabulary.js.
+    SHOT_ENUM,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -2737,6 +2742,10 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
+    // ONE shot vocabulary for every stage that writes or reads a `shot` — the
+    // beats planner produces it, planCounters counts it, and the image prompt
+    // defines it. See server/lib/shotVocabulary.js.
+    SHOT_ENUM,
   });
   // Text-zone rule family, same gate as the all-pages builder. A cover call
   // (pageNumber <= 0) never gets it; a page call follows the story's layout,
@@ -4236,7 +4245,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // it answers (D-24, D-16b). The template places both at the very end, in
       // the protected tail.
       NO_CHARACTER_MARKING: NO_CHARACTER_MARKING_RULE,
-      HANDS_HOLD_ONLY_NAMED: HANDS_HOLD_ONLY_NAMED_RULE
+      HANDS_HOLD_ONLY_NAMED: HANDS_HOLD_ONLY_NAMED_RULE,
+      // The shot rule lived in the droppable **Composition:** head block — first
+      // in CUT_DROP_ORDER — so every over-cap page lost the only statement of
+      // what its declared shot means. It sits at the END of the template now,
+      // inside the tail shrinkPromptForModel never cuts, and comes from the same
+      // constant the Art Director enum does (server/lib/shotVocabulary.js).
+      SHOT_DEFINITIONS
     })));
   }
 

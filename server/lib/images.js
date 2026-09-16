@@ -4572,6 +4572,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       ...(iterQuality || {}),
       imageData: genResult.imageData,
       modelId: genResult.modelId,
+      // The rewrite's prompt goes over the model cap as readily as the original
+      // build did; `compressedScene` is what shrinkPromptForModel actually sent.
+      // Dropped here, an iterate version had no sent prose of its own and the
+      // judges fell back to a brief this image was never painted from.
+      compressedScene: genResult.compressedScene || null,
       qualityModelId: iterQuality?.modelId || null,
       grokRefImages: genResult.grokRefImages || null,
       totalAttempts: 1,
@@ -4601,6 +4606,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     qualityModelId: imageResult.qualityModelId || null,
     fixTargets: imageResult.fixTargets || [],
     fixableIssues: imageResult.fixableIssues || [],
+    // The post-shrink prose this rewrite was rendered from — null when its
+    // prompt fit under the cap. The pipeline stamps it on the version entry.
+    compressedScene: imageResult.compressedScene || null,
     totalAttempts: imageResult.totalAttempts,
     referencePhotos,
     landmarkPhotos: pageLandmarkPhotos,

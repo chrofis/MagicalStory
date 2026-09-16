@@ -280,6 +280,9 @@ function resolveDeclaredCast(...candidates) {
  */
 function inheritSceneContract(target, parent) {
   if (!target || !parent) return target;
+  // Captured BEFORE the assignment below: whether this version authored its own
+  // brief decides what else it is allowed to inherit (see compressedScene).
+  const authoredOwnBrief = target.description != null;
   // `== null` on purpose: a version that authored its OWN contract (an iterate
   // rewrite) keeps it; only an absent field is inherited.
   if (target.description == null) target.description = parent.description || null;
@@ -289,9 +292,43 @@ function inheritSceneContract(target, parent) {
   if (!Array.isArray(target.sceneCharacters)) {
     target.sceneCharacters = Array.isArray(parent.sceneCharacters) ? parent.sceneCharacters : null;
   }
+  // The SENT prose travels with the brief it was cut from. A version that
+  // authored its own brief was rendered from a different contract, so it takes
+  // the parent's sent prose only when it inherited the parent's brief; a
+  // version compressed at its own render always keeps its own.
+  if (target.compressedScene == null) {
+    target.compressedScene = authoredOwnBrief ? null : (parent.compressedScene || null);
+  }
   // Lineage breadcrumb for diagnosis — which version's pixels this one edited.
   if (target.parentSource === undefined) target.parentSource = parent.source || null;
   return target;
+}
+
+/**
+ * THE POST-SHRINK PROSE A VERSION WAS RENDERED FROM, by lineage.
+ *
+ * `shrinkPromptForModel` (images.js) rewrites, dedupes or cuts the prompt HEAD
+ * whenever the built prompt is over the image model's character cap, and stamps
+ * what it actually sent as `compressedScene`. Every judge scores the render
+ * against that string rather than the pre-shrink brief
+ * (sceneMetadata.resolveEvalSceneDescription), so the wrong one silently grades
+ * a picture against prose the model never received.
+ *
+ * Three cases, and the middle one is why this is not a `||` chain:
+ *   - the version was compressed at its own render → its own string wins;
+ *   - the version authored its own brief (an iterate rewrite) and was NOT
+ *     compressed → nothing sent differed from that brief, so null. Inheriting
+ *     the page's here would hand the judge the SUPERSEDED scene's prose;
+ *   - the version is original-lineage → the page's sent prose.
+ *
+ * @param {object|null} version  the version entry being resolved
+ * @param {object|null} page     the page record it belongs to
+ * @returns {string|null} the prose the model received, or null when nothing was shrunk
+ */
+function resolveVersionCompressedScene(version, page) {
+  const usable = v => (typeof v === 'string' && v.trim() ? v : null);
+  return usable(version?.compressedScene)
+    || (version?.description ? null : usable(page?.compressedScene));
 }
 
 /**
@@ -1046,4 +1083,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

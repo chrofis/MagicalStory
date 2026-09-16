@@ -91,7 +91,13 @@ describe('wiring: the compressed scene block is produced, carried and consumed',
     expect(images).toContain('compressedScene: shrinkMeta.compressedScene');
     expect(pipeline).toContain('compressedScene: genResult.compressedScene || null');
     expect(pipeline).toContain('compressedScene: img.compressedScene || null');
-    expect(repair).toContain('compressedScene: entry.description ? null : (orig.compressedScene || null)');
+    // The lineage rule moved into one resolver (repairLogic) once the same
+    // question had to be answered again at final assembly — see
+    // tests/unit/compressed-scene-lineage.test.ts for its behaviour.
+    expect(repair).toContain('compressedScene: resolveVersionCompressedScene(entry, orig)');
     expect(repair).toContain('compressedScene: img.compressedScene || null');
+    // …and it must survive the repair pipeline's output whitelist, which is
+    // where it was being dropped on every page of every full story.
+    expect(repair).toContain('compressedScene: resolveVersionCompressedScene(best, img)');
   });
 });
