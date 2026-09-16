@@ -24,7 +24,7 @@
  *   4. a bible stored before the enum falls back to its free-text `size` — the
  *      capability decisions.md 2026-09-06/09/11/14 measured may not be lost.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 
 // @ts-ignore - CommonJS
 const VB = require('../../server/lib/visualBible');
@@ -32,6 +32,8 @@ const VB = require('../../server/lib/visualBible');
 const PB = require('../../server/lib/promptBuilders');
 // @ts-ignore - CommonJS
 const { log } = require('../../server/utils/logger');
+// @ts-ignore - CommonJS
+const { loadPromptTemplates } = require('../../server/services/prompts');
 
 const { parseVisualBible, parseNewVisualBibleEntries, normaliseScaleClass, resolveScaleClass,
         scalePhrase, elementScaleNote, SCALE_CLASSES, SCALE_PHRASES, SCALE_CLASS_SPEC, LEGACY_SCALE_CLASSES,
@@ -467,10 +469,13 @@ describe('the stored-`size` fallback is permanent — real pre-enum bibles', () 
  * ONE SOURCE OF TRUTH FOR THE AUTHORING VOCABULARY (2026-09-16).
  *
  * The enum text used to be typed out nine times across the two Visual-Bible
- * authoring templates. It is now `SCALE_CLASS_SPEC` in `visualBible.js`, and
- * every occurrence in a template is that string verbatim — so a band added in
- * code but not offered to the writer, or a phrase that drifts between the
- * trial and the full path, fails here instead of shipping.
+ * authoring templates, then kept byte-identical by hand. Both sites now
+ * declare a `{SCALE_CLASS_SPEC}` placeholder and the constant is FILLED into
+ * it, so no copy exists to drift.
+ *
+ * What is pinned is the STRUCTURE, never the prose: both built prompts carry
+ * the same spec, it offers every live band, the two comparison groups are
+ * disjoint, and no placeholder token survives the fill.
  */
 describe('the authoring templates offer exactly the code enum', () => {
   const fs = require('fs');
@@ -478,13 +483,59 @@ describe('the authoring templates offer exactly the code enum', () => {
   const ROOT = path.resolve(__dirname, '../..');
   const SITES = ['prompts/scene-expansion-all.txt', 'prompts/story-trial.txt'];
 
-  it('carries the spec verbatim at every authoring site', () => {
+  const trialInput = {
+    language: 'en',
+    readingLevel: '2nd-grade',
+    storyCategory: 'adventure',
+    storyTheme: 'adventure',
+    storyDetails: 'a kite caught in a tree',
+    trialMode: true,
+    characters: [{ name: 'Mia', age: 8, gender: 'female', isMain: true }],
+  };
+  const allInput = {
+    title: 'The Quay',
+    language: 'en',
+    languageLevel: 'medium',
+    artStyle: 'watercolor',
+    characters: [{ id: 'c1', name: 'Mia', age: 8, gender: 'female', isMain: true }],
+    mainCharacters: ['c1'],
+    relationships: {},
+    relationshipTexts: {},
+  };
+  const BEATS = [
+    { pageNumber: 1, text: 'She lifted the lantern.', plan: 'wide — the main character on the pier' },
+    { pageNumber: 2, text: 'The lamp caught.', plan: 'close — the lamp is lit' },
+  ];
+
+  // A backslash-b inside a template string is a literal backspace, so both
+  // matchers are built from ordinary strings.
+  const offered = (group: string, band: string) => new RegExp('\\b' + band + '\\b').test(group);
+  const exampleOf = (band: string) => new RegExp('\\b' + band + ' — ');
+
+  let built: Record<string, string> = {};
+  beforeAll(async () => {
+    await loadPromptTemplates();
+    built = {
+      all: String(PB.buildSceneExpansionAllPrompt(allInput, BEATS, {})),
+      trial: String(PB.buildTrialStoryPrompt(trialInput, 5)),
+    };
+  });
+
+  it('declares the placeholder at every authoring site and hand-types no copy', () => {
     for (const rel of SITES) {
       const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
-      const count = text.split(SCALE_CLASS_SPEC).length - 1;
-      expect(count, `${rel} scaleClass spec occurrences`).toBeGreaterThan(0);
-      // and no stale hand-typed variant survives beside it
+      expect(text.includes('{SCALE_CLASS_SPEC}'), `${rel} lost the placeholder`).toBe(true);
+      // the spec exists in exactly ONE place — code
+      expect(text.includes(SCALE_CLASS_SPEC), `${rel} hand-types the spec`).toBe(false);
       expect(text.includes('how big this element is beside a standing adult'), rel).toBe(false);
+    }
+  });
+
+  it('fills the same spec into both built prompts, with nothing left unfilled', () => {
+    for (const [site, prompt] of Object.entries(built)) {
+      expect(prompt.includes(SCALE_CLASS_SPEC), `${site} prompt lost the spec`).toBe(true);
+      expect(prompt).not.toContain('{SCALE_CLASS_SPEC}');
+      expect(prompt.match(/\{[A-Z][A-Z0-9_]*\}/g), `${site} prompt has an unfilled token`).toBeNull();
     }
   });
 
@@ -495,8 +546,38 @@ describe('the authoring templates offer exactly the code enum', () => {
     // it is a JSON string value in the templates — a double quote would break
     // the schema example the writer copies
     expect(SCALE_CLASS_SPEC).not.toContain('"');
-    // the spec names both comparison modes, which is the whole fix
-    expect(SCALE_CLASS_SPEC).toMatch(/SIZE/);
-    expect(SCALE_CLASS_SPEC).toMatch(/HEIGHT/);
+  });
+
+  it('presents the two comparison modes as separate, disjoint groups', () => {
+    const sizeAt = SCALE_CLASS_SPEC.indexOf('HOW BIG IS IT');
+    const heightAt = SCALE_CLASS_SPEC.indexOf('HOW TALL DOES IT STAND');
+    expect(sizeAt, 'the size group lost its label').toBeGreaterThan(-1);
+    expect(heightAt, 'the height group lost its label').toBeGreaterThan(-1);
+    expect(heightAt).toBeGreaterThan(sizeAt);
+
+    // The examples end where the closing rules begin.
+    const tailAt = SCALE_CLASS_SPEC.indexOf('A band never carries');
+    expect(tailAt, 'the disambiguating tail is gone').toBeGreaterThan(heightAt);
+    const sizeGroup = SCALE_CLASS_SPEC.slice(sizeAt, heightAt);
+    const heightGroup = SCALE_CLASS_SPEC.slice(heightAt, tailAt);
+
+    // Every band is offered in exactly one group — reading a size band as a
+    // stature claim is the bug this vocabulary exists to prevent.
+    for (const band of SCALE_CLASSES) {
+      const inSize = offered(sizeGroup, band);
+      const inHeight = offered(heightGroup, band);
+      expect(inSize || inHeight, `${band} is offered in neither group`).toBe(true);
+      expect(inSize && inHeight, `${band} is offered in BOTH groups`).toBe(false);
+    }
+    // The size group makes no stature claim, and the height group no bulk claim.
+    expect(sizeGroup).toMatch(/say nothing about how tall/i);
+    expect(heightGroup).toMatch(/say nothing about how bulky/i);
+  });
+
+  it('gives every band an everyday example', () => {
+    for (const band of SCALE_CLASSES) {
+      const seg = SCALE_CLASS_SPEC.split(exampleOf(band))[1] || '';
+      expect(seg.length, `${band} carries no example`).toBeGreaterThan(3);
+    }
   });
 });

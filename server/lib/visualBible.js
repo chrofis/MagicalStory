@@ -669,12 +669,19 @@ const SCALE_PHRASES = Object.freeze({
 
 /**
  * The enum as the AUTHORING prompts state it. ONE source of truth: the
- * Visual-Bible authoring templates carry this string verbatim, and
- * `tests/unit/vb-scale-class.test.ts` fails the moment a template drifts from
- * it. It is a JSON string value in those templates, so it may never contain a
- * double quote.
+ * Visual-Bible authoring templates declare a `{SCALE_CLASS_SPEC}` placeholder
+ * and this string is filled into it, so no copy is hand-typed anywhere;
+ * `tests/unit/vb-scale-class.test.ts` fails if a site loses the placeholder or
+ * the two sites build different text. It is a JSON string value in those
+ * templates, so it may never contain a double quote.
+ *
+ * 2026-09-16 (second pass): the ladder was one undifferentiated list, so an
+ * author picking a band could not see that the first six answer HOW BIG and
+ * the last seven answer HOW TALL. It is now two labelled groups, each with its
+ * question in the author's own terms and each band carrying everyday
+ * examples.
  */
-const SCALE_CLASS_SPEC = "[how big this element is, one of: fingertip, palm, hand, melon, forearm, arm, knee, hip, chest, adult, double, house, landmark. The first six state the object's own SIZE: fingertip — sits on a fingertip; palm — a hand closes around it; hand — fills an open hand; melon — head-sized, like a lantern or a football; forearm, arm — as long as that limb. The last seven state HEIGHT against a standing adult: knee, hip, chest — reaches that part of the adult; adult — as tall as the adult; double — twice the adult's height; house — several adults high; landmark — fills the horizon. `adult` is a HEIGHT band and never means head-SIZED; a head-sized object is `melon`. Judge the element's largest dimension, not how the story feels about it. This is the only place the element's size is stated. Never omitted.]";
+const SCALE_CLASS_SPEC = "[the element's scale band, one of: fingertip, palm, hand, melon, forearm, arm, knee, hip, chest, adult, double, house, landmark. Two questions, two groups — answer one of them, never both. HOW BIG IS IT, for a thing someone could pick up and hold; these bands say nothing about how tall it stands: fingertip — a pea, a ring; palm — an apple, a mouse; hand — a book, a loaf; melon — a football, a lantern, a helmet; forearm — a rolling pin, a small cat; arm — a broom, a shovel. HOW TALL DOES IT STAND, for a thing that rests on the ground and has a height; these bands say nothing about how bulky it is: knee — a dog, a stool; hip — a young child, a barrel; chest — a counter, a pony; adult — a doorway, a grown-up standing; double — a market stall with its roof; house — a house, a full-grown tree; landmark — a cliff, a mountain, the horizon behind everything. A band never carries the other group's meaning: a head-sized thing is melon, never adult. Judge the element's largest dimension, not how the story feels about it. This is the only place the element's size is stated. Never omitted.]";
 
 /** Ascending. The order IS the contract — a reader must be able to tell any two apart. */
 const SCALE_CLASSES = Object.keys(SCALE_PHRASES);

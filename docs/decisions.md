@@ -7,6 +7,64 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-16 — The writer-facing scale spec is two labelled groups, filled from one constant
+
+**Context.** `scaleClass` mixes two comparison modes under one vocabulary: six bands answer
+*how big is this object* (fingertip, palm, hand, melon, forearm, arm) and seven answer *how tall
+does it stand* (knee, hip, chest, adult, double, house, landmark). The morning's fix renamed the
+height ladder's top rung `head` → `adult` and gave the head-SIZED band its own non-body name,
+`melon`, after an author picked `head` for a football-sized object and every page rendered it as
+tall as a standing adult. The token rename removed the one word that could be read both ways; it
+did not change the fact that the spec presented all thirteen bands as a single undifferentiated
+ladder, with the two modes explained in a sentence halfway through. An author reading that list
+top-to-bottom still has to infer which question each band answers.
+
+Second: the spec was typed into the two authoring templates nine times and kept byte-identical by
+a drift test. A test that catches divergence is not one source of truth — it is nine copies with an
+alarm on them.
+
+**Decision.**
+1. `SCALE_CLASS_SPEC` (server/lib/visualBible.js) now presents the bands as TWO labelled groups —
+   *HOW BIG IS IT*, for a thing someone could pick up and hold, and *HOW TALL DOES IT STAND*, for a
+   thing that rests on the ground — each group stating in the author's own terms what it does NOT
+   claim ("these bands say nothing about how tall it stands" / "…about how bulky it is"), and every
+   band carrying two everyday examples. The disambiguating tail stays: a band never carries the
+   other group's meaning, and a head-sized thing is `melon`, never `adult`.
+2. Both authoring sites (`prompts/scene-expansion-all.txt`, `prompts/story-trial.txt` — the
+   `vb-authoring-sites` sibling set) now declare a `{SCALE_CLASS_SPEC}` placeholder and the constant
+   is filled into it by `buildSceneExpansionAllPrompt` / `buildTrialStoryPrompt`. No copy of the
+   text exists outside code.
+
+**Rationale.** The failure was never that the words were wrong — it was that the author had to
+work out which of two questions a band answered. Labelling the question is the smallest change that
+makes the wrong pick unavailable, and everyday examples per band make the right one obvious without
+the author reading a rule. The placeholder removes the class of bug rather than the instance: the
+drift test could only fail *after* someone edited one copy, and hand-maintained copies in this repo
+have drifted four times in a week.
+
+The `SCALE_PHRASES` render map is unchanged — this is authoring-side wording only, and no stored
+bible changes meaning. `LEGACY_SCALE_CLASSES` still maps `head` → `adult`, the behaviour every
+stored bible already has.
+
+**Open, not changed here.** `prompts/image-evaluation.txt` D-21 (`scale`) carries the critic's OWN
+natural-size reference list — "apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ head, bowl ≈ two
+palms, sword/crossbow/arrow ≈ arm". These are anatomical referents in a judge's rule, not band
+tokens, and "lantern ≈ head" is still physically true; but `head` is no longer a band name, and
+`melon`'s own example is a lantern. Left for the owner to rule on — a critic-side edit is not
+covered by this task's sign-off.
+
+**Touched files.**
+- `server/lib/visualBible.js` — `SCALE_CLASS_SPEC` reworded into two labelled groups
+- `server/lib/promptBuilders.js` — `SCALE_CLASS_SPEC` filled at both Art Director builders and at
+  the trial writer builder
+- `prompts/scene-expansion-all.txt`, `prompts/story-trial.txt` — nine hand-typed copies replaced by
+  the `{SCALE_CLASS_SPEC}` placeholder
+- `tests/unit/vb-scale-class.test.ts` — the drift test becomes a structural contract: the
+  placeholder is declared at both sites, no copy is hand-typed, the same spec reaches both BUILT
+  prompts with no token unfilled, the two groups are disjoint, every band is in exactly one group
+  and carries an example
+- `tests/unit/artifact-size.test.ts` — the band/units assertions read the constant, not the template
+
 ## 2026-09-16 — An iterate round keeps the page's worn states, and never swaps a Visual Bible id
 
 **Context.** Staging story `job_1789506283204_3kxqshifx` produced two independent faults on the same

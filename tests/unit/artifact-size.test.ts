@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 // @ts-ignore - CommonJS modules
-const { buildArtifactDescription, parseVisualBible } = require('../../server/lib/visualBible');
+const { buildArtifactDescription, parseVisualBible, SCALE_CLASS_SPEC } = require('../../server/lib/visualBible');
 // @ts-ignore
 const { buildTextFromJson } = require('../../server/lib/sceneMetadata');
 // @ts-ignore
@@ -162,22 +162,28 @@ describe('artifact scale — authoring instruction contract', () => {
       expect(text).not.toContain('Every artifact carries `size`');
     });
 
-    it(file + ' lists the thirteen bands and no others', () => {
+    // The instruction itself is no longer typed into the template: both
+    // authoring sites declare the {SCALE_CLASS_SPEC} placeholder and the
+    // constant in visualBible.js is filled into it (2026-09-16). What each
+    // template still owes is the slot; the vocabulary is asserted on the
+    // constant, so there is one place to read it and one place to change it.
+    it(file + ' takes its scaleClass instruction from the code constant', () => {
       const text = read(file);
-      const at = text.indexOf('"scaleClass": "[');
-      expect(at, file + ' has no scaleClass instruction').toBeGreaterThan(-1);
-      const instruction = text.slice(at, text.indexOf(']"', at));
-      for (const band of BANDS) expect(instruction, band).toContain(band);
+      expect(text.includes('"scaleClass": "{SCALE_CLASS_SPEC}"'),
+        file + ' no longer declares the scaleClass placeholder').toBe(true);
+      expect(text.includes('"scaleClass": "[the element'),
+        file + ' hand-types the scaleClass instruction again').toBe(false);
+    });
+
+    it(file + ' lists the thirteen bands and no others', () => {
+      for (const band of BANDS) expect(SCALE_CLASS_SPEC, band).toContain(band);
       // the retired six-value list must not survive as choices anywhere
-      expect(text).not.toContain('person, vehicle, building, landscape');
+      expect(read(file)).not.toContain('person, vehicle, building, landscape');
     });
 
     it(file + ' states the bands against an adult, never in units', () => {
-      const text = read(file);
-      const at = text.indexOf('"scaleClass": "[');
-      const instruction = text.slice(at, text.indexOf(']"', at));
-      expect(instruction).toContain('standing adult');
-      expect(instruction).not.toMatch(/\bcm\b|\bmetre|\bmeter|\binch/i);
+      expect(SCALE_CLASS_SPEC).toMatch(/\badult\b/);
+      expect(SCALE_CLASS_SPEC).not.toMatch(/\bcm\b|\bmetre|\bmeter|\binch/i);
     });
   }
 });

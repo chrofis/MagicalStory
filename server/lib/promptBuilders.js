@@ -12,7 +12,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
+const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -2479,6 +2479,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     SEASON: seasonLabel(inputData || {}),
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
+    // ONE scale vocabulary for every Visual-Bible authoring site (the
+    // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
+    SCALE_CLASS_SPEC,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -2723,6 +2726,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     SEASON: seasonLabel(options.story || {}),
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
+    // ONE scale vocabulary for every Visual-Bible authoring site (the
+    // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
+    SCALE_CLASS_SPEC,
   });
   // Text-zone rule family, same gate as the all-pages builder. A cover call
   // (pageNumber <= 0) never gets it; a page call follows the story's layout,
@@ -7675,6 +7681,9 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // Same resolver the trial's images use, so prose and pictures agree.
       SEASON: buildSeasonInstruction(inputData),
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
+      // ONE scale vocabulary for every Visual-Bible authoring site — the trial
+      // writer authors its own bible, so it declares the same placeholder.
+      SCALE_CLASS_SPEC,
     });
   }
 
