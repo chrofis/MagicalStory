@@ -365,8 +365,10 @@ another.
   `["LOC001","ART001.1","ANI001"]`, and `ANI001` is the dog, whose Visual Bible `pages` is
   `[3,9,16]`. The first plan line that names the dog is **p9** — six pages later. Art Director
   rule 3 governs "characters", and the animal never entered `characters[]`: it came in through its
-  own VB entry's `pages`, then through `objects[]` and the prose. The reviewer's 5a, which reads
-  `characters[]` and the prose, reported nothing.
+  own VB entry's `pages`, then through `objects[]`, `sceneIntent` and the prose ("To the far left
+  in the background, Nia, a Bernese Mountain Dog…"). 5a covers a character named in the prose, so
+  the channel was not even the blocker — the reviewer simply did not read an animal as a character.
+  The stored review reads `[cast_not_in_plan] none`.
 - **p5 — the prop.** The plan line is `close-up — Levin — Levin holds up his dragon book open to a
   picture of an egg just like Lindi…`. `ART003` ("picture book") carries the two-sided
   convention's single face state, and its `delta` is `spread wide open, showing a colorful page
@@ -374,9 +376,12 @@ another.
   the story's later reveal. The page cites `ART003.2`, so the frame showed the dragon, not the egg
   the plan line called for. The text then followed the frame: the shipped p5 prose keeps the plan
   line's claim in dialogue («In meinem Buch ist genau so ein Ei») and adds a sentence for the
-  picture that was actually painted («Auf der Seite war ein kleiner Drache abgebildet»). The
-  reviewer's 9f checks state PAGE RANGES only — no state claimed a page it should not, so 9f was
-  silent.
+  picture that was actually painted («Auf der Seite war ein kleiner Drache abgebildet»). 9f did
+  engage the entry — the stored review reads `[vb_state_range] ART003` — but only on its one axis,
+  page RANGES: the `unaltered` state carries `pages: []`. The corrected entry it emitted was then
+  thrown away by the bible validator (`rejected: state "unaltered" has pages outside the book`),
+  and nothing in 9f ever looked at what a state's `delta` SHOWS. The content mismatch that
+  mis-painted p5 survived a check that named the very entry carrying it.
 
 **Decision.** Two JS constants in `promptBuilders.js`, each reaching three prompts through one
 placeholder — both Art Director templates AND the scene review, so generator and critic hold the
@@ -399,11 +404,16 @@ identical string:
    — and corrects the `delta` or splits the entry. A single-picture prop keeps the turned-away /
    face-to-camera convention unchanged.
 
-**Rationale.** Neither fault is a missing rule; both are a channel gap. The cast contract existed
-for `characters[]` and the state contract existed for page RANGES, while the damage arrived through
-`objects[]` and through a state's CONTENT. A rule the critic applies that the generator was never
-given produces a finding no rewrite can satisfy, so each contract is ONE constant injected into
-both sides — the generator-vs-critic shape `scene-brief-generator-vs-critic` exists to enforce.
+**Rationale.** Neither fault is a missing rule; each is a rule that did not reach the case in
+front of it. p3 is a CLASSIFICATION gap: 5a already covers a character named in the prose and the
+dog was named there, but neither the Art Director nor the reviewer read a tracked animal as a
+character, so both sides need told that it is one — and `objects[]` named as a channel closes the
+route that does not go through prose at all. p5 is an AXIS gap: 9f engaged the very entry at fault
+and could only ask whether its page ranges were right. Naming the animal as cast, and giving 9f a
+content axis beside its range axis, is what closes them. A rule the critic applies that the
+generator was never given produces a finding no rewrite can satisfy, so each contract is ONE
+constant injected into both sides — the generator-vs-critic shape
+`scene-brief-generator-vs-critic` exists to enforce.
 The p5 class is the more expensive of the two: a face state carrying the wrong picture does not
 merely mis-paint a frame, it pulls the page TEXT after it, because the later text passes read the
 shipped image as ground truth.
@@ -418,10 +428,32 @@ reference cell"). Vouched with `Siblings-Checked:` on the commit.
 (`story-bible-from-beats.txt` is not a third authoring site: since 2026-09-11 it writes the
 wardrobe only — the bible moved to the all-pages Art Director.)
 
+**Verified.** Test Lab `scene_review_replay` #1278, same story, staging SHA `2a07a6c3`,
+deepseek-v4-pro, 18 pages, an 80,870-char prompt, 395s, $0.17. Both halves fire, against a
+baseline that reported neither:
+
+- `[cast_not_in_plan]` went from `none` to `pages 3, 6, 15 — imported Nia on page 3, imported crow
+  on pages 6 and 15`, and the rewrite acted: `REMOVED CAST: page 3 = Nia: not in plan line;
+  page 6 = crow: not in plan line; page 15 = crow: not in plan line`. The p3 dog is caught, plus
+  two further animal imports the original review also let through.
+- `[vb_state_range]` went from the bare range complaint on `ART003` to `page 5, 16 — page 5's book
+  picture should show an egg, not a sneezing baby dragon; page 16 should cite the egg, not the
+  hatched dragon` — the content axis, under the existing type, and a second instance of the class
+  on p16.
+
+The content finding fires from the brief's own prose against the plan line, so it does not need
+the bible block — which matters here, because `runSceneReviewReplayStage`
+(`server/lib/testlab.js:6888`) passes no `visualBible` while production does
+(`server/lib/beatsPipeline.js:2151`). A replay can therefore report the mismatch but not emit a
+corrected entry; that is the Lab stage's gap, not the rule's, and it is on the backlog.
+One side effect to watch: `[cast_over_cap]` now reads `pages 9, 16 — Nia needed a character entry,
+not just an object or prose mention` — the reviewer asking for a `characters[]` row on the pages
+whose plan line DOES name the animal. Right in substance, odd bucket.
+
 **Touched.** `server/lib/promptBuilders.js`, `prompts/scene-expansion-all.txt`,
 `prompts/scene-expansion.txt`, `prompts/scene-review.txt`,
-`tests/unit/plan-line-cast-and-multi-picture-prop.test.ts`.
-**Status:** ✅ active
+`tests/unit/plan-line-cast-and-multi-picture-prop.test.ts`, `tasks/BACKLOG.md`.
+**Status:** ✅ active — measured by Test Lab experiment 1278
 
 ## 2026-09-16 — The iterate length budget is gone; the declared id set is the guard, and the page range gates BOTH staging sites
 

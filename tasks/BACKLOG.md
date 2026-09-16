@@ -456,6 +456,13 @@ measurement, is lost).
       page loses the brief comparison as well as the image (1 of 5 in exp 815). The text-only
       `scene_expansion` stage should gate the render for prompt-shape questions
       → `server/lib/testlab.js` (`runSceneExpansionAbStage`)
+- [ ] **`scene_review_replay` sends no Visual Bible, so check 9f is half-blind.** The stage
+      calls `buildSceneReviewPrompt` without `visualBible`, while production passes it
+      (`server/lib/beatsPipeline.js:2151`, comment: "the bible feeds check 9f"). With no
+      bible block the reviewer can still flag a state whose content contradicts the plan
+      line (it reads the brief's own prose — proved in exp 1278), but it cannot see state
+      page ranges or emit a corrected entry, so a replay under-reports 9f versus prod
+      → `server/lib/testlab.js:6888`
 
 - [x] D1 — zombie experiment rows blocking pushes — **fixed 2026-08-19** (30s `heartbeat_at`,
       5-minute freshness on the reaper and the busy probe; `docs/decisions.md:13844`)
