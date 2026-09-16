@@ -2758,7 +2758,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
  * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null, options = {}) {
-  const { freeIterate = false, textInImage = false, extraRule = null, stagedFigures = '', briefBudget = '' } = options;
+  const { freeIterate = false, textInImage = false, extraRule = null, stagedFigures = '' } = options;
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -3129,12 +3129,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       LANGUAGE_NOTE: getLanguageNote(language),
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
       MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3,
-      OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE,
-      // The rewrite's length budget as a NUMBER (iterateBeat.renderBriefBudget),
-      // computed from the brief being rewritten. Declared here for BOTH iterate
-      // templates — fillTemplate drops an undeclared key silently, so an
-      // undeclared placeholder would ship as literal {BRIEF_BUDGET}.
-      BRIEF_BUDGET: briefBudget || ''
+      OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE
     });
     // Text-overlay-only rules gate:
     // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,

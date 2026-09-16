@@ -647,32 +647,3 @@ describe('both Visual Bible authoring templates forbid a shared proper name', ()
     expect(line).toMatch(/separate ids/i);
   });
 });
-
-// ---------------------------------------------------------------------------
-// THE REWRITE BUDGET (2026-09-16). Every measured iterate rewrite grew the
-// brief 2.2x-3.4x and invented content that had been correct, while rule 1
-// ("Simplify, don't elaborate") said so in prose and was ignored. The budget is
-// a NUMBER computed in code and injected into BOTH iterate templates through one
-// placeholder. Pinned: the number ARRIVES on both sides and no token survives.
-// Never the wording.
-// ---------------------------------------------------------------------------
-describe('both iterate templates carry the rewrite budget as a number', () => {
-  const IB = require('../../server/lib/iterateBeat.js');
-  const budget = IB.computeBriefBudget('x'.repeat(4000));
-  const iterate = (freeIterate: boolean) => PB.buildSceneDescriptionPrompt(
-    1, PAGE_TEXT, CHARACTERS, '', 'en', VISUAL_BIBLE, [], {}, '', '', null, null,
-    { freeIterate, briefBudget: IB.renderBriefBudget(budget) });
-
-  it('the strict template receives the computed character budget', () => {
-    expect(iterate(false)).toContain(String(budget.maxChars));
-  });
-
-  it('the free template receives the same computed budget', () => {
-    expect(iterate(true)).toContain(String(budget.maxChars));
-  });
-
-  it('no placeholder token survives in either', () => {
-    expect(iterate(false)).not.toContain('{BRIEF_BUDGET}');
-    expect(iterate(true)).not.toContain('{BRIEF_BUDGET}');
-  });
-});

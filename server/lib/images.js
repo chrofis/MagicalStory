@@ -3754,7 +3754,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const {
     resolvePlanLine, collectStagedFigures, renderStagedFiguresBlock,
     checkRewrittenBrief, describeBriefFindings,
-    vbEntityCoversPage, computeBriefBudget, renderBriefBudget, checkBriefBudget,
+    declaredSetAllowance, checkDeclaredSet, partitionAnchoredObjects,
   } = require('./iterateBeat');
   const planLine = resolvePlanLine(currentScene, savedScene);
   if (!planLine) {
@@ -3764,7 +3764,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // list below is roster-only by construction, so they are carried separately
   // and named — a figure that reaches the rewriter only through the bulk
   // recurring-elements dump comes back described by species.
-  const stagedFigures = collectStagedFigures({ visualBible, sceneMetadata, savedScene, planLine });
+  const stagedFigures = collectStagedFigures({ visualBible, sceneMetadata, savedScene, planLine, pageNumber });
   if (stagedFigures.length > 0) {
     log.info(`🔄 [ITERATE] Page ${pageNumber}: staged non-roster figures: ${stagedFigures.map(f => `${f.name} (${f.id})`).join(', ')}`);
   }
@@ -3810,7 +3810,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     ?? storyData?.layout?.textInImage
     ?? false
   ) === true;
-  const briefBudget = computeBriefBudget(sceneDescText);
   const scenePrompt = buildSceneDescriptionPrompt(
     pageNumber,
     pageText,
@@ -3835,13 +3834,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     {
       freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements,
       stagedFigures: renderStagedFiguresBlock(stagedFigures),
-      // THE REWRITE BUDGET as a concrete number, computed from the brief being
-      // rewritten (iterateBeat.computeBriefBudget). Rule 1 has said "simplify,
-      // don't elaborate" in prose for months and every measured rewrite still
-      // grew 2.2x-3.4x, inventing content that had been correct. Mechanical
-      // rule computed in code, injected into the prompt, and re-asked with the
-      // specific breach below.
-      briefBudget: renderBriefBudget(briefBudget),
     }
   );
 
@@ -3950,72 +3942,56 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
-  // ── THE REWRITE BUDGET, CHECKED (2026-09-16) ─────────────────────────────
-  // The number went into the prompt above; this is its backstop, and it re-asks
-  // ONCE with the specific breach — the same shape as the declaration re-ask
-  // just above. Measured: every rewrite on job_1789506283204_3kxqshifx grew the
-  // brief 2.2x-3.4x and the added clauses created NEW criticals on content that
-  // had been correct. A gate is a guideline: one corrective ask, then the round
-  // ships with a warning rather than dying on a paid call.
-  {
-    const budgetHaystack = `${JSON.stringify(evaluationFeedback || {})}
-${pageText || ''}
-${planLine || ''}`.toLowerCase();
-    const budgetBaseId = (o) => String(typeof o === 'string' ? o : (o && o.id) || '').trim().toUpperCase().split('.')[0];
-    const budgetOrigObjects = (savedScene.sceneMetadata?.objects || savedScene.sceneMetadata?.fullData?.objects || []);
-    // original ∪ plan-line ∪ evaluator-feedback — an id either was already
-    // there, or something asked for it by name in a structured input.
-    const allowedObjects = [
-      ...budgetOrigObjects.map(budgetBaseId),
-      ...(Array.isArray(extractSceneMetadata(newSceneDescription)?.objects) ? extractSceneMetadata(newSceneDescription).objects : [])
-        .map(budgetBaseId).filter(id => id && budgetHaystack.includes(id.toLowerCase())),
-    ].filter(Boolean);
-    const allowedNames = [
-      ...(Array.isArray(sceneMetadata?.characters) ? sceneMetadata.characters : []).map(c => String(c?.name || c || '')),
-      ...(promptCharacters || []).map(c => String(c?.name || '')),
-      ...stagedFigures.map(f => String(f?.name || '')),
-    ].filter(Boolean);
-    const budgetArgs = { budget: briefBudget, allowedObjects, allowedNames };
-    let budgetFindings = checkBriefBudget({
-      brief: newSceneDescription, newMetadata: extractSceneMetadata(newSceneDescription), ...budgetArgs,
-    });
-    if (budgetFindings.length > 0) {
-      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite breaks its budget:
-${describeBriefFindings(budgetFindings)}`);
-      const trimmed = await callClaudeAPI(
-        `${scenePrompt}
-
-Your previous answer broke the budget it was given:
-${describeBriefFindings(budgetFindings)}
-
-Return the whole brief again. Keep the same moment and the same fixes; cut back to the budget by removing the description you added beyond what the feedback and the plan line asked for, and cite only the objects and characters those inputs name.`,
-        null, effectiveSceneModel, { usageLabel: 'scene_iterate_budget' }
-      );
-      if (usageTracker && trimmed.usage) {
-        usageTracker('anthropic', trimmed.usage, 'scene_iterate', trimmed.modelId || effectiveSceneModel);
-      }
-      const trimmedGuard = assessIterateBrief(trimmed.text, { truncation: trimmed.truncation });
-      const trimmedFindings = trimmedGuard.usable
-        ? checkBriefBudget({ brief: trimmed.text, newMetadata: extractSceneMetadata(trimmed.text), ...budgetArgs })
-        : null;
-      // Only take the re-ask if it is BOTH inside the budget's direction of
-      // travel and still declares what it draws — a shorter brief that drops a
-      // figure's declaration would trade one defect for another.
-      const trimmedDeclarations = trimmedGuard.usable
-        ? checkRewrittenBrief({ pageNumber, brief: trimmed.text, planLine, castNames: castNamesForCheck, visualBible })
-        : null;
-      if (trimmedGuard.usable && trimmedFindings.length < budgetFindings.length
-          && (trimmedDeclarations || []).length <= consistencyFindings.length) {
-        sceneResult = trimmed;
-        newSceneDescription = trimmed.text;
-        budgetFindings = trimmedFindings;
-        consistencyFindings = trimmedDeclarations;
-        log.info(`🔄 [ITERATE] Page ${pageNumber}: budget re-ask resolved ${trimmedFindings.length === 0 ? 'every' : 'some'} breach`);
-      }
-      if (budgetFindings.length > 0) {
-        log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite over its budget:
-${describeBriefFindings(budgetFindings)}`);
-      }
+  // ── THE DECLARED SET, CHECKED (2026-09-16) ────────────────────────────────
+  // objects[] / characters[] may cite only original ∪ plan-line ∪ feedback
+  // (iterateBeat.declaredSetAllowance). Measured on job_1789506283204_3kxqshifx:
+  // three of five rewrites cited a landmark or a creature none of their inputs
+  // named, and each invented citation became a critical on content that had
+  // been correct. One corrective re-ask carrying the specific ids — the same
+  // shape as the declaration re-ask above — then the round ships with a
+  // warning: a gate is a guideline and an iterate round is paid. (A length
+  // budget shipped beside this the same day and was removed: the growth it
+  // measured was the template's own audit keys, not prose.)
+  const origObjects = (savedScene.sceneMetadata?.objects || savedScene.sceneMetadata?.fullData?.objects || []);
+  const citedMetadata = extractSceneMetadata(newSceneDescription);
+  const declaredSetArgs = declaredSetAllowance({
+    origObjects,
+    rewriteObjects: citedMetadata?.objects,
+    evaluationFeedback, pageText, planLine,
+    origCharacters: sceneMetadata?.characters,
+    promptCharacters,
+    stagedFigures,
+  });
+  let declaredSetFindings = checkDeclaredSet({ newMetadata: citedMetadata, ...declaredSetArgs });
+  if (declaredSetFindings.length > 0) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite cites outside its declared set:\n${describeBriefFindings(declaredSetFindings)}`);
+    const recited = await callClaudeAPI(
+      `${scenePrompt}\n\nYour previous answer cites objects or characters that none of its inputs name:\n${describeBriefFindings(declaredSetFindings)}\n\nReturn the whole brief again. Keep the same moment and the same fixes; cite only the objects and characters the previous brief, the plan line and the feedback name, and take out of the prose whatever depended on the others.`,
+      null, effectiveSceneModel, { usageLabel: 'scene_iterate_declared_set' }
+    );
+    if (usageTracker && recited.usage) {
+      usageTracker('anthropic', recited.usage, 'scene_iterate', recited.modelId || effectiveSceneModel);
+    }
+    const recitedGuard = assessIterateBrief(recited.text, { truncation: recited.truncation });
+    const recitedFindings = recitedGuard.usable
+      ? checkDeclaredSet({ newMetadata: extractSceneMetadata(recited.text), ...declaredSetArgs })
+      : null;
+    // Only take the re-ask if it BOTH shrinks the breach and still declares
+    // what it draws — a brief that drops a figure's declaration to satisfy the
+    // set would trade one defect for another.
+    const recitedDeclarations = recitedGuard.usable
+      ? checkRewrittenBrief({ pageNumber, brief: recited.text, planLine, castNames: castNamesForCheck, visualBible })
+      : null;
+    if (recitedGuard.usable && recitedFindings.length < declaredSetFindings.length
+        && (recitedDeclarations || []).length <= consistencyFindings.length) {
+      sceneResult = recited;
+      newSceneDescription = recited.text;
+      declaredSetFindings = recitedFindings;
+      consistencyFindings = recitedDeclarations;
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: declared-set re-ask resolved ${recitedFindings.length === 0 ? 'every' : 'some'} citation`);
+    }
+    if (declaredSetFindings.length > 0) {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that cites outside its declared set:\n${describeBriefFindings(declaredSetFindings)}`);
     }
   }
 
@@ -4042,55 +4018,21 @@ ${describeBriefFindings(budgetFindings)}`);
   // Extract metadata from the new scene description for per-character clothing
   let newSceneMetadata = extractSceneMetadata(newSceneDescription);
 
-  // ANCHORED OBJECT ALLOW-LIST (user decision 2026-07-18): the rewrite may
-  // keep/drop objects freely and may ADD an object only when something asked
-  // for it — the original scene metadata, the eval feedback (e.g. "rowing
-  // boat missing"), or the page text. Unanchored additions are scrubbed
-  // (observed: a rewrite swapped the scene's vehicle for an unrelated statue
-  // and the model painted it into the scene). Matching is tolerant across
-  // the language boundary: entity id, entity name, or ≥5-char words from the
-  // name/English VB description against feedback + page text.
-  const rewriteObjects = Array.isArray(newSceneMetadata?.objects) ? newSceneMetadata.objects : [];
-  const origObjects = (savedScene.sceneMetadata?.objects || savedScene.sceneMetadata?.fullData?.objects || []);
-  if (rewriteObjects.length > 0) {
-    const baseId = (o) => String(o).trim().toUpperCase().split('.')[0];
-    const origSet = new Set(origObjects.map(baseId));
-    // The plan line is an anchor source since the rewriter started receiving it
-    // (2026-09-14): an element the page's own beat stages is asked for by the
-    // beat, and scrubbing it would undo the reinstatement in the same breath.
-    const haystack = `${JSON.stringify(evaluationFeedback || {})}\n${pageText || ''}\n${planLine || ''}`.toLowerCase();
-    const vbEntityById = new Map();
-    for (const pool of [visualBible?.artifacts, visualBible?.animals, visualBible?.vehicles, visualBible?.locations, visualBible?.secondaryCharacters]) {
-      for (const e of (pool || [])) if (e?.id) vbEntityById.set(baseId(e.id), e);
-    }
-    const isAnchored = (obj) => {
-      const id = baseId(obj);
-      if (origSet.has(id)) return true;
-      if (haystack.includes(id.toLowerCase())) return true;
-      const ent = vbEntityById.get(id);
-      if (!ent) return true; // not a VB id — plain names pass through
-      // PAGE RANGE BEATS THE NAME TOKEN (2026-09-16). The token anchor below
-      // matches ≥5-char words from the entity's name/description against the
-      // page text — so a creature anchored on its own proper name because the
-      // page text legitimately used that name for the OBJECT it hatches from,
-      // and the transformation was staged pages early. The Visual Bible already
-      // states which pages an entity appears on; that STRUCTURED range decides,
-      // and no prose is consulted. Tolerant: an entry with no range at all is
-      // unknown, not excluded, and falls through to the previous behaviour.
-      if (vbEntityCoversPage(ent, pageNumber) === false) return false;
-      const tokens = [String(ent.name || ''), ...String(ent.name || '').split(/\s|-/), ...String(ent.description || '').split(/[^A-Za-zÀ-ž]+/)]
-        .map(t => t.trim().toLowerCase()).filter(t => t.length >= 5);
-      return tokens.some(t => haystack.includes(t));
-    };
-    const scrubbed = rewriteObjects.filter(o => !isAnchored(o));
-    if (scrubbed.length > 0) {
-      const kept = rewriteObjects.filter(o => !scrubbed.includes(o));
-      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite added unanchored VB object(s) ${JSON.stringify(scrubbed)} — scrubbed (not in original metadata, feedback, or page text)`);
-      const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
-      if (objRe.test(newSceneDescription)) {
-        newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(kept)}`);
-        newSceneMetadata = extractSceneMetadata(newSceneDescription);
-      }
+  // ANCHORED OBJECT ALLOW-LIST (owner decision 2026-07-18). The rule, its
+  // page-range gate and the measurements live on
+  // iterateBeat.partitionAnchoredObjects, beside collectStagedFigures — the two
+  // sites that put a Visual Bible entity on a page, pinned together by the
+  // `iterate-page-staging-sites` sibling-registry set. This site only applies
+  // the verdict to the brief.
+  const { kept, scrubbed } = partitionAnchoredObjects({
+    rewriteObjects: newSceneMetadata?.objects, origObjects, evaluationFeedback, pageText, planLine, visualBible, pageNumber,
+  });
+  if (scrubbed.length > 0) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite added unanchored VB object(s) ${JSON.stringify(scrubbed)} — scrubbed (not in original metadata, feedback, page text or plan line)`);
+    const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
+    if (objRe.test(newSceneDescription)) {
+      newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(kept)}`);
+      newSceneMetadata = extractSceneMetadata(newSceneDescription);
     }
   }
 

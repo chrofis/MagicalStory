@@ -354,6 +354,68 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-16 — The iterate length budget is gone; the declared id set is the guard, and the page range gates BOTH staging sites
+
+**Context.** `fa2cb3696` (entry below) shipped two mechanical guards on an iterate rewrite beside
+the contract-lineage fix: a length budget (`computeBriefBudget`, 1.5× the prose of the brief being
+rewritten, floor 1200, injected into both iterate templates as `{BRIEF_BUDGET}`, checked as
+`brief_over_budget`) and an id-set constraint (`objects[]`/`characters[]` may cite only original ∪
+plan-line ∪ feedback). The budget's premise was mismeasured, and caught the same day. The
+"2.2×–3.4×" growth on staging job_1789506283204_3kxqshifx was RAW brief length, and a raw iterate
+brief is prose plus a `---METADATA---` block whose keys the iterate template itself mandates
+(diagnosis, previewMismatches, corrections, draftValidation, translatedSummary…) — format a
+first-generation brief never carries. The prose half grew 1.01× (p2), 1.55× (p7), 1.66× (p10),
+1.44× (p13), 1.45× (p16). Length was never the signal for the damage. The id set was: on the same
+five pages the constraint flags LOC003 on p7, LOC002/LOC003/ANI003 on p13 and LOC003/ANI003 on p16
+— a landmark whose bible range is [1,18] and a creature whose range is [17,18], none of them named
+by the feedback, the page text or the plan line — and nothing on p2 or p10.
+
+The second gap: `collectStagedFigures` still staged a Visual Bible figure onto the rewriter's locked
+cast from its plan-line NAME with no range check, while the allow-list beside it had just been
+gated. The page text calls the egg by the creature's proper name, so the creature (pages [17,18])
+was staged on p13 and p16 — the exact partial-fix class the sibling registry exists to catch, and
+the pair was not registered.
+
+**Decision.**
+1. The length budget is removed outright — `BRIEF_GROWTH_FACTOR`, `BRIEF_MIN_BUDGET_CHARS`,
+   `briefProse`, `computeBriefBudget`, `renderBriefBudget`, the `brief_over_budget` branch, the
+   `{BRIEF_BUDGET}` placeholder in both iterate templates and its `promptBuilders` declaration. No
+   disabled constant, no toggle. `scene-iteration.txt` rule 1 ("Simplify, don't elaborate") stays;
+   it was never the problem.
+2. The id-set constraint stays and says what it is: `checkDeclaredSet` (findings
+   `object_outside_declared_set` / `character_outside_declared_set`, each carrying the offending
+   `ids` / `names` structurally), its allowance computed by `declaredSetAllowance` from the same
+   three inputs the rewriter was handed, and exactly ONE corrective re-ask (`usageLabel:
+   scene_iterate_declared_set`) fired only by an id-set finding, taken only if it shrinks the
+   findings and does not regress the declaration check. Otherwise the round ships with a warning —
+   a gate is a guideline. The `scene_iterate_budget` label had no reader outside the test it
+   shipped with.
+3. The page-range gate (`vbEntityCoversPage`) now covers BOTH sites that put a bible entity on a
+   page. `collectStagedFigures` takes `pageNumber` and applies the allow-list's exact rule: an id
+   the previous brief already cites is lineage and passes; a name-only hit from the plan line needs
+   the bible's structured range to cover the page; no range at all is unknown, never excluded. The
+   allow-list itself moved from `images.js` into `iterateBeat.partitionAnchoredObjects` (logic
+   verbatim) so the two sites sit in one module.
+4. The pair is registered: `withinFile` set `iterate-page-staging-sites` in
+   `scripts/admin/sibling-registry.json` — every `collectStagedFigures` / `partitionAnchoredObjects`
+   block must contain `vbEntityCoversPage(`, enforced by `tests/unit/sibling-parity.test.ts`. A
+   file-level `images.js`↔`iterateBeat.js` set was rejected: 198 of the last 200 `images.js`
+   commits did not touch `iterateBeat.js`, and every set blocks.
+
+**Rationale.** A guard built on a mismeasurement teaches the model the wrong lesson and spends a
+paid re-ask on every rewrite that merely fills in the template's own keys. The declared set is the
+measured guard: it named every invented citation on the reference story and none on the clean
+pages. And a gate that exists at one of two sibling sites is the partial-fix class the registry was
+built for — the fix is one module, one helper, one registered pair.
+
+**Touched.** `server/lib/iterateBeat.js`, `server/lib/images.js`, `server/lib/promptBuilders.js`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/iterate-declared-set-and-page-range.test.ts`
+(was `iterate-budget-and-page-range.test.ts`),
+`tests/unit/fixtures/iterate-declared-set-job_1789506283204_3kxqshifx.json`,
+`tests/unit/built-prompt-values.test.ts`, `tasks/BACKLOG.md`.
+**Status:** ✅ active — supersedes item 5 of the entry below.
+
 ## 2026-09-16 — Iterate is a SECOND ART DIRECTOR: the new composition IS the contract, and no version is ever discarded
 
 **Context.** An iterate round rewrites a page's brief and repaints the frame. Until now only the
@@ -364,10 +426,15 @@ while the canvas held the iterate composition. The version was then graded again
 pixels were never painted from. Measured on job_1789506283204_3kxqshifx: p16 v2 scored -205 and
 p13 v2 -12, both of them repairs over an iterate output judged against the superseded plan.
 
-Separately, all five iterate rewrites on that story grew the brief 2.2x-3.4x (1891→4890, 2430→5920,
-1320→4440, 2176→5758, 3174→6947) and the added clauses created NEW criticals on content that had
-been correct — a real landmark deleted, contradictory trees invented, a described feature lost.
-`scene-iteration.txt` rule 1 has said "Simplify, don't elaborate" for months and was ignored. And
+Separately, three of the five iterate rewrites on that story cited a landmark or a creature none of
+their inputs named (p7 LOC003; p13 LOC002/LOC003/ANI003; p16 LOC003/ANI003), and the added clauses
+created NEW criticals on content that had been correct — a real landmark deleted, contradictory
+trees invented, a described feature lost. *Corrected the same day:* this entry first read "all five
+rewrites grew the brief 2.2x-3.4x (1891→4890, 2430→5920, 1320→4440, 2176→5758, 3174→6947)". Those
+are RAW lengths, and the growth was the iterate template's own mandated audit keys (diagnosis,
+previewMismatches, corrections, draftValidation, translatedSummary…), not content: the prose grew
+1.01x, 1.55x, 1.66x, 1.44x, 1.45x (804→815, 877→1362, 591→981, 857→1238, 1318→1916). Length was
+never the signal for the damage; the invented ids were. And
 the anchored-object allow-list (`images.js` ~:3974-4008) let a rewrite ADD any Visual Bible id whose
 name shared a ≥5-char token with the page text — which staged a creature pages early because the
 page text legitimately used its proper name for the object it hatches from.
@@ -398,14 +465,13 @@ discard anything. Keep ALL versions so we can diagnose later."*
    bible's STRUCTURED `pages` / `appearsInPages` / per-state page lists (`vbEntityCoversPage`) and
    drops the name-token anchor for an id whose range excludes this page. No prose, no finding text.
    Tolerant: an entry declaring no range is UNKNOWN and keeps the previous behaviour.
-5. **The rewrite is budgeted in code and the breach is fed back.** `computeBriefBudget` sets a hard
-   prose budget of **1.5×** the brief being rewritten (floor 1200 chars) — below the smallest growth
-   ever measured, so every observed runaway is caught, while still leaving half the brief again of
-   new room. The number is injected into BOTH iterate templates through one `{BRIEF_BUDGET}`
-   placeholder, and a breach (length, or an `objects[]`/`characters[]` citation outside original ∪
-   plan-line ∪ evaluator-feedback) triggers exactly ONE corrective re-ask carrying the specific
-   breach — the same shape as the declaration re-ask beside it. A gate is a guideline: the round
-   ships with a loud warning rather than dying on a paid call.
+5. 🗄 **Superseded the same day** — see "The iterate length budget is gone" above. As shipped:
+   `computeBriefBudget` set a hard prose budget of 1.5× the brief being rewritten (floor 1200 chars),
+   injected into BOTH iterate templates through one `{BRIEF_BUDGET}` placeholder, and a breach
+   (length, or an `objects[]`/`characters[]` citation outside original ∪ plan-line ∪
+   evaluator-feedback) triggered exactly ONE corrective re-ask. What stays is the id-set half, renamed
+   `checkDeclaredSet` (findings `object_outside_declared_set` / `character_outside_declared_set`) with
+   its single re-ask; the length half and the placeholder are removed outright.
 
 **Rationale.** A repair judged against a brief it was never painted to cannot be repaired — the
 findings are unsatisfiable and the score is noise, which is exactly what -205 on p16 was. Making the

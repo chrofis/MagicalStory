@@ -9,7 +9,6 @@
 3. **Cast is locked.** The characters list plus the staged-figures list is exactly the cast — every entry must appear; nothing outside those two lists may be added. If the scene seems crowded, simplify staging (depth, framing, pose), not the cast.
 3a. **Whatever is in the picture is declared.** Every figure the prose puts in the frame appears in the metadata: a person in `characters[]` by name, a staged animal or secondary figure in `objects[]` by its id. A figure the plan line stages that the previous brief had dropped may be brought back — only together with its declaration.
 3b. {OBJECT_ID_STABILITY}
-3c. {BRIEF_BUDGET}
 4. **Character count (hard cap: {MAX_CHARACTERS_PER_SCENE}).** 1-3 is ideal. Preserve every character the hint lists.
 5. **One moment, one focal point.** Single instant; one main action draws the eye. When the page text chains physical actions, depict the one with the most motion.
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.

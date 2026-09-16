@@ -49,6 +49,17 @@
  * "the scruffy terrier mix dog" in the prose. An unnamed figure has no
  * reference cell and no name for the detector to match, which is how that page
  * carried an unmatched figure. `collectStagedFigures` names them.
+ *
+ * THE PAGE RANGE
+ *
+ * Two sites put a Visual Bible entity on a page: `collectStagedFigures` (names
+ * a figure onto the locked cast) and `partitionAnchoredObjects` (lets the
+ * rewrite ADD a cited id). Both consult the bible's STRUCTURED page range
+ * (`vbEntityCoversPage`) and never a name token — the page text may use a
+ * creature's proper name for the object it hatches from. They live in this one
+ * module and are pinned together by the `iterate-page-staging-sites` set in
+ * scripts/admin/sibling-registry.json, because the first gate shipped on one
+ * site only (2026-09-16).
  */
 
 const { log } = require('../utils/logger');
@@ -117,6 +128,46 @@ function namedIn(haystack, name) {
 }
 
 /**
+ * DOES THIS VISUAL-BIBLE ENTRY BELONG ON THIS PAGE? (2026-09-16)
+ *
+ * Reads STRUCTURED page-range data only — `pages` / `appearsInPages` as written
+ * by the Visual Bible author, plus any per-state page lists. Never prose, never
+ * a finding's text: the page range is a fact the bible states, and matching on
+ * words is how a creature got staged early because the page text legitimately
+ * named the object it hatches from.
+ *
+ * TOLERANT BY DESIGN: an entry that declares no range at all returns `null`
+ * ("unknown"), and the caller must fall back to its previous behaviour rather
+ * than coerce. Only a range that EXISTS and EXCLUDES this page returns false.
+ *
+ * @returns {boolean|null} true = in range, false = out of range, null = unknown
+ */
+function vbEntityCoversPage(ent, pageNumber) {
+  const n = Number(pageNumber);
+  if (!ent || !Number.isFinite(n)) return null;
+  const nums = new Set();
+  const collect = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (const p of arr) { const v = Number(p); if (Number.isFinite(v)) nums.add(v); }
+  };
+  collect(ent.pages);
+  collect(ent.appearsInPages);
+  for (const st of (Array.isArray(ent.states) ? ent.states : [])) collect(st && st.pages);
+  if (nums.size === 0) return null;
+  return nums.has(n);
+}
+
+/**
+ * The text an ADDED citation may be anchored in: the evaluator's feedback, the
+ * page text and the plan line — the three structured inputs the rewriter was
+ * handed. One construction, shared by the allow-list and the declared-set
+ * allowance so the two never read different inputs.
+ */
+function anchorHaystack({ evaluationFeedback = null, pageText = '', planLine = '' } = {}) {
+  return `${JSON.stringify(evaluationFeedback || {})}\n${pageText || ''}\n${planLine || ''}`.toLowerCase();
+}
+
+/**
  * The named non-roster figures staged on this page, from every source that can
  * legitimately claim one: the previous brief's `characters[]` and `objects[]`,
  * the saved scene metadata, and the plan line's staged segment.
@@ -127,9 +178,19 @@ function namedIn(haystack, name) {
  * offered to the rewriter as part of the locked cast, never forced into the
  * picture.
  *
+ * PAGE RANGE BEATS THE NAME TOKEN here too (2026-09-16). The plan line is the
+ * one source that ADDS a figure the previous brief did not cite, and it names
+ * figures by word — so a creature whose proper name the page text also uses for
+ * the object it hatches from was staged four pages before the bible says it
+ * exists (staging job_1789506283204_3kxqshifx p13/p16; the creature's range is
+ * [17,18]). Same rule as partitionAnchoredObjects: an id the previous brief
+ * already cites is lineage and passes; a name-only hit from the plan line needs
+ * the bible's STRUCTURED range to cover this page; no range at all is unknown,
+ * never excluded.
+ *
  * @returns {Array<{id,name,kind,description}>} deduped by visual-bible id
  */
-function collectStagedFigures({ visualBible = null, sceneMetadata = null, savedScene = null, planLine = null } = {}) {
+function collectStagedFigures({ visualBible = null, sceneMetadata = null, savedScene = null, planLine = null, pageNumber = null } = {}) {
   const pool = figurePool(visualBible);
   if (pool.length === 0) return [];
 
@@ -160,10 +221,62 @@ function collectStagedFigures({ visualBible = null, sceneMetadata = null, savedS
   for (const f of pool) {
     const hit = citedIds.has(f.id)
       || namedRefs.some(n => namedIn(n, f.name) || namedIn(f.name, n))
-      || (staged && namedIn(staged, f.name));
+      || (staged && namedIn(staged, f.name) && vbEntityCoversPage(f.entry, pageNumber) !== false);
     if (hit) picked.push({ id: f.id, name: f.name, kind: f.kind, description: f.description });
   }
   return picked;
+}
+
+/**
+ * ANCHORED-OBJECT ALLOW-LIST (owner decision 2026-07-18; moved here from
+ * images.js on 2026-09-16 so it sits beside collectStagedFigures — the two
+ * sites that put a Visual Bible entity on a page, pinned by one registry set).
+ *
+ * The rewrite may keep/drop objects freely and may ADD an object only when
+ * something asked for it — the original scene metadata, the evaluator feedback
+ * (e.g. "rowing boat missing"), the page text, or the plan line (an anchor
+ * source since the rewriter started receiving it, 2026-09-14: an element the
+ * page's own beat stages is asked for by the beat, and scrubbing it would undo
+ * the reinstatement in the same breath). Unanchored additions are scrubbed
+ * (observed: a rewrite swapped the scene's vehicle for an unrelated statue and
+ * the model painted it into the scene). Matching is tolerant across the
+ * language boundary: entity id, entity name, or >=5-char words from the
+ * name/English VB description against feedback + page text + plan line.
+ *
+ * PAGE RANGE BEATS THE NAME TOKEN (2026-09-16). The token anchor matches
+ * >=5-char words from the entity's name/description against the page text — so
+ * a creature was anchored on its own proper name because the page text
+ * legitimately used that name for the OBJECT it hatches from, and the
+ * transformation was staged pages early. The Visual Bible already states which
+ * pages an entity appears on; that STRUCTURED range decides, and no prose is
+ * consulted. Tolerant: an entry with no range at all is unknown, not excluded,
+ * and falls through to the token anchor.
+ *
+ * @returns {{kept: Array, scrubbed: Array}} both in the rewrite's own order
+ */
+function partitionAnchoredObjects({ rewriteObjects = [], origObjects = [], evaluationFeedback = null, pageText = '', planLine = '', visualBible = null, pageNumber = null } = {}) {
+  const list = Array.isArray(rewriteObjects) ? rewriteObjects : [];
+  if (list.length === 0) return { kept: [], scrubbed: [] };
+  const origSet = new Set((Array.isArray(origObjects) ? origObjects : []).map(baseId));
+  const haystack = anchorHaystack({ evaluationFeedback, pageText, planLine });
+  const vbEntityById = new Map();
+  for (const pool of [visualBible?.artifacts, visualBible?.animals, visualBible?.vehicles, visualBible?.locations, visualBible?.secondaryCharacters]) {
+    for (const e of (pool || [])) if (e?.id) vbEntityById.set(baseId(e.id), e);
+  }
+  const isAnchored = (obj) => {
+    const id = baseId(obj);
+    if (origSet.has(id)) return true;
+    if (haystack.includes(id.toLowerCase())) return true;
+    const ent = vbEntityById.get(id);
+    if (!ent) return true; // not a VB id — plain names pass through
+    if (vbEntityCoversPage(ent, pageNumber) === false) return false;
+    const tokens = [String(ent.name || ''), ...String(ent.name || '').split(/\s|-/), ...String(ent.description || '').split(/[^A-Za-zÀ-ž]+/)]
+      .map(t => t.trim().toLowerCase()).filter(t => t.length >= 5);
+    return tokens.some(t => haystack.includes(t));
+  };
+  const scrubbed = list.filter(o => !isAnchored(o));
+  const kept = list.filter(o => !scrubbed.includes(o));
+  return { kept, scrubbed };
 }
 
 /**
@@ -220,100 +333,57 @@ function checkRewrittenBrief({ pageNumber, brief, planLine = null, castNames = [
 }
 
 /**
- * DOES THIS VISUAL-BIBLE ENTRY BELONG ON THIS PAGE? (2026-09-16)
+ * THE DECLARED SET (2026-09-16). A rewrite's `objects[]` and `characters[]` may
+ * cite only what the previous brief already cited, what the plan line stages,
+ * or what the evaluator asked for — original ∪ plan-line ∪ feedback. Measured on
+ * staging job_1789506283204_3kxqshifx: three of five rewrites cited a landmark
+ * or a creature none of their inputs named (p7 LOC003; p13 LOC002, LOC003,
+ * ANI003; p16 LOC003, ANI003), and each invented citation became a critical on
+ * content that had been correct; p2 and p10 cited nothing new.
  *
- * Reads STRUCTURED page-range data only — `pages` / `appearsInPages` as written
- * by the Visual Bible author, plus any per-state page lists. Never prose, never
- * a finding's text: the page range is a fact the bible states, and matching on
- * words is how a creature got staged early because the page text legitimately
- * named the object it hatches from.
+ * A length budget shipped beside this check the same day and was removed: the
+ * 2.2x-3.4x raw growth it was built on was the iterate template's own mandated
+ * audit keys (diagnosis, previewMismatches, corrections, draftValidation,
+ * translatedSummary…), not prose — prose grew 1.0x-1.7x — and length was never
+ * the signal for the damage. The id set is.
  *
- * TOLERANT BY DESIGN: an entry that declares no range at all returns `null`
- * ("unknown"), and the caller must fall back to its previous behaviour rather
- * than coerce. Only a range that EXISTS and EXCLUDES this page returns false.
- *
- * @returns {boolean|null} true = in range, false = out of range, null = unknown
+ * This computes the allowance from exactly the inputs the rewriter was handed.
+ * @returns {{allowedObjects: string[], allowedNames: string[]}}
  */
-function vbEntityCoversPage(ent, pageNumber) {
-  const n = Number(pageNumber);
-  if (!ent || !Number.isFinite(n)) return null;
-  const nums = new Set();
-  const collect = (arr) => {
-    if (!Array.isArray(arr)) return;
-    for (const p of arr) { const v = Number(p); if (Number.isFinite(v)) nums.add(v); }
-  };
-  collect(ent.pages);
-  collect(ent.appearsInPages);
-  for (const st of (Array.isArray(ent.states) ? ent.states : [])) collect(st && st.pages);
-  if (nums.size === 0) return null;
-  return nums.has(n);
-}
-
-// THE REWRITE BUDGET (2026-09-16). Measured on job_1789506283204_3kxqshifx:
-// every one of the five iterate rewrites grew the brief 2.2x-3.4x over the
-// brief it was correcting (1891->4890, 2430->5920, 1320->4440, 2176->5758,
-// 3174->6947), and the added clauses invented content that had been correct — a
-// real landmark deleted, contradictory trees added, a described feature lost.
-// scene-iteration.txt rule 1 ("Simplify, don't elaborate") is prose and was
-// ignored, so the limit is a NUMBER computed here, injected into both iterate
-// templates, and checked afterwards with one corrective re-ask.
-//
-// 1.5x is the factor: it sits below the smallest growth ever measured (2.2x) so
-// every observed runaway is caught, while still leaving a rewrite half the
-// original brief again of new room — more than enough to restate a fix, add a
-// pose or re-frame a shot, which is all rule 1 asks it to do.
-const BRIEF_GROWTH_FACTOR = 1.5;
-// A very short original must not produce an impossible budget: a brief has
-// mandatory structure (setting, cast, framing) regardless of what it replaces.
-const BRIEF_MIN_BUDGET_CHARS = 1200;
-
-/** The prose half of a brief — the ---METADATA--- JSON is structure, not prose. */
-function briefProse(text) {
-  const s = String(text || '');
-  const cut = s.indexOf('---METADATA---');
-  return (cut >= 0 ? s.slice(0, cut) : s).trim();
+function declaredSetAllowance({ origObjects = [], rewriteObjects = [], evaluationFeedback = null, pageText = '', planLine = '', origCharacters = [], promptCharacters = [], stagedFigures = [] } = {}) {
+  const haystack = anchorHaystack({ evaluationFeedback, pageText, planLine });
+  const nameOf = (c) => String((c && c.name) || c || '').trim();
+  // An id either was already there, or something asked for it by name in a
+  // structured input.
+  const allowedObjects = [
+    ...(Array.isArray(origObjects) ? origObjects : []).map(baseId),
+    ...(Array.isArray(rewriteObjects) ? rewriteObjects : []).map(baseId).filter(id => id && haystack.includes(id.toLowerCase())),
+  ].filter(Boolean);
+  const allowedNames = [
+    ...(Array.isArray(origCharacters) ? origCharacters : []).map(nameOf),
+    ...(Array.isArray(promptCharacters) ? promptCharacters : []).map(nameOf),
+    ...(Array.isArray(stagedFigures) ? stagedFigures : []).map(nameOf),
+  ].filter(Boolean);
+  return { allowedObjects, allowedNames };
 }
 
 /**
- * The concrete budget for one rewrite, from the brief it is rewriting.
- * @returns {{originalChars:number,maxChars:number,growthFactor:number}}
- */
-function computeBriefBudget(originalBrief) {
-  const originalChars = briefProse(originalBrief).length;
-  const maxChars = Math.max(BRIEF_MIN_BUDGET_CHARS, Math.ceil(originalChars * BRIEF_GROWTH_FACTOR));
-  return { originalChars, maxChars, growthFactor: BRIEF_GROWTH_FACTOR };
-}
-
-/** The sentence the templates carry, built from the numbers above. */
-function renderBriefBudget(budget) {
-  if (!budget) return '';
-  return `**Length budget (hard): ${budget.maxChars} characters of prose.** The brief you are correcting is ${budget.originalChars} characters; yours may be at most ${budget.growthFactor}x that. Spend the room on the flagged problems. Do not restate what already worked, and do not add scenery, props or figures the plan line and the feedback did not ask for.`;
-}
-
-/**
- * Did the rewrite stay inside its budget? Length plus the declaration sets:
- * `objects[]` and `characters[]` may cite only what the original brief already
- * cited, what the plan line stages, or what the evaluator asked for.
+ * Did the rewrite cite outside its declared set? Each finding carries the
+ * offending ids / names structurally so a caller never parses the sentence.
  *
  * Reports only — a gate is a guideline and an iterate round is paid.
- * @returns {Array<{type:string,detail:string}>}
+ * @returns {Array<{type:string,detail:string,ids?:string[],names?:string[]}>}
  */
-function checkBriefBudget({ brief, budget, newMetadata = null, allowedObjects = [], allowedNames = [] } = {}) {
+function checkDeclaredSet({ newMetadata = null, allowedObjects = [], allowedNames = [] } = {}) {
   const findings = [];
-  const prose = briefProse(brief);
-  if (budget && prose.length > budget.maxChars) {
-    findings.push({
-      type: 'brief_over_budget',
-      detail: `the brief is ${prose.length} characters of prose; the budget is ${budget.maxChars} (the brief it replaces is ${budget.originalChars}). Cut ${prose.length - budget.maxChars} characters.`,
-    });
-  }
   const allowedIds = new Set((allowedObjects || []).map(baseId).filter(Boolean));
-  const addedObjects = (Array.isArray(newMetadata?.objects) ? newMetadata.objects : [])
-    .filter(o => baseId(o) && !allowedIds.has(baseId(o)));
-  if (addedObjects.length > 0) {
+  const addedIds = (Array.isArray(newMetadata?.objects) ? newMetadata.objects : [])
+    .map(baseId).filter(id => id && !allowedIds.has(id));
+  if (addedIds.length > 0) {
     findings.push({
-      type: 'object_outside_budget',
-      detail: `objects[] cites ${addedObjects.map(o => baseId(o)).join(', ')}, which the previous brief, the plan line and the feedback all leave out.`,
+      type: 'object_outside_declared_set',
+      ids: addedIds,
+      detail: `objects[] cites ${addedIds.join(', ')}, which the previous brief, the plan line and the feedback all leave out.`,
     });
   }
   const allowedLower = new Set((allowedNames || []).map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
@@ -322,7 +392,8 @@ function checkBriefBudget({ brief, budget, newMetadata = null, allowedObjects = 
     .filter(n => n && !allowedLower.has(n.toLowerCase()));
   if (addedNames.length > 0) {
     findings.push({
-      type: 'character_outside_budget',
+      type: 'character_outside_declared_set',
+      names: addedNames,
       detail: `characters[] adds ${addedNames.join(', ')}, who the previous brief, the plan line and the feedback all leave out.`,
     });
   }
@@ -338,16 +409,14 @@ module.exports = {
   resolvePlanLine,
   planStagedSegment,
   figurePool,
+  vbEntityCoversPage,
+  anchorHaystack,
   collectStagedFigures,
+  partitionAnchoredObjects,
   renderStagedFiguresBlock,
   checkRewrittenBrief,
+  declaredSetAllowance,
+  checkDeclaredSet,
   describeBriefFindings,
-  vbEntityCoversPage,
-  briefProse,
-  computeBriefBudget,
-  renderBriefBudget,
-  checkBriefBudget,
-  BRIEF_GROWTH_FACTOR,
-  BRIEF_MIN_BUDGET_CHARS,
   REINSTATE_TYPES,
 };

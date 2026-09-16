@@ -297,6 +297,19 @@
       ],
       "excludeReason": "callClaudeAPI is a dispatcher over the provider entry points, not one itself — it guards nothing because the callee does.",
       "severity": "block"
+    },
+    {
+      "id": "iterate-page-staging-sites",
+      "axis": "staged-figures list vs anchored-object allow-list",
+      "reason": "collectStagedFigures (names a Visual Bible figure onto the rewriter's locked cast) and partitionAnchoredObjects (lets a rewrite ADD a Visual Bible id) are the two sites that put a bible entity on a page; fa2cb3696 gated one on the bible's structured page range and not the other, so the creature the allow-list refused on p13/p16 was still staged there by its plan-line name. Both must consult vbEntityCoversPage.",
+      "file": "server/lib/iterateBeat.js",
+      "blockPattern": "function (collectStagedFigures|partitionAnchoredObjects)\\(|module\\.exports",
+      "mustContain": "vbEntityCoversPage(",
+      "exclude": [
+        "module.exports"
+      ],
+      "excludeReason": "module.exports is the terminator that closes partitionAnchoredObjects' block so its body is measured exactly; it is not a staging site.",
+      "severity": "block"
     }
   ]
 }
