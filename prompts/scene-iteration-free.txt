@@ -23,6 +23,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 16. **CAMERA-ACTION CONSISTENCY** - When a character moves into, descends into, climbs into, or steps through a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold), use `framingPattern: over-the-shoulder` or `side` and `perspective: back view`/`over-the-shoulder`/`side` — never `front` with `framingPattern: solo-*`, because the body occludes the interior the action is about. Also name the camera POV in the scene prose ("camera positioned outside the cellar door looking past the threshold").
 17. **DOCUMENT CAST CHANGES** - If you drop or swap a character, list the change in `castChanges` with a one-sentence reason (e.g. "Dropped CharacterB — glance-back geometry impossible with both characters in frame").
 18. **DECLARE WHOEVER IS IN THE PICTURE** - Every figure the prose puts in the frame appears in the metadata: a person in `characters[]` by name, a staged animal or secondary figure in `objects[]` by its id. Name a staged figure by its own name, never by species or role alone.
+19. {OBJECT_ID_STABILITY}
 
 ---
 

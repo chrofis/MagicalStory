@@ -586,3 +586,64 @@ describe('object counts are exact up to three and non-numeric above', () => {
     expect(rule).toMatch(/no exact expectation/i);
   });
 });
+
+// ---------------------------------------------------------------------------
+// OBJECT ID STABILITY (2026-09-16). An iterate round answered an evaluator
+// complaint about an object's COLOUR by citing a different Visual Bible id --
+// the creature that object becomes later in the story -- and staged the
+// transformation pages early (staging job_1789506283204_3kxqshifx p16).
+// The rule is one JS constant reaching BOTH iterate templates through one
+// placeholder; what is pinned is arrival and sameness, never wording.
+// ---------------------------------------------------------------------------
+describe('both iterate templates carry the object-id rule from ONE constant', () => {
+  const iterate = (freeIterate: boolean) => PB.buildSceneDescriptionPrompt(
+    1, PAGE_TEXT, CHARACTERS, '', 'en', VISUAL_BIBLE, [], {}, '', '', null, null, { freeIterate });
+
+  it('the strict template receives the constant', () => {
+    expect(iterate(false)).toContain(PB.OBJECT_ID_STABILITY_RULE);
+  });
+
+  it('the free template receives the same constant', () => {
+    expect(iterate(true)).toContain(PB.OBJECT_ID_STABILITY_RULE);
+  });
+
+  it('no placeholder token survives in either', () => {
+    expect(iterate(false)).not.toContain('{OBJECT_ID_STABILITY}');
+    expect(iterate(true)).not.toContain('{OBJECT_ID_STABILITY}');
+  });
+
+  it('the rule names a state complaint and forbids a different id', () => {
+    expect(PB.OBJECT_ID_STABILITY_RULE).toMatch(/STATE complaint/);
+    expect(PB.OBJECT_ID_STABILITY_RULE).toMatch(/never a different id/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// One proper name, one id. ART001.properName and ANI003.name were both "Lindi"
+// on the job above -- the same name across a transformation boundary, which is
+// what let the rewriter treat the two entries as interchangeable. Both LIVE
+// Visual Bible authoring sites must state it (sibling set `vb-authoring-sites`).
+// ---------------------------------------------------------------------------
+describe('both Visual Bible authoring templates forbid a shared proper name', () => {
+  const fs2 = require('fs');
+  const path2 = require('path');
+  const DIR = path2.join(__dirname, '../../prompts');
+  const properNameLine = (file: string) =>
+    (fs2.readFileSync(path2.join(DIR, file), 'utf8').split(String.fromCharCode(10))
+      .map((l: string) => l.trim())
+      .find((l: string) => l.includes('`properName`') && l.includes('nowhere else')) || '');
+
+  it('the all-pages Art Director states it', () => {
+    expect(properNameLine('scene-expansion-all.txt')).toMatch(/never share a name/i);
+  });
+
+  it('the trial writer states it identically', () => {
+    expect(properNameLine('story-trial.txt')).toBe(properNameLine('scene-expansion-all.txt'));
+  });
+
+  it('the rule names the transformation case without naming a story', () => {
+    const line = properNameLine('scene-expansion-all.txt');
+    expect(line).toMatch(/transforms later/i);
+    expect(line).toMatch(/separate ids/i);
+  });
+});

@@ -969,6 +969,16 @@ function parseTeachingGuideFile(filePath) {
 }
 
 // Load teaching guides at startup
+// OBJECT ID STABILITY (2026-09-16). One text, injected into both iterate
+// templates through {OBJECT_ID_STABILITY}. An evaluator complaint about an
+// object's colour was read by the rewriter as "wrong entity" and answered by
+// citing a different Visual Bible id — the creature the object becomes later in
+// the story — which staged that transformation pages early. This states that a
+// state complaint is answered with a state variant of the SAME id. It is
+// additive to rule 3a (a dropped plan-line figure may be brought back);
+// re-adding an id is allowed, replacing one is not.
+const OBJECT_ID_STABILITY_RULE = "**Object ids are not substituted.** `objects[]` entries may be added, removed or reordered; an id is never swapped for a different id standing for the same thing. A complaint about an object's colour, glow, temperature, size or condition is a STATE complaint — cite the same id with the state variant that matches (`ART001.1` → `ART001.2`), never a different id. An object that transforms later in the story and the creature it becomes are separate ids: cite the one whose Visual Bible pages include this page.";
+
 const PROMPTS_DIR = path.join(__dirname, '../../prompts');
 const EDUCATIONAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'educational-guides.txt'));
 const LIFE_CHALLENGE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
@@ -3112,7 +3122,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language),
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
-      MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3
+      MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3,
+      OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE
     });
     // Text-overlay-only rules gate:
     // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,
@@ -7914,6 +7925,7 @@ function buildTrialIdeaPrompts({
 }
 
 module.exports = {
+  OBJECT_ID_STABILITY_RULE,
   wrapUserInput,
   getPhysicalFromChar,
   stripAgeWords,

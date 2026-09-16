@@ -7,6 +7,67 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-16 — An iterate round keeps the page's worn states, and never swaps a Visual Bible id
+
+**Context.** Staging story `job_1789506283204_3kxqshifx` produced two independent faults on the same
+page (p16), both introduced by the brief-rewrite (iterate) layer rather than by the illustrator.
+
+1. *The item that came back on.* `scene-iteration.txt` / `scene-iteration-free.txt` do not emit
+   `wornItems`, and `parseWornItems` turns an absent field into `[]`. `iteratePageCore`
+   (server/lib/images.js) already re-hydrates `era`, `textZoneDescription`, `aboard` and
+   `crowdExpected` from the saved scene for exactly this reason; `wornItems` was missing from that
+   list. p16's stored `wornItems` is `[]` while p8-p18 otherwise carry the owner's headwear as
+   `state: "off"` with a location. `resolveWornItemsForPage` (server/lib/wornItems.js) defaults an
+   undeclared `wornAs` item to `worn`, so `buildWornStateLines` emitted the affirmative "IS wearing
+   this … Draw it on <owner> even if the attached reference shows <owner> without it" — and the item
+   was inside a wall at that point in the plot.
+2. *The transformation staged a page early.* An evaluator complained that an object's COLOUR was
+   wrong. The iterate round answered by replacing that object's id in `objects[]` with the id of the
+   creature it becomes later in the story — an entity substitution in answer to a state complaint.
+   It was enabled by the two entries sharing one `properName`, and by nothing in the iterate
+   templates saying an id may not be swapped.
+
+**Decision.**
+1. `wornItems` is carried across a rewrite by one helper, `carryForwardWornItems`
+   (server/lib/wornItems.js), called from `iteratePageCore`. A non-empty emission wins; otherwise the
+   saved rows (top level or `fullData`) survive; the result is always an array.
+2. Prompt-side, per the project rule that classification belongs to the prompt: one JS constant,
+   `OBJECT_ID_STABILITY_RULE` (server/lib/promptBuilders.js), injected into BOTH iterate templates
+   through `{OBJECT_ID_STABILITY}`. It states that `objects[]` may be added to, removed from or
+   reordered but an id is never swapped for a different id standing for the same thing, that a
+   colour/glow/temperature/size/condition complaint is a STATE complaint answered with a state
+   variant of the same id, and that an object which transforms later and the creature it becomes are
+   separate ids. It is additive to rule 3a (a dropped plan-line figure may be re-added).
+3. Both LIVE Visual Bible authoring sites (`scene-expansion-all.txt`, `story-trial.txt` — sibling set
+   `vb-authoring-sites`) now state that one `properName` belongs to one id and two entries never
+   share a name.
+4. A sibling set `scene-iteration-templates` was added to the registry: the two iterate templates are
+   filled by one call site with one placeholder map, so a rule on one and not the other is silently
+   absent on whichever template that page selected.
+
+**Rationale.** Both faults are the rewrite layer discarding or re-deciding context it was never asked
+to own — the same disease the era/aboard/crowd carry-forward already fixed. No code reads a finding's
+prose to work out what it means: the classification (state complaint vs entity error) is stated to the
+rewriter in its own prompt, and the worn-state fix is a structural carry-forward with no inference.
+
+**Deliberately NOT done (owner ruling, 2026-09-16).**
+- *Silencing the worn-default.* Making an undeclared `wornAs` item emit no line at all (instead of
+  defaulting to `worn`) was considered and declined for now: the default exists so an item the Art
+  Director simply did not mention is still drawn on its owner, and removing it changes behaviour on
+  every page, not just rewritten ones.
+- *A page-membership guard on `objects[]`.* Rejecting an id whose Visual Bible `pages` exclude the
+  page would have caught the substitution in code. Declined: `pages` is authored by the same model
+  and a legitimate late addition to a page would be dropped silently.
+- *A new critic type.* No evaluator type or deduction was added for an id substitution. The rules
+  above are generator-side only; the critic-side counterpart is parked in `tasks/BACKLOG.md` for
+  owner sign-off, per the rule that a severity or classification change is the owner's call.
+
+**Touched files.** `server/lib/images.js`, `server/lib/wornItems.js`, `server/lib/promptBuilders.js`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/story-trial.txt`, `scripts/admin/sibling-registry.json`,
+`tests/unit/iterate-worn-items-carry.test.ts`, `tests/unit/built-prompt-values.test.ts`,
+`tasks/BACKLOG.md`.
+
 ## 2026-09-16 — The scale ladder states SIZE or HEIGHT, and says which; `head` becomes `adult` + `melon`
 
 **Context.** `SCALE_PHRASES` (server/lib/visualBible.js) is the closed band enum every Visual Bible

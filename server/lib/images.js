@@ -4219,6 +4219,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // extras would come back as a derived extra_character.
     crowdExpected: newSceneMetadata?.crowdExpected === true
       || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true,
+    // Same class again: scene-iteration.txt does not emit `wornItems`, and the
+    // metadata parser turns an absent field into `[]`. An undeclared row makes
+    // resolveWornItemsForPage default the item to `worn`, so an iterated page
+    // that had taken an item OFF came back with the affirmative "IS wearing
+    // this" override in the prompt and the item painted back on. One rule, in
+    // wornItems.carryForwardWornItems.
+    wornItems: require('./wornItems').carryForwardWornItems(newSceneMetadata, savedMeta),
   };
 
   // Route by scene complexity when no explicit model override

@@ -483,6 +483,26 @@ function wornItemLook(r) {
   return sameName(capped, r.name) ? '' : capped;
 }
 
+/**
+ * Carry a page's declared worn states across a brief rewrite (2026-09-16).
+ *
+ * scene-iteration.txt / scene-iteration-free.txt do not emit `wornItems`, and
+ * the metadata parser turns an absent field into `[]`. An undeclared row makes
+ * resolveWornItemsForPage default the item to `worn`, so an iterated page that
+ * had taken an item OFF came back carrying the affirmative "IS wearing this"
+ * override and the item painted back on. Same class as era / textZoneDescription
+ * / aboard / crowdExpected in iteratePageCore: context the rewriter never
+ * re-decides. A non-empty emission still wins.
+ */
+function carryForwardWornItems(newSceneMetadata, savedSceneMetadata) {
+  const nonEmpty = (v) => (Array.isArray(v) && v.length > 0 ? v : null);
+  const saved = savedSceneMetadata || {};
+  return nonEmpty(newSceneMetadata && newSceneMetadata.wornItems)
+    || nonEmpty(saved.wornItems)
+    || nonEmpty(saved.fullData && saved.fullData.wornItems)
+    || (Array.isArray(newSceneMetadata && newSceneMetadata.wornItems) ? newSceneMetadata.wornItems : []);
+}
+
 function buildWornStateLines(resolved) {
   const lines = [];
   for (const r of (resolved || [])) {
@@ -903,6 +923,7 @@ module.exports = {
   resolveWornItemsForPage,
   wornStateById,
   wornItemLook,
+  carryForwardWornItems,
   buildWornStateLines,
   buildWornStateBlock,
   removeWornItemFromOutfit,

@@ -539,6 +539,8 @@ measurement, is lost).
 
 Nothing below should be coded until it is answered.
 
+- [ ] **A critic-side counterpart for the object-id substitution rule** (raised 2026-09-16). The generator side shipped: both iterate templates now carry `OBJECT_ID_STABILITY_RULE` (an `objects[]` id is never swapped for a different id; a colour/condition complaint is a STATE complaint). No judge can currently deduct when a rewrite substitutes an id, so the rule is unenforced — the candidate site is `prompts/scene-review.txt`. Adding a scored type is a classification/severity change and needs owner sign-off. → `docs/decisions.md` (2026-09-16 iterate worn-state + object-id entry)
+
 - [ ] **Season-appropriate clothing — 6 open questions, nothing to be built until answered** (investigated 2026-09-13). `season` exists and reaches the brief, the image prompt and a post-render audit, but says only "foliage, ground cover, sky, daylight" — clothing is never mentioned in any wardrobe prompt. Measured: **0** cold-season stories order a summery outfit (0/22 staging, 0/12 prod), so the writer is not the fault; the real fault is the **description-less trial contract** (`standard: {used:true, signature:'none'}`, 12/22 staging, 11/12 prod), which falls through to a generic default so the outfit is whatever the child was photographed in — that is the motivating story `job_1789296188291_thezv15y1`. Open: beats AD gets no season at all; slot-vs-description; whether the evaluator checks it; hemisphere; which trial shape; whether to measure the pixels. → `tasks/seasonal-clothing-2026-09-13.md:8`
 
 - [x] (2026-09-11, 27c37dfd9) **Round 2 of the scene review is GONE — owner killed it.** Net break-even when measured

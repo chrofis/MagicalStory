@@ -272,6 +272,16 @@
         "server/routes/jobs.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "scene-iteration-templates",
+      "axis": "strict iterate vs free iterate",
+      "reason": "scene-iteration.txt (the default rewrite) and scene-iteration-free.txt (the looser rewrite chosen when the composition is failing) are filled by ONE call site with one placeholder map; a rule or placeholder added to one is silently absent on whichever template that page's iterate selected.",
+      "members": [
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [
