@@ -219,6 +219,116 @@ function checkRewrittenBrief({ pageNumber, brief, planLine = null, castNames = [
   }
 }
 
+/**
+ * DOES THIS VISUAL-BIBLE ENTRY BELONG ON THIS PAGE? (2026-09-16)
+ *
+ * Reads STRUCTURED page-range data only — `pages` / `appearsInPages` as written
+ * by the Visual Bible author, plus any per-state page lists. Never prose, never
+ * a finding's text: the page range is a fact the bible states, and matching on
+ * words is how a creature got staged early because the page text legitimately
+ * named the object it hatches from.
+ *
+ * TOLERANT BY DESIGN: an entry that declares no range at all returns `null`
+ * ("unknown"), and the caller must fall back to its previous behaviour rather
+ * than coerce. Only a range that EXISTS and EXCLUDES this page returns false.
+ *
+ * @returns {boolean|null} true = in range, false = out of range, null = unknown
+ */
+function vbEntityCoversPage(ent, pageNumber) {
+  const n = Number(pageNumber);
+  if (!ent || !Number.isFinite(n)) return null;
+  const nums = new Set();
+  const collect = (arr) => {
+    if (!Array.isArray(arr)) return;
+    for (const p of arr) { const v = Number(p); if (Number.isFinite(v)) nums.add(v); }
+  };
+  collect(ent.pages);
+  collect(ent.appearsInPages);
+  for (const st of (Array.isArray(ent.states) ? ent.states : [])) collect(st && st.pages);
+  if (nums.size === 0) return null;
+  return nums.has(n);
+}
+
+// THE REWRITE BUDGET (2026-09-16). Measured on job_1789506283204_3kxqshifx:
+// every one of the five iterate rewrites grew the brief 2.2x-3.4x over the
+// brief it was correcting (1891->4890, 2430->5920, 1320->4440, 2176->5758,
+// 3174->6947), and the added clauses invented content that had been correct — a
+// real landmark deleted, contradictory trees added, a described feature lost.
+// scene-iteration.txt rule 1 ("Simplify, don't elaborate") is prose and was
+// ignored, so the limit is a NUMBER computed here, injected into both iterate
+// templates, and checked afterwards with one corrective re-ask.
+//
+// 1.5x is the factor: it sits below the smallest growth ever measured (2.2x) so
+// every observed runaway is caught, while still leaving a rewrite half the
+// original brief again of new room — more than enough to restate a fix, add a
+// pose or re-frame a shot, which is all rule 1 asks it to do.
+const BRIEF_GROWTH_FACTOR = 1.5;
+// A very short original must not produce an impossible budget: a brief has
+// mandatory structure (setting, cast, framing) regardless of what it replaces.
+const BRIEF_MIN_BUDGET_CHARS = 1200;
+
+/** The prose half of a brief — the ---METADATA--- JSON is structure, not prose. */
+function briefProse(text) {
+  const s = String(text || '');
+  const cut = s.indexOf('---METADATA---');
+  return (cut >= 0 ? s.slice(0, cut) : s).trim();
+}
+
+/**
+ * The concrete budget for one rewrite, from the brief it is rewriting.
+ * @returns {{originalChars:number,maxChars:number,growthFactor:number}}
+ */
+function computeBriefBudget(originalBrief) {
+  const originalChars = briefProse(originalBrief).length;
+  const maxChars = Math.max(BRIEF_MIN_BUDGET_CHARS, Math.ceil(originalChars * BRIEF_GROWTH_FACTOR));
+  return { originalChars, maxChars, growthFactor: BRIEF_GROWTH_FACTOR };
+}
+
+/** The sentence the templates carry, built from the numbers above. */
+function renderBriefBudget(budget) {
+  if (!budget) return '';
+  return `**Length budget (hard): ${budget.maxChars} characters of prose.** The brief you are correcting is ${budget.originalChars} characters; yours may be at most ${budget.growthFactor}x that. Spend the room on the flagged problems. Do not restate what already worked, and do not add scenery, props or figures the plan line and the feedback did not ask for.`;
+}
+
+/**
+ * Did the rewrite stay inside its budget? Length plus the declaration sets:
+ * `objects[]` and `characters[]` may cite only what the original brief already
+ * cited, what the plan line stages, or what the evaluator asked for.
+ *
+ * Reports only — a gate is a guideline and an iterate round is paid.
+ * @returns {Array<{type:string,detail:string}>}
+ */
+function checkBriefBudget({ brief, budget, newMetadata = null, allowedObjects = [], allowedNames = [] } = {}) {
+  const findings = [];
+  const prose = briefProse(brief);
+  if (budget && prose.length > budget.maxChars) {
+    findings.push({
+      type: 'brief_over_budget',
+      detail: `the brief is ${prose.length} characters of prose; the budget is ${budget.maxChars} (the brief it replaces is ${budget.originalChars}). Cut ${prose.length - budget.maxChars} characters.`,
+    });
+  }
+  const allowedIds = new Set((allowedObjects || []).map(baseId).filter(Boolean));
+  const addedObjects = (Array.isArray(newMetadata?.objects) ? newMetadata.objects : [])
+    .filter(o => baseId(o) && !allowedIds.has(baseId(o)));
+  if (addedObjects.length > 0) {
+    findings.push({
+      type: 'object_outside_budget',
+      detail: `objects[] cites ${addedObjects.map(o => baseId(o)).join(', ')}, which the previous brief, the plan line and the feedback all leave out.`,
+    });
+  }
+  const allowedLower = new Set((allowedNames || []).map(n => String(n || '').trim().toLowerCase()).filter(Boolean));
+  const addedNames = (Array.isArray(newMetadata?.characters) ? newMetadata.characters : [])
+    .map(c => String((c && c.name) || c || '').trim())
+    .filter(n => n && !allowedLower.has(n.toLowerCase()));
+  if (addedNames.length > 0) {
+    findings.push({
+      type: 'character_outside_budget',
+      detail: `characters[] adds ${addedNames.join(', ')}, who the previous brief, the plan line and the feedback all leave out.`,
+    });
+  }
+  return findings;
+}
+
 /** One short line per finding, for a log and for the corrective re-ask. */
 function describeBriefFindings(findings) {
   return (findings || []).map(f => `[${f.type}] ${f.detail}`).join('\n');
@@ -232,5 +342,12 @@ module.exports = {
   renderStagedFiguresBlock,
   checkRewrittenBrief,
   describeBriefFindings,
+  vbEntityCoversPage,
+  briefProse,
+  computeBriefBudget,
+  renderBriefBudget,
+  checkBriefBudget,
+  BRIEF_GROWTH_FACTOR,
+  BRIEF_MIN_BUDGET_CHARS,
   REINSTATE_TYPES,
 };

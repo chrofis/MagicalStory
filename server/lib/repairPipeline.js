@@ -28,7 +28,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, AUDIT_ADMIT_MAX } = require('./repairLogic');
+const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
@@ -2340,6 +2340,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             if (!versions || !rc) continue;
             const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
             const { applyScore } = require('./scoring');
+            // Lineage: a recolour repaints a garment on the version it was
+            // handed — same contract, new pixels.
+            const recolourParent = selectBestVersion(versions);
             const recolourVersion = {
               imageData: rc.imageData,
               score: ev.score ?? ev.qualityScore ?? null,
@@ -2368,6 +2371,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             if (ev.evalImageFp && images().hashImageData(rc.imageData) !== ev.evalImageFp) {
               log.error(`❌ [GARMENT-COLOUR] p${ev.pageNumber} round ${round}: version bytes do not match the bytes the eval graded (eval fp ${ev.evalImageFp}) — eval/bytes decoupled at creation`);
             }
+            inheritSceneContract(recolourVersion, recolourParent);
             versions.push(recolourVersion);
             recolourVersioned.add(ev.pageNumber);
           }
@@ -2394,6 +2398,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     // Execute all repairs in parallel
     let roundResults;
+    // THE VERSION EACH REPAIR EDITS, recorded as a link rather than re-derived.
+    // Every action resolves its input the same way — selectBestVersion(versions)
+    // falling back to the page's original bytes — so the parent is known at
+    // dispatch. Read again after the round to carry that version's contract.
+    const roundParent = new Map();
     try {
       roundResults = await Promise.all(
       pageStrategies.map(({ img, method, latestEval, decision, skipped }) => repairLimit(async () => {
@@ -2401,6 +2410,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (skipped || method === 'skip' || method == null) {
           return { pageNumber, imageData: null, skipped: true };
         }
+        roundParent.set(pageNumber, selectBestVersion(pageVersions.get(pageNumber) || []));
         try {
           // The recolour already ran in the recolour phase above and became its
           // own scored version. Its bytes are handed to the repair here so the
@@ -2517,6 +2527,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
 
     const roundSuccess = roundResults.filter(r => r.imageData);
+    // THE CONTRACT FOLLOWS THE LINEAGE (owner, 2026-09-16). Iterate is a SECOND
+    // ART DIRECTOR: once it has rewritten the brief, that rewrite IS the
+    // contract — for its own output and for every repair layered on top of it.
+    // Stamped here, before this round's detection / eval / entity check /
+    // consolidation, so all four judge the repaired pixels against the brief the
+    // version they were painted over carried. An iterate result authored its own
+    // contract and keeps it (inheritSceneContract only fills absent fields); an
+    // inpaint or char-fix over an iterate output inherits the iterate brief, and
+    // one over the original inherits nothing and falls back to the page record.
+    for (const r of roundSuccess) inheritSceneContract(r, roundParent.get(r.pageNumber) || null);
     const roundDuration = ((Date.now() - roundStart) / 1000).toFixed(1);
     log.info(`✅ [UNIFIED PIPELINE] Round ${round}: ${roundSuccess.length}/${badPages.length} repaired in ${roundDuration}s`);
 
@@ -3017,6 +3037,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // activeVersion then pointed at a different version than the flattened
         // root imageData.
         const { applyScore: stampTextSpace } = require('./scoring');
+        // Lineage: recomposed from the picked best — its contract, its brief.
+        inheritSceneContract(newVersion, best);
         newVersion.consolidatedPlan = best.consolidatedPlan || null;
         stampTextSpace(newVersion, {
           evalResult: newVersion.evaluation,
@@ -3355,6 +3377,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               },
               pageNumber: target.page,
             };
+            // Lineage: a style transfer repaints prevBest — same contract.
+            inheritSceneContract(newVersion, prevBest);
             newVersion.consolidatedPlan = prevBest.consolidatedPlan || null;
             stampStyleRepair(newVersion, {
               evalResult: newVersion.evaluation,
@@ -3668,7 +3692,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       textAreaMask: img.textAreaMask || null,
       emptySceneVbGrid: img.emptySceneVbGrid || null,
       textCoverageReport: img.textCoverageReport || null,
-      sceneCharacters: best?.sceneCharacters || img.sceneCharacters,
+      // A declared cast of [] is a decision, not an absence — `||` promoted the
+      // ORIGINAL roster over a version that deliberately emptied it. Same
+      // resolver buildEvalInputs uses, so promotion and evaluation agree in both
+      // directions: an iterate-lineage winner promotes the rewrite's cast, an
+      // original-lineage winner (no declaration of its own) promotes the page's.
+      sceneCharacters: resolveDeclaredCast(best?.sceneCharacters, img.sceneCharacters),
       sceneMetadata: best?.sceneMetadata || img.sceneMetadata,
       perCharClothing: img.perCharClothing,
       modelId: best?.modelId || img.modelId,

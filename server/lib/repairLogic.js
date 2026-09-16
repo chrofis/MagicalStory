@@ -252,6 +252,49 @@ function resolveDeclaredCast(...candidates) {
 }
 
 /**
+ * THE EVALUATION CONTRACT FOLLOWS THE LINEAGE (owner, 2026-09-16).
+ *
+ * Iterate is a SECOND ART DIRECTOR: the first brief asked for a composition the
+ * renderer could not deliver, and the rewrite is the new, achievable one. From
+ * the moment it exists, THE REWRITE IS THE CONTRACT — for the iterate output
+ * itself and for every repair layered on top of it. An inpaint or char-fix edits
+ * the pixels of the version it was handed, so it must be judged against THAT
+ * version's brief, not the superseded original.
+ *
+ * Until this, only the iterate branch set `description` / `sceneMetadata` /
+ * `sceneCharacters` on its result, so a repair over an iterate output carried
+ * none and `buildEvalInputs` fell back to the ORIGINAL page brief while the
+ * canvas held the iterate composition. Measured on job_1789506283204_3kxqshifx:
+ * p16 v2 scored -205 and p13 v2 -12, both graded against a brief their image was
+ * never painted from.
+ *
+ * The inverse direction is the same rule: a version whose parent is the ORIGINAL
+ * inherits the original brief (all three fields stay null and every consumer
+ * falls back to the page record), so reverting to an original-lineage version
+ * reverts the contract with it. No version is ever discarded — every one is kept
+ * for diagnosis, and pick-best simply promotes the winner's own contract.
+ *
+ * @param {object} target  the round result / version being created (mutated)
+ * @param {object|null} parent  the version this one was rendered FROM
+ * @returns {object} target
+ */
+function inheritSceneContract(target, parent) {
+  if (!target || !parent) return target;
+  // `== null` on purpose: a version that authored its OWN contract (an iterate
+  // rewrite) keeps it; only an absent field is inherited.
+  if (target.description == null) target.description = parent.description || null;
+  if (target.sceneMetadata == null) target.sceneMetadata = parent.sceneMetadata || null;
+  // An ARRAY is a declaration — `[]` is a cast this version deliberately
+  // emptied, and `||` cannot say that. Same rule as resolveDeclaredCast.
+  if (!Array.isArray(target.sceneCharacters)) {
+    target.sceneCharacters = Array.isArray(parent.sceneCharacters) ? parent.sceneCharacters : null;
+  }
+  // Lineage breadcrumb for diagnosis — which version's pixels this one edited.
+  if (target.parentSource === undefined) target.parentSource = parent.source || null;
+  return target;
+}
+
+/**
  * The pages that SHIP KNOWN-BROKEN, worst first (D7, 2026-09-11).
  *
  * A page qualifies when the repair budget is spent and it is still below the
@@ -1003,4 +1046,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

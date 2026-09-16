@@ -302,6 +302,75 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-16 — Iterate is a SECOND ART DIRECTOR: the new composition IS the contract, and no version is ever discarded
+
+**Context.** An iterate round rewrites a page's brief and repaints the frame. Until now only the
+iterate branch stamped `description` / `sceneMetadata` / `sceneCharacters` on its result
+(`repairPipeline.js` :2482); an inpaint or char-fix layered ON TOP of an iterate output stamped
+none, so `buildEvalInputs` (:432-456) fell back to `orig.sceneDescription` — the ORIGINAL brief —
+while the canvas held the iterate composition. The version was then graded against a brief its
+pixels were never painted from. Measured on job_1789506283204_3kxqshifx: p16 v2 scored -205 and
+p13 v2 -12, both of them repairs over an iterate output judged against the superseded plan.
+
+Separately, all five iterate rewrites on that story grew the brief 2.2x-3.4x (1891→4890, 2430→5920,
+1320→4440, 2176→5758, 3174→6947) and the added clauses created NEW criticals on content that had
+been correct — a real landmark deleted, contradictory trees invented, a described feature lost.
+`scene-iteration.txt` rule 1 has said "Simplify, don't elaborate" for months and was ignored. And
+the anchored-object allow-list (`images.js` ~:3974-4008) let a rewrite ADD any Visual Bible id whose
+name shared a ≥5-char token with the page text — which staged a creature pages early because the
+page text legitimately used its proper name for the object it hatches from.
+
+**Decision.** The owner's model, verbatim: *"Iterate is supposed to be a 2nd art director. The first
+art director could not be fulfilled, might have asked something impossible. We only notice it when
+the image is rendered… So we do like a 2nd art director, get a better composition. We now must
+evaluate against this new composition. ANY REPAIR AS WELL. Unless iterate is worse and we scrap
+iterate and work with original version."* And: *"pick-best is just the best score, why would we ever
+discard anything. Keep ALL versions so we can diagnose later."*
+
+1. **The evaluation contract follows the lineage.** Every repair records the version it edited
+   (`roundParent`, captured at dispatch — every action already resolves its input as
+   `selectBestVersion(versions)` falling back to the page's bytes) and inherits that version's
+   contract through `inheritSceneContract` (`repairLogic.js`) before the round's detection, eval,
+   entity check and consolidation run. A version that authored its own contract keeps it; one over
+   the original declares nothing and every consumer falls back to the page record. Applied at every
+   version-creation site with a known parent: the repair round, the garment recolour, the
+   post-repair text-space recovery, and the style repair.
+2. **Revert is wholesale, in both directions.** Because an original-lineage version declares no
+   contract of its own, pick-best promoting it restores the ORIGINAL brief to the page; an
+   iterate-lineage winner promotes the rewrite. The cast promotion moved from `||` to
+   `resolveDeclaredCast`, so a rewrite that deliberately declares an EMPTY cast is no longer
+   overwritten by the page roster.
+3. **No discard logic, ever.** Every version stays stored for diagnosis. Pick-best is a score
+   comparison and nothing else.
+4. **A rewrite may not stage a VB id outside its own page range.** The allow-list consults the
+   bible's STRUCTURED `pages` / `appearsInPages` / per-state page lists (`vbEntityCoversPage`) and
+   drops the name-token anchor for an id whose range excludes this page. No prose, no finding text.
+   Tolerant: an entry declaring no range is UNKNOWN and keeps the previous behaviour.
+5. **The rewrite is budgeted in code and the breach is fed back.** `computeBriefBudget` sets a hard
+   prose budget of **1.5×** the brief being rewritten (floor 1200 chars) — below the smallest growth
+   ever measured, so every observed runaway is caught, while still leaving half the brief again of
+   new room. The number is injected into BOTH iterate templates through one `{BRIEF_BUDGET}`
+   placeholder, and a breach (length, or an `objects[]`/`characters[]` citation outside original ∪
+   plan-line ∪ evaluator-feedback) triggers exactly ONE corrective re-ask carrying the specific
+   breach — the same shape as the declaration re-ask beside it. A gate is a guideline: the round
+   ships with a loud warning rather than dying on a paid call.
+
+**Rationale.** A repair judged against a brief it was never painted to cannot be repaired — the
+findings are unsatisfiable and the score is noise, which is exactly what -205 on p16 was. Making the
+contract a property of the lineage rather than of one branch means the answer is the same at every
+site and in both directions, so "scrap iterate and work with the original" needs no special case.
+The budget and the page range are mechanical rules computed in code and injected into the prompt,
+because both had a prose rule that the model ignored.
+
+**Touched files.** `server/lib/repairLogic.js` (`inheritSceneContract`), `server/lib/repairPipeline.js`
+(round parent link, four version sites, pick-best cast promotion), `server/lib/iterateBeat.js`
+(`vbEntityCoversPage`, `computeBriefBudget`/`renderBriefBudget`/`checkBriefBudget`),
+`server/lib/images.js` (budget injection + re-ask, page-range gate),
+`server/lib/promptBuilders.js` (`BRIEF_BUDGET` declared), `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`, `tests/unit/repair-contract-lineage.test.ts`,
+`tests/unit/iterate-budget-and-page-range.test.ts`, `tests/unit/built-prompt-values.test.ts`,
+`tests/unit/iterate-cast-writeback.test.ts`.
+
 Append new entries at the bottom of the matching section. Don't rewrite
 history — if a decision is reversed, add a new entry marking the old one
 superseded and link forward.

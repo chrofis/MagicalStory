@@ -40,7 +40,11 @@ describe('the rewritten scene contract travels with the version', () => {
   });
 
   it('final assembly still promotes the picked version contract to the page', () => {
-    expect(SRC).toMatch(/sceneCharacters: best\?\.sceneCharacters \|\| img\.sceneCharacters/);
+    // The cast moved onto resolveDeclaredCast on 2026-09-16: `||` promoted the
+    // page roster over a winner that DECLARED an empty cast, which is the same
+    // truthiness bug this file's third case forbids one level up. The metadata
+    // has no empty-declaration state and keeps the coalesce.
+    expect(SRC).toMatch(/sceneCharacters: resolveDeclaredCast\(best\?\.sceneCharacters, img\.sceneCharacters\)/);
     expect(SRC).toMatch(/sceneMetadata: best\?\.sceneMetadata \|\| img\.sceneMetadata/);
   });
 });
