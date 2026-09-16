@@ -618,8 +618,9 @@ function parseVisualBible(outline) {
  * The bands are RELATIVE, never metric — an illustration has no absolute
  * scale — and every one is a phrase about a standing adult. The band names are
  * the same body-part vocabulary the quality evaluator's D-21 `scale` rule
- * already reasons in (apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ head,
- * sword ≈ arm), so generator and critic speak one language.
+ * already reasons in (apple ≈ fist, mug ≈ palm, book ≈ forearm, lantern ≈ a
+ * head — the `melon` band, sword ≈ arm), so generator and critic speak one
+ * language.
  *
  * `null` is a first-class value: a bible stored before the field existed has
  * none, and every consumer falls back to its pre-2026-09-15 behaviour — for
@@ -627,26 +628,60 @@ function parseVisualBible(outline) {
  * token is NEVER coerced to the nearest band; a guessed class routes an object
  * to the wrong pipeline.
  */
+/**
+ * TWO COMPARISON MODES, AND EVERY PHRASE SAYS WHICH (owner, 2026-09-16).
+ *
+ * The bands below the knee compare the object's own SIZE; the bands from the
+ * knee up compare its HEIGHT against a standing adult. Until 2026-09-16 the
+ * ladder mixed the two under one body-part vocabulary and collided on `head`:
+ * `forearm`/`arm` were SIZE rungs ("as big as that limb"), so `head` read as
+ * "head-sized" — while the phrase it rendered was "as big as a standing adult".
+ * The quality evaluator's D-21 reference list reads `head` the other way still
+ * ("lantern ≈ head"), so generator and critic disagreed on one token.
+ *
+ * Measured: staging story job_1789506283204_3kxqshifx gave a football-sized
+ * dragon egg `scaleClass: "head"` meaning head-sized, and every page carrying
+ * the egg was told it was as big as a standing adult — correct on p2/p4,
+ * oversized on p13, enormous on p14 and p17 (filling a child's lap).
+ *
+ * The fix is vocabulary, not a phrase tweak: the height top rung is named
+ * `adult` (a word that cannot be read as a size referent) and the head-SIZED
+ * object gets its own band, `melon` — a non-body noun, so it cannot be read as
+ * a rung of the height ladder. `head` survives as a LEGACY alias of `adult`,
+ * the behaviour every stored bible already has; a stored token is never
+ * reinterpreted on a guess about what its author meant.
+ */
 const SCALE_PHRASES = Object.freeze({
   fingertip: 'small enough to sit on a fingertip',
   palm: 'small enough to close one hand around',
   hand: 'fills an open hand',
-  forearm: "about as big as an adult's forearm",
-  arm: "about as big as an adult's whole arm",
-  knee: "reaches an adult's knee",
-  hip: "reaches an adult's hip",
-  chest: "reaches an adult's chest",
-  head: 'as big as a standing adult',
-  double: 'twice the size of a standing adult',
+  melon: 'about as big as a human head, like a lantern or a football',
+  forearm: "about as long as an adult's forearm",
+  arm: "about as long as an adult's whole arm",
+  knee: 'stands knee-high to an adult',
+  hip: 'stands hip-high to an adult',
+  chest: 'stands chest-high to an adult',
+  adult: 'as tall as a standing adult',
+  double: 'twice the height of a standing adult',
   house: 'several adults high, the size of a house',
   landmark: 'fills the horizon behind everything'
 });
+
+/**
+ * The enum as the AUTHORING prompts state it. ONE source of truth: the
+ * Visual-Bible authoring templates carry this string verbatim, and
+ * `tests/unit/vb-scale-class.test.ts` fails the moment a template drifts from
+ * it. It is a JSON string value in those templates, so it may never contain a
+ * double quote.
+ */
+const SCALE_CLASS_SPEC = "[how big this element is, one of: fingertip, palm, hand, melon, forearm, arm, knee, hip, chest, adult, double, house, landmark. The first six state the object's own SIZE: fingertip — sits on a fingertip; palm — a hand closes around it; hand — fills an open hand; melon — head-sized, like a lantern or a football; forearm, arm — as long as that limb. The last seven state HEIGHT against a standing adult: knee, hip, chest — reaches that part of the adult; adult — as tall as the adult; double — twice the adult's height; house — several adults high; landmark — fills the horizon. `adult` is a HEIGHT band and never means head-SIZED; a head-sized object is `melon`. Judge the element's largest dimension, not how the story feels about it. This is the only place the element's size is stated. Never omitted.]";
 
 /** Ascending. The order IS the contract — a reader must be able to tell any two apart. */
 const SCALE_CLASSES = Object.keys(SCALE_PHRASES);
 
 /**
- * The 2026-09-15 morning enum, mapped onto the granular one that replaced it
+ * The retired tokens, mapped onto the live enum. The 2026-09-15 morning
+ * six-value enum, and the `head` rung renamed to `adult` on 2026-09-16. Mapped
  * the same afternoon. Bibles authored between the two carry these tokens, and
  * repair, iterate, regeneration and cover paths re-read stored bibles months
  * later — an unmapped token would make a stored element unroutable.
@@ -659,7 +694,13 @@ const LEGACY_SCALE_CLASSES = Object.freeze({
   person: 'hip',
   vehicle: 'double',
   building: 'house',
-  landscape: 'landmark'
+  landscape: 'landmark',
+  // 2026-09-16: the height ladder's top rung was renamed `head` -> `adult`.
+  // Stored bibles carry `head`, and it resolves to the phrase it has always
+  // rendered. A stored token is NEVER reinterpreted: an author who meant
+  // head-sized cannot be told apart from one who meant adult-height, and
+  // guessing would change a shipped story's scale on a repaint.
+  head: 'adult'
 });
 
 /**
@@ -3642,6 +3683,7 @@ function recordElementCellGate(visualBible, elementId, verdict) {
 module.exports = {
   recordElementCellGate,
   SCALE_CLASSES,
+  SCALE_CLASS_SPEC,
   SCALE_PHRASES,
   LEGACY_SCALE_CLASSES,
   resolveScaleClass,

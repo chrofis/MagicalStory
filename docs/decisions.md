@@ -7,6 +7,55 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-16 — The scale ladder states SIZE or HEIGHT, and says which; `head` becomes `adult` + `melon`
+
+**Context.** `SCALE_PHRASES` (server/lib/visualBible.js) is the closed band enum every Visual Bible
+element carries and the only place an element's size is stated. Shipped 2026-09-15 as one
+body-part ladder, it mixed two comparison modes without saying so: `forearm`/`arm` compared the
+object's SIZE ("about as big as an adult's forearm"), `knee`/`hip`/`chest` compared its HEIGHT
+("reaches an adult's knee"), and the two collided on `head` — a body part that reads as a size
+referent (a lantern is head-sized) but which rendered "as big as a standing adult". The quality
+evaluator reads it the size way still: D-21's reference list is "apple ≈ fist, mug ≈ palm, book ≈
+forearm, lantern ≈ head". Measured on staging story job_1789506283204_3kxqshifx: the writer gave a
+football-sized dragon egg `scaleClass: "head"` meaning head-sized, so every page carrying the egg
+told the image model it was as big as a standing adult — correct on p2/p4, oversized on p13,
+enormous on p14 and p17 (filling a child's lap). The enum was NOT missing a small-object band
+(`fingertip`/`palm`/`hand` exist and the authoring prompt offers them); the token was ambiguous.
+
+**Decision.**
+1. The height ladder's top rung is renamed `head` -> **`adult`** ("as tall as a standing adult") —
+   a word that cannot be read as a size referent.
+2. A head-SIZED band is added: **`melon`** ("about as big as a human head, like a lantern or a
+   football"), between `hand` and `forearm`. A non-body noun, so it cannot be read as a rung of the
+   height ladder.
+3. Every phrase now states its mode: the six size bands never claim stature, the seven height bands
+   always do. Pinned as BEHAVIOUR, not wording, in `tests/unit/vb-scale-class.test.ts`.
+4. `head` joins `LEGACY_SCALE_CLASSES` mapping to `adult` — the phrase every stored bible already
+   renders. A stored token is never REINTERPRETED: an author who meant head-sized cannot be told
+   apart from one who meant adult-height, and guessing would silently change a shipped story's
+   scale on a repaint. The pre-enum free-text `size` fallback in `elementScaleNote` is untouched.
+5. The authoring vocabulary becomes ONE constant, `SCALE_CLASS_SPEC`, carried verbatim by both VB
+   authoring templates — it was hand-typed nine times across them. A test fails on any drift.
+6. Plate routing is unchanged: `LARGE_SCALE_CLASSES` is still {double, house, landmark}.
+
+**Rationale.** The enum's job is to be unguessable. A vocabulary where one token has two readings is
+worse than free text, because code acts on it. Renaming is cheap; the alternative — explaining in
+prose which mode each rung means while keeping the colliding name — leaves the collision in the
+data. The owner's standing ruling that a scale referent may NOT be drawn inside a VB cell
+(`feedback_no_scale_referent_in_vb_cell`) is why scale stays words-in-the-prompt only.
+
+**Generator vs critic — NOT closed, proposal only.** No evaluator judges an object against its
+DECLARED band: D-21 `scale` judges an everyday object against its NATURAL size, D-31
+`structure_scale` judges vessels/buildings against adjacent figures. A band the generator is given
+and the critic cannot deduct for is generator-only. Proposed, not implemented, needs owner sign-off:
+inject the band phrases from `SCALE_CLASS_SPEC` into `image-evaluation.txt` and extend D-21 to fire
+when a cited VB element contradicts its own band — one JS constant into both templates.
+
+**Touched files.** `server/lib/visualBible.js` (`SCALE_PHRASES`, `LEGACY_SCALE_CLASSES`,
+`SCALE_CLASS_SPEC`), `prompts/scene-expansion-all.txt`, `prompts/story-trial.txt` (9 occurrences
+regenerated from the constant), `tests/unit/vb-scale-class.test.ts`,
+`tests/unit/artifact-size.test.ts`, `tasks/BACKLOG.md`.
+
 ## 2026-09-16 — Age-band spans are tagged by what a rule IS; views compose by allow-list
 
 **Context.** `prompts/age-band-*.txt` sliced one band file into three reader views by SUBTRACTING

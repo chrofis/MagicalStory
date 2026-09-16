@@ -33,7 +33,10 @@ const buildPagePrompt = (vb: any) => {
 // because two of these four had no such field). Since 2026-09-15 the field is
 // the closed `scaleClass` band, not a free-text sentence.
 /** The bands every authoring site must offer, ascending. */
-const BANDS = ['fingertip', 'palm', 'hand', 'forearm', 'arm', 'knee', 'hip', 'chest', 'head', 'double', 'house', 'landmark'];
+// 2026-09-16: the height ladder's top rung is `adult`, and `melon` is the
+// head-SIZED band it used to be confused with. `head` survives only as a
+// stored-bible alias — it is no longer OFFERED to an author.
+const BANDS = ['fingertip', 'palm', 'hand', 'melon', 'forearm', 'arm', 'knee', 'hip', 'chest', 'adult', 'double', 'house', 'landmark'];
 
 // The two pre-beats unified writers were members until 2026-09-15, when they
 // were deleted as unreachable (docs/decisions.md).
@@ -50,7 +53,7 @@ describe('artifact size — builder contract', () => {
       scaleClass: 'knee'
     });
     expect(desc).toContain('a squat pail with two iron bands');
-    expect(desc).toContain("reaches an adult's knee");
+    expect(desc).toContain('stands knee-high to an adult');
     // the phrase, never the token
     expect(desc).not.toMatch(/Size: knee$/);
   });
@@ -86,7 +89,7 @@ describe('artifact size — builder contract', () => {
       }]
     }), '```'].join(NL);
     const prompt = buildPagePrompt(parseVisualBible(outline));
-    expect(prompt).toContain("about as big as an adult's forearm");
+    expect(prompt).toContain("about as long as an adult's forearm");
     expect(prompt).not.toMatch(/scaleClass/i);
     expect(prompt).not.toMatch(/\u2014 forearm\b/);
   });
@@ -159,7 +162,7 @@ describe('artifact scale — authoring instruction contract', () => {
       expect(text).not.toContain('Every artifact carries `size`');
     });
 
-    it(file + ' lists the twelve bands and no others', () => {
+    it(file + ' lists the thirteen bands and no others', () => {
       const text = read(file);
       const at = text.indexOf('"scaleClass": "[');
       expect(at, file + ' has no scaleClass instruction').toBeGreaterThan(-1);

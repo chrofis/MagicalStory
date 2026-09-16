@@ -34,7 +34,7 @@ const PB = require('../../server/lib/promptBuilders');
 const { log } = require('../../server/utils/logger');
 
 const { parseVisualBible, parseNewVisualBibleEntries, normaliseScaleClass, resolveScaleClass,
-        scalePhrase, elementScaleNote, SCALE_CLASSES, SCALE_PHRASES, LEGACY_SCALE_CLASSES,
+        scalePhrase, elementScaleNote, SCALE_CLASSES, SCALE_PHRASES, SCALE_CLASS_SPEC, LEGACY_SCALE_CLASSES,
         isLargeScaleClass } = VB;
 
 const bible = (data: any) =>
@@ -57,10 +57,10 @@ const FULL = {
 };
 
 describe('scaleClass — the closed enum', () => {
-  it('is the twelve bands, ascending, each with exactly one render phrase', () => {
+  it('is the thirteen bands, ascending, each with exactly one render phrase', () => {
     expect(SCALE_CLASSES).toEqual([
-      'fingertip', 'palm', 'hand', 'forearm', 'arm',
-      'knee', 'hip', 'chest', 'head', 'double', 'house', 'landmark'
+      'fingertip', 'palm', 'hand', 'melon', 'forearm', 'arm',
+      'knee', 'hip', 'chest', 'adult', 'double', 'house', 'landmark'
     ]);
     // ONE source of truth: the token list IS the phrase map's key list, so a
     // band can never exist without a wording or carry two of them.
@@ -71,6 +71,46 @@ describe('scaleClass — the closed enum', () => {
     }
     // every phrase is distinguishable — no two bands read the same
     expect(new Set(Object.values(SCALE_PHRASES)).size).toBe(SCALE_CLASSES.length);
+  });
+
+  /**
+   * THE 2026-09-16 DEFECT, PINNED. The ladder mixed a SIZE comparison
+   * (forearm/arm: "as big as that limb") with a HEIGHT comparison
+   * (knee/hip/chest: "reaches that part") under one body-part vocabulary, and
+   * collided on `head`: the writer of job_1789506283204_3kxqshifx classed a
+   * football-sized dragon egg `head` meaning head-SIZED and every page was
+   * told the egg was as big as a standing adult.
+   *
+   * These are BEHAVIOURAL, not wording, assertions: a small object's band must
+   * render a phrase that never claims adult stature, and the adult-height band
+   * must render a phrase that does.
+   */
+  it('a head-sized object has a band of its own, and it is not an adult-height phrase', () => {
+    expect(SCALE_CLASSES).toContain('melon');
+    const melon = scalePhrase('melon') as string;
+    expect(melon).toMatch(/head/i);           // it is the head-SIZED band
+    expect(melon).not.toMatch(/tall|stands|high/i);
+    // and it sorts below the limb bands, above the hand bands
+    expect(SCALE_CLASSES.indexOf('melon')).toBeGreaterThan(SCALE_CLASSES.indexOf('hand'));
+    expect(SCALE_CLASSES.indexOf('melon')).toBeLessThan(SCALE_CLASSES.indexOf('forearm'));
+  });
+
+  it('every SIZE band says size and every HEIGHT band says height', () => {
+    const SIZE = ['fingertip', 'palm', 'hand', 'melon', 'forearm', 'arm'];
+    const HEIGHT = ['knee', 'hip', 'chest', 'adult', 'double', 'house', 'landmark'];
+    expect([...SIZE, ...HEIGHT]).toEqual(SCALE_CLASSES);
+    for (const band of SIZE) {
+      // a size band never claims stature — that is the sentence that oversized
+      // the egg on four pages
+      expect(SCALE_PHRASES[band], band).not.toMatch(/tall|stands .*-high|adults high/i);
+    }
+    for (const band of HEIGHT) {
+      expect(SCALE_PHRASES[band], band).toMatch(/tall|high|height|horizon/i);
+    }
+    // the top of the height ladder is named for the adult, never for a body
+    // part that doubles as a size referent
+    expect(SCALE_CLASSES).not.toContain('head');
+    expect(scalePhrase('adult')).toMatch(/as tall as a standing adult/);
   });
 
   it('states every band against a standing adult, never in units', () => {
@@ -113,7 +153,7 @@ describe('scaleClass — the closed enum', () => {
 describe('scaleClass — the retired six-value enum still resolves', () => {
   it('maps each legacy band onto exactly one granular band', () => {
     expect(LEGACY_SCALE_CLASSES).toEqual({
-      person: 'hip', vehicle: 'double', building: 'house', landscape: 'landmark'
+      person: 'hip', vehicle: 'double', building: 'house', landscape: 'landmark', head: 'adult'
     });
     // `hand` and `arm` survived the rewrite under their own names
     expect(resolveScaleClass('hand')).toBe('hand');
@@ -125,13 +165,20 @@ describe('scaleClass — the retired six-value enum still resolves', () => {
     }
   });
 
+  it("a stored `head` keeps the phrase it has always rendered, never a reinterpretation", () => {
+    // An author who meant head-sized cannot be told apart from one who meant
+    // adult-height, so the stored token is NOT re-pointed at `melon`.
+    expect(resolveScaleClass('head')).toBe('adult');
+    expect(scalePhrase('head')).toBe(SCALE_PHRASES.adult);
+  });
+
   it('leaves plate routing unchanged for a legacy-classed element', () => {
     // The whole point of the mapping: the three large legacy bands are exactly
     // the three large granular bands, so nothing already stored changes route.
     for (const large of ['vehicle', 'building', 'landscape', 'double', 'house', 'landmark']) {
       expect(isLargeScaleClass(large), large).toBe(true);
     }
-    for (const small of ['hand', 'arm', 'person', 'fingertip', 'palm', 'forearm', 'knee', 'hip', 'chest', 'head']) {
+    for (const small of ['hand', 'arm', 'person', 'fingertip', 'palm', 'melon', 'forearm', 'knee', 'hip', 'chest', 'head', 'adult']) {
       expect(isLargeScaleClass(small), small).toBe(false);
     }
     expect(isLargeScaleClass(null)).toBe(false);
@@ -142,7 +189,7 @@ describe('scaleClass — the retired six-value enum still resolves', () => {
 describe('scaleClass — the Visual Bible whitelist parse', () => {
   it('admits the field on all five element collections', () => {
     const vb = parseVisualBible(bible(FULL));
-    expect(vb.secondaryCharacters[0].scaleClass).toBe('head');
+    expect(vb.secondaryCharacters[0].scaleClass).toBe('adult'); // stored 'head', the legacy alias
     expect(vb.animals[0].scaleClass).toBe('knee');
     expect(vb.artifacts[0].scaleClass).toBe('fingertip');
     expect(vb.locations[0].scaleClass).toBe('landmark');
@@ -413,5 +460,43 @@ describe('the stored-`size` fallback is permanent — real pre-enum bibles', () 
         artStyle: 'watercolor', relationships: {}, relationshipTexts: {},
       } as any, null, vb, 1, null, {}));
     expect(prompt).toContain('the size of a thumb');
+  });
+});
+
+/**
+ * ONE SOURCE OF TRUTH FOR THE AUTHORING VOCABULARY (2026-09-16).
+ *
+ * The enum text used to be typed out nine times across the two Visual-Bible
+ * authoring templates. It is now `SCALE_CLASS_SPEC` in `visualBible.js`, and
+ * every occurrence in a template is that string verbatim — so a band added in
+ * code but not offered to the writer, or a phrase that drifts between the
+ * trial and the full path, fails here instead of shipping.
+ */
+describe('the authoring templates offer exactly the code enum', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const ROOT = path.resolve(__dirname, '../..');
+  const SITES = ['prompts/scene-expansion-all.txt', 'prompts/story-trial.txt'];
+
+  it('carries the spec verbatim at every authoring site', () => {
+    for (const rel of SITES) {
+      const text = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+      const count = text.split(SCALE_CLASS_SPEC).length - 1;
+      expect(count, `${rel} scaleClass spec occurrences`).toBeGreaterThan(0);
+      // and no stale hand-typed variant survives beside it
+      expect(text.includes('how big this element is beside a standing adult'), rel).toBe(false);
+    }
+  });
+
+  it('offers every live band and no retired one', () => {
+    for (const band of SCALE_CLASSES) {
+      expect(SCALE_CLASS_SPEC, band).toContain(band);
+    }
+    // it is a JSON string value in the templates — a double quote would break
+    // the schema example the writer copies
+    expect(SCALE_CLASS_SPEC).not.toContain('"');
+    // the spec names both comparison modes, which is the whole fix
+    expect(SCALE_CLASS_SPEC).toMatch(/SIZE/);
+    expect(SCALE_CLASS_SPEC).toMatch(/HEIGHT/);
   });
 });

@@ -48,3 +48,22 @@ Not decided; not coded. Needs owner triage → then Lab stage design.
 **Status:** not decided, not coded (owner asked for ideas only, 2026-09-15). Next step is owner
 
 triage of the seven, then a Test Lab stage design for whichever are taken.
+
+## Status update 2026-09-16 — idea #1 shipped, then repaired
+
+Idea #1 shipped on 2026-09-15 as a granular 12-band enum (`SCALE_PHRASES`, `server/lib/visualBible.js`),
+not the six-value list sketched above; the six values survive as `LEGACY_SCALE_CLASSES`.
+
+It then produced its own defect. The ladder mixed two comparison modes under one body-part
+vocabulary — `forearm`/`arm` compared the object's SIZE, `knee`/`hip`/`chest` compared its HEIGHT —
+and collided on `head`. On `job_1789506283204_3kxqshifx` the writer classed a football-sized dragon
+egg as `head` meaning head-sized; every page carrying it was told it was "as big as a standing
+adult" (correct on p2/p4, oversized p13, enormous p14/p17).
+
+Fixed 2026-09-16: the height rung is `adult`, the head-SIZED band is the new `melon`, every phrase
+states its mode, `head` resolves to `adult` for stored bibles, and the authoring text is one
+constant (`SCALE_CLASS_SPEC`) both authoring templates carry verbatim.
+→ `docs/decisions.md` 2026-09-16 "The scale ladder states SIZE or HEIGHT, and says which".
+
+Ideas #2-#7 remain undecided and uncoded. #6 (measure scale after render) is the critic-side half
+that is still missing: nothing deducts for an element rendered off its declared band.

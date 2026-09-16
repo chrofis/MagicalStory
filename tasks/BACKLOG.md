@@ -1220,11 +1220,23 @@ decisions → `docs/decisions.md` (ten entries dated 2026-09-15).
       p16. Same story, likely the same wardrobe-resolution question as the item above; confirm from the
       stored clothing requirements before treating it as a render fault →
       `tasks/staging-story-review-2026-09-15.md:2`
-- [ ] **VB element scale — one reference cell for a ship or a walnut (ideas only, owner triage
-      pending).** p8 put a football-sized chestnut nearest to camera for a prop whose VB says "the size
-      of a thumb"; p12 drew a three-master as a small rowboat. Seven ideas written up, recommended
-      start #1 (a scale-class enum on every VB element) and #2 (hand-class props never get their own
-      reference cell). Not decided, not coded → `tasks/scale-ideas-2026-09-15.md`
+- [ ] **VB element scale — one reference cell for a ship or a walnut (ideas #3-#7 still open).**
+      p8 put a football-sized chestnut nearest to camera for a prop whose VB says "the size of a
+      thumb"; p12 drew a three-master as a small rowboat. Idea #1 (a scale-class enum on every VB
+      element) SHIPPED 2026-09-15 and was repaired 2026-09-16: the ladder mixed a SIZE comparison
+      with a HEIGHT comparison and collided on `head`, so a head-sized dragon egg was rendered
+      adult-sized on four pages of `job_1789506283204_3kxqshifx`. The band is now `adult` for the
+      height rung plus a new head-SIZED band `melon`, every phrase states its mode, and the
+      authoring vocabulary is one constant (`SCALE_CLASS_SPEC`) both authoring templates carry
+      verbatim. Idea #2 (hand-class props never get their own reference cell) and #3-#7 are still
+      undecided → `tasks/scale-ideas-2026-09-15.md`, `docs/decisions.md` 2026-09-16 "The scale
+      ladder states SIZE or HEIGHT"
+- [ ] **Object scale is generator-only: no evaluator judges an element against its declared
+      `scaleClass` band (2026-09-16, proposal not coded).** D-21 judges natural size, D-31 judges
+      structures against adjacent figures; neither reads the band the generator was given. Proposed:
+      inject the band phrases into `image-evaluation.txt` from the same JS constant and extend D-21.
+      Needs owner sign-off → `prompts/image-evaluation.txt`, `server/lib/visualBible.js`
+      `SCALE_CLASS_SPEC`
 - [ ] **`PEOPLELESS_ON_INTERACTION_PAGE` is ranked "also noted", not must-fix** — decide whether to
       promote it into `REPLAN_MUST_FIX_CODES`. The finding has the same shape as the one code already
       there ("a commissioned character the division left out"): the climax has no faces. Owner is
