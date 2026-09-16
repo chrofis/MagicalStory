@@ -2320,7 +2320,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 (800 max tokens — 2-3 sentence idea)
+    // Stream Story 1 (800 max tokens — three-sentence idea)
     const streamStory1 = callTextModelStreaming(prompt1Local, null, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
@@ -2342,7 +2342,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 (800 max tokens — 2-3 sentence idea)
+    // Stream Story 2 (800 max tokens — three-sentence idea)
     const streamStory2 = callTextModelStreaming(prompt2, null, (delta, fullText) => {
       fullResponse2 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {

@@ -41788,3 +41788,53 @@ and the watchdog that reads it are meaningless apart, and both watchdog comments
 `scripts/admin/sibling-registry.json`, `tests/unit/job-liveness-heartbeat.test.ts`,
 `tasks/bugs.json`.
 **Status:** ✅ active — committed on `staging`, not pushed (owner approval pending).
+
+## 2026-09-16 — The trial idea prompt asks for three slots, not "the core idea"
+
+**Context.** `prompts/trial-idea.txt` closed with *"Respond with ONLY 2-3 sentences describing the
+core idea of the story. Maximum 40 words."* — it named a length and a subject but never said what
+those sentences had to CONTAIN, so the budget went on setting and decoration and the story's
+movement was optional. Measured over 112 rated ideas across four rounds: **12 of 28 round-4 ideas
+stop on the problem** and never resolve. Two worked examples from the worst cards: one 35-word idea
+spent 8 words on a place clause and 7 on a decorative mount-and-forest clause — 15 of 35 words on
+where and how pretty, nothing on what the child does, and it stopped on the problem; a second at 42
+words carried two unrelated setups, three ornamental noun phrases, and no turn. Decoration also
+lands on the season: at premise length a stated season was being narrated ("in the autumn leaves",
+"before the autumn fog") rather than used, which is the `a4e3015c2` failure one step further in —
+there the season chose the subject, here it eats the words.
+
+**Decision.** Four changes, all owner-approved, to `prompts/trial-idea.txt` only.
+1. A per-sentence contract replaces "describing the core idea": *(1) what the main character wants,
+   and what gets in the way; (2) what they do about it; (3) how it turns out*, with a missing slot
+   and an idea that stops on the problem both named as faults. The shape is borrowed from
+   `scene-expansion-all.txt`'s `sceneIntent` spec ("Sentence 1: who does what to whom, where.
+   Sentence 2: … Sentence 3: setting, lighting, and the mood as it shows…"), the one slotted
+   contract in the repo that has survived tightening — sentence 3 there could be made stricter
+   precisely because it had a slot to tighten.
+2. An explicit ban on ornamental adjectives: name each thing plainly.
+3. The cap rises 40 → 50 words, to pay for three required slots. The template is the ONLY site that
+   states or enforces this cap — no parser, no clamp, no truncation in `TrialIdeasStep.tsx`.
+4. `{SEASON}` STAYS in the prompt (owner, reversing the first draft of this change): the season is
+   what keeps a premise plausible for the time of year. What is new is that it may not be SPENT —
+   the idea never names the season or describes its weather, light or scenery. The writer
+   (`buildTrialIdeaPrompts` → `story-trial.txt`, `promptBuilders.js` `SEASON: buildSeasonInstruction`)
+   and the image prompt (`SEASON_NOTE: buildSeasonNote`) both still render it; neither
+   `buildSeasonInstruction` nor `buildSeasonNote` is touched, so the wizard's two idea endpoints and
+   the trial writer are unaffected.
+
+**Rationale.** A length plus a subject is a stylistic hint; a slot is a violation. The routine band
+(age 0-1) was checked for conflict and has none: its own injected line already says "what the main
+character wants, what stands in the way, and the objects the story turns on belong to the world of
+someone that age", and its `[[premise:resolution]]` slot *is* want → obstacle → turn ("One small
+thing goes wrong, and comes right"). Slot 2 asks for a doing, which that band enumerates (patting,
+carrying, splashing); it never asks for reasoning, so "never anything that turns on working
+something out" still governs unopposed. Its "never carry one want from page to page" is a
+page-to-page mechanics rule, not a premise rule.
+
+**Sibling paths.** The `/try` route and the Lab's variety stage already share ONE assembly
+(`buildTrialIdeaPrompts`, `trial-idea-prompt-mirror` set), so the template change reaches both with
+no copy to keep in step; `server/lib/testlab.js` needed no edit.
+
+**Touched:** `prompts/trial-idea.txt`, `server/routes/trial.js` (two stale "2-3 sentence" comments),
+`docs/decisions.md`.
+**Status:** ✅ active — committed on `staging`, not pushed.
