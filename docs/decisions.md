@@ -41307,3 +41307,52 @@ agency rule AND the resolution rule and still lacks the beat structure.
 
 **Status:** ✅ active — repairs an incomplete fix from `fdc85a290`. No corpus rerun (no paid calls
 authorised for this change).
+
+## The job liveness heartbeat spans the WHOLE job, not one phase (2026-09-16)
+
+**Context.** `server/routes/jobs.js` fails any job whose `story_jobs.updated_at` has
+been still for `HEARTBEAT_TIMEOUT_MINUTES` (10). Liveness was written by *phase-local*
+intervals: one in the text phase, one armed for Phase 5a image generation and cleared
+in a `finally` the instant the page-image `Promise.all` resolved. The next write of
+`updated_at` was the "Finishing cover images..." progress update far below. Everything
+between — missing-page retry, the text-region pass, the Phase 5b-pre shared bbox
+detection that runs on the *separate* analyzer service, the quality/semantic/entity
+evals, the repair rounds — ran with zero liveness writes. On staging,
+`job_1789506283204_3kxqshifx` (18 pages) was declared dead at 64% after 10.7 minutes of
+silence with all 18 pages and 3 covers already rendered. This was the **second**
+instance of the class: the comment above the Phase 5a interval documented the identical
+false kill from 2026-08, and that fix covered only the one phase it was standing in.
+
+**Decision.** One PUSH heartbeat, `startJobHeartbeat()` in `server/lib/jobHeartbeat.js`,
+armed **once** in `processStoryJob` — the single entry point every caller uses (jobs,
+trial, admin retry, admin rerun, auth), and therefore the single arming site for the
+unified, beats and trial pipelines alike — and disarmed in the same outermost `finally`
+that already ends the analyzer session. Completion, failure, cancellation and early
+return all disarm it exactly once. The interval is `unref`'d, `stop()` is idempotent, a
+failing write is caught and the beat continues, and the UPDATE is scoped
+`AND status = 'processing'` so it can never touch a row that has reached a terminal
+state. The now-redundant phase-local liveness interval in Phase 5a was **removed** so
+there is one source of truth. The text-phase timer stays: it also interpolates the
+progress bar between stage checkpoints, which is a second, real job.
+
+**Rationale.** Raising the timeout was rejected outright — it treats the symptom. The
+blind window is not 10.7 minutes long by nature; it is however long the post-generation
+tail happens to be on that story, and the next phase to grow past whatever the new
+number is re-breaks it. Two incidents already followed that shape. Arming per phase has
+the same defect at a smaller scale: every new long phase is a new blind window nobody
+remembers to cover, which is exactly how this one appeared. The heartbeat is
+deliberately *not* a progress detector — it proves the worker **process** is alive,
+which is precisely what the watchdog's staleness detector is for (crash, container
+restart, wedged worker); a job that is alive but useless is bounded by the separate
+`TOTAL_TIMEOUT_MINUTES` (180) backstop, not by this.
+
+Registered as a sibling set (`job-liveness-heartbeat-vs-watchdog`): the heartbeat writer
+and the watchdog that reads it are meaningless apart, and both watchdog comments in
+`server/routes/jobs.js` claimed the old per-phase guarantee.
+
+**Touched:** `server/lib/jobHeartbeat.js` (`startJobHeartbeat`), `storyJobPipeline.js`
+(arm/disarm in `processStoryJob`; Phase 5a liveness interval removed),
+`server/routes/jobs.js` (both watchdog rationale comments),
+`scripts/admin/sibling-registry.json`, `tests/unit/job-liveness-heartbeat.test.ts`,
+`tasks/bugs.json`.
+**Status:** ✅ active — committed on `staging`, not pushed (owner approval pending).

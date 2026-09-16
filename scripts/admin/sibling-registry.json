@@ -141,16 +141,16 @@
       "severity": "block"
     },
     {
-    "id": "trial-idea-prompt-mirror",
-    "axis": "trial idea route vs its Test Lab mirror",
-    "reason": "the /try idea route (server/routes/trial.js) and the Lab's idea stage (server/lib/testlab.js, marked `route mirror:`) hand-assemble the SAME character line, category context and landmark text; a copy kept by hand at both is how the raw storyTheme ID shipped into every life-skill prompt as \"the child plays at being a farm\" (2026-09-15). Shared text belongs in one constant both require.",
-    "members": [
-      "server/routes/trial.js",
-      "server/lib/testlab.js"
-    ],
-    "severity": "block"
-  },
-  {
+      "id": "trial-idea-prompt-mirror",
+      "axis": "trial idea route vs its Test Lab mirror",
+      "reason": "the /try idea route (server/routes/trial.js) and the Lab's idea stage (server/lib/testlab.js, marked `route mirror:`) hand-assemble the SAME character line, category context and landmark text; a copy kept by hand at both is how the raw storyTheme ID shipped into every life-skill prompt as \"the child plays at being a farm\" (2026-09-15). Shared text belongs in one constant both require.",
+      "members": [
+        "server/routes/trial.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "lab-vs-prod-eval",
       "axis": "Test Lab stage vs production call site",
       "reason": "testlab.js re-implements the call that evalPipeline.js makes in production; when they drift the Lab measures something production never runs (version pinning, cast lists, model ids).",
@@ -260,6 +260,16 @@
       ],
       "critics": [
         "prompts/plan-check.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "job-liveness-heartbeat-vs-watchdog",
+      "axis": "heartbeat writer vs watchdog reader",
+      "reason": "server/lib/jobHeartbeat.js writes story_jobs.updated_at and server/routes/jobs.js is the only reader that kills a job for a stale one (two detectors, poll-time and stale-sweep); a change to when or whether the worker heartbeats, or to the timeout that reads it, is meaningless unless both sides move together.",
+      "members": [
+        "server/lib/jobHeartbeat.js",
+        "server/routes/jobs.js"
       ],
       "severity": "block"
     }

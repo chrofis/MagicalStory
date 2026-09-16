@@ -90,7 +90,7 @@ const {
 const { UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { checkSceneConsistency, formatSceneConsistencySummary } = require('./server/lib/sceneConsistencyCheck');
 const { generateStoryViaBeats, resolvePipelineMode } = require('./server/lib/beatsPipeline');
-const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
+const { createJobHeartbeat, startJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { stripDataUriPrefix } = require('./server/lib/r2');
 const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
@@ -5203,12 +5203,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const genStartTime = Date.now();
       const genLimit = pLimit(50);
 
-      // Liveness heartbeat. progress/updated_at only move as a page STARTS, and
-      // all pages start at once — so updated_at freezes for the whole first
-      // pass and the status endpoint's 10-minute heartbeat check (jobs.js)
-      // declares a perfectly healthy job dead. Observed: a 14-page run killed at
-      // 28% while the analyzer was burning 5,776 CPU-seconds of real work.
-      // Touching updated_at on a timer says "alive" without faking progress.
       // Progress tracked on COMPLETION, not on start. Every page starts at once,
       // so the old per-start update drove the bar straight to its ceiling (28%)
       // and then sat there for the entire pass — looking hung to the user and to
@@ -5223,14 +5217,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         ).catch(err => log.debug(`[PROGRESS] job ${jobId}: ${err.message}`));
       };
 
-      const heartbeat = setInterval(() => {
-        dbPool.query('UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2', [jobId, 'processing'])
-          .catch(err => log.debug(`[HEARTBEAT] job ${jobId}: ${err.message}`));
-      }, 60_000);
-      heartbeat.unref?.();
-
+      // NO phase-local liveness interval here any more: the whole-job heartbeat
+      // armed in processStoryJob covers this phase and every phase after it.
       let rawImages;
-      try {
       rawImages = await Promise.all(
         pageDataArray.map(pageData => genLimit(async () => {
           await checkCancellation();
@@ -5660,10 +5649,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }).finally(bumpProgress))
       );
-      } finally {
-        // Stop the liveness heartbeat whether generation succeeded or threw.
-        clearInterval(heartbeat);
-      }
 
       // ── A PAGE WITH NO IMAGE IS A LOUD FAILURE (2026-08-29) ──────────────
       // The per-page catch above returns `imageData: null` and the story went
@@ -7640,9 +7625,19 @@ async function processStoryJob(jobId) {
     // Begin/end are fire-and-forget; this finally runs on completion, failure
     // and cancellation alike, so a story can never leak a session.
     require('./server/lib/analyzerClient').sessionBegin(`story:${jobId}`);
+    // WHOLE-JOB liveness heartbeat — armed here, the ONE entry point every
+    // caller uses (jobs, trial, admin rerun, auth), so every phase of every
+    // pipeline (unified, beats, trial) is inside it. Phase-local intervals
+    // were the old shape and they left a blind window after every phase that
+    // grew a new one; see server/lib/jobHeartbeat.js and docs/decisions.md
+    // "Job liveness heartbeat spans the whole job". Cleared in the same
+    // outermost finally as the analyzer session, so completion, failure,
+    // cancellation and early return all disarm it exactly once.
+    const jobHeartbeat = startJobHeartbeat(jobId, dbPool);
     try {
       return await _processStoryJobImpl(jobId);
     } finally {
+      jobHeartbeat.stop();
       require('./server/lib/analyzerClient').sessionEnd(`story:${jobId}`);
       // Free the per-scope avatar log buckets. The buckets were captured into
       // saved story data already; the dev panel reads from the DB, not from
