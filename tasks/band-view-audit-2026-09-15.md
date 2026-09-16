@@ -417,7 +417,7 @@ This is a medium-sized change, and it should not be one commit.
 
 1. [x] **T2 + T3 against today's files** (no retag) — `41438ac32`, committed failing on four bands
    (dangling antecedents) and on every band (untagged prose).
-2. [x] **Role tags + allow-list views** — `40d026e16`. `writer` verified byte-identical in all five
+2. [x] **Role tags + allow-list views** — `8e6978f89`. `writer` verified byte-identical in all five
    bands. One deviation from §2: "Three tries, no more." and the six-beat enumeration are
    `[[premise]]`, not `[[mechanics]]` — they are the antecedents T2 demands, and a premise can
    honour them; only the per-try / per-page machinery stays writer-side.
