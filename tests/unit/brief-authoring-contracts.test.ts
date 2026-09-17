@@ -21,6 +21,8 @@
  *        .notEvaluated, reason `no_required_objects`) and p5 lost the ball.
  *   p8   the shadow of an off-page creature reached prose + emptyScenePrompt and
  *        nothing else, with no silhouette shape stated; the sky came back clear.
+ *        NOT FIXED and deliberately not contracted — two staging renders (Lab
+ *        #1279/#1280) produced two different failure modes, so no rule shipped.
  *   p4   the one case where the structured channel WAS used and the model still
  *        disobeyed: a body-part contact phrased as a noun.
  *
@@ -156,15 +158,15 @@ describe('the brief-authoring contracts reach every site that writes a brief', (
 
   it('exports each contract as a non-empty constant', () => {
     for (const name of [
-      'CONCEALED_OBJECT_RULE', 'OFFSCREEN_SHADOW_RULE',
-      'STAGED_PROP_RULE', 'CONTACT_VERB_RULE', 'ELEMENT_ENTRY_PAGE_RULE',
+      'CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE',
+      'CONTACT_VERB_RULE', 'ELEMENT_ENTRY_PAGE_RULE',
     ]) {
       expect(typeof PB[name], `${name} is not exported`).toBe('string');
       expect(PB[name].length, name).toBeGreaterThan(40);
     }
   });
 
-  for (const rule of ['CONCEALED_OBJECT_RULE', 'OFFSCREEN_SHADOW_RULE', 'STAGED_PROP_RULE', 'CONTACT_VERB_RULE']) {
+  for (const rule of ['CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE', 'CONTACT_VERB_RULE']) {
     it(`all four brief-authoring sites carry ${rule}, from that one constant`, () => {
       for (const [site, prompt] of Object.entries(built)) {
         expect(prompt.includes(PB[rule]), `${site} lost ${rule}`).toBe(true);

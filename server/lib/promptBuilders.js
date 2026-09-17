@@ -2484,13 +2484,11 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
-    // FOUR brief-authoring contracts, one constant each, shared by both Art
+    // THREE brief-authoring contracts, one constant each, shared by both Art
     // Director templates and both iterate templates — a page brief is written at
     // four sites and a rule that reaches one of them is absent on the other
-    // three. See CONCEALED_OBJECT_RULE / OFFSCREEN_SHADOW_RULE /
-    // STAGED_PROP_RULE / CONTACT_VERB_RULE.
+    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE.
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
-    OFFSCREEN_SHADOW: OFFSCREEN_SHADOW_RULE,
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
@@ -2751,13 +2749,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
-    // FOUR brief-authoring contracts, one constant each, shared by both Art
+    // THREE brief-authoring contracts, one constant each, shared by both Art
     // Director templates and both iterate templates — a page brief is written at
     // four sites and a rule that reaches one of them is absent on the other
-    // three. See CONCEALED_OBJECT_RULE / OFFSCREEN_SHADOW_RULE /
-    // STAGED_PROP_RULE / CONTACT_VERB_RULE.
+    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE.
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
-    OFFSCREEN_SHADOW: OFFSCREEN_SHADOW_RULE,
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
@@ -3168,12 +3164,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
       MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3,
       OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE,
-      // The same four brief-authoring contracts the Art Director templates
+      // The same three brief-authoring contracts the Art Director templates
       // carry. An iterate rewrites the WHOLE brief, so a rule the first pass was
       // given and the rewrite was not is a rule one repair round undoes.
       CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
-      OFFSCREEN_SHADOW: OFFSCREEN_SHADOW_RULE,
-      STAGED_PROP: STAGED_PROP_RULE,
+        STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
     });
     // Text-overlay-only rules gate:
@@ -6527,20 +6522,6 @@ const MULTI_PICTURE_PROP_RULE = "An object that shows a different picture on dif
 const CONCEALED_OBJECT_RULE = "An object the page puts out of sight \u2014 inside a coat, under a cloth, in a closed bag, behind a back \u2014 is staged as what a viewer would actually see: the shape it makes under the covering. Its id still goes in `objects[]`, and the `where` of every interaction with it names the covering (carries the bulge under his coat), never the object's own surface. Do not describe its colour, markings or glow on that page, and never place it inside the covering and against the outside of the covering in one sentence. A page whose moment is somebody NOTICING it still shows only that shape.";
 
 /**
- * ONE contract for the shadow of a creature that is not itself in frame.
- *
- * Same run, p8: the plan line stages "a large shadow slides across the linden
- * above them", the brief wrote "a massive dark shadow spans across the
- * cobblestones" into the prose AND into `emptyScenePrompt`, and the render came
- * back with a clear sky and soft dappled tree shade. The brief never said what
- * SHAPE the shadow has, and a shadow with no shape is ordinary shade. The
- * creature casting it is correctly absent from the page's `objects[]` -- its
- * Visual Bible range excludes the page by design -- so its outline has to be
- * written, not cited.
- */
-const OFFSCREEN_SHADOW_RULE = "The shadow of a creature that is not itself in the picture is drawn as that creature's outline \u2014 wings, body, tail, head \u2014 falling hard-edged across the ground, a wall or a roof, far larger than the figures under it. Write the silhouette's shape into the prose: a shadow given no shape is drawn as ordinary shade and the moment disappears. The creature itself stays out of frame, and out of `objects[]` on that page.";
-
-/**
  * ONE contract for a prop the page's own TEXT puts against a character.
  *
  * This does NOT reopen "the page text is not a checklist for the image"
@@ -8236,7 +8217,6 @@ module.exports = {
   PLAN_LINE_CAST_RULE,
   MULTI_PICTURE_PROP_RULE,
   CONCEALED_OBJECT_RULE,
-  OFFSCREEN_SHADOW_RULE,
   STAGED_PROP_RULE,
   CONTACT_VERB_RULE,
   ELEMENT_ENTRY_PAGE_RULE,

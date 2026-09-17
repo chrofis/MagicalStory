@@ -24,9 +24,8 @@
 <!-- TEXT_OVERLAY_END -->
 15. **Never describe** weapons touching a character's body, characters held or bound by another character, or wounds or blood.
 16. **An object out of sight.** {CONCEALED_OBJECT}
-17. **A shadow cast by something off the page.** {OFFSCREEN_SHADOW}
-18. **A prop the page text puts against a character.** {STAGED_PROP}
-19. **Contact reads as a verb.** {CONTACT_VERB}
+17. **A prop the page text puts against a character.** {STAGED_PROP}
+18. **Contact reads as a verb.** {CONTACT_VERB}
 
 ---
 

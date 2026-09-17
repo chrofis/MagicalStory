@@ -509,21 +509,31 @@ touched.
   the job `collectStagedFigures` already does for animals and secondaries, reusing the same
   staged-segment scoping and the same whole-word name match. It OFFERS the sheet; rule 3a still
   decides who is in the frame.
-- **Five contracts, one JS constant each, injected through a declared placeholder** — the
+- **Four contracts, one JS constant each, injected through a declared placeholder** — the
   pattern `PLAN_LINE_CAST_RULE` / `MULTI_PICTURE_PROP_RULE` established, so there is one source
   and no hand-kept copies. `CONCEALED_OBJECT_RULE` (an out-of-sight object is staged as the
   shape it makes under the covering; the covering rides every `where`; no colour, markings or
   glow on that page; never inside and against the outside in one sentence),
-  `OFFSCREEN_SHADOW_RULE` (the shadow of a creature not itself in frame is drawn as that
-  creature's OUTLINE, hard-edged and far larger than the figures, with the creature out of frame
-  and out of `objects[]`), `STAGED_PROP_RULE` (a prop the page's own text puts AGAINST a
+  `STAGED_PROP_RULE` (a prop the page's own text puts AGAINST a
   character is in the picture — cited by id when the bible has an entry, named in the prose when
-  it does not), `CONTACT_VERB_RULE` (an interaction's `where` opens with the verb, never with
+  it does not) and `CONTACT_VERB_RULE` (an interaction's `where` opens with the verb, never with
   the body part; a non-hand contact says which part makes it and the prose says what the hands
   do instead) reach all four brief-authoring sites: both Art Director templates and both iterate
   templates. `ELEMENT_ENTRY_PAGE_RULE` (an element's `pages` always includes the page the story
   first brings it in) reaches the two live bible-authoring sites, the all-pages Art Director and
   the trial writer.
+- **p8's shadow gets NO contract — measured, twice, and pulled back out.** A fifth constant was
+  written and reverted the same hour. Lab #1279 rendered p8 from a brief naming the silhouette's
+  parts ("the unmistakable outline of a winged creature — long body, two wide outstretched
+  leathery wings, a trailing tail, a horned head … nothing of the creature itself in the
+  picture"): the model painted the CREATURE, solid and in frame, perched over the square — a
+  worse defect than the vague shade it replaced, and on this book a spoiled reveal, since the
+  bible puts that creature on the last page only. Lab #1280 rendered the same page from a brief
+  that never uses a creature noun at all ("one enormous patch of darkened ground … a wing-shaped
+  outline … nothing is in the air"): no creature, and no wing shape either — a plain dark
+  rectangle lying on the stones. Two attempts, two failure modes, so the third was not bought
+  (burn-loop rule). Nothing ships for this class; the finding and both render paths are in
+  `tasks/BACKLOG.md`.
 - **The HANDS rule's free-hand clause is narrowed** to "rests or gestures, and never joins a
   contact the scene gives to another part of that character's body". Generator-side only
   (`HANDS_HOLD_ONLY_NAMED_RULE`, injected into `image-generation.txt`); it makes the generator
@@ -544,22 +554,37 @@ wrong only for the page the reader first meets it on.
 
 Concealment is a prompt fix, not a new field, because the evidence says the channel already
 works — p9 is the positive control, and its REQUIRED OBJECTS line is identical to p11's. Adding
-a `concealed` flag would have been a second way to say what the `where` already says. The shadow
-is a prompt fix for the same reason in reverse: a generic element has no id to cite (bible rule:
-"a generic element … never appears in `objects[]`"), and the creature's own range excludes the
-page by design, so its silhouette can only be written — what was missing was the instruction to
-write a SHAPE. This leaves one known limitation, logged in `tasks/BACKLOG.md`: a shadow lives in
-the compressible head, so on a page that does blow the cap it can still be compressed away.
+a `concealed` flag would have been a second way to say what the `where` already says.
 
-**Verification** (free, no paid call): every affected page's image prompt was rebuilt in-process
-from its REAL stored brief, amended only as the new contracts require. p1 goes from no REQUIRED
-OBJECTS block at all to the prop listed there AND on an EXACT POSES line; p5's ball, p7's and
-p11's covering and p4's verb-led contact all land in the protected tail, after the split.
+The shadow looked like the same kind of prompt fix and is not. A generic element has no id to
+cite (bible rule: "a generic element … never appears in `objects[]`") and the creature's own page
+range excludes p8 by design, so a silhouette can only ever be written into the prose — which also
+means it lives in the compressible head and has no protected-tail channel at all. That was
+already the weak half of the idea; the two renders then showed the instruction itself has no
+phrasing that works yet. Naming the creature's parts makes the model draw the creature; removing
+the creature noun makes the shape disappear. Shipping a rule with a measured way of making a page
+worse would have been worse than shipping nothing, so nothing shipped. A structured channel for a
+page's non-character staging — a field the builder re-anchors into the tail — is the shape of the
+real answer and is a design question for the owner, not a bug fix.
+
+**Verification.** FREE first: every affected page's image prompt was rebuilt in-process from its
+REAL stored brief, amended only as the new contracts require. p1 goes from no REQUIRED OBJECTS
+block at all to the prop listed there AND on an EXACT POSES line; p5's ball, p7's and p11's
+covering and p4's verb-led contact all land in the protected tail, after the split.
 `tests/unit/brief-authoring-contracts.test.ts` pins arrival and structure — never any rule's
 wording — from this run's stored fixtures. `npx vitest run`: 262 files, 3044 tests, 0 failures.
 
+PAID, four single-page renders on staging's Test Lab `image` stage
+(`_params.sceneDescriptionOverride`, `grok-imagine-image`, ~$0.05 each; the original run used
+`grok-imagine-image-2.0`, so these are not a like-for-like rerun). **p11 (#1279): the contract
+works** — the object is under the zipped jacket as a bulge with both forearms folded over it,
+where the shipped version held it openly in both arms. **p4 (#1279): partial** — the ear is now
+against the shell, which three renders across two repair rounds never achieved, but the hands
+still rest on it, so the verb-led `where` bought the defining action and the narrowed HANDS rule
+did not clear the hands. **p8 (#1279, #1280): both failed**, which is why nothing shipped for it.
+
 **Touched:** `server/lib/iterateBeat.js` (`collectPlanLineCast`), `server/lib/images.js`
-(iterate locked cast), `server/lib/promptBuilders.js` (five new rule constants, the narrowed
+(iterate locked cast), `server/lib/promptBuilders.js` (four new rule constants, the narrowed
 HANDS rule, the fill maps), `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
 `prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`, `prompts/story-trial.txt`,
 `tests/unit/brief-authoring-contracts.test.ts`, `tasks/BACKLOG.md`.
