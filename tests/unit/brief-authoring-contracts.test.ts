@@ -347,3 +347,96 @@ describe('the reach contract reaches every site that writes or rewrites this pag
       expect(unfilled(prompt), 'the rewrite prompt shipped an unfilled placeholder').toEqual([]);
     });
 });
+
+// ── 9. A non-hand contact leaves the hands out of the rows ──────────────────
+
+/**
+ * p4, SECOND HALF (2026-09-17). The verb contract fixed the phrasing and the
+ * hands stayed on the object. The repair round that rewrote this brief decided
+ * in its own `draftValidation` that an ear press "requires hands free or
+ * grounded" and answered that by declaring TWO supportive interactions for the
+ * same character — a hand on the ground for balance, a hand bracing on a root —
+ * while the prose said nothing at all about the hands. buildExactPosesBlock
+ * re-anchors one pose line per row, so the protected tail told the painter about
+ * that character's hands twice and about the ear once, and every render of a
+ * brief shaped that way put a hand on the object (6 of 6 across the shipped
+ * versions and the Lab arms; 7 of 12 clean once the rows went and the prose put
+ * the hands off the object).
+ *
+ * Pinned here: ARRIVAL and STRUCTURE — that the contract reaches all four sites
+ * that author or rewrite this page from the one constant, and that a supportive
+ * hand row is exactly what the tail amplifies. The rule's wording is not
+ * asserted anywhere.
+ */
+const P4_PLAN_LINE =
+  'PLAN: medium — Levin — Levin presses his ear against the egg in the hollow, eyes wide — a knock from inside the egg has been heard';
+
+/** The rewritten p4 brief's prose paragraph, verbatim — note it never says where the hands are. */
+const P4_BRIEF_PROSE =
+  'Levin, a preschooler, kneels on the dirt beside the thick linden root on the Lindenhof, his body angled slightly left, head turned side-on and lowered into the hollow, left cheek up toward the sky, right ear pressed flat against the smooth, glowing pale orange shell of the dragon egg. His green eyes are wide open, staring straight ahead at the dark dirt wall of the hollow. Medium shot at ground level.';
+
+/** The three interactions that brief declared for one character, verbatim. */
+const P4_INTERACTIONS = [
+  {
+    character: 'Levin', object: 'ART001',
+    where: 'turns his head side-on, left cheek up toward the sky, and presses his right ear flat against the shell of the dragon egg',
+    action: 'listening', hands: false, storyRelevant: true, priority: 'essential',
+  },
+  {
+    character: 'Levin', object: 'ground',
+    where: 'rests his left hand on the dirt for balance',
+    action: 'balancing', hands: true, storyRelevant: false, priority: 'supportive',
+  },
+  {
+    character: 'Levin', object: 'the linden root',
+    where: 'braces his right hand on the linden root beside the hollow',
+    action: 'bracing', hands: true, storyRelevant: false, priority: 'supportive',
+  },
+];
+
+describe('the non-hand contact contract reaches every site that writes or rewrites this page', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  it('the all-pages Art Director carries it when authoring p4 from its real plan line', () => {
+    const prompt = String(PB.buildSceneExpansionAllPrompt(
+      inputData, [{ pageNumber: 4, planLine: P4_PLAN_LINE.replace(/^PLAN:\s*/, '') }], {}));
+    expect(prompt.includes(PB.CONTACT_VERB_RULE), 'the Art Director never got the contact contract').toBe(true);
+    expect(unfilled(prompt), 'the Art Director prompt shipped an unfilled placeholder').toEqual([]);
+  });
+
+  it('the per-page Art Director carries it too', () => {
+    const prompt = String(PB.buildSceneExpansionPrompt(
+      4, 'page text', ROSTER, 'de-ch', VISUAL_BIBLE, '', null, {}));
+    expect(prompt.includes(PB.CONTACT_VERB_RULE), 'the per-page Art Director never got the contact contract').toBe(true);
+    expect(unfilled(prompt), 'the per-page prompt shipped an unfilled placeholder').toEqual([]);
+  });
+
+  it.each([['strict', false], ['free', true]])(
+    'a %s rewrite of p4 — the real stored brief as its starting point — carries it too',
+    (_label, freeIterate) => {
+      const prompt = String(PB.buildSceneDescriptionPrompt(
+        4, 'page text', ROSTER, P4_BRIEF_PROSE, 'de-ch', VISUAL_BIBLE, [], 'standard', '', '',
+        { planLine: P4_PLAN_LINE },
+        { fixIssues: ['a hand on the object, no ear contact'], previousScore: -100 },
+        { freeIterate }));
+      expect(prompt.includes(P4_BRIEF_PROSE), 'the stored brief never reached the rewriter').toBe(true);
+      expect(prompt.includes(PB.CONTACT_VERB_RULE), 'one repair round would delete the contact contract').toBe(true);
+      expect(unfilled(prompt), 'the rewrite prompt shipped an unfilled placeholder').toEqual([]);
+    });
+
+  it('a supportive hand row becomes another pose line about that hand, beside the contact', () => {
+    const block = String(PB.buildExactPosesBlock(P4_INTERACTIONS, [], VISUAL_BIBLE, { language: 'de-ch' }));
+    const poseLines = block.split('\n').filter(l => l.startsWith('- Levin:'));
+    expect(poseLines.length, 'the supportive rows did not each become a pose line').toBe(3);
+    expect(poseLines.filter(l => /\bhand\b/.test(l)).length,
+      'the tail did not carry a hand instruction per supportive row').toBe(2);
+  });
+
+  it('the same contact with the supportive rows gone leaves one pose line, about the ear', () => {
+    const block = String(PB.buildExactPosesBlock([P4_INTERACTIONS[0]], [], VISUAL_BIBLE, { language: 'de-ch' }));
+    const poseLines = block.split('\n').filter(l => l.startsWith('- Levin:'));
+    expect(poseLines.length).toBe(1);
+    expect(poseLines[0], 'the one pose line lost the declared contact').toContain('presses his right ear flat');
+    expect(/\bhand\b/.test(poseLines[0]), 'a hand reached the only pose line').toBe(false);
+  });
+});

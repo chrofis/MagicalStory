@@ -6691,8 +6691,28 @@ const STAGED_PROP_RULE = "A prop the page's own text puts against a character \u
  * flat against the ... shell" -- a noun phrase among a block of verb-led lines
  * -- and three renders across two repair rounds all drew a generic hand reach
  * instead. Every `where` on that run that the render obeyed opens with a verb.
+ *
+ * Second half of the same page, measured 2026-09-17 over 18 Lab renders of p4
+ * (experiments #1299-#1312, all offline overrides of the stored brief). The verb
+ * fix landed and the hands did not. The repair round that rewrote the brief
+ * reasoned in its own `draftValidation` that an ear press "requires hands free
+ * or grounded", and answered that by declaring TWO more interactions for the
+ * same character -- one hand on the ground for balance, one bracing on a nearby
+ * root -- which buildExactPosesBlock re-anchors as two more pose lines in the
+ * protected tail. Every render of a brief carrying hand rows, or carrying no
+ * statement of where the hands are, put a hand on the object: 6 of 6 (the three
+ * shipped versions and three Lab arms). Briefs with ONE interaction row and
+ * prose putting both hands off the object: 7 of 12 clean. Not deterministic --
+ * a byte-identical repeat of a clean arm came back with a hand on the object --
+ * but it is the only lever that moved that rate off zero.
+ *
+ * The framing half of the same measurement is deliberately NOT here: a close-up
+ * brief was what produced head-to-object contact (9 of 10 against 0 of 8), and
+ * the planner cannot prefer one on this page class without reversing the
+ * 2026-08-12 "a beat needing kneeling/floor contact is medium" decision. Owner
+ * decision, logged in docs/decisions.md and tasks/BACKLOG.md.
  */
-const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the character performs, never with the body part: `presses his ear to the door`, not `ear pressed to the door`. A contact made with something other than the hands states in that verb which part of the body makes it, and the same row's prose says what the hands do instead.";
+const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the character performs, never with the body part: `presses his ear to the door`, not `ear pressed to the door`. A contact made with something other than the hands states in that verb which part of the body makes it. That character is then given no second interaction row for a hand — no brace, no balance, no steadying touch — and the prose says where both hands are and that they are off the object.";
 
 /**
  * ONE contract for an object the page gives more than one toucher.
