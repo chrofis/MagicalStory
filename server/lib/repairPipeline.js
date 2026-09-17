@@ -1042,10 +1042,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const canIterate = effectiveUseIteratePage && img.pageNumber > 0;
     let result;
     if (canIterate) {
+      // THE EVALUATOR'S OWN ACCOUNT, not just its verdict (2026-09-17). Until
+      // the rewriter was given a reader for it, `reasoning` was carried here and
+      // dropped on the floor, and the 1,000-char cap that cost nothing then cuts
+      // the figure inventory mid-object now. `fixTargets` names WHERE the
+      // evaluator looked and was never forwarded at all: the rewrite was asked
+      // to diagnose a root cause from a list of sentences with no regions.
       const evalFeedback = latestEval ? {
         score: latestEval.score ?? latestEval.qualityScore,
-        reasoning: latestEval.reasoning?.substring(0, 1000),
+        reasoning: latestEval.reasoning?.substring(0, 4000),
         fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
+        fixTargets: (latestEval.enrichedFixTargets || latestEval.fixTargets || []).slice(0, 8),
       } : null;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);

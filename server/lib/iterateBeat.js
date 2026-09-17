@@ -347,6 +347,86 @@ function renderStagedFiguresBlock(figures) {
   ].join('\n');
 }
 
+/**
+ * THREE INPUTS THE REWRITER NEVER HAD (2026-09-17).
+ *
+ * The first Art Director authors a page brief from the plan line, the bible and
+ * the clothing contract. The rewriter authors the SAME artefact from all of
+ * those PLUS one thing the Art Director never sees: a render that failed. It
+ * was given the failure as a score and a list of finding sentences — and
+ * nothing else. Not the evaluator's own figure-by-figure inventory of what was
+ * actually drawn, not the regions the evaluator named, and not the worn state
+ * the page it is rewriting had already declared.
+ *
+ * `evaluationFeedback.reasoning` has been handed to iteratePageCore by the
+ * repair pipeline since the pipeline was written and read by nothing.
+ *
+ * These render the three blocks. Each returns '' when it has nothing, so a
+ * page with no evaluator context builds exactly the prompt it built before.
+ */
+
+/** The evaluator's own reasoning about the failed render, or ''. */
+function renderEvaluatorReasoning(evaluationFeedback) {
+  const raw = evaluationFeedback && evaluationFeedback.reasoning;
+  const text = typeof raw === 'string' ? raw.trim() : (raw ? JSON.stringify(raw) : '');
+  return text || '';
+}
+
+/**
+ * The regions the evaluator marked, one line each: what is wrong, how bad, and
+ * where it looked. The bounds are normalised [x0,y0,x1,y1] — named as a frame
+ * region rather than as numbers, because the rewriter writes prose positions
+ * and the AD templates forbid percentages and metrics in a brief.
+ */
+const REGION_COLS = [[0.34, 'left'], [0.67, 'centre'], [1.01, 'right']];
+const REGION_ROWS = [[0.34, 'top'], [0.67, 'middle'], [1.01, 'bottom']];
+function regionOf(bounds) {
+  if (!Array.isArray(bounds) || bounds.length < 4) return '';
+  const nums = bounds.map(Number);
+  if (nums.some(n => !Number.isFinite(n))) return '';
+  const cx = (nums[0] + nums[2]) / 2;
+  const cy = (nums[1] + nums[3]) / 2;
+  const col = (REGION_COLS.find(([edge]) => cx < edge) || REGION_COLS[REGION_COLS.length - 1])[1];
+  const row = (REGION_ROWS.find(([edge]) => cy < edge) || REGION_ROWS[REGION_ROWS.length - 1])[1];
+  return row === 'middle' && col === 'centre' ? 'centre of the frame' : `${row}-${col} of the frame`;
+}
+
+function renderFixTargetLines(evaluationFeedback, fallbackTargets) {
+  const src = (evaluationFeedback && (evaluationFeedback.fixTargets || evaluationFeedback.enrichedFixTargets))
+    || fallbackTargets || [];
+  const rows = (Array.isArray(src) ? src : []).slice(0, 8);
+  const lines = [];
+  for (const t of rows) {
+    if (!t) continue;
+    const what = String(t.issue || t.description || t.element || t.type || '').trim();
+    if (!what) continue;
+    const where = regionOf(t.bounds || t.bodyBox);
+    const sev = t.severity ? ` [${t.severity}]` : '';
+    lines.push(`- ${what}${sev}${where ? ` \u2014 ${where}` : ''}`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * The page's worn-item states as the PARENT brief declared them, rendered by
+ * the same builder the image prompt uses so the rewriter and the illustrator
+ * read one sentence about one item.
+ */
+function renderParentWornState({ visualBible, promptCharacters, parentSceneMetadata, pageNumber }) {
+  if (!visualBible) return '';
+  try {
+    const { resolveWornItemsForPage, buildWornStateLines } = require('./wornItems');
+    const resolved = resolveWornItemsForPage(
+      visualBible, promptCharacters || [], parentSceneMetadata || {}, { pageNumber }
+    );
+    return buildWornStateLines(resolved).join('\n');
+  } catch {
+    // A bible shape this resolver cannot read costs the rewriter one input; it
+    // never costs it the rewrite.
+    return '';
+  }
+}
+
 // The two faults that mean a figure is in the picture but not on the roster the
 // judge reads. Both come from sceneBriefCheck, which the first-generation path
 // already runs on every brief — the iterate path ran neither on its rewrite.
@@ -603,6 +683,10 @@ module.exports = {
   collectPlanLineCast,
   partitionAnchoredObjects,
   renderStagedFiguresBlock,
+  renderEvaluatorReasoning,
+  renderFixTargetLines,
+  renderParentWornState,
+  regionOf,
   checkRewrittenBrief,
   declaredSetAllowance,
   checkDeclaredSet,

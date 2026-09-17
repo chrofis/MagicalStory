@@ -354,6 +354,115 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — Iterate is the SECOND Art Director, and it holds the same contract
+
+**Context.** Owner directive: *"Make iterate to parity."* A page brief is authored at FOUR sites.
+Two write it the first time — `prompts/scene-expansion-all.txt` (the all-pages Art Director the
+beats pipeline runs) and `prompts/scene-expansion.txt` (the per-page fallback). Two REWRITE it when
+the render proves the brief unbuildable — `prompts/scene-iteration.txt` (strict) and
+`prompts/scene-iteration-free.txt` (free). The rewrite replaces the brief wholesale, so its output,
+not the Art Director's, becomes the page's contract with the image model. Nothing in the tree said
+the four files were related: the registry paired the two Art Director templates with each other and
+the two iterate templates with each other, and nothing bridged them. Art Director rules added since
+late August therefore never propagated, and no diff could show it.
+
+The gap was measured, not assumed, over the 11 stored iterate rounds of staging
+`job_1789584708605_rts4wqupm` (p4, p6, p9, p10, p13, p16) and `job_1789506283204_3kxqshifx`
+(p2, p7, p10, p13, p16), by re-parsing each page's Art Director brief and the rewrite that replaced
+it:
+
+- `shot` — declared by the Art Director on 11 of 11, by the rewrite on 0 of 11. It sets the
+  background plate's framing (`sceneMetadata.resolveVantage` falls back to `wide`), the scale
+  repair's foreground/background split, and the `loose` reference mode's face-crop decision.
+- `landmarkView` — 11 of 11 vs 0 of 11. It picks the landmark reference photo, and
+  `getLandmarkPhotosForScene` was being handed the RAW rewrite, so every repaired page chose its
+  landmark photo blind.
+- `depth` and `looksAt` — on every Art Director character and on none of the rewrite's.
+- `action` (and `hands`) — on every Art Director interaction and none of the rewrite's; `action`
+  is what orders the EXACT POSES block.
+- `wornItems` — no rewrite emitted a row. On p16 the brief being replaced declared the jacket OFF
+  and held as a bundle; the rewrite declared nothing, and the built image prompt flipped from
+  "Levin is NOT wearing this" to "Levin IS wearing this". The same page's REQUIRED OBJECTS block
+  came back empty, the dragon egg gone.
+
+**Decision.** Parity is not "paste the Art Director's rules into the rewriter". It is: every rule
+and input that bears on authoring a page brief reaches the rewriter too, unless it genuinely cannot
+apply to a rewrite — and it reaches it through ONE constant, not a fourth copy of the prose.
+
+1. **Seven page-brief contracts became shared constants** (promptBuilders.js), each lifted out of
+   the Art Director templates — where it stood byte-identical in both — and filled at all four
+   sites: `ONE_INSTANT_RULE` (5c), `GAZE_TARGET_RULE` (6c), `LOOKS_AT_FIELD_RULE` (8j),
+   `GARMENT_REMOVED_RULE` (10d), `WORN_ON_OTHER_RULE` (10e), `ABSENT_THING_RULE` (12b) and
+   `SCENE_INTENT_FIELD_RULE` (the `sceneIntent` field rule). `{NEVER_NAME_ABSENT}` is the
+   rewrite-specific one: a rewriter handed "extra figure in the upper right" writes "no figure in
+   the upper right", which paints the figure.
+2. **Seven contracts that were ALREADY one constant** and reached the Art Director alone are now
+   filled into both iterate templates: `{PLAN_LINE_CAST}`, `{COUNTING_RULE}`,
+   `{MULTI_PICTURE_PROP}`, `{CREATURE_TONE}`, `{SEASON}`, `{VB_ELEMENT_BUDGET}`, `{SHOT_ENUM}`.
+   No new prose at all — the rules existed, the rewriter was simply never given them.
+3. **The metadata contract.** Both iterate templates now declare `shot`, `landmarkView` and
+   `wornItems`, `depth` and `looksAt` on `characters[]`, and `action` and `hands` on
+   `interactions[]`, with the Art Director's own field rules. `sceneIntent` moves from "one short
+   sentence under 25 words" to the Art Director's 2–3 sentence contract — and the FREE template,
+   which never mentioned `sceneIntent` at all, now emits it: a free-mode rewrite was shipping a
+   page whose **THIS IMAGE DEPICTS** anchor was empty.
+4. **Three inputs the rewriter never had.** `evaluationFeedback.reasoning` — the evaluator's own
+   figure-by-figure inventory — has been handed to `iteratePageCore` by the repair pipeline all
+   along and read by nothing; the rewriter got a score and a list of sentences and was asked to
+   name each finding's root cause. It now reaches the prompt, and the repair pipeline's cap on it
+   rises 1,000 → 4,000 chars (at 1,000 the inventory is cut mid-object; the cap was free while
+   nothing read the value). `fixTargets` now reaches it too, rendered as *what is wrong* + *which
+   frame region* — never coordinates, which a brief may not carry. And the page's resolved worn
+   state arrives, rendered by the SAME `wornItems.buildWornStateLines` the image prompt uses, so
+   the rewriter and the illustrator read one sentence about one item. Cited Visual Bible states now
+   carry their page ranges, so a rewrite can DERIVE the dotted handle instead of copying the
+   previous brief's.
+5. **`shot` and `landmarkView` get a floor in code**, alongside the existing
+   `era`/`aboard`/`crowdExpected`/`textZoneDescription`/`wornItems` carry-forward: a rewrite that
+   states one wins, a rewrite that is silent keeps the page's own. The `iterateSceneMetadata` merge
+   now runs BEFORE `getLandmarkPhotosForScene`, which is what makes the landmark floor reach the
+   photo lookup.
+6. **The sibling set `art-director-vs-iterate`** (all four templates, `severity: block`, 17
+   placeholder anchors) is registered. It is the durable half: touch an Art Director template and
+   the pre-push gate asks what the rewriter gets, and `Siblings-Checked: <reason>` is how you say
+   "this one cannot apply to a rewrite" in writing.
+
+**Rationale.** The alternative — extracting the Art Director's whole 53-rule per-page block into
+one shared file included by all four templates — is the true single source and is the recommended
+next step, but it rewrites three templates wholesale while another session is editing the same
+brief-authoring path. Shared constants plus a registered sibling set get the measured damage fixed
+now and make the next drift mechanically visible, at a diff a reviewer can read.
+
+**What is deliberately NOT ported.** `era`, `crowdExpected`, `aboard`, `textPosition` and
+`textZoneDescription` stay Art-Director-only: they are page context a rewrite has no business
+re-deciding, and `iteratePageCore` carries them forward (6738d7dca). The Art Director's cross-page
+rules C1–C7 cannot apply to a single-page rewrite that sees no neighbours. The bible-authoring
+rules (`{SCALE_CLASS_SPEC}`, `{CHILD_AGE_BAND}`, `{ELEMENT_ENTRY_PAGE}`, every `states[]`/`pages`
+rule) cannot apply either — iterate never writes a bible. The Art Director's scale rules 8e–8h are
+owned by a concurrent session and are logged in `tasks/BACKLOG.md` instead of touched here. The
+"SCENE prose stays under 450 words" rule is NOT ported: a rewrite length budget was removed with
+evidence one day earlier (a78e8fa7d), and re-adding one needs the owner, not this commit.
+
+**The previous IMAGE stays out.** The rewriter re-composes a picture it has never seen, and the
+obvious fix is to attach the failed render. Rejected for now, on three grounds: the rewriter
+already receives `analyzeGeneratedImage`'s structured description of that exact frame, which exists
+for this purpose; the configured default scene-iteration model is not chosen for vision, so the
+contract would hold only on whichever model a given environment happens to run; and free-form VLM
+judging has measured badly here before. It belongs in a Test Lab `iterate` A/B with a multimodal
+arm — logged in `tasks/BACKLOG.md`, not decided by assertion.
+
+**Touched files.** `prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`server/lib/promptBuilders.js` (seven constants, three fill maps, `stateLineForIterate`),
+`server/lib/iterateBeat.js` (`renderEvaluatorReasoning`, `renderFixTargetLines`,
+`renderParentWornState`, `regionOf`), `server/lib/images.js` (`iteratePageCore`: the three inputs,
+the merge order, the `shot`/`landmarkView` floors), `server/lib/repairPipeline.js` (forward
+`fixTargets`, raise the reasoning cap), `scripts/admin/sibling-registry.json`,
+`tests/unit/ad-iterate-parity.test.ts`, `tests/unit/iterate-parity-staging.test.ts`,
+`tests/unit/fixtures/ad-iterate-parity-staging.json`, `tasks/BACKLOG.md`.
+
+**Status:** ✅ active
+
 ## 2026-09-17 — A repair aimed at a figure it cannot paint, and three places a step's own report went unchecked
 
 **Context.** Four separate silences on staging `job_1789584708605_rts4wqupm`, each one a step

@@ -3769,6 +3769,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     checkRewrittenBrief, describeBriefFindings,
     declaredSetAllowance, checkDeclaredSet, partitionAnchoredObjects,
     normalizeCitedHandles, restoreParentObjects,
+    renderEvaluatorReasoning, renderFixTargetLines, renderParentWornState,
   } = require('./iterateBeat');
   const planLine = resolvePlanLine(currentScene, savedScene);
   if (!planLine) {
@@ -3863,6 +3864,25 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     {
       freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements,
       stagedFigures: renderStagedFiguresBlock(stagedFigures),
+      // THE STORY, for the two page facts the Art Director is given and the
+      // rewriter was not: the book's SEASON and the creature-tone band. A
+      // rewrite authors a whole new setting paragraph and `emptyScenePrompt`,
+      // so a season it is never told is a season it can contradict.
+      story: storyData,
+      // WHY THE PAGE SCORED WHAT IT SCORED. `evaluationFeedback.reasoning` has
+      // been handed to this function by the repair pipeline all along and read
+      // by nothing: the rewriter got a score and a list of findings and was
+      // asked to "name the root cause" of each with no sight of the evaluator's
+      // own figure-by-figure inventory. Same for the regions it named.
+      evaluatorReasoning: renderEvaluatorReasoning(evaluationFeedback),
+      fixTargets: renderFixTargetLines(evaluationFeedback, optionFixTargets),
+      // THE WORN STATE THE PAGE ALREADY DECLARED, rendered by the SAME builder
+      // the image prompt uses (wornItems.buildWornStateLines) so the rewriter
+      // and the illustrator read one sentence. Measured on staging
+      // job_1789584708605_rts4wqupm p16: the parent brief declared the jacket
+      // OFF and held as a bundle, the rewrite declared nothing, and the built
+      // image prompt flipped to "Levin IS wearing this".
+      wornState: renderParentWornState({ visualBible, promptCharacters, parentSceneMetadata, pageNumber }),
     }
   );
 
@@ -4310,15 +4330,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
-  // Build landmark photos
-  const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata, { pageNumber }) : [];
-
-  // Determine image model and backend (needed before empty scene generation)
-  // A page REDO renders on the page tier, not on the edit/inpaint tier. Falling
-  // through to null meant generateImageOnly's defaultModel (MODEL_DEFAULTS
-  // .pageImage = the edit tier), so an iterate could redo on a different model
-  // than the one that produced V1. pageRenderImage is that same page tier.
-  let imageModelOverride = modelOverrides?.imageModel || CONFIG_DEFAULTS.pageRenderImage;
   // The rewrite's metadata is the working copy, but scene-iteration.txt does
   // not emit `era` or `textZoneDescription` — context fields iterate has no
   // business re-deciding. Read them from the rewrite when present, else from
@@ -4342,7 +4353,33 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // this" override in the prompt and the item painted back on. One rule, in
     // wornItems.carryForwardWornItems.
     wornItems: require('./wornItems').carryForwardWornItems(newSceneMetadata, savedMeta),
+    // Same class, two more fields the rewrite may legitimately re-decide and
+    // must never silently drop: `shot` drives the background plate's framing,
+    // the scale repair's foreground/background split and the reference mode;
+    // `landmarkView` picks the landmark reference photo. Both were emitted by
+    // the Art Director on every page of both staging runs and by NONE of the 11
+    // rewrites. A rewrite that states one wins; a rewrite that is silent keeps
+    // the page's own.
+    shot: newSceneMetadata?.shot || newSceneMetadata?.fullData?.shot
+      || savedMeta.shot || savedMeta.fullData?.shot || null,
+    landmarkView: newSceneMetadata?.landmarkView || newSceneMetadata?.fullData?.landmarkView
+      || savedMeta.landmarkView || savedMeta.fullData?.landmarkView || null,
   };
+
+  // Build landmark photos — from the MERGED metadata, not the raw rewrite.
+  // getLandmarkPhotosForScene reads `landmarkView` to pick the reference photo,
+  // and the rewrite emitted none on 11 of 11 stored iterate rounds across two
+  // staging runs, so every repaired page chose its landmark photo blind. The
+  // merge below is what restores the parent's value; running it first is the
+  // whole point. (2026-09-17.)
+  const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, iterateSceneMetadata, { pageNumber }) : [];
+
+  // Determine image model and backend (needed before empty scene generation)
+  // A page REDO renders on the page tier, not on the edit/inpaint tier. Falling
+  // through to null meant generateImageOnly's defaultModel (MODEL_DEFAULTS
+  // .pageImage = the edit tier), so an iterate could redo on a different model
+  // than the one that produced V1. pageRenderImage is that same page tier.
+  let imageModelOverride = modelOverrides?.imageModel || CONFIG_DEFAULTS.pageRenderImage;
 
   // Route by scene complexity when no explicit model override
   if (!imageModelOverride) {

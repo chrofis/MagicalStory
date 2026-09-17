@@ -1,0 +1,1270 @@
+{
+ "$comment": [
+  "REAL stored data from two staging runs, pulled 2026-09-17.",
+  "rounds[]: one entry per stored iterate round — what the Art Director brief it replaced declared,",
+  "and what the rewrite declared. This is the measurement the parity work is built on.",
+  "focus: everything buildSceneDescriptionPrompt needs to rebuild ONE real failing rewrite",
+  "(job_1789584708605_rts4wqupm p16, the page whose rewrite emptied REQUIRED OBJECTS and",
+  "flipped the jacket back onto the character)."
+ ],
+ "rounds": [
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 4,
+   "source": "iterate-round-2",
+   "planLine": "PLAN: medium — Levin — Levin presses his ear against the egg in the hollow, eyes wide — a knock from inside the egg has been heard",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 1,
+    "depth": 1,
+    "looksAt": 1,
+    "interactions": 1,
+    "action": 1,
+    "hands": 0
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 1,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 1,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 6,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: wide — Levin, Julian, Max, and Kiaan — all four press their hands onto the egg at once, none letting go — the four strangers are bound to the egg together",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 4,
+    "depth": 4,
+    "looksAt": 4,
+    "interactions": 2,
+    "action": 2,
+    "hands": 1
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 4,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 4,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 9,
+   "source": "iterate-round-2",
+   "planLine": "PLAN: wide — Levin, Max, and Kiaan — the three boys carry the bundled jacket-egg together down through a narrow lane of the Altstadt toward the last sunlit strip ahead — they have left the tree and are moving toward the Rathausbrücke",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 3,
+    "depth": 3,
+    "looksAt": 3,
+    "interactions": 2,
+    "action": 2,
+    "hands": 2
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 3,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 3,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 10,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: close-up — Julian — Julian pulls the Marroni bag out of Levin's jacket and holds it to his mouth, cheeks full — the bag is now flat and cooling, the egg's warmth is threatened",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": false,
+    "characters": 1,
+    "depth": 1,
+    "looksAt": 1,
+    "interactions": 1,
+    "action": 1,
+    "hands": 1
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 2,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 2,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 13,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Ramon and Levin — Ramon's hands grab at the egg in Levin's arms and the Marroni bag swings out of Julian's grip — the Marroni are gone into the Limmat and the egg has been seized",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 2,
+    "depth": 2,
+    "looksAt": 2,
+    "interactions": 2,
+    "action": 2,
+    "hands": 1
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 2,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 3,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 16,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Levin, Kiaan, and Julian — the three press the bundled jacket between them on the dark stairs, Kiaan holding Julian's hand on the step — they are climbing at Julian's pace with only their bodies for warmth",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 3,
+    "depth": 3,
+    "looksAt": 3,
+    "interactions": 1,
+    "action": 1,
+    "hands": 1
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 3,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 2,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 2,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Julian alone — Julian pushes autumn leaves apart between two thick linden roots and reaches toward something round and glowing with warmth beneath them — the warm egg exists and has been found",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": false,
+    "characters": 1,
+    "depth": 1,
+    "looksAt": 1,
+    "interactions": 1,
+    "action": 1,
+    "hands": 1
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 1,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 2,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 7,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: wide — Levin, Max and Julian — Levin walks them back and forth between the root hollow and the Lindenhofbrunnen while the last sunlight slides off the fountain steps; Max stamps his feet — Levin's indecision has cost the warm sun; he is ashamed",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 3,
+    "depth": 3,
+    "looksAt": 3,
+    "interactions": 1,
+    "action": 1,
+    "hands": 0
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 3,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 2,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 10,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: close-up — the crow — the crow drops from the branch with the red wool cap caught in its beak and flaps toward the hole in the Lindenhofbrunnen wall — the cap is gone into the fountain wall; the crow is the antagonist",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": false,
+    "characters": 0,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 1,
+    "action": 1,
+    "hands": 0
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 1,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 2,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 13,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Julian and Levin — Julian presses both hands around Lindi just lifted from the leaves, his face frightened; Levin leans close — Lindi is out of the heap but the hum has stopped and the shell is cold",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 2,
+    "depth": 2,
+    "looksAt": 2,
+    "interactions": 1,
+    "action": 1,
+    "hands": 1
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 2,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 2,
+    "action": 0,
+    "hands": 0
+   }
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 16,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: wide — Levin, Max, Kiaan, Julian and Nia — Levin holds Lindi pressed against his chest inside his open jacket; Max, Kiaan and Julian press their backs around him in a tight huddle with Nia planted in front — Lindi is back against warmth; the four boys and the dog form the living shelter",
+   "artDirector": {
+    "shot": true,
+    "landmarkView": true,
+    "wornItems": true,
+    "characters": 4,
+    "depth": 4,
+    "looksAt": 4,
+    "interactions": 1,
+    "action": 1,
+    "hands": 0
+   },
+   "rewrite": {
+    "shot": false,
+    "landmarkView": false,
+    "wornItems": false,
+    "characters": 4,
+    "depth": 0,
+    "looksAt": 0,
+    "interactions": 2,
+    "action": 0,
+    "hands": 0
+   }
+  }
+ ],
+ "focus": {
+  "storyId": "job_1789584708605_rts4wqupm",
+  "pageNumber": 16,
+  "planLine": "PLAN: medium — Levin, Kiaan, and Julian — the three press the bundled jacket between them on the dark stairs, Kiaan holding Julian's hand on the step — they are climbing at Julian's pace with only their bodies for warmth",
+  "pageText": "Die Treppe war schmal und dunkel. Levin trug das Bündel eng an der Brust, und die anderen drei drückten sich von allen Seiten dagegen. Vier warme Buben waren besser als einer, darum lief keiner voraus.\n\nDie Stufen waren ungleich hoch, und Julian stolperte leicht. Kiaan nahm seine Hand und hielt sie fest. So stiegen sie langsam hinauf, Stufe für Stufe, in Julians Tempo.",
+  "language": "de-ch",
+  "season": "autumn",
+  "layout": {
+   "mode": "square-below",
+   "imageAspect": "1:1",
+   "textInImage": false
+  },
+  "characters": [
+   {
+    "id": 1786902471660,
+    "name": "Levin",
+    "age": "5",
+    "gender": "male",
+    "physicalTraits": null,
+    "apparentAge": null,
+    "description": null,
+    "personality": null
+   },
+   {
+    "id": 1786902747333,
+    "name": "Julian",
+    "age": "3",
+    "gender": "male",
+    "physicalTraits": null,
+    "apparentAge": null,
+    "description": null,
+    "personality": null
+   },
+   {
+    "id": 1786904058132,
+    "name": "Max",
+    "age": "3",
+    "gender": "male",
+    "physicalTraits": null,
+    "apparentAge": null,
+    "description": null,
+    "personality": null
+   },
+   {
+    "id": 1786904387136,
+    "name": "Kiaan",
+    "age": "3",
+    "gender": "male",
+    "physicalTraits": null,
+    "apparentAge": null,
+    "description": null,
+    "personality": null
+   }
+  ],
+  "clothingRequirements": {
+   "Max": {
+    "summer": {
+     "used": false
+    },
+    "winter": {
+     "used": false
+    },
+    "costumed": {
+     "used": false
+    },
+    "standard": {
+     "used": true,
+     "description": "A green hooded sweatshirt — front kangaroo pocket, ribbed cuffs — worn over grey pull-on tracksuit trousers with an elasticated waist, and white velcro-strap sneakers."
+    }
+   },
+   "Kiaan": {
+    "summer": {
+     "used": false
+    },
+    "winter": {
+     "used": false
+    },
+    "costumed": {
+     "used": false
+    },
+    "standard": {
+     "used": true,
+     "description": "An orange crew-neck pullover sweater — long sleeves, ribbed collar and cuffs — worn over dark brown pull-on corduroy trousers with an elasticated waist, and blue velcro-strap ankle boots."
+    }
+   },
+   "Levin": {
+    "summer": {
+     "used": false
+    },
+    "winter": {
+     "used": false
+    },
+    "costumed": {
+     "used": false
+    },
+    "standard": {
+     "used": true,
+     "description": "red fleece fabric garment with a full front zipper, ribbed cuffs and hem — worn over a white long-sleeve shirt, dark blue corduroy trousers, and brown lace-up ankle boots."
+    }
+   },
+   "Julian": {
+    "summer": {
+     "used": false
+    },
+    "winter": {
+     "used": false
+    },
+    "costumed": {
+     "used": false
+    },
+    "standard": {
+     "used": true,
+     "description": "A yellow quilted body warmer — sleeveless, front zip, slightly puffed panels — worn over a white long-sleeve shirt, mid-blue pull-on jogger trousers with an elasticated waist, and grey velcro-strap sneakers."
+    }
+   }
+  },
+  "expectedClothing": {
+   "Kiaan": "standard",
+   "Levin": "standard",
+   "Julian": "standard"
+  },
+  "visualBible": {
+   "secondaryCharacters": [
+    {
+     "id": "CHR001",
+     "age": 8,
+     "face": "brown eyes, sharp jawline",
+     "hair": "black, short, spiky",
+     "name": "Ramon",
+     "peer": "no",
+     "build": "a boy, slightly tall for his age, lean build",
+     "pages": [
+      11,
+      13,
+      17
+     ],
+     "states": [],
+     "clothing": "blue denim jacket over a grey t-shirt, black jeans, and black sneakers",
+     "cellGates": [
+      {
+       "at": "2026-09-16T19:35:49.869Z",
+       "ok": false,
+       "gate": "character_cell",
+       "cellId": "CHR001",
+       "reason": "The image shows only the upper part of a boy's head and hair, making it impossible to verify his clothing, apparent age, or sex.",
+       "recheckOk": true,
+       "rerendered": true,
+       "recheckReason": "The watercolor painting style is well-executed, with visible brushstrokes and washes, and the character appears to be an 8-year-old boy as described."
+      }
+     ],
+     "scaleClass": "adult-height",
+     "description": "8. a boy, slightly tall for his age, lean build. hair: black, short, spiky. brown eyes, sharp jawline. Signature: blue denim jacket. Clothing: blue denim jacket over a grey t-shirt, black jeans, and black sneakers",
+     "signatureLook": "blue denim jacket",
+     "appearsInPages": [
+      11,
+      13,
+      17
+     ],
+     "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/CHR001.jpg",
+     "referenceImageData": null,
+     "referenceImageGenerated": true
+    }
+   ],
+   "animals": [
+    {
+     "id": "ANI001",
+     "name": "Big Dragon",
+     "pages": [
+      18
+     ],
+     "states": [],
+     "species": "European dragon",
+     "coloring": "reddish-orange scales with pale yellow underbelly",
+     "features": "large rounded friendly eyes, blunt soft snout, short blunt horns, wide leathery wings",
+     "scaleClass": "house-height",
+     "description": "European dragon. several adults high, the size of a house. reddish-orange scales with pale yellow underbelly. large rounded friendly eyes, blunt soft snout, short blunt horns, wide leathery wings",
+     "appearsInPages": [
+      18
+     ]
+    },
+    {
+     "id": "ANI002",
+     "name": "Flämmli",
+     "pages": [
+      18
+     ],
+     "states": [],
+     "species": "baby European dragon",
+     "coloring": "reddish-orange scales with pale yellow underbelly",
+     "features": "large rounded friendly eyes, soft rounded snout, tiny wing nubs",
+     "scaleClass": "forearm-sized",
+     "description": "baby European dragon. about as long as an adult's forearm. reddish-orange scales with pale yellow underbelly. large rounded friendly eyes, soft rounded snout, tiny wing nubs",
+     "appearsInPages": [
+      18
+     ]
+    }
+   ],
+   "artifacts": [
+    {
+     "id": "ART001",
+     "name": "smooth egg",
+     "type": "artifact",
+     "label": "dragon egg",
+     "pages": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      9,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16
+     ],
+     "states": [
+      {
+       "id": "ART001.1",
+       "held": null,
+       "name": "unaltered",
+       "delta": "pale orange, smooth, glowing faintly from within",
+       "pages": [
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+       ],
+       "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/ART001_1.jpg",
+       "referenceImageData": null
+      },
+      {
+       "id": "ART001.2",
+       "held": null,
+       "name": "cold",
+       "delta": "pale orange, smooth, matte and dark",
+       "pages": [],
+       "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/ART001_2.jpg",
+       "referenceImageData": null
+      },
+      {
+       "id": "ART001.3",
+       "held": null,
+       "name": "cracked",
+       "delta": "pale orange shell broken in half, hollow empty interior",
+       "pages": [],
+       "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/ART001_3.jpg",
+       "referenceImageData": null
+      }
+     ],
+     "cellGates": [
+      {
+       "at": "2026-09-16T19:36:07.119Z",
+       "ok": true,
+       "gate": "element_cell",
+       "cellId": "ART001.1",
+       "reason": "The watercolor painting depicts a melon-sized oval egg with a smooth curved shell, matching the description and art style.",
+       "recheckOk": false,
+       "rerendered": true,
+       "recheckReason": "The image depicts a chicken egg, not a dragon egg, and the watercolor style is too soft and lacks the bold, expressive brushstrokes described."
+      },
+      {
+       "at": "2026-09-16T19:36:07.119Z",
+       "ok": false,
+       "gate": "state_cells",
+       "cellId": "ART001.1",
+       "reason": "The third image shows a cracked egg, which is a different state than the first two images.",
+       "recheckOk": false,
+       "rerendered": true,
+       "recheckReason": "The third image shows a cracked eggshell, not an unaltered egg, and the color is darker than the first two images."
+      }
+     ],
+     "scaleClass": "melon-sized",
+     "description": "melon-sized oval egg with a smooth curved shell",
+     "appearsInPages": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      9,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16
+     ],
+     "referenceImageGenerated": true
+    },
+    {
+     "id": "ART002",
+     "name": "paper bag",
+     "type": "container",
+     "label": "paper bag",
+     "pages": [
+      7,
+      10,
+      13
+     ],
+     "states": [
+      {
+       "id": "ART002.1",
+       "held": null,
+       "name": "unaltered",
+       "delta": "bulging brown paper bag with rolled top",
+       "pages": [
+        7
+       ],
+       "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/ART002_1.jpg",
+       "referenceImageData": null
+      },
+      {
+       "id": "ART002.2",
+       "held": null,
+       "name": "flat",
+       "delta": "crushed and flat brown paper bag",
+       "pages": [
+        10,
+        13
+       ],
+       "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/ART002_2.jpg",
+       "referenceImageData": null
+      }
+     ],
+     "cellGates": [
+      {
+       "at": "2026-09-16T19:36:36.188Z",
+       "ok": true,
+       "gate": "element_cell",
+       "cellId": "ART002.1",
+       "reason": "The watercolor painting clearly depicts a brown paper bag with visible brushstrokes and wet-on-wet washes, matching the description and art style.",
+       "rerendered": false
+      },
+      {
+       "at": "2026-09-16T19:36:36.188Z",
+       "ok": true,
+       "gate": "state_cells",
+       "cellId": "ART002.1",
+       "reason": "The object is a brown paper bag, shown first upright and bulging, then flattened, matching the description.",
+       "rerendered": false
+      }
+     ],
+     "scaleClass": "hand-sized",
+     "description": "rectangular brown paper bag",
+     "appearsInPages": [
+      7,
+      10,
+      13
+     ],
+     "referenceImageGenerated": true
+    },
+    {
+     "id": "ART003",
+     "name": "push scooter",
+     "type": "hand tool",
+     "label": "metal scooter",
+     "pages": [],
+     "scaleClass": "waist-high",
+     "description": "silver metal push scooter with two small black wheels, a flat standing deck, and a vertical steering column with a T-bar handle perpendicular to the deck",
+     "appearsInPages": []
+    },
+    {
+     "id": "ART004",
+     "name": "fleece jacket",
+     "type": "outer layer",
+     "label": "red jacket",
+     "pages": [
+      7,
+      9,
+      10,
+      15,
+      16,
+      17,
+      18
+     ],
+     "states": [
+      {
+       "id": "ART004.1",
+       "name": "unaltered",
+       "delta": "red zip-up fleece jacket with ribbed cuffs",
+       "pages": [
+        7,
+        9,
+        10
+       ],
+       "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/ART004_1.jpg",
+       "referenceImageData": null
+      },
+      {
+       "id": "ART004.2",
+       "name": "bundled",
+       "delta": "red fleece jacket rolled and wrapped tightly into a round fabric bundle",
+       "pages": [
+        15,
+        16,
+        17,
+        18
+       ],
+       "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/vb/ART004_2.jpg",
+       "referenceImageData": null
+      }
+     ],
+     "wornAs": "Levin.top",
+     "cellGates": [
+      {
+       "at": "2026-09-16T19:36:25.866Z",
+       "ok": true,
+       "gate": "element_cell",
+       "cellId": "ART004.1",
+       "reason": "The image shows a red fleece jacket with a full front zipper, matching the description and art style.",
+       "recheckOk": true,
+       "rerendered": true,
+       "recheckReason": "The image shows a red fleece jacket with a full front zipper, matching the description and art style."
+      },
+      {
+       "at": "2026-09-16T19:36:25.866Z",
+       "ok": false,
+       "gate": "state_cells",
+       "cellId": "ART004.1",
+       "reason": "The first image shows a jacket, while the second image shows a rolled-up blanket or similar item, not a jacket.",
+       "recheckOk": true,
+       "rerendered": true,
+       "recheckReason": "The object is a red fleece jacket, shown both unzipped and zipped, and then rolled into a bundle."
+      }
+     ],
+     "scaleClass": "forearm-sized",
+     "description": "red fleece fabric garment with a full front zipper",
+     "appearsInPages": [
+      7,
+      9,
+      10,
+      15,
+      16,
+      17,
+      18
+     ],
+     "referenceImageGenerated": true
+    }
+   ],
+   "locations": [
+    {
+     "id": "LOC001",
+     "name": "Lindenhof",
+     "label": "Lindenhof",
+     "pages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      17,
+      18
+     ],
+     "colors": "yellow, red, brown, grey",
+     "setting": "outdoor, park square",
+     "features": "gravel surface, mature trees with large exposed roots, stone retaining walls",
+     "scaleClass": "landmark",
+     "description": "outdoor, park square. Colors: yellow, red, brown, grey. gravel surface, mature trees with large exposed roots, stone retaining walls. Signature: large mature linden trees",
+     "photoSource": "wikimedia",
+     "landmarkQuery": "Lindenhof (Zürcher Hügelzug)",
+     "photoVariants": [
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/248/d6f46ee63c42.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/d/dd/Chess_in_Lindenhof_park_2.JPG",
+       "attribution": "Ximeg, CC BY-SA 3.0, via Wikimedia Commons",
+       "description": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+       "variantNumber": 1,
+       "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/debug/p1/landmark-0.jpg"
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/248/c8dfc9d8da3e.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/3/36/Ansicht_von_der_ETH_Z%C3%BCrich_auf_den_Lindenhof_2011-08-06.jpg",
+       "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+       "description": "[distant, green, day] Aerial urban cityscape of Zurich showing historic districts, modern high-rises, and surrounding Alpine foothills.",
+       "variantNumber": 2
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/248/a6fca970dbb3.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/27/Fraum%C3%BCnster_-_Zunfthaus_zur_Meisen_-_Lindenhof_-_M%C3%BCnsterbr%C3%BCcke_-_Limmat_-_Quaibr%C3%BCcke_2011-03-23_15-06-28_ShiftN.jpg",
+       "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+       "description": "[whole, green, day] Waterfront promenade with historic buildings, moored boats, and riverside architecture. Fraumünster and other period structures visible along water.",
+       "variantNumber": 3
+      }
+     ],
+     "appearsInPages": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      17,
+      18
+     ],
+     "isRealLandmark": true,
+     "swissLandmarkId": 210,
+     "photoAttribution": "Ximeg, CC BY-SA 3.0, via Wikimedia Commons",
+     "photoFetchStatus": "pending_lazy",
+     "signatureElement": "large mature linden trees",
+     "isSwissPreIndexed": true,
+     "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/248/d6f46ee63c42.jpg",
+     "extractedDescription": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+     "firstAppearanceAnalyzed": true
+    },
+    {
+     "id": "LOC002",
+     "name": "Altstadt lanes",
+     "label": "Altstadt lanes",
+     "pages": [
+      9,
+      10,
+      11,
+      16
+     ],
+     "colors": "pastel cream, grey, brown",
+     "setting": "outdoor, narrow street",
+     "features": "cobblestone paths, narrow gaps between tall painted buildings, steep stone stairs",
+     "scaleClass": "landmark",
+     "description": "outdoor, narrow street. Colors: pastel cream, grey, brown. cobblestone paths, narrow gaps between tall painted buildings, steep stone stairs. Signature: narrow cobblestone lanes between historic buildings",
+     "photoSource": "wikimedia",
+     "landmarkQuery": "Altstadt von Zürich",
+     "photoVariants": [
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/257/8c0df6e6c831.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Z%C3%BCrich%2C_Augustinergasse_%28165458493%29.jpg",
+       "attribution": "Photo by SebbsterSWITZERLAND, Wikimedia Commons",
+       "description": "[entrance, green, day] Narrow Altstadt street with multi-story painted buildings in pastel colors: pink, cream, and yellow facades with shuttered windows.",
+       "variantNumber": 1
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/257/03181396f47f.jpg",
+       "kind": "view-from",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e1/A_beautiful_picture_of_the_Fraum%C3%BCnster_in_the_city_of_Z%C3%BCrich%2C_Switzerland.jpg",
+       "attribution": "SebbsterSWITZERLAND, CC BY-SA 4.0, via Wikimedia Commons",
+       "description": "[distant, autumn, day] Elevated view of Fraumünster church tower surrounded by lakeside cityscape with moored boats; autumn foliage visible.",
+       "variantNumber": 2
+      }
+     ],
+     "appearsInPages": [
+      9,
+      10,
+      11,
+      16
+     ],
+     "isRealLandmark": true,
+     "swissLandmarkId": 219,
+     "photoAttribution": "Photo by SebbsterSWITZERLAND, Wikimedia Commons",
+     "photoFetchStatus": "pending_lazy",
+     "signatureElement": "narrow cobblestone lanes between historic buildings",
+     "isSwissPreIndexed": true,
+     "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/257/8c0df6e6c831.jpg",
+     "extractedDescription": "[entrance, green, day] Narrow Altstadt street with multi-story painted buildings in pastel colors: pink, cream, and yellow facades with shuttered windows.",
+     "firstAppearanceAnalyzed": true
+    },
+    {
+     "id": "LOC003",
+     "name": "Rathausbruecke",
+     "label": "Rathausbruecke",
+     "pages": [
+      12,
+      13,
+      14,
+      15
+     ],
+     "colors": "grey stone, blue water",
+     "setting": "outdoor, bridge plaza",
+     "features": "wide stone bridge surface, metal railings, river flowing below",
+     "scaleClass": "landmark",
+     "description": "outdoor, bridge plaza. Colors: grey stone, blue water. wide stone bridge surface, metal railings, river flowing below. Signature: wide stone plaza over the river",
+     "photoSource": "wikimedia",
+     "landmarkQuery": "Rathausbrücke (Zürich)",
+     "photoVariants": [
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/269/d075e523f385.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b1/7340_-_Z%C3%BCrich_-_Limmat_at_Rathausbr%C3%BCcke.JPG",
+       "attribution": "Photo by Thisisbossi, Wikimedia Commons",
+       "description": "[whole, green, day] Stone bridge with yellow construction/loading equipment, spanning green river. City buildings with distinctive church tower in background.",
+       "variantNumber": 1,
+       "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/debug/p12/landmark-0.jpg"
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/269/05a05f7ee2f5.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2b/2008-07-25_Z%C3%BCrich_-_08.jpg",
+       "attribution": "Maksym Kozlenko, CC BY-SA 4.0, via Wikimedia Commons",
+       "description": "[whole, green, day] River landscape showing stone bridge structure and densely-built waterfront architecture. Pale stone and terracotta buildings cluster along the riverbank.",
+       "variantNumber": 2,
+       "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/aux/visualBible-locations-2-photoVariants-1-cachedPhotoData.jpg"
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/269/93b2ab9b75bf.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/70/7356_-_Z%C3%BCrich_-_Limmat.JPG",
+       "attribution": "Andrew Bossi, CC BY-SA 2.5, via Wikimedia Commons",
+       "description": "[whole, green, day] Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City buildings and church tower visible beyond water.",
+       "variantNumber": 3
+      }
+     ],
+     "appearsInPages": [
+      12,
+      13,
+      14,
+      15
+     ],
+     "isRealLandmark": true,
+     "swissLandmarkId": 231,
+     "photoAttribution": "Andrew Bossi, CC BY-SA 2.5, via Wikimedia Commons",
+     "photoFetchStatus": "pending_lazy",
+     "signatureElement": "wide stone plaza over the river",
+     "isSwissPreIndexed": true,
+     "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/269/93b2ab9b75bf.jpg",
+     "extractedDescription": "[whole, green, day] Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City buildings and church tower visible beyond water.",
+     "firstAppearanceAnalyzed": true
+    },
+    {
+     "id": "LOC004",
+     "name": "Grossmuenster",
+     "label": "Grossmuenster",
+     "pages": [
+      12
+     ],
+     "colors": "pale stone",
+     "setting": "outdoor, distant skyline",
+     "features": "twin stone towers with ornamental cupolas",
+     "scaleClass": "landmark",
+     "description": "outdoor, distant skyline. Colors: pale stone. twin stone towers with ornamental cupolas. Signature: twin domed towers",
+     "photoSource": "wikimedia",
+     "landmarkQuery": "Grossmünster",
+     "photoVariants": [
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/3224/a7fb35fe1fa0.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/59/Z%C3%BCrich_-_Grossm%C3%BCnster_IMG_0237.jpg",
+       "attribution": "Wikimedia Commons",
+       "description": "[tower, green, day] Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.",
+       "variantNumber": 1,
+       "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789584708605_rts4wqupm/debug/p12/landmark-1.jpg"
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/3224/c26a8e2723ac.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f1/Grossm%C3%BCnster_-_Limmatquai_-_M%C3%BCnsterhof-W%C3%BChre_2011-08-01_16-17-18.jpg",
+       "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+       "description": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+       "variantNumber": 2
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/3224/8cc0842d48db.jpg",
+       "kind": "exterior",
+       "vantage": "exterior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Grossmunster_Zuerich.jpg",
+       "attribution": "Robert Scarth, CC BY-SA 2.0, via Wikimedia Commons",
+       "description": "[tower, green, day] Pair of stone church towers with distinctive architectural details, contemporary structures flanking at right.",
+       "variantNumber": 3
+      },
+      {
+       "url": "https://images.magicalstory.ch/landmarks/index/3224/40ce152dcc80.jpg",
+       "kind": "interior",
+       "vantage": "interior",
+       "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1e/7424_-_Z%C3%BCrich_-_Grossm%C3%BCnster_Charlemagne.JPG",
+       "attribution": "Andrew Bossi, CC BY-SA 2.5, via Wikimedia Commons",
+       "description": "[interior, unclear, day] Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne above altar.",
+       "variantNumber": 4
+      }
+     ],
+     "appearsInPages": [
+      12
+     ],
+     "isRealLandmark": true,
+     "swissLandmarkId": 2384,
+     "photoAttribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+     "photoFetchStatus": "pending_lazy",
+     "signatureElement": "twin domed towers",
+     "isSwissPreIndexed": true,
+     "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/3224/c26a8e2723ac.jpg",
+     "extractedDescription": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+     "firstAppearanceAnalyzed": true
+    }
+   ],
+   "vehicles": [],
+   "clothing": []
+  },
+  "parentSceneMetadata": {
+   "characters": [
+    "Levin",
+    "Kiaan",
+    "Julian"
+   ],
+   "characterClothing": {
+    "Levin": "standard",
+    "Kiaan": "standard",
+    "Julian": "standard"
+   },
+   "characterPositions": {
+    "Levin": "center foreground",
+    "Kiaan": "right midground",
+    "Julian": "left midground"
+   },
+   "characterPerspectives": {
+    "Levin": {
+     "depth": "foreground"
+    },
+    "Kiaan": {
+     "depth": "midground"
+    },
+    "Julian": {
+     "depth": "midground"
+    }
+   },
+   "clothing": null,
+   "objects": [
+    "LOC002",
+    "ART001",
+    "ART004.2"
+   ],
+   "interactions": [
+    {
+     "character": "Levin + Kiaan + Julian",
+     "object": "ART004.2",
+     "where": "press close together around the bundled jacket as they climb",
+     "priority": "essential",
+     "storyRelevant": true,
+     "action": "carrying",
+     "hands": true
+    }
+   ],
+   "wornItems": [
+    {
+     "id": "ART004",
+     "owner": "Levin",
+     "state": "off",
+     "location": "carried as a bundle in Levin's arms",
+     "wearer": null
+    }
+   ],
+   "fullData": {
+    "characters": [
+     {
+      "name": "Levin",
+      "clothing": "standard",
+      "position": "center foreground",
+      "depth": "foreground",
+      "looksAt": "ART004.2",
+      "expression": "tired eyes, firm determined mouth, focused brow"
+     },
+     {
+      "name": "Kiaan",
+      "clothing": "standard",
+      "position": "right midground",
+      "depth": "midground",
+      "looksAt": "ART004.2",
+      "expression": "caring eyes, gentle supportive mouth"
+     },
+     {
+      "name": "Julian",
+      "clothing": "standard",
+      "position": "left midground",
+      "depth": "midground",
+      "looksAt": "ART004.2",
+      "expression": "exhausted soft eyes, slight frown of effort"
+     }
+    ],
+    "objects": [
+     "LOC002",
+     "ART001",
+     "ART004.2"
+    ],
+    "interactions": [
+     {
+      "character": "Levin + Kiaan + Julian",
+      "object": "ART004.2",
+      "where": "press close together around the bundled jacket as they climb",
+      "priority": "essential",
+      "storyRelevant": true,
+      "action": "carrying",
+      "hands": true
+     }
+    ],
+    "wornItems": [
+     {
+      "id": "ART004",
+      "owner": "Levin",
+      "state": "off",
+      "location": "carried as a bundle in Levin's arms",
+      "wearer": null
+     }
+    ],
+    "imageSummary": "Levin, a preschooler wearing only his white long-sleeve shirt, dark blue corduroy trousers, and brown boots, carries the tightly bundled red fleece jacket against his chest as the three boys climb the steep stone stairs of the narrow Altstadt lane. Kiaan, a preschooler in his orange pullover sweater, dark brown corduroy trousers, and blue boots, presses close beside him and holds Julian's hand on the step, while Julian, a toddler in his yellow quilted body warmer, mid-blue joggers, and grey sneakers, steps carefully up the dark stair. Medium shot in the cold autumn night, the three boys pressing close together around the bundle as they move slowly under the warm glow of street lanterns.",
+    "shot": "medium",
+    "crowdExpected": false,
+    "setting": null,
+    "background": null,
+    "sceneIntent": "Levin, Kiaan, and Julian climb the dark stone stairs together while keeping the bundled jacket pressed between them. Dark night with warm lantern light, weary but determined mood."
+   },
+   "thinking": null,
+   "translatedSummary": null,
+   "era": "present day",
+   "landmarkView": "exterior",
+   "imageSummary": "Levin, a preschooler wearing only his white long-sleeve shirt, dark blue corduroy trousers, and brown boots, carries the tightly bundled red fleece jacket against his chest as the three boys climb the steep stone stairs of the narrow Altstadt lane. Kiaan, a preschooler in his orange pullover sweater, dark brown corduroy trousers, and blue boots, presses close beside him and holds Julian's hand on the step, while Julian, a toddler in his yellow quilted body warmer, mid-blue joggers, and grey sneakers, steps carefully up the dark stair. Medium shot in the cold autumn night, the three boys pressing close together around the bundle as they move slowly under the warm glow of street lanterns.",
+   "landmarkVariants": null,
+   "setting": null,
+   "sceneComplexity": "simple",
+   "aboard": null,
+   "crowdExpected": false,
+   "emptyScenePrompt": "A steep, narrow flight of grey stone stairs climbing away from the camera in an old alleyway. The autumn night is dark, with warm orange lantern light spilling across the worn steps.",
+   "reuseEmptyScene": null,
+   "textPosition": null,
+   "textZoneDescription": null,
+   "framingPattern": null,
+   "sceneIntent": "Levin, Kiaan, and Julian climb the dark stone stairs together while keeping the bundled jacket pressed between them. Dark night with warm lantern light, weary but determined mood.",
+   "background": null,
+   "isJsonFormat": true,
+   "isProseFormat": true
+  },
+  "evaluationFeedback": {
+   "score": -15,
+   "reasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"left-foreground\",\n      \"hair\": \"curly, blonde\",\n      \"clothing\": \"white long-sleeve shirt, dark blue corduroy trousers, brown boots\",\n      \"action\": \"climbing stairs, holding red bundled jacket\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"red jacket\",\n        \"right\": \"red jacket\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"center-midground\",\n      \"hair\": \"dark, short\",\n      \"clothing\": \"orange pullover sweater, dark brown corduroy trousers, blue boots\",\n      \"action\": \"climbing stairs, holding hand\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"hand\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 3,\n      \"zone\": \"right-midground\",\n      \"hair\": \"curly, blonde\",\n      \"clothing\": \"yellow quilted body warmer, mid-blue joggers, grey sneakers\",\n      \"action\": \"climbing stairs\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    }\n  ],\n  \"matches\": [\n    {\n      \"figure\": 1,\n      \"reference\": \"Levin\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.19,\n        0.23,\n        0.33,\n        0.37\n      ],\n      \"body_bbox\": [\n        0.14,\n        0.22,\n        0.42,\n        0.98\n      ]\n    },\n    {\n      \"figure\": 2,\n      \"reference\": \"Kiaan\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.35,\n        0.19,\n        0.49,\n        0.33\n      ],\n      \"body_bbox\": [\n        0.3,\n        0.18,\n        0.58,\n        0.85\n      ]\n    },\n    {\n      \"figure\": 3,\n      \"reference\": \"Julian\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.56,\n        0.16,\n        0.7,\n        0.3\n      ],\n      \"body_bbox\": [\n        0.52,\n        0.15,\n        0.78,\n        0.78\n      ]\n    }\n  ],\n  \"height_order\": \"Julian (shortest) -> Kiaan (similar height) -> Levin (slightly taller)\",\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  },\n  \"coherence_gate\": {\n    \"applied\": false,\n    \"reason\": null\n  },\n  \"style_gate\": {\n    \"observed\": \"watercolor painting\",\n    \"linework\": \"no outlines at all, forms defined by paint edges\",\n    \"faces\": \"loose washes with visible brushstroke texture\",\n    \"matches_style\": true,\n    \"reason\": null\n  },\n  \"verdict\": \"SOFT_FAIL\",\n  \"issues_summary\": \"An unrequested object is present in the scene.\",\n  \"fixable_issues\": [\n    {\n      \"type\": \"missing_element\",\n      \"severity\": \"MAJOR\",\n      \"character\": null,\n      \"description\": \"The 'dragon egg' object is missing from the scene.\",\n      \"fix\": \"Add the 'dragon egg' object to the scene as described in the prompt.\"\n    },\n    {\n      \"type\": \"naturalness\",\n      \"severity\": \"MODERATE\",\n      \"character\": null,\n      \"description\": \"An unrequested egg-shaped object is present on the stairs.\",\n      \"fix\": \"Remove the unrequested egg-shaped object from the scene.\"\n    }\n  ]\n}",
+   "fixableIssues": [
+    {
+     "fix": "Add the 'dragon egg' object to the scene as described in the prompt.",
+     "type": "missing_element",
+     "sources": [
+      "quality"
+     ],
+     "severity": "MAJOR",
+     "character": null,
+     "description": "The 'dragon egg' object is missing from the scene."
+    },
+    {
+     "fix": "Remove the unrequested egg-shaped object from the scene.",
+     "type": "naturalness",
+     "sources": [
+      "quality"
+     ],
+     "severity": "MODERATE",
+     "character": null,
+     "description": "An unrequested egg-shaped object is present on the stairs."
+    },
+    {
+     "fix": "Replace blue jeans with dark blue corduroy trousers on the left-foreground figure holding the red jacket",
+     "type": "clothing",
+     "source": "three-stage",
+     "sources": [
+      "compliance"
+     ],
+     "severity": "MAJOR",
+     "character": "Levin",
+     "description": "Levin wears blue jeans instead of dark blue corduroy trousers as specified in CLOTHING CONTRACT"
+    },
+    {
+     "fix": "Replace brown pants with dark brown corduroy trousers on the center-foreground figure holding Julian's hand",
+     "type": "clothing",
+     "source": "three-stage",
+     "sources": [
+      "compliance"
+     ],
+     "severity": "MAJOR",
+     "character": "Kiaan",
+     "description": "Kiaan wears brown pants instead of dark brown corduroy trousers as specified in CLOTHING CONTRACT"
+    },
+    {
+     "fix": "Replace blue jeans with mid-blue pull-on jogger trousers on the right-foreground toddler in yellow quilted body warmer",
+     "type": "clothing",
+     "source": "three-stage",
+     "sources": [
+      "compliance"
+     ],
+     "severity": "MAJOR",
+     "character": "Julian",
+     "description": "Julian wears blue jeans instead of mid-blue joggers as specified in CLOTHING CONTRACT"
+    }
+   ],
+   "fixTargets": [
+    {
+     "type": "clothing",
+     "issue": "Levin wears blue jeans instead of dark blue corduroy trousers as specified in CLOTHING CONTRACT",
+     "severity": "MAJOR",
+     "element": "clothing",
+     "bounds": [
+      0.228515625,
+      0.1279296875,
+      0.990234375,
+      0.40654296875
+     ]
+    },
+    {
+     "type": "clothing",
+     "issue": "Kiaan wears brown pants instead of dark brown corduroy trousers as specified in CLOTHING CONTRACT",
+     "severity": "MAJOR",
+     "element": "clothing",
+     "bounds": [
+      0.17578125,
+      0.3302734375,
+      0.84375,
+      0.5888671875
+     ]
+    },
+    {
+     "type": "clothing",
+     "issue": "Julian wears blue jeans instead of mid-blue joggers as specified in CLOTHING CONTRACT",
+     "severity": "MAJOR",
+     "element": "clothing",
+     "bounds": [
+      0.1474609375,
+      0.53046875,
+      0.7841796875,
+      0.8701171875
+     ]
+    }
+   ]
+  },
+  "storedRewrite": {
+   "objectsInPrompt": "**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.",
+   "wornBlockInPrompt": "**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n- Levin IS wearing this on this page: fleece jacket — red fleece fabric garment with a full front zipper. Draw it on Levin even if the attached reference shows Levin without it."
+  },
+  "originalPrompt": {
+   "objectsInPrompt": "**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **dragon egg** (object) — about as big as a human head, like a lantern or a football — pale orange, smooth, glowing faintly from within\n* **red jacket** (object) — about as long as an adult's forearm — red fleece jacket rolled and wrapped tightly into a round fabric bundle — carried as a bundle in Levin's arms\nThe attached reference images include rough images of: dragon egg; red jacket — match each one's look at the size and placement the scene description gives it.\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.",
+   "wornBlockInPrompt": "**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n- Levin is NOT wearing this on this page: fleece jacket — red fleece fabric garment with a full front zipper. Leave it off Levin even if the attached reference shows it worn — carried as a bundle in Levin's arms."
+  }
+ }
+}

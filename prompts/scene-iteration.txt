@@ -9,9 +9,13 @@
 3. **Cast is locked.** The characters list plus the staged-figures list is exactly the cast — every entry must appear; nothing outside those two lists may be added. If the scene seems crowded, simplify staging (depth, framing, pose), not the cast.
 3a. **Whatever is in the picture is declared.** Every figure the prose puts in the frame appears in the metadata: a person in `characters[]` by name, a staged animal or secondary figure in `objects[]` by its id. A figure the plan line stages that the previous brief had dropped may be brought back — only together with its declaration. A figure brought back is described from CHARACTER DETAILS and from nowhere else: never invent an age look, build, hair or face for a character whose entry you were not given.
 3b. {OBJECT_ID_STABILITY}
+3c. **A tracked animal is cast.** {PLAN_LINE_CAST}
 4. **Character count (hard cap: {MAX_CHARACTERS_PER_SCENE}).** 1-3 is ideal. Preserve every character the hint lists.
 5. **One moment, one focal point.** Single instant; one main action draws the eye. When the page text chains physical actions, depict the one with the most motion.
+5b. **One instant, no history.** {ONE_INSTANT}
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
+6b. **One gaze target.** {GAZE_TARGET}
+6c. **Eyes are a field.** {LOOKS_AT_FIELD}
 7. **Physically possible.** Two hands = max two items. Fix conflicts.
 8. **Honor perspectives.** If the outline lists `perspective: back view`, render shoulders, head, hips, both feet turned away; heels visible, toes pointing away. For `over-the-shoulder`, the OTS character fills the near foreground (back view, shoulder + head visible), the watched subject sits midground/background.
 9. **Body-facing vocabulary (discrete only).** Pick one of: `facing the camera`, `facing left`, `facing right`, `back view`. Never write fractional turns ("three-quarters", "two-thirds toward", "45-degree", "angled three-quarters"). For a glance back, write `back view, glancing over the shoulder toward [target]`.
@@ -24,9 +28,16 @@
 14. **No closed pose for the calm zone.** The page's `textPosition` is locked from first generation. The corner it names must read as calm, uncluttered scene content (smooth sky, unbroken wall, open water, foliage, ground). Do NOT place a named character, an active figure, a weapon, or a busy crowd in that corner. If the previous render put a figure there, move that figure to a different region in the rewrite.
 <!-- TEXT_OVERLAY_END -->
 15. **Never describe** weapons touching a character's body, characters held or bound by another character, or wounds or blood.
+15b. **Never name what must be absent.** {NEVER_NAME_ABSENT}
 16. **An object out of sight.** {CONCEALED_OBJECT}
 17. **A prop the page text puts against a character.** {STAGED_PROP}
 18. **Contact reads as a verb.** {CONTACT_VERB}
+19. **A garment the page removes.** {GARMENT_REMOVED}
+20. **A worn item on someone else.** {WORN_ON_OTHER}
+21. **Counting.** {COUNTING_RULE}
+22. **A two-sided prop.** {MULTI_PICTURE_PROP}
+23. **A creature in frame has a written face.** A page holding a creature states its brow, eyes and mouth in the prose, in the terms of the creature-tone block below — including a creature acting hard, diving, chasing, calling or lifting, and at any distance the face can be read at.
+{CREATURE_TONE}
 
 ---
 
@@ -37,7 +48,7 @@
 
 **Preview / evaluator feedback:**
 {PREVIEW_FEEDBACK}
-
+{EVALUATOR_REASONING}{FIX_TARGETS}
 A feedback line marked SPEC CONFLICT overrides the declared interactions: rewrite the conflicting interactions so each body part serves one purpose, keeping the story moment.
 
 **Context (previous scenes):**
@@ -61,9 +72,12 @@ Clothing rules:
 
 **Main characters:**
 {CHARACTERS}
+{HEIGHT_ORDER}
 {STAGED_FIGURES}
 **Recurring visual elements (copy IDs exactly):**
 {RECURRING_ELEMENTS}
+{WORN_STATE}
+**Season:** {SEASON} — foliage, ground cover, sky and daylight colour are that season's, and no rewrite changes it.
 {CORRECTION_NOTES}
 
 ---
@@ -104,7 +118,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 ```
 {
-  "sceneIntent": "One short sentence (under 25 words) naming WHAT THE IMAGE SHOWS — the central action + main characters + setting. Example: 'CharacterA reaches up toward the glowing clock tower while CharacterB watches from a few paces back in the snowy plaza.' This goes at the very top of the rendered image prompt as the **THIS IMAGE DEPICTS:** anchor — the image model weights it heavily.",
+  "sceneIntent": "CharacterA reaches up toward the clock tower while CharacterB watches from a few paces back in the snowy plaza. She reaches for the tower door, and both look at the tower. Winter afternoon light, cold and still.",
   "diagnosis": ["Evaluator: extra soldier in upper-right. Cause: prose said 'soldiers approach' without count — model invented one."],
   "previewMismatches": ["Intent: hero faces target. Preview: hero faced away."],
   "issues": ["short bullets describing problems found"],
@@ -118,12 +132,17 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     "fixesApplied": []
   },
   "characters": [
-    {"name": "CharacterA", "clothing": "winter", "position": "foreground", "expression": "alarmed, mouth open, brows pulled tight"},
-    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "expression": "calm, attentive, neutral mouth"}
+    {"name": "CharacterA", "clothing": "winter", "position": "foreground", "depth": "foreground", "looksAt": "LOC001", "expression": "alarmed, mouth open, brows pulled tight"},
+    {"name": "CharacterB", "clothing": "winter", "position": "beside CharacterA", "depth": "midground", "looksAt": "LOC001", "expression": "calm, attentive, neutral mouth"}
   ],
+  "shot": "medium",
+  "landmarkView": "exterior",
   "objects": ["LOC001"],
   "interactions": [
-    {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "storyRelevant": true, "priority": "essential"}
+    {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "action": "watching", "storyRelevant": true, "priority": "essential"}
+  ],
+  "wornItems": [
+    {"id": "ART003", "owner": "CharacterA", "state": "off", "location": "lies folded on the bench beside her"}
   ],
   "reuseEmptyScene": true,
   "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the background, its blue face visible against grey clouds. Light snow falls on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
@@ -133,16 +152,20 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 ### Field rules
 
+- `sceneIntent`: {SCENE_INTENT_FIELD} It goes at the very top of the rendered image prompt as the **THIS IMAGE DEPICTS:** anchor — the image model weights it heavily.
+- `shot`: the page's camera framing: {SHOT_ENUM}. Decide it once — the prose, the `emptyScenePrompt` and this field use the same framing. Omitting it makes the background plate default to a wide shot.
+- `landmarkView`: how the page sees a real landmark, when one is cited: `exterior`, `distant`, `close`, `interior`, `view-from`, or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; omitting it attaches none.
+- `wornItems[]`: one row per Visual Bible element with a `wornAs` link whose owner is on this page, whether or not the prose mentions it. `{id, owner, state, location, wearer}`; `state` is `"worn"` or `"off"`, and `off` requires `location`. Omit a row and the item is drawn on the character by default.
 - `diagnosis[]`: one entry per evaluator finding or preview mismatch. Each entry names the root cause in one short sentence — not the symptom. Empty array if there were no findings.
 - `previewMismatches[]`: array of `"Intent: X. Preview: Y."` strings. Empty array if preview matched intent.
 - `issues[]`, `corrections[]`: short bullets. Empty arrays if none.
 <!-- TEXT_OVERLAY_BEGIN -->
 - `draftValidation`: must include `calmZoneCheck` confirming no named character / weapon / crowd in the textPosition corner.
 <!-- TEXT_OVERLAY_END -->
-- `characters[]`: one entry per character. Always `name`, `clothing`, `position`. `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when Rule 10 allows it. Add `"perspective": "back view"` or `"side"` only when non-standard. Add `"depth": "background"` only for tiny/distant figures. For foreground/midground characters add `expression`: a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone; keep it consistent with the prose. The underlying emotion comes from the page text and the draft — strengthen the visible cue if needed, never replace the emotion itself.
+- `characters[]`: one entry per character. Always `name`, `clothing`, `position`, `depth` and `looksAt`. `depth` is `foreground`, `midground` or `background` — distance from the camera, never elevation and never a size. `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when Rule 10 allows it. Add `"perspective": "back view"` or `"side"` only when non-standard. Add `"depth": "background"` only for tiny/distant figures. For foreground/midground characters add `expression`: a short visible-cue phrase from the page text ("alarmed, mouth open, brows pulled tight"), never an emotion word alone; keep it consistent with the prose. The underlying emotion comes from the page text and the draft — strengthen the visible cue if needed, never replace the emotion itself.
 - `clothing` must match the outline exactly — if the outline says `costumed`, write `costumed`, not `standard`. Also describe the costume in the prose.
-- `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible. For landmarks with photo variants use `LOC003.2` format — pick the variant matching the scene's perspective.
-- `interactions[]`: visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`. Mark `storyRelevant: true` only when the contact is the page's plot beat, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`. Omit entirely: pure ground/floor/path contact, leaning on walls, sitting on generic chairs. Field shape `{character, object, where, storyRelevant}`. `where` is a short sentence naming the object as the contact action — no body-part positioning, no pose details. {CONTACT_VERB} Cap: 1–4 entries, 0–2 with `storyRelevant: true`. Distance verbs (`shoots`, `aims at`, `calls to`) require an explicit separation phrase in `where` (`across the room`, `down the valley`); for these scenes the shot must be `ultra-wide` and the prose must place each figure at the correct end of the frame.
+- `objects[]`: string array of Visual Bible IDs only (`LOC001`, `ART002.2`). Include every recurring element visible. At most {VB_ELEMENT_BUDGET} of them per page — secondary characters, animals, artifacts and vehicles count, a LOC does not; keep the ones the page is about. For landmarks with photo variants use `LOC003.2` format — pick the variant matching the scene's perspective.
+- `interactions[]`: visible character-to-object and character-to-character contacts. The image generator reads all entries; the evaluator only enforces entries marked `storyRelevant: true`. Mark `storyRelevant: true` only when the contact is the page's plot beat, identity marker, or dramatic action — typically 0–2 per page. Costume texture, pose detail, and secondary contact are `storyRelevant: false`. In doubt → `false`. Omit entirely: pure ground/floor/path contact, leaning on walls, sitting on generic chairs. Field shape `{character, object, where, action, hands, storyRelevant, priority}`. `action` is required on every row, in English whatever the story language: the physical activity — the verb and what it acts on ("pushing the cart", "climbing the ladder") — never the purpose it serves; use `"watching"` for anyone who only looks on and `"standing"` for anyone merely present. `hands` is `true` when the character's hands are on the object. An actor in the `character` slot is a name listed in `characters[]` or the id of a visual bible animal; a figure written by role rather than by its id resolves to nobody. `where` is a short sentence naming the object as the contact action — no body-part positioning, no pose details. {CONTACT_VERB} Cap: 1–4 entries, 0–2 with `storyRelevant: true`. Distance verbs (`shoots`, `aims at`, `calls to`) require an explicit separation phrase in `where` (`across the room`, `down the valley`); for these scenes the shot must be `ultra-wide` and the prose must place each figure at the correct end of the frame.
 - `reuseEmptyScene`: `true` if the previously generated empty-scene background can be reused. `false` if setting / location / camera angle / lighting changed significantly.
 - `emptyScenePrompt`: 2-3 sentences describing only the background — location, architecture, landscape, lighting, weather, camera angle, depth layers, scene-anchor artifacts (throne, pole-with-banner, boat, cart). EXCLUDE named characters, tracked animals, handheld artifacts. Describe anonymous extras with density/distance/silhouette only, kept away from the zone reserved for named characters.<!-- TEXT_OVERLAY_BEGIN --> The corner matching `textPosition` must read as calm, uncluttered scene content.<!-- TEXT_OVERLAY_END -->
 - `translatedSummary`: one-line translation of the prose summary into the target language, for frontend display.

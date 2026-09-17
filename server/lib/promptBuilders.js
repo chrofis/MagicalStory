@@ -2286,6 +2286,20 @@ function namedByMain(inputData = {}, main = true) {
 }
 
 /**
+ * ONE state line for a recurring-elements dump, WITH the state's page range
+ * (2026-09-17). The bible declares each state's `pages` and a page cites the
+ * state whose range covers it; the brief REWRITER was shown the states' names
+ * and deltas and no ranges at all, so the only way it could pick the right
+ * dotted handle was to copy the one the previous brief used — and a rewrite
+ * that re-derives its citations had nothing to derive from. An entry with no
+ * declared range renders exactly as before.
+ */
+function stateLineForIterate(st) {
+  const pages = Array.isArray(st && st.pages) && st.pages.length > 0 ? ` (pages ${st.pages.join(', ')})` : '';
+  return `[${st.id}] ${st.name}: ${st.delta}${pages}`;
+}
+
+/**
  * Render the Visual Bible as the {RECURRING_ELEMENTS} block.
  *
  * Shared by the per-page expansion (which filters to the ids the scene hint
@@ -2318,7 +2332,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         {
           const states = objectStates(sc);
           if (states.length > 0) {
-            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
           }
         }
       }
@@ -2346,7 +2360,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         {
           const states = objectStates(animal);
           if (states.length > 0) {
-            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
           }
         }
       }
@@ -2362,7 +2376,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         // state; each line is only what changed.
         const states = objectStates(artifact);
         if (states.length > 0) {
-          recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+          recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
         }
       }
     }
@@ -2491,6 +2505,16 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
+    // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
+    // that author a page brief — see ONE_INSTANT_RULE and the block around it.
+    // Registered as sibling set art-director-vs-iterate.
+    ONE_INSTANT: ONE_INSTANT_RULE,
+    GAZE_TARGET: GAZE_TARGET_RULE,
+    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -2756,6 +2780,16 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
+    // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
+    // that author a page brief — see ONE_INSTANT_RULE and the block around it.
+    // Registered as sibling set art-director-vs-iterate.
+    ONE_INSTANT: ONE_INSTANT_RULE,
+    GAZE_TARGET: GAZE_TARGET_RULE,
+    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -2849,7 +2883,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         {
           const states = objectStates(sc);
           if (states.length > 0) {
-            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
           }
         }
       }
@@ -2877,7 +2911,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         {
           const states = objectStates(animal);
           if (states.length > 0) {
-            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
           }
         }
       }
@@ -2890,7 +2924,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         {
           const states = objectStates(artifact);
           if (states.length > 0) {
-            recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
           }
         }
       }
@@ -3170,11 +3204,56 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
         STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
+    // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
+    // that author a page brief — see ONE_INSTANT_RULE and the block around it.
+    // Registered as sibling set art-director-vs-iterate.
+    ONE_INSTANT: ONE_INSTANT_RULE,
+    GAZE_TARGET: GAZE_TARGET_RULE,
+    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
       // The rewrite restates every character's appearance from CHARACTER
       // DETAILS, which is where a declared colour drifts — see
       // DECLARED_TRAIT_VERBATIM_RULE. One constant, both iterate templates,
       // filled from this one call site.
       DECLARED_TRAIT_VERBATIM: DECLARED_TRAIT_VERBATIM_RULE,
+      // THE SAME PAGE CONTRACTS THE FIRST ART DIRECTOR IS GIVEN (2026-09-17).
+      // Each of these already existed as ONE constant filled into the Art
+      // Director templates and into nothing else, so a rewrite dropped the rule
+      // the page was written under. Measured across 11 stored iterate rounds on
+      // two staging runs: see the ONE_INSTANT_RULE block.
+      PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+      MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+      COUNTING_RULE,
+      VB_ELEMENT_BUDGET,
+      SHOT_ENUM,
+      CREATURE_TONE: buildCreatureToneSection(options.story || { characters }),
+      SEASON: seasonLabel(options.story || {}),
+      HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
+      // THREE INPUTS THE REWRITER NEVER HAD. It was handed a SCORE and a list
+      // of findings and asked to diagnose root causes with neither the
+      // evaluator's own reasoning nor the regions it named, and it re-declared
+      // the page's worn state having never been told what that state was.
+      EVALUATOR_REASONING: options.evaluatorReasoning
+        ? `
+**Evaluator reasoning on the previous render (why it scored what it scored):**
+${options.evaluatorReasoning}
+`
+        : '',
+      FIX_TARGETS: options.fixTargets
+        ? `
+**Regions the evaluator marked (the picture, not the brief — each names where it looked):**
+${options.fixTargets}
+`
+        : '',
+      WORN_STATE: options.wornState
+        ? `
+**Worn state this page already declared (carry it, or state the change and emit the row):**
+${options.wornState}
+`
+        : '',
     });
     // Text-overlay-only rules gate:
     // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,
@@ -4235,7 +4314,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   const metaCharacters = Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
     ? metadata.fullData.characters
     : (Array.isArray(metadata?.characters) ? metadata.characters : []);
-  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible);
+  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible, { language: inputData?.language });
   const eraGuard = buildEraGuard(metadata?.era);
   const sceneIntentLine = metadata?.sceneIntent
     ? `**THIS IMAGE DEPICTS:** ${String(metadata.sceneIntent).trim()}`
@@ -4606,6 +4685,29 @@ function resolveVbActorName(name, visualBible) {
 }
 
 /**
+ * The element an interaction's `object` handle names, as {type, entry}.
+ *
+ * Handles only — `ART001`, `ART001.2`, `ANI004`, `VEH002`. A free-text object
+ * ("the dirt", "the stone wall") resolves to nothing on purpose: the pools
+ * below are the ones the REQUIRED OBJECTS block scale-notes, and a name match
+ * would reach entries that block never lists.
+ */
+const VB_ELEMENT_POOLS = [['artifacts', 'object'], ['animals', 'animal'], ['vehicles', 'vehicle']];
+function resolveVbElement(handle, visualBible) {
+  const m = VB_HANDLE.exec(String(handle || '').trim());
+  if (!m || !visualBible) return null;
+  const wanted = (m[1] + m[2]).toUpperCase();
+  for (const [key, type] of VB_ELEMENT_POOLS) {
+    const entries = visualBible[key];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (String((entry && entry.id) || '').trim().toUpperCase() === wanted) return { id: wanted, type, entry };
+    }
+  }
+  return null;
+}
+
+/**
  * The eyes, as a phrase. `looksAt` is the one field that means gaze (AD rule
  * 8j); a Visual Bible id in it becomes the element's name, never a raw id.
  */
@@ -4619,8 +4721,12 @@ function looksAtPhrase(target, visualBible = null) {
   return `eyes on ${scrubVbIds(t, visualBible)}`;
 }
 
-function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null) {
+function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null, options = {}) {
   const interactionList = Array.isArray(interactions) ? interactions : [];
+  const language = options.language || 'en';
+  // An element that was scale-noted on this block already — the rider is stated
+  // ONCE per element, on the first pose line that names it.
+  const scaledElements = new Set();
   // Even with zero declared interactions, we may still emit fill lines for
   // uncovered fg/mg characters — so don't early-return on an empty list.
   const lines = [];
@@ -4682,10 +4788,37 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
         }
       }
     }
+    // SIZE RIDES THE POSE LINE (2026-09-17). The REQUIRED OBJECTS block states
+    // the same scale, and on the pages where nothing takes hold of the element
+    // the render ignored it: staging job_1789584708605_rts4wqupm drew one
+    // head-sized element at beach-ball size on p5, p6 and p14 — the three pages
+    // whose pose line put no hand, arm or ear on it — while p4, p7, p11, p12,
+    // p13 and p15, which did, drew it correctly. The `where` clause is the
+    // field the render obeys: p9 and p11 built a byte-identical REQUIRED
+    // OBJECTS line and differed only there (649908242), and the A/B that
+    // produced this rider (Lab #1281 vs #1284, #1286 vs #1288) shrank the
+    // element on both failing pages and left an already-correct page alone.
+    // Same pools, same label and same phrase as that block, so one element has
+    // one scale and one name across the whole prompt. The label carries the
+    // phrase as an apposition, never as a predicate: three of the thirteen band
+    // phrases are verb-led ("fills an open hand"), so "the X is …" is not a
+    // form every band survives.
+    const element = resolveVbElement(object, visualBible);
+    const scaleNote = element ? elementScaleNote(element.entry) : null;
+    const scaleRider = scaleNote
+      ? ` — the ${elementLeadLabel(element.entry, { language, type: element.type })}: ${scaleNote}`
+      : '';
     for (const target of targets) {
       // A visual-bible actor reaches the model by name, not by handle.
       const label = resolveVbActorName(target, visualBible);
-      lines.push(`- ${label}: ${finalWhere}`);
+      // Stated once per element per block — a multi-character row splits into
+      // one line per figure, and three figures do not need three copies.
+      let lineWhere = finalWhere;
+      if (scaleRider && !scaledElements.has(element.id)) {
+        scaledElements.add(element.id);
+        lineWhere += scaleRider;
+      }
+      lines.push(`- ${label}: ${lineWhere}`);
       coveredNames.add(label.toLowerCase());
       coveredNames.add(target.toLowerCase());   // so the fill below skips it either way
     }
@@ -6593,6 +6726,46 @@ const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page t
  */
 const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair colour and cut, eye colour, skin tone, a distinctive feature — reaches the prose in that entry's own words. The sentence around it is yours to write; the trait words are not. Reordering them is fine (`Hair: <colour>, wavy, short` may be written as `short wavy <colour> hair`); a neighbouring shade, a shade the entry leaves unstated, or a trait written from memory is a different character.";
 
+/**
+ * SEVEN PAGE-BRIEF CONTRACTS THE REWRITER WAS NEVER GIVEN (2026-09-17).
+ *
+ * A page brief is authored at FOUR sites: the two Art Director templates that
+ * write it the first time (scene-expansion.txt, scene-expansion-all.txt) and the
+ * two iterate templates that REWRITE it when the render proves it unbuildable
+ * (scene-iteration.txt, scene-iteration-free.txt). The rewrite's output replaces
+ * the brief wholesale and becomes the page's contract with the image model, so a
+ * rule only the first author holds is a rule one repair round deletes.
+ *
+ * Measured on the 11 iterate rounds stored across staging
+ * job_1789584708605_rts4wqupm (p4, p6, p9, p10, p13, p16) and
+ * job_1789506283204_3kxqshifx (p2, p7, p10, p13, p16): every one of the 11
+ * rewrites came back with `looksAt` on 0 of its characters where the brief it
+ * replaced carried it on all of them, and with no `wornItems` row at all. On
+ * job_1789584708605_rts4wqupm p16 the brief being replaced declared the jacket
+ * OFF and held as a bundle; the rewrite declared nothing, and the built image
+ * prompt flipped from "Levin is NOT wearing this" to "Levin IS wearing this".
+ *
+ * Each of these seven was a sentence standing byte-identical in BOTH Art Director
+ * templates and in neither iterate template. They are constants rather than four
+ * hand-kept copies because that is exactly how these drift: the set is
+ * registered as `art-director-vs-iterate` in sibling-registry.json, and
+ * tests/unit/ad-iterate-parity.test.ts asserts each one reaches all four BUILT
+ * prompts byte-identically.
+ */
+const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
+
+const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
+
+const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, `camera`, or `away`. It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+
+const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both state the character is WITHOUT it and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once.";
+
+const WORN_ON_OTHER_RULE = "When the page has a character other than the item's owner wearing it, the row is `state: \"worn\"` plus `wearer` naming that character — not `off`. The prose puts the item on the wearer and on nobody else; the owner's description does not mention it.";
+
+const ABSENT_THING_RULE = "\"no glow\", \"bare rail\", \"no other figures in the room\", \"does not wave\" each paint the named thing into the picture. Leave it unwritten and describe what does occupy that space instead (\"the rail runs smooth grey iron\", \"the far wall is plain plaster\"). This covers props, people and the medium alike — you are not shown the art style, and a ban on glow, colour, text, reflections or weather can contradict the style the picture is drawn in.";
+
+const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: setting, lighting, and the mood as it shows — in faces, posture, light or weather, never as a mood word. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect.";
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -8249,6 +8422,13 @@ module.exports = {
   STAGED_PROP_RULE,
   CONTACT_VERB_RULE,
   DECLARED_TRAIT_VERBATIM_RULE,
+  ONE_INSTANT_RULE,
+  GAZE_TARGET_RULE,
+  LOOKS_AT_FIELD_RULE,
+  GARMENT_REMOVED_RULE,
+  WORN_ON_OTHER_RULE,
+  ABSENT_THING_RULE,
+  SCENE_INTENT_FIELD_RULE,
   ELEMENT_ENTRY_PAGE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,

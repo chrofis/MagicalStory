@@ -79,7 +79,7 @@
     {
       "id": "text-audit-sighted-vs-blind",
       "axis": "arc-informed audit vs blind audit",
-      "reason": "story-text-audit.txt (arc-informed) and story-text-audit-blind.txt (the blind reader) feed ONE parser and ONE merge (parseFaultLines / mergeAuditFindings, textRefine.js), and that merge dedupes on the CATEGORY TAG: same page + same category + different auditor is folded into one finding. So the FAULT-line output contract and the category vocabulary are shared state \u2014 a category name that gains a meaning on one side and not the other either folds two distinct faults into one or splits one fault into two. The question SETS are deliberately different, which is what the Siblings-Checked marker is for; the contract they share is not.",
+      "reason": "story-text-audit.txt (arc-informed) and story-text-audit-blind.txt (the blind reader) feed ONE parser and ONE merge (parseFaultLines / mergeAuditFindings, textRefine.js), and that merge dedupes on the CATEGORY TAG: same page + same category + different auditor is folded into one finding. So the FAULT-line output contract and the category vocabulary are shared state — a category name that gains a meaning on one side and not the other either folds two distinct faults into one or splits one fault into two. The question SETS are deliberately different, which is what the Siblings-Checked marker is for; the contract they share is not.",
       "members": [
         "prompts/story-text-audit.txt",
         "prompts/story-text-audit-blind.txt"
@@ -292,6 +292,40 @@
         "prompts/scene-iteration-free.txt"
       ],
       "severity": "block"
+    },
+    {
+      "id": "art-director-vs-iterate",
+      "axis": "first Art Director vs rewrite Art Director",
+      "reason": "A page brief is authored at FOUR sites: the two Art Director templates that write it the first time, and the two iterate templates that REWRITE it when the render proves it unbuildable. The rewrite replaces the brief wholesale and becomes the page's contract with the image model, so a rule only the first author holds is a rule one repair round deletes. Measured 2026-09-17 over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx: 11 of 11 rewrites dropped `shot`, `landmarkView` and every character's `depth` and `looksAt`, and emitted no `wornItems` row at all, where the brief each replaced carried all of them. This set is why that cannot happen silently again: touch an Art Director template and the gate asks what the rewriter gets.",
+      "members": [
+        "prompts/scene-expansion.txt",
+        "prompts/scene-expansion-all.txt",
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{ONE_INSTANT}",
+          "{GAZE_TARGET}",
+          "{LOOKS_AT_FIELD}",
+          "{GARMENT_REMOVED}",
+          "{WORN_ON_OTHER}",
+          "{NEVER_NAME_ABSENT}",
+          "{SCENE_INTENT_FIELD}",
+          "{CONCEALED_OBJECT}",
+          "{STAGED_PROP}",
+          "{CONTACT_VERB}",
+          "{PLAN_LINE_CAST}",
+          "{COUNTING_RULE}",
+          "{MULTI_PICTURE_PROP}",
+          "{CREATURE_TONE}",
+          "{VB_ELEMENT_BUDGET}",
+          "{SHOT_ENUM}",
+          "{SEASON}"
+        ],
+        "anchorsNote": "Placeholders, not prose: each is ONE exported constant filled at all four sites, so the anchor proves the rule reaches the template and tests/unit/ad-iterate-parity.test.ts proves the constant reaches the BUILT prompt byte-identically. Three iterate-only placeholders stay deliberately unanchored because they have no Art Director counterpart to keep in step: {OBJECT_ID_STABILITY} (the Art Director MINTS the ids, so it has none to substitute), {DECLARED_TRAIT_VERBATIM} (declared where the drift was measured — see DECLARED_TRAIT_VERBATIM_RULE), and {MAX_CHARACTERS_PER_SCENE} (the image model’s face cap, which the Art Director expresses as its own staging rules)."
+      }
     }
   ],
   "withinFile": [
