@@ -551,6 +551,30 @@ the merge order, the `shot`/`landmarkView` floors), `server/lib/repairPipeline.j
 `tests/unit/ad-iterate-parity.test.ts`, `tests/unit/iterate-parity-staging.test.ts`,
 `tests/unit/fixtures/ad-iterate-parity-staging.json`, `tasks/BACKLOG.md`.
 
+**Verified live, two Test Lab `iterate` replays on staging** (exp #1291 p16, #1292 p15 of
+`job_1789584708605_rts4wqupm`, deployed commit `e41c279f`). Both rewrites came back with
+everything the 11 stored rounds had dropped: `shot` (`medium` / `close-up`), `landmarkView`
+(`exterior`), `depth` and `looksAt` on every character, `action` and `hands` on every interaction,
+a `wornItems` row, and a three-sentence `sceneIntent` reaching the image prompt's **THIS IMAGE
+DEPICTS** anchor.
+
+p15 is the clean case, because its parent brief is still the Art Director's: the rewrite kept
+`state: "off"` with `location: "wrapped around ART001.2"`, so the built image prompt says *"Levin
+is NOT wearing this on this page — leave it off Levin"*, and its REQUIRED OBJECTS block carries
+both declared objects (the egg and the jacket) with their reference images. That is exactly what
+p16 destroyed in the original run.
+
+p16 itself can no longer demonstrate the worn half, and the reason matters: its persisted brief IS
+the damaged rewrite (`wornItems: []`), so `renderParentWornState` resolves the default — `worn` —
+and the rewriter faithfully carried what it was told. The plumbing is proven; a page whose stored
+brief already lost the declaration cannot be un-damaged by giving the rewriter a better input.
+Repairing such a page needs the state restored first.
+
+One miss on the first live run, logged in `tasks/BACKLOG.md`: p15's rewrite wrote *"the egg is
+matte and dark, no glow"* into `sceneIntent` — a negation `ABSENT_THING_RULE` forbids by name, and
+which the parent brief did not contain (it said the egg "catches a faint orange glow"). The rule
+reaches the built prompt; on this page the model wrote past it, at the top of the image prompt.
+
 **Status:** ✅ active
 
 ## 2026-09-17 — A repair aimed at a figure it cannot paint, and three places a step's own report went unchecked
