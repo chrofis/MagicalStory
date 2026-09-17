@@ -874,3 +874,177 @@ describe('state placement vs the page`s own placement', () => {
     expect(line.trim()).toMatch(/— fits in one hand$/);
   });
 });
+
+
+// -- 9. ONE WORD IS A COINCIDENCE, TWO ARE A CLAIM (2026-09-17) --------------
+// `appearanceContradiction` deletes a state's whole look clause from REQUIRED
+// OBJECTS when the page's own instant speaks a SIBLING state's vocabulary. It
+// decided that on a single shared word, and a single shared word is almost
+// always the prose and the bible talking about different things.
+//
+// Replayed over the 123 stored staging stories carrying a Visual Bible (1,261
+// pages, 187 citations of a stated artifact) it fired on 10 pages; 9 of the 10
+// were coincidences and the scene reviewer declined the one it was shown
+// (job_1789584708605_rts4wqupm p5 came back in `briefUnfixed`). The shapes
+// below are those measured cases, with archetypal names.
+describe('appearanceContradiction - a shared word is not an assertion', () => {
+  const { resolveObjectState, MIN_APPEARANCE_EVIDENCE } = require_('../../server/lib/visualBible');
+
+  // The measured shape: the object's own noun ("shell") appears in its base
+  // description AND inside the cracked state's text, and the word for the
+  // cavity it lies in ("hollow") appears inside that same state's text.
+  const EGG = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [],
+    locations: [{ id: 'LOC001', name: 'tree-root square', type: 'place', description: 'a gravel square with old tree roots' }],
+    artifacts: [{
+      id: 'ART001',
+      name: 'smooth egg',
+      type: 'artifact',
+      size: 'melon-sized',
+      description: 'melon-sized oval egg with a smooth curved shell',
+      appearsInPages: [5],
+      states: [
+        { id: 'ART001.1', name: 'unaltered', delta: 'pale orange, smooth, glowing faintly from within', pages: [5] },
+        { id: 'ART001.2', name: 'cold', delta: 'pale orange, smooth, matte and dark', pages: [] },
+        { id: 'ART001.3', name: 'cracked', delta: 'pale orange shell broken in half, hollow empty interior', pages: [] },
+      ],
+    }],
+  });
+
+  const intentScene = (intent: string, objects: string[]) =>
+    `A quiet square.\n\n---METADATA---\n${JSON.stringify({
+      sceneIntent: intent,
+      characters: [{ name: 'Ada', position: 'center', depth: 'midground' }],
+      shot: 'medium',
+      objects,
+      textPosition: 'bottom-left',
+    })}`;
+
+  const grabWarns = <T,>(warnings: string[], fn: () => T): T => {
+    const listener = (level: string, line: string) => { if (level === 'warn') warnings.push(line); };
+    addLogListener(listener);
+    try { return fn(); } finally { removeLogListener(listener); }
+  };
+
+  const stateLine = (vb: any, page: number, objects: string[], intent: string, needle: string, warnings: string[] = []) =>
+    grabWarns(warnings, () => requiredObjectsBlock(
+      buildImagePrompt(intentScene(intent, objects), { language: 'en' }, null, vb, page, null, {}),
+    ).split('\n').find(l => l.includes(needle)) || '');
+
+  const eggState = (intent: string, objects = ['ART001.1', 'LOC001']) =>
+    resolveObjectState(EGG().artifacts[0], objects[0], 5, { sceneIntent: intent, objects },
+      { silent: true, visualBible: EGG() });
+
+  it('"shell" - the object\'s own noun, reused inside a state it has not reached - keeps the clause', () => {
+    // job_1789584708605_rts4wqupm: the cracked state reads "pale orange shell
+    // broken in half"; a page on the unaltered state that says "shell" is
+    // naming the object, not asserting the break.
+    const intent = 'Ada kneels by the roots. Her hands touch the egg\'s shell while she leans close.';
+    expect(eggState(intent).contradictedBy).toBeNull();
+    expect(stateLine(EGG(), 5, ['ART001.1', 'LOC001'], intent, 'egg'))
+      .toContain('pale orange, smooth, glowing faintly from within');
+  });
+
+  it('"hollow" - the cavity the object lies in, and also a word of the cracked state - keeps the clause', () => {
+    // job_1789584708605_rts4wqupm p5, verbatim shape. The scene reviewer was
+    // shown this finding and declined it; it came back in `briefUnfixed`.
+    const intent = 'Ada crouches and points toward the egg in the hollow.';
+    expect(eggState(intent).contradictedBy).toBeNull();
+    expect(stateLine(EGG(), 5, ['ART001.1', 'LOC001'], intent, 'egg'))
+      .toContain('pale orange, smooth, glowing faintly from within');
+  });
+
+  it('prose that really does assert the sibling look still drops the clause, and says which words', () => {
+    const intent = 'The egg lies broken in half on the ground, its interior empty.';
+    const r = eggState(intent);
+    expect(r.contradictedBy).toBe('appearance');
+    expect(r.rival.id).toBe('ART001.3');
+    expect(r.evidenceTokens.length).toBeGreaterThanOrEqual(MIN_APPEARANCE_EVIDENCE);
+    const warnings: string[] = [];
+    const line = stateLine(EGG(), 5, ['ART001.1', 'LOC001'], intent, 'egg', warnings);
+    expect(line).not.toContain('glowing faintly from within');   // the clause is gone
+    expect(line).toContain('egg');                                // the object stays listed
+    const w = warnings.find(x => /VB-STATE/.test(x) && /state clause dropped/.test(x))!;
+    expect(w).toBeDefined();
+    expect(w).toContain('Page 5');                     // the page
+    expect(w).toContain('ART001 ("smooth egg")');      // the element
+    expect(w).toContain('ART001.1 ("unaltered")');     // the cited state
+    expect(w).toContain('ART001.3 ("cracked")');       // the rival
+    expect(w).toMatch(/on the word\(s\) "[a-z]+", "[a-z]+"/);  // the words it decided on
+  });
+
+  it('a single word of a sibling state is never enough on its own', () => {
+    // "matte" alone, from the cold state. Two of its words WOULD decide it.
+    expect(eggState('The egg has gone matte in Ada\'s hands.').contradictedBy).toBeNull();
+    expect(eggState('The egg has gone matte and dark in Ada\'s hands.').contradictedBy).toBe('appearance');
+  });
+
+  // job_1788903616404_iqvhj4l8m p10: the prose names one word of the clipped-on
+  // state ("handlebar") and two of the set-down state ("down", "lamp") - and
+  // calls the object "dark, unlit", which is neither. Two voices, no verdict.
+  const LAMP = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [],
+    artifacts: [{
+      id: 'ART001',
+      name: 'handlebar lamp',
+      type: 'artifact',
+      size: 'palm-sized',
+      description: 'a compact front lamp, warm amber when lit, dark grey when unlit',
+      appearsInPages: [10],
+      states: [
+        { id: 'ART001.1', name: 'clipped on', delta: 'mounted on a bicycle handlebar, clip closed around the bar', pages: [1] },
+        { id: 'ART001.2', name: 'held aloft', delta: 'gripped in one hand, raised toward the viewer, clip open at the base', pages: [10] },
+        { id: 'ART001.3', name: 'set down glowing', delta: 'resting flat on bare rock, lamp face turned outward, emitting a warm amber glow', pages: [11] },
+      ],
+    }],
+  });
+
+  it('two sibling states each speaking their own word leaves the instant undecidable', () => {
+    const intent = 'Ada tightly grips her dark, unlit handlebar lamp, looking down at it as an idea forms.';
+    const r = resolveObjectState(LAMP().artifacts[0], 'ART001.2', 10,
+      { sceneIntent: intent, objects: ['ART001.2'] }, { silent: true, visualBible: LAMP() });
+    expect(r.contradictedBy).toBeNull();
+    expect(stateLine(LAMP(), 10, ['ART001.2'], intent, 'lamp')).toContain('raised toward the viewer');
+  });
+
+  // job_1789083667794_17lz946ik p9 and job_1788727233899_1dpnym94p p4: the
+  // accusing words came out of a PLACEMENT clause - "across the left-hand path"
+  // and "in the raven's nest" - and the prose meant a pair of hands and a bird.
+  const BOULDER = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [],
+    artifacts: [{
+      id: 'ART001',
+      name: 'path boulder',
+      type: 'artifact',
+      size: 'knee-high',
+      description: 'a rounded grey granite boulder with darker streaks',
+      appearsInPages: [9],
+      states: [
+        { id: 'ART001.1', name: 'blocking', delta: 'sitting squarely across the left-hand path, touching both side banks', pages: [8] },
+        { id: 'ART001.2', name: 'moved', delta: 'shifted to the side of the path, one edge overhanging the bank', pages: [9] },
+      ],
+    }],
+  });
+
+  it('the nouns of a placement clause never accuse', () => {
+    const intent = 'Ada leans her weight against the granite boulder, pushing hard with both hands to clear the path.';
+    const r = resolveObjectState(BOULDER().artifacts[0], 'ART001.2', 9,
+      { sceneIntent: intent, objects: ['ART001.2'] }, { silent: true, visualBible: BOULDER() });
+    expect(r.contradictedBy).toBeNull();
+  });
+
+  it('a state with no id still names its element in the drop warning', () => {
+    // A bible stored before the dotted handles existed carries `name` only.
+    const vb = EGG();
+    for (const st of vb.artifacts[0].states) delete (st as any).id;
+    const warnings: string[] = [];
+    stateLine(vb, 5, ['ART001', 'LOC001'], 'The egg lies broken in half on the ground, its interior empty.', 'egg', warnings);
+    const w = warnings.find(x => /VB-STATE/.test(x) && /state clause dropped/.test(x))!;
+    expect(w).toBeDefined();
+    expect(w).toContain('ART001 state "unaltered"');
+    expect(w).not.toMatch(/undefined/);
+  });
+});

@@ -7,6 +7,102 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-17 — A state contradiction needs TWO of the rival's own look-words, and it says which
+
+**Context.** `appearanceContradiction` (server/lib/visualBible.js) deletes an object state's whole
+appearance clause from a page's `**REQUIRED OBJECTS**` block when the page's own `sceneIntent`
+speaks a SIBLING state's vocabulary — the doctrine being that an object's states are mutually
+exclusive, so an instant that says "cracked" cannot also be "unaltered". It decided that on ONE
+shared token, and a single token is almost always the bible and the prose talking about different
+things. Two instances were found by accident on staging job_1789584708605_rts4wqupm, the
+dragon-egg story, both on ART001 and both while an agent was hand-diffing an offline prompt build:
+
+- **"shell"** — a distinctive token of the CRACKED state (`ART001.3`, "pale orange **shell** broken
+  in half, hollow empty interior") and *also the object's own noun*, sitting in its base
+  description ("melon-sized oval egg with a smooth curved **shell**"). A page citing the UNALTERED
+  state `ART001.1` lost `pale orange, smooth, glowing faintly from within`.
+- **"hollow"** — a token of the same state's "**hollow** empty interior", and the story's word for
+  the cavity under the tree root the egg lies in. p5's instant ("Ada crouches and points toward the
+  egg in the hollow") lost the same clause.
+
+Both are the natural nouns for the subject, so a dragon-egg rerun would lose the egg's appearance
+from the prompt on every page that used them.
+
+**Measured before the fix** by replaying `resolveObjectState` over every stored staging story
+carrying a Visual Bible — **123 stories, 1,261 pages, 187 pages citing a stated artifact**. The
+guard fired on **10 pages across 7 stories**:
+
+- **6 are pure coincidence**, no underlying fault at all: "hollow" (the cavity, above); "open"
+  twice (a character's arms opening, and a line about wanting to open a chest, against "split
+  open" and "the lid is propped open"); "hand"/"both" (from the rival's *placement* clause
+  "across the left-hand path, touching both side banks", on a page whose prose says "pushing hard
+  with both hands"); "hand" again (against a rival clause reading "no hands touching it" — the page
+  asserts the OPPOSITE of the clause it was charged with); "raven" (the bird standing in the frame,
+  against "in the raven's nest").
+- **3 name ONE real fault** — job_1789343124794_z2c779f7i, whose first state is a change ("muddy and
+  cracked") claiming the pages before the story makes it. Only p3 carried more than one word of
+  evidence; p4 and p5 rested on "glow" alone.
+- **1 could not be classified**: p16 of the same story, "Levin rubs the mud off the cracked egg",
+  citing the clean state. It is the transition page; both looks are partly true.
+
+None of the ten was ever acted on. The one the scene reviewer was shown — p5 of the dragon-egg
+story — came back in `briefUnfixed`: the reviewer read it and declined to rewrite the page.
+
+**Decision.** Three narrowings in `appearanceContradiction`, and the deletion now says why.
+
+1. **A rival accuses with its LOOK half only.** A state's vocabulary is split by the existing
+   `splitStatePlacement` — the same split the prompt line already uses — and only the appearance
+   half may name a rival. A placement clause's nouns are about the world, not the object.
+2. **Two of the rival's own words, not one** (`MIN_APPEARANCE_EVIDENCE = 2`). One word is a
+   coincidence at the measured rate of 9 in 10; two independent words of one state's own
+   vocabulary in the sentences that name the object is a claim.
+3. **The single-rival gate runs on ANY hit, BEFORE the threshold.** A second state that speaks even
+   one of its own words makes the instant undecidable. Applying the threshold first silently clears
+   that second voice and hands the page to the loudest — which is exactly what an intermediate
+   version of this fix did to job_1788903616404_iqvhj4l8m p10 (one word of the clipped-on state,
+   two of the set-down state, on a page whose prose calls the lamp "dark, unlit").
+
+The chosen state keeps defending itself with its WHOLE delta, placement included, and still stands
+down on a single word: a page agreeing with where a state puts the object is still a page agreeing
+with that state. The asymmetry is deliberate and points the same way as the rest of this guard —
+under-fire. `'both'` also joins `APPEARANCE_STOPWORDS`, beside the `'one'`/`'two'`/`'all'`/`'any'`
+run it belongs to.
+
+**The deletion is no longer anonymous.** `appearanceContradiction` returns the rival's words that
+hit (`tokens`), `resolveObjectState` surfaces them as `evidenceTokens`, and the `[VB-STATE]` drop
+warning now names the ELEMENT (id and name), the cited state, the rival, **and the words the
+verdict rests on**. The three hand-maintained copies of the state reference in that function now
+share one `stateRef` helper, so a pre-`id` bible (staging job_1788727233899_1dpnym94p carries
+states with a `name` and no `id`) no longer prints `undefined` for the thing that was deleted. The
+reviewer-facing `vb_state_contradicted` finding carries the words too — evidence, not a
+reclassification: the type and its severity are untouched.
+
+**Measured after the fix**, same replay: **1 fire on 1 page** — job_1789343124794_z2c779f7i p3, the
+one true fault, on three words. All 6 coincidences gone; p4/p5 of that story no longer fire, and
+the fault they named is still reported once, by p3, in a finding that asks for a whole-entry
+correction ("Correct the entry's state pages"). Both trigger words are dead: "shell" and "hollow"
+no longer contradict, while prose that really does assert a sibling look ("broken in half, its
+interior empty", "matte and dark") still drops the clause.
+
+**Rejected, with the measurement.** Disqualifying tokens the element's own `description` uses —
+the obvious fix for "shell", which sits in "a smooth curved shell". It also kills the one true
+positive, whose entire evidence is the object's base look ("glowing with bright warm light")
+showing through on a page the bible declares mud-covered. A state that RESTORES the base look
+shares the base's words by construction, so the base description cannot be used to disqualify
+them. Also rejected: adding "hollow"/"shell"/"open"/"hand" to a stoplist — that is the
+hand-written vocabulary of appearance concepts this guard's docblock forbids, and it generalises
+to nothing.
+
+**Not addressed here.** Whether a deletion this material should also fail a round rather than warn,
+and whether the ambiguous transition-page case (p16) deserves its own type, are owner
+classification calls — logged in `tasks/BACKLOG.md`, not decided in code.
+
+**Touched files.** `server/lib/visualBible.js` (`MIN_APPEARANCE_EVIDENCE`,
+`appearanceContradiction`, `resolveObjectState`, `APPEARANCE_STOPWORDS`),
+`server/lib/promptBuilders.js` (`stateRef`, the three `[VB-STATE]`/`[RECEIVER]` drop warnings),
+`server/lib/sceneBriefCheck.js` (`checkObjectStateContradiction` detail),
+`tests/unit/vb-object-states.test.ts` (8 new tests on the measured shapes).
+
 ## 2026-09-16 — Every scale band token says its own mode: `knee-high`, `chest-high`, `melon-sized`
 
 **Context.** Two earlier passes the same day fixed the scale ladder one token at a time. The

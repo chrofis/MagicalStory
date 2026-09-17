@@ -4035,14 +4035,29 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // placement half is not asserted against it (the delta's appearance
         // half always stays — that is what the state is FOR).
         let stateDelta = state ? resolved.promptDelta : '';
+        // ONE reference format for this object's state, shared by the three
+        // clause-drop warnings below. Each of them was a hand-maintained copy
+        // that read `state.id` directly, and a bible stored before the dotted
+        // handles existed has none: staging job_1788727233899_1dpnym94p carries
+        // states with a `name` and no `id`, so the line that says what was
+        // deleted said `undefined`.
+        const stateRef = (st) => ((st && st.id)
+          ? `${st.id} ("${st.name}")`
+          : `${artifact.id} state "${(st && st.name) || '?'}"`);
         if (state && resolved.placementDropped.length > 0) {
-          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${stateDelta || '(nothing — the clause was placement only)'}"`);
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${stateDelta || '(nothing — the clause was placement only)'}"`);
         }
         if (resolved.contradicted) {
+          // A DELETION NOBODY CAN SEE THE REASON FOR IS A DELETION NOBODY CAN
+          // CALL WRONG (2026-09-17). The appearance axis decides on WORDS the
+          // prose and a sibling state happen to share, and both false positives
+          // that opened this fix were found by accident off a hand diff. The
+          // words are now in the line, with the element that lost its clause.
           const why = resolved.contradictedBy === 'appearance'
-            ? `the page's instant asserts ${resolved.rival.id} ("${resolved.rival.name}": "${resolved.rival.delta}") instead — "${resolved.evidence}"`
+            ? `the page's instant asserts ${artifact.id} ("${artifact.name}")'s ${stateRef(resolved.rival)} instead ("${resolved.rival.delta}"), `
+              + `on the word(s) ${(resolved.evidenceTokens || []).map(t => `"${t}"`).join(', ') || '(none recorded)'} — "${resolved.evidence}"`
             : `the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} but the state says the object is ${state.held ? 'in hand' : 'untouched'}`;
-          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${state.id} ("${state.name}") — ${why} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — ${why} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
           state = null;
           stateDelta = '';
         }
@@ -4053,7 +4068,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // as the `held` contradiction above; the object itself stays listed.
         const receiverRow = state ? receiverRows.find(r => matchesEntry(artifact, r.receiver)) : null;
         if (receiverRow) {
-          log.warn(`⚠️ [RECEIVER] Page ${pageNumber}: ${state.id} ("${state.name}") is the receiver of ${receiverRow.character}'s action on ${receiverRow.object} — state clause dropped, the result belongs at the contact. Delta was: "${state.delta}"`);
+          log.warn(`⚠️ [RECEIVER] Page ${pageNumber}: ${stateRef(state)} is the receiver of ${receiverRow.character}'s action on ${receiverRow.object} — state clause dropped, the result belongs at the contact. Delta was: "${state.delta}"`);
           state = null;
           stateDelta = '';
         }

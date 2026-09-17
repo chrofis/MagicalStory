@@ -322,6 +322,10 @@ const APPEARANCE_STOPWORDS = new Set([
   // measured: "the" alone made every sibling delta a rival on every page.
   'the', 'and', 'its', 'his', 'her', 'out', 'for', 'are', 'was', 'not', 'but',
   'has', 'had', 'one', 'two', 'all', 'any', 'own', 'off', 'she', 'him', 'you',
+  // Same class as the 'one'/'two'/'all'/'any' run above - a quantifier, never a
+  // look. Its absence is what let "touching both side banks" charge a page
+  // whose prose said "pushing hard with both hands".
+  'both',
   'who', 'how', 'why', 'yet', 'per', 'via', 'now', 'new', 'old', 'own',
   'der', 'die', 'das', 'und', 'ein', 'ist', 'sie', 'ihr', 'den', 'dem', 'des',
   'mit', 'auf', 'aus', 'les', 'des', 'une', 'est', 'son', 'sur', 'par', 'pas',
@@ -351,6 +355,42 @@ function appearanceTokens(text) {
 }
 
 /**
+ * ONE WORD IS A COINCIDENCE, TWO ARE A CLAIM.
+ *
+ * MEASURED 2026-09-17 by replaying `appearanceContradiction` over every stored
+ * staging story carrying a Visual Bible - 123 stories, 1,261 pages, 187 pages
+ * citing a stated artifact. It fired on 10 of them. Once the placement half
+ * stops voting (below), NINE of the ten rest on a SINGLE distinctive token, and
+ * every one of those nine is the rival's text and the page's prose happening to
+ * share a word that means something else in each:
+ *
+ *   "hollow"  the cavity under a tree root, against a cracked state's "hollow
+ *             empty interior"                (job_1789584708605_rts4wqupm p5)
+ *   "shell"   the object's OWN noun, which the cracked state's text reuses
+ *   "open"    a character's arms opening, and a line about wanting to open a
+ *             chest, against "split open" and "the lid is propped open"
+ *   "hand"    a "left-hand path", and a rival clause reading "no hands
+ *             touching it" - the page asserts the OPPOSITE of that clause
+ *   "raven"   the bird standing on the page, against "in the raven's nest"
+ *   "mud"     mud being rubbed OFF, on the page that removes it
+ *   "glow"    the object's own light, which the bible gives it in every state
+ *
+ * The tenth - four words of one state's own vocabulary in one sentence - is the
+ * real fault this guard exists for (an entry whose FIRST state is a change,
+ * claiming the pages before the story makes it: job_1789343124794_z2c779f7i p3,
+ * the case tests/unit/vb-state-review.test.ts locks down).
+ *
+ * REJECTED, with the measurement: disqualifying tokens the element's own
+ * `description` uses. It kills the two words this fix was opened for ("shell"
+ * is in "melon-sized oval egg with a smooth curved shell") - but it also kills
+ * that one true positive, whose whole evidence is the object's base look
+ * ("glowing with bright warm light") showing through on a page the bible
+ * declares mud-covered. A state that RESTORES the base look shares the base's
+ * words by construction, so the base description cannot disqualify them.
+ */
+const MIN_APPEARANCE_EVIDENCE = 2;
+
+/**
  * Does the page's own instant assert a look the chosen state DENIES?
  *
  * The same doctrine as the `held` contradiction, on the appearance axis: a
@@ -367,6 +407,15 @@ function appearanceTokens(text) {
  *     hand-written vocabulary of appearance concepts anywhere in here,
  *   - only tokens DISTINCTIVE to one state vote; a word two states share says
  *     nothing,
+ *   - only a state's LOOK half votes. `splitStatePlacement` already separates a
+ *     delta's placement clauses from its appearance clauses for the prompt
+ *     line, and this is the appearance axis: a placement clause's nouns are
+ *     about the world, not about the object ("across the left-hand path,
+ *     touching both side banks" charged a page with "hand" and "both"; "in the
+ *     raven's nest" charged one with the raven standing in the frame),
+ *   - a rival needs MIN_APPEARANCE_EVIDENCE of its own words in the prose, not
+ *     one; a single shared noun is a coincidence at the measured rate of 9 in
+ *     10 (see the constant above),
  *   - only the sentences of `sceneIntent` that NAME this object are read, so
  *     the intent's closing "…, warm lamplight, hopeful mood" clause — scene
  *     lighting, present on nearly every page — cannot vote,
@@ -379,7 +428,10 @@ function appearanceTokens(text) {
  * used. It under-fires by design — the wrong delta shipping is the same
  * failure we already had, a stripped good delta is a new one.
  *
- * @returns {{rival: Object, evidence: string}|null}
+ * @returns {{rival: Object, evidence: string, tokens: string[]}|null} - `tokens`
+ *   are the rival's own words the prose used, so the log line and the review
+ *   finding can say WHY. Without it a coincidence is invisible: both trigger
+ *   words of the 2026-09-17 fix were found by accident, off a hand diff.
  */
 function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
   if (!state || !state.delta) return null;
@@ -388,10 +440,37 @@ function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
   const intent = String(sceneMetadata?.sceneIntent || '').trim();
   if (!intent) return null;
 
-  const vocab = new Map([[state, appearanceTokens(`${state.name || ''} ${state.delta}`)]]);
-  for (const s of siblings) vocab.set(s, appearanceTokens(`${s.name || ''} ${s.delta || ''}`));
-  const distinctive = (s) => [...vocab.get(s)].filter(t => ![...vocab].some(([o, toks]) => o !== s && toks.has(t)));
-  const mine = distinctive(state);
+  // A state speaks with two voices, and only one of them may ACCUSE.
+  //   `look`  - its name plus the LOOK half of its delta. This is what a rival
+  //             accuses with: an appearance axis has no business reading a
+  //             placement clause's nouns, which are about the world and not the
+  //             object ("across the left-hand path, touching both side banks"
+  //             charged a page with "hand" and "both"; "in the raven's nest"
+  //             charged one with the raven standing in the frame).
+  //   `whole` - its name plus the whole delta. This is what the CHOSEN state
+  //             stands down on, and what disqualifies a word as shared. A page
+  //             agreeing with where a state puts the object is still a page
+  //             agreeing with that state: staging job_1788903616404_iqvhj4l8m
+  //             p10 says the lamp is "grip"ped and the state says "gripped in
+  //             one hand", and reading only the look half lost that word and
+  //             charged the page with the lamp's lit state - a page whose own
+  //             prose calls it "dark, unlit".
+  // A state whose delta is placement ONLY therefore has nothing to accuse with
+  // and is skipped, which is what an appearance axis should do with a clause
+  // that states no look.
+  const lookOf = (s) => `${s.name || ''} ${splitStatePlacement(s.delta).kept}`;
+  const wholeOf = (s) => `${s.name || ''} ${s.delta || ''}`;
+  const look = new Map();
+  const whole = new Map();
+  for (const s of [state, ...siblings]) {
+    look.set(s, appearanceTokens(lookOf(s)));
+    whole.set(s, appearanceTokens(wholeOf(s)));
+  }
+  const ownWords = (source) => (s) => [...source.get(s)]
+    .filter(t => ![...whole].some(([o, toks]) => o !== s && toks.has(t)));
+  const accusing = ownWords(look);
+  const defending = ownWords(whole);
+  const mine = accusing(state);
   if (mine.length === 0) return null;
 
   // Tokens that name THIS object and no other element the page cites.
@@ -422,10 +501,28 @@ function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
   if (sentences.length === 0) return null;
   const said = new Set(sentences.flatMap(s => [...s.toks]));
 
-  if (mine.some(t => said.has(t))) return null; // the instant agrees with the chosen state
-  const rivals = siblings.filter(s => distinctive(s).some(t => said.has(t)));
+  // ASYMMETRIC ON PURPOSE. ONE of the chosen state's own words - from anywhere
+  // in its delta - is enough to stand down; a rival needs
+  // MIN_APPEARANCE_EVIDENCE words of its LOOK to accuse. Both halves of that
+  // asymmetry point the same way, under-fire, which is the doctrine above: a
+  // wrong delta shipping is the failure we already had, a stripped good delta
+  // is a new one.
+  if (defending(state).some(t => said.has(t))) return null; // the instant agrees with the chosen state
+  // TWO GATES, IN THIS ORDER, AND THE ORDER MATTERS. The single-rival gate runs
+  // on ANY hit, before the evidence threshold: a second state that speaks even
+  // one of its own words makes the instant undecidable, and a threshold applied
+  // first silently CLEARS that second voice and hands the page to the loudest.
+  // Measured - job_1788903616404_iqvhj4l8m p10 names the lamp's "handlebar"
+  // (its clipped-on state) and "down"/"lamp" (its set-down state); the old
+  // code declined it as ambiguous, and a threshold that filtered first turned
+  // the same page into a confident charge against a lamp the page calls
+  // "dark, unlit".
+  const rivals = siblings
+    .map(s => ({ state: s, tokens: accusing(s).filter(t => said.has(t)) }))
+    .filter(r => r.tokens.length > 0);
   if (rivals.length !== 1) return null;
-  return { rival: rivals[0], evidence: sentences.map(s => s.text).join(' ') };
+  if (rivals[0].tokens.length < MIN_APPEARANCE_EVIDENCE) return null;
+  return { rival: rivals[0].state, evidence: sentences.map(s => s.text).join(' '), tokens: rivals[0].tokens };
 }
 
 /**
@@ -454,7 +551,7 @@ function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
  * instant asserts a sibling state's look (`appearanceContradiction`).
  * `contradictedBy` says which.
  *
- * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean, contradictedBy:('held'|'appearance'|null), rival:Object|null, evidence:string|null}}
+ * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean, contradictedBy:('held'|'appearance'|null), rival:Object|null, evidence:string|null, evidenceTokens:string[]|null}}
  */
 function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetadata = null, { silent = false, visualBible = null } = {}) {
   const cited = handle ? objectStateFor(entry, handle) : null;
@@ -492,6 +589,7 @@ function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetada
     contradictedBy: heldContradicted ? 'held' : (appearance ? 'appearance' : null),
     rival: appearance?.rival || null,
     evidence: appearance?.evidence || null,
+    evidenceTokens: appearance?.tokens || null,
     scenePlacement,
     promptDelta: scenePlacement ? split.kept : String(state?.delta || '').trim(),
     placementDropped: scenePlacement ? split.dropped : [],
@@ -3807,6 +3905,7 @@ module.exports = {
   citedEntries,
   resolveObjectState,
   appearanceContradiction,
+  MIN_APPEARANCE_EVIDENCE,
   scenePlacesObject,
   splitStatePlacement,
   appearanceTokens,

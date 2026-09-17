@@ -336,8 +336,14 @@ function checkObjectStateContradiction(page, metadata, visualBible) {
       const r = resolveObjectState(entry, handle, page.pageNumber, metadata, { silent: true, visualBible });
       if (!r || !r.contradicted || !r.state) continue;
       const label = elementDisplayLabel(entry) || entry.name || base;
+      // The WORDS the verdict rests on, not just the sentence they sit in: this
+      // axis decides on vocabulary two states share, and the reviewer is the
+      // one reader who can tell "the egg in the hollow" (a cavity in the
+      // ground) from a cracked shell's hollow interior. Evidence, not a
+      // classification - the type and its severity are untouched.
+      const words = (r.evidenceTokens || []).map(t => `"${t}"`).join(', ');
       const asserts = r.contradictedBy === 'appearance' && r.rival
-        ? `the page's own instant asserts "${r.rival.name}" instead${r.evidence ? ` ("${r.evidence}")` : ''}`
+        ? `the page's own instant asserts "${r.rival.name}" instead${words ? `, on the word(s) ${words}` : ''}${r.evidence ? ` ("${r.evidence}")` : ''}`
         : "the page's own interactions[] contradict that state's contact";
       findings.push({
         pageNumber: page.pageNumber,
