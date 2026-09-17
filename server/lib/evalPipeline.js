@@ -812,9 +812,17 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // using the shared 9-zone vocabulary. If quality eval isn't running or fails,
     // pass an empty block and Stage 2 falls back to vision-only reasoning.
     let qualityFiguresBlock = '(not available)';
+    // THREE STATES, NOT TWO. The figures pass either could not be read at all,
+    // or it was read and this page genuinely has nobody in it. Collapsing the
+    // second into the first is the very confusion notEvaluated.js exists to
+    // remove, one level down: staging job_1789584708605_rts4wqupm p3 is a
+    // people-free close-up ("the object alone", `characters: []`, zero detected
+    // figures) and it was filed as a judge that could not run.
+    let figuresRead = false;
     if (qualityFiguresPromise) {
       try {
         const qf = await qualityFiguresPromise;
+        figuresRead = !!qf;
         if (qf && (qf.figures?.length || qf.matches?.length)) {
           qualityFiguresBlock = JSON.stringify({
             figures: qf.figures || [],
@@ -826,11 +834,16 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       }
     }
     if (qualityFiguresBlock === '(not available)') {
-      // The canonical "judge ran with an empty input": Stage 2 falls back to
-      // vision-only reasoning, so named-figure -> description pairing is never
-      // judged. Previously indistinguishable from "paired, no fault found".
-      notEvaluated.record('identity_attribution', 'quality_figures_unavailable',
-        'Stage 2 received no figures/matches - named-figure to description pairing was not judged');
+      // Stage 2 falls back to vision-only reasoning either way, so the pairing
+      // is unjudged either way — the REASON is what differs, and the reason is
+      // what an analyst reads back out of stored data.
+      if (figuresRead) {
+        notEvaluated.record('identity_attribution', 'no_figures_on_page',
+          'The figures pass returned no figure and no match - this page has nobody to pair a name to');
+      } else {
+        notEvaluated.record('identity_attribution', 'quality_figures_unavailable',
+          'Stage 2 received no figures/matches - named-figure to description pairing was not judged');
+      }
     }
 
     const complianceInput = fillTemplate(complianceTemplate, {

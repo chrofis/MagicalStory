@@ -314,9 +314,17 @@ ${JSON.stringify(metadata, null, 2)}`,
  *
  * @param {Object} visualBible  parsed bible (MUTATED in place)
  * @param {Array} pagesWithMetadata  [{pageNumber, metadata|objects|brief|sceneDescription}]
+ * A BARE citation lands on the sub-row the entry's own table already assigns
+ * that page (`objectStateForPage`), not on the first row — the same resolution
+ * the page prompt and the reference-cell pick use. `emptiedStates` names every
+ * state or vantage that ended with no page left, which is a look the book never
+ * reaches and a reference cell rendered for nothing.
+ *
  * @returns {{applied:boolean, pages:number[], entries:Array<{id,collection,name,
  *   oldPages:number[], newPages:number[], gained:number[], lost:number[]}>,
- *   changed:number, emptied:string[], revived:string[]}}
+ *   changed:number, emptied:string[],
+ *   emptiedStates:Array<{id:string, name:string, oldPages:number[]}>,
+ *   revived:string[]}}
  */
 const USAGE_COLLECTIONS = [
   ...ELEMENT_COLLECTIONS.map(c => c.key),
@@ -348,7 +356,7 @@ function castFields(metadata) {
 }
 
 function applyBriefUsage(visualBible, pagesWithMetadata = []) {
-  const report = { applied: false, pages: [], entries: [], changed: 0, emptied: [], revived: [] };
+  const report = { applied: false, pages: [], entries: [], changed: 0, emptied: [], emptiedStates: [], revived: [] };
   if (!visualBible || typeof visualBible !== 'object') return report;
 
   // Normalise the briefs to {pageNumber, metadata}; a page with no parseable
@@ -413,20 +421,53 @@ function applyBriefUsage(visualBible, pagesWithMetadata = []) {
     // cited that exact handle; a handle nobody cited for a page it used to
     // claim loses it. A sub-row is matched by its own id, then by position.
     const subKey = key === 'locations' ? 'vantages' : 'states';
-    const subs = Array.isArray(entry[subKey]) ? entry[subKey] : null;
+    // An EMPTY `states: []` is the normal case — most entries have no states at
+    // all and the parser writes the empty array — so it is `null` here, not a
+    // zero-length list the bare-citation routing below would index into.
+    const subs = (Array.isArray(entry[subKey]) && entry[subKey].length > 0) ? entry[subKey] : null;
     if (subs) {
+      // The AUTHORED tables, snapshotted before any row is rewritten: the
+      // bare-citation routing below reads them, and rewriting row 0 first would
+      // change the answer every later row gets.
+      const authored = subs.map(st => new Set(
+        (Array.isArray(st && st.pages) ? st.pages : []).map(Number).filter(Number.isFinite)
+      ));
+      const dotted = [...subPagesFor.keys()].filter(k => k.startsWith(`${id}.`));
+      const barePages = newPages.filter(p => !dotted.some(k => (subPagesFor.get(k) || new Set()).has(p)));
+      // A BARE citation resolves HERE THE WAY THE PROMPT RESOLVES IT: the page
+      // goes to the sub-row the entry's own table already assigns it
+      // (`objectStateForPage`, visualBible.js — written so that "a brief that
+      // cites the bare parent id still lands on the right cell for the page"),
+      // and only to the first row when no row claims it (`defaultObjectState`).
+      //
+      // Crediting every bare page to row 0 was a SECOND, disagreeing resolution
+      // rule, and it did not merely mis-credit — it rewrote the bible the prompt
+      // path then read. Staging job_1789584708605_rts4wqupm: the Art Director
+      // authored an object's states as unaltered [3-13], cold [14,15], cracked
+      // [18]; the scene review saw that table and correctly left it alone; the
+      // briefs cite the bare parent from p11 on; this loop moved [14,15] onto
+      // the unaltered row and emptied the other two. Both later pages were then
+      // built with the unaltered delta AND the unaltered reference cell — the
+      // object drawn glowing on the pages whose own text has gone cold.
+      const bareFor = subs.map(() => []);
+      for (const p of barePages) {
+        const idx = authored.findIndex(set => set.has(p));
+        bareFor[idx >= 0 ? idx : 0].push(p);
+      }
       subs.forEach((st, i) => {
         if (!st || typeof st !== 'object') return;
         const handle = String(st.id || '').trim().toUpperCase() || `${id}.${i + 1}`;
         const own = sorted(subPagesFor.get(handle));
-        // A page that cited the BARE parent id belongs to the parent's default
-        // sub-row (the first) — the same rule `defaultObjectState` applies.
-        const bare = i === 0
-          ? newPages.filter(p => ![...subPagesFor.keys()]
-            .filter(k => k.startsWith(`${id}.`))
-            .some(k => (subPagesFor.get(k) || new Set()).has(p)))
-          : [];
-        st.pages = sorted(new Set([...own, ...bare]));
+        const before = sorted(authored[i]);
+        st.pages = sorted(new Set([...own, ...bareFor[i]]));
+        // A LOOK NO PAGE REACHES. The entry-level `emptied` list never saw this
+        // — it counts entries — so a state that lost every page (and whose
+        // reference cell was already rendered and paid for) left no signal at
+        // all. Reported, never repaired: which page shows which look is the
+        // Art Director's to say.
+        if (before.length > 0 && st.pages.length === 0) {
+          report.emptiedStates.push({ id: handle, name: String(st.name || ''), oldPages: before });
+        }
       });
     }
 

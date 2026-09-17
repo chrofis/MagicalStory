@@ -2835,12 +2835,24 @@ ${bibleBody}` : bibleBody;
       if (beatsReviewReport) beatsReviewReport.vbBriefUsage = usage;
       const detail = changed.slice(0, 12)
         .map(e => `${e.id} [${e.oldPages.join(',')}] → [${e.newPages.join(',')}]`).join('; ');
-      gl.info('vb_usage_from_briefs', `Visual Bible page assignment rebuilt from the final briefs: ${usage.changed}/${usage.entries.length} entr(ies) changed`
+      // AN ELEMENT OR A LOOK THE BOOK NO LONGER REACHES IS A WARNING, not a
+      // status line. Both mean the bible and the briefs — written in one
+      // Art-Director breath — disagree about what is on the page, and both
+      // leave a paid reference cell rendered for a cell nothing will attach.
+      const deadStates = (usage.emptiedStates || []);
+      const lost = usage.emptied.length + deadStates.length;
+      const summary = `Visual Bible page assignment rebuilt from the final briefs: ${usage.changed}/${usage.entries.length} entr(ies) changed`
         + (usage.revived.length ? `, ${usage.revived.length} revived (${usage.revived.join(', ')})` : '')
         + (usage.emptied.length ? `, ${usage.emptied.length} now cited by no brief (${usage.emptied.join(', ')})` : '')
-        + (detail ? ` — ${detail}` : ''), null, usage);
+        + (deadStates.length ? `, ${deadStates.length} state(s) no page reaches (${deadStates.map(s => `${s.id} "${s.name}" was [${s.oldPages.join(',')}]`).join('; ')})` : '')
+        + (detail ? ` — ${detail}` : '');
+      if (lost > 0) gl.warn('vb_usage_from_briefs', summary, null, usage);
+      else gl.info('vb_usage_from_briefs', summary, null, usage);
       for (const e of changed) {
         log.info(`[VB-USAGE] ${e.id} "${e.name}" [${e.oldPages.join(',')}] → [${e.newPages.join(',')}]`);
+      }
+      for (const s of deadStates) {
+        log.warn(`⚠️ [VB-USAGE] ${s.id} "${s.name}" claimed page(s) [${s.oldPages.join(',')}] and no brief cites it — a look the book never reaches`);
       }
       // ONE SOURCE OF TRUTH: the transcript below is what storyJobPipeline,
       // the resume path and the Lab re-parse. Write the rebuilt pages back.

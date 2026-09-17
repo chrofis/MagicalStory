@@ -139,3 +139,85 @@ describe('applyBriefUsage', () => {
     expect(byId(vb, 'ART001').appearsInPages).toEqual([7]);
   });
 });
+
+/**
+ * A BARE CITATION RESOLVES THE WAY THE PROMPT RESOLVES IT.
+ *
+ * Staging job_1789584708605_rts4wqupm. The Art Director authored ART001's
+ * states as unaltered [3-13], cold [14,15], cracked [18] — correct against the
+ * plan lines, and the scene review saw exactly that table and left it alone
+ * (sceneReviewReport.bibleCorrections corrected a different entry that run).
+ * Its briefs then cite the dotted handle on p3-p13 and the BARE parent from p11
+ * on. The old rebuild gave every bare-cited page to states[0], which moved
+ * [14,15] onto the unaltered row and emptied the other two; the page prompt and
+ * the reference cell both follow the bible, so p14/p15 were built with the
+ * unaltered delta and the unaltered cell on the pages whose own text has gone
+ * cold. `objectStateForPage` exists so a bare citation lands on the right cell
+ * — this rebuild now uses it instead of a second, disagreeing rule.
+ */
+describe('applyBriefUsage — bare citations and the states the book never reaches', () => {
+  const eggBible = (): any => ({
+    secondaryCharacters: [],
+    animals: [],
+    artifacts: [
+      {
+        id: 'ART001', name: 'smooth egg', appearsInPages: [3, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15, 18],
+        pages: [3, 4, 5, 6, 7, 9, 11, 12, 13, 14, 15, 18],
+        states: normaliseObjectStates([
+          { name: 'unaltered', delta: 'pale orange, smooth, glowing faintly from within', pages: [3, 4, 5, 6, 7, 9, 11, 12, 13] },
+          { name: 'cold', delta: 'pale orange, smooth, matte and dark', pages: [14, 15] },
+          { name: 'cracked', delta: 'pale orange shell broken in half, hollow empty interior', pages: [18] },
+        ], 'ART001'),
+      },
+      // Authored on two pages; both briefs cite an id no collection carries.
+      { id: 'ART003', name: 'push scooter', appearsInPages: [11, 17], pages: [11, 17] },
+    ],
+    vehicles: [],
+    locations: [],
+    clothing: [],
+  });
+  // What the run's briefs actually cite: dotted up to p13, bare from p11 on.
+  const eggBriefs = [
+    ...[3, 4, 5, 6, 7, 9].map(p => ({ pageNumber: p, metadata: { objects: ['ART001.1', 'LOC001'] } })),
+    { pageNumber: 11, metadata: { objects: ['LOC002', 'ART001', 'VEH001', 'CHR001'] } },
+    { pageNumber: 12, metadata: { objects: ['LOC003', 'ART001'] } },
+    { pageNumber: 13, metadata: { objects: ['LOC003', 'ART001'] } },
+    { pageNumber: 14, metadata: { objects: ['LOC003', 'ART001'] } },
+    { pageNumber: 15, metadata: { objects: ['LOC003', 'ART001'] } },
+    { pageNumber: 16, metadata: { objects: ['LOC002', 'ART001'] } },
+    { pageNumber: 17, metadata: { objects: ['LOC001', 'VEH001', 'CHR001'] } },
+  ];
+  const st = (vb: any, id: string) => vb.artifacts[0].states.find((s: any) => s.id === id);
+
+  it('gives a bare-cited page to the state the bible assigns it, not to states[0]', () => {
+    const vb = eggBible();
+    applyBriefUsage(vb, eggBriefs);
+    expect(st(vb, 'ART001.2').pages).toEqual([14, 15]);
+    expect(st(vb, 'ART001.1').pages).toEqual([3, 4, 5, 6, 7, 9, 11, 12, 13, 16]);
+  });
+
+  it('names a state that ended with no page, and what it used to claim', () => {
+    const vb = eggBible();
+    const report = applyBriefUsage(vb, eggBriefs);
+    expect(st(vb, 'ART001.3').pages).toEqual([]);
+    expect(report.emptiedStates).toEqual([
+      { id: 'ART001.3', name: 'cracked', oldPages: [18] },
+    ]);
+  });
+
+  it('still empties an entry whose only citations are an id no collection carries', () => {
+    const vb = eggBible();
+    const report = applyBriefUsage(vb, eggBriefs);
+    expect(vb.artifacts[1].appearsInPages).toEqual([]);
+    expect(report.emptied).toEqual(['ART003']);
+  });
+
+  it('is idempotent on the rebuilt table', () => {
+    const vb = eggBible();
+    applyBriefUsage(vb, eggBriefs);
+    const snapshot = JSON.stringify(vb);
+    const second = applyBriefUsage(vb, eggBriefs);
+    expect(JSON.stringify(vb)).toBe(snapshot);
+    expect(second.emptiedStates).toEqual([]);
+  });
+});

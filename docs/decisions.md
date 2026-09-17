@@ -354,6 +354,118 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — A bare citation lands where the bible already put the page, and a look no page reaches says so
+
+**Context.** Staging `job_1789584708605_rts4wqupm`. Three Visual Bible faults were reported in
+the shipped bible: an object with two states carrying `pages: []` (the cold look and the broken
+look), a second object carrying `pages: []` while it is visibly on two pages, and a page brief
+citing an id whose collection in that bible is empty. Pulled apart against the stored data, they
+are not three authoring faults. They are one code fault, one already-reported consequence of a
+brief-side fault, and one type that already exists and is deliberately withheld.
+
+The Art Director writes the bible and the page briefs in ONE call
+(`prompts/scene-expansion-all.txt`, step 4 of the beats pipeline), and it wrote this bible
+correctly. `sceneReviewReport.prompt` holds the reviewer's verbatim `# VISUAL BIBLE — STATED
+OBJECTS` block: `ART001.1 "unaltered" pages [3,4,5,6,7,9,11,12,13]`, `ART001.2 "cold" pages
+[14,15]`, `ART001.3 "cracked" pages [18]` — exactly what the plan lines say. The scene review
+read that table, found nothing wrong with it (its one `bibleCorrections.applied` entry that run
+corrected a different object) and left it alone. What emptied it was `applyBriefUsage`
+(`vbElementBudget.js`), which runs AFTER the review and rebuilds every entry's page table from
+what the final briefs cite. Its sub-row rule credited a page cited by the BARE parent id to
+`states[0]` unconditionally. The briefs cite `ART001.1` up to p13 and the bare `ART001` from p11
+on, so p14 and p15 were moved onto the unaltered row and the other two rows lost every page they
+had.
+
+That is a second, disagreeing resolution rule. `objectStateForPage` (visualBible.js) exists
+precisely so that "a brief that cites the bare parent id still lands on the right cell for the
+page", and the page prompt and the reference-cell pick both go through it. `applyBriefUsage` read
+the same bare citation and answered differently — and it did not merely mis-credit, it REWROTE
+the bible those two consumers then read. p14 and p15 were built with the unaltered delta ("pale
+orange, smooth, glowing faintly from within") and the unaltered reference cell, on the two pages
+whose own text has the object gone cold and dark; the shipped p14 render glows.
+
+Replaying the scene review against the SHIPPED (already-rebuilt) bible confirms both halves of
+that (Test Lab #1283, deepseek-v4-pro, one call): the reviewer returns
+`[vb_state_range] ART001 (pages 13,14,15 state mismatches)` — rule 9f's "a state claiming pages
+before the plan line makes it", fired on exactly the pages the rebuild moved. So the damage IS
+reviewable and the critic does see it; it is simply invisible at the only moment the critic runs,
+because at that moment the table is still correct. A prompt-side fix has nothing to bite on.
+
+The second object (`ART003`, authored `pages: [11,17]`) was emptied by the same function for the
+honest reason — no brief cites it, because both briefs cite a three-letter id whose collection is
+empty in this bible. That emptying is already reported: `usage.emptied` names it, it is stored in
+`beatsReviewReport.vbBriefUsage`, and it was logged. The phantom id itself is already COMPUTED by
+`sceneBriefCheck` check B as `object_id_unresolved` and deliberately kept out of `REVIEWABLE` by
+a measurement (12 pages of 42, all invented prop ids, no measured link to a defect). Reversing
+that is a classification decision and the owner's — logged in `tasks/BACKLOG.md`, not coded here.
+The same replay returns `[element_uncited] none` and `[prop_unheld] none`, so no reviewer-side
+rule reaches the scooter either: 9d is written around "the id OTHER pages give that same element"
+and no page ever gives it one.
+
+**Decision.** Three changes, all narrow, and one measured non-change.
+
+1. **A bare citation resolves in `applyBriefUsage` the way it resolves everywhere else.** The
+   pages credited by a bare parent id are routed to the sub-row the entry's own AUTHORED table
+   already assigns them, and fall back to the first row only when no row claims them — the
+   `objectStateForPage` then `defaultObjectState` ladder, not a private copy of half of it. The
+   authored tables are snapshotted before any row is written, so rewriting row 0 cannot change
+   the answer row 1 gets. Replayed on this run's real bible and real briefs: `ART001.2 "cold"`
+   keeps `[14,15]`, `ART001.1` takes `[3,4,5,6,7,9,11,12,13,16]`, and the entry's own page list
+   is unchanged at `[3…16]` — identical to what production recorded.
+
+2. **`emptiedStates` — a state or vantage that ended with no page left is named.** The
+   entry-level `emptied` list counts ENTRIES, so a state that lost every page left no signal at
+   all, while its reference cell had already been rendered and paid for. It is reported, never
+   repaired: which page shows which look is the Art Director's to say. On this run it names
+   `ART001.3 "cracked"`, which claimed `[18]` — a look the book's pictures never reach, since
+   p18's plan line is the creature leaving and stages no shell. The beats pipeline logs any
+   emptying at WARN now (entries and states alike) instead of at info.
+
+3. **"Nothing to check" is not "could not check".** `evaluateThreeStage` filed
+   `identity_attribution` / `quality_figures_unavailable` whenever its figures block was empty,
+   which on p3 of this run — a deliberately people-free close-up, `characters: []`, zero detected
+   figures — reads as a judge that failed. The figures pass RESOLVING with nothing in it now
+   records `no_figures_on_page`; `quality_figures_unavailable` keeps its meaning, the pass could
+   not be read. Both stay recording-only: no deduction, no severity, no repair trigger.
+
+4. **The figure-relative scale line was measured and NOT shipped.** `ART001.scaleClass` is
+   `melon-sized` and reaches 12 of 13 citing pages as `about as big as a human head, like a
+   lantern or a football`; the object renders correctly two-hands-sized on p4, p7, p11, p12, p13
+   and p15 and far too large on p5, p6 and p14. The discriminator in the stored prompts is
+   contact: every page whose EXACT POSES line puts a hand, arm or ear ON the object is correct;
+   the two pages where nobody touches it (p5 "extends his right arm toward", "watches"; p14
+   "stands over", "cries next to") are oversized, and so is the one page where four pairs of
+   hands are on it at once. One candidate rule was written for the protected tail — "Each size
+   above is measured against the figures in the frame, not against what the object rests on or
+   how many hands reach for it" — and A/B'd against the stock template on p6 and p14 (Test Lab
+   #1281 control, #1282 candidate, 4 renders). Both candidate renders are still oversized, and
+   both drifted staging the control kept (p14's object left the wall for the ground, p6 lost the
+   hollow). Two arms, no gain, nothing shipped.
+
+**Rationale.** (1) is one source of truth, not a new behaviour: the rebuild now asks the same
+question the prompt asks. The alternative — leaving the rebuild alone and having the scene review
+catch the bare-citation disagreement — cannot work on its own, because the review runs BEFORE
+`applyBriefUsage` and a brief is allowed to cite the bare id; the bible would be destroyed after
+the reviewer had approved it. (2) and (3) are the same principle one level down from
+`notEvaluated.js`: an absence reported as the wrong KIND of absence is the failure that module
+exists to remove. (4) follows `29c147839` — a rule that does not survive its own measurement is
+recorded, not shipped.
+
+**Siblings.** `scene-brief-generator-vs-critic` (`prompts/scene-expansion-all.txt` and
+`prompts/scene-review.txt`): no prompt moved on either side, and the generator rule this fix
+serves already exists verbatim — "An entry's `pages` and the `objects[]` of the page briefs below
+say the same thing". `lab-vs-prod-eval` (`evalPipeline.js` and `testlab.js`): the Lab does not
+re-implement `evaluateThreeStage` — it has no `notEvaluated` recorder and no figures block of its
+own.
+
+**Touched:** `server/lib/vbElementBudget.js` (`applyBriefUsage` — bare-citation routing,
+`emptiedStates`), `server/lib/beatsPipeline.js` (the usage log line),
+`server/lib/evalPipeline.js` (`evaluateThreeStage` — the figures-absence reason),
+`tests/unit/vb-brief-usage.test.ts`, `tasks/BACKLOG.md`.
+**Status:** ✅ active on staging. Renders for (4):
+`scratchpad/fix-verify-scale/p06-CONTROL-exp1281.jpg`, `p06-CANDIDATE-exp1282.jpg`,
+`p14-CONTROL-exp1281.jpg`, `p14-CANDIDATE-exp1282.jpg`.
+
 ## 2026-09-17 — Every merged audit finding ends in an outcome, and a reversed decision is a rule on both sides
 
 **Context.** Staging `job_1789584708605_rts4wqupm` (18 pages, de-ch). The blind auditor produced
