@@ -26,6 +26,35 @@ const { detectSheetGrid, cropCells, labelCells, cellLabel, parseCellIdentificati
 
 const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForImage(...args);
 
+/** byFunction bucket for the Visual Bible reference-sheet grid renders. */
+const REFERENCE_SHEET_USAGE_LABEL = 'vb_reference_sheet';
+
+/**
+ * Book one reference-sheet grid render into the running job's usage sink.
+ *
+ * These renders had NO accounting at all: on staging job_1789506283204_3kxqshifx
+ * `tokenUsage.grok` booked all 52 image calls (pages, covers, inpaint, 2x4
+ * sheets) and `gemini_image` booked 0, while the run's 4+ reference-sheet
+ * batches went through `callGeminiAPIForImage` here and appeared under no
+ * `byFunction` key whatsoever — paid renders invisible to every cost report.
+ *
+ * Provider is derived from the resolved model id exactly as the page and cover
+ * call sites do (storyJobPipeline.js / coverIterate.js), so a sheet rendered on
+ * Grok or Runware lands in that provider's bucket rather than always Gemini's.
+ * The sink is ambient (AsyncLocalStorage) because this module is reached
+ * without a `usageTracker` closure — the same route the cell gate below already
+ * uses for its text call. No-op outside a job (Test Lab, scripts, tests).
+ */
+function recordReferenceSheetUsage(result, label = REFERENCE_SHEET_USAGE_LABEL) {
+  if (!result?.usage) return;
+  const modelId = typeof result.modelId === 'string' ? result.modelId : '';
+  const provider = modelId.startsWith('runware:') ? 'runware'
+    : modelId.startsWith('grok-imagine') ? 'grok'
+      : 'gemini_image';
+  const { recordImageUsage } = require('./usageContext');
+  recordImageUsage(provider, result.usage, label, modelId || null);
+}
+
 /**
  * Ask the eval model which detected cell holds which requested element.
  *
@@ -1273,6 +1302,9 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         prompt, [], null, 'avatar', null, batchModel, null, '',
         null, [], 0, null, null, null, null, batchAspectOverride
       );
+      // Booked before the empty-image check: a render that came back without an
+      // image was still paid for.
+      recordReferenceSheetUsage(result);
 
       if (!result || !result.imageData) {
         throw new Error('Image generation did not return an image');
@@ -1304,6 +1336,10 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       const rerenderSolo = async (cells, gateReason = null) => {
         const rePrompt = buildReferenceSheetPrompt(cells, styleDescription, visualBible, gateReason);
         const reResult = await callGeminiAPIForImage(rePrompt, [], null, 'avatar', null, batchModel, null, '', null, [], 0, null, null, null, null, batchAspectOverride);
+        // Its own bucket: a gate/solo re-render is a SECOND paid render of the
+        // same cells, and folding it into the batch label hides how often the
+        // cell gates and the missing-reference salvage pay for a redo.
+        recordReferenceSheetUsage(reResult, `${REFERENCE_SHEET_USAGE_LABEL}_rerender`);
         if (!reResult?.imageData) throw new Error('re-render returned no image');
         const reCells = await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), cells.length, cells);
         if (reCells.length !== cells.length || reCells.some(c => !c)) throw new Error('re-rendered cell extraction failed');
@@ -1823,6 +1859,8 @@ module.exports = {
   expandElementStateCells,
   assertStateCellsCoLocated,
   generateReferenceSheet,
+  recordReferenceSheetUsage,
+  REFERENCE_SHEET_USAGE_LABEL,
   buildEmptySceneVbGrid,
   buildPageCompositeRefs,
   buildVisualBibleGrid,

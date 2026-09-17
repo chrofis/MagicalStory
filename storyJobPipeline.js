@@ -1935,6 +1935,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Exact sent text when the provider reports it (post-truncation /
           // post-sanitize), falling back to the built prompt — same as pages.
           prompt: coverResult.prompt || coverPrompt,
+          // Post-shrink scene block when this cover's prompt went over the
+          // model's cap — same field the page path stamps. Null when it fit.
+          compressedScene: coverResult.compressedScene || null,
           referencePhotos: coverPhotos,
           landmarkPhotos: coverLandmarkPhotos,
           emptySceneImage: coverSceneBackground || null,
@@ -2501,6 +2504,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               description: sceneDescription,
               // Sent text, not the build — same fix as the streaming cover.
               prompt: result.prompt || coverPrompt,
+              // Post-shrink scene block when this cover's prompt went over the
+              // model's cap — same field the page path stamps. Null when it fit.
+              compressedScene: result.compressedScene || null,
               modelId: result.modelId,
               referencePhotos: coverPhotos,
               landmarkPhotos: coverLandmarkPhotos,
@@ -3663,6 +3669,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageData: result.imageData,
               description: result.description,
               prompt: result.prompt,
+              // THE COVER RECORD IS THE SINGLE GATE ON WHAT REACHES
+              // stories.data. `prompt` above is the pre-shrink build; this is
+              // the scene block the model was actually handed when that build
+              // went over the cap. Absent from this whitelist, the field died
+              // here even once the generator returned it — measured on staging
+              // job_1789584708605_rts4wqupm: absent on all three cover roots
+              // and null on all three v0 versions, which resolve from the root.
+              compressedScene: result.compressedScene || null,
               qualityScore: result.qualityScore,
               qualityReasoning: result.qualityReasoning,
               wasRegenerated: result.wasRegenerated,
@@ -3900,8 +3914,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               elapsedMs: r.elapsedMs || 0,
               cost: r.cost ?? null,
               changedPages: r.changedPages || [],
-              // Lector only: how many of its findings the code-side applier
-              // landed, and how many it dropped (see applyLectorFindings).
+              // How much each round landed, in that round's own unit: findings
+              // the code-side applier placed for the lector and the diff (see
+              // applyLectorFindings), pages rewritten for the whole-page passes
+              // (repair / repetition_fix / length_fix), which have no
+              // per-finding applier. `droppedCount` stays applier-only.
               appliedCount: r.appliedCount ?? null,
               droppedCount: r.droppedCount ?? null,
               error: r.error || null,
@@ -5809,6 +5826,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               textMode,
               imageData: coverData.imageData,
               prompt: coverData.prompt,
+              // The sent prose of the ORIGINAL cover render. The repair
+              // pipeline's version builder resolves a version's own
+              // `compressedScene` and falls back to the page's — so without
+              // this the original cover version (v0) resolves to null even
+              // when the render was shrunk, and every judge scores it against
+              // the pre-shrink build.
+              compressedScene: coverData.compressedScene || null,
               characterPhotos: coverData.referencePhotos || [],
               // Carry the original render's references onto the pipeline img so
               // the persisted V1 (original) version records what was actually
@@ -6473,6 +6497,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 coverImages[coverKey].imageVersions = img.imageVersions;
               }
               if (img.imageData) coverImages[coverKey].imageData = img.imageData;
+              // The scene contract of the version that SHIPPED, not of the one
+              // this cover started as. A page gets this for free (its stored
+              // record IS the pipeline mapping); a cover is copied back field
+              // by field, so a repaired cover kept the original render's sent
+              // prose while shipping a rewrite's pixels. `?? null` and never a
+              // skip-if-absent, for the same reason the eval mirror gives:
+              // a stale value is worse than none. Not in COVER_EVAL_MIRROR_FIELDS
+              // because this is the scene contract, not an eval verdict — the
+              // mirror's own docstring reserves those for the caller.
+              coverImages[coverKey].compressedScene = img.compressedScene ?? null;
               if (img.wasRegenerated) coverImages[coverKey].wasRegenerated = true;
               log.info(`📸 [UNIFIED] ${coverKey} pipeline result: score ${img.qualityScore}, ${img.wasRegenerated ? 'regenerated' : 'original'}`);
             }

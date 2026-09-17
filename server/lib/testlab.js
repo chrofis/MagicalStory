@@ -6885,7 +6885,17 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   if (promptOverride) PROMPT_TEMPLATES.sceneReview = promptOverride;
   let prompt;
   try {
-    prompt = buildSceneReviewPrompt(storyData, scenes, { clothingFindings: findingsBlock, beats: outlineBeats });
+    // The bible feeds check 9f (a stated object's state page ranges) — the same
+    // option production passes (beatsPipeline.js `{ clothingFindings,
+    // briefFindings, beats, visualBible }`). Omitted here, buildSceneReviewPrompt
+    // emitted NO `# VISUAL BIBLE — STATED OBJECTS` block at all, so a replay
+    // could never see a state's page range, never emit a corrected entry, and
+    // check 9f under-reported against the production run it is meant to mirror.
+    prompt = buildSceneReviewPrompt(storyData, scenes, {
+      clothingFindings: findingsBlock,
+      beats: outlineBeats,
+      visualBible: storyData.visualBible,
+    });
   } finally {
     PROMPT_TEMPLATES.sceneReview = orig;
   }

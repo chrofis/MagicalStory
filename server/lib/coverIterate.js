@@ -1483,6 +1483,13 @@ async function iterateCover(coverKey, storyData, options = {}) {
       modelId: genResult.modelId,
       totalAttempts: 1,
       prompt: genResult.prompt || coverPrompt,
+      // A COVER PROMPT GOES OVER THE MODEL CAP AS READILY AS A PAGE'S. The
+      // shrinker hands back the scene block it actually sent as
+      // `compressedScene`; dropped from this whitelist it died between the
+      // render and the stored cover, and every judge scored the cover against
+      // prose the model never received. Null when the prompt fit — never a
+      // fallback to the pre-shrink build, which would mask the shrink.
+      compressedScene: genResult.compressedScene || null,
       grokRefImages: genResult.grokRefImages || null,
       usage: genResult.usage || null,
       bboxDetection: coverBboxDetection,
@@ -1574,6 +1581,10 @@ async function iterateCover(coverKey, storyData, options = {}) {
       modelId: imageResult.modelId,
       totalAttempts: imageResult.totalAttempts || 1,
       prompt: imageResult.prompt,
+      // Same contract as the direct path below. The composite route builds its
+      // own per-pass prompts and reports no shrink, so this stays null there —
+      // the key exists, and null means "not shrunk", never "not recorded".
+      compressedScene: imageResult.compressedScene || null,
       referencePhotos: coverCharacterPhotos,
       landmarkPhotos: coverLandmarkPhotos,
       visualBibleGrid: null,
@@ -1658,6 +1669,12 @@ async function iterateCover(coverKey, storyData, options = {}) {
     modelId: imageResult.modelId,
     totalAttempts: imageResult.totalAttempts,
     prompt: coverPrompt,
+    // The post-shrink scene block this render was actually painted from, when
+    // its prompt went over the model's cap. `prompt` above is the PRE-shrink
+    // build, so without this the caller (repairPipeline's cover version entry,
+    // which already reads `result.compressedScene`) has no record of the prose
+    // the model received. Null when nothing was shrunk.
+    compressedScene: imageResult.compressedScene || null,
     referencePhotos: coverCharacterPhotos,
     landmarkPhotos: coverLandmarkPhotos,
     visualBibleGrid: coverVbGrid ? `data:image/jpeg;base64,${coverVbGrid.toString('base64')}` : null,

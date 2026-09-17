@@ -805,6 +805,25 @@ async function refineStoryText(storyData, pages, opts = {}) {
         returnedPages: parsed.pages.map(p => p.pageNumber),
         strayPages,
         changedPages,
+        // WHAT THIS ROUND APPLIED, in ITS unit.
+        //
+        // The whole-page passes (repair / repetition_fix / length_fix) rewrite
+        // WHOLESALE: the findings go in as prose and whole page blocks come
+        // back, so there is no per-finding applier to count the way the lector
+        // and the diff have one (applyLectorFindings, which is where
+        // appliedCount/droppedCount were born). Leaving the key unset made the
+        // stored `textRefineReport.roundTrace` report `appliedCount: null` for
+        // the single most expensive text call in the chain — on staging
+        // job_1789506283204_3kxqshifx, $0.94 for round 1 with no record of what
+        // it closed, beside rounds 2 and 3 reporting 7 and 0.
+        //
+        // The comparable unit for a wholesale rewrite is the page: how many
+        // pages this round actually changed. `null` therefore keeps its one
+        // meaning across the trace — "this round recorded nothing" — instead of
+        // meaning "not applicable" on some rounds and "failed" on others.
+        // Nothing is inferred: a returned page whose text is identical to the
+        // base is not counted, exactly as a dropped lector finding is not.
+        appliedCount: changedPages.length,
         pages: next.map((p, idx) => ({
           pageNumber: p.pageNumber,
           before: base[idx].text,

@@ -354,6 +354,86 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — Three records a paid run must keep: a cover's sent prose, a reference-sheet's cost, a repair round's yield
+
+**Context.** Three gaps measured on two staging runs, all of the same shape — a value is
+produced correctly and a whitelist between the producer and `stories.data` has no key for it,
+so the evidence a later diagnosis needs was never written down.
+
+1. **A cover never stamped `compressedScene`.** When a built image prompt goes over the model's
+   character cap, `shrinkPromptForModel` records the scene block it actually sent, and
+   `resolveEvalSceneDescription` hands THAT to the judges instead of the pre-shrink brief. The
+   page path was repaired in `434ea1e89` (a missing key in `repairPipeline.js`'s per-page output
+   whitelist). The cover path is a different fault at six different sites: `iterateCover` builds
+   three independent output shapes (direct render, composite return, final return) and none
+   carried the key, and neither did the two initial-cover returns nor the `coverImages`
+   whitelist in `storyJobPipeline.js`. Measured on `job_1789584708605_rts4wqupm`:
+   `compressedScene` ABSENT on all three cover roots and null on all three v0 versions. `prompt`
+   on a cover record is the PRE-shrink build, so a shrunk cover left no record at all of what
+   the model read.
+2. **Visual Bible reference-sheet renders had no cost accounting.** They render through
+   `callGeminiAPIForImage` from `referenceSheets.js`, which is reached with no `usageTracker`
+   closure, so they appeared under NO `byFunction` key. On `job_1789506283204_3kxqshifx`
+   `tokenUsage.grok` booked 52 image calls (24 page, 6 cover, 7 inpaint, 15 character_2x4) and
+   `gemini_image` booked 0 — while that run rendered 4+ reference-sheet batches plus their gate
+   re-renders.
+3. **`textRefineReport.roundTrace` round 1 reported `appliedCount: null`.** The repair round is
+   the most expensive text call in the chain ($0.94 on that run, $1.15 on the one before) and
+   carried no record of what it closed, beside rounds 2 and 3 reporting 7 and 0.
+
+A fourth, smaller one in the same family: the Test Lab's `scene_review_replay` called
+`buildSceneReviewPrompt` without `visualBible` while production passes it. The builder emits the
+whole `# VISUAL BIBLE — STATED OBJECTS` block only when that option is present, so the replay
+could never see a stated object's state page ranges, never emit a corrected entry, and check 9f
+under-reported against the very production run the stage exists to mirror.
+
+**Decision.**
+
+- **Covers stamp `compressedScene` exactly as pages do, at every hop.** All three `iterateCover`
+  result shapes, both initial-cover returns, the `coverImages` record, the `rawImages` entry the
+  repair pipeline receives (so the original version v0 can resolve it), and a mirror-back of the
+  SHIPPED version's value onto the cover root after the repair rounds. Null keeps one meaning —
+  "this render was not shrunk". No path substitutes `prompt` or the brief, because a fallback
+  would make every cover look shrunk and hand the judges a string no model ever saw. The
+  mirror-back is in the caller, not in `COVER_EVAL_MIRROR_FIELDS`: that list is eval verdicts,
+  and its own docstring reserves the scene contract for the caller.
+- **Reference-sheet renders are booked under `vb_reference_sheet`**, and a gate/solo re-render
+  under `vb_reference_sheet_rerender` — its own bucket, because it is a SECOND paid render of the
+  same cells and folding it into the batch label hides how often the cell gates pay for a redo.
+  Provider is derived from the resolved model id the same way the page and cover call sites do,
+  so a sheet rendered on Grok or Runware lands in that provider's bucket. Usage reaches the job
+  through the ambient `AsyncLocalStorage` sink (`recordImageUsage`, new sibling of
+  `recordTextUsage`) rather than by threading a tracker argument through `generateReferenceSheet`
+  and its callers — the same route this module's cell gate already uses for its text call.
+- **The whole-page text passes record `appliedCount` as their changed-page count.**
+  `runRepairPass` serves round 1 and both corrective passes (`repetition_fix`, `length_fix`), and
+  all three rewrite WHOLESALE: the findings go in as prose and whole page blocks come back, so
+  there is no per-finding applier to count the way the lector and the diff have one
+  (`applyLectorFindings`, where `appliedCount`/`droppedCount` were born). The comparable unit for
+  a wholesale rewrite is the page. `droppedCount` stays applier-only.
+- **The Lab's `scene_review_replay` passes `storyData.visualBible`**, the same source field and
+  shape production passes.
+
+**Rationale.** Every one of these is a recording gap, not a behaviour change: no extra model
+call, no new route, no score moves. What changes is that a later diagnosis can be answered from
+`stories.data` instead of from a guess. The cost of leaving them was already paid twice — the
+page-path `compressedScene` drop meant judges scored nine pages against prose the model never
+received, and an unaccounted render is invisible to every cost report and to the job spend cap.
+`appliedCount` was given a meaningful value rather than left null so that `null` keeps ONE
+meaning across the trace ("this round recorded nothing") instead of meaning "not applicable
+here" on the one round that costs the most.
+
+**Touched files.** `server/lib/coverIterate.js` (three result shapes), `storyJobPipeline.js`
+(two initial-cover returns, the `coverImages` whitelist, the cover `rawImages` entry, the
+mirror-back, the `roundTrace` comment), `server/lib/referenceSheets.js`
+(`recordReferenceSheetUsage` + both render call sites), `server/lib/usageContext.js`
+(`recordImageUsage`), `server/lib/textRefine.js` (`runRepairPass` entry),
+`server/lib/testlab.js` (`runSceneReviewReplayStage`), `docs/prompt-inventory.md` (13 templates
+that were live in code and absent from the inventory),
+`tests/unit/cover-compressed-scene-and-accounting.test.ts`.
+
+**Status.** ✅ active
+
 ## 2026-09-17 — A rewrite may reorder a brief, never empty it; and staging's one repair round is one
 
 **Context.** Staging `job_1789584708605_rts4wqupm` ("Das Ei unter der Wurzel", 18 pages, commit
