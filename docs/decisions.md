@@ -354,6 +354,86 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — The bible's authored page table is checked against the briefs' citations, mechanically
+
+**Context.** `prompts/scene-expansion-all.txt` tells the Art Director, verbatim, that "An entry's
+`pages` and the `objects[]` of the page briefs below say the same thing". Both halves come out of
+one call and nothing compared them. The two tables are read by different consumers: `pages` (and
+`appearsInPages`) drives the reference-cell pick, the element budget and the usage rebuild, while
+`objects[]` drives REQUIRED OBJECTS and what the illustrator is shown. When they disagree a page is
+built from one table and judged against the other, and nothing says so. `resolveObjectState` makes
+the asymmetry explicit: on a page where the brief cites one state and the bible's table assigns
+another, with no contact verdict to break the tie, **the bible's page table stands** — so a
+citation cannot correct a table that is wrong, it can only disagree with it silently.
+
+The motivating run is staging `job_1789584708605_rts4wqupm`, where `applyBriefUsage` emptied
+`ART001.2 "cold" [14,15]` and `ART001.3 "cracked" [18]` after the review and p14/p15 shipped with
+the GLOWING delta and the glowing reference cell on the two pages whose text has the egg gone
+cold. That rewrite is fixed (3f8ebb21f); nothing would have CAUGHT it.
+
+**Decision.** `checkBiblePageTable` (server/lib/sceneBriefCheck.js), computed with the other brief
+checks before the scene review runs and sent to the reviewer. Two directions, two types, because
+the fix differs:
+
+- `vb_page_uncited` — the entry's page table holds page N and page N's brief cites nothing that
+  resolves to it. The element reaches the illustrator through its id and nothing else.
+- `vb_cite_offpage` — the brief cites the entry on page N and the entry's page table leaves N out.
+  The citation earns a page the bible never granted.
+
+Structured only: entry ids, citation handles and page numbers — never prose, never finding text. A
+state or vantage handle resolves through its parent (`ART001.2` is a citation of ART001); which
+FACET a page lands on is what `vb_state_contradicted` / `vb_state_no_base` already judge. The page
+table is read through `vbEntityCoversPage` (iterateBeat.js), the one helper that already answers
+"does this entry claim this page", and its `null` — an entry declaring no page anywhere — is
+UNKNOWN in both directions, not an absence, the same fallback `normalizeCitedHandles` takes
+(796b070e5). Two exclusions, each measured: the `clothing` pool, because a CLO entry reaches the
+page through the wearer's clothing contract and is never cited (104 findings of that shape), and a
+name match against `characters[]`, which may SUPPRESS an absence but is never itself a citation —
+reading it as one reported "Mother Dragon" off-page against a cast row "Mother"
+(`job_1789163494908_kc2joi4ax` p2). Citations are read with `findVbIds`, not an anchored match, so
+the trial writer's labelled rows (`red leaf bucket [ART002]`) count.
+
+**Measured before it was sent.** Over every staging story whose bible was authored under the rule
+(it landed with 061521b95 on 2026-09-11): **15 stories, 209 pages, 34 findings on 31 pages — 29
+`vb_page_uncited`, 5 `vb_cite_offpage`.** Every finding inspected by hand against its plan line;
+all 34 are real disagreements and none is a false positive. Four stories carry all 34 and eleven
+are clean; the two worst (17 and 13) are the first two runs after the rule landed, and the five
+most recent stories produce none. The shapes: a blanket `pages` range over the whole book, a page
+table running one page past the location change, a table claiming more elements for a page than
+the element budget allows (the brief obeyed the budget, the bible did not), and — the other way —
+a citation the plan line justifies on a page the bible forgot to grant. Sweeping all 124 stored
+stories returns 758 flagged pages of 1370, but those bibles were authored before the rule existed,
+by the writer rather than the Art Director, and their `pages` was never a claim about the briefs;
+that number measures the old contract.
+
+**Rationale for SENT, not diagnostic.** The precedents are `object_id_unresolved` (12 of 42, no
+measured defect link, kept out) and `element_uncited` (1 of 18, no false positives, sent). This
+sits with the second: zero false positives on the corpus it governs, and the fix is a page-range
+or citation edit the reviewer can make from the plan lines it already holds — no figure is
+invented, nothing is auto-repaired (the 2026-08-11 report-never-fix rule stands).
+
+**What it does not claim.** It is NOT the catcher for `rts4wqupm` p14/p15: `applyBriefUsage`
+emptied those state rows AFTER the review, and this check runs before it — on the shipped bible
+the two tables agree by construction and the check is silent, which
+`tests/unit/scene-brief-bible-pages.test.ts` pins as a negative control. On that story's AUTHORED
+table (recorded in 3f8ebb21f: unaltered [3-13], cold [14,15], cracked [18]) it names p18 — the page
+the cracked state claimed and no brief stages. An entry with an empty `pages` that IS cited
+(`m3uam0nxi` ART006, the signpost face carrying the story's text) stays unreported by design.
+
+**Rendered, two A/Bs, Test Lab `image` stage on staging.** The grid was identical in both arms of
+both pairs (`sceneObjectIds` is null in the Lab, so cells come from the page table), so the only
+variable is the REQUIRED OBJECTS line a citation adds. #1293/#1294 — `z18dmvnt6` p14, whose plan
+line stages the pink fairy (ART003, page table holds p14) and whose brief never cites it.
+#1295/#1296 — `m3uam0nxi` p9, whose plan line lays out four bikes and whose brief cites one of the
+three the bible puts there.
+
+**Touched files.** `server/lib/sceneBriefCheck.js` (`checkBiblePageTable`, `bibleEntries`,
+`citedBaseIds`, `CITABLE_POOLS`, the `REVIEWABLE` record), `tests/unit/scene-brief-bible-pages.test.ts`.
+No prompt moved: the generator rule this serves already exists verbatim in
+`scene-expansion-all.txt`, and this commit is its critic half.
+
+**Status.** ✅ active.
+
 ## 2026-09-17 — An element's size rides the pose line that meets it; the off-page shadow is measured again and again ships nothing
 
 **Context.** Two defects of the same shape on staging `job_1789584708605_rts4wqupm`, both
