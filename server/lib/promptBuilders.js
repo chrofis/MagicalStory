@@ -4148,8 +4148,20 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // only on pages that actually state an object.
       requiredObjectsSection += `A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.
 `;
-      if (promptObjects.length === 0) {
-        // All entries were locations — nothing left to list.
+      // A HEADER WITH NOTHING UNDER IT IS NOT A CHECKLIST (2026-09-17). The
+      // old test was `promptObjects.length === 0` — "every entry was a
+      // location" — and it missed the other way an entry disappears: the
+      // worn-item omission inside the loop above. On staging
+      // job_1789584708605_rts4wqupm p16 the page cited LOC002 and ART004.2 (a
+      // jacket the page carries as a bundle); the lost `wornItems` resolved the
+      // jacket back to "worn", the omission rule dropped its line, and the
+      // render was sent a REQUIRED OBJECTS heading followed by nothing but the
+      // markings rule. The condition is now what the block promises: at least
+      // one listed element.
+      // `hasRequiredObjects` deliberately stays true: the brief DID cite
+      // elements, so the whole-bible fallback below must not fire and dump
+      // every entry into the prompt.
+      if (!/^\* /m.test(requiredObjectsSection)) {
         requiredObjectsSection = '';
       }
 
@@ -6681,6 +6693,17 @@ function parseInventedFigures(raw) {
   return parseFigureList(raw, 'Invented figures');
 }
 
+/**
+ * The explicit "there are none" answers a figure list may carry, tested on the
+ * name with any trailing parenthetical qualifier removed.
+ */
+const NEGATIVE_FIGURE_ANSWERS = new Set(['none', 'no one', 'noone', 'nobody', 'n/a', 'na', 'keine', 'aucun']);
+
+function isNegativeFigureAnswer(name) {
+  const bare = String(name || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.,;:]+$/, '').trim().toLowerCase();
+  return bare === '' || NEGATIVE_FIGURE_ANSWERS.has(bare);
+}
+
 function parseFigureList(raw, heading) {
   const src = String(raw || '');
   const h = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -6697,7 +6720,16 @@ function parseFigureList(raw, heading) {
     const m = t.match(/^[-–—*•]\s*(.+)$/);
     if (!m) break;
     const name = m[1].split(/\s+[—–]\s+|\s+-\s+/)[0].replace(/[.,;:]+$/, '').trim();
-    if (name && !/^(?:none|no one|nobody)$/i.test(name)) names.push(name);
+    // A NEGATIVE ANSWER IS AN EMPTY LIST, NOT A NAME (2026-09-17). The sentinel
+    // test was anchored, so the arc's own phrasing walked straight past it:
+    // staging job_1789584708605_rts4wqupm wrote `- none (the creature in the
+    // egg is unnamed in the commission)` under "Premise figures:", and that
+    // whole clause became a commissioned CHARACTER. It then earned two of the
+    // five plan-counter findings against itself (`NO_FOCAL_PAGE`,
+    // `UNDER_COVERED_CHARACTER`) and bought a re-plan of three pages.
+    // The qualifier a model appends is a parenthetical, so it is removed
+    // structurally before the sentinel is tested — never by matching prose.
+    if (name && !isNegativeFigureAnswer(name)) names.push(name);
   }
   const am = block.match(/Allowed\s*:\s*(\d+)[^\d]{0,12}Written\s*:\s*(\d+)/i);
   return {

@@ -138,7 +138,7 @@ function findSafeRepairableFinding(result) {
  * @param {boolean} o.extraRoundUsed   an extra round has already been granted
  * @returns {{ runAudit: boolean, mayGrantExtraRound: boolean }}
  */
-function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed, finalRound = null }) {
+function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed, finalRound = null, maxPasses = null }) {
   const runAudit = !bookUnchanged;
   // `finalRound` is the CALLER's answer to "is this the book that ships". The
   // round loop also exits early — no bad pages left, or nothing actionable —
@@ -147,9 +147,21 @@ function planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed, 
   // to a run that converged ahead of its limit. Omitted, the old derivation
   // still applies.
   const isFinal = finalRound === null ? round >= roundLimit : finalRound === true;
+  // THE GRANT LIVES INSIDE THE CONFIGURED BUDGET (2026-09-17). `roundLimit` is
+  // mutable -- the grant raises it -- so it can never bound the grant. The
+  // budget is `maxPasses` (runtime.repairMaxPasses: 3 in production, 1 on
+  // staging and locally, the one deliberate environment difference). Without
+  // this, staging job_1789584708605_rts4wqupm ran TWO full repair rounds on a
+  // one-pass environment: the round-1 audit was final by construction, granted
+  // an extra round, and round 2 regressed 5 of 6 pages it touched (p16 -68,
+  // p10 -40, p7 -8). A run that converges EARLY still buys its extra round --
+  // that is what the grant is for, and round + 1 is then still within budget.
+  // `null` keeps the pre-2026-09-17 behaviour for a caller that states no
+  // budget (only the tests do).
+  const withinBudget = maxPasses == null || round < maxPasses;
   return {
     runAudit,
-    mayGrantExtraRound: runAudit && !extraRoundUsed && isFinal,
+    mayGrantExtraRound: runAudit && !extraRoundUsed && isFinal && withinBudget,
   };
 }
 

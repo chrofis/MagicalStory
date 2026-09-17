@@ -354,6 +354,144 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — A rewrite may reorder a brief, never empty it; and staging's one repair round is one
+
+**Context.** Staging `job_1789584708605_rts4wqupm` ("Das Ei unter der Wurzel", 18 pages, commit
+`434ea1e8`) ran the fixes of the day before and surfaced four separate faults, three of them in
+the same mechanism: the iterate rewrite was allowed to deliver a brief that said LESS than the
+one it replaced, and nothing downstream noticed.
+
+- **Every one of the six iterate rewrites returned `wornItems: []`.** `carryForwardWornItems`
+  (81ad55a54, `server/lib/wornItems.js`) exists precisely so an iterate cannot lose a declared
+  worn state, and it is wired into `iterateSceneMetadata` — but it reads
+  `savedScene.sceneMetadata`, and the repair pipeline builds its OWN `sceneImages[]` rows
+  (`storyJobPipeline.js`, `pipelineStoryData`) from a whitelist that had no `sceneMetadata` key.
+  On every pipeline iterate that object was `{}`, so there was nothing to carry from. With no
+  declared row `resolveWornItemsForPage` defaults the item to `worn`; p16's rewrite prompt
+  therefore told the model "Levin IS wearing this on this page: fleece jacket" on the page whose
+  whole beat is the jacket bundled in his arms, and the surviving critical on the shipped image
+  reads "Levin is not holding the bundled red fleece jacket against his chest with both hands".
+  The same `{}` also emptied `origObjects`, the basis of the declared-set allowance and of the
+  citation-drop warning.
+- **Two rewrites dropped an id the Art Director had cited.** p6 went `[ART001.1, LOC001]` →
+  `[LOC001.1]` and p16 `[LOC002, ART001, ART004.2]` → `[LOC002.1, ART004.2]`: the egg the page is
+  about, gone from the brief in both. The declared-id guard added in a78e8fa7d
+  (`object_outside_declared_set`) catches only ADDITIONS, and this run had exactly zero of those.
+- **`REQUIRED OBJECTS` shipped as a heading with nothing under it.** p16's citations resolved to
+  one location (skipped by design — the location is the plate) and one jacket, and the jacket's
+  line was then dropped by the worn-item omission rule because the lost `wornItems` had resolved
+  it back to `worn`. The block's own emptiness test was `promptObjects.length === 0` ("every
+  entry was a location"), which cannot see an entry removed inside the loop. p6 lost its block
+  entirely the other way and went 21 → -20; p16 shipped at -12.
+- **Five rewrites cited a facet the bible does not declare** — `LOC001.1`, `LOC002.1`,
+  `LOC003.2` against location entries whose `vantages[]` is empty, and `ART001.2` against a state
+  whose `pages[]` is empty. Nothing rejected them: `matchesEntry` falls back to the parent id and
+  the reference-cell picker falls back to `.1`, so the page silently rendered against a look
+  nothing had declared for it.
+
+Three faults outside the rewrite, on the same run:
+
+- **Staging ran TWO repair rounds on a one-pass environment.** `runtime.repairMaxPasses` is
+  `{default: 3, staging: 1, local: 1}` and `/api/health/config` reported 1, yet
+  `finalChecksReport.repairRounds` holds two and `bookAuditRounds[0]` carries
+  `extraRoundGranted: true, extraRoundAdmittedPages: [5,7,9,12,13,14,15,16,17,18]`. **Commit
+  `deab72254` (2026-09-13 12:35:25 +0200)**, "feat(repair): audit the book that ships, and let a
+  CRITICAL finding buy one more round", introduced `roundLimit = round + 1` under
+  `if (auditPlan.mayGrantExtraRound)`. `roundLimit` is the MUTABLE budget the grant itself
+  raises, so it could never bound the grant, and `planBookAuditRound` was never told the
+  configured one. On staging the round-1 audit is final by construction, so the grant fired every
+  time. Round 2 regressed 5 of the 6 pages it touched (p16 -68, p10 -40, p7 -8, p9 -5, p4 +15).
+- **An undeclared cast removal reverted the WHOLE page brief.** On p18 the reviewer dropped
+  max/julian/kiaan/levin from `characters[]` with no REMOVED CAST line; `revertUndeclaredRemovals`
+  (2026-09-15) restored the pre-review brief, the page shipped as `namedButNotRewritten: [18]`
+  and scored 45 where the previous run's reviewed p18 scored 95. Every other fix that review made
+  to the page went with it.
+- **The word "none" was parsed as a commissioned character.** The arc critique wrote
+  `Premise figures:\n- none (the creature in the egg is unnamed in the commission)`.
+  `parseFigureList`'s sentinel test was anchored (`/^(?:none|no one|nobody)$/i`), so the
+  qualifier walked straight past it and the whole clause entered `commissionedNames`. It then
+  earned two of the five plan-counter findings against itself (`NO_FOCAL_PAGE`,
+  `UNDER_COVERED_CHARACTER`) and bought a re-plan of pages 11, 14 and 18.
+
+And two persistence gaps: all six iterate renders built prompts of 7,981–9,233 chars against the
+7,900 cap yet stored `compressedScene: null`, and `parentSource` — set by `inheritSceneContract`
+on every round result — occurred zero times in the stored story.
+
+**Decision.**
+
+1. **One parent-brief resolver in `iteratePageCore`.** `parentSceneMetadata =
+   savedScene?.sceneMetadata || sceneMetadata || {}` — the page's own brief is the same contract
+   in the same shape and is always present, so it is the fallback, never `{}`. The worn-item
+   carry, the declared-set allowance, the citation-drop check and the era / text-zone / aboard /
+   crowd carries all read it. `pipelineStoryData.sceneImages` also carries `sceneMetadata` now, so
+   the preferred source exists on the pipeline path too.
+2. **The declared set is checked in BOTH directions.** `checkDeclaredSet` gains
+   `object_dropped_from_declared_set`, mirroring `object_outside_declared_set`, and it feeds the
+   SAME single corrective re-ask — no second paid call. "Still cited" means an id in `objects[]`,
+   a VB id in `characters[]`, or a named figure's NAME in `characters[]` (`nameIds`), because
+   moving CHR001 to "Ramon" is a refile, not a loss — that is p13 on this run, and it is
+   deliberately NOT a finding. VB handles only, on both sides: `baseVbId` returns null for
+   free text, so a prose citation is never turned into a pseudo-id.
+3. **A cited facet must exist.** `normalizeCitedHandles` reduces a handle to its bare parent id
+   when the entry declares no such facet or when that facet's `pages[]` is empty, and logs which
+   and why. Structured only — facet arrays and page tables, never a text match.
+4. **The object list can never resolve to nothing.** `restoreParentObjects` puts the parent
+   brief's listable ids back when the rewrite's citations resolve to no printable element
+   (everything outside `locations` and `secondaryCharacters`, the two pools the checklist skips);
+   and `buildImagePrompt`'s emptiness test is now what the block promises — at least one `* `
+   entry — so a heading with nothing under it is unreachable by any route.
+5. **The audit grant lives inside the configured budget.** `planBookAuditRound` takes `maxPasses`
+   and grants only while `round < maxPasses`; the assignment is `Math.min(round + 1,
+   maxRegenAttempts)`. Staging (1) therefore never buys a second round, production (3) keeps the
+   grant for the case the commit was written for — a run that converges early and whose shipping
+   book the final audit reads for the first time.
+6. **Only the dropped cast is restored, not the whole brief** (owner, 2026-09-17: "Reverting the
+   whole brief to punish one undeclared removal is too blunt"). `restoreUndeclaredRemovals`
+   splices the missing rows verbatim out of the pre-review brief's own `characters[]` into the
+   reviewed brief's, bracket-matched and string-aware, and the rest of the review's work stands.
+   A page whose `characters[]` cannot be located structurally still falls back to the whole-brief
+   revert — the emptied cast must never render.
+7. **A negative answer to a figure list is an empty list.** The sentinel is tested on the name
+   with any trailing parenthetical removed, against an explicit set
+   (`none / no one / nobody / n/a / keine / aucun`). Structural, not a prose pattern; it covers
+   `parsePremiseFigures` and `parseInventedFigures` from one place.
+8. **Two more whitelists carry what they were given.** The per-round version object
+   (`repairPipeline.js`) now carries `compressedScene` and `parentSource`, and
+   `buildVersionEntry` carries `parentSource`.
+
+**Rationale.** Every one of these is the same shape: a guard that exists, is correct, and is
+handed nothing. `carryForwardWornItems` was written for exactly this failure and could not fire
+because a whitelist two modules away omitted one key; `compressedScene` was wired through five
+hops the day before and dropped at a sixth; the extra-round grant was bounded by the variable it
+increments. The fix in each case is to give the guard its input at the one place the input is
+assembled, rather than to add a second guard downstream.
+
+The drop check deliberately mirrors the addition check instead of becoming its own gate: same
+finding shape, same `describeBriefFindings` rendering, same re-ask, same ship-with-a-warning
+outcome. A gate is a guideline and an iterate round is paid.
+
+**The 2026-09-15 reason for the whole-brief revert still stands and is handled.** A reviewer that
+drops a name often rewrites the prose around it, so a roster restored into that prose can read
+thin. It cannot read WRONG: the image prompt's REQUIRED CAST rule draws every named character
+whether or not the prose gives them an action, and an under-described figure costs far less than
+the phantom `extra_character` CRITICAL an emptied roster produces — which on
+job_1789420511893_zly5rcdej funded three repair rounds and destroyed a correct original.
+
+**Touched files.** `server/lib/images.js` (`iteratePageCore`: `parentSceneMetadata`, the
+declared-set drop args, the handle/restore block), `server/lib/iterateBeat.js`
+(`checkDeclaredSet` drop direction, `normalizeCitedHandles`, `restoreParentObjects`),
+`storyJobPipeline.js` (`pipelineStoryData.sceneImages` gains `sceneMetadata`),
+`server/lib/promptBuilders.js` (the REQUIRED OBJECTS emptiness test; `isNegativeFigureAnswer`),
+`server/lib/repairLogic.js` (`planBookAuditRound` budget gate), `server/lib/repairPipeline.js`
+(the clamped grant; the per-round version whitelist gains `compressedScene` + `parentSource`;
+`buildVersionEntry` gains `parentSource`), `server/lib/sceneReviewGuard.js`
+(`castArraySpan`, `castEntriesFor`, `restoreUndeclaredRemovals`), `server/lib/beatsPipeline.js`
+(the restore call site and its `beats_scene_review_removal_restored` log),
+`tests/unit/iterate-rewrite-keeps-the-brief.test.ts` (new, 28 cases on this run's real ids),
+`tests/unit/scene-review-revert-undeclared.test.ts`, `tests/unit/final-book-audit-round.test.ts`.
+
+**Status.** ✅ active on staging. No rerun was commissioned; the evidence is the stored run.
+
 ## 2026-09-16 — The shot rule lives in the protected tail, from one vocabulary; and `compressedScene` survives the repair pipeline
 
 **Context.** Two faults measured on staging `job_1789506283204_3kxqshifx` ("Das Ei unter den

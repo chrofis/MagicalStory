@@ -240,4 +240,116 @@ function revertUndeclaredRemovals(expansions, sceneDiffs, changed, audit) {
   return reverted;
 }
 
-module.exports = { parseCastRemovals, castNameSet, diffCastRemovals, revertUndeclaredRemovals, assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };
+/**
+ * The span of the `characters[]` ARRAY inside a brief's metadata block.
+ *
+ * Bracket-matched, string-aware — never a regex over the JSON, which would
+ * stop at the first `]` inside a nested value. Returns the indices of the
+ * opening `[` and its matching `]`, or null when the key is not there.
+ */
+function castArraySpan(brief) {
+  const text = String(brief || '');
+  const marker = text.indexOf('---METADATA---');
+  const from = marker >= 0 ? marker : 0;
+  const key = text.indexOf('"characters"', from);
+  if (key < 0) return null;
+  const open = text.indexOf('[', key);
+  if (open < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '[' || ch === '{') depth++;
+    else if (ch === ']' || ch === '}') {
+      depth--;
+      if (depth === 0) return { open, close: i };
+    }
+  }
+  return null;
+}
+
+/** The pre-review brief's own `characters[]` rows for the named cast. */
+function castEntriesFor(brief, names) {
+  const { extractSceneMetadata } = require('./sceneMetadata');
+  let meta = null;
+  try { meta = extractSceneMetadata(String(brief || '')); } catch { return []; }
+  const rows = Array.isArray(meta?.fullData?.characters) ? meta.fullData.characters
+    : (Array.isArray(meta?.characters) ? meta.characters : []);
+  const want = castNameSet(names);
+  return rows
+    .map(r => (typeof r === 'string' ? { name: r } : r))
+    .filter(r => r && typeof r.name === 'string' && want.has(r.name.trim().toLowerCase()));
+}
+
+/**
+ * Put back ONLY the cast the review dropped without declaring it.
+ *
+ * Supersedes the whole-brief revert of 2026-09-15 (owner, 2026-09-17: "Reverting
+ * the whole brief to punish one undeclared removal is too blunt"). What the
+ * blunt version cost, measured on staging job_1789584708605_rts4wqupm p18: the
+ * reviewer dropped four of the page's cast from `characters[]` with no REMOVED
+ * CAST line, the page was reverted whole to its PRE-REVIEW brief
+ * (`namedButNotRewritten: [18]`), and it shipped at 45 where the previous run's
+ * reviewed p18 scored 95. Every other fix that review made to that page went
+ * with it.
+ *
+ * The reason the 2026-09-15 revert was whole-brief still stands and is handled:
+ * a reviewer that drops a name often rewrites the prose around it, so a roster
+ * restored into that prose can read thin. It cannot read WRONG — the image
+ * prompt's REQUIRED CAST rule draws every named character whether or not the
+ * prose gives them an action — and an under-described figure costs far less
+ * than a phantom `extra_character` CRITICAL funding repair rounds, which is
+ * what an emptied roster costs.
+ *
+ * Structural throughout: the dropped rows are copied VERBATIM out of the
+ * pre-review brief's own metadata and spliced into the reviewed brief's
+ * `characters[]` array. No prose is read or written. When the array cannot be
+ * located structurally the page falls back to the whole-brief revert rather
+ * than rendering on an emptied cast.
+ *
+ * Mutates `expansions` / `sceneDiffs` / `changed` like its predecessor.
+ *
+ * @returns {{restored: Array<{pageNumber:number, names:string[]}>, reverted: Array<{pageNumber:number, undeclared:string[]}>}}
+ */
+function restoreUndeclaredRemovals(expansions, sceneDiffs, changed, audit) {
+  const restored = [];
+  const revertRows = [];
+  for (const row of (audit || [])) {
+    if (!row || !(row.undeclared || []).length) continue;
+    const diffAt = (sceneDiffs || []).findIndex(d => d && d.pageNumber === row.pageNumber);
+    const x = (expansions || []).find(e => e && e.pageNumber === row.pageNumber);
+    if (diffAt < 0 || !x) continue;
+    const before = sceneDiffs[diffAt].before;
+    const rows = castEntriesFor(before, row.undeclared);
+    const span = rows.length > 0 ? castArraySpan(x.brief) : null;
+    if (span) {
+      const inner = String(x.brief).slice(span.open + 1, span.close);
+      const addition = rows.map(r => JSON.stringify(r)).join(', ');
+      const merged = inner.trim() ? `${inner.replace(/\s+$/, '')}, ${addition}` : addition;
+      x.brief = String(x.brief).slice(0, span.open + 1) + merged + String(x.brief).slice(span.close);
+      sceneDiffs[diffAt].after = x.brief;
+      restored.push({ pageNumber: row.pageNumber, names: rows.map(r => r.name) });
+      continue;
+    }
+    // No locatable `characters[]` (or no rows to copy): the page must not
+    // render on the emptied cast, so the pre-2026-09-17 whole-brief revert
+    // stands for it alone.
+    x.brief = before;
+    x.reviewRewrote = false;
+    sceneDiffs.splice(diffAt, 1);
+    const ci = (changed || []).indexOf(row.pageNumber);
+    if (ci >= 0) changed.splice(ci, 1);
+    revertRows.push({ pageNumber: row.pageNumber, undeclared: row.undeclared });
+  }
+  return { restored, reverted: revertRows };
+}
+
+module.exports = { parseCastRemovals, castNameSet, diffCastRemovals, revertUndeclaredRemovals, restoreUndeclaredRemovals, castArraySpan, castEntriesFor, assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief };

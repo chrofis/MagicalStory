@@ -3739,6 +3739,19 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const sceneDescText = currentScene.description || currentScene.sceneDescription || '';
   let shortSceneDesc = '';
   const sceneMetadata = extractSceneMetadata(sceneDescText);
+  // THE PARENT BRIEF'S METADATA -- ONE RESOLVER (2026-09-17, staging
+  // job_1789584708605_rts4wqupm). Everything an iterate carries forward or
+  // checks against reads the brief this rewrite supersedes: the worn-item
+  // states, the declared-set allowance, the citation-drop check. Every one of
+  // them read `savedScene.sceneMetadata` alone -- and the repair pipeline
+  // builds its own `sceneImages[]` rows (storyJobPipeline.js,
+  // `pipelineStoryData`) from a whitelist that had no `sceneMetadata` key, so
+  // on EVERY pipeline iterate that object was `{}`. All six rewrites of that
+  // run came back with `wornItems: []`, and the jacket a page had taken OFF
+  // was painted back on: p16 shipped at -12 with the surviving critical naming
+  // exactly that. The page's own brief carries the same contract in the same
+  // shape and is always present, so it is the fallback -- never `{}`.
+  const parentSceneMetadata = savedScene?.sceneMetadata || sceneMetadata || {};
   if (sceneMetadata?.imageSummary) {
     shortSceneDesc = sceneMetadata.imageSummary;
   } else {
@@ -3755,6 +3768,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     resolvePlanLine, collectStagedFigures, renderStagedFiguresBlock,
     checkRewrittenBrief, describeBriefFindings,
     declaredSetAllowance, checkDeclaredSet, partitionAnchoredObjects,
+    normalizeCitedHandles, restoreParentObjects,
   } = require('./iterateBeat');
   const planLine = resolvePlanLine(currentScene, savedScene);
   if (!planLine) {
@@ -3952,21 +3966,38 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // warning: a gate is a guideline and an iterate round is paid. (A length
   // budget shipped beside this the same day and was removed: the growth it
   // measured was the template's own audit keys, not prose.)
-  const origObjects = (savedScene.sceneMetadata?.objects || savedScene.sceneMetadata?.fullData?.objects || []);
+  const origObjects = (parentSceneMetadata.objects || parentSceneMetadata.fullData?.objects || []);
   const citedMetadata = extractSceneMetadata(newSceneDescription);
   const declaredSetArgs = declaredSetAllowance({
     origObjects,
     rewriteObjects: citedMetadata?.objects,
     evaluationFeedback, pageText, planLine,
-    origCharacters: sceneMetadata?.characters,
+    origCharacters: parentSceneMetadata.characters,
     promptCharacters,
     stagedFigures,
   });
+  // ...and the SAME set in the other direction (2026-09-17). Zero additions
+  // occurred on job_1789584708605_rts4wqupm; SUBTRACTION did the damage -- p6
+  // and p16 both stopped citing the artefact their page is about, and p16's
+  // REQUIRED OBJECTS block shipped as a header with no entries. `nameIds` lets
+  // a named figure's NAME in `characters[]` satisfy its id: that is a refile,
+  // not a loss (p13 moved CHR001 to "Ramon" on the same run).
+  declaredSetArgs.requiredObjects = origObjects;
+  declaredSetArgs.nameIds = (() => {
+    const map = {};
+    const secondaries = Array.isArray(visualBible?.secondaryCharacters)
+      ? visualBible.secondaryCharacters
+      : Object.values(visualBible?.secondaryCharacters || {});
+    for (const e of [...secondaries, ...(visualBible?.animals || [])]) {
+      if (e?.name && e?.id) map[String(e.name).trim()] = String(e.id);
+    }
+    return map;
+  })();
   let declaredSetFindings = checkDeclaredSet({ newMetadata: citedMetadata, ...declaredSetArgs });
   if (declaredSetFindings.length > 0) {
     log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite cites outside its declared set:\n${describeBriefFindings(declaredSetFindings)}`);
     const recited = await callClaudeAPI(
-      `${scenePrompt}\n\nYour previous answer cites objects or characters that none of its inputs name:\n${describeBriefFindings(declaredSetFindings)}\n\nReturn the whole brief again. Keep the same moment and the same fixes; cite only the objects and characters the previous brief, the plan line and the feedback name, and take out of the prose whatever depended on the others.`,
+      `${scenePrompt}\n\nYour previous answer does not cite the set of objects and characters its inputs give it:\n${describeBriefFindings(declaredSetFindings)}\n\nReturn the whole brief again. Keep the same moment and the same fixes. Cite only the objects and characters the previous brief, the plan line and the feedback name, and take out of the prose whatever depended on the others -- and keep citing every id the previous brief cited, either in "objects[]" or, for a named figure, by name in "characters[]".`,
       null, effectiveSceneModel, { usageLabel: 'scene_iterate_declared_set' }
     );
     if (usageTracker && recited.usage) {
@@ -4036,6 +4067,47 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
+  // THE CITED HANDLES ARE CHECKED AGAINST THE BIBLE, AND THE LIST CAN NEVER
+  // RESOLVE TO NOTHING (2026-09-17, staging job_1789584708605_rts4wqupm).
+  //
+  //  - A facet suffix on an entry that has no such facet, or whose facet covers
+  //    no page, is reduced to the bare parent id. Five of six rewrites appended
+  //    one (`LOC001.1`, `LOC002.1`, `LOC003.2` on location entries with an
+  //    EMPTY `vantages[]`, `ART001.2` on a state with an empty `pages[]`), and
+  //    every consumer silently fell back to the parent or to `.1`.
+  //  - A rewrite whose surviving citations are all locations lists NOTHING in
+  //    REQUIRED OBJECTS, because that block skips location entries by design.
+  //    p6 lost the egg the page is about that way, and p16 shipped a header
+  //    with no entries under it. The parent brief's listable ids come back.
+  //
+  // Structured throughout -- ids, pools and facet arrays, never a text match.
+  // Both rules rewrite the SAME `objects[]` array in the brief, through the one
+  // replacement the scrub above uses, so the stored brief and the metadata the
+  // prompt is built from can never disagree.
+  {
+    const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
+    const applyObjects = (list) => {
+      if (!objRe.test(newSceneDescription)) return false;
+      newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(list)}`);
+      newSceneMetadata = extractSceneMetadata(newSceneDescription);
+      return true;
+    };
+    const normalized = normalizeCitedHandles({ objects: newSceneMetadata?.objects, visualBible });
+    if (normalized.rejected.length > 0) {
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite cited facet(s) the Visual Bible does not declare — `
+        + `${normalized.rejected.map(r => `${r.handle} (${r.reason})`).join(', ')} — reduced to the bare id`);
+      applyObjects(normalized.objects);
+    }
+    const restored = restoreParentObjects({
+      rewriteObjects: newSceneMetadata?.objects, parentObjects: origObjects, visualBible,
+    });
+    if (restored.restored.length > 0) {
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: the rewrite's objects[] resolves to no listable element — `
+        + `restoring ${restored.restored.join(', ')} from the parent brief so REQUIRED OBJECTS is not empty`);
+      applyObjects(restored.objects);
+    }
+  }
+
   // A REWRITE THAT DROPS A CITED VB ID MUST SAY SO (2026-09-14, story B
   // job_1789343124794_z2c779f7i p17). The `iterate-round-1` rewrite there —
   // commissioned for a hammer artefact, a facing error and stray leaves —
@@ -4049,7 +4121,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     const { warnDroppedVbCitations } = require('./storyHelpers');
     warnDroppedVbCitations(
       pageNumber,
-      savedScene.sceneMetadata || {},
+      parentSceneMetadata,
       newSceneMetadata || {},
       { what: 'iterate rewrite' }
     );
@@ -4237,7 +4309,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // business re-deciding. Read them from the rewrite when present, else from
   // the saved scene, or the anachronism guard and text-zone hint go dark on
   // every repaired page (same disease 6738d7dca fixed for beats pages).
-  const savedMeta = savedScene?.sceneMetadata || {};
+  const savedMeta = parentSceneMetadata;
   const iterateSceneMetadata = {
     ...newSceneMetadata,
     era: newSceneMetadata?.era || savedMeta.era || savedMeta.fullData?.era || null,

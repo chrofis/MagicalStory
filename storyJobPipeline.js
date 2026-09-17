@@ -6233,6 +6233,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // died while the covers, which use iterateCover, survived).
             sceneCharacters: r.sceneCharacters || null,
             perCharClothing: r.perCharClothing || null,
+            // THE PAGE'S OWN BRIEF METADATA. Absent from this whitelist,
+            // `iteratePageCore` read `savedScene.sceneMetadata` as `{}` on
+            // every pipeline iterate -- so `wornItems` was never carried
+            // forward (81ad55a54's carryForwardWornItems had nothing to carry
+            // FROM), the declared-set allowance had no original id set, and the
+            // citation-drop warning compared against nothing. Measured on
+            // staging job_1789584708605_rts4wqupm: all six iterate rewrites
+            // stored `wornItems: []`, and p16's REQUIRED OBJECTS block shipped
+            // empty because the jacket it had taken OFF was resolved back to
+            // "worn" and omitted as already-referenced.
+            sceneMetadata: r.sceneMetadata || null,
             imageAspect: inputData?.layout?.imageAspect,
             textInImage: inputData?.layout?.textInImage,
             // The page's locked text-overlay position. Used by iteratePageCore

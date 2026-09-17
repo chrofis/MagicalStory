@@ -119,7 +119,7 @@ const {
   getHistoricalLocations,
   getHistoricalObjects,
 } = require('./storyHelpers');
-const { parseCastRemovals, diffCastRemovals, revertUndeclaredRemovals } = require('./sceneReviewGuard');
+const { parseCastRemovals, diffCastRemovals, restoreUndeclaredRemovals } = require('./sceneReviewGuard');
 const { UnifiedStoryParser } = require('./outlineParser/unified');
 const { stableCandidateIndex } = require('./outlineParser/shared');
 const { log } = require('../utils/logger');
@@ -2272,18 +2272,28 @@ ${bibleBody}` : bibleBody;
         log.error(`❌ [BEATS] Scene review removed cast WITHOUT declaring it — ${detail}`);
         gl.error('beats_scene_review_removal_undeclared',
           `Reviewer dropped character(s) from characters[] with no REMOVED CAST declaration — ${detail}`, null, undeclaredRemovals);
-        // The page does NOT render on a cast the reviewer silently emptied: its
-        // whole brief goes back to the version that was sent for review, which
-        // is internally consistent by construction. That page's other review
-        // fixes are lost with it and are reported below through the ordinary
-        // faulted-but-not-rewritten channel — `changed` is trimmed here, before
-        // that check reads it.
-        const reverted = revertUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
+        // The page does NOT render on a cast the reviewer silently emptied —
+        // but only the DROPPED NAMES come back (owner, 2026-09-17), spliced
+        // verbatim out of the pre-review brief's own `characters[]`. The rest
+        // of the reviewed brief stands. The whole-brief revert it supersedes
+        // cost p18 of job_1789584708605_rts4wqupm every other fix that review
+        // made (shipped at 45; the previous run's reviewed p18 scored 95).
+        // A page whose `characters[]` cannot be located structurally still
+        // falls back to the whole-brief revert — `changed` is trimmed there,
+        // before the faulted-but-not-rewritten check reads it.
+        const { restored, reverted } = restoreUndeclaredRemovals(expansions, sceneDiffs, changed, undeclaredRemovals);
+        if (restored.length > 0) {
+          const detail = restored.map(r => `page ${r.pageNumber}: ${r.names.join(', ')}`).join('; ');
+          log.warn(`↩️ [BEATS] Restored undeclared-removed cast into the reviewed brief — ${detail}`);
+          gl.warn('beats_scene_review_removal_restored',
+            `Dropped character(s) put back into the reviewed brief's characters[]; the rest of the review's fixes stand — ${detail}`,
+            null, restored);
+        }
         if (reverted.length > 0) {
           const pages = reverted.map(r => r.pageNumber).join(', ');
-          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — an undeclared cast removal must not render`);
+          log.error(`↩️ [BEATS] Page(s) ${pages} reverted to the pre-review brief — the reviewed brief has no locatable characters[] to restore into`);
           gl.warn('beats_scene_review_removal_reverted',
-            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration, so that page's review fixes were discarded with it`,
+            `Page(s) ${pages} shipped the PRE-REVIEW brief: the rewrite dropped cast with no declaration and its characters[] could not be located, so that page's review fixes were discarded with it`,
             null, reverted);
         }
       }

@@ -63,6 +63,7 @@
  */
 
 const { log } = require('../utils/logger');
+const { vbIdFacet, baseVbId } = require('./vbIdGuard');
 
 const PLAN_PREFIX = /^\s*PLAN:\s*/i;
 
@@ -374,7 +375,7 @@ function declaredSetAllowance({ origObjects = [], rewriteObjects = [], evaluatio
  * Reports only — a gate is a guideline and an iterate round is paid.
  * @returns {Array<{type:string,detail:string,ids?:string[],names?:string[]}>}
  */
-function checkDeclaredSet({ newMetadata = null, allowedObjects = [], allowedNames = [] } = {}) {
+function checkDeclaredSet({ newMetadata = null, allowedObjects = [], allowedNames = [], requiredObjects = [], nameIds = null } = {}) {
   const findings = [];
   const allowedIds = new Set((allowedObjects || []).map(baseId).filter(Boolean));
   const addedIds = (Array.isArray(newMetadata?.objects) ? newMetadata.objects : [])
@@ -397,7 +398,147 @@ function checkDeclaredSet({ newMetadata = null, allowedObjects = [], allowedName
       detail: `characters[] adds ${addedNames.join(', ')}, who the previous brief, the plan line and the feedback all leave out.`,
     });
   }
+  // ── THE OTHER DIRECTION (2026-09-17) ────────────────────────────────────
+  // The additions check above caught zero breaches on staging
+  // job_1789584708605_rts4wqupm; SUBTRACTION did the damage. Two of six
+  // rewrites stopped citing the artefact the page is about (p6 and p16 both
+  // dropped the egg), and p16's REQUIRED OBJECTS block shipped with a header
+  // and no entries. A rewrite may REORDER its citations; it may not drop one.
+  //
+  // Still cited counts an id filed anywhere the union reader looks: `objects[]`,
+  // a VB id in `characters[]`, or — for a secondary character — that entry's
+  // NAME in `characters[]`, which is how a CHR id legitimately moves list
+  // (p13's CHR001/Ramon on the same run). `nameIds` carries that id↔name map
+  // from the bible; without it a name can never satisfy an id.
+  // VB ids only, on BOTH sides: `baseVbId` returns null for anything that is
+  // not a handle, so a free-text citation ("a pile of leaves") is never turned
+  // into a pseudo-id and never reported as dropped.
+  const stillCited = new Set();
+  for (const o of (Array.isArray(newMetadata?.objects) ? newMetadata.objects : [])) {
+    const id = baseVbId(typeof o === 'string' ? o : (o && o.id));
+    if (id) stillCited.add(id);
+  }
+  const nameToId = new Map(Object.entries(nameIds || {})
+    .map(([n, id]) => [String(n).trim().toLowerCase(), baseVbId(id)])
+    .filter(([, id]) => id));
+  for (const c of (Array.isArray(newMetadata?.characters) ? newMetadata.characters : [])) {
+    const raw = String((c && c.name) || c || '').trim();
+    const id = baseVbId(raw) || nameToId.get(raw.toLowerCase()) || null;
+    if (id) stillCited.add(id);
+  }
+  const droppedIds = [...new Set((requiredObjects || [])
+    .map(o => baseVbId(typeof o === 'string' ? o : (o && o.id))).filter(Boolean))]
+    .filter(id => !stillCited.has(id));
+  if (droppedIds.length > 0) {
+    findings.push({
+      type: 'object_dropped_from_declared_set',
+      ids: droppedIds,
+      detail: `the previous brief cited ${droppedIds.join(', ')} and this rewrite cites neither in objects[] nor in characters[]; a rewrite may reorder its citations but never drop one.`,
+    });
+  }
   return findings;
+}
+
+/**
+ * Every Visual Bible pool a brief may cite, in one place. Facets live on
+ * `states[]` (objects) or `vantages[]` (locations); both are read here so a
+ * dotted handle is checked against whichever list its entry actually carries.
+ */
+const CITABLE_POOLS = ['artifacts', 'animals', 'vehicles', 'locations', 'clothing', 'secondaryCharacters'];
+
+/** Index every citable bible entry by its BASE id. */
+function entryIndex(visualBible) {
+  const idx = new Map();
+  for (const pool of CITABLE_POOLS) {
+    for (const e of (Array.isArray(visualBible?.[pool]) ? visualBible[pool] : [])) {
+      const id = baseId(e?.id);
+      if (id && !idx.has(id)) idx.set(id, { entry: e, pool });
+    }
+  }
+  return idx;
+}
+
+/** The facet rows of an entry — `states[]` for objects, `vantages[]` for locations. */
+function entryFacets(entry) {
+  const states = Array.isArray(entry?.states) ? entry.states : [];
+  const vantages = Array.isArray(entry?.vantages) ? entry.vantages : [];
+  return states.length > 0 ? states : vantages;
+}
+
+/**
+ * A CITED FACET MUST EXIST (2026-09-17, staging job_1789584708605_rts4wqupm).
+ *
+ * Five of six iterate rewrites appended a facet suffix to an entry that has no
+ * such facet — `LOC001.1`, `LOC002.1`, `LOC003.2` on locations whose
+ * `vantages[]` is empty, and `ART001.2` on a state whose `pages[]` is empty.
+ * Nothing rejected them: `matchesEntry` falls back to the parent id, the
+ * reference-cell picker falls back to `.1`, and the page silently rendered
+ * against a look the bible never declared for it.
+ *
+ * Structured only — ids and facet lists, never a text match. A handle whose
+ * facet does not exist, or whose facet covers no page at all, is REDUCED to the
+ * bare parent id (the entry is still cited; only the bogus facet is dropped).
+ *
+ * @returns {{objects: Array, rejected: Array<{handle:string, base:string, reason:string}>}}
+ */
+function normalizeCitedHandles({ objects = [], visualBible = null } = {}) {
+  const list = Array.isArray(objects) ? objects : [];
+  if (list.length === 0 || !visualBible) return { objects: list, rejected: [] };
+  const idx = entryIndex(visualBible);
+  const rejected = [];
+  const out = list.map((raw) => {
+    const handle = String(typeof raw === 'string' ? raw : (raw && raw.id) || '').trim();
+    const facet = vbIdFacet(handle);
+    if (!facet) return raw;
+    const base = baseId(handle);
+    const hit = idx.get(base);
+    if (!hit) return raw; // not a bible id at all — nothing to check it against
+    const facets = entryFacets(hit.entry);
+    const row = facets[facet - 1] || null;
+    if (!row) {
+      rejected.push({ handle: handle.toUpperCase(), base, reason: `the entry declares ${facets.length} facet(s)` });
+      return typeof raw === 'string' ? base : { ...raw, id: base };
+    }
+    if (Array.isArray(row.pages) && row.pages.length === 0) {
+      rejected.push({ handle: handle.toUpperCase(), base, reason: 'that facet covers no page' });
+      return typeof raw === 'string' ? base : { ...raw, id: base };
+    }
+    return raw;
+  });
+  return { objects: out, rejected };
+}
+
+/**
+ * THE PARENT'S OBJECT LIST, WHEN THE REWRITE'S RESOLVES TO NOTHING
+ * (2026-09-17, same run, p6 and p16).
+ *
+ * `buildImagePrompt` lists only NON-location, non-CHR citations, so a rewrite
+ * whose surviving citations are all locations produces no REQUIRED OBJECTS
+ * lines at all — on p6 the egg the whole page is about, on p16 the egg plus a
+ * bundled jacket. The parent brief cited them; a rewrite is allowed to reorder
+ * its citations, never to empty them.
+ *
+ * Purely structural: an id is "listable" when it resolves to a bible entry
+ * outside `locations` and `secondaryCharacters` (the two pools the prompt's
+ * checklist deliberately skips).
+ *
+ * @returns {{objects: Array, restored: string[]}}
+ */
+function restoreParentObjects({ rewriteObjects = [], parentObjects = [], visualBible = null } = {}) {
+  const list = Array.isArray(rewriteObjects) ? rewriteObjects : [];
+  const parent = Array.isArray(parentObjects) ? parentObjects : [];
+  if (!visualBible || parent.length === 0) return { objects: list, restored: [] };
+  const idx = entryIndex(visualBible);
+  const listable = (o) => {
+    const hit = idx.get(baseId(o));
+    return !!hit && hit.pool !== 'locations' && hit.pool !== 'secondaryCharacters';
+  };
+  if (list.some(listable)) return { objects: list, restored: [] };
+  const parentListable = parent.filter(listable);
+  if (parentListable.length === 0) return { objects: list, restored: [] };
+  const have = new Set(list.map(baseId));
+  const add = parentListable.filter(o => !have.has(baseId(o)));
+  return { objects: [...list, ...add], restored: add.map(o => String(typeof o === 'string' ? o : o.id)) };
 }
 
 /** One short line per finding, for a log and for the corrective re-ask. */
@@ -417,6 +558,8 @@ module.exports = {
   checkRewrittenBrief,
   declaredSetAllowance,
   checkDeclaredSet,
+  normalizeCitedHandles,
+  restoreParentObjects,
   describeBriefFindings,
   REINSTATE_TYPES,
 };

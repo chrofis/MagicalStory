@@ -103,11 +103,15 @@ describe('repair pipeline wiring', () => {
     expect(src).not.toContain('if (round < maxRegenAttempts && !bookUnchanged)');
   });
 
-  it('the round budget can only be extended by the audit grant', () => {
-    // Exactly one site raises roundLimit, and it sits under the grant guard.
-    const raises = src.match(/roundLimit = round \+ 1;/g) || [];
+  it('the round budget can only be extended by the audit grant, and never past the cap', () => {
+    // Exactly one site raises roundLimit, it sits under the grant guard, and
+    // it is clamped to the configured budget (2026-09-17): staging runs
+    // repairMaxPasses=1 and the unclamped grant gave it a second full round.
+    const raises = src.match(/roundLimit = Math\.min\(round \+ 1, maxRegenAttempts\);/g) || [];
     expect(raises.length).toBe(1);
+    expect(src).not.toMatch(/roundLimit = round \+ 1;/);
     expect(src).toContain('if (auditPlan.mayGrantExtraRound)');
+    expect(src).toContain('maxPasses: maxRegenAttempts');
   });
 
   it('an audit failure is swallowed — a paid run always finishes', () => {

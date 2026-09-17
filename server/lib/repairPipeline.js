@@ -1906,7 +1906,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const { decideRepairMethod } = require('./repairLogic');
 
   // The round budget is MUTABLE by exactly one step: the final round's book
-  // audit may grant ONE extra round (owner, 2026-09-13). See planBookAuditRound.
+  // audit may grant ONE extra round (owner, 2026-09-13) -- and never past
+  // `maxRegenAttempts`, the configured budget (2026-09-17). See
+  // planBookAuditRound.
   let roundLimit = maxRegenAttempts;
   let extraAuditRoundUsed = false;
   // Pages the final audit re-admitted to repair. Consumed by the next round's
@@ -1923,7 +1925,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
    */
   const runBookAuditRound = async ({ round, bookUnchanged, finalRound }) => {
     const { planBookAuditRound, admitPagesFromAudit } = require('./repairLogic');
-    const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed, finalRound });
+    const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed, finalRound, maxPasses: maxRegenAttempts });
     if (auditPlan.runAudit) {
       try {
         const { auditStoryBook, buildAuditPages } = require('./bookAudit');
@@ -1978,7 +1980,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             if (admitted.length > 0) {
               auditAdmittedNums = admitted;
               extraAuditRoundUsed = true;
-              roundLimit = round + 1;
+              // Provably a no-op given planBookAuditRound's budget gate above;
+              // it stands as the invariant, at the one line that can break it.
+              roundLimit = Math.min(round + 1, maxRegenAttempts);
               record.extraRoundGranted = true;
               record.extraRoundAdmittedPages = admitted;
               log.warn(`📖 [BOOK-AUDIT] Final audit of the shipping book found CRITICAL/CATASTROPHIC IMG fault(s) on page(s) ${admitted.join(', ')} — granting ONE extra repair round (round ${roundLimit})`);
@@ -2714,6 +2718,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // through to buildVersionEntry so dev panel shows what was
             // actually sent to Grok, not the stale original page prompt.
             prompt: repairResult.prompt || null,
+            // ...and the prose that prompt was SHRUNK to before it was sent.
+            // THE SECOND WHITELIST (2026-09-17): 434ea1e89 wired
+            // `compressedScene` through the round result, the eval inputs, the
+            // page OUTPUT whitelist and buildVersionEntry -- but this object,
+            // the one that actually becomes the version, dropped it again. So
+            // originals and inpaint/char-fix lineage stamped correctly while
+            // every iterate version stored null: on staging
+            // job_1789584708605_rts4wqupm all six rewrites built prompts of
+            // 7,981-9,233 chars against Grok's 7,900 cap, and their judges then
+            // scored 4 of the 18 shipped pages against the untruncated brief
+            // (resolveVersionCompressedScene falls back to `description`).
+            compressedScene: repairResult.compressedScene || null,
+            // Lineage breadcrumb stamped by inheritSceneContract -- which
+            // version's pixels this one edited. Dropped here it occurred zero
+            // times in the stored story, so no repair chain was auditable.
+            parentSource: repairResult.parentSource || null,
             description: repairResult.description || null,
             // THE REWRITTEN CONTRACT TRAVELS WITH THE VERSION (2026-09-13).
             // executeIterateAction already returns the cast it re-derived from
@@ -3631,6 +3651,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // The prose the model received for THIS version's bytes. Persisted so a
       // repair rerun from the stored story resolves the same lineage.
       compressedScene: resolveVersionCompressedScene(v, img),
+      // WHICH VERSION'S PIXELS THIS ONE EDITED (2026-09-17). Set by
+      // inheritSceneContract on every round result, and whitelisted away here
+      // -- `parentSource` occurred zero times in the stored story, so a repair
+      // chain could not be read back from the record at all.
+      parentSource: v.parentSource || null,
       sceneMetadata: v.sceneMetadata || null,
       // Declared-or-unknown, never a coincidence of truthiness: `|| null`
       // leaves an empty array intact (it is truthy), so a version could ship
