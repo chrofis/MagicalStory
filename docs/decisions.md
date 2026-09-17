@@ -354,6 +354,114 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — A repaired page's brief is checked like an authored one
+
+**Context.** `prompts/scene-review.txt` runs ONCE per story, over the Art Director's briefs,
+before any image exists (`beatsPipeline.js`, the `buildSceneReviewPrompt` call). Every reviewer
+rule — imported cast, object states, single moment, element citation, the new
+`checkBiblePageTable` — and the whole free mechanical pre-check `sceneBriefCheck.checkScenes`
+feeds it are therefore enforced on the FIRST brief and on no repaired one. When `iteratePageCore`
+repairs a page it REWRITES that brief wholesale, and the rewrite becomes the page's contract: the
+judges score against it (`buildExpectedCastBlock`), `repairPipeline.js` promotes it onto the page
+record, and every later reader — a regeneration, the book audit, a rerun — inherits it. This gap
+is the parent of defects fixed one at a time over the two preceding days.
+
+What DID reach the rewrite: `assessIterateBrief` (structural — prose + parseable metadata +
+`sceneIntent`), `checkDeclaredSet` in both directions (citations, against original ∪ plan-line ∪
+feedback), `normalizeCitedHandles`, `restoreParentObjects`, `partitionAnchoredObjects`,
+`warnDroppedVbCitations`, the `iterateSceneMetadata` carry-forward of `era` / `aboard` /
+`crowdExpected` / `textZoneDescription` / `wornItems` / `shot` / `landmarkView`, and
+`checkRewrittenBrief` — which ran `sceneBriefCheck.checkPage` in full and then **threw away nine
+of its eleven fault types**, keeping only `cast_unlisted` and `element_uncited`.
+
+MEASURED over the 11 stored iterate rounds of staging `job_1789584708605_rts4wqupm` (p4, p6, p9,
+p10, p13, p16) and `job_1789506283204_3kxqshifx` (p2, p7, p10, p13, p16), by running `checkPage`
+over each round's PARENT brief and over the rewrite that replaced it:
+
+- The surviving two types fired on **1 round of 11** (rts p6).
+- `characters[].depth`, `characters[].looksAt` and `interactions[].action` were returned on **zero
+  rows by all 11 rewrites**, where the brief each replaced stated all three on every row. This is
+  not only a lost field: `interactions[].action` is what the one-action count and the hand-off
+  count are computed from, and `characters[].depth` is what the text-zone collision check reads.
+  rts p9's parent brief carries `interaction_multiple_actions` AND
+  `interaction_object_shared_hands`; its rewrite declares FOUR interaction rows against the
+  parent's two and reports nothing, because not one row carries `action`. An absent counter read
+  as a clean score.
+- `vb_page_uncited` fired on 5 rewrites and `vb_cite_offpage` on 3, all introduced — and all 8
+  already named by `checkDeclaredSet` from the parent's own citation list (`ART001` on rts p6 /
+  rts p16 / kxq p13 / kxq p16, `ART004` on kxq p7, and `LOC003` / `LOC002` / `ANI003` as
+  additions), which also catches one thing they cannot see (`character_outside_declared_set`,
+  kxq p10).
+
+**Decision.**
+
+1. **The mechanical checks run on the rewrite, and the parent is checked in the same breath.**
+   `checkRewrittenBrief` takes the brief being replaced and admits `cast_id_unresolved`,
+   `interaction_multiple_actions`, `interaction_object_shared_hands`, `interaction_actor_unknown`,
+   `vb_element_overflow` and `vb_state_contradicted` — `sceneBriefCheck.REVIEWABLE` minus the
+   whole-book type `checkPage` cannot produce (`vb_state_no_base`), minus the `textzone_*` family
+   (those rules are off on this call and a repaired page usually has its text position locked),
+   and minus the two citation types above. INTRODUCED ONLY: a rewrite inherits the bible's page
+   tables and cannot be asked, inside a page rewrite, to fix a fault it was handed — the same line
+   `beatsPipeline`'s post-review re-check already draws between `introduced` and `survived`. The
+   two reinstatement types keep firing whatever the parent did, because reinstating a figure the
+   parent dropped is the rewriter's own job under template rule 3a. Without a parent brief no
+   introduced-only type fires at all, rather than being guessed at.
+2. **A rewrite may not drop a metadata field its parent declared.** `checkCarriedFields` reports
+   one `brief_field_dropped` finding naming `characters[].depth`, `characters[].looksAt` and
+   `interactions[].action` — exactly the fields the two iterate templates state as REQUIRED on
+   every row since `2683e1f7b`. `hands` is deliberately out: the template makes it a claim about
+   contact, so its absence is an answer. `shot`, `landmarkView`, `wornItems`, `era`, `aboard`,
+   `crowdExpected` and `textZoneDescription` are out because the `iterateSceneMetadata` merge
+   already restores them in code — asking the model to re-supply what the caller has put back is a
+   duplicate guard. Presence is tested ACROSS the list, never row by row: a rewrite legitimately
+   restages a page, and comparing rows would report a re-cast frame as a loss.
+3. **ONE re-ask, unchanged.** Both checks feed the existing `scene_iterate_declare` call through a
+   single closure (`runBriefChecks`), so the first verdict, the re-ask's verdict and the
+   declared-set re-ask's verdict can never be taken on three different scopes. The acceptance rule
+   is the one that was already there — take the re-ask only if it strictly reduces findings — and
+   the declared-set re-ask still refuses a reply that regresses declarations. No second paid call,
+   no per-page model review: the story-level `scene-review.txt` costs ~$0.17 and ~476s over 18
+   pages, and per repaired page that is absurd.
+
+**Rationale.** Cheapest layer first. `sceneBriefCheck.checkPage` is pure code and its fault types
+are precisely the failure classes the rewrite exhibits, so the fix is to stop discarding nine
+tenths of a verdict that was already being computed — not to buy a judge. Where a mechanical check
+would merely say again what another mechanical check already says, it is not admitted: one basis
+per defect, or the same fault is named twice across two paid re-asks and the logs stop meaning
+anything.
+
+**WHAT REMAINS UNCHECKED, plainly.** A mechanical check reads structure, so two of the measured
+defects are outside it and stay outside it:
+
+- **Prose that contradicts the page's own declared traits.** rts p10's rewrite wrote a preschooler
+  as "a middle-aged man with short brown hair, stubble" three paragraphs under that page's own
+  `AGE & PROPORTIONS: preschool-age`, and declared hair and eye colour drifted on 5 pages of the
+  same run. Nothing here sees it. Both are addressed at source and on the prompt side —
+  `collectPlanLineCast` gives a reinstated character its sheet, and `DECLARED_TRAIT_VERBATIM_RULE`
+  reaches all four authoring templates — and a critic for them would be a model call per repaired
+  page, which is a classification decision and the owner's.
+- **Whether a citation breach should COST anything.** Every finding here is generator-side: a
+  WARN, one re-ask, then ship. No judge deducts for any of it. Same open question as the two
+  citation findings logged on 2026-09-16 and 2026-09-17; logged in `tasks/BACKLOG.md`, not acted
+  on.
+
+Also unchecked by construction: the text-zone distribution floors (whole-book), `vb_state_no_base`
+(whole-book), and any rule that needs the finished IMAGE rather than the brief.
+
+**Touched files.** `server/lib/iterateBeat.js` (`checkRewrittenBrief` gains `parentBrief` and the
+`INTRODUCED_TYPES` set; new `checkCarriedFields` / `CARRIED_ROW_FIELDS`), `server/lib/images.js`
+(`iteratePageCore`: the `runBriefChecks` closure and the widened re-ask),
+`server/lib/sceneBriefCheck.js` (the REVIEWABLE design record records the second reader),
+`tests/unit/iterate-rewrite-checked-like-authored.test.ts` (new, 16 cases on the 11 real stored
+rewrites), `tests/unit/fixtures/iterate-rewrite-checks-staging.json` (new),
+`tests/unit/iterateBeat.test.ts` (the wiring guard follows the closure), `tasks/BACKLOG.md`.
+
+**Status.** ✅ active on staging. The 11-round measurement is on rounds authored BEFORE
+`2683e1f7b` taught the iterate templates to emit those fields, so the 11-of-11
+`brief_field_dropped` rate measures the old templates; what the current ones return is what the
+Test Lab `iterate` replays measure.
+
 ## 2026-09-17 — The backdrop plate is authored once per Visual Bible vantage, not once per page
 
 **Context.** `emptyScenePrompt` — the prose the empty-scene plate is painted from — was a REQUIRED

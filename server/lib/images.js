@@ -3766,7 +3766,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // keeps the rewriter's roster and the judge's roster the same one.
   const {
     resolvePlanLine, collectStagedFigures, collectPlanLineCast, renderStagedFiguresBlock,
-    checkRewrittenBrief, describeBriefFindings,
+    checkRewrittenBrief, checkCarriedFields, describeBriefFindings,
     declaredSetAllowance, checkDeclaredSet, partitionAnchoredObjects,
     normalizeCitedHandles, restoreParentObjects,
     renderEvaluatorReasoning, renderFixTargetLines, renderParentWornState,
@@ -3964,30 +3964,51 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       .map(c => String(c?.name || '').trim())
       .filter(n => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
   })();
-  let consistencyFindings = checkRewrittenBrief({
-    pageNumber, brief: newSceneDescription, planLine, castNames: castNamesForCheck, visualBible,
-  });
+  // THE REWRITE IS CHECKED LIKE AN AUTHORED BRIEF (2026-09-17). Until now the
+  // filter above kept two of the eleven fault types `checkPage` computes, so a
+  // rewrite could ship a page the scene review would have sent back: a citation
+  // the bible's page table does not grant, an element the table claims and the
+  // rewrite stopped citing, two declared actions on a one-action pipeline. The
+  // parent brief is checked in the same breath, and only faults the parent was
+  // FREE of reach the re-ask — a rewrite inherits the bible and cannot be asked
+  // to fix what it was handed. Plus the metadata half of the same subtraction:
+  // 11 of 11 stored rewrites returned depth / looksAt / action on no row at
+  // all, which does not merely lose those fields, it silently switches the
+  // one-action and hand-off counts off. Both checks are free — pure code, no
+  // model call — and both feed the ONE corrective re-ask below, never a second.
+  const runBriefChecks = (text) => [
+    ...checkRewrittenBrief({
+      pageNumber, brief: text, parentBrief: sceneDescText, planLine, castNames: castNamesForCheck, visualBible,
+    }),
+    ...checkCarriedFields({
+      // The parent BRIEF's own metadata: it is the contract this rewrite
+      // replaces, and it always parses to the full row shape. (savedScene's
+      // stored copy flattens `characters` to a name list on some paths, and a
+      // flattened list would read as "never declared".)
+      parentMetadata: sceneMetadata,
+      rewriteMetadata: extractSceneMetadata(String(text || '')),
+    }),
+  ];
+  let consistencyFindings = runBriefChecks(newSceneDescription);
   if (consistencyFindings.length > 0) {
-    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewritten brief does not declare everything it draws:\n${describeBriefFindings(consistencyFindings)}`);
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewritten brief fails a check an authored brief is held to:\n${describeBriefFindings(consistencyFindings)}`);
     const fixed = await callClaudeAPI(
-      `${scenePrompt}\n\nYour previous answer put figures in the picture that its own metadata does not declare:\n${describeBriefFindings(consistencyFindings)}\n\nReturn the whole brief again. Keep the same moment; either declare each of those figures (a person in "characters[]" by name, a staged animal or secondary figure in "objects[]" by its id) or take them out of the prose.`,
+      `${scenePrompt}\n\nYour previous answer breaks the brief contract:\n${describeBriefFindings(consistencyFindings)}\n\nReturn the whole brief again. Keep the same moment and the same fixes, and resolve each line above: declare a figure in the picture (a person in "characters[]" by name, a staged animal or secondary figure in "objects[]" by its id) or take it out of the prose; cite an element the page stages and drop a citation the page does not; state every field the metadata contract requires on every row.`,
       null, effectiveSceneModel, { usageLabel: 'scene_iterate_declare' }
     );
     if (usageTracker && fixed.usage) {
       usageTracker('anthropic', fixed.usage, 'scene_iterate', fixed.modelId || effectiveSceneModel);
     }
     const fixedGuard = assessIterateBrief(fixed.text, { truncation: fixed.truncation });
-    const fixedFindings = fixedGuard.usable
-      ? checkRewrittenBrief({ pageNumber, brief: fixed.text, planLine, castNames: castNamesForCheck, visualBible })
-      : null;
+    const fixedFindings = fixedGuard.usable ? runBriefChecks(fixed.text) : null;
     if (fixedGuard.usable && fixedFindings.length < consistencyFindings.length) {
       sceneResult = fixed;
       newSceneDescription = fixed.text;
       consistencyFindings = fixedFindings;
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: declaration re-ask resolved ${fixedFindings.length === 0 ? 'every' : 'some'} undeclared figure(s)`);
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: brief re-ask resolved ${fixedFindings.length === 0 ? 'every' : 'some'} fault`);
     }
     if (consistencyFindings.length > 0) {
-      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a brief with undeclared figure(s) — the judge will read a different roster than the rewrite drew:\n${describeBriefFindings(consistencyFindings)}`);
+      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that fails a check an authored brief is held to:\n${describeBriefFindings(consistencyFindings)}`);
     }
   }
 
@@ -4045,9 +4066,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // Only take the re-ask if it BOTH shrinks the breach and still declares
     // what it draws — a brief that drops a figure's declaration to satisfy the
     // set would trade one defect for another.
-    const recitedDeclarations = recitedGuard.usable
-      ? checkRewrittenBrief({ pageNumber, brief: recited.text, planLine, castNames: castNamesForCheck, visualBible })
-      : null;
+    const recitedDeclarations = recitedGuard.usable ? runBriefChecks(recited.text) : null;
     if (recitedGuard.usable && recitedFindings.length < declaredSetFindings.length
         && (recitedDeclarations || []).length <= consistencyFindings.length) {
       sceneResult = recited;

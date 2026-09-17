@@ -836,6 +836,29 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     not read — so on the story it was built from it names 1 page of 18 and no
 //     false ones. The reviewer holds the plan line and the brief, so the fix is
 //     a citation it can make without inventing anything. SENT.
+//
+// THE SECOND READER (2026-09-17). Everything above measures these types against
+// the AUTHORED brief, the one the scene review reads once before any render. A
+// repaired page's brief is written a second time, by the iterate rewrite, and
+// that rewrite BECOMES the page's contract — the judges score against it and it
+// is promoted onto the page record. `iterateBeat.checkRewrittenBrief` runs
+// `checkPage` over it, so these same types are now the rewrite's contract too.
+// Three differences, all decided there and all measured on the 11 stored
+// iterate rounds of two staging runs:
+//   - `cast_unlisted` and `element_uncited` fire on the rewrite whatever the
+//     parent did; the interaction family, `cast_id_unresolved`,
+//     `vb_element_overflow` and `vb_state_contradicted` fire only when the
+//     PARENT brief was free of that type, because a rewrite inherits the
+//     bible's page tables and cannot be asked inside a page rewrite to fix what
+//     it was handed.
+//   - `vb_page_uncited` / `vb_cite_offpage` are NOT run on the rewrite. They
+//     fire there (5 and 3 of those 11 rounds) and every one of the 8 names a
+//     defect `iterateBeat.checkDeclaredSet` already names from the parent's own
+//     citation list, in a re-ask of its own. One basis per defect.
+//   - `vb_state_no_base` is whole-book (`checkObjectStateBase`) and `checkPage`
+//     never produces it, so the iterate path cannot see it.
+//   - the `textzone_*` family is not run there: `opts.textZoneRules` is off on
+//     that call, and a repaired page usually has its text position locked.
 const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
   'vb_element_overflow', 'element_uncited', 'vb_state_contradicted', 'vb_state_no_base',
   'vb_page_uncited', 'vb_cite_offpage',

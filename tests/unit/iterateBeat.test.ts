@@ -236,9 +236,15 @@ describe('iteratePageCore wiring', () => {
     expect(source).toContain('stagedFigures: renderStagedFiguresBlock(stagedFigures)');
   });
 
-  it('runs the post-rewrite declaration check on the rewritten brief', () => {
+  it('runs the post-rewrite brief checks on the rewritten brief, against its parent', () => {
     expect(source).toContain('checkRewrittenBrief({');
-    expect(source).toMatch(/brief:\s*newSceneDescription/);
+    expect(source).toContain('checkCarriedFields({');
+    // One closure runs both checks, so the first verdict, the re-ask's verdict
+    // and the declared-set re-ask's verdict can never be taken on three
+    // different scopes.
+    expect(source).toMatch(/const runBriefChecks = \(text\) =>/);
+    expect(source).toMatch(/runBriefChecks\(newSceneDescription\)/);
+    expect(source).toMatch(/parentBrief:\s*sceneDescText/);
   });
 });
 

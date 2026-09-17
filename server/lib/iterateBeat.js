@@ -430,34 +430,175 @@ function renderParentWornState({ visualBible, promptCharacters, parentSceneMetad
 // The two faults that mean a figure is in the picture but not on the roster the
 // judge reads. Both come from sceneBriefCheck, which the first-generation path
 // already runs on every brief — the iterate path ran neither on its rewrite.
+// They fire on the rewrite whatever the parent brief did: reinstating a figure
+// the parent dropped is the rewriter's own job (template rule 3a), so an
+// inherited one is still its to answer for.
 const REINSTATE_TYPES = new Set(['cast_unlisted', 'element_uncited']);
 
 /**
- * Post-rewrite backstop: does the rewritten brief's own metadata declare
- * everything its prose (and its plan line) puts in the frame?
+ * THE REST OF THE MECHANICAL CHECKS, ON WHAT THE REWRITE INTRODUCED
+ * (2026-09-17).
+ *
+ * `checkPage` computes eleven fault types and the iterate path discarded nine of
+ * them. They are the types `sceneBriefCheck.REVIEWABLE` sends to the scene
+ * review on the authored path — minus `vb_state_no_base`, which is a whole-book
+ * tally `checkPage` never produces, and minus the `textzone_*` family, which
+ * only runs when the text-zone rules are active and whose position a repaired
+ * page usually has locked.
+ *
+ * INTRODUCED ONLY, and that is the whole difference from the two above: a
+ * rewrite inherits the bible's page tables and the parent's citations, so a
+ * fault the parent brief already carried is one the rewrite cannot be asked to
+ * fix inside a page rewrite — spending the one corrective re-ask on it would
+ * buy nothing. The authored path draws exactly this line for exactly this
+ * reason (beatsPipeline's post-review re-check, `introduced` vs `survived`).
+ *
+ * MEASURED over the 11 stored iterate rounds of staging
+ * job_1789584708605_rts4wqupm (p4, p6, p9, p10, p13, p16) and
+ * job_1789506283204_3kxqshifx (p2, p7, p10, p13, p16), by running `checkPage`
+ * over each round's PARENT brief and its REWRITE:
+ *
+ *   today's two types      1 round of 11 (rts p6, element_uncited)
+ *   vb_page_uncited        5 rounds introduced — AND ALREADY COVERED, see below
+ *   vb_cite_offpage        3 rounds introduced — AND ALREADY COVERED
+ *   the other six types    0 rounds. Three of them CANNOT fire at all while the
+ *                          rewrite omits `action`: rts p9's parent brief
+ *                          carried interaction_multiple_actions AND
+ *                          interaction_object_shared_hands, and its rewrite —
+ *                          which declares four interaction rows against the
+ *                          parent's two — reads clean only because the field
+ *                          the count is taken from is gone. An absent counter
+ *                          is not a clean score; `checkCarriedFields` is what
+ *                          makes those three able to fire.
+ *
+ * THE TWO CITATION TYPES ARE DELIBERATELY NOT IN THIS SET. `checkDeclaredSet`
+ * was run over the same 11 rounds and produced the SAME defects from the other
+ * basis: rts p6 / rts p16 / kxq p13 / kxq p16 `object_dropped_from_declared_set
+ * [ART001]`, kxq p7 `[ART004]`, and `object_outside_declared_set` naming
+ * LOC003 on p7, LOC002+LOC003+ANI003 on p13, LOC003+ANI003 on p16 — 8 of 8 of
+ * what `vb_page_uncited` / `vb_cite_offpage` would have added, plus one thing
+ * they cannot see (`character_outside_declared_set[Crow]`, kxq p10). Naming one
+ * defect twice, in two different paid re-asks, buys nothing. The two bases
+ * genuinely differ — the declared set reads the PARENT's citations, the page
+ * table reads the BIBLE's — but where they differ is a page the parent brief
+ * also failed to cite, and that is precisely the inherited case this set
+ * suppresses. They converge, so one of them runs.
+ *
+ * What is left is what NOTHING on the iterate path checked: an id that resolves
+ * to no bible entry, two declared actions on a one-action pipeline, one object
+ * under two pairs of hands, an actor nobody can resolve, the owner's cap of
+ * three packable elements, and a page whose instant contradicts the object
+ * state it resolves to.
+ */
+const INTRODUCED_TYPES = new Set([
+  'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands',
+  'interaction_actor_unknown', 'vb_element_overflow', 'vb_state_contradicted',
+]);
+
+/**
+ * Post-rewrite backstop: does the rewritten brief hold the same mechanical
+ * contract an authored brief is held to?
  *
  * Reuses sceneBriefCheck.checkPage with the page's plan line set — the
- * owner-sanctioned non-fidelity use of the beat. Reports only; the caller
- * decides what to do, because an iterate round is a paid round and a gate here
- * must never destroy one.
+ * owner-sanctioned non-fidelity use of the beat — and runs it a second time
+ * over the brief this rewrite replaces, so an INTRODUCED fault can be told from
+ * an inherited one. Free: pure code, no model call, no image.
  *
- * @returns {Array} findings, filtered to REINSTATE_TYPES
+ * Reports only; the caller decides what to do, because an iterate round is a
+ * paid round and a gate here must never destroy one.
+ *
+ * @param {string} [parentBrief] the brief being replaced. Without it every
+ *   INTRODUCED_TYPES finding is suppressed rather than guessed at — a caller
+ *   that cannot say what the parent declared cannot say what the rewrite added.
+ * @returns {Array} findings: all of REINSTATE_TYPES, plus INTRODUCED_TYPES the
+ *   parent brief was free of
  */
-function checkRewrittenBrief({ pageNumber, brief, planLine = null, castNames = [], visualBible = null } = {}) {
+function checkRewrittenBrief({ pageNumber, brief, parentBrief = null, planLine = null, castNames = [], visualBible = null } = {}) {
   if (!String(brief || '').trim()) return [];
   try {
     const { checkPage } = require('./sceneBriefCheck');
-    const findings = checkPage(
-      { pageNumber, brief: String(brief), planLine: planLine || '' },
-      castNames,
-      visualBible,
-      {}
-    );
-    return findings.filter(f => f && REINSTATE_TYPES.has(f.type));
+    const run = (text) => (String(text || '').trim()
+      ? checkPage({ pageNumber, brief: String(text), planLine: planLine || '' }, castNames, visualBible, {})
+      : []);
+    const findings = run(brief);
+    const parentTypes = new Set(run(parentBrief).map(f => f && f.type));
+    return findings.filter(f => f && (
+      REINSTATE_TYPES.has(f.type)
+      || (INTRODUCED_TYPES.has(f.type) && String(parentBrief || '').trim() && !parentTypes.has(f.type))
+    ));
   } catch (err) {
     log.warn(`[ITERATE-BEAT] page ${pageNumber}: brief consistency check failed: ${err.message}`);
     return [];
   }
+}
+
+/**
+ * A REWRITE MAY NOT DROP A FIELD ITS PARENT DECLARED (2026-09-17).
+ *
+ * The metadata half of the same subtraction the citation checks catch on
+ * `objects[]`. Measured over the same 11 rounds: every one of them returned
+ * `characters[].depth`, `characters[].looksAt` and `interactions[].action` on
+ * ZERO rows where the brief it replaced stated all three on every row.
+ *
+ * The cost is not only the field. `interactions[].action` is what the one-action
+ * count (`interaction_multiple_actions`) and the hand-off count are computed
+ * from, and `characters[].depth` is what the text-zone collision check reads —
+ * so a rewrite that omits them does not merely lose a field, it silently
+ * switches three checks off and reads clean. On rts p9 the parent brief carried
+ * two interaction faults and its rewrite reported none, with four undeclared
+ * interaction rows.
+ *
+ * ONLY the fields the iterate templates state as REQUIRED on every row
+ * (`characters[]`: "Always name, clothing, position, depth and looksAt";
+ * `interactions[]`: "action is required on every row"). `hands` is deliberately
+ * out — the template makes it a claim about contact, so its absence is a
+ * legitimate answer, not a dropped field.
+ *
+ * AND ONLY the fields nothing else already carries. `shot`, `landmarkView`,
+ * `wornItems`, `era`, `aboard`, `crowdExpected` and `textZoneDescription` were
+ * dropped by all 11 rounds too and are restored in code by the
+ * `iterateSceneMetadata` merge (images.js) — reporting them here would ask the
+ * model to re-supply what the caller has already put back.
+ *
+ * Presence is tested ACROSS the list, not row by row: a rewrite legitimately
+ * restages a page, so comparing row to row would report a re-cast frame as a
+ * loss. A parent that states the field somewhere and a rewrite that states it
+ * nowhere is the measured failure and is the whole test.
+ *
+ * @returns {Array} zero or one finding, shaped like every other brief finding
+ */
+const CARRIED_ROW_FIELDS = [
+  { list: 'characters', field: 'depth' },
+  { list: 'characters', field: 'looksAt' },
+  { list: 'interactions', field: 'action' },
+];
+
+/** The object rows of a metadata list, from `fullData` or the flat key. */
+function metadataRows(metadata, key) {
+  const m = metadata || {};
+  const raw = (m.fullData && Array.isArray(m.fullData[key])) ? m.fullData[key]
+    : (Array.isArray(m[key]) ? m[key] : []);
+  return raw.filter(r => r && typeof r === 'object');
+}
+
+const statesField = (rows, field) => rows.some(r => r[field] !== undefined && r[field] !== null && String(r[field]).trim() !== '');
+
+function checkCarriedFields({ parentMetadata = null, rewriteMetadata = null } = {}) {
+  const dropped = [];
+  for (const { list, field } of CARRIED_ROW_FIELDS) {
+    const rewriteRows = metadataRows(rewriteMetadata, list);
+    if (rewriteRows.length === 0) continue;                       // no row to carry it on
+    if (!statesField(metadataRows(parentMetadata, list), field)) continue;  // the parent never declared it
+    if (!statesField(rewriteRows, field)) dropped.push(`${list}[].${field}`);
+  }
+  if (dropped.length === 0) return [];
+  return [{
+    type: 'brief_field_dropped',
+    fields: dropped,
+    detail: `no row of ${dropped.join(' or ')} states a value, and the brief this replaces states `
+      + `${dropped.length > 1 ? 'each of them' : 'it'} on its rows. `
+      + `Return the same moment with ${dropped.length > 1 ? 'those fields' : 'that field'} stated on every row.`,
+  }];
 }
 
 /**
@@ -688,10 +829,13 @@ module.exports = {
   renderParentWornState,
   regionOf,
   checkRewrittenBrief,
+  checkCarriedFields,
   declaredSetAllowance,
   checkDeclaredSet,
   normalizeCitedHandles,
   restoreParentObjects,
   describeBriefFindings,
   REINSTATE_TYPES,
+  INTRODUCED_TYPES,
+  CARRIED_ROW_FIELDS,
 };
