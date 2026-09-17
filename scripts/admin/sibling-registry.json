@@ -316,6 +316,7 @@
           "{CONCEALED_OBJECT}",
           "{STAGED_PROP}",
           "{CONTACT_VERB}",
+          "{REACHABLE_CONTACT}",
           "{PLAN_LINE_CAST}",
           "{COUNTING_RULE}",
           "{MULTI_PICTURE_PROP}",

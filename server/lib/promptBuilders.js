@@ -2498,13 +2498,15 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
-    // THREE brief-authoring contracts, one constant each, shared by both Art
+    // FOUR brief-authoring contracts, one constant each, shared by both Art
     // Director templates and both iterate templates — a page brief is written at
     // four sites and a rule that reaches one of them is absent on the other
-    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE.
+    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE /
+    // REACHABLE_CONTACT_RULE.
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
+    REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -2773,13 +2775,15 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
-    // THREE brief-authoring contracts, one constant each, shared by both Art
+    // FOUR brief-authoring contracts, one constant each, shared by both Art
     // Director templates and both iterate templates — a page brief is written at
     // four sites and a rule that reaches one of them is absent on the other
-    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE.
+    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE /
+    // REACHABLE_CONTACT_RULE.
     CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
+    REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -3198,12 +3202,13 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
       MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3,
       OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE,
-      // The same three brief-authoring contracts the Art Director templates
+      // The same four brief-authoring contracts the Art Director templates
       // carry. An iterate rewrites the WHOLE brief, so a rule the first pass was
       // given and the rewrite was not is a rule one repair round undoes.
       CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
         STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
+      REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -6690,6 +6695,40 @@ const STAGED_PROP_RULE = "A prop the page's own text puts against a character \u
 const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the character performs, never with the body part: `presses his ear to the door`, not `ear pressed to the door`. A contact made with something other than the hands states in that verb which part of the body makes it, and the same row's prose says what the hands do instead.";
 
 /**
+ * ONE contract for an object the page gives more than one toucher.
+ *
+ * Staging job_1789584708605_rts4wqupm p6: the brief put the object down inside
+ * a recess at the foot of a tree and in the same breath had four characters
+ * stack hands on it (one with both palms on it, three reaching over him). An
+ * object recessed that way cannot take four pairs of hands, so the render drew
+ * one of each — a correctly sized one still in the recess and a second,
+ * oversized one out in the open, enlarged until eight hands fit it.
+ *
+ * Lab #1302 re-rendered the page from a brief that moved the object out to the
+ * mouth of the recess, clear of the surrounding structure: exactly ONE object,
+ * no second instance, and the recess not drawn at all. What did NOT change is
+ * scale — the object came back at the same head-ratio — so this rule is
+ * about reachability, never size; the "do not enlarge it for the hands" lever
+ * was A/B tested separately (Lab 1281/1282) and failed.
+ *
+ * The same override also RANKED the contacts (one presses, the rest touch
+ * beside him) and the render inverted the ranking, so nothing here ranks
+ * anyone, and the template's field-shape section keeps the one-pair-of-hands
+ * convention it already carried.
+ *
+ * The second sentence is the other half of that page's brief: only ONE of the
+ * four touchers had a `where` naming the object at all — the other three
+ * "stack their hands over" the first one's hold — so the brief asked the
+ * object to take one pair of hands while the prose put four on it. Row
+ * CARDINALITY is deliberately not legislated here: the Art Director fuses
+ * several names into one `character` slot whatever the template says (measured
+ * again under this rule, Lab #1303), and buildExactPosesBlock already splits
+ * such a row into one pose line per figure, so the protected tail states each
+ * toucher's contact either way.
+ */
+const REACHABLE_CONTACT_RULE = "An object more than one character touches is staged where every one of them can reach it: out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or sunk below something a named toucher would have to reach through. The prose puts it in that same open spot. Each toucher's `where` names the object itself, never another character's hands or hold.";
+
+/**
  * ONE contract for the page a Visual Bible element ENTERS the story on, for
  * every site that authors a bible.
  *
@@ -8454,6 +8493,7 @@ module.exports = {
   CONCEALED_OBJECT_RULE,
   STAGED_PROP_RULE,
   CONTACT_VERB_RULE,
+  REACHABLE_CONTACT_RULE,
   DECLARED_TRAIT_VERBATIM_RULE,
   ONE_INSTANT_RULE,
   GAZE_TARGET_RULE,

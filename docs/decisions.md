@@ -354,6 +354,81 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — An object several characters touch is staged where all of them can reach it
+
+**Context.** Staging `job_1789584708605_rts4wqupm` p6 shipped with TWO of the story's one object
+in frame: a correctly sized one still inside the recess the brief put it in, and a second,
+oversized one out in the open, enlarged until eight hands fitted round it. The brief asked for
+both at once — the object "resting in the dirt hollow" / "in the hollow at the base of the tree"
+AND four characters stacking hands on it (one with both palms on it, three reaching over him). An
+object recessed that way cannot take four pairs of hands, so the model answered by drawing one of
+each. Nothing in the four brief-authoring templates said an object has to be reachable by the
+people the same brief gives it to.
+
+**Decision.** ONE new constant, `REACHABLE_CONTACT_RULE` (`server/lib/promptBuilders.js`), filled
+through a `{REACHABLE_CONTACT}` placeholder at all FOUR sites that author a page brief — both Art
+Director templates and both iterate templates (sibling set `art-director-vs-iterate`). Two
+sentences, and neither is about scale: the object is staged where every declared toucher can reach
+it — out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or
+sunk below something a named toucher would have to reach through, with the prose putting it in
+that same open spot; and each toucher's `where` names the object itself, never another
+character's hands or hold.
+
+**The evidence, and what it does NOT support.** A hand-crafted brief override rendered as Lab
+**#1302** restaged the object to the mouth of the recess and produced exactly one object, no
+second instance, and no recess drawn at all. Three limits ride with that:
+
+1. **Scale did not improve.** The object came back at essentially the same head-ratio. This rule
+   is about reachability and duplication only. The "do not enlarge it for the hands" lever was
+   A/B tested separately in Lab **1281/1282** and FAILED; it is deliberately not re-added here.
+2. **Ranking the contacts did not bind.** #1302 also named who presses and who merely touches,
+   and the render INVERTED it — the character told to press both palms flat was the one whose
+   hands stopped short, while the three told to use fingertips were touching. So this rule ranks
+   nobody, and the one-pair-of-hands convention already in the templates' `interactions[]`
+   field-shape section was left exactly as it was, unmeasured. What replaces the ranking is the
+   second sentence, taken from where p6's brief actually broke: only ONE of the four touchers had
+   a `where` naming the object at all — the other three "stack their hands over" his hold — so
+   the brief asked the object to take one pair of hands while the prose put four on it.
+3. **#1302 was not a controlled comparison.** `shrinkPromptForModel` cut the two runs
+   differently (the earlier run's compression succeeded; #1302's failed twice and dropped the
+   whole Composition block), so the two renders differ by more than the brief.
+
+**Row cardinality is NOT legislated.** The obvious third clause — one `interactions` row per
+toucher — was written, tested and removed. Measured in Lab **#1303** and **#1305**: the Art
+Director fuses several names into one `character` slot ("A + B + C + D") whether the rule is
+present or not, and `buildExactPosesBlock` already splits such a row into one pose line per
+figure, each carrying the contact, verified on #1305's own sent prompt (four `- Name:` lines from
+one fused row). The guarantee exists in code; a third restatement in the prompt that demonstrably
+does not bind is noise.
+
+**Verification.** FREE: the rule arrives filled, with no surviving `{TOKEN}`, in all four BUILT
+prompts — including a rewrite built from p6's real stored brief (`tests/unit/
+brief-authoring-contracts.test.ts`, `tests/unit/ad-iterate-parity.test.ts`). PAID: p6 was
+re-authored through the real Art Director path with the rule inlined (Lab **#1303**, **#1304**,
+claude-sonnet-4-6) and the resulting brief rendered on Grok Imagine 2.0 (Lab **#1305**,
+`grok-imagine-image-2.0`). Both re-authorings moved the object out of any recess unprompted; the
+render holds exactly ONE object, no second instance, no recess drawn, and all four named
+characters in contact with one hand each. The object measures ~1.1 head-widths by ~1.2
+head-heights against the nearest child's head — unchanged, as limit 1 says it would be. #1305's
+semantic and three-stage scores judge the render against the STORED brief (the hollow one), not
+the override, so they report the intended restaging as a mismatch and are not a verdict on this
+rule.
+
+**Iterate is included, deliberately.** A rewrite replaces the brief wholesale and restages the
+page, so it can reintroduce exactly this fault; the `art-director-vs-iterate` set exists for that
+reason and blocks a one-sided change.
+
+**No critic side.** No scored type, severity or bucket was added or changed. `scene-review.txt`
+and `sceneBriefCheck.js` have no check for an out-of-reach staging — that is a classification
+decision and therefore the owner's, logged in `tasks/BACKLOG.md`.
+
+**Touched files.** `server/lib/promptBuilders.js` (`REACHABLE_CONTACT_RULE` + three fill sites +
+export), `prompts/scene-expansion.txt` (12k), `prompts/scene-expansion-all.txt` (12k),
+`prompts/scene-iteration.txt` (18b), `prompts/scene-iteration-free.txt` (22b),
+`scripts/admin/sibling-registry.json` (anchor `{REACHABLE_CONTACT}`),
+`tests/unit/brief-authoring-contracts.test.ts`, `tests/unit/ad-iterate-parity.test.ts`,
+`tasks/BACKLOG.md`.
+
 ## 2026-09-17 — A repaired page's brief is checked like an authored one
 
 **Context.** `prompts/scene-review.txt` runs ONCE per story, over the Art Director's briefs,

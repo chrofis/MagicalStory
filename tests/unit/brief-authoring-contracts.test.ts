@@ -159,14 +159,14 @@ describe('the brief-authoring contracts reach every site that writes a brief', (
   it('exports each contract as a non-empty constant', () => {
     for (const name of [
       'CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE',
-      'CONTACT_VERB_RULE', 'ELEMENT_ENTRY_PAGE_RULE',
+      'CONTACT_VERB_RULE', 'REACHABLE_CONTACT_RULE', 'ELEMENT_ENTRY_PAGE_RULE',
     ]) {
       expect(typeof PB[name], `${name} is not exported`).toBe('string');
       expect(PB[name].length, name).toBeGreaterThan(40);
     }
   });
 
-  for (const rule of ['CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE', 'CONTACT_VERB_RULE']) {
+  for (const rule of ['CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE', 'CONTACT_VERB_RULE', 'REACHABLE_CONTACT_RULE']) {
     it(`all four brief-authoring sites carry ${rule}, from that one constant`, () => {
       for (const [site, prompt] of Object.entries(built)) {
         expect(prompt.includes(PB[rule]), `${site} lost ${rule}`).toBe(true);
@@ -296,4 +296,54 @@ describe("an element's scale reaches the pose line that meets it", () => {
       [], bandless, { language: 'de-ch' }));
     expect(block).toBe('EXACT POSES:\n- Levin: holds the egg');
   });
+});
+
+// ── 7. An object several characters touch (same run, p6) ────────────────────
+
+/**
+ * p6 of the same run shipped TWO of the object in one frame: a correctly sized
+ * one still inside the recess the brief put it in, and a second, oversized one
+ * out in the open where eight hands could reach it. The brief asked for both at
+ * once — the object "in the hollow at the base of the tree" AND four characters
+ * stacking hands on it — and the model answered by drawing one of each.
+ *
+ * Fixtures below are the stored p6 plan line and brief, verbatim. What is
+ * pinned is ARRIVAL: the reach contract reaches every site that authors or
+ * REWRITES a brief, from one constant, with nothing left unfilled. The rule's
+ * wording is not asserted anywhere.
+ */
+const P6_PLAN_LINE =
+  'PLAN: wide — Levin, Julian, Max, and Kiaan — all four press their hands onto the egg at once, none letting go — the four strangers are bound to the egg together';
+
+/** sceneImages[5].sceneDescription, verbatim — the brief a repair round rewrites. */
+const P6_BRIEF_PROSE =
+  "Clustered tightly together around the hollow at the base of the tree on the Lindenhof, all four boys reach into the dirt toward the glowing shell of the melon-sized, pale orange dragon egg at the same moment. Levin kneels on the left and presses his palms flat against the left side of the shell. Julian crouches beside him, pressing his small hands over Levin's shoulders as he leans in. On the right side, Max and Kiaan kneel close together, stacking their hands on top of Levin's in the dirt. Wide shot of the entire group surrounding the hollow in the bright afternoon sun, all four joined in one hold.";
+
+describe('the reach contract reaches every site that writes or rewrites this page', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  it('is exported as one non-empty constant', () => {
+    expect(typeof PB.REACHABLE_CONTACT_RULE).toBe('string');
+    expect(PB.REACHABLE_CONTACT_RULE.length).toBeGreaterThan(40);
+  });
+
+  it('the all-pages Art Director carries it when authoring p6 from its real plan line', () => {
+    const prompt = String(PB.buildSceneExpansionAllPrompt(
+      inputData, [{ pageNumber: 6, planLine: P6_PLAN_LINE.replace(/^PLAN:\s*/, '') }], {}));
+    expect(prompt.includes(PB.REACHABLE_CONTACT_RULE), 'the Art Director never got the reach contract').toBe(true);
+    expect(unfilled(prompt), 'the Art Director prompt shipped an unfilled placeholder').toEqual([]);
+  });
+
+  it.each([['strict', false], ['free', true]])(
+    'a %s rewrite of p6 — the real stored brief as its starting point — carries it too',
+    (_label, freeIterate) => {
+      const prompt = String(PB.buildSceneDescriptionPrompt(
+        6, 'page text', ROSTER, P6_BRIEF_PROSE, 'de-ch', VISUAL_BIBLE, [], 'standard', '', '',
+        { planLine: P6_PLAN_LINE },
+        { fixIssues: ['two of the object in frame'], previousScore: -20 },
+        { freeIterate }));
+      expect(prompt.includes(P6_BRIEF_PROSE), 'the stored brief never reached the rewriter').toBe(true);
+      expect(prompt.includes(PB.REACHABLE_CONTACT_RULE), 'one repair round would delete the reach contract').toBe(true);
+      expect(unfilled(prompt), 'the rewrite prompt shipped an unfilled placeholder').toEqual([]);
+    });
 });
