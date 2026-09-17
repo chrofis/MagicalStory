@@ -72,13 +72,13 @@ const VISUAL_BIBLE: any = {
   artifacts: [
     {
       id: 'ART001', name: 'smooth egg', label: 'dragon egg', type: 'artifact',
-      pages: [11], scaleClass: 'head-sized',
+      pages: [11], scaleClass: 'melon-sized',
       description: 'pale orange, smooth, glowing faintly from within',
       states: [],
     },
     {
       id: 'ART004', name: 'fleece jacket', label: 'red jacket', type: 'outer layer',
-      pages: [11], scaleClass: 'hand-sized', wornAs: 'Levin.outer layer',
+      pages: [11], scaleClass: 'forearm-sized', wornAs: 'Levin.top',
       description: 'red fleece fabric garment with a full front zipper',
       states: [],
     },
@@ -223,5 +223,77 @@ describe('a concealed object is staged as the shape it makes, in the protected t
       P11_BRIEF_CONCEALED, inputData, [ROSTER[0]], VISUAL_BIBLE, 11, null, {}));
     expect(protectedTail(prompt)).toContain(PB.HANDS_HOLD_ONLY_NAMED_RULE);
     expect(PB.HANDS_HOLD_ONLY_NAMED_RULE).not.toContain('touches what the scene describes');
+  });
+});
+
+// ── 8. The element's SIZE rides the pose line that meets it ─────────────────
+
+/**
+ * FIFTH DEFECT OF THE SAME SHAPE (2026-09-17). ART001's band is authored and
+ * correct, and the REQUIRED OBJECTS block stated it on 12 of the 13 pages that
+ * cite it — yet the element rendered at beach-ball size on exactly the three
+ * pages whose EXACT POSES line put no hand, arm or ear on it (p5, p6, p14),
+ * and correctly on the six that did. The checklist line is a presence claim;
+ * the `where` clause is the field the render obeys, which is the same split
+ * p9-vs-p11 proved for concealment. A/B on staging (Lab #1281 control vs #1284
+ * candidate, #1288 control vs #1286 candidate) shrank the element on both
+ * failing pages and left an already-correct page alone.
+ *
+ * Pinned here: ARRIVAL and STRUCTURE — that the scale reaches the pose line,
+ * from the same helper the checklist uses, once per element, after the declared
+ * `where` and never before it. The band wording belongs to visualBible.js.
+ */
+describe("an element's scale reaches the pose line that meets it", () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  const EGG = VISUAL_BIBLE.artifacts[0];
+  const scaleOf = (entry: any) => String(require('../../server/lib/visualBible').elementScaleNote(entry));
+
+  it('the scale rides the EXACT POSES line, in the protected tail, as the checklist states it', () => {
+    const prompt = String(PB.buildImagePrompt(
+      P11_BRIEF_CONCEALED, inputData, [ROSTER[0]], VISUAL_BIBLE, 11, null, {}));
+    const tail = protectedTail(prompt);
+    const poseLine = tail.split('\n').find(l => /^- Levin:/.test(l)) || '';
+    expect(poseLine, 'no EXACT POSES line for the carrying character').not.toBe('');
+    expect(poseLine, 'the pose line carries no scale for the element it names').toContain(scaleOf(EGG));
+    // ONE element, ONE scale, ONE name: the rider is built from the same helper
+    // and the same label the REQUIRED OBJECTS lead uses.
+    expect(tail, 'the checklist lost the scale the pose line now repeats').toContain(scaleOf(EGG));
+  });
+
+  it('the rider follows the declared `where` — a concealment clause still leads the line', () => {
+    const prompt = String(PB.buildImagePrompt(
+      P11_BRIEF_CONCEALED, inputData, [ROSTER[0]], VISUAL_BIBLE, 11, null, {}));
+    const poseLine = protectedTail(prompt).split('\n').find(l => /^- Levin:/.test(l)) || '';
+    const whereAt = poseLine.indexOf('carries the bulge under the front of his jacket');
+    const riderAt = poseLine.indexOf(scaleOf(EGG));
+    expect(whereAt, 'the declared where left the pose line').toBeGreaterThan(-1);
+    expect(riderAt, 'the scale rider left the pose line').toBeGreaterThan(whereAt);
+  });
+
+  it('a multi-character row splits into one line per figure and states the scale once', () => {
+    const block = String(PB.buildExactPosesBlock(
+      [{ character: 'Levin + Julian + Max', object: 'ART001', where: 'stack their hands on the egg', priority: 'essential' }],
+      [], VISUAL_BIBLE, { language: 'de-ch' }));
+    const poseLines = block.split('\n').filter(l => l.startsWith('- '));
+    expect(poseLines.length, 'the multi-character row did not split per figure').toBe(3);
+    const withScale = poseLines.filter(l => l.includes(scaleOf(EGG)));
+    expect(withScale.length, 'the scale was repeated on every split line').toBe(1);
+  });
+
+  it('a free-text object gets no rider — only a Visual Bible handle resolves', () => {
+    const block = String(PB.buildExactPosesBlock(
+      [{ character: 'Levin', object: 'the dirt', where: 'leans forward over the prints in the dirt', priority: 'essential' }],
+      [], VISUAL_BIBLE, { language: 'de-ch' }));
+    expect(block).toContain('leans forward over the prints in the dirt');
+    expect(block, 'a free-text object was resolved against the bible').not.toContain(scaleOf(EGG));
+  });
+
+  it('an element with no authored band gets no rider at all', () => {
+    const bandless = { ...VISUAL_BIBLE, artifacts: [{ ...EGG, scaleClass: null, size: '' }] };
+    const block = String(PB.buildExactPosesBlock(
+      [{ character: 'Levin', object: 'ART001', where: 'holds the egg', priority: 'essential' }],
+      [], bandless, { language: 'de-ch' }));
+    expect(block).toBe('EXACT POSES:\n- Levin: holds the egg');
   });
 });

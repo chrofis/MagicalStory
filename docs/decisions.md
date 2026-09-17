@@ -354,6 +354,96 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — An element's size rides the pose line that meets it; the off-page shadow is measured again and again ships nothing
+
+**Context.** Two defects of the same shape on staging `job_1789584708605_rts4wqupm`, both
+downstream of the 649908242 finding that a page-critical fact reaches the picture through a
+STRUCTURED FIELD and only advises through prose.
+
+*Scale.* `ART001.scaleClass` is authored, correct and reaches the protected tail as a
+`**REQUIRED OBJECTS**` rider on 12 of the 13 pages citing it. The element still rendered at
+beach-ball size on exactly the three pages whose `EXACT POSES` line put no hand, arm or ear on it
+(p5 "extends his right arm toward", p14 "stands over" / "cries next to", p6 where four pairs of
+hands reach at once), and correctly on the six that did (p4 ear, p7 arms, p11 chest, p12 held up,
+p13 both hands, p15 wrapped). A tail RULE after the checklist had already been tried and reverted
+the same day (Lab #1281 control vs #1282 candidate): the rule was verified present in the
+candidate tail, both candidate renders were still oversized, and both drifted staging the control
+kept.
+
+*Shadow.* p8's plan line stages only the SHADOW of a large creature whose Visual Bible entry
+correctly excludes that page. There is no id to cite, so no protected-tail channel exists and the
+fact lives in prose. Two `OFFSCREEN_SHADOW_RULE` renders were reverted on 29c147839 (one drew the
+creature solid and in frame, one drew a featureless dark rectangle).
+
+**Decision — scale: the element's scale rider now also rides the `EXACT POSES` line.**
+`buildExactPosesBlock` resolves an interaction's `object` handle against the same three pools the
+checklist scale-notes (artifacts, animals, vehicles) and appends the element's label and band
+phrase to the `where` clause, once per element per block, after the declared `where` and never
+before it. Same helper (`elementScaleNote`), same label (`elementLeadLabel`) — one element keeps
+one scale and one name across the whole prompt. The phrase is carried as an apposition
+(`— the <label>: <phrase>`), not as a predicate: three of the thirteen band phrases are verb-led
+("fills an open hand"), so `the X is …` is not a form every band survives. A free-text object
+("the dirt") resolves to nothing on purpose, and an element with no authored band gets no rider.
+
+**Decision — shadow: nothing ships, and here is why, so it is not tried a fourth time.**
+Two further levers were measured and both failed, and the measurement turned up the structural
+reason all four attempts were fighting the same thing:
+
+- *The page's own `emptyScenePrompt` never renders.* p8's field already stages the shadow
+  verbatim — "A massive, hard-edged shadow falls entirely across the ground and tree roots,
+  darkening the scattered autumn leaves". It reaches no image. Plates are built **per vantage**,
+  and `repPageNum = group.pageNumbers[0]` (storyJobPipeline.js) means the FIRST page of the group
+  frames the plate for all of them. Pages 1–8, 17 and 18 share `LOC001.1` and render against ONE
+  byte-identical plate (md5 `19d63b9f…`) framed by page 1 — a bright, sunlit, shadow-free plaza.
+  The page prompt then instructs the render to "copy its setting, geography and light direction"
+  from that reference. p8's shadow was competing with a picture of the opposite.
+- *Lever — the page's own field as a `GROUND AND LIGHT` tail block* (Lab #1285): no shadow
+  appeared, and the three-toed prints that the shipped render does carry were lost.
+- *Lever — give p8 its own plate* (Lab #1287 plate → #1289 page): the plate DOES respond to the
+  page's own field (its foreground is shadowed where the shared plate is fully sunlit), so the
+  field works when it reaches the builder. The page render still produced no massive hard-edged
+  shadow, still lost the prints, and the own-plate drifted the book's art style (oil-painted
+  orange-brown foliage against the shared plate's bold-watercolour yellow) — the plate is the
+  style anchor, so a per-page plate buys a per-page style.
+
+Four levers, four failures, on a page whose shipped render is merely plain rather than wrong. It
+stays unfixed deliberately. The two untried levers both require authoring the cast shadow as its
+own Visual Bible element — a thing on a surface, not the creature — which cannot be measured
+without re-authoring a bible, and which is an owner decision, not an agent's.
+
+**Rationale.** The checklist line is a presence claim; the `where` clause is what the render
+obeys. p9 and p11 built a byte-identical `REQUIRED OBJECTS` line and differed only in the `where`,
+and that difference decided whether the object was hidden or shown (649908242). Stating the scale
+in the field the render obeys is the same move, and unlike the reverted tail rule it adds no new
+rule for the model to weigh — it repeats a fact the prompt already carries, in the channel that
+works. The A/B is controlled: same stage, same params, same page, one prompt difference.
+
+| page | control | candidate | glowing-core bbox, 512px frame |
+|---|---|---|---|
+| p6 (oversized) | #1281 | #1284 | 89×119 → 67×84 |
+| p14 (oversized) | #1281 | #1284 | 65×53 → 48×51 |
+| p13 (already correct) | #1288 | #1286 | 69×56 → 40×40 |
+| p5 (oversized) | shipped v0 | #1286 | 70×85 → 65×75 |
+
+Both failing pages shrank. The already-correct page moved from slightly large to slightly small
+and kept its composition — its control drifted pose and lighting identically, so the pose drift
+seen there is Grok run-to-run variance on this story, not the rider.
+
+**Not done, deliberately.** No scored type was added and no severity changed, so no judge
+mirrors this — the rider restates a fact `**REQUIRED OBJECTS**` already states and that the
+`DEPTH AND SIZE` rule already tells the generator to honour. One interaction is unmeasured and is
+on the backlog: on a p9-shaped page the `where` deliberately does NOT name the concealed element,
+and the rider now names it there — the concealment clause still leads the line (pinned by test),
+but whether the trailing name un-hides the object was not rendered.
+
+**Touched files.** `server/lib/promptBuilders.js` (`resolveVbElement`, `buildExactPosesBlock`, its
+one call site) — swept into commit 2683e1f7b by a concurrent commit in the shared tree, not by the
+commit carrying these tests; `tests/unit/brief-authoring-contracts.test.ts` (five contracts, and
+the ART001/ART004 fixture bands corrected to the stored `melon-sized` / `forearm-sized` — the
+file claims verbatim stored data and carried two tokens the enum does not resolve, so the
+fixture's element had no scale at all). **Status:** ✅ active (scale) / 🟡 measured-and-not-shipped
+(shadow).
+
 ## 2026-09-17 — Iterate is the SECOND Art Director, and it holds the same contract
 
 **Context.** Owner directive: *"Make iterate to parity."* A page brief is authored at FOUR sites.
