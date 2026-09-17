@@ -4507,7 +4507,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // regardless of the flag and the canvases were attached to ref0 anyway
       // (per packReferences), partly defeating singlePassScene.
       if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene && visualBible?.locations?.length > 0) {
-        const { groupPagesByVantage, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
+        const { groupPagesByVantage, resolvePagePlate, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
         const groups = groupPagesByVantage(pageDataArray, visualBible);
         const allRealGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
         // A vantage whose pages ALL have zero cast needs no canvas — nobody
@@ -4573,16 +4573,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // (text overlay zone differs per page via spread rule). The per-page
             // image render handles those.
             const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
-            // HYBRID PLATE (owner-approved 2026-08-29): the Art Director's
-            // per-page emptyScenePrompt decides framing and foreground — it
-            // knows where the action has to sit — and the vantage/LOC prose is
-            // setting context underneath it. Before this the vantage path
+            // HYBRID PLATE (owner-approved 2026-08-29): Art Director prose
+            // decides framing and foreground, and the vantage/LOC prose is
+            // setting context underneath it. Before that the vantage path
             // DISCARDED the AD prose entirely and built the plate from Visual
             // Bible prose alone; 25 of 30 audited plates were prompt-wrong.
-            // Where several pages share a plate, the FIRST page's AD prose is
-            // the framing (same page whose model/aspect/landmarks we inherit).
-            const adEmptyPrompt = (repPageData.emptyScenePrompt
-              || repPageData.sceneMetadata?.emptyScenePrompt || '').trim();
+            //
+            // The FRAMING paragraph is the VANTAGE's own plate since 2026-09-17
+            // (owner: "we either reuse a plate or create a new one — the AD
+            // decides"). The Art Director writes it once per vantage, so the
+            // plate this canvas renders is the plate its author wrote for these
+            // pages, not the first page's leftover. A stored story authored
+            // per-page plates instead: resolvePagePlate falls back to the
+            // representative page's, which is exactly today's behaviour and the
+            // same page whose model / aspect / landmarks we inherit.
+            const repPlate = resolvePagePlate({
+              pageNumber: repPageNum,
+              sceneMetadata: repPageData.sceneMetadata,
+              visualBible,
+              outlinePlate: repPageData.emptyScenePrompt,
+              vantage: v,
+            });
+            const adEmptyPrompt = repPlate.text;
+            if (repPlate.source === 'missing') {
+              // Never substituted by another vantage's plate or another page's:
+              // the canvas below is built from Visual Bible prose alone, which
+              // is the prompt-wrong case the hybrid plate exists to prevent.
+              log.error(`❌ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) has NO plate: the bible authored no \`emptyScenePrompt\` for this vantage and page ${repPageNum} carries none either. Pages ${group.pageNumbers.join(',')} render on a canvas built from bible prose only.`);
+              genLog.warn('vantage_plate_missing', `Vantage ${vantageId} has no emptyScenePrompt — pages ${group.pageNumbers.join(',')} render on bible prose alone`, null, {
+                vantageId, pages: group.pageNumbers, locationName: v.locationName, vantageName: v.name,
+              });
+            } else {
+              log.info(`🏛️ [VANTAGE] ${vantageId}: plate prose from ${repPlate.source}${repPlate.source === 'page' ? ` (page ${repPageNum})` : ''}`);
+            }
             // Shot follows the same precedence: the AD's page shot wins over
             // the vantage's generic one.
             const vantageShot = (repPageData.sceneMetadata?.fullData?.shot || v.shot || '').trim();
@@ -4825,8 +4848,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
             const sceneMetadata = pageData.sceneMetadata;
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
-            // emptyScenePrompt lives on pageData (from scene expansion), not on sceneMetadata
-            const expandedEmptyPrompt = pageData.emptyScenePrompt || sceneMetadata?.emptyScenePrompt || '';
+            // The page's plate: the outline hint's, then the cited vantage's
+            // (the Art Director writes one per vantage since 2026-09-17), then
+            // the brief's own — which is where every stored story keeps it.
+            // Pages that reach THIS loop are the ones the vantage pass did not
+            // cover, so a page with no LOC at all legitimately resolves
+            // 'missing' and falls through to the setting fields below.
+            const { resolvePagePlate } = require('./server/lib/storyHelpers');
+            const pagePlate = resolvePagePlate({
+              pageNumber: pageData.pageNumber,
+              sceneMetadata,
+              visualBible,
+              outlinePlate: pageData.emptyScenePrompt,
+            });
+            const expandedEmptyPrompt = pagePlate.text;
             if (!settingDesc && !expandedEmptyPrompt) return null;
 
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';

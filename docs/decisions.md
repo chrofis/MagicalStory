@@ -354,6 +354,95 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — The backdrop plate is authored once per Visual Bible vantage, not once per page
+
+**Context.** `emptyScenePrompt` — the prose the empty-scene plate is painted from — was a REQUIRED
+per-page field of the Art Director's brief, with a twenty-bullet rule block behind it. The plate is
+RENDERED per Visual Bible vantage and has been since 2026-08-29: `storyJobPipeline.js` groups the
+pages by vantage and takes the framing, aspect, model and landmark refs from `group.pageNumbers[0]`,
+then fans one canvas out to every page in the group. Every other page's plate prose was written and
+thrown away. Replayed over the stored bibles of two staging stories: `job_1789584708605_rts4wqupm`
+authored 18 plates for 3 vantage groups (15 discarded — pages 1-8, 17 and 18 all ride one canvas
+framed by page 1), and `job_1789506283204_3kxqshifx` authored 18 for 2 (16 discarded, one vantage
+covering 17 pages). Worse than the waste: which pages share a plate was decided by array order, so
+the shared backdrop's framing belonged to whichever page sorted first and the other nine got a
+camera position nobody chose for them.
+
+**Decision.** Owner ruling, 2026-09-17: *"We either reuse a plate or create a new one. AD should
+decide. Making a new one and discarding it is obviously stupid."* The plate moves onto the thing it
+describes.
+
+1. **Where it lives.** `vantages[].emptyScenePrompt` on a Visual Bible location. A location shown
+   from one viewpoint declares no `vantages[]` and carries its single plate on the entry itself;
+   `getPrimaryVantageForPage` already synthesizes a `LOC###.1` for that case and now copies the
+   entry's plate onto it, so there is ONE read — the resolved vantage's `emptyScenePrompt`.
+2. **Who authors it.** The all-pages Art Director (`prompts/scene-expansion-all.txt`), the only site
+   that writes the bible and sees every plan line at once. It opens a new vantage when a page needs
+   a backdrop the shared plate cannot hold; the reuse decision is now written down and reviewable
+   instead of implied by array order. The per-page Art Director (`prompts/scene-expansion.txt`)
+   writes NO plate at all: it expands one page against a bible it did not author, so it has no
+   vantage to write on and its page is drawn on the vantage its LOC cites. Both templates lost the
+   per-page `emptyScenePrompt` from their metadata schema, which keeps the schema-parity test whole.
+3. **What a plate contains is unchanged**, beyond the clauses that named a single page: the plate
+   mirrors the VANTAGE's geometry rather than one page's composition, holds only what looks the same
+   on every page of that vantage, and leaves the figure bands as the place's own ground — which is
+   what the plate call's `characterSpace` has told the model all along.
+4. **The sharing itself is untouched.** Sonnet still decides which pages share a vantage; no code-side
+   text heuristic was added.
+
+**Reading it back — every stored story keeps working.** `resolvePagePlate()`
+(`server/lib/sceneMetadata.js`) is the single ladder: an outline-level plate, then the cited
+vantage's, then the brief's own `emptyScenePrompt`, then `'missing'`. Every story in the database
+carries per-page plates and no vantage plates, so it lands on rung three and gets its own stored
+prose back verbatim — nothing is reinterpreted, coerced or re-derived (the principle the 17 legacy
+scale aliases of `c083926b2` set). Verified on `job_1789506283204_3kxqshifx`: 18 of 18 pages resolve
+to their own stored plate, character for character. The iterate templates keep their per-page
+`emptyScenePrompt` deliberately — `reuseEmptyScene: false` authors a fresh plate for ONE page after a
+failed render, which is the owner's reuse-or-create decision made at repair time, and rung three
+carries it. Read sites touched: the vantage plate loop and the per-page plate loop in
+`storyJobPipeline.js`. Untouched because they read the BUILT plate prompt stored on the page, not the
+AD's prose: `server/routes/regeneration.js`, `server/lib/repairPipeline.js`, `server/routes/stories.js`,
+`server/lib/testlab.js`. Untouched because covers never ran scene expansion (`coverExpandedMetadata`
+is `null`): `server/lib/coverIterate.js`.
+
+**A vantage with no plate fails loudly.** The old failure was silent — an absent per-page prose left
+`adEmptyPrompt` empty and the canvas was built from bible prose alone, the exact "25 of 30 plates
+prompt-wrong" case the hybrid plate was introduced to fix. `resolvePagePlate` now returns
+`source: 'missing'` and the vantage loop logs a `log.error` plus a `vantage_plate_missing` generation
+fault naming the vantage, its location and every page riding it. It does NOT fall back to another
+page's plate: borrowing the neighbour's is the behaviour being removed.
+
+**Rationale.** A field whose value is used once per N pages is a property of the group, not of the
+member. Authoring it per page cost ~15 plates of output tokens per story, made the brief set that
+much larger for every downstream prompt that carries briefs, and — the real cost — hid the reuse
+decision inside `pageNumbers[0]` where nobody could review it. Moving the field makes the AD state
+its intent: these pages share this backdrop, that page gets its own. The plate count that is
+RENDERED does not change (3 and 2 on the two reference stories); the count AUTHORED drops to match
+it, and rises only where the Art Director now deliberately opens a vantage it would previously have
+had no way to ask for. Each such vantage is one more plate render (~$0.02-0.04) and one more
+style-drift surface — the plate is also the art-style anchor, and swapping one drifted a story to
+oil-painted during the `29c147839` work — so the split is the Art Director's to justify per story,
+not a default.
+
+**The critic moved with the field.** `prompts/scene-review.txt` rule 10a `[plate_contains_effect]`
+graded a per-page plate that no longer exists; it now grades the vantage plate and outputs its
+correction under `---VISUAL BIBLE---`. That subject had to reach the reviewer: the `{VISUAL_BIBLE}`
+block rendered only entries carrying `states[]`, which locations never do, so
+`buildSceneReviewBibleBlock` gained a `# VANTAGE PLATES` section (one row per vantage with its pages
+and its plate). Rule 10's close-up clause points at the vantage plate for the same reason.
+`describeDegradedSceneMetadata` stopped listing `emptyScenePrompt` as a lost input — a recovered
+brief never had one to lose, and leaving it there would have marked every degraded page with a
+phantom.
+
+**Touched files.** `prompts/scene-expansion-all.txt` (vantage rule + the plate block moved to the
+bible, locations schema, page schema, rules 1 / 11c / 11d / 11e / the `shot` note / the text-overlay
+cross-reference), `prompts/scene-expansion.txt` (same cross-references; the plate block replaced by
+a "you do not write one" note), `prompts/scene-review.txt` (rules 10, 10a),
+`server/lib/sceneMetadata.js` (`resolvePagePlate`, the synthesized vantage's plate, the vantage
+result's `emptyScenePrompt`, `describeDegradedSceneMetadata`), `server/lib/storyHelpers.js` (facade),
+`server/lib/promptBuilders.js` (`buildSceneReviewBibleBlock`), `storyJobPipeline.js` (both plate
+loops), `tests/unit/vantage-plate-authoring.test.ts`.
+
 ## 2026-09-17 — The bible's authored page table is checked against the briefs' citations, mechanically
 
 **Context.** `prompts/scene-expansion-all.txt` tells the Art Director, verbatim, that "An entry's

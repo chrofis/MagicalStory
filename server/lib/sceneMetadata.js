@@ -1798,6 +1798,12 @@ function getPrimaryVantageForPage(sceneMetadata, visualBible, opts = {}) {
       description: location.description
         || [location.setting, location.colors, location.features, location.signatureElement]
             .filter(Boolean).join('. '),
+      // A location shown from one viewpoint declares no `vantages[]` and
+      // carries its single plate on the entry itself (owner ruling 2026-09-17,
+      // one plate per vantage). The synthesized vantage IS that one viewpoint,
+      // so the entry's plate is its plate. Empty on a legacy bible, which
+      // authored no plate here at all — resolvePagePlate falls to the page's.
+      emptyScenePrompt: location.emptyScenePrompt || '',
     };
   }
 
@@ -1808,9 +1814,60 @@ function getPrimaryVantageForPage(sceneMetadata, visualBible, opts = {}) {
     name: vantage.name,
     shot: vantage.shot || 'wide',
     description: vantage.description || '',
+    // The vantage's backdrop plate, '' when the bible authored none.
+    emptyScenePrompt: vantage.emptyScenePrompt || '',
     location, // full LOC entry for landmark photo lookup, attribution, etc.
     vantage,  // raw vantage entry (in case caller needs canvasImage etc.)
   };
+}
+
+/**
+ * The backdrop plate a page is drawn on, and where it came from.
+ *
+ * The Art Director writes ONE plate per Visual Bible vantage — owner ruling
+ * 2026-09-17, "we either reuse a plate or create a new one, the AD decides" —
+ * so a plate is a property of the vantage, not of the page. Every stored story
+ * predates that and carries a per-page `emptyScenePrompt` in its brief
+ * metadata; that value is still used, exactly as written, whenever the bible
+ * offers no vantage plate. Nothing stored is reinterpreted or coerced.
+ *
+ * Ladder, first non-empty wins:
+ *   'outline'  a plate the caller already pulled off the outline hint (the
+ *              pre-beats path; absent on beats). Kept first because that is
+ *              where it has always sat.
+ *   'vantage'  the cited vantage's own plate. A location with no `vantages[]`
+ *              carries its single plate on the entry, and
+ *              getPrimaryVantageForPage copies it onto the synthesized vantage.
+ *   'page'     the brief's own `emptyScenePrompt`: legacy stories, and the
+ *              iterate rewrite, which authors a fresh plate for ONE page after
+ *              a failed render (`reuseEmptyScene: false`).
+ *   'missing'  nothing to build a plate from. Returned explicitly so a caller
+ *              reports it — never silently replaced by another page's plate.
+ *
+ * @param {Object} args
+ * @param {number} [args.pageNumber]
+ * @param {Object} [args.sceneMetadata] - the page's parsed brief metadata
+ * @param {Object} [args.visualBible]
+ * @param {string} [args.outlinePlate]  - outline-level plate, when the caller has one
+ * @param {Object} [args.vantage]       - an already-resolved getPrimaryVantageForPage
+ *                                        result, so a caller that grouped pages by
+ *                                        vantage does not resolve it twice
+ * @returns {{text: string, source: 'outline'|'vantage'|'page'|'missing', vantageId: string|null}}
+ */
+function resolvePagePlate({ pageNumber = null, sceneMetadata = null, visualBible = null, outlinePlate = '', vantage = undefined } = {}) {
+  const outline = String(outlinePlate || '').trim();
+  if (outline) return { text: outline, source: 'outline', vantageId: null };
+  // The page's own plate feeds rule 2 of the primary-LOC selection, so a legacy
+  // story resolves to exactly the vantage it resolves to today.
+  const v = vantage !== undefined ? vantage : getPrimaryVantageForPage(sceneMetadata, visualBible, {
+    pageNumber,
+    emptyScenePrompt: sceneMetadata?.emptyScenePrompt || '',
+  });
+  const fromVantage = String(v?.emptyScenePrompt || '').trim();
+  if (fromVantage) return { text: fromVantage, source: 'vantage', vantageId: v.vantageId || null };
+  const fromPage = String(sceneMetadata?.emptyScenePrompt || '').trim();
+  if (fromPage) return { text: fromPage, source: 'page', vantageId: v?.vantageId || null };
+  return { text: '', source: 'missing', vantageId: v?.vantageId || null };
 }
 
 /**
@@ -2294,7 +2351,10 @@ function describeDegradedSceneMetadata(sceneMetadata) {
   if (!sceneMetadata.interactions) empty.push('interactions');
   if (!sceneMetadata.textPosition) empty.push('textPosition');
   if (!sceneMetadata.setting) empty.push('setting');
-  if (!sceneMetadata.emptyScenePrompt) empty.push('emptyScenePrompt');
+  // `emptyScenePrompt` was on this list until 2026-09-17, when plate authoring
+  // moved from the page to the Visual Bible vantage. A page brief no longer
+  // carries one at all, so its absence says nothing about how the brief parsed
+  // — listing it marked every recovered page with an input it never had.
   return { recovered: true, emptyInputs: empty };
 }
 
@@ -2331,6 +2391,7 @@ module.exports = {
   extractCoverScenes,
   extractPageClothing,
   getPrimaryVantageForPage,
+  resolvePagePlate,
   groupPagesByVantage,
   groupTrialPlatePagesByVantage,
   normalizePositionToLCR,

@@ -7642,14 +7642,47 @@ function buildSceneReviewBibleBlock(visualBible) {
       }
     }
   }
-  if (lines.length === 0) return '';
-  return [
-    '# VISUAL BIBLE — STATED OBJECTS',
-    '',
-    'One physical thing per entry, then the looks it wears and the pages each look covers.',
-    '',
-    ...lines,
-  ].join('\n');
+  // VANTAGE PLATES. The Art Director writes one backdrop plate per location
+  // vantage (owner ruling 2026-09-17) and the page briefs no longer carry one,
+  // so rule 10a's subject reaches the reviewer here or not at all. A location
+  // with no `vantages[]` is one viewpoint and carries its plate on the entry.
+  const plateLines = [];
+  for (const loc of (Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
+    if (!loc || !loc.id) continue;
+    const id = String(loc.id).trim().toUpperCase();
+    const label = elementDisplayLabel(loc) || loc.name || id;
+    const vantages = Array.isArray(loc.vantages) && loc.vantages.length > 0
+      ? loc.vantages
+      : [{ id: `${id}.1`, name: loc.name || '', shot: '', pages: loc.pages, emptyScenePrompt: loc.emptyScenePrompt }];
+    for (const v of vantages) {
+      if (!v) continue;
+      const plate = String(v.emptyScenePrompt || '').trim();
+      if (!plate) continue;
+      const pages = Array.isArray(v.pages) ? v.pages.map(Number) : (Array.isArray(loc.pages) ? loc.pages.map(Number) : []);
+      plateLines.push(`- ${String(v.id || `${id}.1`).trim().toUpperCase()} (${label}${v.shot ? `, ${v.shot}` : ''}) — pages ${JSON.stringify(pages)}: ${plate}`);
+    }
+  }
+
+  const blocks = [];
+  if (lines.length > 0) {
+    blocks.push([
+      '# VISUAL BIBLE — STATED OBJECTS',
+      '',
+      'One physical thing per entry, then the looks it wears and the pages each look covers.',
+      '',
+      ...lines,
+    ].join('\n'));
+  }
+  if (plateLines.length > 0) {
+    blocks.push([
+      '# VANTAGE PLATES',
+      '',
+      'One backdrop plate per vantage, and the pages drawn on it.',
+      '',
+      ...plateLines,
+    ].join('\n'));
+  }
+  return blocks.join('\n\n');
 }
 
 /**
