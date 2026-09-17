@@ -105,3 +105,59 @@ describe('the PULL question is age-band aware', () => {
     for (const age of [2, 9]) expect(audit(age)).not.toContain('{PULL_QUESTION}');
   });
 });
+
+// The abandon-then-reclaim rule (staging job_1789584708605_rts4wqupm, 2026-09-17).
+// A character called the story's object worthless, set it down and rode off on
+// p13; on p17 he blocked the path demanding it back. Neither auditor flagged it
+// and neither had a question that named the class. It is NOT a new fault type:
+// it rides on CAUSE in the arc-informed audit (the question about uncaused
+// states) and on CONTRADICTION in the blind one (the question about a page
+// saying otherwise), and the matching rule reaches both live writers. Asserted
+// on the BUILT prompts.
+describe('a reversed decision is a rule on both sides', () => {
+  beforeAll(async () => {
+    await require('../../server/services/prompts').loadPromptTemplates();
+  });
+
+  const beats = () => B.buildStoryTextFromBeatsPrompt(
+    story(7), [{ pageNumber: 1, planLine: 'wide \u2014 Mara \u2014 Mara pulls the rope \u2014 the sail is up' }], [], 'An arc.',
+  );
+  const trial = () => B.buildTrialStoryPrompt({
+    trialMode: true, language: 'de', storyTheme: 'realistic',
+    storyDetails: 'a kite caught in a tree',
+    characters: [{ name: 'Mia', age: 6, gender: 'female', isMain: true }],
+  }, 5);
+  const sighted = () => B.buildTextAuditPrompt(
+    story(7), [{ pageNumber: 1, text: 'A page.', planLine: 'wide \u2014 Mara \u2014 Mara pulls the rope \u2014 the sail is up' }], 'An arc.',
+  );
+  const blind = () => B.buildTextAuditBlindPrompt(story(7), [{ pageNumber: 1, text: 'A page.' }]);
+
+  it('the beats writer is told it', () => {
+    expect(beats()).toContain('stays done with it; where a later page has them want it back or take it up again, that page says what changed');
+  });
+
+  it('the trial writer is told it', () => {
+    expect(trial()).toContain('stays done with it; where a later scene has them want it back or take it up again, that scene says what changed');
+  });
+
+  it('the arc-informed auditor asks it under CAUSE, not under a new type', () => {
+    const p = sighted();
+    expect(p).toContain('takes back, demands or acts on a thing they had refused, given up or discarded');
+    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(12);
+  });
+
+  it('the blind auditor asks it under CONTRADICTION, not under a new type', () => {
+    const p = blind();
+    expect(p).toContain('acting against a decision an earlier page had them state or carry out');
+    expect(p.match(/^\d+\. [A-Z]+:/gm)).toHaveLength(5);
+  });
+
+  it('no auditor gained a fault type the writer was never given', () => {
+    const types = (p: string) => (p.match(/^\d+\. ([A-Z]+):/gm) || []).map(m => m.replace(/^\d+\. /, '').replace(':', ''));
+    expect(types(sighted())).toEqual([
+      'ASSUMED', 'UNFORCED', 'DEVICE', 'TRANSITION', 'CAUSE', 'ENTRANCE',
+      'LANGUAGE', 'LIMIT', 'PAYOFF', 'PULL', 'INFERRED', 'LOADBEARING',
+    ]);
+    expect(types(blind())).toEqual(['CONFUSION', 'CONTRADICTION', 'IDLE', 'TRANSITION', 'PAYOFF']);
+  });
+});

@@ -3921,6 +3921,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // per-finding applier. `droppedCount` stays applier-only.
               appliedCount: r.appliedCount ?? null,
               droppedCount: r.droppedCount ?? null,
+              // WHY each non-applied finding was not applied. The count alone
+              // cannot answer "what happened to that finding" — which is the
+              // whole question the ledger below exists for, asked of the
+              // per-finding appliers (quote-absent / overlap / no-such-page).
+              droppedFindings: r.droppedFindings || [],
+              // The whole-page passes' per-finding outcomes (textRefine.js,
+              // resolveFindingOutcomes). Present only on repair / repetition_fix
+              // / length_fix, which are the rounds handed FAULT lines.
+              findingOutcomes: (r.findingOutcomes || []).map(f => ({
+                pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+                text: f.text, outcome: f.outcome, reason: f.reason || null,
+              })),
               error: r.error || null,
               analysis: (r.analysis || '').slice(0, 15000),
             })),
@@ -3950,6 +3962,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sources: f.sources,
             })),
             mergeStats: usable.mergeStats || null,
+            // THE LEDGER — one entry per merged finding, each with the outcome
+            // the repair pass gave it and, where that is not `page-rewritten`,
+            // the reason. Without it the report could say 20 findings went in
+            // and 17 pages came out, and nothing at all about which finding
+            // reached which page (staging job_1789584708605_rts4wqupm).
+            findingLedger: (usable.findingLedger || []).map(f => ({
+              pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+              text: f.text, outcome: f.outcome, reason: f.reason || null,
+            })),
+            // The word counter's re-measurement after the whole-page passes
+            // (textRefine.js): before/after violation counts, every page's final
+            // word count, and whether the corrective pass ran. It is the one
+            // finding class whose closure is MEASURED rather than assumed, and
+            // it was computed on every run since 2026-09-11 and stored on none.
+            wordBudget: usable.wordBudget || null,
             // The lector's raw output, its parsed findings, and what the
             // code-side applier did with each (see applyLectorFindings).
             proofread: usable.proofread || '',

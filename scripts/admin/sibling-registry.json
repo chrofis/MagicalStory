@@ -77,6 +77,16 @@
       }
     },
     {
+      "id": "text-audit-sighted-vs-blind",
+      "axis": "arc-informed audit vs blind audit",
+      "reason": "story-text-audit.txt (arc-informed) and story-text-audit-blind.txt (the blind reader) feed ONE parser and ONE merge (parseFaultLines / mergeAuditFindings, textRefine.js), and that merge dedupes on the CATEGORY TAG: same page + same category + different auditor is folded into one finding. So the FAULT-line output contract and the category vocabulary are shared state \u2014 a category name that gains a meaning on one side and not the other either folds two distinct faults into one or splits one fault into two. The question SETS are deliberately different, which is what the Siblings-Checked marker is for; the contract they share is not.",
+      "members": [
+        "prompts/story-text-audit.txt",
+        "prompts/story-text-audit-blind.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "lector-and-diff-pass",
       "axis": "lector prompt vs diff-pass prompt",
       "reason": "story-text-proofread.txt (the lector) and story-text-diff.txt (the diff pass) feed the SAME parser and applier (parseLectorFindings / applyLectorFindings, textRefine.js:996-999), so a change to the quoting or span contract on one breaks the other's output against the shared applier.",

@@ -177,6 +177,76 @@ function mergeAuditFindings(lists = []) {
   return { findings, duplicates, bySource, text };
 }
 
+// ───────────────── FINDING LEDGER: EVERY FINDING ENDS SOMEWHERE ───────────────
+
+/**
+ * What became of one finding a whole-page pass was given.
+ *
+ * WHY THIS EXISTS (staging job_1789584708605_rts4wqupm, 2026-09-17). The blind
+ * audit's single finding was correct, was merged, and the shipped book still
+ * carries the fault. Asked what happened to it, the stored report could not
+ * answer: the lector and the diff have a code-side applier that records
+ * applied/dropped per finding (applyLectorFindings), and the repair pass — the
+ * ONLY step the merged audit findings are ever handed to — had none. It
+ * recorded `findingsCount` going in and `changedPages` coming out, with nothing
+ * joining the two. A merged finding could therefore be neither applied nor
+ * dropped, and leave no trace at all.
+ *
+ * WHAT THIS IS NOT: a claim that a finding was CLOSED. A whole-page pass
+ * rewrites wholesale, so the strongest mechanical statement available is
+ * whether the page the finding names came back rewritten. `page-rewritten` says
+ * the pass touched what the finding named, nothing more — on that same run the
+ * repair pass rewrote p18 and its own analysis claimed it had dropped the
+ * page's contradicted claim, which still ships. A self-report is not an
+ * outcome, which is also why the repairer's prose ledger is not parsed here.
+ *
+ * WHAT IT GUARANTEES: every finding in, exactly one outcome out, and every
+ * outcome that is not `page-rewritten` carries a reason. That is what makes the
+ * silent third state impossible.
+ */
+const FINDING_OUTCOME = {
+  /** The pass returned the page this finding names, rewritten. */
+  PAGE_REWRITTEN: 'page-rewritten',
+  /** The pass returned that page unchanged — the finding went unanswered. */
+  PAGE_UNCHANGED: 'page-unchanged',
+  /** The finding names a page the story does not have (the lector's guard, one level up). */
+  NO_SUCH_PAGE: 'no-such-page',
+  /** The auditor filed the fault without a page number — nothing can be matched to it. */
+  NO_PAGE_NAMED: 'no-page-named',
+  /** The pass itself failed, so no finding it held was answered. */
+  PASS_FAILED: 'pass-failed',
+};
+
+/**
+ * Resolve every finding to exactly one outcome.
+ *
+ * @param {Array<{category:string,pageNumber:number|null,text:string,line:string,sources:string[]}>} findings
+ * @param {Array<{pageNumber:number}>} pages   the pages the pass was given
+ * @param {number[]} changedPages              the pages it returned rewritten
+ * @returns {Array<Object>} one entry per finding, each with `outcome` and `reason`
+ */
+function resolveFindingOutcomes(findings = [], pages = [], changedPages = []) {
+  const known = new Set((pages || []).map(p => p.pageNumber));
+  const changed = new Set(changedPages || []);
+  return (findings || []).map((f) => {
+    if (f.pageNumber == null) {
+      return { ...f, outcome: FINDING_OUTCOME.NO_PAGE_NAMED, reason: 'the fault line names no page, so no rewrite can be matched to it' };
+    }
+    if (!known.has(f.pageNumber)) {
+      return { ...f, outcome: FINDING_OUTCOME.NO_SUCH_PAGE, reason: `page ${f.pageNumber} is not in this story` };
+    }
+    if (!changed.has(f.pageNumber)) {
+      return { ...f, outcome: FINDING_OUTCOME.PAGE_UNCHANGED, reason: `the pass returned page ${f.pageNumber} unchanged` };
+    }
+    return { ...f, outcome: FINDING_OUTCOME.PAGE_REWRITTEN, reason: null };
+  });
+}
+
+/** The ledger entries that did NOT reach a rewritten page. */
+function unresolvedFindings(ledger = []) {
+  return (ledger || []).filter(f => f.outcome !== FINDING_OUTCOME.PAGE_REWRITTEN);
+}
+
 // ──────────── WORD-BUDGET COUNTER: THE DETERMINISTIC THIRD AUDITOR ────────────
 
 /**
@@ -572,6 +642,9 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let audits = [];
   let mergedFindings = [];
   let mergeStats = { bySource: {}, duplicates: 0 };
+  // One entry per merged finding, filled the moment the repair pass settles —
+  // see resolveFindingOutcomes. Empty only while that pass has not run.
+  let findingLedger = [];
   let proofread = '';
   let lectorFindings = [];
   let lectorApplied = [];
@@ -600,6 +673,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     audits: audits.slice(),
     mergedFindings: mergedFindings.slice(),
     mergeStats,
+    findingLedger: findingLedger.slice(),
     proofread,
     lectorFindings: lectorFindings.slice(),
     lectorApplied: lectorApplied.slice(),
@@ -754,7 +828,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
    * decides whether to adopt it. Invoked exactly ONCE below; a second bounded
    * pass after a re-audit would be one more call here, never a loop.
    */
-  const runRepairPass = async (findingsText, base, kind = 'repair') => {
+  const runRepairPass = async (findings, base, kind = 'repair') => {
+    // The findings arrive STRUCTURED and the prompt text is rebuilt from their
+    // own FAULT lines — the same verbatim lines mergeAuditFindings joined. That
+    // is what lets the ledger below name each finding's outcome: a pass handed
+    // a blob of text can count its lines and nothing else.
+    const findingsText = findings.map(f => f.line).join('\n');
     let prompt = buildTextRefinePrompt(storyData, base, findingsText, arc);
     if (!prompt) throw new Error('text-refine template unavailable');
     if (opts.promptOverride) prompt = opts.promptOverride;
@@ -782,6 +861,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
     const next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== base[idx].text).map(p => p.pageNumber);
+    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages);
+    for (const f of unresolvedFindings(findingOutcomes)) {
+      log.warn(`⚠️ [TEXT-REPAIR/${kind}] UNANSWERED [${f.category}] p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
+    }
     return {
       next,
       entry: {
@@ -801,7 +884,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
         prompt,
         rawResponse: (r.text || '').slice(0, 40000),
         analysis: (parsed.analysis || '').slice(0, 40000),
-        findingsCount: parseFaultLines(findingsText).length,
+        findingsCount: findings.length,
         returnedPages: parsed.pages.map(p => p.pageNumber),
         strayPages,
         changedPages,
@@ -824,6 +907,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
         // Nothing is inferred: a returned page whose text is identical to the
         // base is not counted, exactly as a dropped lector finding is not.
         appliedCount: changedPages.length,
+        // EVERY FINDING THIS PASS HELD, RESOLVED. The page count above says how
+        // much the pass rewrote; this says what became of each thing it was
+        // asked to fix. See resolveFindingOutcomes for what the outcomes mean
+        // and, just as importantly, what they do not claim.
+        findingOutcomes,
+        unresolvedCount: unresolvedFindings(findingOutcomes).length,
         pages: next.map((p, idx) => ({
           pageNumber: p.pageNumber,
           before: base[idx].text,
@@ -838,17 +927,37 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let repairEntry = null;
   try {
     beginStep();
-    const { next, entry } = await runRepairPass(merged.text, current);
+    const { next, entry } = await runRepairPass(merged.findings, current);
     rounds.push(entry);
     repairEntry = entry;
     current = next;
+    findingLedger = entry.findingOutcomes;
     publish();
-    log.info(`✍️  [TEXT-REPAIR] ${repairModel} closed ${entry.findingsCount} finding(s), rewrote page(s) ${entry.changedPages.join(', ') || 'none'}`);
+    log.info(`✍️  [TEXT-REPAIR] ${repairModel} answered ${entry.findingsCount - entry.unresolvedCount}/${entry.findingsCount} finding(s), rewrote page(s) ${entry.changedPages.join(', ') || 'none'}`);
   } catch (err) {
     // Non-blocking like every step: the lector still reads the writer's text.
     rounds.push({ round: rounds.length + 1, kind: 'repair', ok: false, modelKey: repairModel, error: err.message });
-    log.warn(`⚠️ [TEXT-REPAIR] failed (${err.message}) — the audits' findings are unclosed`);
+    // A failed pass answers nothing, and that is an OUTCOME, not an absence:
+    // the ledger stays total even when the only step that reads the merged
+    // findings never ran.
+    findingLedger = merged.findings.map(f => ({
+      ...f, outcome: FINDING_OUTCOME.PASS_FAILED, reason: `the repair pass failed (${err.message})`,
+    }));
+    log.warn(`⚠️ [TEXT-REPAIR] failed (${err.message}) — all ${merged.findings.length} merged finding(s) are unanswered`);
     publish();
+  }
+  // THE LEDGER IS TOTAL, and it says so out loud. Anything short of one entry
+  // per merged finding is a plumbing defect in this file, not a model outcome.
+  if (findingLedger.length !== merged.findings.length) {
+    log.error(`❌ [TEXT-REPAIR] finding ledger holds ${findingLedger.length} of ${merged.findings.length} merged finding(s) — the accounting is not total`);
+  }
+  {
+    const open = unresolvedFindings(findingLedger);
+    if (open.length) {
+      log.warn(`🧾 [TEXT-REPAIR] ${open.length}/${findingLedger.length} merged finding(s) unanswered: ${open.map(f => `[${f.category}] p${f.pageNumber ?? '?'} — ${f.reason}`).join('; ')}`);
+    } else if (findingLedger.length) {
+      log.info(`🧾 [TEXT-REPAIR] all ${findingLedger.length} merged finding(s) reached a rewritten page`);
+    }
   }
 
   // ── CROSS-PAGE REPETITION — right after the repair, before the diff ──────────
@@ -870,7 +979,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       log.warn(`🔁 [TEXT-REPETITION] ${hits.map(h => `p${h.pages[0]}/p${h.pages[1]} (${h.sharedCount} shared)`).join(', ')} — one corrective pass`);
       try {
         beginStep();
-        const { next, entry } = await runRepairPass(buildRepetitionFindings(hits, current), current, 'repetition_fix');
+        const { next, entry } = await runRepairPass(parseFaultLines(buildRepetitionFindings(hits, current)), current, 'repetition_fix');
         rounds.push(entry);
         repetitionEntry = entry;
         current = next;
@@ -934,7 +1043,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       log.warn(`🔢 [TEXT-COUNTER] ${lines.length} page(s) still outside the word budget after the whole-page passes — one corrective pass`);
       try {
         beginStep();
-        const { next, entry } = await runRepairPass(stillRaw, current, 'length_fix');
+        const { next, entry } = await runRepairPass(parseFaultLines(stillRaw), current, 'length_fix');
         rounds.push(entry);
         current = next;
         wordBudget.correctivePassRan = true;
@@ -1161,7 +1270,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
 
   return {
     pages: current, original, rounds, changed,
-    audits, mergedFindings, mergeStats,
+    audits, mergedFindings, mergeStats, findingLedger,
     proofread, lectorFindings, lectorApplied, lectorDropped,
     diffReview, diffFindings, diffApplied, diffDropped,
     repetition, wordBudget,
@@ -1352,6 +1461,9 @@ module.exports = {
   startBackgroundRefine,
   parseFaultLines,
   mergeAuditFindings,
+  FINDING_OUTCOME,
+  resolveFindingOutcomes,
+  unresolvedFindings,
   countPageWords,
   buildWordBudgetFindings,
   parseLectorFindings,

@@ -354,6 +354,90 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — Every merged audit finding ends in an outcome, and a reversed decision is a rule on both sides
+
+**Context.** Staging `job_1789584708605_rts4wqupm` (18 pages, de-ch). The blind auditor produced
+exactly ONE fault and it was correct — a consumable the story had already used up spilling into a
+river four pages later. It merged cleanly (20 findings, 0 duplicates) and the shipped book still
+carries the fault. Asked what became of it, the stored `textRefineReport` could not answer. The
+lector and the diff each have a code-side applier that records applied/dropped per finding
+(`applyLectorFindings`); the repair pass — the ONLY step the merged findings are ever handed to —
+had none. It recorded `findingsCount` going in and `changedPages` coming out, with nothing joining
+them, and in this run `appliedCount` was `null` (the run predates `e1430bb99`, which made it a PAGE
+count — still not a finding count). A merged finding could therefore be neither applied nor
+dropped and leave no trace at all.
+
+The report also threw away two things the chain had already computed: the word counter's
+re-measurement after the whole-page passes (`wordBudget`, computed on every run since 2026-09-11,
+stored on none — so "was the 117-word page brought inside its 25-70 budget?" was unanswerable even
+though the code had measured 74), and the diff and lector rounds' per-finding drop REASONS, of
+which only the count survived.
+
+Separately, a narrative fault no auditor caught: a character calls the story's object worthless,
+sets it down and leaves; four pages later he blocks the path demanding it back. Reading all
+thirteen fault questions across the two audit templates, none names that class — the nearest,
+`INFERRED` ("why a plan works, why a rival fails") is about a mechanism the reader must supply and
+`CONTRADICTION` is about a page SAYING otherwise, and a character acting against a decision is
+neither.
+
+**Decision.** Two changes, both narrow.
+
+1. **A FINDING LEDGER.** `resolveFindingOutcomes` (textRefine.js) resolves every finding a
+   whole-page pass was given to exactly one of `page-rewritten`, `page-unchanged`, `no-such-page`,
+   `no-page-named` or `pass-failed`, and everything but `page-rewritten` carries a reason. It hangs
+   off each whole-page round as `findingOutcomes` and off the chain as `findingLedger`, both stored
+   in `textRefineReport`; an unanswered finding is logged by category and page. `wordBudget` and the
+   appliers' `droppedFindings` are now stored too. `runRepairPass` takes STRUCTURED findings instead
+   of a text blob and rebuilds the prompt text from their own FAULT lines — a pass handed a blob can
+   count its lines and nothing else.
+
+   `appliedCount` for the whole-page passes is NOT touched: `e1430bb99` set it to the page count one
+   day earlier with a stated rationale, and the ledger is additive beside it, not a second
+   definition of the same key.
+
+   **`page-rewritten` is not a claim that the finding was CLOSED**, and the same run is why. The
+   repair pass rewrote p18 and its own analysis states it dropped the page's contradicted claim; the
+   claim still ships. A self-report is not an outcome — which is also why the repairer's prose
+   ledger is not parsed. The ledger's guarantee is narrower and mechanical: every finding in,
+   exactly one outcome out, no silent third state.
+
+2. **A REVERSED DECISION IS A RULE, NOT A NEW TYPE.** Classification belongs to the prompt, so the
+   class is written into the questions that already exist: the arc-informed `CAUSE` (the question
+   about uncaused states) gains "where someone takes back, demands or acts on a thing they had
+   refused, given up or discarded, name the page that says what changed it", and the blind
+   `CONTRADICTION` gains its listener-side twin. No fault type was added and no severity changed;
+   both templates still ask twelve and five questions respectively, pinned by test. The generator
+   half lands in the same commit: both live writers (`story-text-from-beats.txt`,
+   `story-trial.txt`) are told that a character who refuses, gives up or discards a thing stays done
+   with it unless a later page says what changed. The two sides are phrased differently on purpose
+   — one is a rule, the other a question — so no shared constant was introduced.
+
+**Rationale.** The accounting half is plumbing: the question "what happened to that finding" must
+have an answer for every finding, and the only honest mechanical answer a wholesale rewrite affords
+is whether the page came back rewritten. Narrowing it further would mean parsing the repairer's own
+prose, which this same run shows to be unreliable.
+
+The classification half was verified before it was written: all thirteen questions were read and
+none covers the class, which is what makes it a missing rule rather than a judge's miss. **It is
+NOT verified to fire.** Two paid replays over this story's shipped text with the updated templates
+($0.32 total — grok-4.6 blind, gemini-3.1-pro arc-informed) did not flag this instance. Reading the
+shipped pages, the instance is thinner than it looked: an earlier page states why the character
+wants the object, and the page he sets it down on states why he cannot carry it, so the reclaim IS
+caused, just barely. The rule stands on the class being real and unnamed and on the writer-side
+counterpart being free; the next run that produces a clean reversal is what will exercise it, and
+that is logged in the backlog rather than claimed here.
+
+**Touched files.** `server/lib/textRefine.js` (`FINDING_OUTCOME`, `resolveFindingOutcomes`,
+`unresolvedFindings`, `runRepairPass`, the chain's `findingLedger`), `storyJobPipeline.js` (the
+`textRefineReport` projection), `prompts/story-text-audit.txt`,
+`prompts/story-text-audit-blind.txt`, `prompts/story-text-from-beats.txt`,
+`prompts/story-trial.txt`, `scripts/admin/sibling-registry.json` (new set
+`text-audit-sighted-vs-blind`: the two audits feed ONE parser and ONE merge that dedupes on the
+category tag, so the FAULT-line contract and the category vocabulary are shared state even though
+the question sets are deliberately not), `tests/unit/text-finding-ledger.test.ts` (new, built on
+this run's real auditor replies), `tests/unit/text-audit-rules-reach-writer.test.ts`.
+
+
 ## 2026-09-17 — A brief's STRUCTURED fields are the instruction; prose in a brief is advisory
 
 **Context.** Four defects on staging `job_1789584708605_rts4wqupm` ("Das Ei unter der Wurzel",
