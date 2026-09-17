@@ -239,11 +239,13 @@ describe('iteratePageCore wiring', () => {
   it('runs the post-rewrite brief checks on the rewritten brief, against its parent', () => {
     expect(source).toContain('checkRewrittenBrief({');
     expect(source).toContain('checkCarriedFields({');
-    // One closure runs both checks, so the first verdict, the re-ask's verdict
-    // and the declared-set re-ask's verdict can never be taken on three
-    // different scopes.
+    // One closure runs every check, so the first verdict and the corrective
+    // re-ask's verdict can never be taken on two different scopes. Since
+    // 2026-09-17 that closure also carries the declared-set family, and the
+    // one re-ask is judged on the union.
     expect(source).toMatch(/const runBriefChecks = \(text\) =>/);
-    expect(source).toMatch(/runBriefChecks\(newSceneDescription\)/);
+    expect(source).toMatch(/const runAllBriefChecks = \(text\) =>/);
+    expect(source).toMatch(/runAllBriefChecks\(newSceneDescription\)/);
     expect(source).toMatch(/parentBrief:\s*sceneDescText/);
   });
 });

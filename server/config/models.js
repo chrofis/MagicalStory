@@ -424,6 +424,17 @@ const MODEL_DEFAULTS = {
   // to sonnet via resolveSceneIterationModel(). NOTE: initial sceneDescription
   // expansion stays on Sonnet — only the repair-iterate moved.
   sceneIteration: process.env.SCENE_ITERATE_MODEL || 'qwen-plus',
+  // THE BRIEF CORRECTOR — the one call that answers a brief's mechanical
+  // findings, on BOTH paths (owner, 2026-09-17: "All 3 same as pipeline").
+  // The authored path has always answered them with sceneReviewModel and it
+  // works (15 pages changed, 5 unfixed, 3 introduced on the reference story);
+  // the rewrite path answered them with `sceneIteration` — the same model that
+  // had just failed the contract — and resolved nothing on 11 of 11 stored
+  // rounds. Correcting a brief against a fault list is the scene review's job,
+  // so it is the scene reviewer's model, not the rewriter's. The REWRITE itself
+  // stays on sceneIteration: that is a separate decision with its own evidence
+  // (the 2026-07-12 cost A/B).
+  briefCorrectionModel: process.env.BRIEF_CORRECTION_MODEL || process.env.SCENE_REVIEW_MODEL || 'deepseek-v4-pro',
 
   // Eval/consolidation model — the swappable, cost-sensitive stage (NOT story
   // prose). Changed to Qwen for the cost A/B (2026-07-12). resolveEvalModel()
@@ -1286,6 +1297,7 @@ function guardModel(modelKey, label = 'model') {
 function resolveEvalModel() { return guardModel(MODEL_DEFAULTS.evalModel, 'EVAL MODEL'); }
 function resolveComplianceModel() { return guardModel(MODEL_DEFAULTS.complianceModel, 'COMPLIANCE MODEL'); }
 function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIteration, 'SCENE ITERATE MODEL'); }
+function resolveBriefCorrectionModel() { return guardModel(MODEL_DEFAULTS.briefCorrectionModel, 'BRIEF CORRECTION MODEL'); }
 function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneValidationRepair, 'SCENE VALIDATION MODEL'); }
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
 function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
@@ -1315,6 +1327,7 @@ module.exports = {
   resolveEvalModel,
   resolveComplianceModel,
   resolveSceneIterationModel,
+  resolveBriefCorrectionModel,
   resolveSceneValidationModel,
   resolveSceneRewriteModel,
   resolvePromptCompressModel,

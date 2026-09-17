@@ -3771,6 +3771,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     normalizeCitedHandles, restoreParentObjects,
     renderEvaluatorReasoning, renderFixTargetLines, renderParentWornState,
   } = require('./iterateBeat');
+  // The corrective loop itself is shared with the authored-brief path — one
+  // payload contract, one introduced-vs-survived verdict, one model name.
+  const { correctFindings, renderCorrectionRequest } = require('./briefCorrection');
   const planLine = resolvePlanLine(currentScene, savedScene);
   if (!planLine) {
     log.warn(`⚠️ [ITERATE] Page ${pageNumber}: no stored plan line (outlineExtract) — the rewrite runs on the previous brief alone`);
@@ -3989,57 +3992,47 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       rewriteMetadata: extractSceneMetadata(String(text || '')),
     }),
   ];
-  let consistencyFindings = runBriefChecks(newSceneDescription);
-  if (consistencyFindings.length > 0) {
-    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewritten brief fails a check an authored brief is held to:\n${describeBriefFindings(consistencyFindings)}`);
-    const fixed = await callClaudeAPI(
-      `${scenePrompt}\n\nYour previous answer breaks the brief contract:\n${describeBriefFindings(consistencyFindings)}\n\nReturn the whole brief again. Keep the same moment and the same fixes, and resolve each line above: declare a figure in the picture (a person in "characters[]" by name, a staged animal or secondary figure in "objects[]" by its id) or take it out of the prose; cite an element the page stages and drop a citation the page does not; state every field the metadata contract requires on every row.`,
-      null, effectiveSceneModel, { usageLabel: 'scene_iterate_declare' }
-    );
-    if (usageTracker && fixed.usage) {
-      usageTracker('anthropic', fixed.usage, 'scene_iterate', fixed.modelId || effectiveSceneModel);
-    }
-    const fixedGuard = assessIterateBrief(fixed.text, { truncation: fixed.truncation });
-    const fixedFindings = fixedGuard.usable ? runBriefChecks(fixed.text) : null;
-    if (fixedGuard.usable && fixedFindings.length < consistencyFindings.length) {
-      sceneResult = fixed;
-      newSceneDescription = fixed.text;
-      consistencyFindings = fixedFindings;
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: brief re-ask resolved ${fixedFindings.length === 0 ? 'every' : 'some'} fault`);
-    }
-    if (consistencyFindings.length > 0) {
-      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that fails a check an authored brief is held to:\n${describeBriefFindings(consistencyFindings)}`);
-    }
-  }
-
-  // ── THE DECLARED SET, CHECKED (2026-09-16) ────────────────────────────────
-  // objects[] / characters[] may cite only original ∪ plan-line ∪ feedback
-  // (iterateBeat.declaredSetAllowance). Measured on job_1789506283204_3kxqshifx:
+  // ── ONE CORRECTIVE RE-ASK, FOR BOTH CHECK FAMILIES (2026-09-17) ───────────
+  // Owner: "All 3 same as pipeline. These should be siblings or even identical
+  // code." Two hand-rolled re-asks stood here — one for the declaration checks
+  // above, one for the declared set — and MEASURED over the 11 stored iterate
+  // rounds of staging job_1789584708605_rts4wqupm and
+  // job_1789506283204_3kxqshifx neither resolved anything on any page: each
+  // fired once, the count never fell, so the original was kept every time and
+  // every page shipped with a WARN. Detection worked; correction never landed.
+  // Three defects, all of them now answered in server/lib/briefCorrection.js,
+  // which the authored path reads from the same file:
+  //   - the corrector was sent the ORIGINAL prompt and never the answer it was
+  //     asked to revise, which is a re-roll, not a correction
+  //     (renderCorrectionRequest + assertCorrectorSeesText),
+  //   - acceptance was `after.length < before.length`, which scores a swap of
+  //     one fault for another as EQUAL and rejects it, and never asks WHICH
+  //     faults moved (judgeCorrection: introduced vs survived),
+  //   - the corrector was `sceneIteration`, the model that had just failed the
+  //     contract (MODEL_DEFAULTS.briefCorrectionModel).
+  //
+  // The two families are checked together and answered in ONE call. The
+  // declared set never depended on the declaration re-ask's output, and judging
+  // a correction on the UNION is what the second re-ask's hand-rolled
+  // cross-guard was reaching for: a correction that resolves one family by
+  // breaching the other introduces a finding, and an introduced finding is a
+  // refusal.
+  //
+  // THE DECLARED SET (2026-09-16): objects[] / characters[] may cite only
+  // original ∪ plan-line ∪ feedback. Measured on job_1789506283204_3kxqshifx,
   // three of five rewrites cited a landmark or a creature none of their inputs
   // named, and each invented citation became a critical on content that had
-  // been correct. One corrective re-ask carrying the specific ids — the same
-  // shape as the declaration re-ask above — then the round ships with a
-  // warning: a gate is a guideline and an iterate round is paid. (A length
-  // budget shipped beside this the same day and was removed: the growth it
-  // measured was the template's own audit keys, not prose.)
+  // been correct. The allowance is computed per CANDIDATE, because part of it
+  // ("an id this answer cites that the feedback names") is a property of the
+  // answer being judged, not of the first one.
   const origObjects = (parentSceneMetadata.objects || parentSceneMetadata.fullData?.objects || []);
-  const citedMetadata = extractSceneMetadata(newSceneDescription);
-  const declaredSetArgs = declaredSetAllowance({
-    origObjects,
-    rewriteObjects: citedMetadata?.objects,
-    evaluationFeedback, pageText, planLine,
-    origCharacters: parentSceneMetadata.characters,
-    promptCharacters,
-    stagedFigures,
-  });
   // ...and the SAME set in the other direction (2026-09-17). Zero additions
   // occurred on job_1789584708605_rts4wqupm; SUBTRACTION did the damage -- p6
   // and p16 both stopped citing the artefact their page is about, and p16's
   // REQUIRED OBJECTS block shipped as a header with no entries. `nameIds` lets
   // a named figure's NAME in `characters[]` satisfy its id: that is a refile,
   // not a loss (p13 moved CHR001 to "Ramon" on the same run).
-  declaredSetArgs.requiredObjects = origObjects;
-  declaredSetArgs.nameIds = (() => {
+  const declaredSetNameIds = (() => {
     const map = {};
     const secondaries = Array.isArray(visualBible?.secondaryCharacters)
       ? visualBible.secondaryCharacters
@@ -4049,34 +4042,65 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
     return map;
   })();
-  let declaredSetFindings = checkDeclaredSet({ newMetadata: citedMetadata, ...declaredSetArgs });
-  if (declaredSetFindings.length > 0) {
-    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite cites outside its declared set:\n${describeBriefFindings(declaredSetFindings)}`);
-    const recited = await callClaudeAPI(
-      `${scenePrompt}\n\nYour previous answer does not cite the set of objects and characters its inputs give it:\n${describeBriefFindings(declaredSetFindings)}\n\nReturn the whole brief again. Keep the same moment and the same fixes. Cite only the objects and characters the previous brief, the plan line and the feedback name, and take out of the prose whatever depended on the others -- and keep citing every id the previous brief cited, either in "objects[]" or, for a named figure, by name in "characters[]".`,
-      null, effectiveSceneModel, { usageLabel: 'scene_iterate_declared_set' }
-    );
-    if (usageTracker && recited.usage) {
-      usageTracker('anthropic', recited.usage, 'scene_iterate', recited.modelId || effectiveSceneModel);
+  const runDeclaredSetCheck = (text) => {
+    const meta = extractSceneMetadata(String(text || ''));
+    const args = declaredSetAllowance({
+      origObjects,
+      rewriteObjects: meta?.objects,
+      evaluationFeedback, pageText, planLine,
+      origCharacters: parentSceneMetadata.characters,
+      promptCharacters,
+      stagedFigures,
+    });
+    args.requiredObjects = origObjects;
+    args.nameIds = declaredSetNameIds;
+    return checkDeclaredSet({ newMetadata: meta, ...args });
+  };
+  const runAllBriefChecks = (text) => [...runBriefChecks(text), ...runDeclaredSetCheck(text)];
+
+  let briefFindings = runAllBriefChecks(newSceneDescription);
+  if (briefFindings.length > 0) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewritten brief fails a check an authored brief is held to:\n${describeBriefFindings(briefFindings)}`);
+    const correctionModel = modelOverrides?.briefCorrectionModel || require('../config/models').resolveBriefCorrectionModel();
+    let correctionResult = null;
+    // ONE CORRECTIVE RE-ASK, THEN SHIP FLAGGED. The comment above the old
+    // re-asks claimed this ("a gate is a guideline and an iterate round is
+    // paid, so this never fails the round") and the code did not implement it:
+    // a provider error inside the re-ask threw straight out of iteratePageCore
+    // and destroyed the whole paid round. The correction is an improvement on
+    // a brief that already exists, so its failure costs the improvement and
+    // nothing else.
+    const correction = await correctFindings({
+      label: `iterate page ${pageNumber}`,
+      priorText: newSceneDescription,
+      before: briefFindings,
+      payload: renderCorrectionRequest({
+        context: scenePrompt,
+        priorText: newSceneDescription,
+        findingsText: describeBriefFindings(briefFindings),
+        instruction: 'Return the whole brief again. Keep the same moment and the same fixes, and resolve each line above: declare a figure in the picture (a person in "characters[]" by name, a staged animal or secondary figure in "objects[]" by its id) or take it out of the prose; cite an element the page stages and drop a citation the page does not; cite only the objects and characters the previous brief, the plan line and the feedback name, and keep citing every id the previous brief cited, either in "objects[]" or, for a named figure, by name in "characters[]"; state every field the metadata contract requires on every row. Change nothing else — a line above resolved by breaking another is not a fix.',
+      }),
+      invoke: async (payload) => {
+        const r = await callClaudeAPI(payload, null, correctionModel, { usageLabel: 'scene_iterate_correct' });
+        if (usageTracker && r.usage) {
+          usageTracker('anthropic', r.usage, 'scene_iterate', r.modelId || correctionModel);
+        }
+        const g = assessIterateBrief(r.text, { truncation: r.truncation });
+        correctionResult = r;
+        return { text: r.text, usable: g.usable, usage: r.usage, reason: g.usable ? null : describeIterateBrief(g) };
+      },
+      recheck: runAllBriefChecks,
+    }).catch((err) => {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: the corrective re-ask failed (${err.message}) — the rewrite stands and ships flagged`);
+      return { accepted: false };
+    });
+    if (correction.accepted) {
+      if (correctionResult) sceneResult = correctionResult;
+      newSceneDescription = correction.text;
+      briefFindings = correction.after;
     }
-    const recitedGuard = assessIterateBrief(recited.text, { truncation: recited.truncation });
-    const recitedFindings = recitedGuard.usable
-      ? checkDeclaredSet({ newMetadata: extractSceneMetadata(recited.text), ...declaredSetArgs })
-      : null;
-    // Only take the re-ask if it BOTH shrinks the breach and still declares
-    // what it draws — a brief that drops a figure's declaration to satisfy the
-    // set would trade one defect for another.
-    const recitedDeclarations = recitedGuard.usable ? runBriefChecks(recited.text) : null;
-    if (recitedGuard.usable && recitedFindings.length < declaredSetFindings.length
-        && (recitedDeclarations || []).length <= consistencyFindings.length) {
-      sceneResult = recited;
-      newSceneDescription = recited.text;
-      declaredSetFindings = recitedFindings;
-      consistencyFindings = recitedDeclarations;
-      log.info(`🔄 [ITERATE] Page ${pageNumber}: declared-set re-ask resolved ${recitedFindings.length === 0 ? 'every' : 'some'} citation`);
-    }
-    if (declaredSetFindings.length > 0) {
-      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that cites outside its declared set:\n${describeBriefFindings(declaredSetFindings)}`);
+    if (briefFindings.length > 0) {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that fails a check an authored brief is held to:\n${describeBriefFindings(briefFindings)}`);
     }
   }
 

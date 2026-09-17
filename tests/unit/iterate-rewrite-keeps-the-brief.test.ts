@@ -178,8 +178,11 @@ describe('A2 — a citation the parent made is never dropped', () => {
 
   it('it feeds the ONE corrective re-ask that already exists — no second call', () => {
     const src = read('server/lib/images.js');
-    expect((src.match(/usageLabel: 'scene_iterate_declared_set'/g) || []).length).toBe(1);
-    expect(src).toContain('declaredSetArgs.requiredObjects = origObjects;');
+    // Since 2026-09-17 that re-ask is the shared one (briefCorrection), and it
+    // answers the declaration and declared-set families together.
+    expect((src.match(/usageLabel: 'scene_iterate_correct'/g) || []).length).toBe(1);
+    expect((src.match(/correctFindings\(\{/g) || []).length).toBe(1);
+    expect(src).toContain('args.requiredObjects = origObjects;');
   });
 });
 

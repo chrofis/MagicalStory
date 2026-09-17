@@ -327,6 +327,21 @@
         ],
         "anchorsNote": "Placeholders, not prose: each is ONE exported constant filled at all four sites, so the anchor proves the rule reaches the template and tests/unit/ad-iterate-parity.test.ts proves the constant reaches the BUILT prompt byte-identically. Three iterate-only placeholders stay deliberately unanchored because they have no Art Director counterpart to keep in step: {OBJECT_ID_STABILITY} (the Art Director MINTS the ids, so it has none to substitute), {DECLARED_TRAIT_VERBATIM} (declared where the drift was measured — see DECLARED_TRAIT_VERBATIM_RULE), and {MAX_CHARACTERS_PER_SCENE} (the image model’s face cap, which the Art Director expresses as its own staging rules)."
       }
+    },
+    {
+      "id": "brief-corrective-loops",
+      "axis": "authored-brief correction vs rewritten-brief correction",
+      "reason": "A brief's mechanical findings are answered on two paths — the scene review on the authored path (beatsPipeline.js) and the corrective re-ask on the rewrite path (images.js iteratePageCore) — and the second was a hand-rolled copy of the first that measurably did not work: over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx it fired once per page and resolved findings on ZERO of them, because it sent the findings without the text being corrected, accepted on a COUNT (a correction that swaps one fault for another scores equal and is rejected), and re-asked the same model that had just failed the contract. Owner, 2026-09-17: 'All 3 same as pipeline. These should be siblings or even identical code.' The payload contract (assertCorrectorSeesText), the introduced-vs-survived verdict (judgeCorrection) and the model name (MODEL_DEFAULTS.briefCorrectionModel) are now ONE implementation in server/lib/briefCorrection.js; this set is what stops a call site drifting off it again.",
+      "members": [
+        "server/lib/images.js",
+        "server/lib/beatsPipeline.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "require('./briefCorrection')"
+        ]
+      }
     }
   ],
   "withinFile": [

@@ -388,6 +388,23 @@ measurement, is lost).
 
 ## Refactor + tech debt
 
+- [ ] **The OpenRouter price table under-bills `deepseek-v4-pro` by ~3.7x** (measured 2026-09-17).
+      `server/config/models.js:1119` carries `{ input: 0.435, output: 0.87 }` per 1M and the
+      `TEXT_MODELS` description repeats it; the vendor's live rate that day
+      (`GET https://openrouter.ai/api/v1/models`) is **$1.60 / $3.20**, and a real call billed
+      $0.0484 for in 8,698 / out 10,761 — which is $1.60/$3.20 to the cent, not $0.435/$0.87.
+      DeepSeek is the reviewer on three stages (`sceneReviewModel`, `clothingReviewModel`,
+      `briefCorrectionModel`) and it is a REASONING model, so its output token count is several
+      times the visible answer. Every per-story cost figure that includes a DeepSeek call is low.
+      Re-check the whole table against the API, not against a repo comment.
+      → `server/config/models.js:1119`
+- [ ] **The brief corrector costs ~$0.048/call against the rewriter's ~$0.003 — confirm the trade**
+      (raised 2026-09-17, shipped as `briefCorrectionModel`). The re-ask had to leave `qwen-plus`:
+      on the 11 stored rounds the old loop resolved nothing. Measured spend and the per-story delta
+      are in the decisions entry below; the owner may want a cheaper corrector measured against the
+      same 11 rounds before this reaches master.
+      → `docs/decisions.md` (2026-09-17 "One corrective loop")
+
 - [x] **FIXED 2026-09-15 b68ff92f5 — GDPR erasure and orphan cleanup bypass the failed-prune ledger built for them (review 2026-09-15).** `delete-user-data.js:684-687` calls raw `r2.deleteByPrefix`/`deleteObject`; `cleanup-orphaned-data.js:72` calls `r2.deleteStoryArtefacts` inside a warn-only catch. Neither records a failed prune to `r2_pending_deletions`, so the daily retry never sees it. Swap to `r2Pending.prunePrefix`/`pruneObject`/`pruneStory` → `scripts/admin/delete-user-data.js:684`, `scripts/admin/cleanup-orphaned-data.js:72`
 - [x] **FIXED 2026-09-15 e6e0cb9f1 — `images.js` facade is stale — ~15 newer `evalPipeline`/`bboxDetection` exports (presence derivation, `reconcileDetectorCast`, `isMicroFigure`, …) are not re-exported** although CLAUDE.md says it re-exports every name. No live caller today; add them or narrow the documented contract → `server/lib/images.js`
 - [x] **FIXED 2026-09-15 057e4f75a — `TOPIC_AGE_WINDOWS` is a hand-typed "generated mirror" of the client `suitableAges` table** (56 entries, parity test only). Make it real codegen or one imported constant → `server/lib/promptBuilders.js:5264`

@@ -120,6 +120,10 @@ const {
   getHistoricalObjects,
 } = require('./storyHelpers');
 const { parseCastRemovals, diffCastRemovals, restoreUndeclaredRemovals } = require('./sceneReviewGuard');
+// The corrective loop's shared halves — the payload contract and the
+// introduced-vs-survived verdict. The rewrite path (images.js iteratePageCore)
+// reaches the same two through briefCorrection.correctFindings.
+const { judgeCorrection, assertCorrectorSeesText } = require('./briefCorrection');
 const { UnifiedStoryParser } = require('./outlineParser/unified');
 const { stableCandidateIndex } = require('./outlineParser/shared');
 const { log } = require('../utils/logger');
@@ -2095,6 +2099,7 @@ ${bibleBody}` : bibleBody;
   // and the pre-review fault set to tell a SURVIVING fault from an INTRODUCED one.
   let briefCastNames = [];
   const briefBeforeByPage = new Map();
+  let briefBefore = [];
   try {
     const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
     // Secondary characters belong in this list too. `inputData.characters` is the
@@ -2130,6 +2135,14 @@ ${bibleBody}` : bibleBody;
       { textZoneRules: textZoneRulesActive(inputData) }
     );
     for (const [pn, list] of res.byPage) briefBeforeByPage.set(pn, new Set(list.map(f => f.type)));
+    // The findings THEMSELVES, not only their types: the post-review verdict is
+    // briefCorrection.judgeCorrection, the same partition the rewrite path now
+    // runs, and it keys a finding by (page, type). Page 0 is the whole-book
+    // tally and is reported on its own line, so it stays out of both sides.
+    {
+      const { REVIEWABLE: R } = require('./sceneBriefCheck');
+      briefBefore = res.findings.filter(f => f && R.has(f.type) && f.pageNumber !== 0);
+    }
     briefFindings = renderBriefBlock(res.byPage);
     if (briefFindings) {
       // Count only what the block actually carries — diagnostic-only types stay
@@ -2162,6 +2175,24 @@ ${bibleBody}` : bibleBody;
       // with nothing to show — exactly the run we needed to inspect
       // (job_1786235099497_ytd5c7eek: 3 faults handed over, 0 briefs rewritten).
       const briefsIn = expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief }));
+      // THE PAYLOAD CONTRACT, asserted on this path too (2026-09-17). A
+      // corrector is shown the text it is correcting — this path always has
+      // been, through {ALL_SCENES}, and the rewrite path was not, which is the
+      // defect that made its re-ask a re-roll. One function answers for both
+      // so neither can lose it silently.
+      // Reported, never fatal: a review that runs is worth more than a story
+      // that dies on its own contract check, and this path's whole ruling is
+      // advisory anyway.
+      for (const pn of briefBeforeByPage.keys()) {
+        const faulted = briefsIn.find(b => b.pageNumber === pn);
+        if (!faulted) continue;
+        try {
+          assertCorrectorSeesText(srPrompt, faulted.brief, `scene review p${pn}`);
+        } catch (seeErr) {
+          log.error(`❌ [BEATS] p${pn}: ${seeErr.message} — the reviewer is being asked to correct a brief it cannot see`);
+          gl.warn('beats_brief_unseen', `The scene review prompt does not carry page ${pn}'s brief — its faults cannot be corrected`, null, { pageNumber: pn });
+        }
+      }
       await stage(42, 'Reviewing scene briefs...', { next: 51, ms: 132000 });
       const srRes = await textModels.callTextModelStreaming(srPrompt, null, onChunk, sceneReviewModel, { usageLabel: 'beats_scene_review' });
       // "0 briefs rewritten" has meant three different things: a reviewer that
@@ -2505,8 +2536,17 @@ ${bibleBody}` : bibleBody;
           log.warn(`⚠️ [BEATS] text-position distribution after review: ${d}`);
           gl.warn('beats_textzone_distribution', `Text-position distribution still off after the scene review: ${d}`, null, { findings: bookLevel });
         }
-        const introduced = left.filter(f => !(briefBeforeByPage.get(f.pageNumber)?.has(f.type)));
-        const survived = left.filter(f => briefBeforeByPage.get(f.pageNumber)?.has(f.type));
+        // THE VERDICT IS SHARED (2026-09-17). This partition — introduced vs
+        // survived, keyed by (page, type) — is briefCorrection.judgeCorrection,
+        // and the rewrite path's corrective re-ask now reaches the same
+        // function through correctFindings. It used to hand-roll
+        // `after.length < before.length` instead, which scores a correction
+        // that swaps one fault for another as EQUAL and rejects it; measured
+        // over 11 stored rounds it resolved nothing on any of them.
+        // `advisory` is this path's ruling (owner, 2026-08-11): the reviewer
+        // authored both halves, so its rewrite stands and its faults are
+        // reported.
+        const { introduced, survived } = judgeCorrection({ before: briefBefore, after: left, acceptance: 'advisory' });
         briefUnfixedList = left;
         briefIntroducedList = introduced;
         if (introduced.length > 0) {

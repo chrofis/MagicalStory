@@ -117,27 +117,41 @@ describe('the declared set: a rewrite may cite only original ∪ plan-line ∪ f
 describe('exactly one corrective re-ask, fired only by an id-set finding', () => {
   const read = (rel: string) => fs.readFileSync(path.join(__dirname, '../../', rel), 'utf8');
   const IMAGES = read('server/lib/images.js');
-  const LABEL = "usageLabel: 'scene_iterate_declared_set'";
+  // ONE re-ask for BOTH check families since 2026-09-17. The declared-set
+  // family had its own call beside the declaration family's, and neither
+  // worked: over the 11 stored rounds each fired once and resolved nothing.
+  // Both now go through briefCorrection.correctFindings — one payload, one
+  // verdict, one model.
+  const LABEL = "usageLabel: 'scene_iterate_correct'";
 
   it('there is one re-ask call, not a retry loop, and the budget re-ask is gone', () => {
     expect(IMAGES.split(LABEL).length - 1).toBe(1);
+    expect(IMAGES.split('correctFindings({').length - 1).toBe(1);
     expect(IMAGES).not.toContain('scene_iterate_budget');
+    expect(IMAGES).not.toContain('scene_iterate_declared_set');
   });
 
   it('the re-ask sits inside the finding branch and carries the specific ids', () => {
-    const branch = IMAGES.indexOf('if (declaredSetFindings.length > 0) {');
+    const branch = IMAGES.indexOf('if (briefFindings.length > 0) {');
     const call = IMAGES.indexOf(LABEL);
     expect(branch).toBeGreaterThan(-1);
     expect(call).toBeGreaterThan(branch);
     const body = IMAGES.slice(branch, call);
-    expect(body).toContain('describeBriefFindings(declaredSetFindings)');
+    expect(body).toContain('describeBriefFindings(briefFindings)');
     // no other paid call between the branch and the re-ask
     expect(body.split('callClaudeAPI(').length - 1).toBe(1);
   });
 
-  it('the re-ask is taken only when it shrinks the breach and does not regress the declaration check', () => {
-    expect(IMAGES).toContain('recitedFindings.length < declaredSetFindings.length');
-    expect(IMAGES).toContain('(recitedDeclarations || []).length <= consistencyFindings.length');
+  it('the declared-set findings reach that one re-ask alongside the declaration ones', () => {
+    // The union is what the corrector is sent and what its result is judged on,
+    // so a correction cannot satisfy one family by breaching the other.
+    expect(IMAGES).toMatch(/runAllBriefChecks\s*=\s*\(text\)\s*=>\s*\[\.\.\.runBriefChecks\(text\), \.\.\.runDeclaredSetCheck\(text\)\]/);
+    expect(IMAGES).toMatch(/recheck:\s*runAllBriefChecks/);
+  });
+
+  it('the re-ask is judged by introduced-vs-survived, never by a finding count', () => {
+    expect(IMAGES).toContain('correctFindings(');
+    expect(IMAGES).not.toMatch(/Findings\.length\s*[<>]=?\s*\w*Findings\.length/);
   });
 
   it('no rewrite is measured by length anywhere on the iterate path', () => {

@@ -354,6 +354,136 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — One corrective loop: the authored brief and the rewritten brief answer their findings the same way
+
+**Context.** A brief's mechanical findings are answered twice in this codebase. On the AUTHORED
+path `sceneBriefCheck.checkScenes` runs over the Art Director's briefs, its findings are rendered
+into `{BRIEF_FINDINGS}` for `prompts/scene-review.txt`, the reviewer rewrites the faulted pages
+**while looking at them** (`{ALL_SCENES}`), and a free post-review re-check partitions what is left
+into INTRODUCED and SURVIVED (`beatsPipeline.js`). On the REWRITE path `iteratePageCore` runs
+`checkRewrittenBrief` + `checkCarriedFields` + `checkDeclaredSet` over the brief a repair round has
+just written, and answered them with two hand-rolled re-asks that were a crude copy of the first
+mechanism.
+
+The copy did not work. MEASURED over the 11 stored iterate rounds of staging
+`job_1789584708605_rts4wqupm` (p4, p6, p9, p10, p13, p16) and `job_1789506283204_3kxqshifx`
+(p2, p7, p10, p13, p16): all 11 carry findings (21 in total), the re-ask fired on every one, and it
+**reduced the finding count on none** — the original was kept every time and every page shipped
+with a WARN. Detection worked; correction never landed. Three defects explain it:
+
+1. **The corrector was never shown the text it was correcting.** The payload was `scenePrompt`
+   (the ORIGINAL prompt) + the findings + "Return the whole brief again". A model cannot revise an
+   artefact it has not been given — that is a re-roll billed as a correction.
+2. **Acceptance was a count.** `fixedFindings.length < consistencyFindings.length`. A correction
+   that resolves one fault and creates another scores EQUAL and is rejected, and the rule never
+   asks WHICH faults moved.
+3. **Wrong model.** The re-ask used `effectiveSceneModel` — `sceneIteration` (`qwen-plus`), the
+   same model that had just failed the contract. The authored path answers the same findings with
+   `sceneReviewModel`.
+
+**Decision.** Owner, 2026-09-17, verbatim: *"All 3 same as pipeline. These should be siblings or
+even identical code."* The three shared halves are ONE implementation in
+`server/lib/briefCorrection.js`, and BOTH paths call it:
+
+- `assertCorrectorSeesText(payload, priorText)` — the payload contract. The authored path asserts
+  it against its own review prompt (the briefs are in `{ALL_SCENES}`); the rewrite path builds its
+  payload with `renderCorrectionRequest`, which carries the prior brief by construction.
+- `judgeCorrection({ before, after, acceptance })` — the verdict, keyed by (page, type). `strict`
+  (rewrite path) takes a correction only when it resolves at least one finding and introduces none;
+  `advisory` (authored path, owner ruling 2026-08-11) takes the rewrite whatever it did and reports
+  the partition. The authored path's hand-rolled `introduced` / `survived` filters are gone — that
+  partition IS this function.
+- `MODEL_DEFAULTS.briefCorrectionModel` — one named constant, defaulting to `sceneReviewModel`
+  (`deepseek-v4-pro`), resolved through `resolveBriefCorrectionModel()`. Correcting a brief against
+  a fault list is the scene review's job, so the corrector is the scene reviewer's model. The
+  REWRITE itself stays on `sceneIteration`: a separate decision with its own evidence (2026-07-12
+  cost A/B).
+
+`correctFindings` is the full loop (assert → invoke → re-check → judge) and the rewrite path runs
+it. The authored path calls the two shared halves directly rather than the whole loop, because its
+correction is genuinely a different shape: one whole-book review that also answers ~20
+non-mechanical checks, with a nested worn-state round between the call and the re-check, and by the
+2026-08-11 ruling it is advisory — it reports, it never refuses. The two call sites are registered
+as a BLOCKING sibling set (`brief-corrective-loops`) whose parity anchor is
+`require('./briefCorrection')`, so a side that drifts off the shared routine fails the pre-push
+gate and `tests/unit/sibling-parity.test.ts`.
+
+The rewrite path's TWO re-asks became ONE. The declared-set family never depended on the
+declaration re-ask's output, and judging a correction on the UNION of both families is exactly what
+the second re-ask's hand-rolled cross-guard (`recitedDeclarations.length <=
+consistencyFindings.length`) was reaching for: a correction that resolves one family by breaching
+the other now INTRODUCES a finding, and an introduced finding is a refusal.
+
+**Rationale.** MEASURED by replaying the corrective call live over those same 11 rounds, one
+corrective call per arm, same finding set, same page prompt as context (the production
+`buildSceneDescriptionPrompt`, minus the live vision analysis, which cannot be replayed):
+
+```
+round     findings | OLD ships  outcome   | NEW ships  outcome
+rts  p4          1 |         1  unchanged |         0  RESOLVED
+rts  p6          3 |         1  partial   |         3  unchanged
+rts  p9          1 |         1  unchanged |         0  RESOLVED
+rts  p10         1 |         1  unchanged |         1  unchanged
+rts  p13         1 |         1  unchanged |         0  RESOLVED
+rts  p16         2 |         2  unchanged |         2  unchanged
+kxq  p2          1 |         1  unchanged |         1  unchanged
+kxq  p7          3 |         2  partial   |         0  RESOLVED
+kxq  p10         2 |         2  unchanged |         2  unchanged
+kxq  p13         3 |         1  partial   |         3  unchanged
+kxq  p16         3 |         3  unchanged |         3  unchanged
+total           21 |        16            |        15
+
+rounds RESOLVED   OLD 0/11   NEW 4/11
+rounds partial    OLD 3/11   NEW 0/11
+rounds unchanged  OLD 8/11   NEW 7/11
+rounds made worse OLD 0/11   NEW 0/11
+```
+
+**The rule and the model each did half of it, and the rule did the decisive half.** Re-judging the
+OLD arm's own answers under the new introduced-vs-survived rule: **0 of 11 would be accepted** —
+every one of them introduced a fault, including the three the count rule waved through as
+"partial". The old mechanism's only three wins were fault-swaps. Its re-roll signature is visible
+in the raw numbers too: on rts p13 it came back with 4 findings where it started with 1, on kxq p16
+with 4 where it started with 3, and on kxq p10 it returned an unusable brief.
+
+The 7 rounds the new loop still refuses all have the same shape: the correction resolved every
+finding it was sent and introduced exactly one —
+`interaction_multiple_actions` ×4, `interaction_object_shared_hands` ×1, `element_uncited` ×2. Five
+of the seven are interaction faults that **could not fire before**: the finding being corrected was
+`brief_field_dropped` for `interactions[].action`, and that field is what the one-action and
+hand-off counts are computed from. Restoring it makes the checks able to run, so those faults were
+newly VISIBLE, not necessarily newly created (`iterateBeat.js`: "an absent counter is not a clean
+score"). `judgeCorrection` cannot tell the two apart and refuses — correctly under the rule as
+specified, but it means the page ships with its ORIGINAL faults instead of a brief whose only
+remaining fault was previously being hidden. Logged for the owner in `tasks/BACKLOG.md`.
+
+A failed correction now costs the improvement and nothing else: the re-ask is wrapped so a provider
+error leaves the rewrite standing and ships it flagged. The old code's own comment promised exactly
+that ("a gate is a guideline and an iterate round is paid, so this never fails the round") while an
+exception inside the re-ask threw straight out of `iteratePageCore` and destroyed the paid round.
+
+**Cost.** Measured, from the provider's own billing lines on those 22 replay calls: the corrector
+goes from **$0.0026 (CHF 0.0021) per call on `qwen-plus` to $0.0598 (CHF 0.0493) on
+`deepseek-v4-pro`** — 23x, because DeepSeek is a reasoning model and spends ~14,600 output tokens
+per correction against qwen's ~1,230. Per story, the old loop fired 16 calls over these 11 rounds
+(declaration family 11/11, declared set 5/11) and the new one fires 11, so at these stories' ~5.5
+iterate rounds each: **$0.021 → $0.329 per story, a delta of +$0.308 = +CHF 0.254**, roughly +7% on
+the ~$4.4 production story. Total replay spend: $0.686 (CHF 0.57). Rates are the vendor's live ones
+that day (`GET https://openrouter.ai/api/v1/models`: qwen-plus $0.26/$0.78, deepseek-v4-pro
+$1.60/$3.20 per 1M; USD→CHF 0.82449) — note the repo's own price table has deepseek at
+$0.435/$0.87, which is 3.7x low and is filed in `tasks/BACKLOG.md`. `gemini-3.1-pro` (the first Art
+Director's model) is $2.00/$12.00 and would be dearer still; `qwen-plus` is the cheap option and is
+the one that resolves nothing.
+
+**Touched files:** `server/lib/briefCorrection.js` (new), `server/lib/images.js`,
+`server/lib/beatsPipeline.js`, `server/config/models.js`, `scripts/admin/sibling-registry.json`,
+`tests/unit/brief-corrective-loop-shared.test.ts` (new),
+`tests/unit/iterate-declared-set-and-page-range.test.ts`,
+`tests/unit/iterate-rewrite-keeps-the-brief.test.ts`, `tests/unit/iterateBeat.test.ts`,
+`tasks/BACKLOG.md`
+
+**Status:** ✅ active
+
 ## 2026-09-17 — An object several characters touch is staged where all of them can reach it
 
 **Context.** Staging `job_1789584708605_rts4wqupm` p6 shipped with TWO of the story's one object
