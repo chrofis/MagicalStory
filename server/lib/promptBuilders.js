@@ -2513,6 +2513,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     ONE_INSTANT: ONE_INSTANT_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
@@ -2790,6 +2791,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     ONE_INSTANT: ONE_INSTANT_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
@@ -3215,6 +3217,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     ONE_INSTANT: ONE_INSTANT_RULE,
     GAZE_TARGET: GAZE_TARGET_RULE,
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
@@ -6817,6 +6820,34 @@ const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so
 
 const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, `camera`, or `away`. It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 
+/**
+ * ONE contract for the `expression` field, at every site that writes a brief.
+ *
+ * `characters[].expression` (with `looksAt`) is the ONLY thing that builds the
+ * EXPRESSIONS AND EYES block in the protected tail of the image prompt — no
+ * field, no block. Measured on staging job_1789584708605_rts4wqupm p4,
+ * 2026-09-17, 19 Lab renders (#1299-#1313): every one of the 8 arms whose
+ * character object carried no `expression` came back with a mild smile aimed at
+ * the camera, on a page whose beat is a child listening to a sound. The 5 arms
+ * that carried one were obeyed 5/5.
+ *
+ * The field was contracted at only two of the four brief-authoring sites:
+ * scene-expansion-all.txt ("required for every character") and
+ * scene-iteration.txt ("for foreground/midground characters add `expression`").
+ * scene-expansion.txt and scene-iteration-free.txt named it in their JSON
+ * examples and nowhere in their rules -- and a rewrite that drops it deletes the
+ * block for the rest of that page's life. Those two templates keep their format
+ * sentences; this constant is the contract all four now share.
+ *
+ * NOT here, deliberately: any particular eye state. "eyes closed, listening" was
+ * obeyed 4/4 and the owner rejected the result -- a child with his eyes shut
+ * reads as ASLEEP, not as listening. The shipped brief's own wording ("eyes wide
+ * open, neutral mouth, focused", gaze on a surface beside him) is what reads as
+ * listening, re-measured in arm FO. What is contracted is that the face is
+ * stated at all.
+ */
+const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `expression`, and a rewrite carries it through. A page whose beat is a character sensing something — listening, feeling, watching, smelling — states that in the eyes and mouth as much as in the pose.";
+
 const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both state the character is WITHOUT it and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once.";
 
 const WORN_ON_OTHER_RULE = "When the page has a character other than the item's owner wearing it, the row is `state: \"worn\"` plus `wearer` naming that character — not `off`. The prose puts the item on the wearer and on nobody else; the owner's description does not mention it.";
@@ -8518,6 +8549,7 @@ module.exports = {
   ONE_INSTANT_RULE,
   GAZE_TARGET_RULE,
   LOOKS_AT_FIELD_RULE,
+  EXPRESSION_FIELD_RULE,
   GARMENT_REMOVED_RULE,
   WORN_ON_OTHER_RULE,
   ABSENT_THING_RULE,

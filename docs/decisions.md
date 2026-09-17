@@ -354,7 +354,7 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
-## 2026-09-17 — A non-hand contact gets no hand row: the brief says where the hands are instead
+## 2026-09-17 — A non-hand contact gets no hand row, and a face reaches the painter only through `expression`
 
 **Context.** Staging `job_1789584708605_rts4wqupm` p4. The page text has the child lay his EAR on
 the egg and hear a knock through the shell. Every shipped render put a HAND on the egg and no part
@@ -365,49 +365,62 @@ hands free or grounded", and answered that by declaring TWO more interactions fo
 character — a hand on the ground for balance, a hand bracing on a root — while the prose said
 nothing about the hands at all. `buildExactPosesBlock` re-anchors one pose line per row, so the
 protected tail instructed the painter about that character's hands twice and about the ear once.
+Separately, every experimental brief that dropped `characters[].expression` came back with a mild
+smile aimed at the camera, on a page whose beat is a child listening.
 
-**Decision.** `CONTACT_VERB_RULE` (`server/lib/promptBuilders.js`) gains its second half: a
-character whose contact is made with something other than the hands is given no second interaction
-row for a hand — no brace, no balance, no steadying touch — and the prose states where both hands
-are and that they are off the object. One constant, already injected through `{CONTACT_VERB}` at
-the four sites that author or rewrite a page brief (`scene-expansion.txt`,
-`scene-expansion-all.txt`, `scene-iteration.txt`, `scene-iteration-free.txt`), so no template file
-changed.
+**Decision — two contracts, both one constant reaching all four brief-authoring sites.**
+1. `CONTACT_VERB_RULE` gains its second half: a character whose contact is made with something
+   other than the hands is given no second interaction row for a hand — no brace, no balance, no
+   steadying touch — and the prose states where both hands are and that they are off the object.
+   It already travels through `{CONTACT_VERB}` at all four sites, so no template changed for it.
+2. New `EXPRESSION_FIELD_RULE`, declared as `{EXPRESSION_FIELD}` in all four templates
+   (`scene-expansion.txt`, `scene-expansion-all.txt`, `scene-iteration.txt`,
+   `scene-iteration-free.txt`) and registered as an anchor of the `art-director-vs-iterate` sibling
+   set: every foreground or midground character carries `expression`, a rewrite carries it through,
+   and a sensing beat states itself in the eyes and mouth as much as in the pose. The field was
+   contracted at only TWO of the four sites before this — `scene-expansion.txt` and
+   `scene-iteration-free.txt` named it in a JSON example and in no rule — and it is the only input
+   that builds the `EXPRESSIONS AND EYES` block of the protected tail. **No eye state is
+   prescribed**, deliberately; see the negative below.
 
-**Rationale — measured over 18 Lab renders of p4** (experiments #1299–#1312, Grok Imagine 2.0,
+**Rationale — measured over 19 Lab renders of p4** (experiments #1299–#1313, Grok Imagine 2.0,
 `noBackground: true`, every prompt verified un-shrunk: the sent body is byte-identical to the
 offline build).
 
-| brief shape | renders | hand OFF the object |
+| brief shape | renders | outcome |
 |---|---|---|
-| hand rows declared, or no prose statement of where the hands are | 6 | **0** |
-| one interaction row + prose putting both hands off the object | 12 | **7** |
+| hand rows declared, or no prose statement of where the hands are | 6 | hand off the object **0** |
+| one interaction row + prose putting both hands off the object | 12 | hand off the object **7** |
+| no `characters[].expression` | 8 | face not a camera-facing smile **0** |
+| `characters[].expression` declared | 5 | the declared face rendered **5** |
 
-The lever is real (0 % → 58 %) and it is NOT deterministic: a byte-identical repeat of a clean arm
-came back with a hand on the object. One render on this page proves nothing on its own.
+The hands lever is real (0 % → 58 %) and NOT deterministic: a byte-identical repeat of a clean arm
+came back with a hand on the object. One render on this page proves nothing on its own. The
+expression lever is the only one in the set that held 5/5.
 
 **Negative results, recorded so nobody re-runs them.**
-- *Giving a hand its own pose row is worse than saying nothing about the hands.* That is the defect
-  above; it is what the stored brief did.
+- *Eyes closed is WRONG.* "eyes closed, listening" was obeyed 4/4 and the owner rejected every
+  result: a child with his eyes shut reads as ASLEEP, not as listening, and on the lying-down arm
+  it reads as unambiguously asleep. The page's own original brief already had the right wording —
+  `eyes wide open, neutral mouth, focused`, gaze on a surface beside him — and re-measuring it (arm
+  FO) gave the best render of the whole run: head on the object, both hands off it, neutral mouth,
+  eyes open and off the camera. The expression was never the defect; losing the block was.
+  **Do not encode an eye state in any rule.**
+- *Giving a spare hand its own pose row is worse than saying nothing about the hands.* That is the
+  defect above; it is what the stored brief did.
 - *Restaging the object onto a new support at head height* was obeyed as staging 4/4 and cancelled
   the contact every time — including in the arm that also declared a close-up, where the close-up
   was ignored, a full figure was drawn and the head↔object contact of the arm it was built from was
   lost. Two staging instructions competed and the wider one won.
 - *Naming the ear emphatically* ("the part touching the shell is his RIGHT EAR"; "his other ear
   points at the sky") — ear 0/2. *Lying the character down so the head rolls onto the object* —
-  ear 0/1, and it reads as asleep rather than listening. *The "pillow" idiom* put the head on the
-  character's own hand. Across all 18 renders the contact came out as cheek or jaw and the
-  anatomical ear **0/18**. The ear is not reachable from this model by prose. Cheek-to-object
-  contact is the achievable version of the beat, and it reads correctly — a viewer sees a child
-  with his head laid against the object, listening — provided the eyes are shut.
-- *The auto scale rider* that a Visual Bible handle adds to the pose line did not hold the element's
+  ear 0/1. *The "pillow" idiom* put the head on the character's own hand. Across all 19 renders the
+  contact came out as cheek or jaw and the anatomical ear **0/19**. The ear is not reachable from
+  this model by prose; cheek-to-object contact is the achievable version of the beat, and with the
+  face stated it reads as a child listening.
+- *The auto scale rider* a Visual Bible handle adds to the pose line did not hold the element's
   size: arms carrying it rendered the object at 1.2–1.5× the head; arms whose PROSE said
   "head-sized" measured 0.89×. Scale travels in the prose, not in the rider.
-- *The `characters[].expression` field is what makes a listening beat read as listening.* "eyes
-  closed, listening" was obeyed 4/4; every arm whose character object carried no `expression`
-  rendered a mild smile aimed at the camera, 0/8 — the `EXPRESSIONS AND EYES` block exists only when
-  that field does. Not shipped as a rule: it is an authorial choice inside a field the Art Director
-  already has, and eyes-shut on a lying figure reads as asleep.
 
 **NOT shipped — the framing half, an owner decision.** The strongest single signal in the run is
 that a brief declaring `shot: close-up` produced head-to-object contact **9/10**, where medium-shot
@@ -418,13 +431,18 @@ close-up* — and p4, a child kneeling at a hollow among tree roots, is exactly 
 planner chose `medium` correctly under its own rule; preferring a close-up here reverses a
 documented decision on one page of evidence. The plan counters themselves do not object —
 `SHOT_CLOSEUP_COUNT` fires below two close-ups, so a preference would help it, and `SHOT_VARIETY` /
-`CONSECUTIVE_SAME_SHOT_CAST` are only at risk if this page class were common, which it is not. The
-collision is with the decision, not with the counters. Carried to `tasks/BACKLOG.md` for the owner.
+`CONSECUTIVE_SAME_SHOT_CAST` only bite if this page class were common, which it is not. The
+collision is with the decision, not with the counters. A confound is also unresolved: every
+close-up arm's prose said "head and object fill the frame", so the enum and the prose travel
+together and one page cannot separate them. Carried to `tasks/BACKLOG.md` for the owner.
 
-**Touched files.** `server/lib/promptBuilders.js` (`CONTACT_VERB_RULE` and its evidence comment),
-`tests/unit/brief-authoring-contracts.test.ts` (section 9 — arrival at all four brief-authoring
-sites from p4's real plan line and stored brief, plus the pose-line structure a supportive hand row
-produces), `tasks/BACKLOG.md`.
+**Touched files.** `server/lib/promptBuilders.js` (`CONTACT_VERB_RULE`, new
+`EXPRESSION_FIELD_RULE`, both evidence comments, the three placeholder maps, the export),
+`prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`, `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt` (one `{EXPRESSION_FIELD}` rule line each),
+`scripts/admin/sibling-registry.json` (the new anchor on `art-director-vs-iterate`),
+`tests/unit/ad-iterate-parity.test.ts`, `tests/unit/brief-authoring-contracts.test.ts`
+(sections 9 and 10), `tasks/BACKLOG.md`.
 **Status:** ✅ active.
 
 ## 2026-09-17 — One corrective loop: the authored brief and the rewritten brief answer their findings the same way

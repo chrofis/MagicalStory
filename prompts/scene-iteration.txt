@@ -16,6 +16,7 @@
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
 6b. **One gaze target.** {GAZE_TARGET}
 6c. **Eyes are a field.** {LOOKS_AT_FIELD}
+6d. **A face is a field.** {EXPRESSION_FIELD}
 7. **Physically possible.** Two hands = max two items. Fix conflicts.
 8. **Honor perspectives.** If the outline lists `perspective: back view`, render shoulders, head, hips, both feet turned away; heels visible, toes pointing away. For `over-the-shoulder`, the OTS character fills the near foreground (back view, shoulder + head visible), the watched subject sits midground/background.
 9. **Body-facing vocabulary (discrete only).** Pick one of: `facing the camera`, `facing left`, `facing right`, `back view`. Never write fractional turns ("three-quarters", "two-thirds toward", "45-degree", "angled three-quarters"). For a glance back, write `back view, glancing over the shoulder toward [target]`.

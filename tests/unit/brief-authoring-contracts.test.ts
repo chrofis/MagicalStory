@@ -160,13 +160,15 @@ describe('the brief-authoring contracts reach every site that writes a brief', (
     for (const name of [
       'CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE',
       'CONTACT_VERB_RULE', 'REACHABLE_CONTACT_RULE', 'ELEMENT_ENTRY_PAGE_RULE',
+      'EXPRESSION_FIELD_RULE',
     ]) {
       expect(typeof PB[name], `${name} is not exported`).toBe('string');
       expect(PB[name].length, name).toBeGreaterThan(40);
     }
   });
 
-  for (const rule of ['CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE', 'CONTACT_VERB_RULE', 'REACHABLE_CONTACT_RULE']) {
+  for (const rule of ['CONCEALED_OBJECT_RULE', 'STAGED_PROP_RULE', 'CONTACT_VERB_RULE',
+    'REACHABLE_CONTACT_RULE', 'EXPRESSION_FIELD_RULE']) {
     it(`all four brief-authoring sites carry ${rule}, from that one constant`, () => {
       for (const [site, prompt] of Object.entries(built)) {
         expect(prompt.includes(PB[rule]), `${site} lost ${rule}`).toBe(true);
@@ -438,5 +440,64 @@ describe('the non-hand contact contract reaches every site that writes or rewrit
     expect(poseLines.length).toBe(1);
     expect(poseLines[0], 'the one pose line lost the declared contact').toContain('presses his right ear flat');
     expect(/\bhand\b/.test(poseLines[0]), 'a hand reached the only pose line').toBe(false);
+  });
+});
+
+// ── 10. A face reaches the painter only through `expression` ────────────────
+
+/**
+ * The EXPRESSIONS AND EYES block of the protected tail is built from
+ * `characters[].expression` and `looksAt` and from nothing else — no field, no
+ * block. On p4 (2026-09-17) every arm whose character object carried no
+ * `expression` came back with a mild smile aimed at the camera on a page whose
+ * beat is a child listening: 0 of 8. The 5 arms that carried one were obeyed.
+ * The field was contracted at only two of the four sites that author a brief,
+ * so a rewrite through either of the other two deletes the block for the rest of
+ * that page's life.
+ *
+ * Pinned here: STRUCTURE — the block exists exactly when the field does, and it
+ * sits in the protected tail. No eye state is asserted: "eyes closed" was
+ * obeyed and rejected (it reads as asleep), so the contract is that the face is
+ * stated, never what it states.
+ */
+describe('the face block exists exactly when the brief declares a face', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  const briefWith = (charExtra: Record<string, unknown>) => `Levin has laid his head sideways onto the egg. Both hands in his lap, off it.
+
+---METADATA---
+${JSON.stringify({
+    sceneIntent: 'Levin lays his head on the egg.',
+    characters: [{ name: 'Levin', clothing: 'standard', position: 'beside the root', depth: 'foreground', ...charExtra }],
+    shot: 'medium',
+    objects: ['ART001'],
+    interactions: [{
+      character: 'Levin', object: 'ART001',
+      where: 'presses his ear flat to the egg; both hands in his lap, off it',
+      action: 'listening', hands: false, storyRelevant: true, priority: 'essential',
+    }],
+  })}`;
+
+  it('a character with no expression and no gaze gets no face block at all', () => {
+    const prompt = String(PB.buildImagePrompt(briefWith({}), inputData, [ROSTER[0]], VISUAL_BIBLE, 4, null, {}));
+    expect(prompt).not.toContain('EXPRESSIONS AND EYES');
+  });
+
+  it('the declared face rides the protected tail, verbatim, beside the pose', () => {
+    const prompt = String(PB.buildImagePrompt(
+      briefWith({ expression: 'eyes wide open, neutral mouth, focused', looksAt: 'the earth beside him' }),
+      inputData, [ROSTER[0]], VISUAL_BIBLE, 4, null, {}));
+    const tail = protectedTail(prompt);
+    expect(tail, 'the prompt has no protected tail').not.toBe('');
+    expect(tail, 'the face block left the protected tail').toContain('EXPRESSIONS AND EYES');
+    const faceLine = tail.split('\n').find(l => l.includes('eyes wide open')) || '';
+    expect(faceLine, 'the declared expression never reached the tail').not.toBe('');
+    expect(faceLine, 'the declared gaze never reached the tail').toContain('the earth beside him');
+  });
+
+  it('a gaze alone still builds the block — the two fields share one line', () => {
+    const prompt = String(PB.buildImagePrompt(
+      briefWith({ looksAt: 'the earth beside him' }), inputData, [ROSTER[0]], VISUAL_BIBLE, 4, null, {}));
+    expect(prompt).toContain('EXPRESSIONS AND EYES');
   });
 });

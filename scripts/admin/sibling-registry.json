@@ -309,6 +309,7 @@
           "{ONE_INSTANT}",
           "{GAZE_TARGET}",
           "{LOOKS_AT_FIELD}",
+          "{EXPRESSION_FIELD}",
           "{GARMENT_REMOVED}",
           "{WORN_ON_OTHER}",
           "{NEVER_NAME_ABSENT}",
