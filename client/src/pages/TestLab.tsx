@@ -1730,8 +1730,16 @@ function TextRefineView({ result }: { result: ExperimentResult }) {
                 {r.cost != null && ` · $${r.cost.toFixed(4)}`}
                 {' · '}rewrote: {r.changedPages?.length ? r.changedPages.join(', ') : <span className="text-emerald-600">nothing — converged, stopped here</span>}
                 {!!r.strayPages?.length && <span className="text-amber-600"> · ignored out-of-range page {r.strayPages.join(', ')}</span>}
-                {r.appliedCount != null && (
-                  <span>{' · '}{r.appliedCount} of {(r.findings || []).length} finding(s) applied</span>
+                {/* "X of N findings" only where an APPLIER placed quoted spans —
+                    the lector and the diff, the two rounds that carry a
+                    `findings` list. The whole-page passes (repair /
+                    repetition_fix / length_fix) rewrite wholesale, so their
+                    appliedCount is a PAGE count and `rewrote:` above already
+                    shows it; rendering the findings phrasing there read
+                    "18 of 0 finding(s) applied". `findings` is the exact
+                    discriminator — no hand-kept list of round kinds. */}
+                {r.appliedCount != null && Array.isArray(r.findings) && (
+                  <span>{' · '}{r.appliedCount} of {r.findings.length} finding(s) applied</span>
                 )}
                 {!!r.droppedFindings?.length && (
                   <span className="text-red-600">

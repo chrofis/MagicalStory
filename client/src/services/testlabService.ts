@@ -362,8 +362,13 @@ export interface RefineRound {
   changedFromOriginal?: number[];
   converged?: boolean;
   findingsCount?: number;
-  /** Lector only: its quoted-span findings and what the code-side applier did. */
+  /**
+   * The APPLIER rounds only (lector, diff): their quoted-span findings. Its
+   * presence is what tells the renderer `appliedCount` is counted in findings —
+   * the whole-page passes carry no list and count pages.
+   */
   findings?: { pageNumber: number; quote: string; correction: string }[];
+  /** Findings placed, for an applier round; pages rewritten, for a whole-page pass. */
   appliedCount?: number | null;
   droppedCount?: number | null;
   droppedFindings?: { pageNumber: number; quote: string; reason: string }[];

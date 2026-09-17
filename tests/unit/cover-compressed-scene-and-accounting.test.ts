@@ -181,6 +181,22 @@ describe('every text-refine round records how much it landed', () => {
     expect(pipeline).not.toContain('// Lector only: how many of its findings');
   });
 
+  it('only an APPLIER round carries a findings list, so the unit is readable', () => {
+    // `findings` is set by the lector and the diff entries and by nothing else;
+    // runRepairPass records findingsCount but never a list. That is the exact
+    // discriminator the Lab renderer uses to pick the unit.
+    expect((textRefine.match(/^\s+findings: (?:diff|lector)Findings\.map\(/gm) || []).length).toBe(2);
+    expect(textRefine).not.toMatch(/appliedCount: changedPages\.length,[\s\S]{0,400}?^\s+findings:/m);
+  });
+
+  it('the Lab shows "X of N findings" only for a round that has findings', () => {
+    // Without the guard a whole-page round rendered "18 of 0 finding(s)
+    // applied" the moment appliedCount stopped being null.
+    const lab = read('client/src/pages/TestLab.tsx');
+    expect(lab).toContain('r.appliedCount != null && Array.isArray(r.findings)');
+    expect(lab).not.toContain('{r.appliedCount} of {(r.findings || []).length}');
+  });
+
   it('a wholesale round counts only pages whose text actually changed', () => {
     // The rule the implementation encodes: a returned page identical to the
     // base is not an application, exactly as a dropped lector finding is not.
