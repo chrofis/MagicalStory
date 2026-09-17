@@ -398,6 +398,21 @@ measurement, is lost).
       times the visible answer. Every per-story cost figure that includes a DeepSeek call is low.
       Re-check the whole table against the API, not against a repo comment.
       → `server/config/models.js:1119`
+- [ ] **A newly VISIBLE fault is refused as a newly CREATED one — 7 of 11 rounds** (measured
+      2026-09-17 on the live replay of the 11 stored iterate rounds). The shared corrector resolves
+      every finding it is sent on those 7 rounds and introduces exactly one:
+      `interaction_multiple_actions` ×4, `interaction_object_shared_hands` ×1, `element_uncited` ×2.
+      Five of the seven are interaction faults that **could not fire before the correction**: the
+      finding being corrected was `brief_field_dropped` for `interactions[].action`, and that field
+      is what the one-action and hand-off counts are computed from, so restoring it switches those
+      checks back on (`iterateBeat.js`: "an absent counter is not a clean score").
+      `briefCorrection.judgeCorrection` cannot tell "this fault is new" from "this fault was always
+      there and is now measurable", and refuses — so the page ships with its ORIGINAL faults rather
+      than a brief whose only remaining fault was previously hidden. Options: a second corrective
+      round on the introduced fault only; exempting the types a restored field unmasks; or leaving
+      it (the refusal is conservative and correct under the rule as the owner stated it). This is an
+      acceptance-rule change, so it is the owner's call.
+      → `server/lib/briefCorrection.js`, `docs/decisions.md` (2026-09-17 "One corrective loop")
 - [ ] **The brief corrector costs ~$0.048/call against the rewriter's ~$0.003 — confirm the trade**
       (raised 2026-09-17, shipped as `briefCorrectionModel`). The re-ask had to leave `qwen-plus`:
       on the 11 stored rounds the old loop resolved nothing. Measured spend and the per-story delta
