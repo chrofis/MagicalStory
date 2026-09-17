@@ -3170,6 +3170,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
         STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
+      // The rewrite restates every character's appearance from CHARACTER
+      // DETAILS, which is where a declared colour drifts — see
+      // DECLARED_TRAIT_VERBATIM_RULE. One constant, both iterate templates,
+      // filled from this one call site.
+      DECLARED_TRAIT_VERBATIM: DECLARED_TRAIT_VERBATIM_RULE,
     });
     // Text-overlay-only rules gate:
     // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,
@@ -6564,6 +6569,30 @@ const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the char
  */
 const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page the story first brings it in \u2014 handed over, found, taken out, put on \u2014 even when that page's plan line is about something else. That is the page the reader learns what it looks like on.";
 
+/**
+ * ONE contract for how a DECLARED trait reaches the prose, for both iterate
+ * templates — the stage that rewrites a whole brief from the CHARACTER DETAILS
+ * block it is given.
+ *
+ * The rewriter is told to "weave each named character's appearance on first
+ * mention from CHARACTER DETAILS ... as flowing language, not a labeled list",
+ * and weaving is where the colour words go. Measured on staging
+ * job_1789584708605_rts4wqupm p16: the prompt that was SENT states `Eyes:
+ * green. Hair: light blonde, wavy, short, tousled`, and the round-1 rewrite came
+ * back with the entry's own three shape words and a different colour on each
+ * trait — hair and eyes both. A second character on the same page had one shade
+ * shifted. The page shipped that brief. This is NOT the locked-cast gap
+ * (649908242): every drifted character was in the locked cast with its entry in
+ * hand. Same class on the previous run's p7 and p16.
+ *
+ * The Art Director templates carry the same weaving instruction and the same
+ * corpus shows no drift from them — they copy the entry's words — so the rule
+ * is declared where it is measured. It is a constant rather than two hand-kept
+ * sentences: the pair is a registered sibling set (scene-iteration-templates)
+ * filled by ONE call site.
+ */
+const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair colour and cut, eye colour, skin tone, a distinctive feature — reaches the prose in that entry's own words. The sentence around it is yours to write; the trait words are not. Reordering them is fine (`Hair: <colour>, wavy, short` may be written as `short wavy <colour> hair`); a neighbouring shade, a shade the entry leaves unstated, or a trait written from memory is a different character.";
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -8219,6 +8248,7 @@ module.exports = {
   CONCEALED_OBJECT_RULE,
   STAGED_PROP_RULE,
   CONTACT_VERB_RULE,
+  DECLARED_TRAIT_VERBATIM_RULE,
   ELEMENT_ENTRY_PAGE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,

@@ -17,6 +17,7 @@
 9. **Body-facing vocabulary (discrete only).** Pick one of: `facing the camera`, `facing left`, `facing right`, `back view`. Never write fractional turns ("three-quarters", "two-thirds toward", "45-degree", "angled three-quarters"). For a glance back, write `back view, glancing over the shoulder toward [target]`.
 10. **Position language is relational.** Describe positions by what the character touches, faces, or is near (`on the boat`, `behind the desk`, `at the doorway`, `beside the tree`, `in the foreground`, `in the background`). Reach for `left`/`right` only when the action genuinely demands it — pointing/aiming/reaching at a specific target across the frame,<!-- TEXT_OVERLAY_BEGIN --> the textPosition rule below,<!-- TEXT_OVERLAY_END --> distance separation in an ultra-wide shot, or when cross-page continuity must be preserved (same location, characters were on the same side last scene).
 11. **Age = apparent-age category.** Use the `Looks:` category from CHARACTER DETAILS verbatim (`school-age boy`, `teenager`, `middle-aged man`). Never numeric years.
+11a. **A declared trait is copied, not recalled.** {DECLARED_TRAIT_VERBATIM}
 12. **No collective nouns.** ❌ "the children" ✅ name each character, or "all three", "the group".
 13. **No closed eyes, no pointing-as-cliché.** Open eyes; use looking, walking toward, reaching, discovering instead of pointing.
 <!-- TEXT_OVERLAY_BEGIN -->

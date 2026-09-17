@@ -354,6 +354,114 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — A repair aimed at a figure it cannot paint, and three places a step's own report went unchecked
+
+**Context.** Four separate silences on staging `job_1789584708605_rts4wqupm`, each one a step
+reporting less than it knew.
+
+1. **A char fix was routed at a figure that has no reference.** p11's plan line stages a
+   secondary the story INVENTED (`cast.invented`), its Visual Bible entry exists (`CHR001`, pages
+   11/13/17), the detector found it on the page (`bboxDetection.figures`: the protagonist and
+   that figure), the entity check filed a CRITICAL on it, and `decideRepairMethod` routed a
+   char fix. The round then died at `characters.find(c => c.name === charName)` with
+   `character <name> not found` — a sentence that reads as a typo or a detection miss on a page
+   where the figure is plainly there. What is missing is the REFERENCE a repaint copies from: a
+   char fix paints a figure to match a styled avatar or an uploaded face photo, both of which
+   hang off the roster entry an invented figure has never had. Its reference-sheet CELL is not an
+   avatar and nothing in that path reads it. The page's repair round was spent on a certain
+   failure; the same shape sits in the manual endpoint (`Character "X" not found`).
+2. **The Lab's scene-review replay saw less than production.** Production passes
+   `{ clothingFindings, briefFindings, beats, visualBible }`; the replay passed three of four.
+   `e1430bb99` closed the `visualBible` half of exactly this gap the day before.
+3. **A finding-shaped line the lector parser cannot read was dropped in silence.** Skipping
+   unparseable lines is right for a model musing between findings and wrong for a malformed
+   finding — the two were indistinguishable, so a reply offering nine findings could be reported
+   as "7 findings, 7 applied, 0 dropped".
+4. **A whole-page repair pass's own report was never checked against its output.** `0fd27918b`
+   made every merged finding resolve to an outcome; the strongest of those outcomes,
+   `page-rewritten`, still conflated "returned and rewritten" with "returned and identical",
+   and nothing said which pages the pass rewrote that no finding had named.
+
+**Decision.**
+
+**A figure with no reference is declined at the router, and every entry point says why.**
+`charFixReferenceGap()` (`server/lib/charRepairTarget.js`) is the ONE answer to "can a char fix
+paint this figure at all", matched canonically against the roster. `decideRepairMethod` takes the
+roster as `options.characters` and both char-fix gates — the CRITICAL entity gate and the clothing
+figure-redo gate — decline a figure it cannot execute on, with a WARN naming the reason; the page
+falls through to the remaining gates exactly as it would with no such finding (p11 replays to
+`inpaint`, not to a wasted round). Absent the option, routing is unchanged, so no caller that does
+not carry the roster loses a repair. The executor and the manual endpoint report the same
+sentence. `char_repair_skip_no_reference` counts it.
+
+**This does NOT widen what a char fix can do.** Giving an invented figure a repaintable reference
+(from its sheet cell, say) is a separate decision and is not taken here — invented figures remain
+unrepairable, and now say so honestly instead of failing with a wrong cause.
+
+**The replay is handed all four options.** The brief check is recomputed in the stage the way
+`beatsPipeline` computes it — roster plus bible secondaries in the cast list, the plan line from
+the stored `---BEATS---` section, the text-zone rules gate — so the Lab measures the reviewer on
+the input the reviewer actually gets. Verified in-process on that story: no `# BRIEF FAULTS` block
+before, 6 findings and 1,656 prompt chars of block after.
+
+**An unreadable finding line is counted.** `classifyLectorLine()` is the one classification;
+`parseLectorLines()` returns `{ findings, unparsed }` and `parseLectorFindings()` is its findings
+half, byte-identical in behaviour for every existing caller. A line counts as unreadable only when
+it ANNOUNCES itself as a finding (a `PAGE n` marker or an arrow) and then fails to parse — prose
+between findings produces nothing, which is the behaviour the 2026-08-31 withdraw filter relies
+on. Both passes log each one and store `unparsedCount` / `unparsedLines`. Measured first: 33
+staging stories with a stored lector reply, 83 finding-shaped lines, 0 unreadable. This is a
+tripwire on a path that is clean today, not a repair.
+
+**The pass's structural self-report is checked against the diff.** The page blocks a whole-page
+pass returns ARE its claim, and the returned text is the check: `returnedIdentical` (returned as a
+rewrite, byte-identical to the input — now its own finding outcome, `page-returned-identical`) and
+`changedUnasked` (rewritten although no finding named it; three of seventeen pages on this run).
+The repairer's PROSE ledger is still not parsed — that decision stands.
+
+**A declared trait is copied, not recalled.** `DECLARED_TRAIT_VERBATIM_RULE`, one constant into
+both iterate templates through a `{DECLARED_TRAIT_VERBATIM}` placeholder each declares. Evidence:
+p16's iterate prompt as SENT carries `Eyes: green. Hair: light blonde, wavy, short, tousled`, and
+the rewrite it produced reads "wavy, short, tousled brown hair and bright blue eyes" — the entry's
+own three shape words with a different colour on each trait — plus one shade shifted on a second
+character of the same page. Not the locked-cast gap of `649908242`: every drifted character was in
+the locked cast with its entry in hand. A scan of every stored brief version of this run and its
+predecessor puts the class on five pages across the two runs, all of them ITERATE output; the Art
+Director's own briefs copy the entry's words, which is why the rule is declared where it is
+measured.
+
+**Rationale.** Every one of the four is the same defect: a step that knows something and writes
+down less. The router knew the roster; the replay knew the story; the parser knew the line was
+finding-shaped; the pass knew which blocks it had returned. None of these change a score or add a
+judge — three add a counted outcome and one refuses a route that could never have worked.
+
+**The blend gate is NOT loosened.** The same run shows `repair_reject_blend_gate: 6` over five
+char-fix runs, and read per ATTEMPT (three draws per run) that is the retry loop working:
+`char_repair_retry_saved: 2` runs went on to produce an accepted image and one exhausted. The two
+face-gate refusals (p15 round 1, p12 round 2) both name smeared features. Nothing here is evidence
+of a misfiring gate — and the refused frames are not persisted on the pipeline path, so the
+stronger claim cannot be made either way from stored data (the manual endpoint does return
+`attemptFrames`). Logged in `tasks/BACKLOG.md`; no threshold moved.
+
+**NOT closed by any of this:** a finding whose page was rewritten INTO A DIFFERENT FAULT. The
+blind auditor's p13 contradiction was answered on p10 and both paid replays re-found it; the diff
+check above cannot see it (p13 changed, p10 was named by a finding) and no mechanical check can,
+because the FAULT line carries no quoted span. Requiring one in both audit templates, or buying a
+bounded re-audit, are classification decisions and the owner's — `tasks/BACKLOG.md`.
+
+**Touched files.** `server/lib/charRepairTarget.js` (`charFixReferenceGap`),
+`server/lib/repairLogic.js` (both char-fix gates, `options.characters`),
+`server/lib/repairPipeline.js` (router call, executor message, metric),
+`server/routes/regeneration.js` (the manual entry point's message),
+`server/lib/testlab.js` (`runSceneReviewReplayStage` brief findings),
+`server/lib/textRefine.js` (`classifyLectorLine`, `parseLectorLines`, `FINDING_OUTCOME`,
+`resolveFindingOutcomes`, both pass entries), `storyJobPipeline.js` (roundTrace whitelist),
+`server/lib/promptBuilders.js` (`DECLARED_TRAIT_VERBATIM_RULE` + the iterate fill map),
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`tests/unit/repair-reference-and-finding-ledger.test.ts`.
+
+**Status.** ✅ active.
+
 ## 2026-09-17 — A bare citation lands where the bible already put the page, and a look no page reaches says so
 
 **Context.** Staging `job_1789584708605_rts4wqupm`. Three Visual Bible faults were reported in

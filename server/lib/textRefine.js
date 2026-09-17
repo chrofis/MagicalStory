@@ -207,8 +207,15 @@ function mergeAuditFindings(lists = []) {
 const FINDING_OUTCOME = {
   /** The pass returned the page this finding names, rewritten. */
   PAGE_REWRITTEN: 'page-rewritten',
-  /** The pass returned that page unchanged — the finding went unanswered. */
+  /** The pass never returned that page — the finding went unanswered. */
   PAGE_UNCHANGED: 'page-unchanged',
+  /**
+   * The pass RETURNED that page and the text it returned is identical to the
+   * one it was given. A rewrite claimed and not delivered — the only self-report
+   * this step makes that the diff can check, and the two used to collapse into
+   * one `page-unchanged` with no way to tell them apart.
+   */
+  PAGE_RETURNED_IDENTICAL: 'page-returned-identical',
   /** The finding names a page the story does not have (the lector's guard, one level up). */
   NO_SUCH_PAGE: 'no-such-page',
   /** The auditor filed the fault without a page number — nothing can be matched to it. */
@@ -222,12 +229,17 @@ const FINDING_OUTCOME = {
  *
  * @param {Array<{category:string,pageNumber:number|null,text:string,line:string,sources:string[]}>} findings
  * @param {Array<{pageNumber:number}>} pages   the pages the pass was given
- * @param {number[]} changedPages              the pages it returned rewritten
+ * @param {number[]} changedPages              the pages whose text actually differs
+ * @param {number[]} [returnedPages]           the pages the pass CHOSE to return —
+ *        its own structural self-report. Passed, a returned page whose text did
+ *        not move is separated from one the pass never answered. Omitted, both
+ *        stay `page-unchanged`, which is what every earlier caller meant.
  * @returns {Array<Object>} one entry per finding, each with `outcome` and `reason`
  */
-function resolveFindingOutcomes(findings = [], pages = [], changedPages = []) {
+function resolveFindingOutcomes(findings = [], pages = [], changedPages = [], returnedPages = null) {
   const known = new Set((pages || []).map(p => p.pageNumber));
   const changed = new Set(changedPages || []);
+  const returned = Array.isArray(returnedPages) ? new Set(returnedPages) : null;
   return (findings || []).map((f) => {
     if (f.pageNumber == null) {
       return { ...f, outcome: FINDING_OUTCOME.NO_PAGE_NAMED, reason: 'the fault line names no page, so no rewrite can be matched to it' };
@@ -236,7 +248,14 @@ function resolveFindingOutcomes(findings = [], pages = [], changedPages = []) {
       return { ...f, outcome: FINDING_OUTCOME.NO_SUCH_PAGE, reason: `page ${f.pageNumber} is not in this story` };
     }
     if (!changed.has(f.pageNumber)) {
-      return { ...f, outcome: FINDING_OUTCOME.PAGE_UNCHANGED, reason: `the pass returned page ${f.pageNumber} unchanged` };
+      if (returned && returned.has(f.pageNumber)) {
+        return {
+          ...f,
+          outcome: FINDING_OUTCOME.PAGE_RETURNED_IDENTICAL,
+          reason: `the pass returned page ${f.pageNumber} as a rewrite and its text is identical to the one it was given`,
+        };
+      }
+      return { ...f, outcome: FINDING_OUTCOME.PAGE_UNCHANGED, reason: `the pass did not return page ${f.pageNumber}` };
     }
     return { ...f, outcome: FINDING_OUTCOME.PAGE_REWRITTEN, reason: null };
   });
@@ -379,30 +398,79 @@ function bareSpan(s) {
   return String(s || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
 }
 
-function parseLectorFindings(text) {
-  const out = [];
+/**
+ * A line that ANNOUNCES itself as a finding: it opens with the `PAGE <n>` marker
+ * the format requires, or carries the arrow that separates a quote from its
+ * correction. Ordinary prose between findings does neither, which is what keeps
+ * the unparsed count below a measurement rather than a tally of the model's
+ * thinking.
+ */
+const LECTOR_FINDING_SHAPED_RE = /^(?:[-*]\s*)?PAGE\s+\d+|→|->|=>/i;
+
+/**
+ * ONE classification of ONE line, so the parser and the unparsed count can
+ * never disagree about what a finding is.
+ *
+ * @returns {{finding:Object}|{rejected:string}|null}  null = not a finding line at all
+ */
+function classifyLectorLine(rawLine) {
+  const raw = String(rawLine || '').trim();
+  if (!raw) return null;
+  const m = raw.match(LECTOR_LINE_RE);
+  if (!m) return LECTOR_FINDING_SHAPED_RE.test(raw) ? { rejected: 'not in the PAGE n: \'quote\' → \'correction\' format' } : null;
+  const pageNumber = parseInt(m[1], 10);
+  // Strip a trailing parenthetical alternative BEFORE reading the span: the
+  // measured output writes `'x' → 'y' (oder 'z')`, and a first-to-last read
+  // would otherwise swallow `y' (oder 'z`.
+  const lhs = bareSpan(m[2]);
+  const rhs = bareSpan(m[3]);
+  const qs = quotedSpan(lhs);
+  const cs = quotedSpan(rhs);
+  // An unbalanced quote on either side is a malformed line, not a finding.
+  if (qs === false || cs === false) return { rejected: 'a quote is opened and never closed' };
+  const quote = qs ?? lhs;
+  const correction = cs ?? rhs;
+  if (!Number.isFinite(pageNumber)) return { rejected: 'the page number is not a number' };
+  // An explicitly EMPTY correction (`''`) lands here and is rejected: this apply
+  // path substitutes text, it does not delete spans, and a deletion would leave
+  // the surrounding spacing and punctuation broken.
+  if (!quote || !correction) return { rejected: 'one side of the arrow is empty' };
+  if (quote === correction) return { rejected: 'the correction is identical to the quote' };
+  return { finding: { pageNumber, quote, correction, raw } };
+}
+
+/**
+ * Findings AND the finding-shaped lines the parser could not read.
+ *
+ * WHY THE SECOND HALF EXISTS (owner, 2026-09-17). Everything that does not
+ * parse is skipped, and that is correct for a model musing between findings —
+ * but it made a MALFORMED finding indistinguishable from an absent one. The
+ * same class the repair pass's ledger closed one level up: the lector and the
+ * diff would report "7 findings" over a reply that offered nine, and the two
+ * the parser choked on left no trace anywhere.
+ *
+ * Measured before building it: 33 staging stories with a stored proofread reply,
+ * 83 finding-shaped lines, 0 unreadable. So this is a tripwire on a path that is
+ * clean today, not a repair — which is exactly why it must count out loud rather
+ * than be trusted to stay clean.
+ *
+ * @returns {{findings:Array, unparsed:Array<{line:string,reason:string}>}}
+ */
+function parseLectorLines(text) {
+  const findings = [];
+  const unparsed = [];
   for (const raw of String(text || '').split('\n')) {
-    const m = raw.trim().match(LECTOR_LINE_RE);
-    if (!m) continue;
-    const pageNumber = parseInt(m[1], 10);
-    // Strip a trailing parenthetical alternative BEFORE reading the span: the
-    // measured output writes `'x' → 'y' (oder 'z')`, and a first-to-last read
-    // would otherwise swallow `y' (oder 'z`.
-    const lhs = bareSpan(m[2]);
-    const rhs = bareSpan(m[3]);
-    const qs = quotedSpan(lhs);
-    const cs = quotedSpan(rhs);
-    // An unbalanced quote on either side is a malformed line, not a finding.
-    if (qs === false || cs === false) continue;
-    const quote = qs ?? lhs;
-    const correction = cs ?? rhs;
-    // An explicitly EMPTY correction (`''`) falls to the guard below and is
-    // dropped: this apply path substitutes text, it does not delete spans, and
-    // a deletion would leave the surrounding spacing and punctuation broken.
-    if (!Number.isFinite(pageNumber) || !quote || !correction || quote === correction) continue;
-    out.push({ pageNumber, quote, correction, raw: raw.trim() });
+    const verdict = classifyLectorLine(raw);
+    if (!verdict) continue;
+    if (verdict.finding) findings.push(verdict.finding);
+    else unparsed.push({ line: String(raw).trim().slice(0, 300), reason: verdict.rejected });
   }
-  return out;
+  return { findings, unparsed };
+}
+
+/** The findings alone — the shape every existing caller and test reads. */
+function parseLectorFindings(text) {
+  return parseLectorLines(text).findings;
 }
 
 /** Collapse whitespace runs to one space, keeping a map back to source indices. */
@@ -649,10 +717,14 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let lectorFindings = [];
   let lectorApplied = [];
   let lectorDropped = [];
+  // Finding-shaped lines the parser could not read — counted, never skipped in
+  // silence (parseLectorLines).
+  let lectorUnparsed = [];
   let diffReview = '';
   let diffFindings = [];
   let diffApplied = [];
   let diffDropped = [];
+  let diffUnparsed = [];
   let repetition = null;
   let wordBudget = null;
 
@@ -861,9 +933,27 @@ async function refineStoryText(storyData, pages, opts = {}) {
     const strayPages = parsed.pages.map(p => p.pageNumber).filter(n => !expected.includes(n));
     const next = base.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
     const changedPages = next.filter((p, idx) => p.text !== base[idx].text).map(p => p.pageNumber);
-    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages);
+    const returnedPages = parsed.pages.map(p => p.pageNumber);
+    const findingOutcomes = resolveFindingOutcomes(findings, base, changedPages, returnedPages);
     for (const f of unresolvedFindings(findingOutcomes)) {
       log.warn(`⚠️ [TEXT-REPAIR/${kind}] UNANSWERED [${f.category}] p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
+    }
+    // THE PASS'S OWN REPORT, CHECKED AGAINST THE DIFF. A whole-page pass says
+    // what it did in two ways: the page blocks it chose to return, and prose
+    // this file deliberately does not parse. The block list IS checkable —
+    // against the text that came back.
+    //   returnedIdentical  it returned the page as a rewrite and changed nothing
+    //   changedUnasked     it rewrote a page no finding named
+    // Neither kills the run; both were invisible, and on the reference run the
+    // second was three of seventeen pages.
+    const askedPages = new Set(findings.map(f => f.pageNumber).filter(n => n != null));
+    const returnedIdentical = returnedPages.filter(n => !changedPages.includes(n));
+    const changedUnasked = changedPages.filter(n => !askedPages.has(n));
+    if (returnedIdentical.length) {
+      log.warn(`⚠️ [TEXT-REPAIR/${kind}] returned page(s) ${returnedIdentical.join(', ')} as rewritten and the text is unchanged — a claim the diff refutes`);
+    }
+    if (changedUnasked.length) {
+      log.info(`✏️ [TEXT-REPAIR/${kind}] also rewrote page(s) ${changedUnasked.join(', ')}, which no finding named`);
     }
     return {
       next,
@@ -885,9 +975,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
         rawResponse: (r.text || '').slice(0, 40000),
         analysis: (parsed.analysis || '').slice(0, 40000),
         findingsCount: findings.length,
-        returnedPages: parsed.pages.map(p => p.pageNumber),
+        returnedPages,
         strayPages,
         changedPages,
+        // The two diff-checked halves of this pass's own report (above).
+        returnedIdentical,
+        changedUnasked,
         // WHAT THIS ROUND APPLIED, in ITS unit.
         //
         // The whole-page passes (repair / repetition_fix / length_fix) rewrite
@@ -1123,7 +1216,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
       diffReview = String(dr.text || '').trim();
       // The SAME parser and the SAME applier as the lector — the output contract
       // is identical by design, so there is no parallel apply path.
-      diffFindings = parseLectorFindings(diffReview);
+      const diffParse = parseLectorLines(diffReview);
+      diffFindings = diffParse.findings;
+      diffUnparsed = diffParse.unparsed;
+      for (const u of diffUnparsed) {
+        log.warn(`⚠️ [TEXT-DIFF] unreadable finding line — ${u.reason}: ${u.line}`);
+      }
       const result = applyLectorFindings(current, diffFindings);
       diffApplied = result.applied;
       diffDropped = result.dropped;
@@ -1152,6 +1250,10 @@ async function refineStoryText(storyData, pages, opts = {}) {
         appliedCount: diffApplied.length,
         droppedCount: diffDropped.length,
         droppedFindings: diffDropped.map(d => ({ pageNumber: d.pageNumber, quote: d.quote, reason: d.reason })),
+        // Same tripwire as the lector: a finding-shaped line the parser could
+        // not read is counted, never skipped in silence.
+        unparsedCount: diffUnparsed.length,
+        unparsedLines: diffUnparsed,
         changedPages: diffChanged,
         pages: next.map((p, idx) => ({
           pageNumber: p.pageNumber,
@@ -1163,7 +1265,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       });
       current = next;
       publish();
-      log.info(`🔬 [TEXT-DIFF] ${diffModel}: ${pairs.length} rewritten page(s) reviewed, ${diffFindings.length} finding(s), ${diffApplied.length} applied to page(s) ${diffChanged.join(', ') || 'none'}, ${diffDropped.length} dropped, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+      log.info(`🔬 [TEXT-DIFF] ${diffModel}: ${pairs.length} rewritten page(s) reviewed, ${diffFindings.length} finding(s), ${diffApplied.length} applied to page(s) ${diffChanged.join(', ') || 'none'}, ${diffDropped.length} dropped${diffUnparsed.length ? `, ${diffUnparsed.length} unreadable` : ''}, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     } else if (!pairs.length) {
       log.info('🔬 [TEXT-DIFF] the repair pass rewrote nothing — no diff to review');
     } else {
@@ -1216,7 +1318,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
       // below keeps the text as the repair pass left it.
       if (lr.truncation?.suspected) throw new Error(`lector reply ${describeTruncation(lr.truncation)} — findings unusable`);
       proofread = String(lr.text || '').trim();
-      lectorFindings = parseLectorFindings(proofread);
+      const lectorParse = parseLectorLines(proofread);
+      lectorFindings = lectorParse.findings;
+      lectorUnparsed = lectorParse.unparsed;
+      for (const u of lectorUnparsed) {
+        log.warn(`⚠️ [LECTOR] unreadable finding line — ${u.reason}: ${u.line}`);
+      }
       const result = applyLectorFindings(current, lectorFindings);
       lectorApplied = result.applied;
       lectorDropped = result.dropped;
@@ -1244,6 +1351,11 @@ async function refineStoryText(storyData, pages, opts = {}) {
         appliedCount: lectorApplied.length,
         droppedCount: lectorDropped.length,
         droppedFindings: lectorDropped.map(d => ({ pageNumber: d.pageNumber, quote: d.quote, reason: d.reason })),
+        // Finding-shaped lines this reply offered that the parser could not
+        // read. Zero on every measured run; a non-zero one means the reply and
+        // the applied count disagree, and the difference is now visible.
+        unparsedCount: lectorUnparsed.length,
+        unparsedLines: lectorUnparsed,
         changedPages,
         // Same per-page shape as the repair entry, so the Lab renders both
         // steps in one column set instead of special-casing this one.
@@ -1257,7 +1369,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       });
       current = next;
       publish();
-      log.info(`✍️  [LECTOR] ${lectorModel}: ${lectorFindings.length} finding(s), ${lectorApplied.length} applied to page(s) ${changedPages.join(', ') || 'none'}, ${lectorDropped.length} dropped, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+      log.info(`✍️  [LECTOR] ${lectorModel}: ${lectorFindings.length} finding(s), ${lectorApplied.length} applied to page(s) ${changedPages.join(', ') || 'none'}, ${lectorDropped.length} dropped${lectorUnparsed.length ? `, ${lectorUnparsed.length} unreadable` : ''}, in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
     }
   } catch (le) {
     log.warn(`⚠️ [LECTOR] failed (${le.message}) — text kept as the repair pass left it`);
@@ -1467,6 +1579,8 @@ module.exports = {
   countPageWords,
   buildWordBudgetFindings,
   parseLectorFindings,
+  parseLectorLines,
+  classifyLectorLine,
   quotedSpan,
   applyLectorFindings,
   locateQuote,

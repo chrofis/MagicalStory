@@ -6881,18 +6881,61 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
   const outlineBeats = parseBeats(beatsSection).pages;
 
+  // BRIEF CONTRADICTIONS — the fourth option production passes, and the last
+  // one this stage was missing (the bible half was closed a day earlier in
+  // e1430bb99; clothing and beats were already here). Deterministic, so a
+  // replay regenerates the same block production computed: prose against the
+  // brief's own metadata, the cast (roster + bible secondaries) and the bible,
+  // with the plan line carrying the element-coverage check. Without it
+  // {BRIEF_FINDINGS} filled empty and the replay could not reproduce a single
+  // cast_unlisted / element_uncited / vb_state_* rewrite the production run
+  // made — the stage measures the reviewer, and it was measuring it on less
+  // than the reviewer is given.
+  let briefFindingsBlock = '';
+  try {
+    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
+    const { textZoneRulesActive } = require('../config/runtime');
+    const planLineOf = (pageNumber) => (outlineBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
+    // Same cast list as beatsPipeline: the uploaded roster PLUS the bible's
+    // secondaries, or a figure the story invented can never trigger cast_unlisted.
+    const secondaryList = Array.isArray(storyData.visualBible?.secondaryCharacters)
+      ? storyData.visualBible.secondaryCharacters
+      : Object.values(storyData.visualBible?.secondaryCharacters || {});
+    const seenCast = new Set();
+    const castNames = [
+      ...(storyData.characters || []).map(c => c && c.name),
+      ...secondaryList.map(c => c && c.name),
+    ].filter(Boolean).filter((n) => {
+      const k = String(n).trim().toLowerCase();
+      if (!k || seenCast.has(k)) return false;
+      seenCast.add(k);
+      return true;
+    });
+    const briefRes = checkBriefs(
+      scenes.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
+      castNames,
+      storyData.visualBible,
+      { textZoneRules: textZoneRulesActive(storyData) }
+    );
+    briefFindingsBlock = renderBriefBlock(briefRes.byPage);
+  } catch (bcErr) {
+    log.warn(`⚠️ [TESTLAB] scene-review replay: brief check failed (${bcErr.message}) — the replay runs without brief findings, unlike production`);
+  }
+
   const orig = PROMPT_TEMPLATES.sceneReview;
   if (promptOverride) PROMPT_TEMPLATES.sceneReview = promptOverride;
   let prompt;
   try {
-    // The bible feeds check 9f (a stated object's state page ranges) — the same
-    // option production passes (beatsPipeline.js `{ clothingFindings,
-    // briefFindings, beats, visualBible }`). Omitted here, buildSceneReviewPrompt
-    // emitted NO `# VISUAL BIBLE — STATED OBJECTS` block at all, so a replay
-    // could never see a state's page range, never emit a corrected entry, and
-    // check 9f under-reported against the production run it is meant to mirror.
+    // ALL FOUR options production passes (beatsPipeline.js `{ clothingFindings,
+    // briefFindings, beats, visualBible }`). The bible feeds check 9f (a stated
+    // object's state page ranges); omitted, buildSceneReviewPrompt emitted NO
+    // `# VISUAL BIBLE — STATED OBJECTS` block at all, so a replay could never
+    // see a state's page range, never emit a corrected entry, and check 9f
+    // under-reported against the production run it is meant to mirror. The
+    // brief findings are the same shape of gap, closed above.
     prompt = buildSceneReviewPrompt(storyData, scenes, {
       clothingFindings: findingsBlock,
+      briefFindings: briefFindingsBlock,
       beats: outlineBeats,
       visualBible: storyData.visualBible,
     });

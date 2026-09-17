@@ -160,6 +160,45 @@ function findBorrowedLabel({ figures, sceneCharacters = [], sceneMetadata = {}, 
 }
 
 /**
+ * CAN a char fix paint this figure at all? One answer, every repair entry point.
+ *
+ * A char fix repaints a figure to match a REFERENCE built from the roster entry
+ * — the styled avatar for the page's clothing category, or the uploaded face
+ * photo. A figure the story invented (a Visual Bible secondary) has neither: it
+ * has an id, a description and a reference-sheet cell, and no `characters[]`
+ * entry for `getStyledAvatarForClothing` or `getFacePhoto` to read. Detection
+ * finds such a figure perfectly well and the entity check grades it, so the
+ * routing gate hands it to a repair that cannot run.
+ *
+ * Measured on staging job_1789584708605_rts4wqupm p11: the page's own plan line
+ * stages an invented secondary, its bible entry exists, the entity check filed a
+ * CRITICAL on it, and the round reported `character <name> not found` —
+ * indistinguishable from a typo or a detection miss, on a page where nothing was
+ * missing and nothing could ever have been repainted. The round was spent.
+ *
+ * This says WHY, so the router can decline before spending a round and every
+ * entry point reports the same honest sentence. It does not widen what a char
+ * fix can do: giving an invented figure a repaintable reference is a separate
+ * decision (its sheet cell is not an avatar).
+ *
+ * @param {Object} args
+ * @param {Array} args.characters    the uploaded roster (`storyData.characters`)
+ * @param {string} args.characterName
+ * @returns {{reason:string, message:string}|null} null when the figure is repairable
+ */
+function charFixReferenceGap({ characters = [], characterName = '' } = {}) {
+  const name = String(characterName || '').trim();
+  if (!name) return { reason: 'no-name', message: 'char fix was given no character name' };
+  const canon = canonicalName(name);
+  const found = (characters || []).some(c => c && c.name && canonicalName(c.name) === canon);
+  if (found) return null;
+  return {
+    reason: 'no-roster-entry',
+    message: `${name} has no uploaded character entry, so there is no avatar or face photo to repaint from — a figure the story invented cannot be char-fixed`,
+  };
+}
+
+/**
  * Where is this character on this page? Tiered, most-trusted first.
  *
  * Tier 1 entity report — appearances from the generation-time consistency pass,
@@ -340,6 +379,7 @@ module.exports = {
   buildPageCast,
   briefNamesForPage,
   findBorrowedLabel,
+  charFixReferenceGap,
   resolveCharBbox,
   resolveFigureMask,
 };

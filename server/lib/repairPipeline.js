@@ -1323,10 +1323,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return { pageNumber, imageData: null, error: borrowed.message, borrowedLabel: borrowed };
     }
 
-    const character = characters.find(c => c.name === charName);
-    if (!character) {
-      return { pageNumber, imageData: null, error: `character ${charName} not found` };
+    // "not found" was the wrong sentence for the commonest case: the figure is
+    // right there, drawn and detected, and what is missing is the REFERENCE a
+    // repaint needs. charFixReferenceGap says which — one answer shared with
+    // the router (which now declines earlier) and the manual endpoint.
+    const { charFixReferenceGap } = require('./charRepairTarget');
+    const refGap = charFixReferenceGap({ characters, characterName: charName });
+    if (refGap) {
+      require('./runMetrics').forJob(storyData?.id || jobId).count('char_repair_skip_no_reference');
+      log.warn(`🚫 [CHAR-FIX] p${pageNumber}: ${refGap.message}`);
+      return { pageNumber, imageData: null, error: `char-fix skipped: ${refGap.message}`, referenceGap: refGap.reason };
     }
+    // Same comparison the gap check just made, so the two can never disagree:
+    // a canonical match that passed the gap must resolve to a character here.
+    const { canonicalName } = require('./castResolver');
+    const character = characters.find(c => c && c.name === charName)
+      || characters.find(c => c && c.name && canonicalName(c.name) === canonicalName(charName));
 
     // Case-insensitive lookup — scene metadata can key perCharClothing with
     // different casing than the canonical character name, and an exact-key
@@ -2217,7 +2229,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         return { img, method: null, latestEval, skipped: true };
       }
 
-      const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport);
+      // The roster travels with the decision so the two char-fix gates can
+      // decline a figure the repaint has no reference for (an invented
+      // secondary) instead of spending the page's round on a certain failure.
+      const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport, { characters });
       let method = decision.method;
       let reason = decision.reason;
 

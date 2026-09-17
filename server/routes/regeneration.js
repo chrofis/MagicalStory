@@ -5366,7 +5366,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       const { character: characterName, pages } = repair;
       let character = storyData.characters?.find(c => c.name === characterName);
       if (!character) {
-        results.push({ character: characterName, pagesRepaired: [], error: `Character "${characterName}" not found` });
+        // THE SAME ANSWER THE PIPELINE GIVES (charRepairTarget.charFixReferenceGap).
+        // A figure the story invented is drawn, detected and gradeable, and has
+        // no avatar to repaint from — "not found" read as a typo or a detection
+        // miss and sent two diagnoses down the wrong path.
+        const { charFixReferenceGap } = require('../lib/charRepairTarget');
+        const gap = charFixReferenceGap({ characters: storyData.characters || [], characterName });
+        results.push({ character: characterName, pagesRepaired: [], error: gap ? gap.message : `Character "${characterName}" not found` });
         continue;
       }
 

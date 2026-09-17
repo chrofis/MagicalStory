@@ -642,6 +642,9 @@ function selectCharRepairTasks(entityReport, options = {}) {
  * @param {Object} entityReport - Story-level entity consistency report
  * @param {Object} [options]
  * @param {Function} [options.chooseRepairStrategy] - Helper to pick inpaint/iterate when entity isn't the answer (DI for testability)
+ * @param {Array} [options.characters] - the uploaded roster. Present, the two char-fix
+ *        gates decline a figure with no roster entry (charFixReferenceGap) instead of
+ *        routing a repaint that has no reference to paint from. Absent, no opinion.
  * @returns {{method: 'skip'|'inpaint'|'iterate'|'char-fix', reason: string, charName?: string, severity?: string, issueDescription?: string}}
  */
 function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) {
@@ -780,6 +783,18 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   //   - MAJOR entity findings get NO automatic repair: not char-fix (this
   //     gate), and not inpaint either — NOT_INPAINTABLE_TYPES keeps character
   //     types out of inpaint instructions regardless of how this gate routes.
+  // A figure the story INVENTED has no roster entry, so a char fix has no
+  // avatar and no face photo to repaint it from — see charFixReferenceGap. The
+  // router declines before the round is spent and says why; the page falls
+  // through to the gates below exactly as it would with no entity finding.
+  // `options.characters` absent ⇒ no opinion, every name stays routable (the
+  // unit tests and any caller that does not carry the roster).
+  const charFixImpossible = (name) => {
+    if (!Array.isArray(options.characters)) return null;
+    const { charFixReferenceGap } = require('./charRepairTarget');
+    return charFixReferenceGap({ characters: options.characters, characterName: name });
+  };
+
   if (pageNumber > 0 && entityReport?.characters) {
     let worst = null; // {severity, charName, issue}
     for (const [charName, charResult] of Object.entries(entityReport.characters)) {
@@ -798,6 +813,11 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         if (!pages.includes(pageNumber)) continue;
         if (!worst) worst = { severity: sev, charName, issue };
       }
+    }
+    const entityGap = worst && charFixImpossible(worst.charName);
+    if (entityGap) {
+      log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: entity ${worst.severity} on ${worst.charName} cannot take a char fix — ${entityGap.message}`);
+      worst = null;
     }
     if (worst) {
       const issueDescription = worst.issue.description || worst.issue.fixInstruction || '';
@@ -871,7 +891,13 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
       deferredClothing = worseNonClothing;
       log.info(`👕 [REPAIR-DECIDE] page ${pageNumber}: clothing MAJOR deferred — a CRITICAL ${worseNonClothing.type || 'finding'} outranks it this round`);
     }
-    if (clothingIssue && !worseNonClothing) {
+    // Same reference gap as gate 2: a wardrobe redo is still a figure repaint
+    // from the roster entry's avatar, so an invented figure cannot take one.
+    const clothingGap = clothingIssue && charFixImpossible(String(clothingIssue.character).trim());
+    if (clothingGap) {
+      log.warn(`🚫 [REPAIR-DECIDE] page ${pageNumber}: clothing ${String(clothingIssue.severity).toLowerCase()} on ${String(clothingIssue.character).trim()} cannot take a figure redo — ${clothingGap.message}`);
+    }
+    if (clothingIssue && !worseNonClothing && !clothingGap) {
       const charName = String(clothingIssue.character).trim();
       const issueDescription = require('./scoring').findingText(clothingIssue);
       const { resolveRepairAxes } = require('./faceRepair');

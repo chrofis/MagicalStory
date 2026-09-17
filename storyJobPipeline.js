@@ -3921,6 +3921,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // per-finding applier. `droppedCount` stays applier-only.
               appliedCount: r.appliedCount ?? null,
               droppedCount: r.droppedCount ?? null,
+              // THE PASS'S OWN REPORT vs THE DIFF (2026-09-17). A whole-page
+              // pass claims a rewrite by returning a page block; these say which
+              // of those blocks came back identical, and which pages it rewrote
+              // that no finding named. The per-finding appliers answer the same
+              // question with `unparsedCount`: finding-shaped lines the parser
+              // could not read, which used to be skipped in silence.
+              returnedIdentical: r.returnedIdentical || [],
+              changedUnasked: r.changedUnasked || [],
+              unparsedCount: r.unparsedCount ?? null,
+              unparsedLines: r.unparsedLines || [],
               // WHY each non-applied finding was not applied. The count alone
               // cannot answer "what happened to that finding" — which is the
               // whole question the ledger below exists for, asked of the
