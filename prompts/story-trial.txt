@@ -17,6 +17,7 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - {PAGE_OPENING_VARIETY}
 - The text never asserts a position, an action or an object the scene hint does not stage: a figure the hint leaves out of frame does nothing visible on that page, and an action the hint stages as its aftermath is told as its aftermath
 - Show character personality through actions
+- A character who refuses, gives up or discards a thing stays done with it; where a later scene has them want it back or take it up again, that scene says what changed
 - Never describe a character's hair, eye colour, skin or clothing in the story text — appearance belongs to the scene hints and the illustrations
 - No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
 {RISK_FRAMING}
@@ -159,6 +160,7 @@ Each background describes a scene with no people, no human figures. Include: loc
 
 - Every Visual Bible element carries `scaleClass`, and it is the only place an element’s size is stated. It is never omitted, and an adjective is not a band — massive, tiny, huge name none. No entry gives a size of its own, in words or in units.
 - A generic element is named in the page's scene prose like any other physical fact, and never appears in `objects[]`. It has no id to cite.
+- {ELEMENT_ENTRY_PAGE}
 
 **Keep it MINIMAL for a 5-scene story:**
 - max **2 locations**

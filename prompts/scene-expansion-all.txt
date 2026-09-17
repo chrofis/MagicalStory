@@ -81,6 +81,12 @@
 
 12g. **Build descriptions are visual, not nominal.** Describe an object by its shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style") — style words are lettering bait the sanitizer can't catch.
 
+12h. **An object out of sight.** {CONCEALED_OBJECT}
+
+12i. **A shadow cast by something off the page.** {OFFSCREEN_SHADOW}
+
+12j. **A prop the page text puts against a character.** {STAGED_PROP}
+
 12d. **A held document is read, not displayed.** A map, letter, note or book in a character's hands stays angled toward the character reading it, its face foreshortened or turned away from the camera — the shot shows the characters reading, never the document presented flat to the viewer. This holds even when the page's plan line is what the document says: stage the readers' reactions and pointing hands from the reader's side, and never make the document the frame-filling focal object.
  A prop being carried rather than read stays folded, rolled or pocketed.
 
@@ -147,7 +153,7 @@ Work from the plan lines: an element a plan line only implies still needs an ent
 - An object's `description` is drawn literally. Material, colour, size and shape in plain terms; a size comparison is fine ("about as wide as a coin"), but never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
 - A vehicle's `description` states its real-world dimensions in everyday terms — hull or body length in metres, mast or overall height in storeys of a house.
 - As many entries as the story needs, no more. Include an element even if it appears once.
-- `pages` is earned: a page belongs to an element only when your brief for that page puts it in frame, never a blanket 1-{PAGE_COUNT} range. Being physically present is not earning: a worn satchel, a leash on a wrist, the room they stand in are on many pages and earn only the pages that make something of them. At most {VB_ELEMENT_BUDGET} elements claim any one page (locations do not count); when more could, the ones the plan line names come first and the rest leave that page. An element the story leaves behind ends its range there. A character's or a tracked animal's entry claims only pages whose plan line names it — a brief never earns one for it (rule 3). An entry's `pages` and the `objects[]` of the page briefs below say the same thing.
+- `pages` is earned: a page belongs to an element only when your brief for that page puts it in frame, never a blanket 1-{PAGE_COUNT} range. Being physically present is not earning: a worn satchel, a leash on a wrist, the room they stand in are on many pages and earn only the pages that make something of them. At most {VB_ELEMENT_BUDGET} elements claim any one page (locations do not count); when more could, the ones the plan line names come first and the rest leave that page. An element the story leaves behind ends its range there. A character's or a tracked animal's entry claims only pages whose plan line names it — a brief never earns one for it (rule 3). {ELEMENT_ENTRY_PAGE} An entry's `pages` and the `objects[]` of the page briefs below say the same thing.
 - Empty categories are `[]`.
 - One entry per secondary character, no matter how the plan lines refer to them; a person named both by relation and by attribute is one entry. Never reuse an id. Every character the story names is declared exactly once: a name that is neither in {CHARACTER_NAMES} nor a `secondaryCharacters` entry is a fault, and so are two entries for the same person under different names.
 
@@ -417,7 +423,7 @@ Mark `storyRelevant: true` only when the contact is the page's plot moment, iden
 
 Omit entirely (do not include with `false`): pure ground/floor/path contact, leaning on walls, sitting on generic chairs.
 
-Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side" — the visible grip belongs in the prose (rule 7b). Name which hand, how many hands, or where on the object they land only when the story turns on it.
+Field shape: `{character, object, where, action, hands, storyRelevant, priority}`. {CONTACT_VERB} `where` is a short sentence naming the object as the contact action ("holds the parchment map", "hands the letter to the messenger"). No body-part positioning, no pose detail: write "pushes the cart", not "presses both palms flat against the cart's side" — the visible grip belongs in the prose (rule 7b). Name which hand, how many hands, or where on the object they land only when the story turns on it.
 
 `receiver` (optional): when the action's result later arrives at a second object — a basin under a spout, a bucket under a pump, a pool below — its VB id or plain name. `target` (optional): what the tool acts on, as a short noun phrase ("the crack in the rock face"). The page shows the result at the contact; the builder places the receiver clear of the tool.
 

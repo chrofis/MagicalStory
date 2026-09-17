@@ -281,6 +281,53 @@ function partitionAnchoredObjects({ rewriteObjects = [], origObjects = [], evalu
 }
 
 /**
+ * ROSTER CHARACTERS THE PLAN LINE STAGES (2026-09-17, staging
+ * job_1789584708605_rts4wqupm p10).
+ *
+ * Strict-mode iterate builds the rewriter's CHARACTER DETAILS from the PARENT
+ * brief's `characters[]` alone, while template rule 3a invites the rewrite to
+ * bring back a figure the plan line stages that the brief had dropped. On p10
+ * the plan line and the evaluator both named the older brother; the brief did
+ * not, so his sheet was withheld -- and the rewrite wrote him as "a middle-aged
+ * man with short brown hair, stubble", which is the iteration template's own
+ * example token for an apparent-age category. The preschooler shipped as a
+ * bearded adult standing beside his toddler brother, and the page's own AGE &
+ * PROPORTIONS block said "preschool-age" three paragraphs above the prose that
+ * contradicted it. Same class as the 2026-06 fix that gave iterate the full
+ * character block instead of a bare name list ("a 38-year-old came back as a
+ * kindergartner") -- this is the variant where the character is not in the list
+ * at all.
+ *
+ * Same shape as collectStagedFigures, for the other pool: that one reinstates
+ * NAMED NON-ROSTER figures (animals, secondaries) from the plan line, this one
+ * reinstates ROSTER characters. A roster character has no Visual Bible page
+ * range, so there is nothing structured to consult -- the plan line's staged
+ * segment (never its trailing purpose clause) is the whole test, and the name
+ * match is the same whole-word, diacritic-safe one.
+ *
+ * Offering the sheet is not forcing the figure into the frame: the rewriter
+ * still decides, under rule 3a, whether the plan line stages them.
+ *
+ * @param {Array}  characters    the story roster
+ * @param {string} planLine      the page's `PLAN: ...` line
+ * @param {Array}  alreadyLocked entries already in the locked cast
+ * @returns {Array} roster entries the staged segment names and the lock dropped
+ */
+function collectPlanLineCast({ characters = [], planLine = null, alreadyLocked = [] } = {}) {
+  const staged = planStagedSegment(planLine);
+  if (!staged) return [];
+  const have = new Set(Array.isArray(alreadyLocked) ? alreadyLocked : []);
+  const out = [];
+  for (const c of (Array.isArray(characters) ? characters : [])) {
+    if (!c || have.has(c)) continue;
+    const name = String(c.name || '').trim();
+    if (!name || !namedIn(staged, name)) continue;
+    out.push(c);
+  }
+  return out;
+}
+
+/**
  * Render the staged figures as the `{STAGED_FIGURES}` block. Empty string when
  * the page has none, so the prompt gains nothing on the common page.
  */
@@ -553,6 +600,7 @@ module.exports = {
   vbEntityCoversPage,
   anchorHaystack,
   collectStagedFigures,
+  collectPlanLineCast,
   partitionAnchoredObjects,
   renderStagedFiguresBlock,
   checkRewrittenBrief,

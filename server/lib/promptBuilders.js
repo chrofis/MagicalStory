@@ -2484,9 +2484,21 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+    // FOUR brief-authoring contracts, one constant each, shared by both Art
+    // Director templates and both iterate templates — a page brief is written at
+    // four sites and a rule that reaches one of them is absent on the other
+    // three. See CONCEALED_OBJECT_RULE / OFFSCREEN_SHADOW_RULE /
+    // STAGED_PROP_RULE / CONTACT_VERB_RULE.
+    CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
+    OFFSCREEN_SHADOW: OFFSCREEN_SHADOW_RULE,
+    STAGED_PROP: STAGED_PROP_RULE,
+    CONTACT_VERB: CONTACT_VERB_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
+    // ONE entry-page contract for the same two bible-authoring sites — see
+    // ELEMENT_ENTRY_PAGE_RULE.
+    ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
     // ONE shot vocabulary for every stage that writes or reads a `shot` — the
     // beats planner produces it, planCounters counts it, and the image prompt
     // defines it. See server/lib/shotVocabulary.js.
@@ -2739,6 +2751,15 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+    // FOUR brief-authoring contracts, one constant each, shared by both Art
+    // Director templates and both iterate templates — a page brief is written at
+    // four sites and a rule that reaches one of them is absent on the other
+    // three. See CONCEALED_OBJECT_RULE / OFFSCREEN_SHADOW_RULE /
+    // STAGED_PROP_RULE / CONTACT_VERB_RULE.
+    CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
+    OFFSCREEN_SHADOW: OFFSCREEN_SHADOW_RULE,
+    STAGED_PROP: STAGED_PROP_RULE,
+    CONTACT_VERB: CONTACT_VERB_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -3146,7 +3167,14 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       LANGUAGE_NOTE: getLanguageNote(language),
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
       MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3,
-      OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE
+      OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE,
+      // The same four brief-authoring contracts the Art Director templates
+      // carry. An iterate rewrites the WHOLE brief, so a rule the first pass was
+      // given and the rewrite was not is a rule one repair round undoes.
+      CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
+      OFFSCREEN_SHADOW: OFFSCREEN_SHADOW_RULE,
+      STAGED_PROP: STAGED_PROP_RULE,
+      CONTACT_VERB: CONTACT_VERB_RULE,
     });
     // Text-overlay-only rules gate:
     // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,
@@ -6435,7 +6463,13 @@ function buildArcBudgetSection(inputData, pageCount) {
 // head can be compressed away.
 const NO_CHARACTER_MARKING_RULE = "**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.";
 
-const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests, gestures, or touches what the scene describes.";
+// The free-hand clause used to read "rests, gestures, or touches what the
+// scene describes", which licensed exactly the failure it was meant to stop:
+// on staging job_1789584708605_rts4wqupm p4 the brief's one contact was an
+// EAR against an object and both hands were declared idle, and the render put
+// a hand on the object instead. A contact the brief gives to another part of
+// the body is not an invitation to the hands.
+const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.";
 
 /**
  * COUNTING — one string for both Art Director templates (owner, 2026-09-15:
@@ -6469,6 +6503,85 @@ const PLAN_LINE_CAST_RULE = "A tracked animal — one with a Visual Bible entry 
  * review's 9f checked page ranges only.
  */
 const MULTI_PICTURE_PROP_RULE = "An object that shows a different picture on different pages — a book, an album, a board, a screen — has one face-to-camera state per distinct picture the plan lines call for. Each such state's `delta` restates what its page's plan line says the object shows, its `pages` is that page alone, and a page cites only the state whose `delta` is the picture its own plan line names.";
+
+/**
+ * ONE concealment contract for every stage that writes a page brief -- both Art
+ * Director templates and both iterate templates.
+ *
+ * Staging job_1789584708605_rts4wqupm carries the controlled pair. p9 and p11
+ * declare the SAME object, cite it the same way, and build an identical
+ * REQUIRED OBJECTS line for it ("match its look ... at the placement the scene
+ * description gives it"). p9's interaction `where` reads "carries the heavy
+ * bulge in the front of his jacket" and the render hides the object under a
+ * bulging jacket; p11's reads "holds the egg tightly against his chest" and the
+ * render holds it in the open, so the beat that depends on somebody SPOTTING it
+ * has nothing left to spot. p7 lost it the same way and additionally placed the
+ * object inside the covering and against its outside in one sentence.
+ *
+ * So the channel exists and works: the structured `where` is what reaches the
+ * protected tail as an EXACT POSES line, and concealment written into the prose
+ * alone is advisory. Nothing else in the schema can say "hidden" -- `wornItems`
+ * has `state: "off"` plus a `location`, but only for an entry with a `wornAs`
+ * link, i.e. a garment. This rule is the representation for everything else.
+ */
+const CONCEALED_OBJECT_RULE = "An object the page puts out of sight \u2014 inside a coat, under a cloth, in a closed bag, behind a back \u2014 is staged as what a viewer would actually see: the shape it makes under the covering. Its id still goes in `objects[]`, and the `where` of every interaction with it names the covering (carries the bulge under his coat), never the object's own surface. Do not describe its colour, markings or glow on that page, and never place it inside the covering and against the outside of the covering in one sentence. A page whose moment is somebody NOTICING it still shows only that shape.";
+
+/**
+ * ONE contract for the shadow of a creature that is not itself in frame.
+ *
+ * Same run, p8: the plan line stages "a large shadow slides across the linden
+ * above them", the brief wrote "a massive dark shadow spans across the
+ * cobblestones" into the prose AND into `emptyScenePrompt`, and the render came
+ * back with a clear sky and soft dappled tree shade. The brief never said what
+ * SHAPE the shadow has, and a shadow with no shape is ordinary shade. The
+ * creature casting it is correctly absent from the page's `objects[]` -- its
+ * Visual Bible range excludes the page by design -- so its outline has to be
+ * written, not cited.
+ */
+const OFFSCREEN_SHADOW_RULE = "The shadow of a creature that is not itself in the picture is drawn as that creature's outline \u2014 wings, body, tail, head \u2014 falling hard-edged across the ground, a wall or a roof, far larger than the figures under it. Write the silhouette's shape into the prose: a shadow given no shape is drawn as ordinary shade and the moment disappears. The creature itself stays out of frame, and out of `objects[]` on that page.";
+
+/**
+ * ONE contract for a prop the page's own TEXT puts against a character.
+ *
+ * This does NOT reopen "the page text is not a checklist for the image"
+ * (docs/SETTLED.md, owner 2026-09-13): that verdict governs the per-page
+ * EVALUATOR, which judges image-vs-brief, and the cast and the choice of moment
+ * stay the plan line's. This is the brief-authoring side, where the page text is
+ * already a declared input. Same run: p1's text hands the protagonist the warm
+ * bag whose loss the book later turns on and the brief cited a location and
+ * nothing else, so that page built no REQUIRED OBJECTS block at all
+ * (finalChecksReport.notEvaluated, reason `no_required_objects`); p5's text has
+ * a ball roll into a character's shoe and neither the plan line, the bible nor
+ * the brief ever named it. A prop that touches somebody is the one physical
+ * fact the text settles that the plan line routinely leaves out.
+ */
+const STAGED_PROP_RULE = "A prop the page's own text puts against a character \u2014 handed to them, pressed into their hands, rolling into them, taken out, put on \u2014 is in the picture: cite its id in `objects[]` when the Visual Bible has an entry for it, name it in the prose when it does not. Who is in the frame and which instant it is stay the plan line's; this is the one physical fact the page text settles.";
+
+/**
+ * ONE contract for how an interaction's `where` is phrased.
+ *
+ * `where` is the text of the EXACT POSES line in the protected tail of the image
+ * prompt, so its grammar is the instruction the model acts on. Same run, p4: the
+ * page turns on a character laying an EAR against an object, the brief declared
+ * exactly that contact and the tail carried it verbatim as "right ear pressed
+ * flat against the ... shell" -- a noun phrase among a block of verb-led lines
+ * -- and three renders across two repair rounds all drew a generic hand reach
+ * instead. Every `where` on that run that the render obeyed opens with a verb.
+ */
+const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the character performs, never with the body part: `presses his ear to the door`, not `ear pressed to the door`. A contact made with something other than the hands states in that verb which part of the body makes it, and the same row's prose says what the hands do instead.";
+
+/**
+ * ONE contract for the page a Visual Bible element ENTERS the story on, for
+ * every site that authors a bible.
+ *
+ * The pages-is-earned rule says "being physically present is not earning", and
+ * it is right for the pages that merely carry a thing along. It is wrong for the
+ * page that introduces it: on staging job_1789584708605_rts4wqupm the bag the
+ * story's whole warmth chain hangs on was given to the protagonist on p1 and its
+ * entry claimed pages 7, 10 and 13. The reader meets it for the first time on a
+ * page that does not draw it.
+ */
+const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page the story first brings it in \u2014 handed over, found, taken out, put on \u2014 even when that page's plan line is about something else. That is the page the reader learns what it looks like on.";
 
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
@@ -7766,6 +7879,8 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // ONE scale vocabulary for every Visual-Bible authoring site — the trial
       // writer authors its own bible, so it declares the same placeholder.
       SCALE_CLASS_SPEC,
+      // ...and the same entry-page contract, for the same reason.
+      ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
     });
   }
 
@@ -8120,6 +8235,11 @@ module.exports = {
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
   MULTI_PICTURE_PROP_RULE,
+  CONCEALED_OBJECT_RULE,
+  OFFSCREEN_SHADOW_RULE,
+  STAGED_PROP_RULE,
+  CONTACT_VERB_RULE,
+  ELEMENT_ENTRY_PAGE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
   PAGE_OPENING_VARIETY_RULE,

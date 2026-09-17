@@ -354,6 +354,133 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-17 — A brief's STRUCTURED fields are the instruction; prose in a brief is advisory
+
+**Context.** Four defects on staging `job_1789584708605_rts4wqupm` ("Das Ei unter der Wurzel",
+18p, de-ch, watercolor, grok-imagine-image-2.0) turned out to have one shape. The image prompt
+has a protected tail — everything from `**REQUIRED OBJECTS` / `**ART STYLE` onward, which
+`shrinkPromptForModel` never hands to a compressor — and that tail is built ENTIRELY from the
+brief's structured metadata: `objects[]` becomes REQUIRED OBJECTS, `interactions[]` becomes
+EXACT POSES, `characters[]` becomes EXPRESSIONS AND EYES. The Art Director's prose paragraph
+sits in the compressible head. A page-critical fact that reaches only the prose, or reaches
+nothing at all, is therefore advisory; a fact in a structured field is an instruction.
+
+The run carries the controlled pair that proves it. p9 and p11 declare the same object, cite it
+the same way, and build a byte-identical REQUIRED OBJECTS line for it ("match its look … at the
+placement the scene description gives it"). p9's interaction `where` reads *carries the heavy
+bulge in the front of his jacket* and the render hides the object under a bulging jacket. p11's
+reads *holds the egg tightly against his chest* — the concealment was in the prose and fell out
+of the field — and the render holds it in the open, so the beat that turns on somebody SPOTTING
+it has nothing left to spot. The four defects, each read from the stored built prompt:
+
+1. **p10 — a 4-year-old rendered as a bearded middle-aged man.** The prompt was not disobeyed:
+   the brief itself says *"Levin — a middle-aged man with short brown hair, stubble"*, three
+   paragraphs below the page's own AGE & PROPORTIONS block calling him preschool-age. The brief
+   came from `iterate-round-1`, whose plan line and evaluator feedback both name the character
+   while the parent brief's `characters[]` did not. Strict-mode iterate builds CHARACTER DETAILS
+   from the parent brief's cast alone, and template rule 3a invites the rewrite to bring back
+   exactly such a figure — so the one character the rewriter was told to reinstate is the one
+   whose sheet the lock withheld. Step 2 asks it to weave that appearance *"from CHARACTER
+   DETAILS"*; with nothing there it wrote rule 11's own example token, `middle-aged man`. Same
+   class as the 2026-06 fix that replaced iterate's bare name list with full character blocks
+   ("a 38-year-old came back as a kindergartner"); this is the variant where the character is
+   not in the list at all. (The book audit also cried "the adult Levin" on p14 and p15 — both
+   briefs describe a preschooler correctly and both renders show a toddler. Judge noise; p10 is
+   the only real instance.)
+2. **p7 / p11 — a concealed object drawn in the open.** Both briefs put the object inside a
+   garment in their PROSE and dropped the covering from the interaction's `where`, so the tail
+   said *holds the egg tightly against his chest* and the render obeyed. p7 additionally wrote
+   the object inside the covering and pressed against the covering's outside in one sentence.
+   Nothing in the schema could say "hidden": `wornItems[]` has `state: "off"` plus a `location`,
+   but only for an entry with a `wornAs` link — a garment. For every other object there was no
+   representation of concealment at all.
+3. **p1 / p5 / p8 — plot-critical staging that never reached a field.** p1's text hands the
+   protagonist the warm bag the whole book's warmth chain and its p13 loss depend on; the plan
+   line is about kicking leaves, the bible gave the bag `pages: [7,10,13]`, the brief cited a
+   location and nothing else, and the page built **no REQUIRED OBJECTS block at all**
+   (`finalChecksReport.notEvaluated`, reason `no_required_objects`, p1/p2/p8). The A4 guarantee
+   in 796b070e5 does not close it: that restores a parent brief's objects on an ITERATE whose
+   rewrite resolves to nothing listable, and p1 shipped `char-fix-round-1` from an original
+   brief that never cited the bag. p5's ball rolls into a character's shoe in the text and
+   exists in neither the plan line, the bible nor the brief. p8's shadow DID reach the prose,
+   `sceneIntent` and `emptyScenePrompt` — the prompt was 6,522 chars against a 7,900 cap, so
+   nothing shrank it — but the brief never said what SHAPE the shadow has, and a shadow with no
+   shape is drawn as ordinary tree shade, which is what came back under a clear blue sky.
+4. **p4 — the one prompt that was right.** The page turns on a character laying his EAR against
+   an object. The brief declared exactly that contact, and the tail carried it verbatim:
+   `- Levin: right ear pressed flat against the smooth glowing pale orange shell`. Three renders
+   across two repair rounds all drew a generic hand reach. Two things differ from every pose
+   line the run obeyed: it is a NOUN PHRASE in a block of verb-led lines, and the tail's own
+   HANDS rule ended *"a hand with nothing assigned to it rests, gestures, **or touches what the
+   scene describes**"* — which licensed precisely the substitution, on a page whose brief had
+   explicitly grounded both hands.
+
+**Decision.** One code fix where a value is structurally dropped; prompt-layer contracts where
+the fault is what the author was asked to write; no judge, no scored type and no severity
+touched.
+
+- **A reinstated roster character arrives with his sheet.** `collectPlanLineCast()`
+  (`iterateBeat.js`) returns the roster characters the plan line's staged segment names that the
+  parent brief dropped, and `promptCharacters` is the lock plus those. It is the roster half of
+  the job `collectStagedFigures` already does for animals and secondaries, reusing the same
+  staged-segment scoping and the same whole-word name match. It OFFERS the sheet; rule 3a still
+  decides who is in the frame.
+- **Five contracts, one JS constant each, injected through a declared placeholder** — the
+  pattern `PLAN_LINE_CAST_RULE` / `MULTI_PICTURE_PROP_RULE` established, so there is one source
+  and no hand-kept copies. `CONCEALED_OBJECT_RULE` (an out-of-sight object is staged as the
+  shape it makes under the covering; the covering rides every `where`; no colour, markings or
+  glow on that page; never inside and against the outside in one sentence),
+  `OFFSCREEN_SHADOW_RULE` (the shadow of a creature not itself in frame is drawn as that
+  creature's OUTLINE, hard-edged and far larger than the figures, with the creature out of frame
+  and out of `objects[]`), `STAGED_PROP_RULE` (a prop the page's own text puts AGAINST a
+  character is in the picture — cited by id when the bible has an entry, named in the prose when
+  it does not), `CONTACT_VERB_RULE` (an interaction's `where` opens with the verb, never with
+  the body part; a non-hand contact says which part makes it and the prose says what the hands
+  do instead) reach all four brief-authoring sites: both Art Director templates and both iterate
+  templates. `ELEMENT_ENTRY_PAGE_RULE` (an element's `pages` always includes the page the story
+  first brings it in) reaches the two live bible-authoring sites, the all-pages Art Director and
+  the trial writer.
+- **The HANDS rule's free-hand clause is narrowed** to "rests or gestures, and never joins a
+  contact the scene gives to another part of that character's body". Generator-side only
+  (`HANDS_HOLD_ONLY_NAMED_RULE`, injected into `image-generation.txt`); it makes the generator
+  stricter, so no judge can deduct for something newly unstated.
+- **Rule 3a of both iterate templates** now says a reinstated figure is described from CHARACTER
+  DETAILS and from nowhere else, and that no age look, build, hair or face is invented for a
+  character whose entry was not supplied — the belt to the code fix's braces.
+
+**Rationale.** `STAGED_PROP_RULE` does NOT reopen *the page text is not a checklist for the
+image* (`docs/SETTLED.md`, owner 2026-09-13). That verdict governs the per-page EVALUATOR, which
+judges image-vs-brief, and it stands untouched: no judge here was given anything, the cast stays
+the plan line's ("AD trims cast by design"), and the choice of moment stays the plan line's. This
+is the brief-AUTHORING side, where the page text is already a declared input — and a prop that
+physically touches somebody is the one thing the text settles that a plan line routinely leaves
+out. The same reasoning keeps `ELEMENT_ENTRY_PAGE_RULE` compatible with *being physically
+present is not earning*: that rule is right for the pages that merely carry a thing along and
+wrong only for the page the reader first meets it on.
+
+Concealment is a prompt fix, not a new field, because the evidence says the channel already
+works — p9 is the positive control, and its REQUIRED OBJECTS line is identical to p11's. Adding
+a `concealed` flag would have been a second way to say what the `where` already says. The shadow
+is a prompt fix for the same reason in reverse: a generic element has no id to cite (bible rule:
+"a generic element … never appears in `objects[]`"), and the creature's own range excludes the
+page by design, so its silhouette can only be written — what was missing was the instruction to
+write a SHAPE. This leaves one known limitation, logged in `tasks/BACKLOG.md`: a shadow lives in
+the compressible head, so on a page that does blow the cap it can still be compressed away.
+
+**Verification** (free, no paid call): every affected page's image prompt was rebuilt in-process
+from its REAL stored brief, amended only as the new contracts require. p1 goes from no REQUIRED
+OBJECTS block at all to the prop listed there AND on an EXACT POSES line; p5's ball, p7's and
+p11's covering and p4's verb-led contact all land in the protected tail, after the split.
+`tests/unit/brief-authoring-contracts.test.ts` pins arrival and structure — never any rule's
+wording — from this run's stored fixtures. `npx vitest run`: 262 files, 3044 tests, 0 failures.
+
+**Touched:** `server/lib/iterateBeat.js` (`collectPlanLineCast`), `server/lib/images.js`
+(iterate locked cast), `server/lib/promptBuilders.js` (five new rule constants, the narrowed
+HANDS rule, the fill maps), `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`, `prompts/story-trial.txt`,
+`tests/unit/brief-authoring-contracts.test.ts`, `tasks/BACKLOG.md`.
+**Status:** ✅ active
+
 ## 2026-09-17 — Three records a paid run must keep: a cover's sent prose, a reference-sheet's cost, a repair round's yield
 
 **Context.** Three gaps measured on two staging runs, all of the same shape — a value is

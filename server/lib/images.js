@@ -3765,7 +3765,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // rewriting. See iterateBeat.js for what this fixes and for the rule that
   // keeps the rewriter's roster and the judge's roster the same one.
   const {
-    resolvePlanLine, collectStagedFigures, renderStagedFiguresBlock,
+    resolvePlanLine, collectStagedFigures, collectPlanLineCast, renderStagedFiguresBlock,
     checkRewrittenBrief, describeBriefFindings,
     declaredSetAllowance, checkDeclaredSet, partitionAnchoredObjects,
     normalizeCitedHandles, restoreParentObjects,
@@ -3810,7 +3810,22 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     } else if (originalSceneCharNames) {
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Locked cast to original scene (${lockedCast.length} chars: ${lockedCast.map(c => c.name).join(', ')})`);
     }
-    promptCharacters = lockedCast;
+    // A REINSTATED FIGURE ARRIVES WITH ITS SHEET (2026-09-17, staging
+    // job_1789584708605_rts4wqupm p10). The lock above is the PARENT BRIEF's
+    // cast, and template rule 3a lets the rewrite bring back a roster character
+    // the plan line stages that the brief had dropped -- so the one figure the
+    // rewriter is invited to add is the one whose CHARACTER DETAILS entry the
+    // lock withholds. Step 2 then asks it to weave that character's appearance
+    // "from CHARACTER DETAILS" with nothing there to weave, and it wrote the
+    // template's own apparent-age example instead: a 4-year-old shipped as a
+    // bearded middle-aged man. `collectStagedFigures` already does exactly this
+    // for the non-roster pool; this is the roster half of the same job, and it
+    // only OFFERS the sheet -- rule 3a still decides who is in the frame.
+    const planLineCast = collectPlanLineCast({ characters, planLine, alreadyLocked: lockedCast });
+    if (planLineCast.length > 0) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: plan line stages ${planLineCast.map(c => c.name).join(', ')} — the previous brief dropped them, so their character details ride along with the locked cast`);
+    }
+    promptCharacters = [...lockedCast, ...planLineCast];
   }
 
   // Step 3: Build the scene description prompt with preview feedback
