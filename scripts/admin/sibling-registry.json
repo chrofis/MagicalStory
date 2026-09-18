@@ -361,6 +361,16 @@
           ".position || null"
         ]
       }
+    },
+    {
+      "id": "provider-refusal-guards",
+      "axis": "text reply guard vs image reply guard",
+      "reason": "textReplyGuard.js and imageReplyGuard.js are the same allow-list judgement over the same provider vocabulary on the two halves of the pipeline; imageReplyGuard IMPORTS NATURAL_STOP / TRUNCATING_STOP_REASONS / REFUSING_STOP_REASONS from textReplyGuard so there is one copy, and a reason class added or reclassified on one side without the other means a refusal is loud on text and silent on images (or the reverse) - the 2026-09-18 split, where the text path was inverted to an allow-list in a5052d176 and the image path's two-value refusal test was left standing in the same tree.",
+      "members": [
+        "server/lib/textReplyGuard.js",
+        "server/lib/imageReplyGuard.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

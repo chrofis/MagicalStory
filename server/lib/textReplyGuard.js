@@ -77,9 +77,12 @@ const TRUNCATING_STOP_REASONS = new Set([
 // classifiers); Gemini's candidate-level block family; the OpenAI-shaped
 // `content_filter` (OpenAI, OpenRouter's normalised value, DeepSeek).
 // Gemini's IMAGE_* block family is deliberately absent: those come back from
-// image calls, which never route through this text guard (they are handled at
-// images.js / evalPipeline.js). If one ever did arrive it lands in `unknown`
-// and still fails loudly.
+// image calls, which never route through this text guard. Its SIBLING,
+// server/lib/imageReplyGuard.js, owns them — it imports the three sets below
+// and adds only the values that cannot reach a text call, so there is one copy
+// of the shared vocabulary and not two (registry set `provider-refusal-guards`,
+// scripts/admin/sibling-registry.json). If an IMAGE_* value ever did arrive
+// here it lands in `unknown` and still fails loudly.
 const REFUSING_STOP_REASONS = new Set([
   'refusal',
   'safety', 'recitation', 'language', 'blocklist', 'prohibited_content', 'spii', 'escalation',

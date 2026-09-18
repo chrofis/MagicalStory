@@ -28,6 +28,7 @@ const { sanitizeIssueForInpaint, stripCharacterNames } = require('./imageComposi
 const { blackoutIssueRegions } = require('./imageInpainting');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
+const { assessImageResponse, describeImageBlock } = require('./imageReplyGuard');
 
 /**
  * The evaluator-derived EVIDENCE fields that every result-assembly whitelist in
@@ -2134,12 +2135,19 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       const candidate = data.candidates[0];
       const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN-ONLY');
 
-      // Check for safety block at candidate level
-      const finishReason = candidate.finishReason;
-      if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
-        log.warn(`⚠️ [IMAGE GEN-ONLY] Content blocked (${finishReason}) at level ${sanitizationLevel}`);
+      // Candidate-level refusal. ALLOW-LIST since 2026-09-18 (imageReplyGuard):
+      // only a finish reason that MEANS the model finished lets the response
+      // through. The old test named SAFETY and PROHIBITED_CONTENT alone, so
+      // every other refusal — RECITATION, BLOCKLIST, SPII, LANGUAGE, OTHER and
+      // the whole IMAGE_* family, IMAGE_OTHER included — fell past it into the
+      // parts loop and was caught only by the "no image data" fall-through
+      // below, under a vaguer log line. MAX_TOKENS is deliberately NOT a block
+      // here: it keeps falling through exactly as before.
+      const block = assessImageResponse(data);
+      if (block.blocked) {
+        log.warn(`⚠️ [IMAGE GEN-ONLY] Content ${describeImageBlock(block)} at level ${sanitizationLevel}`);
         if (sanitizationLevel < sanitizationLevels.length - 1) continue;
-        throw new Error(`Image blocked by API: reason=${finishReason}`);
+        throw new Error(`Image blocked by API: reason=${block.reason}`);
       }
 
       if (candidate.content && candidate.content.parts) {

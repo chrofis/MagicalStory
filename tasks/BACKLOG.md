@@ -388,6 +388,16 @@ measurement, is lost).
 
 ## Refactor + tech debt
 
+- [ ] **`evaluateCostumeApplication` turns any non-`STOP` finish reason into a green `pass: true`**
+      and labels it "Response truncated" — on prod `job_1772905039960_2b41whb4e` a
+      `PROHIBITED_CONTENT` REFUSAL is stored, and rendered in StoryDisplay's debug panel, as a
+      PASS. Left unfixed on 2026-09-18 with the rest of the image refusal-guard work **because
+      the function has had no caller since `3aa773c86`** (dead `generateStyledCostumedAvatar`
+      removed) — changing unreachable code only adds risk. Whoever re-wires it must route the
+      finish reason through `classifyImageFinishReason` (server/lib/imageReplyGuard.js) so a
+      refusal is not reported as a truncation, and decide whether a refusal should still
+      fail open. → `server/routes/avatars.js:857`
+
 - [ ] **The OpenRouter price table under-bills `deepseek-v4-pro` by ~3.7x** (measured 2026-09-17).
       `server/config/models.js:1119` carries `{ input: 0.435, output: 0.87 }` per 1M and the
       `TEXT_MODELS` description repeats it; the vendor's live rate that day

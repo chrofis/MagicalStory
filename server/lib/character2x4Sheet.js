@@ -31,6 +31,7 @@ const { MODEL_DEFAULTS } = require('../config/models');
 const { photoAnalyzerUrl } = require('./photoAnalyzerClient');
 const r2 = require('./r2');
 const { getFacePhoto, getStandardAvatar } = require('./characterPhotos');
+const { assessImageResponse, describeImageBlock, describeImageOutcome } = require('./imageReplyGuard');
 
 // Minimal Gemini image-edit for the avatar style-transfer pass. Same contract
 // as editWithGrok (prompt + reference images → { imageData, usage, modelId }).
@@ -50,7 +51,13 @@ async function editWithGeminiImage(prompt, refImages, { aspectRatio = '16:9', mo
   const j = await resp.json();
   const part = (j?.candidates?.[0]?.content?.parts || []).find(p => p.inlineData || p.inline_data);
   const inline = part?.inlineData || part?.inline_data;
-  if (!inline) throw new Error('Gemini returned no image (style transfer)');
+  if (!inline) {
+    // NAME THE REASON (2026-09-18). This is the exact call a Gemini IMAGE_OTHER
+    // refuses on a photorealistic adult-face Pass-1 sheet — see the
+    // styled-avatar guarantee in docs/decisions.md — and the message used to be
+    // a bare "no image", leaving the operator nothing to act on.
+    throw new Error(`Gemini returned no image (style transfer): ${describeImageOutcome(assessImageResponse(j))}`);
+  }
   const usage = j?.usageMetadata ? { input_tokens: j.usageMetadata.promptTokenCount || 0, output_tokens: j.usageMetadata.candidatesTokenCount || 0 } : null;
   return { imageData: 'data:image/jpeg;base64,' + inline.data, usage, modelId: model, sentToGrok: refImages };
 }
@@ -874,6 +881,13 @@ async function callSheetJudge(model, parts, _maxOutputTokens, geminiApiKey) {
     if (cand?.finishReason === 'MAX_TOKENS') {
       throw new Error('Gemini eval truncated (finishReason=MAX_TOKENS at the model ceiling)');
     }
+    // Same argument, ALLOW-LIST shape (imageReplyGuard, 2026-09-18): every
+    // other non-completion — a SAFETY/RECITATION/IMAGE_* refusal, or a reason
+    // Google adds later — also returns no text, and parseJudgeJson then throws
+    // on `undefined` naming neither the model nor the reason. Say why instead;
+    // the retry loop and the caller's fail-open are unchanged.
+    const verdict = assessImageResponse(j);
+    if (verdict.blocked) throw new Error(`Gemini eval ${describeImageBlock(verdict)}`);
     return { text: cand?.content?.parts?.[0]?.text, usageMetadata: j?.usageMetadata };
   }
   if (provider === 'xai') {

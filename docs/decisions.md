@@ -7,6 +7,124 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-18 — The IMAGE paths' refusal test is an allow-list too, and one module holds both vocabularies
+
+**Context.** Hours after `textReplyGuard` was inverted (the entry below, `a5052d176`), the image half
+of the pipeline still carried the mirror-image bug that entry's scope note reported for triage:
+
+```js
+finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT'
+```
+
+— an **allow-list OF REFUSALS** at `images.js` `generateImageOnly`, at `evalPipeline.js`
+`isBlockedResponse` (which gates BOTH the full-sanitisation retry and the Grok-vision fallback for
+every quality/semantic evaluation), and at `evalPipeline.js`'s P1 visual-inventory block test.
+Everything else fell past it as if the call had succeeded: `RECITATION`, `LANGUAGE`, `BLOCKLIST`,
+`SPII`, `OTHER`, `NO_IMAGE`, and the entire `IMAGE_*` family — **`IMAGE_OTHER` included**, which
+`CLAUDE.md` already names as this project's routine Gemini refusal mode and whose rule is explicit:
+*a refusal must fail loudly, never ship an empty page.*
+
+**Live or latent? The refusal CLASS is live in both environments; this particular predicate has no
+recorded instance where it changed the outcome.** Measured over staging (138 stories, 14 story_jobs,
+1,287 Lab experiments) and production (130 stories, 6 story_jobs, 69 experiments), scanning
+`stories.data`, `story_jobs.progress`/`result_data`/`error_message` and `testlab_experiments.results`
+for every value of both Gemini enums:
+
+| where | value | rows | which code path |
+|---|---|---|---|
+| staging `stories.data` | `PROHIBITED_CONTENT` | **13** | `figureDetection.js` SoM identity, `prompt blocked (…)` on the `gemini-full` tier — has its own Qwen-VL fallback |
+| staging `stories.data` | `IMAGE_OTHER` | **1** | `job_1787984454250_n257i2cmk` — **all three covers** died `Image blocked by API: reason=IMAGE_OTHER`, then `covers_all_failed`, story shipped coverless |
+| staging Lab | `IMAGE_OTHER` | **10** | `[IMAGE GEN-ONLY] No image data, reason=IMAGE_OTHER at level 0/1/2` (the whole sanitisation ladder), `styleRepair` 3/3 attempts, `Image blocked by API` in 5 |
+| staging Lab | `PROHIBITED_CONTENT` | **11** | 5 × `[QUALITY] Gemini safety block (PROHIBITED_CONTENT), retrying with sanitization` — the path that *was* handled |
+| **prod** `stories.data` | `OTHER` | **1** | `job_1768749129515_etqzmleof`: `generation_failed … Image blocked by API: reason=OTHER, message=no message`; attempt 2 recovered |
+| **prod** `stories.data` | `PROHIBITED_CONTENT` | **1** | `job_1772905039960_2b41whb4e`: `costumeEvaluation {pass: true, reason: "Response truncated: PROHIBITED_CONTENT"}` — **a refusal stored, and rendered in the UI, as a green PASS** |
+| **prod** `stories.data` | `MAX_TOKENS` | **1** | `job_1772488868662_ihvjideup`, same site, same shape |
+
+`RECITATION`, `BLOCKLIST`, `SPII`, `LANGUAGE`, `IMAGE_SAFETY`, `IMAGE_PROHIBITED_CONTENT`,
+`IMAGE_RECITATION`, `NO_IMAGE`, `MALFORMED_FUNCTION_CALL`, `UNEXPECTED_TOOL_CALL`,
+`FINISH_REASON_UNSPECIFIED`: **zero rows, both environments.**
+
+Two facts from that data shaped the fix. First, `generateImageOnly` never actually shipped a blank
+page from this hole, because a *second*, generic fall-through below it ("no image data,
+reason=`X`") caught the same responses and named the reason — the two-value test only decided which
+log line you got. The eval side has no such backstop: an unrecognised refusal there skips the
+sanitisation retry AND the Grok fallback and returns `null`, so the page silently loses its
+evaluation instead of getting a second opinion. Second, `OTHER` is real on production — a value that
+neither the old test nor a naive "add the IMAGE_* family" patch would have caught.
+
+**Decision.** Same inversion, same shape as the text guard, in a **new sibling module**
+`server/lib/imageReplyGuard.js`: `classifyImageFinishReason` → `absent | natural | truncation |
+refusal | unknown`, and `assessImageResponse(data)` → `{ blocked, truncated, cls, reason, source }`.
+`STOP` (plus `stop` / `end_turn`, which the synthesised Grok- and OpenRouter-vision envelopes in
+`images.js` stamp) is the only thing that passes. **Unknown is blocked**, which is what makes this
+safe against values Google adds later.
+
+- **`MAX_TOKENS` is `truncation`, never `blocked`** — deliberately, so the dedicated
+  retry-with-a-smaller-thinking-budget path and the named P1-inventory-truncated check keep firing
+  exactly as before.
+- **`blocked` spans a policy refusal and a provider-side abort** (`OTHER`, `NO_IMAGE`,
+  `MALFORMED_FUNCTION_CALL`, …). Every call site does the same thing with both, and the literal
+  reason is always printed, which is the distinction an operator actually needs.
+- The module **only classifies and never throws.** The text guard stamps a verdict on a reply
+  because a paid text run must not die on a heuristic; the image call sites are the opposite — they
+  already throw, `continue` to the next sanitisation level, or fall back to another provider, and
+  they keep their own control flow.
+
+**ONE source of truth, not a second list.** `imageReplyGuard` **imports** `NATURAL_STOP`,
+`TRUNCATING_STOP_REASONS` and `REFUSING_STOP_REASONS` from `textReplyGuard` and declares only
+`IMAGE_REFUSAL_REASONS` — the ten values that cannot reach a text call. A unit test asserts the two
+sets are disjoint, so a value added to one guard can never become a silent second copy in the other.
+The pair is registered in `scripts/admin/sibling-registry.json` as **`provider-refusal-guards`**
+(axis: *text reply guard vs image reply guard*, severity `block`), so gate 9 refuses a push that
+reclassifies a reason on one side only — which is precisely how the image half sat unfixed while the
+text half was inverted in the same working tree.
+
+**Enumeration — read 2026-09-18 from the proto the REST API is generated from**, not from an SDK and
+not from a repo comment: `googleapis/googleapis`,
+`google/ai/generativelanguage/v1beta/generative_service.proto`. `enum FinishReason` has **18**
+values (`FINISH_REASON_UNSPECIFIED, STOP, MAX_TOKENS, SAFETY, RECITATION, OTHER, LANGUAGE, BLOCKLIST,
+PROHIBITED_CONTENT, SPII, MALFORMED_FUNCTION_CALL, IMAGE_SAFETY, UNEXPECTED_TOOL_CALL,
+TOO_MANY_TOOL_CALLS, IMAGE_PROHIBITED_CONTENT, IMAGE_OTHER, NO_IMAGE, IMAGE_RECITATION`) and
+`enum BlockReason` has **6** (`BLOCK_REASON_UNSPECIFIED, SAFETY, OTHER, BLOCKLIST,
+PROHIBITED_CONTENT, IMAGE_SAFETY`). The installed `@google/generative-ai` **0.24.1** carries **11**
+FinishReason values, stops at `MALFORMED_FUNCTION_CALL`, knows **none** of the `IMAGE_*` family, and
+spells the block default `BLOCKED_REASON_UNSPECIFIED` where the proto says
+`BLOCK_REASON_UNSPECIFIED`. An SDK enum is a stale snapshot of a list the vendor keeps extending —
+the whole argument for making the *pass* list the closed one.
+
+**Call sites — changed.**
+
+| site | before, on an unrecognised reason | after |
+|---|---|---|
+| `images.js` `generateImageOnly` (~2138) | fell through to the generic "no image data" backstop under a vaguer log line | `assessImageResponse` decides; same escalate-sanitisation-then-throw control flow, reason named at the point of refusal |
+| `evalPipeline.js` `isBlockedResponse` (~1046) | **not blocked** → skipped the sanitisation retry AND the Grok fallback → `return null`, page loses its eval | blocked → both recovery steps run, as they already did for `SAFETY` |
+| `evalPipeline.js` P1 `p1Blocked` (~207) | **not blocked** → `!p1Text` → `return null`, no Grok fallback, page loses its visual inventory | blocked → Grok fallback; `MAX_TOKENS` still hits its own named check below |
+| `character2x4Sheet.js` judge (~874) | only `MAX_TOKENS` named; any other refusal returned `text: undefined` and `parseJudgeJson` threw naming neither model nor reason | named; retry loop and the caller's fail-open unchanged |
+| `character2x4Sheet.js` `editWithGeminiImage` | `'Gemini returned no image (style transfer)'` — the exact call `IMAGE_OTHER` refuses on an adult-face sheet, with the reason discarded | reason named via `describeImageOutcome` |
+
+**Call sites — deliberately NOT changed**, each already failing loudly, or making a cost decision
+that belongs to the owner rather than to this fix:
+
+- `avatars.js` (~1916) keys its paid **retry** on `IMAGE_OTHER` alone; every other reason returns
+  `imageData: null` and is logged. *Which* refusals are worth paying to retry is a cost decision.
+- `bboxDetection.js` (~699) keys its **sanitisation retry** on `blockReason === 'PROHIBITED_CONTENT'`;
+  every other reason still reaches the Grok fallback.
+- `figureDetection.js` (~1235), `styleRepair.js` (~160), `images.js` (~1824 / ~2206) and
+  `textModels.js` (~630) were already generic and already name the reason.
+- `avatars.js` `evaluateCostumeApplication` (~857) turns **any** non-`STOP` reason into
+  `pass: true, "Response truncated: <reason>"` — the prod row above is a `PROHIBITED_CONTENT`
+  refusal displayed to the owner as a green PASS. Left alone **because the function has had no
+  caller since `3aa773c86`** (dead `generateStyledCostumedAvatar` removed); changing unreachable
+  code only adds risk. Recorded in `tasks/BACKLOG.md` for whoever re-wires it.
+
+**Touched files.** `server/lib/imageReplyGuard.js` (new), `server/lib/images.js`,
+`server/lib/evalPipeline.js`, `server/lib/character2x4Sheet.js`,
+`scripts/admin/sibling-registry.json`, `tests/unit/image-reply-guard.test.ts` (23 tests: the
+allow-list verdict for all 18 FinishReason values, `MAX_TOKENS` stays a truncation, unknown is
+blocked, case-insensitivity, absent ≠ unknown, prompt- and candidate-level blocks, the reason always
+reaches the operator, the two guards' vocabularies are disjoint, and a source scan that fails if any
+`server/` file re-introduces a `finishReason === '<refusal>'` test).
+
 ## 2026-09-18 — A reply's stop reason is an ALLOW-LIST: a refusal, and an unknown reason, fail loudly
 
 **Context.** `server/lib/textReplyGuard.js` stamps `result.truncation` on EVERY reply leaving
@@ -121,8 +239,10 @@ prose: it is a structured field, compared against a set.
 (`server/lib/images.js` ~2139, `server/lib/evalPipeline.js` ~1046, `figureDetection.js`), which test
 `finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT'` only and would miss
 `RECITATION`, `BLOCKLIST`, `SPII`, `LANGUAGE`, `ESCALATION` and the `IMAGE_*` block family. Those
-were NOT changed here — different subsystem, different call semantics — and are reported for
-triage rather than fixed.
+were NOT changed here — different subsystem, different call semantics — and were reported for
+triage rather than fixed. **Superseded the same day** by the entry above: they are now inverted too,
+through `server/lib/imageReplyGuard.js`, which imports this module's sets so the two vocabularies
+cannot drift.
 
 **Touched files.** `server/lib/textReplyGuard.js` (the inversion: `NATURAL_STOP` /
 `TRUNCATING_STOP_REASONS` / `REFUSING_STOP_REASONS`, `classifyStopReason`, `collectStopReasons`,

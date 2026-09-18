@@ -69,6 +69,7 @@ function getCastResolver() {
 // keep their own calls and can keep thinking where reasoning genuinely helps.
 const { EVAL_TEMPERATURE } = require('../config/models');
 const { FINDING_SOURCES, stampFindingSource } = require('./findingSources');
+const { assessImageResponse, describeImageBlock } = require('./imageReplyGuard');
 const EVAL_THINKING_BUDGET = process.env.EVAL_THINKING_BUDGET != null ? Number(process.env.EVAL_THINKING_BUDGET) : 0;
 
 // Quality threshold from environment or default
@@ -204,14 +205,19 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
     let outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
     const thinkingTokens = p1Data.usageMetadata?.thoughtsTokenCount || 0;
 
-    const p1Blocked = p1Data.promptFeedback?.blockReason ||
-      !p1Data.candidates || p1Data.candidates.length === 0 ||
-      p1Data.candidates[0]?.finishReason === 'SAFETY' ||
-      p1Data.candidates[0]?.finishReason === 'PROHIBITED_CONTENT';
+    // ALLOW-LIST since 2026-09-18 (imageReplyGuard): a finish reason must MEAN
+    // the model finished, or the inventory is treated as blocked and routed to
+    // the Grok fallback below. The old test named SAFETY and PROHIBITED_CONTENT
+    // only, so RECITATION / BLOCKLIST / SPII / LANGUAGE / OTHER / the IMAGE_*
+    // family reached the `!p1Text` return instead — the page lost its visual
+    // inventory entirely rather than getting a second opinion. MAX_TOKENS stays
+    // OUT of this: it has its own named check a few lines down.
+    const p1Block = assessImageResponse(p1Data);
+    const p1Blocked = p1Block.blocked;
 
     if (p1Blocked) {
       const pageLabel = pageContext ? `[${pageContext}] ` : '';
-      log.warn(`⚠️ [QUALITY P1] ${pageLabel}Content blocked by Gemini safety`);
+      log.warn(`⚠️ [QUALITY P1] ${pageLabel}Inventory ${describeImageBlock(p1Block)}`);
       // Fall back to Grok vision if we weren't already using xAI
       if (modelConfig?.provider !== 'xai') {
         const grokFallbackId = 'grok-4-fast';
@@ -1031,23 +1037,20 @@ function sanitizeForGemini(text, level = 'light') {
   return result.replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').trim();
 }
 
-// Helper function to check if a Gemini response indicates blocked content
-const isBlockedResponse = (responseData) => {
-  // Check promptFeedback for block reason
-  if (responseData.promptFeedback?.blockReason) {
-    return true;
-  }
-  // Check if no candidates due to safety
-  if (!responseData.candidates || responseData.candidates.length === 0) {
-    return true;
-  }
-  // Check candidate-level blocking
-  const finishReason = responseData.candidates[0]?.finishReason;
-  if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
-    return true;
-  }
-  return false;
-};
+// Does a Gemini vision response carry nothing usable?
+//
+// ALLOW-LIST since 2026-09-18 (server/lib/imageReplyGuard.js, the sibling of
+// textReplyGuard). This used to test `finishReason === 'SAFETY' ||
+// finishReason === 'PROHIBITED_CONTENT'` — an allow-list OF REFUSALS — so
+// every other refusal read as a clean response: RECITATION, BLOCKLIST, SPII,
+// LANGUAGE, OTHER, NO_IMAGE and the entire IMAGE_* family. Those calls then
+// skipped BOTH recovery steps this function gates (the full-sanitisation retry
+// and the Grok-vision fallback) and returned null — the page silently lost its
+// evaluation instead of getting a second opinion.
+//
+// MAX_TOKENS is deliberately NOT a block: it is a cut, not a refusal, and it
+// has its own retry-with-a-smaller-thinking-budget path below.
+const isBlockedResponse = (responseData) => assessImageResponse(responseData).blocked;
 
 /**
  * EXPECTED CAST — the roster the quality evaluator judges figure COUNT against
