@@ -45,7 +45,25 @@ const SLOT_NOUNS = {
   accessories: ['scarf', 'gloves', 'mittens', 'glasses', 'earrings', 'necklace', 'satchel', 'rucksack', 'backpack'],
 };
 
-/** `wornAs: "Lily.headwear"` -> {owner: 'Lily', slot: 'headwear'}; null when malformed. */
+/**
+ * `wornAs: "Lily.headwear"` -> {owner: 'Lily', slot: 'headwear', slotKnown: true};
+ * null when malformed.
+ *
+ * `slotKnown` IS THE FLAG, AND THE LINK IS NEVER DROPPED (2026-09-18). The
+ * writer can name a slot that does not exist — staging
+ * job_1789681157795_wkt20ckod linked `Levin.hands` (mittens) and `Levin.neck`
+ * (a scarf), neither of which is in WORN_SLOTS, and the parse accepted both
+ * without a word. Rejecting the link here was the obvious repair and is the
+ * WRONG one: `wornAsEntries` would then not enumerate the entry at all, so the
+ * page would lose its "is NOT wearing this" prompt line, the item would keep
+ * its reference cell on its own owner, and the strip would never even be
+ * attempted — strictly worse than the silent no-op it replaces, and it would
+ * take the element-identity route below out of reach for the one case it can
+ * still answer. So the parse MARKS and never drops; the loud failure lives
+ * where it can be acted on (`auditVisualBibleContract`, at authoring time) and
+ * where it actually costs something (`stripOffItemsFromOutfit`, when a garment
+ * the page took off stays in the contract).
+ */
 function parseWornAs(wornAs) {
   const raw = String(wornAs || '').trim();
   const dot = raw.indexOf('.');
@@ -53,7 +71,7 @@ function parseWornAs(wornAs) {
   const owner = raw.slice(0, dot).trim();
   const slot = raw.slice(dot + 1).trim().toLowerCase();
   if (!owner || !slot) return null;
-  return { owner, slot };
+  return { owner, slot, slotKnown: WORN_SLOTS.includes(slot) };
 }
 
 const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
@@ -101,7 +119,7 @@ function wornAsEntries(visualBible) {
     for (const entry of list) {
       const link = parseWornAs(entry && entry.wornAs);
       if (!link || !entry || !entry.id) continue;
-      out.push({ entry, id: String(entry.id).toUpperCase(), name: entry.name || entry.id, owner: link.owner, slot: link.slot, pool });
+      out.push({ entry, id: String(entry.id).toUpperCase(), name: entry.name || entry.id, owner: link.owner, slot: link.slot, slotKnown: link.slotKnown, pool });
     }
   }
   return out;
@@ -362,6 +380,8 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       // avatar reference demonstrably carries it — see referenceCarriesItem.
       wornAsLinked: true,
       slot: item.slot,
+      // The writer's slot is not necessarily one of ours — see parseWornAs.
+      slotKnown: item.slotKnown,
       entry: item.entry,
       state,
       location: w.location,
@@ -420,6 +440,9 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       // wardrobe, so no attached reference shows it on them.
       wornAsLinked: false,
       slot,
+      // Source 2 derives the slot from `slotFromType` / `deriveSlotFromName`,
+      // both of which only ever answer with a member of WORN_SLOTS.
+      slotKnown: true,
       entry,
       state: w2.state,
       location: w2.location,
@@ -847,6 +870,12 @@ function indexOfElementAmong(texts, element) {
  */
 function clauseRemainderWithoutItem(clause, slotNouns, itemName, element = null) {
   const parts = String(clause).split(LAYER_SPLIT_RE).map(s => s.trim()).filter(Boolean);
+  // NO SLOT, NO VOCABULARY (2026-09-18). The caller reaches here with
+  // `slotNouns: null` when the writer named a slot outside WORN_SLOTS and only
+  // Route A could identify the clause. Route B then has nothing to consult, and
+  // an empty vocabulary makes it refuse — which is the right answer and the one
+  // the safety bias asks for, never a crash on `null.filter`.
+  const vocab = Array.isArray(slotNouns) ? slotNouns : [];
 
   // ROUTE A — the declared element identifies its own half of the clause.
   // Ahead of the whole-clause shortcut below on purpose: that shortcut counts
@@ -871,8 +900,8 @@ function clauseRemainderWithoutItem(clause, slotNouns, itemName, element = null)
   // ROUTE B — closed vocabulary. Unchanged, and reached only when the element's
   // own declared words could not tell the halves apart.
   if (countGarments(clause) <= 1) return null;
-  const itemNouns = (itemName ? garmentNounsIn(itemName, slotNouns) : []);
-  const mine = itemNouns.length > 0 ? itemNouns : garmentNounsIn(clause, slotNouns);
+  const itemNouns = (itemName ? garmentNounsIn(itemName, vocab) : []);
+  const mine = itemNouns.length > 0 ? itemNouns : garmentNounsIn(clause, vocab);
   if (mine.length === 0) return false;
   const mineRe = new RegExp(`\\b(?:${mine.join('|')})\\b`, 'i');
   if (parts.length < 2) return false;
@@ -928,9 +957,25 @@ function removeWornItemFromOutfit(description, slot, itemName = null, element = 
   }
 
   // Route 2: plain sentence — exactly one clause must own the slot.
-  const nouns = SLOT_NOUNS[key];
-  if (!nouns) return { text: raw, removed: false, reason: 'unknown-slot' };
+  //
+  // AN UNKNOWN SLOT NO LONGER PRE-EMPTS IDENTITY (2026-09-18). `wornAs` is
+  // free text the writer composes, and it can name a slot this module has never
+  // heard of: staging job_1789681157795_wkt20ckod links `Levin.hands` for
+  // mittens and `Levin.neck` for a scarf — both of them `accessories` in the
+  // one vocabulary that exists — and the bare `SLOT_NOUNS[key]` miss returned
+  // `unknown-slot` before anything else was tried. Nothing was stripped on nine
+  // pages: the generator kept drawing the scarf the page had wrapped around
+  // something else, and every clothing judge kept demanding it back.
+  //
+  // The element-identity route does not need a slot at all — it asks the
+  // declared element which clause is itself — so the miss is no longer an exit,
+  // it is only the loss of the fallback. Identity answers or nothing happens,
+  // and `unknown-slot` is still the reason reported when identity declines, so
+  // a slot outside WORN_SLOTS never becomes invisible.
+  const nouns = SLOT_NOUNS[key] || null;
   const clauses = splitClauses(raw);
+  const byElement = indexOfElementAmong(clauses, element);
+  if (!nouns && byElement < 0) return { text: raw, removed: false, reason: 'unknown-slot' };
   if (clauses.length < 2) return { text: raw, removed: false, reason: 'single-clause-outfit' };
   // THE DECLARED ELEMENT PICKS ITS OWN CLAUSE (2026-09-18), ahead of the slot
   // vocabulary. The slot is the writer's `wornAs` link, which on staging
@@ -941,7 +986,6 @@ function removeWornItemFromOutfit(description, slot, itemName = null, element = 
   // do not depend on either being right. Same precedence as d104a283d: a
   // declared field outranks a guess at English.
   let hits = [];
-  const byElement = indexOfElementAmong(clauses, element);
   if (byElement >= 0) hits = [byElement];
   else {
     const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
@@ -1000,6 +1044,26 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
     // field a hand-built row always carries.
     const res = removeWornItemFromOutfit(text, r.slot, r.name, r.entry || { name: r.name });
     removals.push({ id: r.id, slot: r.slot, removed: res.removed, reason: res.reason });
+    // LOUD WHERE IT COSTS SOMETHING (2026-09-18). Every other failed strip is
+    // the module refusing one it cannot make safely, and the explicit "is NOT
+    // wearing" prompt line still carries the instruction. A slot the writer
+    // INVENTED is not that: the element's own words were the only thing that
+    // could have answered, they did not, and the garment the page took off is
+    // still standing in the one string the generator, all three judges and
+    // every repair entry point read.
+    //
+    // The test is the slot itself, not the returned reason, because the two
+    // routes report an invented slot differently — a plain-sentence contract
+    // answers `unknown-slot` and a slot-LABELLED one answers
+    // `slot-not-in-contract`, which is also what a real slot legitimately
+    // answers. 401 of the 4,757 stored pairs are slot-labelled, so that second
+    // route is not hypothetical. Same shape and severity as the unmappable
+    // source-2 `off` above — never kills the run, never edits the entry.
+    if (!res.removed && !WORN_SLOTS.includes(String(r.slot || '').trim().toLowerCase())) {
+      log.error(`[WORN] ${r.id} "${r.name}" is declared off ${characterName} but its wornAs slot "${r.slot}" is not an outfit slot `
+        + `(${WORN_SLOTS.join(', ')}), and the element's own declared words do not single out a clause of the contract `
+        + `(${res.reason}). Nothing is stripped: the image model is still told to draw it and every clothing judge still demands it.`);
+    }
     if (res.removed) text = res.text;
   }
   return { text, removals };
@@ -1039,7 +1103,13 @@ function applyWornItemsToOutfit(description, resolved, characterName) {
     if (!r || r.state !== 'worn' || !r.slot) continue;
     if (!sameName(r.wearer || r.owner, characterName)) continue;
     const nouns = SLOT_NOUNS[r.slot];
-    if (!nouns) continue;
+    // An unknown slot ends the swap, and says so (2026-09-18). The element's own
+    // words cannot stand in for the vocabulary here the way they do in the
+    // strip: what this branch removes is the contract's INCUMBENT garment, and
+    // the element's words point at the garment going IN. So the swap genuinely
+    // cannot run — but it is recorded, like every other skip, instead of
+    // vanishing on a bare `continue`.
+    if (!nouns) { swaps.push({ id: r.id, slot: r.slot, applied: false, reason: 'unknown-slot' }); continue; }
     const clauses = splitClauses(text);
     const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
     const hits = clauses.filter(c => nounRe.test(c));

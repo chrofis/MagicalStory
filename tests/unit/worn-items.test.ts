@@ -70,7 +70,11 @@ describe('wornItems — METADATA parser', () => {
   });
 
   it('parses the wornAs link and ignores a malformed one', () => {
-    expect(worn.parseWornAs('Lily.headwear')).toEqual({ owner: 'Lily', slot: 'headwear' });
+    // `slotKnown` (2026-09-18): a slot outside WORN_SLOTS is MARKED, never
+    // dropped — dropping the link would un-enumerate the entry entirely. Full
+    // coverage in worn-unknown-slot.test.ts.
+    expect(worn.parseWornAs('Lily.headwear')).toEqual({ owner: 'Lily', slot: 'headwear', slotKnown: true });
+    expect(worn.parseWornAs('Lily.neck')).toEqual({ owner: 'Lily', slot: 'neck', slotKnown: false });
     expect(worn.parseWornAs('Lily')).toBeNull();
     expect(worn.parseWornAs('.headwear')).toBeNull();
   });

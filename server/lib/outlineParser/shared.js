@@ -795,7 +795,40 @@ function auditVisualBibleContract(visualBible, options = {}) {
     }
   }
 
-  // (2) A range covering nearly the whole book was almost certainly not earned.
+  // (2) `wornAs` names a slot that exists.
+  //
+  // THE ONE LOUD PLACE (2026-09-18). `wornAs: "<Name>.<slot>"` is free text the
+  // writer composes, and staging job_1789681157795_wkt20ckod composed
+  // `Levin.hands` for mittens and `Levin.neck` for a scarf — both `accessories`
+  // in the only slot vocabulary there is. Nothing said a word: the parse
+  // accepted the string, and nine pages later the resolver quietly declined to
+  // strip either garment from the contract the generator and all three judges
+  // read. This is the moment the fault is created and the only moment it can be
+  // seen once for the whole story, so it is reported here; wornItems.js reports
+  // again, per page, on the pages where it actually costs a garment.
+  //
+  // REPORT, never repair. Mapping `neck` onto `accessories` here would be this
+  // module inferring what the writer meant, and the authoring prompt is where
+  // the closed list belongs.
+  {
+    const { WORN_SLOTS, parseWornAs } = require('../wornItems');
+    for (const cat of ['artifacts', 'clothing', 'vehicles']) {
+      for (const entry of entriesOf(cat)) {
+        const link = parseWornAs(entry.wornAs);
+        if (!link || link.slotKnown) continue;
+        findings.push({
+          code: 'worn-as-unknown-slot',
+          id: entry?.id || entry?.name || '(unnamed)',
+          category: cat,
+          message: `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" declares wornAs "${entry.wornAs}" — `
+            + `"${link.slot}" is not an outfit slot (${WORN_SLOTS.join(', ')}), so a page that takes the item off `
+            + `strips nothing from ${link.owner}'s clothing and every judge still demands it`,
+        });
+      }
+    }
+  }
+
+  // (3) A range covering nearly the whole book was almost certainly not earned.
   // A genuinely single-setting story can trip this on its one location; the
   // warning is a prompt for a human look, not a defect claim.
   //
