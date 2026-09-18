@@ -453,6 +453,54 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   // is skipped and the grid image carries the references instead.
   const isGrokImage = IMAGE_MODELS[MODEL_DEFAULTS.pageImage]?.backend === 'grok';
 
+  // THE PLATE AND THE GRID ARE RESOLVED BEFORE THE PROMPT (2026-09-18), because
+  // the prompt has to know which references the call actually carries. This is
+  // the same ordering production settled on 2026-09-15 (storyJobPipeline.js
+  // `makeImagePrompt` + the 5a-pre-grid rebuild) and that images.js `iterate`
+  // already had: build the grid, then build the prompt from the cells that are
+  // in it. Nothing else moved — the reference-photo knobs (avatarSheets,
+  // refCrop) still run after the prompt, exactly as before, because they change
+  // the PIXELS of a character card and nothing the prompt reads.
+
+  // backgroundRef: use a specific (test) empty-scene version as the background
+  // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
+  // noBackground: render WITHOUT the Pass-1 plate — A/B what the empty scene
+  // actually contributes to the final page (VB grid then carries locations).
+  let emptyScene;
+  if (params.noBackground) {
+    emptyScene = null;
+  } else if (params.backgroundRef?.versionIndex !== undefined) {
+    const bg = await loadTestImage(ctx.storyId, params.backgroundRef.imageType || 'empty_scene', ctx.pageNumber, params.backgroundRef.versionIndex);
+    emptyScene = bg?.imageData || null;
+    if (!emptyScene) throw new Error(`backgroundRef v${params.backgroundRef.versionIndex} not found`);
+  } else {
+    emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
+  }
+  const textInImage = ctx.layout?.textInImage !== false;
+  const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
+
+  // Visual Bible grid + landmark refs — production's shared helper (a plate
+  // background drops vehicles/locations/landmarks; otherwise locations only).
+  let visualBibleGrid = null;
+  let genLandmarkPhotos = ctx.landmarkPhotos;
+  if (ctx.visualBible) {
+    try {
+      const refs = await buildPageCompositeRefs(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, {
+        hasBackground: !!emptyScene,
+        logTag: 'TESTLAB',
+        // aboardOverride is the empty_scene stage's knob for stories whose
+        // stored metadata predates the field; honour it here too so a Lab page
+        // render matches production's grid exactly.
+        aboardId: params.aboardOverride ?? ctx.scene?.sceneMetadata?.aboard ?? null,
+        sceneMetadata: ctx.scene?.sceneMetadata ?? null,
+      });
+      visualBibleGrid = refs.visualBibleGrid;
+      genLandmarkPhotos = refs.landmarkPhotos;
+    } catch (err) {
+      log.warn(`[TESTLAB] VB grid build failed (continuing without): ${err.message}`);
+    }
+  }
+
   // buildImagePrompt reads PROMPT_TEMPLATES.imageGeneration internally and is
   // SYNCHRONOUS — swap the key only around this call (no await inside the
   // window, so concurrent generations can never observe the override).
@@ -469,7 +517,21 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       ctx.visualBible,
       ctx.pageNumber,
       ctx.referencePhotos,
-      { textPositionOverride: ctx.textPosition || undefined, skipVisualBible: isGrokImage }
+      {
+        textPositionOverride: ctx.textPosition || undefined,
+        skipVisualBible: isGrokImage,
+        // THE ELEMENTS WHOSE REFERENCE RENDER RIDES WITH THIS CALL — the cells
+        // the grid above actually holds, and nothing else. `rawElements` is set
+        // by buildVisualBibleGrid from the cells whose bytes loaded, so an
+        // element that was selected but has no usable render is correctly
+        // absent. Without this the Lab's REQUIRED OBJECTS block claimed no
+        // attached reference for any element while production's named them
+        // ("The attached reference images include a rough image of X — match
+        // its look"), so every Lab measurement of that block was made against a
+        // prompt production never sends. Empty grid → empty set, which is the
+        // honest answer, not a missing argument.
+        vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
+      }
     );
   } finally {
     PROMPT_TEMPLATES.imageGeneration = origTemplate;
@@ -526,45 +588,6 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
         .jpeg({ quality: 92 }).toBuffer();
       p.photoUrl = 'data:image/jpeg;base64,' + cropped.toString('base64');
       p.photoData = undefined;
-    }
-  }
-
-  // backgroundRef: use a specific (test) empty-scene version as the background
-  // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
-  // noBackground: render WITHOUT the Pass-1 plate — A/B what the empty scene
-  // actually contributes to the final page (VB grid then carries locations).
-  let emptyScene;
-  if (params.noBackground) {
-    emptyScene = null;
-  } else if (params.backgroundRef?.versionIndex !== undefined) {
-    const bg = await loadTestImage(ctx.storyId, params.backgroundRef.imageType || 'empty_scene', ctx.pageNumber, params.backgroundRef.versionIndex);
-    emptyScene = bg?.imageData || null;
-    if (!emptyScene) throw new Error(`backgroundRef v${params.backgroundRef.versionIndex} not found`);
-  } else {
-    emptyScene = await loadEmptyScene(ctx.storyId, ctx.pageNumber);
-  }
-  const textInImage = ctx.layout?.textInImage !== false;
-  const textAreaMask = textInImage && ctx.textPosition ? getTextAreaMask(ctx.textPosition, ctx.languageLevel) : null;
-
-  // Visual Bible grid + landmark refs — production's shared helper (a plate
-  // background drops vehicles/locations/landmarks; otherwise locations only).
-  let visualBibleGrid = null;
-  let genLandmarkPhotos = ctx.landmarkPhotos;
-  if (ctx.visualBible) {
-    try {
-      const refs = await buildPageCompositeRefs(ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, {
-        hasBackground: !!emptyScene,
-        logTag: 'TESTLAB',
-        // aboardOverride is the empty_scene stage's knob for stories whose
-        // stored metadata predates the field; honour it here too so a Lab page
-        // render matches production's grid exactly.
-        aboardId: params.aboardOverride ?? ctx.scene?.sceneMetadata?.aboard ?? null,
-        sceneMetadata: ctx.scene?.sceneMetadata ?? null,
-      });
-      visualBibleGrid = refs.visualBibleGrid;
-      genLandmarkPhotos = refs.landmarkPhotos;
-    } catch (err) {
-      log.warn(`[TESTLAB] VB grid build failed (continuing without): ${err.message}`);
     }
   }
 
@@ -4002,6 +4025,47 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       : '';
     const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
 
+    // ONE resolver for BOTH Art-Director call shapes in this stage — the
+    // all-pages builder below and the per-page `expandOnePage` fallback. That
+    // is why buildReplaySceneOptions exists: the all-pages sibling was routed
+    // through it and the per-page one was not, so the two measured different
+    // inputs from the same stored story (no clothing contract at all on the
+    // per-page side).
+    const replayScene = buildReplaySceneOptions(storyData, {
+      availableAvatars,
+      maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+      parseBeats,
+    });
+
+    // THE BIBLE THIS RUN AUTHORED, parsed ONCE and read by every consumer in
+    // this stage. Production adopts `adBible.visualBible` before the per-page
+    // fallback runs, "so a recovered page is expanded against the same bible
+    // the batch wrote" (beatsPipeline.js). The Lab had the parse in exactly one
+    // place — the brief pre-check — so the per-page expansion and the pre-check
+    // read different bibles, and the stored one is a different id space
+    // (Lab #1195: findings naming ART002 as an egg while the new bible's ART002
+    // was a coin). The stored bible stays the fallback for a run that authored
+    // none (`params.perPageExpansion`, where no batch call happens at all).
+    //
+    // Declared HERE, above the batch call, on purpose: `expandOnePage` runs as
+    // the batch's recovery callback, so a `let` further down would still be in
+    // its temporal dead zone when the first recovered page asks for the bible.
+    let _runVb;
+    function runVisualBible() {
+      if (_runVb !== undefined) return _runVb;
+      _runVb = storyData.visualBible || null;
+      if (authoredBible?.body) {
+        try {
+          const { UnifiedStoryParser } = require('./outlineParser/unified');
+          const parsed = new UnifiedStoryParser(authoredBible.body).extractVisualBible();
+          if (parsed) _runVb = parsed;
+        } catch (vbErr) {
+          log.warn(`[TESTLAB] beats_scenes: authored bible did not parse (${vbErr.message}) — falling back to the stored bible`);
+        }
+      }
+      return _runVb;
+    }
+
     const expStart = Date.now();
 
     // ALL-PAGES PATH — what production actually runs (owner, 2026-08-09).
@@ -4031,11 +4095,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         // story)" on every run while production's Art Director staged each page
         // with the whole arc in view. It is the SAME arc the stage already hands
         // its own planner above — one expression for both, now.
-        buildReplaySceneOptions(storyData, {
-          availableAvatars,
-          maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
-          parseBeats,
-        })
+        replayScene
       );
       if (allPrompt) {
         const tAll = Date.now();
@@ -4104,11 +4164,25 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       const pageContent = `PLAN: ${b.planLine || ''}`;
       const prompt = buildSceneExpansionPrompt(
         b.pageNumber, pageContent, storyData.characters || [], lang,
-        storyData.visualBible || null, availableAvatars, null,
+        runVisualBible(), replayScene.availableAvatars, null,
         {
-          maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+          maxCharactersPerScene: replayScene.maxCharactersPerScene,
           artStyleId: storyData.artStyle,
           imageBackend: imgModelConfig?.backend,
+          // THE TWO OPTIONS PRODUCTION PASSES AND THIS CALL DID NOT
+          // (beatsPipeline.js `expandOnePage`). Both are measurable in the
+          // built prompt, on every page:
+          //   - `clothingRequirements` — the per-page fallback attaches no
+          //     referencePhotos, so the contract is the ONLY outfit source.
+          //     Without it every character's CHARACTER DETAILS line ended at
+          //     its face and carried no `Wearing:` clause at all.
+          //   - `story` — decides the book's SEASON and whether the text-zone
+          //     rule family is asked for. With neither, `seasonLabel` fell back
+          //     to TODAY's date (a summer story replayed in September was told
+          //     "the season is Autumn on every page") and the text-zone rules
+          //     were always on, where 94 of 118 recent stories gate them off.
+          clothingRequirements: replayScene.clothingRequirements,
+          story: storyData,
         }
       );
       const t = Date.now();
@@ -4162,29 +4236,20 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       // finding changes what it rewrites: exp 821 produced four two-action pages
       // and the review prompt carried no BRIEF FAULTS block at all.
       let briefFindings = '';
-      // Declared out here so the scene-review prompt below gets the SAME bible
-      // the pre-check read — production passes it (beatsPipeline.js) and a Lab
-      // that did not would stop reproducing the review it is measuring.
-      let vb = storyData.visualBible || null;
+      // CHECK THE BIBLE THIS RUN AUTHORED, not the one the story shipped with
+      // (2026-09-12). The Art Director writes a fresh bible ahead of page 1, so
+      // the stored one is a different id space: on Lab #1195 the findings named
+      // "The Dragon Egg (ART002)" while the new bible's ART002 was a coin, no
+      // finding could name it by an id that meant the same thing in both
+      // bibles, and the reviewer was told to drop an element by an id that
+      // meant something else in its own bible. Declared out here so the
+      // scene-review prompt below gets the SAME bible the pre-check read —
+      // production passes it (beatsPipeline.js) and a Lab that did not would
+      // stop reproducing the review it is measuring. `runVisualBible` is the
+      // one parse, shared with the per-page expansion above.
+      const vb = runVisualBible();
       try {
         const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-        // CHECK THE BIBLE THIS RUN AUTHORED, not the one the story shipped with
-        // (2026-09-12). The Art Director writes a fresh bible ahead of page 1,
-        // so the stored one is a different id space: on Lab #1195 the findings
-        // named "The Dragon Egg (ART002)" while the new bible's ART002 was a
-        // coin, no finding could name it by an id that meant the same thing
-        // in both bibles, and the reviewer was told
-        // to drop an element by an id that meant something else in its own
-        // bible. The stored bible stays the fallback for a run that authored none.
-        if (authoredBible?.body) {
-          try {
-            const { UnifiedStoryParser } = require('./outlineParser/unified');
-            const parsed = new UnifiedStoryParser(authoredBible.body).extractVisualBible();
-            if (parsed) vb = parsed;
-          } catch (vbErr) {
-            log.warn(`[TESTLAB] beats_scenes: authored bible did not parse for the pre-check (${vbErr.message}) — falling back to the stored bible`);
-          }
-        }
         const secondaryList = Array.isArray(vb?.secondaryCharacters)
           ? vb.secondaryCharacters : Object.values(vb?.secondaryCharacters || {});
         const seen = new Set();
@@ -4776,7 +4841,16 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
       ctx.visualBible || null,
       ctx.pageNumber,
       ctx.referencePhotos || null,
-      { skipVisualBible: true },
+      {
+        skipVisualBible: true,
+        // EMPTY ON PURPOSE, not omitted (2026-09-18). `vbRefElementIds` names
+        // the elements whose reference render rides with the call, and this
+        // prompt is handed to the blend pass, whose only images are the pasted
+        // canvas and — where one exists — `ctx.visualBibleGrid`, which
+        // loadSceneContext never sets. Nothing element-shaped is attached, so
+        // the REQUIRED OBJECTS block must not claim a reference for anything.
+        vbRefElementIds: [],
+      },
     );
   } catch (err) {
     log.warn(`[TESTLAB] could not rebuild the page prompt (${err.message}) — blend falls back to the legacy brief`);
@@ -5600,13 +5674,35 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
     ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
     : '';
 
+  // THE PAGE'S PLAN LINE. Ten positional arguments left `rawOutlineContext`
+  // (the 11th) on its default, and images.js:3884 names exactly what that
+  // costs: "with a null, buildSceneDescriptionPrompt fills the authoritative
+  // SCENE_SUMMARY slot from the previous brief's own imageSummary, and the
+  // rewrite has no narrative anchor outside the artefact it is rewriting."
+  // The endpoint this stage replays passes `planLine ? { planLine } : null`
+  // (regeneration.js), through the same resolver.
+  const storedScene = (storyData.sceneDescriptions || []).find(sc => sc.pageNumber === ctx.pageNumber) || null;
+  const storedImage = (storyData.sceneImages || []).find(si => si.pageNumber === ctx.pageNumber) || null;
+  const { resolvePlanLine } = require('./iterateBeat');
+  const planLine = resolvePlanLine(storedScene, storedImage);
+  if (!planLine) {
+    log.warn(`[TESTLAB] scene_description P${ctx.pageNumber}: no stored plan line — the rewrite runs on the previous brief alone, exactly as the endpoint warns`);
+  }
+
   let prompt;
   const orig = PROMPT_TEMPLATES.sceneDescriptions;
   if (promptOverride) PROMPT_TEMPLATES.sceneDescriptions = promptOverride;
   try {
     prompt = buildSceneDescriptionPrompt(
       ctx.pageNumber, ctx.scene.text || '', storyData.characters || [], '',
-      ctx.language, ctx.visualBible, [], 'standard', '', availableAvatars
+      ctx.language, ctx.visualBible, [], 'standard', '', availableAvatars,
+      planLine ? { planLine } : null,
+      null,
+      // clothingRequirements so each character's CHARACTER DETAILS line carries
+      // its outfit TEXT. Without it the block ends at the face and every
+      // `Wearing:` clause is gone — the same omission the all-pages Art
+      // Director builder was fixed for.
+      { clothingRequirements: storyData.clothingRequirements || null }
     );
   } finally {
     PROMPT_TEMPLATES.sceneDescriptions = orig;

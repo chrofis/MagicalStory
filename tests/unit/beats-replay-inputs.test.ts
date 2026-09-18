@@ -174,7 +174,18 @@ describe('wiring — the Lab replay stages call through the resolver', () => {
   it('every Lab call to the all-pages Art Director builds its options through the resolver', () => {
     const calls = testlabSrc.match(/buildSceneExpansionAllPrompt\([\s\S]{0,1400}?\n\s*\);/g) || [];
     expect(calls.length).toBeGreaterThan(0);
-    for (const c of calls) expect(c).toContain('buildReplaySceneOptions');
+    // Inline, or through a local the resolver assigns — the Lab's beats stage
+    // hoists one `buildReplaySceneOptions` call and hands it to BOTH the
+    // all-pages builder and the per-page `expandOnePage` fallback, which is
+    // this rule taken further, not around it. What must never appear is a
+    // hand-written options literal.
+    const resolverLocals = [...testlabSrc.matchAll(/(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*buildReplaySceneOptions\(/g)]
+      .map(m => m[1]);
+    for (const c of calls) {
+      const viaResolver = c.includes('buildReplaySceneOptions')
+        || resolverLocals.some(name => new RegExp(`\\b${name}\\b`).test(c));
+      expect(viaResolver).toBe(true);
+    }
   });
 
   it('no Lab site derives the writer arc from the outline transcript alone', () => {

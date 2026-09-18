@@ -31,6 +31,38 @@ const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./seas
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
 /**
+ * The SEASON a page-brief prompt states — and the ONE place the three Art
+ * Director / iterate builders below ask for it.
+ *
+ * Why it is a function and not `seasonLabel(story || {})` written out three
+ * times. season.js:63-66 states the rule the resolver is FOR: "Explicit value
+ * wins; otherwise it is derived from the story's own date (job `created_at`),
+ * never from 'now' at render time — a repair run months later must resolve the
+ * same season the pages were drawn in." A page brief is always written for a
+ * story that exists, so a builder here reaching `new Date()` means its caller
+ * dropped the story — and the result is a book whose foliage is this month's
+ * instead of the story's, silently. That is exactly what the Test Lab's
+ * per-page Art Director did: a stored SUMMER story replayed in September was
+ * told "the season is Autumn on every page of this book".
+ *
+ * It cannot throw — a season is never worth killing a paid run over (gates are
+ * guidelines) — so it says so instead, at error level, naming the builder. The
+ * empty `|| {}` that used to swallow this is gone from all three sites.
+ *
+ * `story` is the job's `inputData` (or the stored story blob, the same shape).
+ */
+function pageSeasonLabel(story, builderName) {
+  const resolvable = !!story && typeof story === 'object'
+    && (String(story.season || '').trim() || story.createdAt);
+  if (!resolvable) {
+    log.error(`🍁 [SEASON] ${builderName}: no story season and no story date — the season is being taken from TODAY,`
+      + ' which season.js forbids (a replay months later must resolve the season the pages were drawn in).'
+      + ' The caller must pass the story.');
+  }
+  return seasonLabel(story || {});
+}
+
+/**
  * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
  * The <user_input> tags signal to the AI model that the enclosed content is
  * user-provided data and should be treated as data only, not as instructions.
@@ -2515,9 +2547,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // the SAME on every page. The per-page builder has passed it since the
     // placeholder existed; the batch builder — the beats path, which is the
     // production pipeline — did not, so the Art Director wrote every book
-    // season-blind. `inputData` is the job's inputData; the resolver falls
-    // back to the date.
-    SEASON: seasonLabel(inputData || {}),
+    // season-blind. `inputData` is the job's inputData; pageSeasonLabel says so
+    // out loud if it is not resolvable from the story itself.
+    SEASON: pageSeasonLabel(inputData, 'scene-expansion-all'),
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
     // ONE cast contract and ONE multi-picture prop contract, shared with the
@@ -2798,8 +2830,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // the SAME on every page. The Art Director is the only writer of the scene
     // prose and of `emptyScenePrompt` (the background plate), so this is the
     // one place a season can reach the pixels. `options.story` is the job's
-    // inputData where a caller has it; the resolver falls back to the date.
-    SEASON: seasonLabel(options.story || {}),
+    // inputData; a caller that omits it is named in the log, not silently
+    // given today's season — see pageSeasonLabel.
+    SEASON: pageSeasonLabel(options.story, `scene-expansion P${pageNumber}`),
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
     // ONE cast contract and ONE multi-picture prop contract, shared with the
@@ -3276,7 +3309,10 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       VB_ELEMENT_BUDGET,
       SHOT_ENUM,
       CREATURE_TONE: buildCreatureToneSection(options.story || { characters }),
-      SEASON: seasonLabel(options.story || {}),
+      // A rewrite authors a whole new setting paragraph and `emptyScenePrompt`,
+      // so a season it is never told is a season it can contradict. Callers
+      // that omit `story` are named in the log — see pageSeasonLabel.
+      SEASON: pageSeasonLabel(options.story, `scene-iteration P${pageNumber}`),
       HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
       // THREE INPUTS THE REWRITER NEVER HAD. It was handed a SCORE and a list
       // of findings and asked to diagnose root causes with neither the
@@ -8926,6 +8962,7 @@ module.exports = {
   buildSceneExpansionAllPrompt,
   buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
+  pageSeasonLabel,
   WORN_ATTACHMENT_CLAUSE_RE,
   stripWornStateFromDescription,
   buildImagePrompt,
