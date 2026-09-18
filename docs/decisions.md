@@ -450,6 +450,84 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-18 — `element_uncited` is deleted from the code; the rule stays in the reviewer's prompt
+
+**Context.** `sceneBriefCheck.checkElementCoverage` shipped on 2026-09-12 in `4d169a6a3`, together
+with check 9d of `prompts/scene-review.txt`. It decided whether a page stages a Visual Bible
+element by taking a head noun from the entry's `name` / `type` / `species` and testing whether that
+word appears in the plan line's staged segment while `objects[]` omits the entry's id — a code
+check that works out what prose MEANS by matching words. The owner's standing rule is the opposite:
+classification belongs to the PROMPT, and code may only change a severity.
+
+**Measured before removing it.** Replayed over the **138 stored staging stories** (30 carry both a
+Visual Bible and plan lines; **451 pages** in scope): **137 findings on 118 pages — 26% of every
+page it could see — 28 TRUE (20%), 103 FALSE (75%), 6 unclear.** In **production**, over the 10
+runs since it shipped: **43 fired — 9 true, 33 false, 1 unclear.** The scene review **acted on 20
+of those 43 and got it wrong 12 times**, and the damage is in the stored final briefs:
+
+- a hatched dragon added to **six egg pages** of `9oxos7dwv`;
+- the correct cold-egg citation `ART001.2` **removed** from `3kxqshifx` p16 and replaced by the
+  dragon — one page before the hatch;
+- `VEH001`, a wreck the bible describes as "spanning the width of a house", added to a museum
+  interior holding a forearm-length model (`y3n0euk3z` p1);
+- an iron crowbar added to `ueh8h145m` p1, whose own plan line puts it in a bunk aboard another
+  ship.
+
+Three of the false shapes are **structural, not tunable**: a creature entry reduced to its name
+matches the unhatched egg the story calls by that name (19 findings); the head-noun rule takes the
+LAST token of the `type` sentence, so `"Julian's bicycle"` typed `"child's balance or pedal
+bicycle, smaller than Levin's"` yields the word `levin` (11 findings in one story); and a one-word
+head noun cannot separate a wedged stone from a stone wall, or a lantern from a lantern man. The
+design comment's own claim — "names 1 page of 18 and no false ones" — does not reproduce: on that
+same story it names 2 of 18, one true and one false.
+
+**Decision.** Delete `checkElementCoverage`, `coverageIndex`, `COVERAGE_STOP`,
+`COVERAGE_COLLECTIONS`, the `element_uncited` member of `REVIEWABLE`, the exports and the `checkPage`
+call site. A deletion, not a toggle: no disabled constant, no commented-out block, no flag. **Rule 9d
+of `prompts/scene-review.txt` is untouched** — that is the point — and the generator side keeps its
+half in `prompts/scene-expansion-all.txt:157` ("An entry's `pages` and the `objects[]` of the page
+briefs below say the same thing"). The measurement, the damage and the reason live on in the design
+block of `server/lib/sceneBriefCheck.js`, so a future session finds out why the type is gone instead
+of rebuilding it.
+
+**Rationale.** Over the same briefs the reviewer's rule 9d named **4 pages the code structurally
+cannot see** — one where the plan line says "shell" while the code's word for that entry is `egg` —
+and **declined to repeat 20 of the 41** pages the code handed it, almost all false. A model reading
+the plan line, the brief and the bible resolves reference; a head-noun regex cannot, and 75% of what
+it emitted was noise that a reviewer then had to be right about 43 times in a row. Honest limit,
+recorded rather than glossed: it **cannot** be proven the reviewer finds all 9 true ones alone,
+because 9d and this check shipped in the SAME commit and the reviewer has never run without the
+code's line in front of it.
+
+**The iterate path loses one shape, and it is recorded.** `iterateBeat.REINSTATE_TYPES` carried
+`element_uncited` as one of two types that fire on a rewrite regardless of lineage. On the 11-round
+stored corpus it named exactly one round — `rts4wqupm` p6 — and `checkDeclaredSet`'s dropped-id half
+(added in `a78e8fa7d`) names that same page from the other basis, `object_dropped_from_declared_set
+[ART001]`: the parent's own citation the rewrite stopped making. So the measured guard survives.
+What does **not** survive is the shape with no citation on either side — a rewrite that reinstates an
+ANIMAL or an artefact in the prose alone, which `cast_unlisted` cannot see (animals are deliberately
+out of that roster, owner 2026-08-16) and `checkDeclaredSet` cannot see (the parent never cited it
+either). A person or a bible secondary reinstated in the prose alone is still caught.
+`tests/unit/iterateBeat.test.ts` pins the gap as a fact rather than leaving it to be rediscovered,
+and `tasks/BACKLOG.md` carries it.
+
+**Verification.** `npx vitest run`: 3214 passed, 0 failures (baseline 3210 at `ea46d3afb`; +4 are a
+concurrent session's). `checkScenes` replayed over two stored staging stories, before and after:
+`job_1789681157795_wkt20ckod` 10 findings → 6, `job_1789506283204_3kxqshifx` 9 → 4; every removed
+line is an `element_uncited`, nothing was added, and the per-type counts of `cast_unlisted`,
+`interaction_multiple_actions`, `interaction_object_shared_hands`, `vb_page_uncited`,
+`vb_cite_offpage` and `vb_state_no_base` are identical on both sides.
+
+**Touched files.** `server/lib/sceneBriefCheck.js` (the check, the index, the constants, the call
+site, `REVIEWABLE`, the exports, the design block), `server/lib/iterateBeat.js`
+(`REINSTATE_TYPES` and the two comments resting on it), `server/lib/images.js` and
+`server/lib/testlab.js` (comment references that would otherwise describe a type that no longer
+exists), `tests/unit/iterateBeat.test.ts`, `tests/unit/iterate-rewrite-checked-like-authored.test.ts`,
+`tests/unit/brief-corrective-loop-shared.test.ts`, `tasks/BACKLOG.md`.
+
+**Status.** ✅ active.
+
+
 ## 2026-09-18 — `beatsReviewReport` describes the division that SHIPPED; a discarded re-plan round moves to `discardedRounds`
 
 **Context.** The beats re-plan loop (`server/lib/beatsPipeline.js`) can run a round and throw it

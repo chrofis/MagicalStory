@@ -188,18 +188,25 @@ describe('a reinstated figure must be declared in the rewrite\'s own metadata', 
     expect(findings).toEqual([]);
   });
 
-  // The exact shape the beat introduces: the rewriter brings the animal back in
-  // the prose and leaves objects[] alone, so the judge — which reads the brief,
-  // never the plan line (3b3070dce) — scores it as an extra character.
-  it('catches an animal reinstated in the prose but never cited', () => {
+  // THE ANIMAL HALF OF THIS BACKSTOP IS GONE (2026-09-18). It rode on
+  // sceneBriefCheck's `element_uncited`, which decided what a page stages by
+  // matching plan-line words against Visual Bible names — 33 of 43 production
+  // findings false, and the scene review acted on 20 and was wrong on 12. The
+  // owner removed the code check and kept the rule in the prompts. This pins
+  // the CONSEQUENCE so the gap is a measured fact and not a surprise: the
+  // rewriter can bring an animal back in the prose, cite nothing, and no
+  // mechanical check on the iterate path says so. `checkDeclaredSet` cannot
+  // either — the parent brief did not cite it, so it was never in the declared
+  // set to be dropped from. The person half below still holds.
+  it('an animal reinstated in the prose alone is NOT caught any more', () => {
     const undeclared = BRIEF
       .replace('the scruffy terrier mix dog pads along', 'Nia pads along')
       .replace('"objects": ["LOC001", "ART001", "ANI001", "ANI002"]', '"objects": ["LOC001", "ART001"]');
     const findings = checkRewrittenBrief({
       pageNumber: 7, brief: undeclared, planLine: PLAN_LINE, castNames: CAST_NAMES, visualBible: VISUAL_BIBLE,
     });
-    expect(findings.map(f => f.type)).toContain('element_uncited');
-    expect(findings.find(f => f.type === 'element_uncited').ids).toContain('ANI001');
+    expect(findings.map(f => f.type)).not.toContain('element_uncited');
+    expect(findings).toEqual([]);
   });
 
   it('catches a person in the prose who is absent from characters[]', () => {

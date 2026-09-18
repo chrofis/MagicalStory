@@ -87,10 +87,12 @@ function resolvePlanLine(currentScene, savedScene) {
  * The staged segment of a plan line — the "who/what is in frame" and "the
  * instant" fields, never the shot and never the trailing purpose clause.
  *
- * Same scoping, and the same reason, as sceneBriefCheck.checkElementCoverage:
- * the purpose clause routinely names elements that are elsewhere in the world
- * ("the creature cannot reach the object inside"), and reading it is where a
- * naive whole-line match earns its false positives.
+ * The purpose clause routinely names elements that are elsewhere in the world
+ * ("the creature cannot reach the object inside"), so reading it is where a
+ * naive whole-line match earns its false positives. (sceneBriefCheck's
+ * element-coverage check drew the same line for the same reason until it was
+ * removed on 2026-09-18; the scoping is still right for the figure pass here,
+ * which resolves NAMES against the bible rather than matching prose words.)
  */
 function planStagedSegment(planLine) {
   const plan = String(planLine || '').replace(PLAN_PREFIX, '').trim();
@@ -427,13 +429,28 @@ function renderParentWornState({ visualBible, promptCharacters, parentSceneMetad
   }
 }
 
-// The two faults that mean a figure is in the picture but not on the roster the
-// judge reads. Both come from sceneBriefCheck, which the first-generation path
-// already runs on every brief — the iterate path ran neither on its rewrite.
-// They fire on the rewrite whatever the parent brief did: reinstating a figure
+// The fault that means a figure is in the picture but not on the roster the
+// judge reads. It comes from sceneBriefCheck, which the first-generation path
+// already runs on every brief — the iterate path ran it on no rewrite at all.
+// It fires on the rewrite whatever the parent brief did: reinstating a figure
 // the parent dropped is the rewriter's own job (template rule 3a), so an
 // inherited one is still its to answer for.
-const REINSTATE_TYPES = new Set(['cast_unlisted', 'element_uncited']);
+//
+// THIS SET HELD TWO TYPES UNTIL 2026-09-18. `element_uncited` was removed from
+// sceneBriefCheck entirely that day (owner call — it classified by matching
+// plan-line words against bible names; 33 of 43 production findings were false,
+// and the scene review acted on 20 of them and was wrong on 12; the rule now
+// lives only in prompts/scene-review.txt check 9d). On this corpus it named one
+// round, rts4wqupm p6, and `checkDeclaredSet` names that same page from the
+// other basis — `object_dropped_from_declared_set [ART001]`, the parent's own
+// citation the rewrite stopped making — so the measured guard survives the
+// removal. What does NOT survive is the shape with no citation on either side:
+// a rewrite that reinstates an ANIMAL or an artefact in the prose alone, which
+// `cast_unlisted` cannot see because animals are deliberately out of that
+// roster (owner, 2026-08-16) and `checkDeclaredSet` cannot see because the
+// parent never cited it either. A person or a bible secondary reinstated in the
+// prose alone is still caught. Recorded in tasks/BACKLOG.md.
+const REINSTATE_TYPES = new Set(['cast_unlisted']);
 
 /**
  * THE REST OF THE MECHANICAL CHECKS, ON WHAT THE REWRITE INTRODUCED
@@ -458,7 +475,9 @@ const REINSTATE_TYPES = new Set(['cast_unlisted', 'element_uncited']);
  * job_1789506283204_3kxqshifx (p2, p7, p10, p13, p16), by running `checkPage`
  * over each round's PARENT brief and its REWRITE:
  *
- *   today's two types      1 round of 11 (rts p6, element_uncited)
+ *   today's reinstate set  1 round of 11 (rts p6, element_uncited — that type
+ *                          was removed on 2026-09-18, see REINSTATE_TYPES; the
+ *                          same page is still named by checkDeclaredSet)
  *   vb_page_uncited        5 rounds introduced — AND ALREADY COVERED, see below
  *   vb_cite_offpage        3 rounds introduced — AND ALREADY COVERED
  *   the other six types    0 rounds. Three of them CANNOT fire at all while the

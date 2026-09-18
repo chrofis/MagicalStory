@@ -3994,7 +3994,8 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
         // (2026-09-12). The Art Director writes a fresh bible ahead of page 1,
         // so the stored one is a different id space: on Lab #1195 the findings
         // named "The Dragon Egg (ART002)" while the new bible's ART002 was a
-        // coin, no element_uncited could ever fire, and the reviewer was told
+        // coin, no finding could name it by an id that meant the same thing
+        // in both bibles, and the reviewer was told
         // to drop an element by an id that meant something else in its own
         // bible. The stored bible stays the fallback for a run that authored none.
         if (authoredBible?.body) {
@@ -6888,7 +6889,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
   // brief's own metadata, the cast (roster + bible secondaries) and the bible,
   // with the plan line carrying the element-coverage check. Without it
   // {BRIEF_FINDINGS} filled empty and the replay could not reproduce a single
-  // cast_unlisted / element_uncited / vb_state_* rewrite the production run
+  // cast_unlisted / vb_state_* / vb_page_uncited rewrite the production run
   // made — the stage measures the reviewer, and it was measuring it on less
   // than the reviewer is given.
   let briefFindingsBlock = '';

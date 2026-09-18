@@ -3949,15 +3949,18 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // ALONE therefore renders as an extra character and is scored as one. The
   // prompt states the rule; this verifies it happened, reusing the same
   // sceneBriefCheck types the first-generation path already runs
-  // (cast_unlisted, element_uncited) with the page's plan line set — the
-  // owner-sanctioned non-fidelity use of the beat.
+  // (cast_unlisted — and, until 2026-09-18, element_uncited) with the page's
+  // plan line set — the owner-sanctioned non-fidelity use of the beat.
   //
   // One corrective re-ask, then ship with a warning: a gate is a guideline and
   // an iterate round is paid, so this never fails the round.
   // Same roster the first-generation path checks against: main cast plus
   // visual-bible SECONDARY characters, animals deliberately excluded (owner,
   // 2026-08-16 — beatsPipeline.js:1955 carries the measurement). A named animal
-  // is covered by element_uncited through the plan line instead.
+  // was covered by element_uncited through the plan line until that check was
+  // removed on 2026-09-18 (it classified by matching prose; see
+  // sceneBriefCheck's design block). A reinstated ANIMAL cited nowhere is
+  // therefore unguarded on this path — tasks/BACKLOG.md carries it.
   const castNamesForCheck = (() => {
     const secondaries = Array.isArray(visualBible?.secondaryCharacters)
       ? visualBible.secondaryCharacters

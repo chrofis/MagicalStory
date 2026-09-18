@@ -132,8 +132,8 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
     expect(admitted.has('object_id_unresolved')).toBe(false);
   });
 
-  it('the two reinstatement types fire whatever the parent did; the rest need the parent clean', () => {
-    expect([...IB.REINSTATE_TYPES].sort()).toEqual(['cast_unlisted', 'element_uncited']);
+  it('the reinstatement type fires whatever the parent did; the rest need the parent clean', () => {
+    expect([...IB.REINSTATE_TYPES].sort()).toEqual(['cast_unlisted']);
     for (const t of IB.REINSTATE_TYPES) expect(IB.INTRODUCED_TYPES.has(t)).toBe(false);
   });
 });
@@ -175,10 +175,15 @@ describe('introduced vs inherited, on the stored rounds', () => {
 describe('what the widened scope produces on the 11 stored rounds', () => {
   const scope = (r: Round) => [...checkRewrite(r, { parentBrief: r.parentBrief }), ...carried(r)];
 
-  it('every round now earns the one corrective re-ask; before, one of eleven did', () => {
+  it('every round earns the one corrective re-ask; the reinstate set alone earns none', () => {
+    // Before the 2026-09-17 widening the reinstate set alone caught 1 round of
+    // 11 — rts p6, element_uncited. That type was removed on 2026-09-18 (it
+    // classified by matching prose), so the reinstate set now catches none, and
+    // everything the iterate path checks mechanically comes from the widening
+    // and from checkDeclaredSet.
     const before = ROUNDS.filter(r => checkRewrite(r).length > 0).length;
     const after = ROUNDS.filter(r => scope(r).length > 0).length;
-    expect(before, 'the old two-type scope').toBe(1);
+    expect(before, 'the reinstate set alone').toBe(0);
     expect(after, 'the widened scope').toBe(11);
   });
 
@@ -192,9 +197,26 @@ describe('what the widened scope produces on the 11 stored rounds', () => {
     }
   });
 
-  it('the one element_uncited on the corpus is the page whose rewrite stopped citing the artefact', () => {
-    const hits = ROUNDS.filter(r => scope(r).some((f: any) => f.type === 'element_uncited'));
-    expect(hits.map(label)).toEqual(['ts4wqupm p6']);
+  it('the corpus round that used to be element_uncited is still named, by the citation basis', () => {
+    // element_uncited is gone (2026-09-18). rts p6 was the only round it named,
+    // and checkDeclaredSet names the same page from the parent's own citation
+    // list — the artefact the rewrite stopped citing. That is why the removal
+    // costs this corpus nothing.
+    for (const r of ROUNDS) {
+      for (const f of scope(r)) expect(f.type, label(r)).not.toBe('element_uncited');
+    }
+    const r = ROUNDS.find(x => x.job.endsWith('rts4wqupm') && x.pageNumber === 6)!;
+    const parentMeta: any = extractSceneMetadata(r.parentBrief) || {};
+    const rewriteMeta: any = extractSceneMetadata(r.rewriteBrief) || {};
+    const origObjects = parentMeta.fullData?.objects || parentMeta.objects || [];
+    const findings = IB.checkDeclaredSet({
+      newMetadata: rewriteMeta,
+      ...IB.declaredSetAllowance({ origObjects, rewriteObjects: rewriteMeta.objects, planLine: r.planLine }),
+      requiredObjects: origObjects,
+    });
+    const dropped = findings.find((f: any) => f.type === 'object_dropped_from_declared_set');
+    expect(dropped, 'rts p6 must still be named').toBeTruthy();
+    expect(dropped.ids).toContain('ART001');
   });
 
   it('three interaction checks are blind while the field they count is missing', () => {

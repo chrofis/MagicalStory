@@ -55,12 +55,12 @@ describe('the verdict is introduced-vs-survived, never a count', () => {
   it('refuses a correction that swaps one fault for another', () => {
     // The old rule was `after.length < before.length`. This pair is the case it
     // cannot see: equal counts, a different fault.
-    const before = [{ pageNumber: 4, type: 'element_uncited' }];
+    const before = [{ pageNumber: 4, type: 'cast_unlisted' }];
     const after = [{ pageNumber: 4, type: 'interaction_multiple_actions' }];
     const v = BC.judgeCorrection({ before, after, acceptance: 'strict' });
     expect(v.accepted).toBe(false);
     expect(v.introduced.map((f: any) => f.type)).toEqual(['interaction_multiple_actions']);
-    expect(v.resolved.map((f: any) => f.type)).toEqual(['element_uncited']);
+    expect(v.resolved.map((f: any) => f.type)).toEqual(['cast_unlisted']);
   });
 
   it('refuses a correction that resolves one fault and adds two, even though the count is unchanged for one of them', () => {
