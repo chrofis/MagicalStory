@@ -382,68 +382,32 @@ function extractThinkingFromParts(parts, logPrefix = 'IMAGE GEN') {
 
 // =============================================================================
 // PROMPT SANITIZATION FOR GEMINI SAFETY BLOCKS
-// Progressive sanitization levels for retrying blocked image prompts
 // =============================================================================
-
-// Problematic words that may trigger Gemini content filtering
-const PROBLEMATIC_WORDS = [
-  // Violence
-  'weapon', 'sword', 'knife', 'dagger', 'spear', 'axe', 'bow and arrow',
-  'blood', 'bleeding', 'wound', 'injured', 'injury',
-  'kill', 'killing', 'death', 'dead', 'dying', 'corpse',
-  'attack', 'attacking', 'fight', 'fighting', 'combat', 'battle', 'war',
-  'explosion', 'exploding', 'bomb', 'gun', 'pistol', 'rifle', 'shoot', 'shooting',
-  'violent', 'violence', 'aggressive',
-  // Horror
-  'scary', 'horror', 'terrifying', 'nightmare', 'monster',
-  'torture', 'torment', 'suffering', 'agony',
-  'poison', 'poisonous', 'toxic', 'venom',
-  // Fire/destruction
-  'fire', 'burning', 'flames', 'ablaze', 'inferno',
-  'destroy', 'destruction', 'devastation', 'ruins',
-  // Other
-  'slave', 'slavery', 'chains', 'shackles', 'prisoner',
-  'drunk', 'alcohol', 'wine', 'beer',
-  'naked', 'nude', 'undressed',
-  'evil', 'demonic', 'devil', 'satan', 'hell',
-  'skull', 'skeleton', 'bones'
-];
-
-/**
- * Which PROBLEMATIC_WORDS actually occur in `prompt` (deduplicated).
- *
- * The ladder needs this to tell a real strip from a no-op: sanitizePromptLevel1
- * ALWAYS returns a different string — it collapses double spaces and triple
- * newlines whether or not it removed a word — so `!==` cannot answer "did level
- * 1 change anything that matters?". Measured 2026-09-18: 16.8% of stored staging
- * page prompts and 58.4% of production ones contain none of the 78 words, so on
- * those a level-1 retry re-sends a request that differs from the refused one
- * only in whitespace.
- */
-function findProblematicWords(prompt) {
-  if (!prompt) return [];
-  return PROBLEMATIC_WORDS.filter(word => new RegExp(`\\b${word}\\b`, 'i').test(prompt));
-}
-
-/**
- * Remove problematic words from a prompt (Level 1 sanitization)
- */
-function sanitizePromptLevel1(prompt) {
-  let sanitized = prompt;
-  for (const word of PROBLEMATIC_WORDS) {
-    // Replace whole words only (case-insensitive)
-    const regex = new RegExp(`\\b${word}\\b`, 'gi');
-    sanitized = sanitized.replace(regex, '');
-  }
-  // Clean up double spaces and empty lines
-  sanitized = sanitized.replace(/  +/g, ' ').replace(/\n\s*\n\s*\n/g, '\n\n');
-  return sanitized;
-}
-
-// Former sanitization levels 2-3 (generic "simplified scene" / "happy child
-// in a magical setting" prompts) are GONE — they produced images unrelated
-// to the page. Blocked generations now get a Claude scene rewrite instead
-// (see the sanitization ladder in generateImageOnly).
+// There is no word list here any more, and no local string surgery: a Gemini
+// safety refusal gets exactly ONE retry, with the scene REWRITTEN by a text
+// model (rewriteBlockedScene). The ladder lives in generateImageOnly.
+//
+// Two earlier rungs were deleted, both for the same reason — they bought a
+// render by silently destroying the instructions the page needed:
+//
+//  • Generic "simplified scene" / "happy child in a magical setting" prompts
+//    (former levels 2-3): the "successful" image had nothing to do with the
+//    page — a fairy/bubbles picture shipped as a Tell-saga crossbow scene on
+//    job_1781289599516 p4.
+//
+//  • PROBLEMATIC_WORDS + sanitizePromptLevel1 (deleted 2026-09-18, owner
+//    approved): 78 words deleted whole-word, case-insensitively, from the WHOLE
+//    prompt. Measured on stored data first — the list matched OUR OWN
+//    INSTRUCTIONS far more often than any violence. `bleeding` is in
+//    image-generation.txt's "filling the canvas, bleeding off all four edges"
+//    (81.8% of stored staging page prompts, 27.5% of production ones); `weapon`
+//    is in the text-zone rule "(hats, embroidery, patterns, weapon edges)";
+//    `wound`, `hell`, `dead` and `shooting` match ordinary English and German
+//    prose ("the rope is wound", "der Kiel ist hell", "the dead end of the
+//    path", "her brow is shooting upward"). The rung fired 14 times on staging
+//    and never once in production; it rescued 1 of those 14, and THAT render
+//    went out without the full-bleed instruction. The rewrite rung rescued 2.
+//    A refusal now escalates straight to the rewrite.
 
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
@@ -2070,16 +2034,14 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, sampling: ${JSON.stringify(geminiSampling(modelId))}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
 
-  // Progressive retry with sanitization on safety blocks
-  // Progressive retries on safety blocks. Level 1 is a cheap local word
-  // strip; level 2 asks Claude to REWRITE the scene — defuse the safety
-  // trigger while keeping the story moment (same rewriteBlockedScene used
-  // by the main generation path). The former levels 2-3 replaced the prompt
-  // with a generic "happy child in a magical setting" one-liner, so the
-  // "successful" image had nothing to do with the page (observed: a
-  // fairy/bubbles image shipped as a Tell-saga crossbow scene on
-  // job_1781289599516 p4). If the rewritten scene is STILL blocked, this
-  // function throws — a wrong image is worse than no image.
+  // Safety-block ladder: level 0 is the prompt as built, level 1 asks a text
+  // model to REWRITE the scene — defuse the safety trigger while keeping the
+  // story moment (same rewriteBlockedScene used by the main generation path).
+  // If the rewritten scene is STILL blocked, this function throws — a wrong
+  // image is worse than no image, and so is a mutilated prompt. Every earlier
+  // rung (the generic one-liner prompts, then the 78-word local strip) is gone;
+  // the PROMPT SANITIZATION note near the top of this file records what each
+  // one cost and the measurements that retired it.
   // Every rung rebuilds from what level 0 actually SENT — `parts[0].text`, the
   // post-shrink string — not from the raw `prompt` argument. The two diverge on
   // the Grok→Gemini fallback: shrinkPromptForModel ran against the GROK model's
@@ -2108,32 +2070,14 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     return originalScene ? sentPrompt.replace(originalScene, () => rewriteResult.text) : rewriteResult.text;
   };
   const sanitizationLevels = [
-    null,                                       // Level 0: the prompt as sent
-    () => sanitizePromptLevel1(sentPrompt),     // Level 1: strip safety-trigger words
-    rewriteSceneInPrompt,                       // Level 2: Claude scene rewrite (keeps the story moment)
+    null,                   // Level 0: the prompt as sent
+    rewriteSceneInPrompt,   // Level 1: text-model scene rewrite (keeps the story moment)
   ];
 
   for (let sanitizationLevel = 0; sanitizationLevel < sanitizationLevels.length; sanitizationLevel++) {
     // Apply sanitization if needed
     let currentPrompt = sentPrompt;
     if (sanitizationLevel > 0) {
-      // A level-1 pass over a prompt that contains none of the 78 words removes
-      // nothing: sanitizePromptLevel1 still returns a NEW string (it collapses
-      // double spaces and triple newlines unconditionally), so the retry differs
-      // from the request just refused only in whitespace — a paid image call
-      // that cannot change the verdict, and, if the provider's nondeterminism
-      // happens to let it through, one that records sanitizationLevel 1 and
-      // stores a whitespace-mangled prompt as the page's prompt. Escalate to the
-      // rewrite instead. The sibling sanitizer on the Grok moderation path
-      // (editImageWithPrompt) has always had this guard as `sanitized !== editPrompt`.
-      if (sanitizationLevel === 1) {
-        const strippable = findProblematicWords(sentPrompt);
-        if (strippable.length === 0) {
-          log.info(`⏭️ [IMAGE GEN-ONLY] Level 1 has no listed word to strip — escalating straight to the scene rewrite`);
-          continue;
-        }
-        log.debug(`🧹 [IMAGE GEN-ONLY] Level 1 will strip: ${strippable.join(', ')}`);
-      }
       try {
         currentPrompt = await sanitizationLevels[sanitizationLevel]();
       } catch (rewriteErr) {
@@ -2141,7 +2085,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         throw new Error(`Image blocked and scene rewrite failed: ${rewriteErr.message}`);
       }
       parts[0] = { text: currentPrompt };
-      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel}${sanitizationLevel === 2 ? ' (Claude scene rewrite)' : ''}, prompt: ${currentPrompt.substring(0, 100)}...`);
+      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel} (scene rewrite), prompt: ${currentPrompt.substring(0, 100)}...`);
     }
 
     try {
@@ -2221,7 +2165,12 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
               modelId,
               thinkingText,
               usage,
-              sanitizationLevel, // Track which level succeeded
+              // Which rung produced this image: 0 = the prompt as built,
+              // 1 = after the scene rewrite. (Level 1 meant the local word
+              // strip until 2026-09-18; nothing reads this field — verified
+              // repo-wide, and `$.**.sanitizationLevel` returns zero rows in
+              // both environments' stories.data — so the renumber is safe.)
+              sanitizationLevel,
               // Reconstruction record — refs were in parts but never stamped.
               // NOTE ON THE COUNT (documented 2026-08-29): on this GEMINI
               // FALLBACK path the field holds the UNPACKED part list — one
@@ -5159,13 +5108,30 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
       // Content moderation block — sanitize prompt and retry, then fall back to Gemini
       if (grokErr.message?.includes('content moderation') || grokErr.message?.includes('400')) {
         log.warn(`⚠️ [IMAGE EDIT] Grok blocked by content moderation, sanitizing prompt and retrying...`);
-        // Soften violent/weapon language for retry
+        // Soften violent/weapon language for retry.
+        //
+        // ORDER MATTERS, and the chin rule has to come FIRST. It is written for
+        // an instruction that already says "touch … chin" in the author's own
+        // words; the violence rule below injects the word "touch" throughout the
+        // prompt, so running the chin rule after it let an INJECTED "touch"
+        // anchor the match. Worse, the rule used to read `/touch.*chin/gi`: the
+        // `.*` is greedy and `chin` was unanchored, so it matched inside
+        // ordinary words — "crouching", "reaching", "catching", "chin-length",
+        // "etching" — and swallowed every character between the first injected
+        // "touch" and the last such word on the line. Measured 2026-09-18 across
+        // the 529 stored inpaint instructions that reach this function (219
+        // production, 310 staging): 19 production and 36 staging carry a `chin`
+        // substring and EVERY one of them is inside a word like "crouching" or
+        // "chin-length". None has yet shared a line with a violence word, so
+        // nothing has shipped mangled — but the collision is one edit
+        // instruction away, not a hypothesis. Bounded window, word-anchored
+        // `chin`, and no match on a hyphenated "chin-length" haircut.
         const sanitized = editPrompt
+          .replace(/\btouch\w*[^.\n]{0,40}?\bchin(?![\w-])/gi, 'be positioned near the face')
           .replace(/\b(stab|pierce|impale|kill|slay|attack|strike|hit|slash|cut|wound|bleed|blood|die|dead|death)\b/gi, 'touch')
           .replace(/\b(spear|sword|knife|blade|weapon|arrow|axe)\s+(go(?:es|ing)?|plung(?:es|ing)?|driv(?:es|ing)?|thrust(?:s|ing)?)\s+(into|through)\b/gi, '$1 reaches toward')
           .replace(/\b(into|through)\s+(the\s+)?(body|chest|stomach|head|neck|heart|flesh|skin)\b/gi, 'near the $3')
-          .replace(/going into/gi, 'pointing at')
-          .replace(/touch.*chin/gi, 'be positioned near the face');
+          .replace(/going into/gi, 'pointing at');
         if (sanitized !== editPrompt) {
           log.info(`🔄 [IMAGE EDIT] Retrying with sanitized prompt: "${sanitized.substring(0, 120)}..."`);
           try {
