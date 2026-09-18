@@ -757,16 +757,23 @@ function whoColumn(planLine) {
 }
 
 /**
- * Pages whose RE-PLAN dropped a character the standing division had in frame.
+ * Pages whose RE-PLAN dropped a character the standing division had in frame
+ * AND DID NOT SAY SO.
  *
- * A re-plan answers named findings on named pages. Nothing in the finding
- * vocabulary asks for a character to leave: `NO_COMMISSIONED_ON_PAGE` is
- * answered by bringing the commissioned cast in, `CAST_OVER_CEILING` by a
- * justification in the plan line, plan-check Q3 likewise. So a name that is in
- * a page's who-column before the round and gone after it was deleted, not
- * repaired — and once the plan line stops naming a figure, the Art Director
- * has no authority to stage them and the scene review's `[cast_not_in_plan]`
- * check strips them from the brief by the book.
+ * A removal is legitimate work — an over-crowded page is answered by taking a
+ * name out, and the division that stands is itself a model output that round
+ * one may have got wrong (owner, 2026-09-18: "we can not say delete only or add
+ * only; we must give a fair review and allow both fix types"). What is never
+ * legitimate is a SILENT removal. The re-plan declares each structural change
+ * it made under `---CHANGES---`; `reviewPlanChanges` judges the declared ones;
+ * this function finds the ones nobody declared. Until 2026-09-18 the only way
+ * anyone found such a removal was diffing two who-columns after the book was
+ * finished.
+ *
+ * Once the plan line stops naming a figure, the Art Director has no authority
+ * to stage them and the scene review's `[cast_not_in_plan]` check strips them
+ * from the brief by the book — so an undeclared loss is unreviewable damage,
+ * and the page is restored from the division that stands.
  *
  * Measured on staging job_1789681157795_wkt20ckod ("Das Ei im Lindenhof"): the
  * arc's fourth declared challenge is "Tobias sits on the stone in the dark
@@ -811,9 +818,15 @@ function whoColumn(planLine) {
  * @param {string[]} castNames the resolved cast (`resolveCast().all`; the commissioned
  *   names alone when the roster failed and there is no resolved cast)
  * @param {Object} [aliases] name → other spellings (`resolveCast().aliases`)
+ * @param {Map<number,string[]>|Object} [declaredOut] page → the names the re-plan
+ *   DECLARED it took out of that page's frame. A declared removal is not this
+ *   function's business — `reviewPlanChanges` judges it. Omitted (or empty) means
+ *   nothing was declared, which is a re-plan that returned no `---CHANGES---`
+ *   block at all: every loss is then undeclared, which is the behaviour this
+ *   function had before declarations existed.
  * @returns {Array<{pageNumber:number, lost:string[]}>} one row per page to restore, page order
  */
-function castLostByReplan(standing, returned, castNames = [], aliases = {}) {
+function castLostByReplan(standing, returned, castNames = [], aliases = {}, declaredOut = null) {
   const names = (Array.isArray(castNames) ? castNames : []).map(n => String(n || '').trim()).filter(Boolean);
   if (!names.length) return [];
   const before = new Map();
@@ -824,12 +837,21 @@ function castLostByReplan(standing, returned, castNames = [], aliases = {}) {
   });
   if (!changed.length) return [];
 
+  const declaredFor = (pageNumber) => {
+    if (!declaredOut) return [];
+    const v = declaredOut instanceof Map ? declaredOut.get(Number(pageNumber)) : declaredOut[pageNumber];
+    return Array.isArray(v) ? v.map(n => String(n || '').trim()).filter(Boolean) : [];
+  };
+
   const lostOn = new Map();
   const gained = new Set();
   for (const p of changed) {
     const nb = namesIn(whoColumn(before.get(Number(p.pageNumber))), names, aliases);
     const na = namesIn(whoColumn(p.planLine), names, aliases);
-    const lost = nb.filter(n => !na.includes(n));
+    // A name the round SAID it took out of this page is reviewed elsewhere; it
+    // is not a silent loss and this function must not report it twice.
+    const declared = new Set(declaredFor(p.pageNumber));
+    const lost = nb.filter(n => !na.includes(n) && !declared.has(n));
     if (lost.length) lostOn.set(Number(p.pageNumber), lost);
     for (const n of na) if (!nb.includes(n)) gained.add(n);
   }
@@ -840,6 +862,197 @@ function castLostByReplan(standing, returned, castNames = [], aliases = {}) {
   }
   return out.sort((a, b) => a.pageNumber - b.pageNumber);
 }
+
+/**
+ * HOW A FINDING MOVES A PAGE'S CAST — the vocabulary's own property.
+ *
+ * 'more' means answering this finding puts a name in frame; 'fewer' means
+ * answering it takes one out; a finding absent from the map moves the cast
+ * neither way and constrains nothing.
+ *
+ * This is a table over finding TAGS — a counter's `code`, a plan-check
+ * question's number — and never a reading of a finding's sentence. It exists so
+ * an addition and a removal are judged by the SAME rule: before 2026-09-18 the
+ * re-plan was told a removal is never a fix, which left `CAST_OVER_CEILING` and
+ * plan-check Q3 — the two findings a removal is the natural answer to — with no
+ * answer available at all, and an over-crowded page could only get more crowded.
+ *
+ * Deliberately absent: `NO_FOCAL_PAGE` (a focal page is at most two in frame OR
+ * a close-up, so either direction can answer it), `CONSECUTIVE_SAME_SHOT_CAST`
+ * (satisfied by changing the shot, adding or removing), `ARC_INVENTED_OVER_ALLOWANCE`
+ * (a finding against the ARC, which names no page and no division edit repairs)
+ * and plan-check Q2 (an entrance is a staging question, not a headcount). An
+ * unlisted finding leaves the change unreviewed by direction — the span,
+ * obstacle and declaration rules still apply.
+ */
+const REPLAN_FINDING_DIRECTION = new Map([
+  ['NO_COMMISSIONED_ON_PAGE', 'more'],
+  ['PEOPLELESS_ON_INTERACTION_PAGE', 'more'],
+  ['UNDER_COVERED_CHARACTER', 'more'],
+  ['MAIN_UNDER_HALF', 'more'],
+  // The invented-dominance pair asks for MORE, not fewer — measured, not
+  // assumed. Both counters fire where the invented cast outnumbers the
+  // commissioned cast on a page, and the ratio moves either way; ranking them
+  // 'fewer' let the replay of staging job_1789681157795_wkt20ckod delete the
+  // arc's antagonist off two pages a second time, answering
+  // INVENTED_DOMINANT_EXCESS instead of NO_COMMISSIONED_ON_PAGE. The arc is
+  // settled by the time it is divided, so the figure it gave the page stays and
+  // the commissioned cast is what comes in. A page genuinely at the ceiling can
+  // still remove to make room — that carve-out is the ceiling check, not this
+  // table.
+  ['INVENTED_DOMINANT_EXCESS', 'more'],
+  ['INVENTED_DOMINANT_CONSECUTIVE', 'more'],
+  ['CAST_OVER_CEILING', 'fewer'],
+  ['NO_SOLO_PAGE', 'fewer'],
+  ['NO_PEOPLELESS_PAGE', 'fewer'],
+  // Plan-check questions, by number (prompts/plan-check.txt).
+  ['CHECK:1', 'fewer'],   // an emotional highlight page holding a second actor
+  ['CHECK:3', 'fewer'],   // three or more named characters in frame
+  ['CHECK:11', 'more'],   // the page's obstacle-holder is not named
+]);
+
+/** The direction of the finding a change declares it answers; null when unknown. */
+function replanChangeDirection(tag) {
+  if (!tag) return null;
+  if (tag.code) return REPLAN_FINDING_DIRECTION.get(String(tag.code).toUpperCase()) || null;
+  if (tag.check != null) return REPLAN_FINDING_DIRECTION.get(`CHECK:${Number(tag.check)}`) || null;
+  return null;
+}
+
+/**
+ * REVIEW a re-plan's DECLARED structural changes — the middle third of
+ * declare → review → apply (owner design, 2026-09-18).
+ *
+ * A removal is judged, not banned and not waved through. Every input here is a
+ * DECLARED field: the change's own kind and the finding tag it answers, the
+ * plan check's ROSTER-derived cast, the plan check's OBSTACLES block, the image
+ * model's cast ceiling, and the who-columns of two divisions. No sentence is
+ * pattern-matched; recognising a character or a justification in prose is
+ * language and belongs to the prompts.
+ *
+ * Four rules refuse a change. Each names a page; the caller restores exactly
+ * those pages from the division that stands, and the finding that named the
+ * page survives to the recheck — the same, cheap failure mode the merge has
+ * always had. Nothing here discards a round.
+ *
+ *   obstacle  a `cast out` of the figure the preceding check declared as that
+ *             page's obstacle-holder (plan-check Q11). A figure whose action
+ *             the page's instant works against is the page; dropping them
+ *             leaves a picture of nothing happening to nobody.
+ *   span      a `cast out` that leaves the figure in frame on fewer than two
+ *             pages of the returned division while the standing one gave them
+ *             two or more. Two pages is the floor `UNDER_COVERED_CHARACTER`
+ *             already holds the commissioned cast to; three stories lost an
+ *             invented figure from every page (Pfiff, Silberkrabbe, Krümel).
+ *   direction a `cast out` answering a finding that asks for MORE in frame,
+ *             on a page the standing division left under the cast ceiling —
+ *             and its mirror, a `cast in` answering a finding that asks for
+ *             fewer. Under the ceiling there is room to add, so a removal is
+ *             not what that finding asked for; at or over it, taking a name
+ *             out to make room is exactly right and is allowed.
+ *   balance   a page that takes another page's material with no page declaring
+ *             the new material that freed number now stages, or the reverse.
+ *             The book keeps its page count, so a merge and a split are one
+ *             move and both halves are named.
+ *
+ * @param {Object} args
+ * @param {Array} args.changes   `parsePlanChanges().changes`
+ * @param {Array} args.standing  the division that stands
+ * @param {Array} args.returned  the merged re-plan result
+ * @param {string[]} args.castNames `resolveCast().all`
+ * @param {Object} [args.aliases]   `resolveCast().aliases`
+ * @param {number} [args.maxCast]   the image model's cast ceiling
+ * @param {Map<number,string[]>} [args.obstacles] page → obstacle-holders, from the
+ *   plan check that produced these findings
+ * @returns {{refusals: Array<{pageNumber:number, rule:string, detail:string, line:string}>,
+ *            declaredOut: Map<number,string[]>, notes: string[]}}
+ */
+function reviewPlanChanges({ changes = [], standing = [], returned = [], castNames = [], aliases = {}, maxCast = 3, obstacles = null } = {}) {
+  const names = (Array.isArray(castNames) ? castNames : []).map(n => String(n || '').trim()).filter(Boolean);
+  const refusals = [];
+  const notes = [];
+  const declaredOut = new Map();
+  const list = Array.isArray(changes) ? changes : [];
+  if (!list.length) return { refusals, declaredOut, notes };
+
+  const whoOf = (pages) => {
+    const m = new Map();
+    for (const p of (pages || [])) m.set(Number(p.pageNumber), namesIn(whoColumn(p.planLine), names, aliases));
+    return m;
+  };
+  const beforeWho = whoOf(standing);
+  const afterWho = whoOf(returned);
+  const spanIn = (who) => {
+    const c = new Map();
+    for (const list2 of who.values()) for (const n of list2) c.set(n, (c.get(n) || 0) + 1);
+    return c;
+  };
+  const beforeSpan = spanIn(beforeWho);
+  const afterSpan = spanIn(afterWho);
+  const refuse = (pageNumber, rule, detail, line) => {
+    if (!Number.isFinite(pageNumber)) return;
+    refusals.push({ pageNumber: Number(pageNumber), rule, detail, line: String(line || '') });
+  };
+  // The declared subject is resolved against the DECLARED cast list, never read
+  // as prose: a subject naming nobody on that list resolves to nothing, the
+  // removal stays undeclared, and `castLostByReplan` restores the page.
+  const resolve = (subject) => namesIn(String(subject || ''), names, aliases);
+
+  for (const c of list) {
+    const page = Number(c.pageNumber);
+    const dir = replanChangeDirection(c.answers);
+    if (!c.answers) notes.push(`p${page}: "${String(c.line || '').slice(0, 120)}" names no finding tag`);
+
+    if (c.kind === 'cast_out') {
+      const hit = resolve(c.subject);
+      if (!hit.length) {
+        notes.push(`p${page}: declared "cast out ${c.subject}" names nobody on the cast list`);
+        continue;
+      }
+      declaredOut.set(page, [...(declaredOut.get(page) || []), ...hit]);
+      const held = obstacles instanceof Map ? (obstacles.get(page) || []) : [];
+      const heldNames = held.length ? namesIn(held.join(', '), names, aliases) : [];
+      const onObstacle = hit.filter(n => heldNames.includes(n));
+      if (onObstacle.length) {
+        refuse(page, 'obstacle', `${onObstacle.join(', ')} holds this page's obstacle (the check's own OBSTACLES line)`, c.line);
+        continue;
+      }
+      const stranded = hit.filter(n => (beforeSpan.get(n) || 0) >= 2 && (afterSpan.get(n) || 0) < 2);
+      if (stranded.length) {
+        refuse(page, 'span', `${stranded.map(n => `${n} ${beforeSpan.get(n) || 0}→${afterSpan.get(n) || 0} page(s)`).join(', ')} — two pages is the floor`, c.line);
+        continue;
+      }
+      if (dir === 'more' && (beforeWho.get(page) || []).length < Number(maxCast)) {
+        refuse(page, 'direction', `${c.answersText || 'the finding'} asks for a name in frame and this page held ${(beforeWho.get(page) || []).length} of ${maxCast}, so there was room to add`, c.line);
+        continue;
+      }
+    } else if (c.kind === 'cast_in') {
+      if (dir === 'fewer') {
+        refuse(page, 'direction', `${c.answersText || 'the finding'} asks for fewer in frame and this change adds one`, c.line);
+      }
+    }
+  }
+
+  // BALANCE: the book keeps its page count, so a merge frees exactly one number
+  // and that number is declared as staging something new.
+  const merges = list.filter(c => c.kind === 'material_from' && Number.isFinite(c.fromPage));
+  const fresh = list.filter(c => c.kind === 'new_material');
+  const freshPages = new Set(fresh.map(c => Number(c.pageNumber)));
+  const freedPages = new Set(merges.map(c => Number(c.fromPage)));
+  for (const c of merges) {
+    if (!freshPages.has(Number(c.fromPage))) {
+      refuse(c.pageNumber, 'balance', `page ${c.fromPage}'s material moves here and no page declares what page ${c.fromPage} now stages`, c.line);
+      refuse(c.fromPage, 'balance', `its material moved to page ${c.pageNumber} and nothing was declared in its place`, c.line);
+    }
+  }
+  for (const c of fresh) {
+    if (!freedPages.has(Number(c.pageNumber))) {
+      refuse(c.pageNumber, 'balance', 'new material here, and no page declares taking over what this page used to stage', c.line);
+    }
+  }
+  return { refusals, declaredOut, notes };
+}
+
 
 module.exports = {
   runPlanCounters,
@@ -856,4 +1069,7 @@ module.exports = {
   stripQuoted,
   whoColumn,
   castLostByReplan,
+  reviewPlanChanges,
+  replanChangeDirection,
+  REPLAN_FINDING_DIRECTION,
 };

@@ -456,36 +456,79 @@ describe('the Art Director is told to name a size ratio', () => {
 });
 
 // ---------------------------------------------------------------------------
-// The re-plan asks for the NAMED pages only (owner decision, 2026-09-14).
+// The re-plan asks for the pages it CHANGES only (owner decision, 2026-09-14;
+// scope widened to declared changes 2026-09-18).
 //
 // The RE-DIVIDE block used to contradict itself in one breath — "Return ONLY
 // the pages a finding names ... and nothing else" next to "Output the full plan
 // again" — and the template's OUTPUT FORMAT broke the tie the wrong way ("One
 // line per page, through page N"). Two of three signals demanded the whole
 // book, and that is what the planner delivered: 8 and 9 unnamed pages rewritten
-// in consecutive rounds. What is pinned here is the CONTRACT, not the wording:
-// a re-plan build asks for the named pages and carries no full-plan demand; a
-// first-plan build still demands every page through the page count.
+// in consecutive rounds.
+//
+// A SECOND contradiction outlived that fix and is what these tests now pin
+// against: "Every page number you return is already in the plan above" stood
+// one sentence away from "or on its own page when it earns a picture of its
+// own", so the split the block described had no number available and was
+// structurally impossible. The page-number rule is now stated once — the book
+// keeps its page count, a new picture takes an existing number whose material
+// joins a neighbour — and the scope a round may rewrite is the pages a finding
+// named PLUS the pages its change block declares.
+//
+// What is pinned here is the CONTRACT, not the wording: a re-plan build asks
+// for the pages it changes, carries no full-plan demand, states one consistent
+// page-number rule, and carries the declaration format; a first-plan build
+// still demands every page through the page count and declares nothing.
 // ---------------------------------------------------------------------------
-describe('the re-plan asks for only the pages a finding named', () => {
+describe('the re-plan asks for only the pages it changes', () => {
   const FINDINGS = [{ check: 9, line: 'Page 3 holds two actions.', pages: [3] }];
   const PLAN = 'Page 1: wide — the main character — she sets out — she is on the road\nPage 3: close — the main character — she opens the box and runs — the box is open';
   const replanSection = () => PB.buildReplanSection(PLAN, FINDINGS);
   const replanPrompt = () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE, replan: replanSection() });
   const firstPrompt = () => PB.buildBeatsPrompt(inputData, 4, { finalArc: ARC_LINE });
 
-  it('the RE-DIVIDE block still demands the named pages and nothing else', () => {
+  it('the RE-DIVIDE block still scopes the reply to the changed pages', () => {
     const block = replanSection();
-    expect(block).toMatch(/ONLY the pages a finding names/);
-    expect(block, 'the full-plan demand is back — it contradicts the named-pages contract')
+    expect(block).toMatch(/for no other page/);
+    expect(block).toMatch(/stands exactly as it is/);
+    expect(block, 'the full-plan demand is back — it contradicts the changed-pages contract')
       .not.toMatch(/full plan/i);
   });
 
-  it('must-fix precedence and the one-action/merge paragraph survive', () => {
+  it('states ONE page-number rule, and it is the one that permits a split', () => {
+    const block = replanSection();
+    // The rule that made a split impossible must not come back in any form.
+    expect(block, 'the contradictory page-number rule is back')
+      .not.toMatch(/page number you return is already in the plan/i);
+    expect(block).toMatch(/No number is added and none is retired/);
+    // …and the split it permits is stated in the same breath, so the two
+    // sentences cannot be obeyed separately.
+    expect(block).toMatch(/takes an existing number/);
+    expect(block).toMatch(/joins a neighbouring page/);
+  });
+
+  it('must-fix precedence and the one-action paragraph survive', () => {
     const block = replanSection();
     expect(block).toMatch(/must-fix wins/);
     expect(block).toMatch(/more than one action/);
-    expect(block).toMatch(/Keep the page count by merging/);
+  });
+
+  it('allows BOTH fix types and names what a removal may never touch', () => {
+    const block = replanSection();
+    // Owner, 2026-09-18: "we can not say delete only or add only."
+    expect(block, 'the one-directional rule is back').not.toMatch(/is not a fix/i);
+    expect(block).toMatch(/answered by adding or by removing/);
+    expect(block).toMatch(/past the cast ceiling loses one/);
+    // The two figures a removal may not take, stated to the planner.
+    expect(block).toMatch(/instant works against/);
+    expect(block).toMatch(/fewer than two pages/);
+  });
+
+  it('asks for every change to be declared, and says an undeclared one is undone', () => {
+    const block = replanSection();
+    expect(block).toMatch(/Declare every change/);
+    expect(block).toMatch(/---CHANGES---/);
+    expect(block).toMatch(/do not declare is undone/);
   });
 
   it('a re-plan build does not demand every page through the page count', () => {
@@ -493,7 +536,26 @@ describe('the re-plan asks for only the pages a finding named', () => {
     expect(p).toMatch(/RE-DIVIDE/);
     expect(p, 'the template still orders a whole-book reply on a re-plan')
       .not.toMatch(/One line per page, through page/);
-    expect(p).toMatch(/named under RE-DIVIDE/);
+    expect(p).toMatch(/you change under RE-DIVIDE/);
+    expect(unfilled(p)).toEqual([]);
+  });
+
+  it('carries the declaration grammar into the BUILT prompt, verbatim from the constant', () => {
+    // fillTemplate drops an undeclared key silently, so the format the parser
+    // reads has to be proven present in the string the model sees.
+    const p = replanPrompt();
+    expect(p).toContain(PB.REPLAN_CHANGES_FORMAT.trim());
+    for (const kind of ['cast in <name>', 'cast out <name>', 'action out <the action>',
+      'action to page <M>', 'material from page <M>', 'new material']) {
+      expect(p, `the declared vocabulary lost "${kind}"`).toContain(kind);
+    }
+    // The total is re-counted, never asserted up front.
+    expect(p).toMatch(/counts the lines above it/);
+  });
+
+  it('a first plan declares nothing — there is no earlier division to change', () => {
+    const p = firstPrompt();
+    expect(p).not.toContain('---CHANGES---');
     expect(unfilled(p)).toEqual([]);
   });
 

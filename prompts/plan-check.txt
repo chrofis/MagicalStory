@@ -37,7 +37,7 @@ Answer only these eleven:
 
 10. Two heights. Name every page whose instant puts two named characters at different heights — deck and water, ledge and ground, roof and street. Such a page is staged from one level with the other character out of frame, or split into a page per level. A whole cast carried together on one back or one boat is one level.
 
-11. Obstacles. Name every page whose instant works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal. For each, name that character and say whether the page's plan line names them. A page whose obstacle is held by a character the plan line does not name is a finding.
+11. Obstacles. Name every page whose instant works against what a character is doing — a way blocked, a place kept, a thing taken or withheld, a refusal. For each, give that page an OBSTACLES line naming that character, and say whether the page's plan line names them. A page whose obstacle is held by a character the plan line does not name is a finding.
 
 # OUTPUT FORMAT
 
@@ -45,6 +45,10 @@ The roster first, one line per page, every page present and in order:
 
 ROSTER <page>: people = <names, comma separated, or none>; things = <names, comma separated, or none>; covers = <names, comma separated, or none>
 
+Then one line for each page whose instant works against what a character is doing, and no line for the other pages:
+
+OBSTACLES <page>: <the character whose action the instant works against>
+
 Then the findings: numbered, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
 
-When the roster is complete and nothing is wrong anywhere, write the roster and then exactly: NONE
+When the roster is complete and nothing is wrong anywhere, write the roster, the obstacle lines, and then exactly: NONE

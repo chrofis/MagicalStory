@@ -1,6 +1,6 @@
 
 
-const { runPlanCounters, collectPlaceNames, castLostByReplan } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges } = require('./planCounters');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -101,7 +101,9 @@ const {
   buildPlanCheckPrompt,
   parsePlanCheck,
   parsePlanCheckRoster,
+  parsePlanCheckObstacles,
   buildReplanSection,
+  parsePlanChanges,
   replanRank,
   findingPages,
   buildClothingReviewPrompt,
@@ -720,10 +722,16 @@ function shippedReplanState(rounds = []) {
   const changed = new Set();
   let recheck = null;
   const discardedRounds = [];
+  // What the SHIPPED division's rounds said they changed, and which of those
+  // the review refused. A removal used to be recorded nowhere (2026-09-18).
+  const declaredChanges = [];
+  const changeRefusals = [];
   for (const r of (rounds || [])) {
     if (!r) continue;
     if (r.kept) {
       for (const n of (r.changedPages || [])) changed.add(Number(n));
+      for (const line of (r.declaredChanges || [])) declaredChanges.push({ round: r.round, line });
+      for (const ref of (r.changeRefusals || [])) changeRefusals.push({ round: r.round, ...ref });
       // The recheck that measured the division now standing. A later kept round
       // supersedes an earlier one; a discarded round never does.
       recheck = r.recheck || null;
@@ -736,7 +744,7 @@ function shippedReplanState(rounds = []) {
       });
     }
   }
-  return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds };
+  return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals };
 }
 
 /**
@@ -1254,6 +1262,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   const runCheck = async (label, pages, planText) => {
     let modelFindings = [];
     let roster = null;
+    // The check's OBSTACLES block: per page, the character whose action that
+    // page's instant works against (plan-check Q11). It is the declared
+    // evidence a re-plan's removal is judged against — a figure the arc gives a
+    // moment of their own is not a figure a page may quietly drop — so it is
+    // read as DATA here, never re-derived from a finding's prose.
+    let obstacles = null;
     let checkModelId = null;
     let prompt = null;
     try {
@@ -1267,6 +1281,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       checkModelId = res.modelId || planCheckModel;
       modelFindings = parsePlanCheck(res.text || '');
       roster = parsePlanCheckRoster(res.text || '');
+      obstacles = parsePlanCheckObstacles(res.text || '');
     } catch (err) {
       // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
       // with it (the counters do arithmetic on its roster), so this is an
@@ -1295,7 +1310,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
       counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
     });
-    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt };
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles };
   };
 
   // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
@@ -1350,12 +1365,29 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const replanPrompt = buildBeatsPrompt(inputData, pageCount, {
           finalArc: approvedArc,
           arcHints,
-          replan: buildReplanSection(pagePlan, pendingCheck.findings),
+          replan: buildReplanSection(pagePlan, pendingCheck.findings, { pageCount: beats.length }),
         });
         if (!replanPrompt) throw new Error('story-beats template unavailable');
         const rpRes = await textModels.callTextModelStreaming(replanPrompt, null, onChunk, planModel, { usageLabel: 'beats_replan' });
         const second = readPlan(rpRes.text);
         if (second.parsed.pages.length === 0) throw new Error('re-plan returned no parseable plan lines');
+        // DECLARE. The round states each structural change it made — a name in
+        // or out of frame, an action moved or dropped, one page's material
+        // joining another's — with the finding it answers and why. `present:
+        // false` is a round that emitted no block at all: every change it made
+        // is then undeclared, which is the behaviour the merge had before
+        // declarations existed (2026-09-18).
+        const declared = parsePlanChanges(rpRes.text);
+        // A TOTAL IS ALWAYS SELF-CERTIFIABLE: the block re-counts its own lines,
+        // and a count that disagrees with the enumeration is the enumeration's
+        // word against an assertion. The lines win; the discrepancy is reported.
+        if (declared.present && declared.declaredCount != null && declared.declaredCount !== declared.counted) {
+          gl.warn('beats_replan_change_count', `Round ${round}: the change block declares ${declared.declaredCount} change(s) and enumerates ${declared.counted}; the enumeration stands`, null, { round, declared: declared.declaredCount, counted: declared.counted });
+        }
+        const unreadable = declared.changes.filter(c => c.kind === 'other');
+        if (unreadable.length) {
+          gl.warn('beats_replan_change_unreadable', `Round ${round}: ${unreadable.length} declared change(s) do not use the declared vocabulary, so nothing reviewed them`, null, { round, lines: unreadable.map(c => c.line.slice(0, 160)) });
+        }
         // MERGE, don't replace. The re-plan is asked for ONLY the pages a
         // finding names; every other page stands. Until 2026-09-09 it returned
         // the whole division, and the planner rewrote 15-18 of 18 pages every
@@ -1366,6 +1398,19 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // stands, so a round can only change what it was asked to change.
         const namedPages = new Set();
         for (const nf of (pendingCheck.findings || [])) for (const n of findingPages(nf)) namedPages.add(Number(n));
+        // A DECLARED PAGE IS IN SCOPE. Splitting a page's second action onto a
+        // picture of its own needs two pages rewritten — the one a finding
+        // named and the neighbour whose number now stages the new moment — and
+        // until 2026-09-18 the merge below restored the neighbour, which made
+        // the split the prompt described structurally impossible. A page the
+        // round DECLARES it changed, with the finding it answers and why, is
+        // asked-for work; a page in neither list is still restored.
+        const declaredPages = new Set();
+        for (const c of declared.changes) {
+          if (Number.isFinite(c.pageNumber)) declaredPages.add(Number(c.pageNumber));
+          if (Number.isFinite(c.toPage)) declaredPages.add(Number(c.toPage));
+          if (Number.isFinite(c.fromPage)) declaredPages.add(Number(c.fromPage));
+        }
         // When NO finding names a page — a whole-book finding, or a finding whose
         // page reference could not be read — the re-plan is answering for the
         // whole division, so every returned page is accepted. The merge still
@@ -1376,50 +1421,88 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         {
           const standing = new Map(beats.map(b => [b.pageNumber, b]));
           const kept = [];
+          const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
           for (const pg of second.parsed.pages) {
-            if (scopeAll || namedPages.has(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
+            if (scopeAll || inScope(pg.pageNumber) || !standing.has(pg.pageNumber)) kept.push(pg);
             else kept.push(standing.get(pg.pageNumber));
           }
           for (const [num, pg] of standing) if (!kept.some(k => k.pageNumber === num)) kept.push(pg);
           kept.sort((a, b) => a.pageNumber - b.pageNumber);
-          const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !namedPages.has(pg.pageNumber) && standing.has(pg.pageNumber)).length;
+          const overridden = scopeAll ? 0 : second.parsed.pages.filter(pg => !inScope(pg.pageNumber) && standing.has(pg.pageNumber)).length;
           if (overridden > 0) {
-            log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named - restored from the standing division`);
-            gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) no finding named; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b) });
+            log.warn(`[BEATS] Round ${round}: the re-plan returned ${overridden} page(s) no finding named and no change declared - restored from the standing division`);
+            gl.warn('beats_replan_unnamed_pages', `Round ${round}: the re-plan rewrote ${overridden} page(s) that no finding named and no change declared; those pages were restored from the division that stands`, null, { round, overridden, named: [...namedPages].sort((a, b) => a - b), declared: [...declaredPages].sort((a, b) => a - b) });
           }
           second.parsed.pages = kept;
           second.parsed.missing = [];
         }
-        // A RE-PLAN ADDS A CHARACTER, IT NEVER DELETES ONE (2026-09-18).
-        // Nothing in the finding vocabulary asks for a figure to leave a page:
-        // `NO_COMMISSIONED_ON_PAGE` is answered by bringing the commissioned
-        // cast into frame, `CAST_OVER_CEILING` by a justification in the plan
-        // line, plan-check Q3 likewise. Measured on staging
-        // job_1789681157795_wkt20ckod: that finding named pages 8, 12, 16 and
-        // 18; the round answered 8 and 12 by ADDING the four children and
-        // answered 16 and 18 by DELETING Tobias — the invented antagonist whose
-        // blocking of the stone is the arc's fourth declared challenge. His
-        // who-column pages went [8,9,16,18] → [8,9]. The Art Director still
-        // wrote him into the briefs for 16 and 17 from the page text, and the
-        // scene review then stripped him by the book (`[cast_not_in_plan]`,
-        // castRemovals reason "not named by PAGE PLAN line"), because the plan
-        // line is the brief's authority. The book audit returned three CRITICAL
-        // and one MAJOR IMG faults for an antagonist the words describe and no
-        // picture shows. Same remedy as the unnamed-pages merge above: the page
-        // is restored from the standing division, per page, and the finding
-        // that named it survives to the recheck.
+        // REVIEW, then APPLY (2026-09-18). A removal is judged, never banned
+        // and never waved through.
+        //
+        // What this replaced: the round was told a removal is never a fix and
+        // `castLostByReplan` mechanically restored every name a re-plan took
+        // out. That rule is one-directional — `NO_COMMISSIONED_ON_PAGE` is
+        // answered by adding, `CAST_OVER_CEILING` by writing a justification
+        // into the line, plan-check Q3 likewise — so an over-crowded page could
+        // only ever get more crowded, and the standing division was treated as
+        // always right when it is itself a model output. Owner's verdict: "we
+        // can not say delete only or add only; we must give a fair review and
+        // allow both fix types."
+        //
+        // Two passes, in this order:
+        //   1. DECLARED changes go to `reviewPlanChanges`, which refuses one
+        //      against declared evidence — the check's own OBSTACLES line for
+        //      that page, the figure's span across the book, the cast ceiling,
+        //      and the page-count balance of a merge and a split. A refusal
+        //      restores that page from the division that stands and the finding
+        //      that named it survives to the recheck; it never discards a round.
+        //   2. UNDECLARED removals — a name gone from a who column with no
+        //      change line saying so — are restored exactly as before. A silent
+        //      deletion is unreviewable: the plan line is the brief's authority,
+        //      so the Art Director loses the figure and the scene review strips
+        //      them by the book (`[cast_not_in_plan]`). On staging
+        //      job_1789681157795_wkt20ckod that cost three CRITICAL and one
+        //      MAJOR IMG fault for an antagonist the page text describes and no
+        //      picture shows, and the only way anyone found it was diffing two
+        //      who-columns after the book was finished.
+        let reviewRefusals = [];
         {
           const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
           const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
-          const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases);
-          if (lost.length) {
-            const standing = new Map(beats.map(b => [b.pageNumber, b]));
+          const standing = new Map(beats.map(b => [b.pageNumber, b]));
+          const restore = (pageNumbers) => {
+            const want = new Set(pageNumbers.map(Number));
             second.parsed.pages = second.parsed.pages.map(pg => (
-              lost.some(l => l.pageNumber === pg.pageNumber) ? standing.get(pg.pageNumber) : pg
+              want.has(Number(pg.pageNumber)) && standing.has(pg.pageNumber) ? standing.get(pg.pageNumber) : pg
             ));
+          };
+
+          const review = reviewPlanChanges({
+            changes: declared.changes,
+            standing: beats,
+            returned: second.parsed.pages,
+            castNames: guardCast,
+            aliases: guardAliases,
+            maxCast,
+            obstacles: pendingCheck.obstacles,
+          });
+          reviewRefusals = review.refusals;
+          if (review.notes.length) {
+            gl.info('beats_replan_change_notes', `Round ${round}: ${review.notes.length} declared change(s) could not be tied to a finding or a cast name`, null, { round, notes: review.notes });
+          }
+          if (review.refusals.length) {
+            restore(review.refusals.map(r => r.pageNumber));
+            const detail = review.refusals.map(r => `p${r.pageNumber} (${r.rule}): ${r.detail}`).join('; ');
+            log.warn(`⚠️ [BEATS] Round ${round}: ${review.refusals.length} declared change(s) refused on review - ${detail}`);
+            gl.warn('beats_replan_change_refused', `Round ${round}: the review refused ${review.refusals.length} declared change(s) — ${detail}; ${review.refusals.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, refusals: review.refusals });
+          }
+
+          const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases, review.declaredOut);
+          if (lost.length) {
+            restore(lost.map(l => l.pageNumber));
             const detail = lost.map(l => `p${l.pageNumber}: ${l.lost.join(', ')}`).join('; ');
-            log.warn(`⚠️ [BEATS] Round ${round}: the re-plan dropped cast from ${lost.length} page(s) (${detail}) - restored from the standing division`);
-            gl.warn('beats_replan_cast_lost', `Round ${round}: the re-plan removed ${detail} from the page plan; a re-plan adds a character, never deletes one, so ${lost.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, pages: lost });
+            log.warn(`⚠️ [BEATS] Round ${round}: the re-plan dropped cast from ${lost.length} page(s) without declaring it (${detail}) - restored from the standing division`);
+            gl.warn('beats_replan_cast_lost', `Round ${round}: the re-plan removed ${detail} from the page plan and declared no change for it; an undeclared removal is unreviewable, so ${lost.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, pages: lost, declaredBlock: declared.present });
           }
         }
         // A re-plan that answers "this page holds two actions" by copying a
@@ -1487,6 +1570,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           findingsIn: pendingCheck.lines.length,
           recheck: recheckRecord(check2),
           kept: true,
+          // WHAT THE ROUND SAID IT DID, AND WHAT THE REVIEW MADE OF IT. Before
+          // 2026-09-18 a removal was recorded nowhere at all — the only way to
+          // find one was diffing two who-columns after the book was finished.
+          // `declaredChanges: null` marks a round that emitted no block.
+          declaredChanges: declared.present ? declared.changes.map(c => c.line) : null,
+          changeRefusals: reviewRefusals,
         };
         replanRounds.push(roundRecord);
         const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
@@ -1573,6 +1662,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // thrown away", while a MISSING key says "this row predates the fix and
       // its canonical fields may describe a discarded round" (2026-09-18).
       discardedRounds: shipped.discardedRounds,
+      // The structural edits the shipped division's rounds DECLARED, and the
+      // ones the review refused. Empty arrays mean nothing was declared and
+      // nothing refused; a MISSING key means the row predates declarations.
+      declaredChanges: shipped.declaredChanges,
+      changeRefusals: shipped.changeRefusals,
       prompt: check1.prompt || '',
       briefsIn: plan.pages.map(x => ({
         pageNumber: x.pageNumber,

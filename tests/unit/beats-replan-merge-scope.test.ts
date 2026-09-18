@@ -22,7 +22,17 @@ describe('beats re-plan merge scope', () => {
   });
 
   it('with no named page every returned page is accepted', () => {
-    expect(SRC).toMatch(/if \(scopeAll \|\| namedPages\.has\(pg\.pageNumber\)/);
+    expect(SRC).toMatch(/if \(scopeAll \|\| inScope\(pg\.pageNumber\)/);
+  });
+
+  // 2026-09-18: the scope is the pages a finding named PLUS the pages the
+  // round's change block declares. Splitting one page's second action onto a
+  // picture of its own rewrites two pages — the named one and the neighbour
+  // whose number now stages the new moment — and restoring the neighbour made
+  // the split the prompt describes structurally impossible.
+  it('a page the round DECLARED a change on is in scope, a page in neither list is not', () => {
+    expect(SRC).toMatch(/const inScope = n => namedPages\.has\(Number\(n\)\) \|\| declaredPages\.has\(Number\(n\)\);/);
+    expect(SRC).toMatch(/if \(Number\.isFinite\(c\.fromPage\)\) declaredPages\.add\(Number\(c\.fromPage\)\);/);
   });
 
   it('a page the return omits is still filled from the standing division', () => {

@@ -6302,19 +6302,71 @@ function findingPages(finding) {
   return findingPages(String(finding.line || ''));
 }
 
-function buildReplanSection(pagePlan, findingLines) {
+/**
+ * THE RE-DIVIDE BLOCK — declare, review, apply (owner design, 2026-09-18).
+ *
+ * What it replaced, and why. The block used to carry three structural rules in
+ * consecutive sentences and two of them contradicted outright:
+ *
+ *   "Every page number you return is already in the plan above."
+ *   "…or on its own page when it earns a picture of its own… Keep the page
+ *    count by merging two pages…, or by dropping the weakest."
+ *
+ * A planner obeying the second has to violate the first — a new page has no
+ * number available — so the cut-one-add-one the block described was
+ * structurally impossible, and the half that did work ("dropping the weakest")
+ * was an unreviewed deletion of an entire page with nothing recording which
+ * page went or why. The third rule, "dropping a character is not a fix either",
+ * was one-directional: `NO_COMMISSIONED_ON_PAGE` is answered by adding,
+ * `CAST_OVER_CEILING` by writing a justification into the line, plan-check Q3
+ * likewise — so an over-crowded page could only ever get more crowded, and a
+ * division the first round got wrong could never be corrected in the second.
+ * The owner's verdict: "we can not say delete only or add only; we must give a
+ * fair review and allow both fix types."
+ *
+ * What it says now, in three parts:
+ *   DECLARE  every structural change, with the finding it answers and why,
+ *            under `---CHANGES---`. An undeclared change is undone.
+ *   REVIEW   a removal is judged against declared evidence — the page's
+ *            obstacle-holder, the cast ceiling, the figure's span, the page
+ *            count (`reviewPlanChanges`, server/lib/planCounters.js).
+ *   APPLY    code restores the pages a rule refuses and nothing else; the
+ *            finding that named the page survives to the recheck.
+ *
+ * The page-number rule is now stated once and is consistent with the split: the
+ * book keeps its page count, no number is added or retired, and a moment that
+ * earns its own picture takes an existing number whose material merges into a
+ * neighbour — both halves declared, both pages returned.
+ *
+ * @param {string} pagePlan the division that stands
+ * @param {Array|string} findingLines structured findings (or legacy strings)
+ * @param {Object} [opts]
+ * @param {number} [opts.pageCount] the book's page count; derived from the plan
+ *   when absent so the two can never disagree
+ */
+function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
   const items = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
     .map(f => (f && typeof f === 'object' ? { ...f, line: String(f.line || '').trim() } : { line: String(f || '').trim() }))
     .filter(f => f.line);
   if (items.length === 0) return '';
   const must = items.filter(f => replanRank(f) === 'must').map(f => f.line);
   const also = items.filter(f => replanRank(f) !== 'must').map(f => f.line);
+  // Derived from the plan when the caller gives no count, and never smaller
+  // than the highest page number the plan shows: a span that contradicts the
+  // division printed underneath it is worse than no span at all.
+  const planned = parsePagePlan(pagePlan);
+  const count = Number(pageCount) > 0
+    ? Number(pageCount)
+    : Math.max(planned.size, ...[0, ...planned.keys()]);
+  const span = count > 0 ? `its ${count} pages, numbered 1 to ${count}` : 'its pages and their numbers';
   return [
     '# RE-DIVIDE',
     '',
-    'You divided this story once. Your plan and the findings against it follow. Return ONLY the pages a finding names, one line each in the same format, and nothing else — every other page stands exactly as it is and must not be repeated. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Every page number you return is already in the plan above.',
-    'When a page is named for holding more than one action, its instant keeps the first action alone. What follows from it belongs in "what is true after", or on its own page when it earns a picture of its own. Dropping the action is not a fix: every action in the division above is still in the division you return. Keep the page count by merging two pages that each hold only presence or position, or by dropping the weakest.',
-    'Dropping a character is not a fix either: every name a page above puts in frame is in frame on that page in the division you return. A page faulted for holding none of the commissioned characters gains one — the story puts them there, and the page keeps whoever it already had. A page faulted for a crowded frame keeps every name and separates them by depth or distance. The story is settled, so a figure it gives a page is a figure that page shows.',
+    'You divided this story once. Your plan and the findings against it follow. Return a line for every page you change, in the same format, and for no other page — a page you leave out stands exactly as it is. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins.',
+    `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
+    'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
+    'Two figures stay wherever they are: the character whose action a page\'s instant works against, and a character the division would leave with fewer than two pages in the book.',
+    'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',
@@ -6322,6 +6374,127 @@ function buildReplanSection(pagePlan, findingLines) {
     ...(must.length ? ['## MUST FIX', must.join('\n'), ''] : []),
     ...(also.length ? ['## ALSO NOTED', also.join('\n')] : []),
   ].join('\n').trimEnd();
+}
+
+/**
+ * The change block's grammar, exactly as the planner is given it.
+ *
+ * ONE constant, so the format the prompt asks for and the format
+ * `parsePlanChanges` reads cannot drift apart — a hand-kept copy on each side
+ * is how a declared field quietly stops being parsed.
+ *
+ * The count comes LAST and is a re-count of the lines above it: a total is
+ * always self-certifiable, and asking for it first invites an assertion.
+ */
+const REPLAN_CHANGES_FORMAT = [
+  '',
+  '---CHANGES---',
+  'Page <N>: <the change> — <the finding it answers> — <why, one clause>',
+  'Changes: <how many lines stand above this one>',
+  '',
+  'One line per change. The change is one of: cast in <name>; cast out <name>; action out <the action>; action to page <M> <the action>; material from page <M>; new material <what this page now stages>. The finding it answers is its tag, PLAN[CODE] or CHECK[n]. The last line counts the lines above it.',
+].join('\n');
+
+/** A change line's declared finding tag: PLAN[CODE] or CHECK[n]. Null when it carries neither. */
+function parseFindingTag(text) {
+  const t = String(text || '');
+  const plan = t.match(/PLAN\s*\[\s*([A-Za-z0-9_]+)\s*\]/);
+  if (plan) return { code: plan[1].toUpperCase() };
+  const chk = t.match(/CHECK\s*\[\s*(\d+)\s*\]/i);
+  if (chk) return { check: Number(chk[1]) };
+  return null;
+}
+
+// The declared vocabulary, in match order — `action to page` before `action out`
+// so the longer form is never swallowed by the shorter one.
+const PLAN_CHANGE_GRAMMAR = [
+  [/^cast\s+in\b[:\s]*(.+)$/i, m => ({ kind: 'cast_in', subject: m[1].trim() })],
+  [/^cast\s+out\b[:\s]*(.+)$/i, m => ({ kind: 'cast_out', subject: m[1].trim() })],
+  [/^action\s+to\s+page\s+(\d+)\b[:\s]*(.*)$/i, m => ({ kind: 'action_to', toPage: Number(m[1]), subject: m[2].trim() })],
+  [/^action\s+out\b[:\s]*(.+)$/i, m => ({ kind: 'action_out', subject: m[1].trim() })],
+  [/^material\s+from\s+page\s+(\d+)\b[:\s]*(.*)$/i, m => ({ kind: 'material_from', fromPage: Number(m[1]), subject: m[2].trim() })],
+  [/^new\s+material\b[:\s]*(.*)$/i, m => ({ kind: 'new_material', subject: m[1].trim() })],
+];
+
+// The plan line's own column separator, so a change line is split the same way
+// a plan line is (planCounters.SEGMENT_SPLIT).
+const CHANGE_FIELD_SPLIT = /\s+[—–]\s+|\s+--\s+/;
+
+/**
+ * A re-plan's `---CHANGES---` block — the structural edits it DECLARES.
+ *
+ * Every field is declared and read positionally; nothing here interprets a
+ * sentence. A line whose change does not match the declared vocabulary is kept
+ * with `kind: 'other'` rather than dropped — a change the parser cannot read is
+ * a change nobody reviewed, and the caller must be able to see it.
+ *
+ * `present: false` means the response carried no block at all — a planner that
+ * ignored the format, or a stored round from before declarations existed. The
+ * caller then treats every structural change as undeclared, which is exactly
+ * the behaviour the re-plan merge had before 2026-09-18.
+ *
+ * @returns {{present:boolean, changes:Array, declaredCount:(number|null), counted:number}}
+ */
+function parsePlanChanges(raw) {
+  const full = String(raw || '');
+  const m = full.match(/---\s*CHANGES\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i);
+  if (!m) return { present: false, changes: [], declaredCount: null, counted: 0 };
+  const changes = [];
+  let declaredCount = null;
+  for (const rawLine of m[1].split('\n')) {
+    const line = rawLine.trim().replace(/\*\*/g, '').trim();
+    if (!line) continue;
+    const total = line.match(/^changes?\s*:\s*(\d+)\s*$/i);
+    if (total) { declaredCount = Number(total[1]); continue; }
+    const p = line.match(/^(?:\d+[.)]\s*)?(?:Page|Seite|Pagina)\s*(\d+)\s*[:.)-]\s*(.+)$/i);
+    if (!p) continue;
+    const fields = String(p[2]).split(CHANGE_FIELD_SPLIT).map(s => s.trim()).filter(Boolean);
+    const what = fields[0] || '';
+    const answersText = fields[1] || '';
+    let parsed = { kind: 'other', subject: what };
+    for (const [re, build] of PLAN_CHANGE_GRAMMAR) {
+      const hit = what.match(re);
+      if (hit) { parsed = build(hit); break; }
+    }
+    changes.push({
+      pageNumber: Number(p[1]),
+      ...parsed,
+      answers: parseFindingTag(answersText),
+      answersText,
+      reason: fields.slice(2).join(' — '),
+      line,
+    });
+  }
+  return { present: true, changes, declaredCount, counted: changes.length };
+}
+
+/**
+ * The plan check's OBSTACLES block — per page, the character whose action that
+ * page's instant works against, as DATA.
+ *
+ * Question 11 has asked this since 2026-09-18 and answered it only as a finding
+ * ("the plan line does not name them"), so the mapping itself — the evidence a
+ * removal is judged against — never left the model's prose. Reading it back out
+ * of a finding sentence is exactly the prose pattern-matching this codebase
+ * forbids, so the check declares it in the same shape as the ROSTER.
+ *
+ * "OBSTACLES 16: Tobias" → {16: ['Tobias']}. Pages with no obstacle emit no
+ * line and are absent from the map.
+ *
+ * @returns {Map<number, string[]>}
+ */
+function parsePlanCheckObstacles(raw) {
+  const out = new Map();
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().replace(/\*\*/g, '').match(/^OBSTACLES?\s+(\d+)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    const names = String(m[2] || '')
+      .split(',')
+      .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/(?:'s|’s|s'|s’)$/i, '').trim())
+      .filter(n => n && !/^none$/i.test(n));
+    if (names.length) out.set(parseInt(m[1], 10), names);
+  }
+  return out;
 }
 
 function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '' } = {}) {
@@ -6348,11 +6521,15 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     MAX_CHARACTERS_PER_SCENE: ctx.MAX_CHARACTERS_PER_SCENE,
     PAGE_COUNT: pageCount,
     // The output scope follows the mode. A first plan (no replan section)
-    // owes every page; a re-plan owes only the pages a finding named — the
-    // merge in beatsPipeline restores the rest from the division that stands.
+    // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
+    // — the merge in beatsPipeline restores every other page from the division
+    // that stands, and a change the CHANGES block declares is what carries a
+    // page the findings did not name into that scope.
     OUTPUT_SCOPE: String(replan || '').trim()
-      ? 'One line for each page named under RE-DIVIDE, and for no other page.'
+      ? 'One line for each page you change under RE-DIVIDE, and for no other page, then the changes block.'
       : `One line per page, through page ${pageCount}.`,
+    // Only a re-plan declares changes; a first division has nothing to declare.
+    CHANGES_FORMAT: String(replan || '').trim() ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
     ARC_HINTS: String(arcHints || '').trim()
@@ -8685,7 +8862,10 @@ module.exports = {
   buildPlanCheckPrompt,
   parsePlanCheck,
   parsePlanCheckRoster,
+  parsePlanCheckObstacles,
   buildReplanSection,
+  parsePlanChanges,
+  REPLAN_CHANGES_FORMAT,
   replanRank,
   findingPages,
   buildArcReviewPrompt,

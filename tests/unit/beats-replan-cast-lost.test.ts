@@ -11,7 +11,21 @@ const BEATS_SRC = fs.readFileSync(path.join(ROOT, 'server/lib/beatsPipeline.js')
 const BUILDERS_SRC = fs.readFileSync(path.join(ROOT, 'server/lib/promptBuilders.js'), 'utf8');
 
 /**
- * A re-plan ADDS a character, it never deletes one.
+ * A re-plan may remove a character — but never SILENTLY.
+ *
+ * Revised 2026-09-18. The rule this file was written for was one-directional:
+ * a re-plan adds a character and never deletes one, enforced by restoring every
+ * name a round took out. The owner rejected it — "we can not say delete only or
+ * add only; we must give a fair review and allow both fix types" — because it
+ * left an over-crowded page with no answer available and treated the standing
+ * division, itself a model output, as always right. What survives unchanged is
+ * this function's set arithmetic, which now answers a narrower question: which
+ * removals did the round NOT declare? Those are restored; a declared one goes
+ * to `reviewPlanChanges` to be judged.
+ *
+ * The fixtures below carry no declaration — a round from before the change
+ * block existed — so every removal in them is undeclared and the expectations
+ * are the same ones the original guard had.
  *
  * Fixtures are the plan lines of staging job_1789681157795_wkt20ckod ("Das Ei
  * im Lindenhof", 2026-09-17), verbatim: `beatsReviewReport.briefsIn` is the
@@ -157,27 +171,53 @@ describe('castLostByReplan — multi-page rounds', () => {
  */
 describe('the beats re-plan wiring', () => {
   it('runs the guard on the merged return, before the round is measured', () => {
-    expect(BEATS_SRC).toMatch(/const lost = castLostByReplan\(beats, second\.parsed\.pages, guardCast, guardAliases\);/);
+    expect(BEATS_SRC).toMatch(/const lost = castLostByReplan\(beats, second\.parsed\.pages, guardCast, guardAliases, review\.declaredOut\);/);
     const guardAt = BEATS_SRC.indexOf('castLostByReplan(beats, second.parsed.pages');
     const changedAt = BEATS_SRC.indexOf('const changedThisRound = second.parsed.pages');
     expect(guardAt).toBeGreaterThan(0);
     expect(changedAt).toBeGreaterThan(guardAt);
   });
 
+  it('reviews the DECLARED changes before it hunts undeclared ones', () => {
+    // Order matters: the review produces `declaredOut`, which is what stops the
+    // undeclared-loss guard reporting a removal the round openly stated.
+    const reviewAt = BEATS_SRC.indexOf('const review = reviewPlanChanges({');
+    const guardAt = BEATS_SRC.indexOf('castLostByReplan(beats, second.parsed.pages');
+    expect(reviewAt).toBeGreaterThan(0);
+    expect(guardAt).toBeGreaterThan(reviewAt);
+  });
+
   it('restores the flagged pages from the standing division', () => {
-    expect(BEATS_SRC).toMatch(/lost\.some\(l => l\.pageNumber === pg\.pageNumber\) \? standing\.get\(pg\.pageNumber\) : pg/);
+    expect(BEATS_SRC).toMatch(/want\.has\(Number\(pg\.pageNumber\)\) && standing\.has\(pg\.pageNumber\) \? standing\.get\(pg\.pageNumber\) : pg/);
+    expect(BEATS_SRC).toMatch(/restore\(review\.refusals\.map\(r => r\.pageNumber\)\)/);
+    expect(BEATS_SRC).toMatch(/restore\(lost\.map\(l => l\.pageNumber\)\)/);
   });
 
   it('falls back to the commissioned names when the roster failed and there is no resolved cast', () => {
     expect(BEATS_SRC).toMatch(/pendingCheck\.counters\.cast && pendingCheck\.counters\.cast\.all\) \|\| commissionedNames/);
   });
 
-  it('reports the restore in the generation log', () => {
+  it('reports both verdicts in the generation log', () => {
     expect(BEATS_SRC).toMatch(/gl\.warn\('beats_replan_cast_lost'/);
+    expect(BEATS_SRC).toMatch(/gl\.warn\('beats_replan_change_refused'/);
   });
 
-  it('tells the planner the same rule the guard enforces', () => {
-    expect(BUILDERS_SRC).toMatch(/Dropping a character is not a fix either/);
-    expect(BUILDERS_SRC).toMatch(/every name a page above puts in frame is in frame on that page in the division you return/);
+  it('feeds the review the check\'s own OBSTACLES evidence and the cast ceiling', () => {
+    expect(BEATS_SRC).toMatch(/obstacles: pendingCheck\.obstacles/);
+    expect(BEATS_SRC).toMatch(/parsePlanCheckObstacles\(res\.text \|\| ''\)/);
+    expect(BEATS_SRC).toMatch(/maxCast,/);
+  });
+
+  it('tells the planner the same rule the review enforces — both directions', () => {
+    // The one-directional rule this replaced (owner, 2026-09-18: "we can not
+    // say delete only or add only") must not come back in any form.
+    expect(BUILDERS_SRC).not.toMatch(/Dropping a character is not a fix either/);
+    expect(BUILDERS_SRC).toMatch(/answered by adding or by removing, whichever that finding asks for/);
+    // The two figures a removal may not take are stated to the planner in the
+    // same words the review refuses on: the obstacle-holder and the span floor.
+    expect(BUILDERS_SRC).toMatch(/the character whose action a page\\?'s instant works against/);
+    expect(BUILDERS_SRC).toMatch(/fewer than two pages in the book/);
+    // And the declaration the whole design rests on.
+    expect(BUILDERS_SRC).toMatch(/A change you do not declare is undone/);
   });
 });
