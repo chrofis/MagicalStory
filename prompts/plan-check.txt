@@ -18,6 +18,8 @@ Before the checks, read each page's who column and say who is in frame. A PERSON
 
 Report every name the who column carries, on every page, under one of the two headings — a name you leave out is counted as absent.
 
+A who column also reaches characters without naming them — a count of them ("the three of them"), a word for the group ("the whole family"), a description standing in for one. Under COVERS write out the names that reference stands for, one by one. Unnamed figures — a crowd, onlookers, guards — cover nobody, and a column that names everyone it holds covers nobody.
+
 # YOUR TASK
 
 Answer only these eight:
@@ -39,7 +41,7 @@ Answer only these eight:
 
 The roster first, one line per page, every page present and in order:
 
-ROSTER <page>: people = <names, comma separated, or none>; things = <names, comma separated, or none>
+ROSTER <page>: people = <names, comma separated, or none>; things = <names, comma separated, or none>; covers = <names, comma separated, or none>
 
 Then the findings: numbered, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
 

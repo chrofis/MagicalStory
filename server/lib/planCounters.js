@@ -436,6 +436,55 @@ function namesIn(text, cast, aliases = {}) {
   });
 }
 
+/**
+ * The characters a page's who column reaches WITHOUT naming them.
+ *
+ * A plan line may carry the cast collectively — a count of them, a word for the
+ * group, a description standing in for one figure — and the counters matched
+ * literal names only, so such a page read as holding nobody. Measured on
+ * staging job_1789681157795_wkt20ckod: `NO_COMMISSIONED_ON_PAGE` (a must-fix
+ * code) named four pages, and two of the four were this — the whole
+ * commissioned cast, in frame, referred to as a group. The re-plan answered the
+ * other two by deleting the story's antagonist, which cost three CRITICAL image
+ * faults.
+ *
+ * Recognising that language in code is forbidden here (owner: the thing-marker
+ * grammar above, and the mirror-guard of 2026-08-09), so the plan check's model
+ * answers it: `covers` on the ROSTER line (prompts/plan-check.txt) names, one
+ * by one, who such a reference stands for.
+ *
+ * THE LIST IS RE-COUNTED, NEVER TRUSTED. A claim is only as good as the names
+ * it writes out: a covered name counts when it resolves — through the same
+ * `namesIn` the counters and the re-plan guard use, aliases included — to a
+ * character this book already has. A name nothing knows is dropped, and a
+ * `covers` that enumerates nobody ("the whole cast") credits nobody, so the
+ * finding stands. That is the arc's invented-figure rule applied one stage
+ * later (docs/decisions.md, 2026-09-09): an enumeration cannot be
+ * self-certified.
+ *
+ * `people` keeps its meaning — the names the column CARRIES — so the cast
+ * `resolveCast` derives, and every invented-figure count that rides on it, are
+ * untouched by this field. It adds per-page presence and nothing else, and a
+ * roster without it behaves exactly as before.
+ *
+ * @param {{covers?: string[]}} row the page's roster row
+ * @param {{all: string[], aliases: Object}} cast the resolved cast
+ * @returns {string[]} cast names the page holds without naming them
+ */
+function coveredNames(row, cast) {
+  const declared = (row && Array.isArray(row.covers)) ? row.covers : [];
+  const out = [];
+  for (const claim of declared) {
+    const hits = namesIn(claim, cast.all, cast.aliases);
+    if (hits.length === 0) {
+      console.debug(`[planCounters] roster covers "${claim}", which is nobody this book names — not counted`);
+      continue;
+    }
+    for (const n of hits) if (!out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
 /** Contiguous runs of 2+ page numbers in a sorted list. */
 function consecutiveRuns(sorted) {
   const runs = [];
@@ -464,10 +513,11 @@ function consecutiveRuns(sorted) {
  *   cast (collectPlaceNames: places, plus the calendar nouns of its language),
  *   whatever the plan grammar looks like
  * @param {number} [args.maxCharactersPerScene] the image model's ceiling for the one whole-cast page
- * @param {Map<number,{people:string[],things:string[]}>} [args.roster] the plan check's
- *   per-page roster (`parsePlanCheckRoster`). Every counter that needs to know who is on a
+ * @param {Map<number,{people:string[],things:string[],covers?:string[]}>} [args.roster] the plan
+ *   check's per-page roster (`parsePlanCheckRoster`). Every counter that needs to know who is on a
  *   page needs this; without it the counters do not run, because the only alternative was
- *   guessing the cast out of the prose in code, which is what they were doing wrong.
+ *   guessing the cast out of the prose in code, which is what they were doing wrong. `covers`
+ *   is the names a page reaches without naming them (`coveredNames`).
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
 function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null } = {}) {
@@ -490,7 +540,11 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
     const segs = planSegments(p.planLine);
     const complete = segs.length >= 4;
     const who = whoColumn(p.planLine);
-    const present = namesIn(who, cast.all, cast.aliases);
+    const named = namesIn(who, cast.all, cast.aliases);
+    // Named outright, plus the ones the column reaches without naming them
+    // (`coveredNames`). One list: who is in frame on this page.
+    const covered = coveredNames(roster.get(Number(p.pageNumber)), cast).filter(n => !named.includes(n));
+    const present = [...named, ...covered];
     return {
       pageNumber: p.pageNumber,
       planLine: String(p.planLine || ''),
@@ -499,6 +553,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       shot: segs.length >= 1 ? classifyShot(segs[0]) : 'other',
       who,
       present,
+      covered,
       commissionedPresent: present.filter(n => cast.commissioned.includes(n)),
       inventedPresent: present.filter(n => cast.invented.includes(n)),
       peopled: present.length > 0 || PERSON_WORDS.test(stripQuoted(who)),
@@ -621,6 +676,10 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   // picture (see NO_PEOPLELESS_PAGE), so it cannot owe the book a commissioned
   // character. Whether it is the RIGHT page to leave empty is
   // `PEOPLELESS_ON_INTERACTION_PAGE`'s question, not this one's.
+  // A page that carries the cast collectively is NOT one of these: `present`
+  // holds the names the roster says the column reaches (`coveredNames`), so the
+  // whole commissioned cast in frame under one phrase reads as present, not
+  // absent.
   const noCommissioned = rows.filter(r => r.peopled && r.commissionedPresent.length === 0).map(r => r.pageNumber);
   if (noCommissioned.length) {
     add('NO_COMMISSIONED_ON_PAGE', noCommissioned,
@@ -681,7 +740,9 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       shotTypesUsed: usedShots,
       soloPages,
       peoplelessPages: emptyPages,
-      castPerPage: rows.map(r => ({ pageNumber: r.pageNumber, names: r.present })),
+      // `covered` rides along only when the roster declared one, so a stored
+      // report says whether the check's model used the field at all.
+      castPerPage: rows.map(r => ({ pageNumber: r.pageNumber, names: r.present, ...(r.covered.length ? { covered: r.covered } : {}) })),
       inventedDominantPages: dominant,
       focalPages: focal,
       coveragePages: coverage,
@@ -791,6 +852,7 @@ module.exports = {
   resolveCast,
   canonicalName,
   namesIn,
+  coveredNames,
   stripQuoted,
   whoColumn,
   castLostByReplan,

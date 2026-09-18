@@ -7326,7 +7326,15 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counter
  * A page the model omits is absent from the map, and the caller decides what an
  * incomplete roster means — never a silent empty cast.
  *
- * @returns {Map<number, {people: string[], things: string[]}>}
+ * THIRD FIELD, `covers` (2026-09-18): the names a who column reaches without
+ * naming them — a count of the cast, a word for the group, a description
+ * standing in for one figure. `people` still means only what the column NAMES,
+ * so the cast the counters resolve is unchanged; `covers` is per-page presence
+ * and nothing else. It is OPTIONAL in the parse: a roster line without it reads
+ * exactly as it did before, and a `things` value carrying its own semicolon
+ * still lands whole in `things`.
+ *
+ * @returns {Map<number, {people: string[], things: string[], covers: string[]}>}
  */
 function parsePlanCheckRoster(raw) {
   const out = new Map();
@@ -7338,9 +7346,9 @@ function parsePlanCheckRoster(raw) {
     .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/(?:'s|’s|s'|s’)$/i, '').trim())
     .filter(n => n && !/^none$/i.test(n));
   for (const line of String(raw || '').split('\n')) {
-    const m = line.trim().match(/^ROSTER\s+(\d+)\s*:\s*people\s*=\s*([^;]*)(?:;\s*things\s*=\s*(.*))?$/i);
+    const m = line.trim().match(/^ROSTER\s+(\d+)\s*:\s*people\s*=\s*([^;]*)(?:;\s*things\s*=\s*(.*?))?(?:;\s*covers\s*=\s*(.*))?$/i);
     if (!m) continue;
-    out.set(parseInt(m[1], 10), { people: names(m[2]), things: names(m[3]) });
+    out.set(parseInt(m[1], 10), { people: names(m[2]), things: names(m[3]), covers: names(m[4]) });
   }
   return out;
 }
