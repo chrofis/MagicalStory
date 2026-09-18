@@ -15,6 +15,11 @@
  *      another scored equal and was rejected,
  *   3. the corrector was the model that had just failed the contract.
  *
+ * And one ruling on top of them (owner, 2026-09-18): a finding the corrected
+ * text reports and the prior text did not is REPORTED, never a refusal. Over
+ * the same 11 rounds that refusal fired 5 times and was wrong 5 times — see
+ * the "a newly reported finding does not refuse the correction" block.
+ *
  * Structure and behaviour, never prose: no assertion reads a finding's wording
  * or a prompt's phrasing. Offline and free — pure code, no model call, no
  * database.
@@ -52,22 +57,22 @@ const checksFor = (r: Round) => (text: string) => [
 ];
 
 describe('the verdict is introduced-vs-survived, never a count', () => {
-  it('refuses a correction that swaps one fault for another', () => {
+  it('reports the partition when a correction swaps one fault for another', () => {
     // The old rule was `after.length < before.length`. This pair is the case it
-    // cannot see: equal counts, a different fault.
+    // cannot see: equal counts, a different fault. The partition names both
+    // halves; what the verdict DOES with them is the next describe block.
     const before = [{ pageNumber: 4, type: 'cast_unlisted' }];
     const after = [{ pageNumber: 4, type: 'interaction_multiple_actions' }];
     const v = BC.judgeCorrection({ before, after, acceptance: 'strict' });
-    expect(v.accepted).toBe(false);
     expect(v.introduced.map((f: any) => f.type)).toEqual(['interaction_multiple_actions']);
     expect(v.resolved.map((f: any) => f.type)).toEqual(['cast_unlisted']);
   });
 
-  it('refuses a correction that resolves one fault and adds two, even though the count is unchanged for one of them', () => {
+  it('separates survived from newly reported when one of each is present', () => {
     const before = [{ pageNumber: 2, type: 'a' }, { pageNumber: 2, type: 'b' }];
     const after = [{ pageNumber: 2, type: 'b' }, { pageNumber: 2, type: 'c' }];
     const v = BC.judgeCorrection({ before, after, acceptance: 'strict' });
-    expect(v.accepted).toBe(false);
+    expect(v.resolved.map((f: any) => f.type)).toEqual(['a']);
     expect(v.survived.map((f: any) => f.type)).toEqual(['b']);
     expect(v.introduced.map((f: any) => f.type)).toEqual(['c']);
   });
@@ -86,14 +91,27 @@ describe('the verdict is introduced-vs-survived, never a count', () => {
     expect(BC.judgeCorrection({ before, after: before, acceptance: 'strict' }).accepted).toBe(false);
   });
 
-  it('keys a finding by page and type, so the same type on another page is an introduction', () => {
+  it('refuses a correction that resolves nothing even when it reports something new', () => {
+    // The surviving refusal branch. `resolves nothing` is a different ruling
+    // from the deleted `introduces` one and is not touched by it: no gain was
+    // shown, so the text that was reviewed stands.
+    const v = BC.judgeCorrection({
+      before: [{ pageNumber: 9, type: 'a' }],
+      after: [{ pageNumber: 9, type: 'a' }, { pageNumber: 9, type: 'b' }],
+      acceptance: 'strict',
+    });
+    expect(v.accepted).toBe(false);
+    expect(v.reason).toContain('resolves nothing');
+  });
+
+  it('keys a finding by page and type, so the same type on another page is a different finding', () => {
     const v = BC.judgeCorrection({
       before: [{ pageNumber: 3, type: 'a' }],
       after: [{ pageNumber: 4, type: 'a' }],
       acceptance: 'strict',
     });
-    expect(v.accepted).toBe(false);
-    expect(v.introduced).toHaveLength(1);
+    expect(v.resolved.map((f: any) => f.pageNumber)).toEqual([3]);
+    expect(v.introduced.map((f: any) => f.pageNumber)).toEqual([4]);
   });
 
   it('advisory takes the correction whatever it did, and still reports the partition', () => {
@@ -111,6 +129,90 @@ describe('the verdict is introduced-vs-survived, never a count', () => {
 
   it('rejects an unknown acceptance mode rather than defaulting to one', () => {
     expect(() => BC.judgeCorrection({ before: [], after: [], acceptance: 'lenient' })).toThrow();
+  });
+});
+
+/**
+ * A NEWLY REPORTED FINDING IS NOT GROUNDS TO REFUSE (owner, 2026-09-18).
+ *
+ * `strict` used to refuse any correction whose after-list carried a (page,
+ * type) the before-list did not. Over these same 11 stored rounds that branch
+ * fired 5 times and was wrong on 5 of 5: the corrector had resolved EVERY
+ * finding it was sent, and the "introduced" fault was already stated in the
+ * page's own plan line, which predates both the rewrite and the correction.
+ *
+ * The mechanism is the checks' own inputs, and it is pinned below on the real
+ * fixture: `interaction_multiple_actions` counts `interactions[].action` and
+ * `interaction_object_shared_hands` counts `interactions[].hands`, and all 11
+ * rewrites return their rows with neither. Both checks are therefore
+ * structurally OFF before the correction — silent, not passing — and the
+ * corrector restoring the field (which is exactly what `brief_field_dropped`
+ * asked of it) wakes them on a fault that was always there.
+ */
+describe('a newly reported finding does not refuse the correction', () => {
+  it('both interaction checks are silent on every stored rewrite, because the rows state neither field', () => {
+    for (const r of ROUNDS) {
+      const meta = extractSceneMetadata(r.rewriteBrief);
+      const rows = ((meta?.fullData?.interactions ?? meta?.interactions ?? []) as any[])
+        .filter((x: any) => x && typeof x === 'object');
+      expect(rows.length, label(r)).toBeGreaterThan(0);
+      expect(rows.some((x: any) => String(x.action || '').trim()), `${label(r)} states an action`).toBe(false);
+      expect(rows.some((x: any) => x.hands === true), `${label(r)} states hands`).toBe(false);
+      // …and the carried-field check is what asks for the field back, on every round.
+      const dropped = IB.checkCarriedFields({
+        parentMetadata: extractSceneMetadata(r.parentBrief),
+        rewriteMetadata: meta,
+      });
+      expect(dropped.map((f: any) => f.type), label(r)).toEqual(['brief_field_dropped']);
+      expect(dropped[0].fields, label(r)).toContain('interactions[].action');
+    }
+  });
+
+  /**
+   * The five rounds the deleted branch refused, as re-measured offline at
+   * dba954ee6 over the 2026-09-17 live replay's stored finding lists. One page
+   * per round; `after` is what the production check set reports against the
+   * corrector's answer. Every one of them resolves its whole before-list.
+   */
+  const MEASURED = [
+    { round: 'rts4wqupm p6', page: 6, before: ['brief_field_dropped', 'object_dropped_from_declared_set'], after: ['interaction_object_shared_hands'] },
+    { round: 'rts4wqupm p10', page: 10, before: ['brief_field_dropped'], after: ['interaction_multiple_actions'] },
+    { round: 'rts4wqupm p16', page: 16, before: ['brief_field_dropped', 'object_dropped_from_declared_set'], after: ['interaction_multiple_actions'] },
+    { round: 'kxqshifx p2', page: 2, before: ['brief_field_dropped'], after: ['interaction_multiple_actions'] },
+    { round: 'kxqshifx p10', page: 10, before: ['brief_field_dropped', 'character_outside_declared_set'], after: ['interaction_multiple_actions'] },
+  ];
+
+  it.each(MEASURED)('$round: a correction resolving everything it was sent is taken, and names what it now reports', (m) => {
+    const mk = (types: string[]) => types.map(t => ({ pageNumber: m.page, type: t }));
+    const v = BC.judgeCorrection({ before: mk(m.before), after: mk(m.after), acceptance: 'strict' });
+    expect(v.accepted).toBe(true);
+    expect(v.resolved.map((f: any) => f.type)).toEqual(m.before);
+    expect(v.survived).toEqual([]);
+    // The diagnostic is not destroyed with the refusal: the partition still
+    // carries it and the verdict still names it.
+    expect(v.introduced.map((f: any) => f.type)).toEqual(m.after);
+    for (const t of m.after) expect(v.reason).toContain(t);
+  });
+
+  it('the deleted branch cannot come back by accident', () => {
+    const src = read('server/lib/briefCorrection.js');
+    expect(src).not.toContain('refused: introduces');
+    // …while the branch the owner did NOT rule on is still there.
+    expect(src).toContain("reason: 'refused: resolves nothing'");
+  });
+
+  it('the authored path still gets its introduced list, which is what it logs', () => {
+    // beatsPipeline destructures { introduced, survived } and raises
+    // `beats_brief_introduced` from it. Deleting the refusal must not delete
+    // the field.
+    const v = BC.judgeCorrection({
+      before: [{ pageNumber: 1, type: 'a' }],
+      after: [{ pageNumber: 1, type: 'b' }],
+      acceptance: 'advisory',
+    });
+    expect(v).toHaveProperty('introduced');
+    expect(v).toHaveProperty('survived');
+    expect(read('server/lib/beatsPipeline.js')).toContain('const { introduced, survived } = judgeCorrection(');
   });
 });
 
@@ -157,7 +259,7 @@ describe('correctFindings over the real stored rounds', () => {
     expect(faulted.length).toBeGreaterThan(0);
   });
 
-  it('hands the corrector a payload carrying the rewrite, and keeps the rewrite when the correction swaps a fault', async () => {
+  it('hands the corrector a payload carrying the rewrite, and takes a correction that resolves everything it was sent', async () => {
     const r = faulted[0];
     const before = checksFor(r)(r.rewriteBrief);
     let seen = '';
@@ -169,13 +271,18 @@ describe('correctFindings over the real stored rounds', () => {
         context: 'RULES', priorText: r.rewriteBrief, findingsText: IB.describeBriefFindings(before), instruction: 'Return it again.',
       }),
       invoke: async (payload: string) => { seen = payload; return { text: 'CORRECTED', usable: true }; },
-      // Resolves everything it was sent and returns one fault of another type:
-      // the same COUNT is possible, and the old rule would have taken it.
+      // Resolves everything it was sent and comes back carrying a fault of
+      // another type. That is the measured shape of all five 2026-09-18
+      // refusals, and it is taken.
       recheck: () => [{ pageNumber: r.pageNumber, type: 'zzz_other_fault' }],
     });
     expect(seen.includes(r.rewriteBrief.trim())).toBe(true);
-    expect(out.accepted).toBe(false);
-    expect(out.text).toBe(r.rewriteBrief);
+    expect(out.accepted).toBe(true);
+    expect(out.text).toBe('CORRECTED');
+    expect(out.resolved.length).toBe(before.length);
+    expect(out.introduced.map((f: any) => f.type)).toEqual(['zzz_other_fault']);
+    // The information is not dropped with the refusal — the verdict names it.
+    expect(out.reason).toContain('zzz_other_fault');
   });
 
   it('takes the correction when it resolves without introducing, on every faulted round', async () => {

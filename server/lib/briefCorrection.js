@@ -23,8 +23,10 @@
  *     scores a correction that resolves one fault and creates another as EQUAL,
  *     and rejects it — while never asking WHICH faults moved. `judgeCorrection`
  *     partitions by (page, type) the way the authored path's post-review
- *     re-check always has, and takes a correction only when it resolves at
- *     least one finding and introduces none.
+ *     re-check always has, and takes a correction that resolves at least one
+ *     finding. What the corrected text newly reports is named in the verdict
+ *     and handed to the caller — it is reported, never a refusal; the
+ *     measurement that settled that is on `judgeCorrection` below.
  *  3. THE MODEL IS THE PIPELINE'S. The iterate re-ask reused the same
  *     `sceneIteration` model that had just failed the contract.
  *     `MODEL_DEFAULTS.briefCorrectionModel` is the one name both paths read.
@@ -53,6 +55,9 @@ function findingKey(f) {
   return `${page}|${f.type}`;
 }
 
+/** One finding, named for a log line or a verdict. Page then type, no prose. */
+const findingName = (f) => `${f && f.pageNumber ? `p${f.pageNumber} ` : ''}${f && f.type}`;
+
 /**
  * Which findings did the correction RESOLVE, which SURVIVED it, and which did
  * it INTRODUCE? The authored path has partitioned exactly this way since its
@@ -71,29 +76,52 @@ function partitionFindings(before = [], after = []) {
 
 /**
  * ACCEPTANCE MODES.
- *  - `strict`: take the correction only when it resolves at least one finding
- *    and introduces none. A correction that swaps one fault for another is
- *    refused, and the reason names both halves.
+ *  - `strict`: take the correction when it resolves at least one finding. One
+ *    that resolves nothing is refused — a correction nobody can show a gain
+ *    from is a re-roll, and the prior text is the one that was reviewed.
  *  - `advisory`: the correction is taken whatever it did, and the partition is
  *    reported. The authored path's ruling (owner, 2026-08-11), kept because a
  *    reviewer that authored both halves may not be second-guessed in code.
+ *
+ * A NEWLY REPORTED FINDING IS NOT GROUNDS TO REFUSE (owner, 2026-09-18).
+ * `strict` also refused any correction whose after-list carried a (page, type)
+ * the before-list did not. Measured over the 11 stored iterate rounds of
+ * staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx, that
+ * branch fired 5 times and was WRONG on 5 of 5:
+ *
+ *  - On every one the corrector had resolved EVERY finding it was sent, and the
+ *    "introduced" fault was already stated in the page's own plan line, which
+ *    predates both the rewrite and the correction.
+ *  - The mechanism is the checks' own inputs. `interaction_multiple_actions` is
+ *    counted from `interactions[].action` and `interaction_object_shared_hands`
+ *    from `interactions[].hands` (sceneBriefCheck.js); all 11 rewrites returned
+ *    their rows with NEITHER field on any row, so both checks were structurally
+ *    OFF — silent, not passing. The corrector restores the fields, which is
+ *    exactly what the `brief_field_dropped` finding asked it to do, and the
+ *    checks wake up and report a fault that was always there. Refusing on that
+ *    punishes the correction for making the page legible.
+ *  - Refusing is not the conservative side. `iterateSceneMetadata` (images.js)
+ *    restores seven parent fields onto a rewrite and deliberately NOT
+ *    `action` / `depth` / `looksAt`, so a refused page ships an interaction
+ *    table stating that nobody is doing anything into the builders that read
+ *    those fields. It trades a reported fault for a silent one.
+ *  - And the test was blind to what it existed to catch: real vandalism — a
+ *    dropped character, a changed location, a deleted prop — produces FEWER
+ *    findings, which a type-set comparison reads as success.
+ *
+ * The partition is unchanged and `introduced` is still returned: the authored
+ * path reports it as `beats_brief_introduced`, and the strict path names it in
+ * the verdict and warns on it, because one genuinely new fault — a second
+ * action the plan line does NOT carry — is the evidence that would reopen this.
  */
 const ACCEPTANCE = new Set(['strict', 'advisory']);
 
 function judgeCorrection({ before = [], after = [], acceptance = 'strict' } = {}) {
   if (!ACCEPTANCE.has(acceptance)) throw new Error(`briefCorrection: unknown acceptance "${acceptance}"`);
   const parts = partitionFindings(before, after);
-  const name = (f) => `${f.pageNumber ? `p${f.pageNumber} ` : ''}${f.type}`;
+  const name = findingName;
   if (acceptance === 'advisory') {
     return { ...parts, accepted: true, reason: 'advisory: the correction stands and its faults are reported' };
-  }
-  if (parts.introduced.length > 0) {
-    return {
-      ...parts,
-      accepted: false,
-      reason: `refused: introduces ${parts.introduced.map(name).join(', ')}`
-        + (parts.resolved.length > 0 ? ` while resolving ${parts.resolved.map(name).join(', ')}` : ''),
-    };
   }
   if (parts.resolved.length === 0) {
     return { ...parts, accepted: false, reason: 'refused: resolves nothing' };
@@ -102,7 +130,8 @@ function judgeCorrection({ before = [], after = [], acceptance = 'strict' } = {}
     ...parts,
     accepted: true,
     reason: `taken: resolves ${parts.resolved.map(name).join(', ')}`
-      + (parts.survived.length > 0 ? `, ${parts.survived.map(name).join(', ')} survive` : ''),
+      + (parts.survived.length > 0 ? `, ${parts.survived.map(name).join(', ')} survive` : '')
+      + (parts.introduced.length > 0 ? `, now reports ${parts.introduced.map(name).join(', ')}` : ''),
   };
 }
 
@@ -177,6 +206,18 @@ async function correctFindings({
   log[verdict.accepted ? 'info' : 'warn'](
     `${verdict.accepted ? '🔄' : '⚠️'} [BRIEF-FIX] ${label}: ${verdict.reason}`,
   );
+  // A TAKEN correction that newly reports a fault gets its own WARN line, so
+  // the one case that would reopen the 2026-09-18 ruling is greppable rather
+  // than buried inside an info-level reason. On the 11 stored rounds every
+  // such fault was in the page's own plan line and was merely unmasked by the
+  // field the correction restored; a fault the plan line does NOT carry would
+  // mean the correction instruction is producing defects.
+  if (verdict.accepted && verdict.introduced.length > 0) {
+    log.warn(
+      `⚠️ [BRIEF-FIX] ${label}: the corrected text newly reports ${verdict.introduced.map(findingName).join(', ')}`
+      + ' — taken anyway; check the plan line before reading it as newly authored',
+    );
+  }
   return { ...verdict, text: verdict.accepted ? out.text : priorText, before, after, usage };
 }
 
