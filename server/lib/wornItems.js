@@ -570,6 +570,14 @@ function buildWornStateBlock(resolved) {
   return `\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n${lines.join('\n')}\n`;
 }
 
+/** Every garment noun in the closed vocabulary, across all slots. */
+const ALL_GARMENT_NOUNS = [...new Set(Object.values(SLOT_NOUNS).flat())];
+
+const ANY_GARMENT_RE = new RegExp(`\\b(?:${ALL_GARMENT_NOUNS.join('|')})\\b`, 'i');
+
+/** Does this text name a garment at all, through the closed vocabulary? */
+const namesAGarment = (text) => ANY_GARMENT_RE.test(String(text || ''));
+
 /**
  * Split an outfit description into top-level clauses.
  *
@@ -580,16 +588,79 @@ function buildWornStateBlock(resolved) {
  * six-garment outfit as ONE clause, so Route 2 bailed out with
  * `single-clause-outfit` and nothing was ever stripped from a semicolon
  * contract — the shape the current writer emits for every costumed character.
+ *
+ * A COMMA ONLY SEPARATES TWO GARMENTS (2026-09-18). Treating every comma as a
+ * clause boundary cut INSIDE a clause, and the caller then deleted an orphan
+ * fragment as if it were a garment. Measured on staging
+ * job_1789506283204_3kxqshifx (Levin, pages 8/9/11/13/15/17/18): the contract
+ * opens "a solid red, visibly hand-knitted wool cap with a small rolled-up brim
+ * around the bottom edge, shaped slightly oversized and wide;" — ONE hat, with
+ * its colour in front of it and its fit behind it. Splitting on the commas made
+ * three clauses of it, only the middle one carried a headwear noun, and taking
+ * the cap off left "A solid red; shaped slightly oversized and wide; …" standing
+ * in the outfit as two free-floating garments. Same shape on
+ * job_1789584708605_rts4wqupm, where the comma inside "red fleece fabric
+ * garment with a full front zipper, ribbed cuffs and hem — worn over a white
+ * long-sleeve shirt" separated the fleece from its own layering phrase.
+ *
+ * So the delimiters are ranked, and the rank is structural, not statistical:
+ *   - a SEMICOLON is always a top-level boundary — over 833 stored staging and
+ *     prod outfit contracts it is never used inside a garment description;
+ *   - a COMMA is a boundary only between two texts that each NAME a garment,
+ *     through the same closed SLOT_NOUNS vocabulary every other decision in
+ *     this module uses. A fragment that names no garment is not a clause: it is
+ *     a colour, a fit or a trim belonging to the garment beside it, and it is
+ *     merged back into it (into the clause before it, or — when it opens the
+ *     contract — into the one after).
+ *
+ * The bias is deliberate. Over-splitting DELETES a garment; under-splitting only
+ * makes `removeWornItemFromOutfit` refuse the strip (the merged clause names a
+ * second garment with no layering connective → `slot-clause-carries-another-
+ * garment`), and the explicit "is NOT wearing" prompt line still carries the
+ * instruction. Nothing is inferred from prose: the only question asked of a
+ * fragment is whether the closed vocabulary appears in it.
+ *
+ * Clause text is returned verbatim from the source, separators and all, so a
+ * caller that drops one clause and rejoins the rest changes nothing else.
  */
 function splitClauses(description) {
-  return String(description || '')
-    .split(/[;,](?![^()]*\))/)
-    .map(s => s.trim())
-    .filter(Boolean);
-}
+  const raw = String(description || '');
+  if (!raw.trim()) return [];
 
-/** Every garment noun in the closed vocabulary, across all slots. */
-const ALL_GARMENT_NOUNS = [...new Set(Object.values(SLOT_NOUNS).flat())];
+  // Candidate boundaries: ';' or ',' at parenthesis depth 0.
+  const segments = [];
+  let depth = 0;
+  let start = 0;
+  let sepBefore = null;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    else if (depth === 0 && (ch === ';' || ch === ',')) {
+      segments.push({ text: raw.slice(start, i), sepBefore });
+      sepBefore = ch;
+      start = i + 1;
+    }
+  }
+  segments.push({ text: raw.slice(start), sepBefore });
+
+  const clauses = [];
+  let current = null;
+  for (const seg of segments) {
+    if (!seg.text.trim()) continue;
+    const garment = namesAGarment(seg.text);
+    if (current === null) { current = { text: seg.text, garment }; continue; }
+    if (seg.sepBefore === ';' || (current.garment && garment)) {
+      clauses.push(current);
+      current = { text: seg.text, garment };
+    } else {
+      current.text += seg.sepBefore + seg.text;
+      current.garment = current.garment || garment;
+    }
+  }
+  if (current) clauses.push(current);
+  return clauses.map(c => c.text.trim()).filter(Boolean);
+}
 
 /** The layering connectives an outfit sentence uses to stack two garments. */
 const LAYER_SPLIT_RE = /\s*\b(?:worn\s+(?:over|under|beneath|underneath)|layered\s+over|on\s+top\s+of|over|under|beneath|underneath)\b\s*/i;
@@ -817,9 +888,42 @@ function applyWornItemsToOutfit(description, resolved, characterName) {
     const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
     const hits = clauses.filter(c => nounRe.test(c));
     if (hits.length !== 1) continue; // no clause, or an ambiguous slot — leave it
-    // Already the same garment? Then there is no disagreement to remove.
+    // NO EVIDENCE OF DISAGREEMENT, NO SWAP (2026-09-18). This whole branch
+    // exists for one premise: the contract's clause for this slot names a
+    // DIFFERENT garment from the one the page declares worn. The only test the
+    // module has for "different" is the closed SLOT_NOUNS vocabulary of the
+    // slot — and when the declared item's own NAME carries none of those nouns
+    // the test proves nothing either way. It used to fall through anyway, and
+    // treated an unprovable premise as a proven one.
+    //
+    // Measured on staging job_1789584708605_rts4wqupm (Levin, pages 1/4/6/7/8/
+    // 9/10/11/12/13/14/16): the writer linked ART004 "fleece jacket" as
+    // `Levin.top`, so the slot is `top` while the item is a jacket — and no
+    // `top` noun appears in "fleece jacket". Levin's contract opens with that
+    // very jacket ("red fleece fabric garment with a full front zipper … worn
+    // over a white long-sleeve shirt"), i.e. there was no disagreement at all;
+    // the swap fired regardless, deleted the clause holding the white
+    // long-sleeve shirt and appended a second copy of the jacket.
+    //
+    // A skipped swap is not a silent no-op: it is recorded with its reason, the
+    // WORN ITEMS block still tells the model in words that the item is worn,
+    // and a redundant mention costs nothing while a wrong deletion costs a
+    // garment — the same bound the strip has always had.
     const mineNouns = garmentNounsIn(r.name, nouns);
-    if (mineNouns.length > 0 && mineNouns.every(n => new RegExp(`\\b${n}\\b`, 'i').test(hits[0]))) continue;
+    if (mineNouns.length === 0) {
+      swaps.push({ id: r.id, slot: r.slot, applied: false, reason: 'item-name-carries-no-slot-noun' });
+      continue;
+    }
+    // Already the same garment? Then there is no disagreement to remove.
+    if (mineNouns.every(n => new RegExp(`\\b${n}\\b`, 'i').test(hits[0]))) continue;
+    // `itemName` is null ON PURPOSE, and it is not the declared item's name.
+    // What comes OUT here is the contract's INCUMBENT garment for the slot —
+    // the tricorn that yields to the cap — and its name is nowhere on record.
+    // Null is what makes `clauseRemainderWithoutItem` identify the item to
+    // remove from the clause itself (`garmentNounsIn(clause, slotNouns)`);
+    // passing `r.name` would narrow to the garment being put IN, which the
+    // guard above has just established the clause does NOT name, and the
+    // removal would target the wrong half of a layered clause.
     const res = removeWornItemFromOutfit(text, r.slot, null);
     if (!res.removed) {
       swaps.push({ id: r.id, slot: r.slot, applied: false, reason: res.reason });
