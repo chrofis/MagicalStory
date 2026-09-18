@@ -123,6 +123,25 @@ describe('parsePlanChanges — the declaration is read as declared fields', () =
     expect(odd.changes[0].kind).toBe('other');
   });
 
+  it('does not leak into the page plan — a change line reads exactly like one', () => {
+    // "Page 16: cast out Tobias — ..." matches parsePagePlan's line shape, so a
+    // page-plan parse that ran past the ---CHANGES--- marker would enter the
+    // declaration as page 16's plan line and ship it as the division.
+    const raw = [
+      '---PAGE PLAN---',
+      'Page 16: medium — Levin and Julian — Levin lifts the branch — the branch is in hand',
+      '',
+      '---CHANGES---',
+      'Page 16: cast out the antagonist — PLAN[CAST_OVER_CEILING] — four names in one frame',
+      'Changes: 1',
+    ].join('\n');
+    const plan = PB.parsePlanResponse(raw, [16]);
+    expect(plan.pages).toHaveLength(1);
+    expect(plan.pages[0].planLine).toBe('medium — Levin and Julian — Levin lifts the branch — the branch is in hand');
+    // …and the change block is still read in full from the same response.
+    expect(parsePlanChanges(raw).changes).toHaveLength(1);
+  });
+
   it('a response with no block at all reports present: false', () => {
     const none = parsePlanChanges('---PAGE PLAN---\nPage 1: wide — a door — it closes — the door is shut');
     expect(none.present).toBe(false);
