@@ -26,6 +26,7 @@ ORIGINAL_PROMPT and DECLARED INTERACTIONS are the only inputs that say who does 
 - Write that a character "is declared to" hold, carry, wear or touch something only when ORIGINAL_PROMPT or DECLARED INTERACTIONS names that character as the one doing it. Otherwise the declaration does not exist and there is no finding.
 - Dialogue is not staging. A line a character speaks — offering to carry a thing, promising a task, claiming a job — is an intention, not what the frame shows. The speaker is routinely not the figure drawn doing it.
 - Narration of a moment before or after this one, or a character named only in STORY_TEXT, is not this frame.
+- {TEXT_NOT_A_CHECKLIST}
 
 STORY_TEXT has one use: corroborating an action ORIGINAL_PROMPT already names, in `main_action_check.story_text_action`. It never originates an action and is never the sole basis of a `fixable_issues[]` entry.
 

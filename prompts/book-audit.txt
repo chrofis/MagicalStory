@@ -4,6 +4,8 @@ This batch covers page(s) {PAGE_LIST}.
 
 The words and the picture tell the story together. Some pages carry the story mostly in the picture and use few words; others carry it mostly in the words. That balance is never a fault. Never report a page for having little text, sparse action, or a quiet moment.
 
+{TEXT_NOT_A_CHECKLIST}
+
 For every page, answer six questions:
 1. TOGETHER: taken together, do this page's words and picture tell one moment of the story a listener can follow? A picture may carry what the words do not say, and words may carry what the picture does not show.
 2. CONTRADICTION: does the picture show something the words make impossible on this page — a character seated where the text has them standing, an object present that the text says is gone, an empty space where the words push through a crowd, or figures side by side facing the viewer where the words have them facing each other?

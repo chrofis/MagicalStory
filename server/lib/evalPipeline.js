@@ -873,7 +873,14 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       EXPECTED_CAST: expectedCast || '',
       INTERACTIONS_BLOCK: interactionsBlock,
       STORY_TEXT: (storyText || '(not provided)').substring(0, 2000),
-      LANDMARK_CONTEXT: buildLandmarkContextBlock(landmarkProtection) || '(none)'
+      LANDMARK_CONTEXT: buildLandmarkContextBlock(landmarkProtection) || '(none)',
+      // ONE rule for every template that authors or judges a page against its
+      // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). This
+      // judge's STORY_TEXT DECLARES NOTHING block already covered a character
+      // named only in the text and a line of dialogue; it never covered the
+      // owner's other half — a text naming three actions where the frame
+      // stages one.
+      TEXT_NOT_A_CHECKLIST: require('./promptBuilders').TEXT_NOT_A_CHECKLIST_RULE,
     });
 
     const { callTextModel } = require('./textModels');

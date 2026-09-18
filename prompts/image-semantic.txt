@@ -12,7 +12,7 @@ Check whether this illustration shows the right STORY BEAT. You are not grading 
 
 **⚠️ CHARACTER AUTHORITY RULE — CRITICAL, READ ONCE, APPLY THROUGHOUT:**
 
-The SCENE_HINT and IMAGE_PROMPT are the ONLY source of truth for which characters belong in the illustration. The STORY_TEXT is background narrative that frequently mentions characters who appear on OTHER pages, or who are referenced in dialogue without being physically present in this scene. A character mentioned in STORY_TEXT but absent from SCENE_HINT and IMAGE_PROMPT is NOT missing and MUST NOT be penalized — under any check, in any step, in any scoring decision below. This rule overrides every other rule in this prompt that could be read as conflicting.
+The SCENE_HINT and IMAGE_PROMPT are the ONLY source of truth for which characters belong in the illustration. The STORY_TEXT is background narrative that frequently mentions characters who appear on OTHER pages, or who are referenced in dialogue without being physically present in this scene. {TEXT_NOT_A_CHECKLIST} This holds under any check, in any step, in any scoring decision below, and overrides every other rule in this prompt that could be read as conflicting.
 
 ---
 

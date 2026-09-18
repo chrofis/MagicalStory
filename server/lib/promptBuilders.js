@@ -2544,6 +2544,10 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
+    // PERMISSION: the page text may name more than the frame stages.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -2822,6 +2826,10 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
+    // PERMISSION: the page text may name more than the frame stages.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -3248,6 +3256,10 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. An iterate rewrites the WHOLE
+    // brief, so the permission to stage one moment has to travel with it.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
       // The rewrite restates every character's appearance from CHARACTER
       // DETAILS, which is where a declared colour drifts — see
       // DECLARED_TRAIT_VERBATIM_RULE. One constant, both iterate templates,
@@ -6907,6 +6919,45 @@ const ABSENT_THING_RULE = "\"no glow\", \"bare rail\", \"no other figures in the
 
 const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: setting, lighting, and the mood as it shows — in faces, posture, light or weather, never as a mood word. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect.";
 
+/**
+ * THE PAGE TEXT IS NOT A CHECKLIST FOR THE PICTURE (owner, 2026-09-18).
+ *
+ * Owner's words: "Not all characters mentioned in text must appear in the image.
+ * Add that rule everywhere! A text can be 3 actions the image must focus on one.
+ * You keep getting this wrong."
+ *
+ * Already settled — `docs/SETTLED.md`, "The page TEXT is not a checklist for the
+ * image — semantic eval judges image-vs-BRIEF, by design" (2026-09-13), and
+ * "the Art Director trims cast by design". This constant implements that
+ * verdict; it reverses nothing. `prompts/story-beats.txt` states the generator
+ * half of the same fact ("one action per page").
+ *
+ * TWO HALVES, and the second is the reason this is one string rather than a
+ * one-line prohibition. Per page, an omission is the Art Director working: the
+ * brief picks the instant and trims the cast to it. Across the book it is not:
+ * a character the story gives a moment of their own whose moment no plan line
+ * ever stages is a real defect — measured on staging
+ * job_1789681157795_wkt20ckod, where an invented antagonist fell out of the
+ * plan over three consecutive pages and three of the book's six CRITICAL faults
+ * followed. A rule carrying only the first half would have excused it. The
+ * second half therefore opens by carving itself out of the first ("Where the
+ * whole book is in view, one absence IS a fault"), so a judge cannot read the
+ * first and wave the second away, and it names the artefact that is at fault —
+ * the PLAN — so a per-page judge never charges it to a picture.
+ *
+ * ONE constant, nine templates. Hand-kept copies of a shared rule drifted four
+ * times in one week in this repo (`docs/decisions.md`, "fix the mirror class,
+ * not the instance"), and this rule already had three partial copies living on
+ * their own: image-semantic.txt's CHARACTER AUTHORITY paragraph (characters
+ * only, no actions), image-prompt-compliance.txt's STORY_TEXT DECLARES NOTHING
+ * block (characters and dialogue, no actions) and book-audit.txt's MAJOR weight
+ * clause. The set is registered as `text-not-a-checklist` in
+ * sibling-registry.json and pinned to the BUILT prompts in
+ * tests/unit/text-not-a-checklist-reach.test.ts — a placeholder nobody declares
+ * is stripped by fillTemplate silently.
+ */
+const TEXT_NOT_A_CHECKLIST_RULE = "A page's text may name several characters and several actions; its picture stages one moment — the one its brief names. A character or an action the text names and the frame does not show is not a fault: not at any severity, and not as support for another finding. Where the whole book is in view, one absence is a fault: a character the story gives a moment of their own — an obstacle they raise, a turn they cause — that no page's plan line stages. Charge that one to the plan, never to a picture.";
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -7882,6 +7933,12 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
     MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. This reviewer is the only stage
+    // holding the whole book's plan lines at once, so the second half — a
+    // character whose own moment no plan line stages — is nameable here and
+    // nowhere else upstream of the finished book.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
   });
 }
 
@@ -8608,6 +8665,11 @@ module.exports = {
   WORN_ON_OTHER_RULE,
   ABSENT_THING_RULE,
   SCENE_INTENT_FIELD_RULE,
+  // ONE rule for the nine templates that author or judge a page against its
+  // text — see TEXT_NOT_A_CHECKLIST_RULE. Exported so the four fill sites that
+  // live outside this file (prompts.js, evalPipeline.js, sceneValidator.js,
+  // bookAudit.js) read the same string, never a copy of it.
+  TEXT_NOT_A_CHECKLIST_RULE,
   ELEMENT_ENTRY_PAGE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,

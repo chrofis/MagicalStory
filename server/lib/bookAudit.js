@@ -201,6 +201,12 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   const { fillTemplate } = require('../services/prompts');
   const instructions = fillTemplate(template, {
     PAGE_LIST: chunk.map(p => p.pageNumber).join(', '),
+    // ONE rule for every template that authors or judges a page against its
+    // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). This audit
+    // is the ONE stage that compares a page's words against its picture, so it
+    // is the one that can commit the fault outright — and, reading the whole
+    // book in order, the one place the rule's second half can actually fire.
+    TEXT_NOT_A_CHECKLIST: require('./promptBuilders').TEXT_NOT_A_CHECKLIST_RULE,
   });
 
   // Instructions FIRST, then the book. The judge must know what it is looking
