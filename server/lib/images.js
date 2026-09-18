@@ -2716,11 +2716,33 @@ async function evaluateImageBatch(images, options = {}) {
       // point where both identities exist side by side; after it, `matches` and
       // every per-character finding carry the detector's names. Enrichment above
       // pairs on geometry, not names, so it is unaffected by the correction.
+      //
+      // AWAITED (2026-09-18). Reconciliation used to be a pure function of two
+      // stored lists. It now asks a THIRD witness on the pages where the two
+      // genuinely disagree AND the detector is about to overwrite the
+      // evaluator — one Set-of-Mark call from a later tier of the same chain,
+      // measured at 19 of 1,194 stored staging versions and 0 of 317 on
+      // production. That makes this a network call, so it is awaited here. It
+      // sits inside the per-page eval task (pLimit, one per page, default
+      // concurrency 100), so a contested page waits for its own witness and no
+      // other page waits for it.
       let identityAgreement = null;
       if (qualityResult && bboxDetection?.figures?.length) {
-        const { reconcileIdentity, describeIdentityAgreement } = require('./identityAgreement');
-        identityAgreement = reconcileIdentity(qualityResult, bboxDetection.figures, {
+        const { reconcileIdentityWithSecondWitness, describeIdentityAgreement } = require('./identityAgreement');
+        identityAgreement = await reconcileIdentityWithSecondWitness(qualityResult, bboxDetection.figures, {
           alsoRename: [enrichedFixTargets],
+          // Closure, not an import inside identityAgreement: that module is a
+          // leaf and stays one. Never called on an uncontested page — the
+          // reconciler decides whether the answer can change anything before it
+          // spends the call.
+          secondOpinion: () => require('./figureDetection').secondOpinionIdentity(
+            img.imageData,
+            bboxDetection.figures,
+            bboxDetection.expectedCharacters,
+            `PAGE ${img.pageNumber}: `,
+            // The tier that already answered is not a second witness.
+            { excludeModel: bboxDetection.gdinoDiag?.identity?.model || null },
+          ),
         });
         if (identityAgreement?.conflicts?.length) {
           log.warn(describeIdentityAgreement(identityAgreement, `PAGE ${img.pageNumber}: `));

@@ -257,12 +257,18 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
   // conflict that is not there — that artefact accounted for 2 of the conflicts
   // in the first measurement of this.
   const dets = (detFigures || [])
-    .filter(f => f && f.name && f.name !== 'UNKNOWN' && (detCentre(f.bodyBox) || detCentre(f.faceBox)))
-    .map(f => ({
+    .map((f, index) => ({ f, index }))
+    .filter(({ f }) => f && f.name && f.name !== 'UNKNOWN' && (detCentre(f.bodyBox) || detCentre(f.faceBox)))
+    .map(({ f, index }) => ({
       name: String(f.name),
       canon: canonicalName(f.name),
       body: detCentre(f.bodyBox),
       head: detCentre(f.faceBox) || detHead(f.bodyBox),
+      // Index into the CALLER's `detFigures`, kept so a conflict can name the
+      // figure it is about and not merely the two names claimed for it. A third
+      // witness asked about this page answers per figure; without this the vote
+      // would need a second pairing pass to find out which figure it meant.
+      index,
     }));
 
   if (evs.length === 0 || dets.length === 0) return null;
@@ -284,7 +290,7 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
   for (const { ev, det, d, on } of assignFigures(pairable, dets, maxCentreDistance)) {
     if (!det) { unpaired.push(ev.name); continue; }
     if (det.canon === ev.canon) agreed.push(ev.name);
-    else conflicts.push({ evaluator: ev.name, detector: det.name, centreDistance: Number(d.toFixed(3)), on });
+    else conflicts.push({ evaluator: ev.name, detector: det.name, centreDistance: Number(d.toFixed(3)), on, detIndex: det.index });
   }
 
   const compared = agreed.length + conflicts.length;
@@ -325,9 +331,11 @@ function describeIdentityAgreement(report, pageLabel = '') {
   const outcome = report.uncorrectable
     ? (report.uncorrectableReason === 'face-paired'
       ? 'paired on the face box only — measured, left as the evaluator wrote it'
-      : 'not a clean swap — left as the evaluator wrote it')
+      : report.uncorrectableReason === 'second-witness-veto'
+        ? `second witness (${report.secondWitness?.model || 'unknown'}) sided with the evaluator on ${report.secondWitness?.vetoed} of them — left as the evaluator wrote it`
+        : 'not a clean swap — left as the evaluator wrote it')
     : report.renamed
-      ? `detector wins, ${report.renamed} name(s) corrected`
+      ? `detector wins${report.secondWitness?.answered ? `, second witness (${report.secondWitness.model || 'unknown'}) agreed` : ''}, ${report.renamed} name(s) corrected`
       : 'measured only';
   return `⚠️ 🪪 [IDENTITY] ${pageLabel}evaluator and detector disagree on ${report.conflicts.length}/${report.compared}: ${pairs} — ${outcome}`;
 }
@@ -417,6 +425,32 @@ function renameInProse(text, map) {
 function reconcileIdentity(evalLike, detFigures, opts = {}) {
   const report = checkIdentityAgreement(evalLike?.matches, detFigures, opts);
   if (!report || report.conflicts.length === 0) return report;
+  return applyConflicts(evalLike, report, report.conflicts, opts);
+}
+
+/**
+ * Apply a set of conflicts to the page, or explain why it cannot be applied.
+ *
+ * Split out of `reconcileIdentity` so the second-witness sibling can hand it a
+ * SUBSET of the conflicts without duplicating a single one of the guards: the
+ * face-paired withdrawal, `buildRenameMap`'s duplicate refusal, and the
+ * simultaneous rewrite of matches, findings and prose are the same code on both
+ * paths, and stay that way.
+ *
+ * @param {Array} conflicts  the conflicts to act on — `report.conflicts`, or
+ *                           what survived a veto
+ * @param {number} [vetoed]  how many the second witness withheld (0 on the
+ *                           synchronous path), only used to say WHY nothing
+ *                           was applied
+ */
+function applyConflicts(evalLike, report, conflicts, opts = {}, vetoed = 0) {
+  // Every conflict withheld. Nothing to permute; say who withheld it.
+  if (conflicts.length === 0) {
+    report.uncorrectable = true;
+    report.uncorrectableReason = vetoed > 0 ? 'second-witness-veto' : 'no-conflicts';
+    report.renamed = 0;
+    return report;
+  }
 
   // THE WEAK SIGNAL MEASURES; IT DOES NOT REWRITE THE PAGE (2026-09-18 —
   // measured on the pixels). A conflict paired head-to-head is one where the
@@ -435,7 +469,7 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
   // to be the nearest figure by 0.026 against 0.151). It does not earn a
   // rewrite. Modern records are unaffected: 2,776 of 2,882 boxed staging
   // matches carry a body box, so this is a legacy guard, not a live one.
-  const weaklyPaired = report.conflicts.filter(c => c.on !== 'body');
+  const weaklyPaired = conflicts.filter(c => c.on !== 'body');
   if (weaklyPaired.length > 0) {
     report.uncorrectable = true;
     report.uncorrectableReason = 'face-paired';
@@ -443,10 +477,14 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
     return report;
   }
 
-  const map = buildRenameMap(report.conflicts, report.heldNames || []);
+  const map = buildRenameMap(conflicts, report.heldNames || []);
   if (!map) {
     report.uncorrectable = true;   // not a clean swap — flag it, touch nothing
-    report.uncorrectableReason = 'not-a-permutation';
+    // A partial veto is the usual way a permutation stops being one: withhold
+    // one leg of a swap and the other leg would write a name a match still
+    // holds. buildRenameMap refuses it — that refusal is bc3cbe062's guarantee
+    // and it covers the veto path for free — but the REASON is the veto.
+    report.uncorrectableReason = vetoed > 0 ? 'second-witness-veto' : 'not-a-permutation';
     report.renamed = 0;
     return report;
   }
@@ -477,6 +515,126 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
   return report;
 }
 
+/**
+ * A THIRD WITNESS BREAKS THE TIE — AND MAY ONLY EVER WITHHOLD A CORRECTION.
+ *
+ * What survives the one-to-one pairing is a genuine who-is-who disagreement on
+ * roughly one page in six, and on it `reconcileIdentity` lets the detector
+ * overwrite the evaluator unconditionally. Lab set 66 / experiment 1324 says
+ * that prior is right more often than not — detector 5, evaluator 1 on the ten
+ * contested pages it downloaded and judged by eye — but "more often than not"
+ * is not "always", and the one it gets wrong costs four correct labels
+ * (job_1789584708605_rts4wqupm p18, shipped at q=45, where the evaluator had
+ * all four boys right).
+ *
+ * So a third answer is asked for, and its only power is a VETO:
+ *
+ *   detector + witness   → rename, exactly as today
+ *   evaluator + witness  → WITHHOLD: the evaluator's labels stay
+ *   a third name, no answer, no witness at all → rename, exactly as today
+ *
+ * The outcome is therefore never MORE renames than the synchronous path, only
+ * the same or fewer. That asymmetry is deliberate: acting on a wrong identity
+ * deletes a character from the page and relabels every finding about them,
+ * while leaving a wrong label alone costs one page of already-wrong findings.
+ * The two errors are not the same size, so the witness is not given a
+ * symmetric vote.
+ *
+ * WHEN IT IS ASKED. Only where the answer can change what happens — a
+ * surviving conflict, body-paired, that `buildRenameMap` would actually apply.
+ * A clean page is never asked about; nor is a page whose conflict the pairing
+ * fix already dissolved; nor a face-paired or non-permutation page, where
+ * nothing is applied either way and the call would buy nothing. Measured over
+ * the stored corpus that is 19 of 1,194 staging versions (1.6%, 0.32 calls per
+ * story, worst single story 4) and 0 of 317 on production.
+ *
+ * WHAT IS NOT PROVEN, AND WHICH WAY IT LEANS. The witness answers the SAME
+ * question from the SAME badged image under the SAME prompt — which ranks
+ * clothing first and demotes position to a supporting hint. Where the pixels
+ * themselves carry a corrupted garment (a child painted in a second copy of
+ * another child's coat, which is exactly `wkt20ckod` p12), a second model
+ * reading clothing first may reproduce the detector's answer rather than break
+ * the tie. MODEL diversity is real here — every stored SoM answer on those 19
+ * pages came from `gemini-full`, so the witness is a different model that has
+ * never seen the page — but QUESTION diversity is not, and the question it is
+ * asked is the DETECTOR's question: badges plus identity prose. The evaluator
+ * arrived at its names by a different route entirely (matching faces against
+ * the reference photos), so this third reading is drawn from the detector's
+ * own distribution, not from neutral ground. Expect it to confirm more often
+ * than it contradicts, for reasons that are not evidence.
+ *
+ * That is survivable only because the vote is veto-only: a witness that merely
+ * echoes the detector changes nothing at all, which the replay confirms
+ * (1,194 / 1,194 staging versions byte-identical under a witness that always
+ * backs the detector). Whether it contradicts USEFULLY is unmeasured, and
+ * measuring it needs paid calls. The follow-up, if it does not: ask the second
+ * witness a differently FRAMED question — one that does not lead with the
+ * channel the page has corrupted. That is a prompt change, and prompt changes
+ * are the owner's call.
+ *
+ * @param {Object} evalLike   mutated in place, as reconcileIdentity
+ * @param {Array}  detFigures detector `figures[]`
+ * @param {Object} [opts]
+ *   secondOpinion  async () => ({ nameByFigure: Map<figureIndex, name> }) |
+ *                  Map | null. Injected, never required here: this module is a
+ *                  leaf and must stay one. `figureDetection.secondOpinionIdentity`
+ *                  is the production implementation.
+ *   …plus everything reconcileIdentity takes.
+ * @returns {Promise<Object|null>} the agreement report, with `secondWitness`
+ */
+async function reconcileIdentityWithSecondWitness(evalLike, detFigures, opts = {}) {
+  const report = checkIdentityAgreement(evalLike?.matches, detFigures, opts);
+  if (!report || report.conflicts.length === 0) return report;
+
+  // Would today's rule act at all? If not, a witness cannot change the outcome
+  // and is not worth a network call.
+  const wouldApply = report.conflicts.every(c => c.on === 'body')
+    && !!buildRenameMap(report.conflicts, report.heldNames || []);
+  if (!wouldApply || typeof opts.secondOpinion !== 'function') {
+    return applyConflicts(evalLike, report, report.conflicts, opts);
+  }
+
+  let witness = null;
+  let failure = null;
+  try {
+    witness = await opts.secondOpinion();
+  } catch (e) {
+    failure = `threw: ${e.message}`;
+  }
+  const nameByFigure = witness instanceof Map ? witness : (witness && witness.nameByFigure) || null;
+  if (!nameByFigure || typeof nameByFigure.get !== 'function') {
+    // NO ANSWER IS NOT A VETO. A failed or absent witness leaves the page
+    // exactly where the synchronous path leaves it — the detector's prior
+    // stands. Recorded so a run where every witness failed is visible as that,
+    // and not mistaken for a run where none was needed.
+    report.secondWitness = { asked: true, answered: false, reason: failure || 'no answer' };
+    return applyConflicts(evalLike, report, report.conflicts, opts);
+  }
+
+  // COMPARE: the witness's name string against both claims in the one space
+  // the pairing already decides agreement in.
+  const { canonicalName } = require('./castResolver');
+  const votes = [];
+  const survivors = [];
+  for (const c of report.conflicts) {
+    const raw = c.detIndex != null ? nameByFigure.get(c.detIndex) : undefined;
+    const said = raw ? canonicalName(raw) : null;
+    let verdict;
+    if (said && said === canonicalName(c.detector)) verdict = 'detector';
+    else if (said && said === canonicalName(c.evaluator)) verdict = 'evaluator';
+    else verdict = said ? 'third-name' : 'silent';
+    votes.push({ evaluator: c.evaluator, detector: c.detector, witness: raw || null, verdict });
+    if (verdict !== 'evaluator') survivors.push(c);
+  }
+  const vetoed = report.conflicts.length - survivors.length;
+  report.secondWitness = {
+    asked: true, answered: true,
+    model: (witness && witness.model) || null,
+    votes, vetoed,
+  };
+  return applyConflicts(evalLike, report, survivors, opts, vetoed);
+}
+
 /*
  * TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27) lived here as
  * charactersSeenByAnyWitness + dropContradictedAbsences: an after-the-fact
@@ -488,6 +646,7 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
 
 module.exports = {
   checkIdentityAgreement, describeIdentityAgreement, reconcileIdentity,
+  reconcileIdentityWithSecondWitness,
   // Exported for the unit tests: the assignment is the whole of the pairing
   // decision, and it is verified against exhaustive brute force.
   minCostAssignment, NAME_AGREEMENT_BONUS, HEAD_Y_FRACTION };
