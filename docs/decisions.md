@@ -21,6 +21,368 @@ superseded and link forward.
 
 ---
 
+## 2026-09-18 — A re-plan declares its structural changes, and they are reviewed in both directions
+
+**Context.** `97ccc4128` (its entry below, now superseded) answered the loss of an invented antagonist
+off two pages — staging `job_1789681157795_wkt20ckod`, "Das Ei im Lindenhof" — with a one-directional
+rule in `buildReplanSection`: *"Dropping a character is not a fix either: every name a page above puts
+in frame is in frame on that page in the division you return"*, enforced by `castLostByReplan()`, which
+mechanically restored any name a round removed. The owner rejected it as the permanent shape: **"We can
+not say delete only or add only. We must give a fair review and allow both fix types."** Three concrete
+defects follow from the one-directional form:
+
+1. **No route existed by which a page's cast could shrink.** `NO_COMMISSIONED_ON_PAGE` is answered by
+   adding, `CAST_OVER_CEILING` by writing a justification into the plan line, plan-check Q3 likewise.
+   An over-crowded page could only ever get more crowded.
+2. **The standing division was treated as always right** — and it is itself a model output, so a
+   mistake in round one could never be corrected in round two.
+3. It is the shape the codebase spent the same day removing elsewhere (`findBorrowedLabel` forming an
+   opinion only on too-few figures).
+
+The same block carried a **page-number contradiction** that had outlived an earlier fix. In consecutive
+sentences it said *"Every page number you return is already in the plan above"* and *"…or on its own
+page when it earns a picture of its own… Keep the page count by merging two pages…, or by dropping the
+weakest."* A planner obeying the second must violate the first — a new page has no number available — so
+the cut-one-add-one the block described was structurally impossible; and where the merge half did work,
+*"dropping the weakest"* was an **unreviewed deletion of a whole page**, with nothing recording which
+page went or why.
+
+**Decision.** Declare → review → apply, covering cast, actions and pages in one review.
+
+- **DECLARE.** A re-plan returns a `---CHANGES---` block: one line per structural change in a closed
+  vocabulary (`cast in|out <name>`, `action out <…>`, `action to page <M> <…>`, `material from page
+  <M>`, `new material <…>`), each naming the finding it answers (`PLAN[CODE]` / `CHECK[n]`) and why in
+  one clause, then a final `Changes: <n>` that re-counts the lines above it. One constant,
+  `REPLAN_CHANGES_FORMAT`, is both what the prompt asks for and what `parsePlanChanges()` reads.
+  **A change that is not declared is undone.**
+- **REVIEW.** `reviewPlanChanges()` judges a declared removal against four pieces of **declared**
+  evidence, never prose:
+  - *obstacle* — the plan check now emits an `OBSTACLES <page>: <name>` block (question 11's answer as
+    data, alongside the existing ROSTER). A `cast out` of the figure whose action that page's instant
+    works against is refused.
+  - *span* — a removal that leaves a figure on fewer than two pages while the standing division gave
+    them two or more is refused. Two pages is the floor `UNDER_COVERED_CHARACTER` already holds the
+    commissioned cast to.
+  - *direction* — `REPLAN_FINDING_DIRECTION` is a table over finding TAGS saying whether answering that
+    finding puts a name in frame or takes one out. A `cast out` answering a "more" finding is refused
+    **unless the standing page was already at the cast ceiling** (then taking a name out to make room
+    is exactly right); the mirror, a `cast in` answering a "fewer" finding, is refused too. Findings
+    either direction can answer (`NO_FOCAL_PAGE`, `CONSECUTIVE_SAME_SHOT_CAST`, Q2) are deliberately
+    absent from the table.
+  - *balance* — the book keeps its page count, so a merge frees exactly one number and that number is
+    declared as staging something new. Half a merge is refused.
+- **APPLY.** Code restores exactly the refused pages from the division that stands, and the finding
+  that named the page survives to the recheck. It never discards a round and never classifies: it acts
+  on a declared field or on arithmetic over who-columns.
+
+**The page-number rule is now stated once**, and it permits the split it describes: *"The book keeps its
+N pages, numbered 1 to N. No number is added and none is retired. A moment that earns a picture of its
+own takes an existing number: that page's material joins a neighbouring page, and the freed number
+stages the moment. Return both pages."* **"Dropping the weakest" is gone.** The re-plan merge scope
+widened to match — pages a finding named **plus** pages the change block declares — because restoring
+the neighbour is what made the split impossible in code as well as in prose.
+
+**`castLostByReplan()` was revised, not deleted.** It keeps its set arithmetic and its
+move-is-not-a-deletion logic and takes a fifth argument, the declared removals. It now answers a
+narrower question — *which removals did the round not declare?* — and those are restored, because an
+undeclared removal is unreviewable: the plan line is the brief's authority, so the Art Director loses
+the figure and the scene review strips them by the book (`[cast_not_in_plan]`). All 20 of its tests
+still pass; its fixtures declare nothing, which is exactly what a round from before this change looks
+like.
+
+**Why the review is not a must-fix.** `replanRank` still promotes only `REPLAN_MUST_FIX_CHECKS = {4, 8}`
+and `REPLAN_MUST_FIX_CODES`. A must-fix that over-fires is the precise cause of this defect:
+`NO_COMMISSIONED_ON_PAGE` named four pages on the motivating story and **two of those hits were
+themselves false** (the plan lines said "all four boys braced shoulder to shoulder" and "the four boys
+sitting together", which a literal-name counter cannot see), and the re-plan answered two of them by
+deleting a character. A false fire of this review costs one page restored from the division that stands
+— a line the planner itself wrote and the plan check already measured — plus a warning, and the finding
+survives to the recheck. It cannot discard a round, cannot block a paid run, and cannot change a page's
+content.
+
+**Evidence — replayed over all 109 stored `beatsReviewReport` rows** in production and staging; 28 carry
+both a resolved cast and plan lines, giving **27 replayable rounds** (the 8 rows carrying a second round
+all lack a resolved cast, which disables the guard in production too).
+
+| measure | result |
+|---|---|
+| rounds with a structural change | **27 / 27** |
+| rounds containing a removal | 14 |
+| pages a removal touched | 23 |
+| **previously-correct outcomes changed** | **0** — end-state divisions byte-identical, old path vs new |
+| pages whose removal the review refuses, had it been declared | **20 of 23** (22 change lines: 15 span, 7 direction) |
+| pages whose removal the review allows | **3** — answering `PLAN_LINE_INCOMPLETE`, `CHECK[9]`, `CONSECUTIVE_SAME_SHOT_CAST`, all repairs the one-directional rule blocked |
+
+**The replay corrected the design once, and that belongs on the record.**
+`INVENTED_DOMINANT_EXCESS` was first ranked as asking for *fewer* figures in frame, and the replay
+showed the antagonist being deleted a second time — by declaring against that finding instead of
+`NO_COMMISSIONED_ON_PAGE`. **Both invented-dominance counters are now "more"**: the arc is settled by the
+time it is divided, so the figure it gave the page stays and the commissioned cast is what comes in.
+With that correction, pages 16 and 18 of `job_1789681157795_wkt20ckod` are refused on *direction* alone
+(the page held one name against a ceiling of three, so there was room to add), without needing the
+OBSTACLES evidence that stored rows do not carry. And an over-crowded page finally has an answer, which
+it had under neither the old prompt nor `97ccc4128`.
+
+**The declaration cannot leak into the division.** A change line (`Page 16: cast out <name> -
+PLAN[CODE] - why`) matches `parsePagePlan`'s line shape exactly, so a page-plan parse that ran past the
+`---CHANGES---` marker would enter the declaration as page 16's plan line and ship it as the division.
+`parsePlanResponse` already stops at the next `---MARKER---`; `7ed94f65c` pins it on a response carrying
+both blocks, and pins that the change block is still read in full from the same text.
+
+**Touched files.** `server/lib/promptBuilders.js` (`buildReplanSection` rewritten, `parsePlanChanges`,
+`parsePlanCheckObstacles`, `REPLAN_CHANGES_FORMAT`, the `CHANGES_FORMAT` fill),
+`server/lib/planCounters.js` (`reviewPlanChanges`, `REPLAN_FINDING_DIRECTION`, `replanChangeDirection`,
+`castLostByReplan`'s fifth argument), `server/lib/beatsPipeline.js` (declare/review/apply wiring, the
+declared merge scope, `declaredChanges` + `changeRefusals` on the stored report), `prompts/story-beats.txt`,
+`prompts/plan-check.txt`, and four test files.
+**Status:** ✅ active — commits `981fcb27a` + `7ed94f65c`, staging, not pushed. Supersedes "A re-plan adds
+a character, it never deletes one" below. **Unproven against a live planner:** no run has been made under
+the new wording, and no stored row carries an `OBSTACLES` line, so the review's *obstacle* rule has never
+fired on real data (both in `tasks/BACKLOG.md`).
+
+## 2026-09-18 — A page's obstacle-holder is named in its plan line, and the plan check counts it
+
+**Context.** Staging `job_1789681157795_wkt20ckod` invents the rival Tobias. The arc's fourth declared
+challenge is his, and its sentence 16 has him kicking earth back into the hole the other three are
+digging. **Page 17 stages exactly that beat and has never named him — not in the first division, not in
+either re-plan round.** `97ccc4128` fixed the sibling fault (a re-plan DELETING a planned figure, pages
+16 and 18) with `castLostByReplan`; that guard is name-set arithmetic between a standing plan line and a
+returned one, so a figure that was never on the page is invisible to it by construction. The Art
+Director wrote Tobias into the briefs for 16 and 17 from the page text, the scene review stripped him by
+the book (`[cast_not_in_plan]`, check 5a, *"not named by PAGE PLAN line"*), and three of that book's six
+CRITICAL IMG faults are that absence.
+
+**What was measured before deciding.** Two code-only shapes were tried against the stored corpus and
+both are dead. Corpus: every story carrying an arc, a shipped page plan and the plan check's stored
+roster — **28 stories / 443 pages** (staging 26 / 410, production 2 / 33); pages aligned to final arc
+sentences by monotone DP over word overlap, offline analysis only, never production logic.
+
+| candidate signal | fires on | true positives |
+|---|---|---|
+| the aligned arc sentence names a cast member the who column omits | **263 / 443** pages | 1 |
+| a figure in frame on page N and N+2, absent from N+1 (the arithmetic form of the continuity rule) | **124 / 443** pages | 1 |
+| narrowed to invented figures, matched against the whole plan line (what the scene review actually reads) | **38 / 425** pages | 1 |
+
+All 38 of the narrowest set were judged by hand: **thirty-seven are not faults**, in four classes — a
+roster mislabel (bikes, an attic, a weekday, a rival vessel, a figure named descriptively); an arc
+sentence spanning several pages with the figure planned on a neighbour; a figure the plan line names by
+description rather than by name; and the Art Director or the planner correctly trimming a secondary,
+which is settled design. **Any check keyed on "the arc names them on this page" over-fires about 37 : 1.**
+A second sweep widened the corpus to every story with an arc and a page plan — **55 stories / 870
+pages** — by deriving a candidate cast instead of reading the stored roster; it produced 352 candidates,
+production's 67 were read in full and the highest-scoring staging ones sampled, and **no additional true
+instance was found. `wkt20ckod` p17 is the only instance in the corpus, and production has none.**
+
+**Decision.** The rule is **not** "the arc names them on this page". It is the clause `story-beats.txt`
+already carried and nothing counted — **the character whose action is what the page's instant works
+against is named in that page's plan line** — and the plan check gains question 11 to count it.
+Classification lives in the prompt pair; no counter, no code, no regex over arc prose. The question
+enumerates rather than asserts (name the page, the character and the naming verdict), so the claim is
+re-countable against the plan line printed above it — the 2026-09-09 self-certifiable-total rule. Two
+wordings changed on the generator side and both are load-bearing: *"forces or blocks something"* is
+unfalsifiable at page granularity, so the obstacle forms are enumerated; and *"in frame where it
+happens"* becomes *"named in that page's plan line"*, because the plan LINE — not the who column — is
+what `scene-review.txt` check 5a reads.
+
+**Advisory, never must-fix.** `replanRank` returns `also` for any check number outside
+`REPLAN_MUST_FIX_CHECKS = {4, 8}`, so a question-11 finding rides into the re-plan under ALSO NOTED and
+cannot be promoted by accident. The reason is the measurement above: *a must-fix that over-fires is
+exactly what caused the defect this question addresses* — `NO_COMMISSIONED_ON_PAGE` named four pages of
+this book, two of those hits were themselves false, and the re-plan answered two of them by deleting
+Tobias. A false fire of an advisory costs one plan line rewritten to name a figure the page's own beat
+already places there. The one real cost: 13% of staging stories (4 of 31) reach zero findings at the
+first plan check, and for those a fire spends a re-plan round that would not otherwise run — round 1 is
+kept unless it corrupts the division, and it is the cheapest call in the stage.
+
+**The live defect the work uncovered: questions 9 and 10 were dead by instruction.** `plan-check.txt`
+announced *"only the eight points below"* (line 1) and *"Answer only these eight"* (line 25) while **ten**
+questions stood — 9 and 10 had been appended without renumbering. Confirmed on the prompt that
+**actually ran**, not on the template: `beatsReviewReport.prompt` stored on `job_1789681157795_wkt20ckod`
+is 11,985 chars and carries ten questions under two headers both saying eight, so the model was
+instructed to ignore *deed and effect* and *two heights*. Both headers now read **eleven**, and the test
+parses the prompt's **own number-words** against the questions actually present rather than hardcoding a
+count, so it keeps working for a future question 12 and fails the moment someone appends one without
+correcting the headers. Mutation-tested: reverting the headers to "eight" fails with `expected 8 to
+be 11`.
+
+**Inert on code, verified on the built objects.** `replanRank({ kind: 'check', check: 11 })` → `'also'`;
+`parsePlanCheck('11. Page 17 — …')` → `[{ check: 11, … }]` on the existing two-digit-tolerant parser;
+`shrinkPromptForModel` is not on the plan-check or beats path, so neither line can be cut.
+
+**Touched files.** `prompts/plan-check.txt` (question 11, both header counts), `prompts/story-beats.txt`
+(the same rule stated so the planner is told what the checker counts),
+`tests/unit/plan-check-question-count.test.ts` (6 tests, behaviour never wording). No code file is
+touched, and both halves of the `plan-generator-vs-critic` **[block]** sibling set move in the one
+commit, with no `Siblings-Checked:` vouch needed.
+**Status:** ✅ active, prompt half unverified — commit `99cb5f6ad`, staging, not pushed. The settling
+experiment (a plan-check replay over the two stored divisions plus three judged-false stories) is in
+`tasks/BACKLOG.md`. Composes with, and does not depend on, the re-plan redesign above: question 11's
+answer is the strongest single reason a declared removal should be refused, and it is what the new
+`OBSTACLES` block carries.
+
+## 2026-09-18 — The page text is not a checklist for the picture: one constant, and it reaches the eight templates that are handed a page text
+
+**Context.** A page's printed text may name several characters and several actions; the illustration
+renders one moment, the one the scene brief names. This is settled twice over — `docs/SETTLED.md`, *"The
+page TEXT is not a checklist for the image — semantic eval judges image-vs-BRIEF, by design"*
+(2026-09-13), and *"the Art Director trims cast by design"* — and it kept being violated. The owner,
+2026-09-18: *"Not all characters mentioned in text must appear in the image. Add that rule everywhere! A
+text can be 3 actions the image must focus on one. You keep getting this wrong."*
+
+Three partial statements of the rule already existed, hand-written, and had already drifted apart:
+`image-semantic.txt`'s CHARACTER AUTHORITY paragraph (characters only, nothing about a text naming
+several actions), `image-prompt-compliance.txt`'s STORY_TEXT DECLARES NOTHING block (characters and
+dialogue, again nothing about actions), and one clause buried inside `book-audit.txt`'s definition of
+the MAJOR weight. The other six templates that author or judge a page against its text carried no
+statement of it at all.
+
+**Decision.** ONE exported constant, `TEXT_NOT_A_CHECKLIST_RULE` (`server/lib/promptBuilders.js:7136`),
+filled through a `{TEXT_NOT_A_CHECKLIST}` placeholder — not nine hand-kept copies, because copies of a
+shared rule drifted four times in one week in this repo ("fix the mirror class, not the instance"):
+
+> A page's text may name several characters and several actions; its picture stages one moment — the one
+> its brief names. A character or an action the text names and the frame does not show is not a fault:
+> not at any severity, and not as support for another finding. Where the whole book is in view, one
+> absence is a fault: a character the story gives a moment of their own — an obstacle they raise, a turn
+> they cause — that no page's plan line stages. Charge that one to the plan, never to a picture.
+
+It went to nine templates in `587d8d755` and was **withdrawn from one of them the same day**
+(`52c42a643`) on the owner's ruling. **The set is eight**, and this entry covers the whole arc, because
+the count is the thing that keeps being quoted.
+
+**Why the rule has two halves.** Per page, an omission is the Art Director working: the brief picks the
+instant and trims the cast to it. Across the book it is not — staging `job_1789681157795_wkt20ckod` lost
+an invented antagonist off pages 16-18 and three of that book's six CRITICAL faults followed, and a
+first-half-only rule would have excused exactly that. So half two opens by carving itself out of half
+one (*"Where the whole book is in view, one absence **is** a fault"*), which a judge cannot read past,
+and it names the artefact at fault — the PLAN — so a per-page judge never charges it to a picture. The
+book audit routes it as `FAULT[TEXT]` under its own existing routing rule, with no new route needed.
+Two hand-written echoes were deliberately left standing, both scoped and doing local work rather than
+stating the rule (`image-semantic.txt`'s one clause in its "No other issues" enumeration,
+`book-audit.txt`'s clause inside the MAJOR weight). The paragraph-length copy in `image-semantic.txt`
+was replaced by the placeholder, so the only full statement of the rule anywhere is the constant.
+
+**The ninth template is not a member, and that is the decision, not an omission.** `587d8d755` put the
+rule into `prompts/image-evaluation.txt` as `N-17` in the NEVER DEDUCT list and flagged it unreachable
+in the same commit message: the owner said everywhere, it is the heaviest-deducting judge, and wiring
+the page text in later would be a one-line change at a call site. The owner ruled the same day — **drop
+it**: every line in a judge prompt competes for attention, and this one is provably dead. The premise was
+re-verified independently before anything was removed, because two findings had been retracted the same
+day after a second look:
+
+- The template is built in **exactly one function**, `buildEvaluationPrompt()`
+  (`server/services/prompts.js:823`), which fills a closed set of named keys. Its eight remaining
+  placeholders hold a brief, an interactions block, a scene intent, a clothing contract, a cast roster,
+  an art style, a required-objects list and a landmark block — **no page text among them**.
+- Three call sites build it and all three pass a brief: `evalPipeline.js:2155` (primary) and `:2367`
+  (the safety-block retry, the same string fully sanitized) pass `evaluateImageQuality`'s
+  `originalPrompt`; `regeneration.js:4382` (admin re-evaluate) passes the stripped scene description,
+  with `storyText` explicitly `null` at the sibling call.
+- `evaluateImageQuality` (`evalPipeline.js:1746`) takes the page text as a **separate seventh argument**,
+  `storyText`, and routes it only to the semantic judge (`fidelityRef`) and the three-stage compliance
+  judge (`storyText:`). **All 20 production callers** — `images.js`, `coverIterate.js`,
+  `regeneration.js` (nine sites) and `testlab.js` (five) — pass a prompt / description / cover prompt at
+  argument 2 and the page text, if any, at argument 7. The Lab reaches the judge through the same
+  production functions, so it cannot diverge.
+
+`N-17` was the last entry in the NEVER DEDUCT list, so nothing renumbers and no gap is left: the template
+is now **byte-identical to its pre-`587d8d755` blob** (`f191bb5b5…`, verified by hash). The fill key went
+too — an unused key is harmless, a `String.replace` that matches nothing, but it left a dead lazy
+`require('../lib/promptBuilders')` behind a comment that stated the opposite of the ruling; a short
+comment now records the deliberate absence. **The decision carries its own reversal condition, enforced
+rather than remembered:** the reach test pins the ninth ABSENT on four surfaces (the template carries
+neither placeholder nor prose, the built prompt carries neither and ships no hole, the builder drops a
+page text handed to it under any name, and the sibling set does not name it) plus a tripwire — a
+page-text-shaped placeholder appearing in that template fails a test whose message says to re-add the
+rule. 13 tests → 18, verified non-vacuous: restoring the `N-17` line fails two of them.
+
+**Measured — what the class has cost the per-page judges.** Scan scope, both DBs, complete: staging 138
+stories / 1,374 page rows (2026-05-04 → 2026-09-17 CH, 40,922 findings) and production 130 stories
+(2025-12-20 → 2026-09-17 CH, 19,790 findings) — **251 stories, 2,699 page rows, 60,712 findings** across
+consolidated and per-version `fixableIssues`, `semanticIssues`, compliance `fixable_issues`,
+`entityIssues`, consolidator `dropped_issues`, `bookAuditFaults` and `bookAuditRounds.imgFaults`.
+
+| number | value | of |
+|---|---|---|
+| FIRES | **93** | 666 findings cite the page text; 527 of those ALSO cite the prompt or brief, so they are corroborated |
+| JUDGED FALSE | **52** | of the 93 (39 legitimate, 2 open) — all 93 hand-read against the page's stored brief, not sampled |
+| DAMAGE SHIPPED | **27** | of the 52 — **297 points** across **25 pages in 23 stories** (4 CRITICAL, 14 MAJOR, 8 MODERATE, 1 MINOR) |
+
+**Occasional, not common**: ~0.15% of all findings, but ~1 page in 100 and 23 of 251 stories carry at
+least one. 16 of the 25 damaged pages carry an extra image version; 3 false fires were caught and dropped
+by the consolidator — the guard working. Worked examples, all brief-verified: `6sn8z0nh2` p1 CRITICAL
+*"core narrative action … absent"* where the brief has the character *"NOT TOUCHING the map"*;
+`622wecmhj` p10 CRITICAL *"story text shows both boys standing still"* where the brief has one
+*"LEAPS across the broken stone gap, airborne"*; `1yx71oyo1wg` p15 MAJOR, where the judge overrode the
+brief's UNFOLDED sheet with the German page text's *gefaltetes Blatt*.
+
+**Measured — the book audit is where the class actually lives, and where it costs money.** 742 distinct
+book-audit IMG faults over 23 stories with a stored audit: 274 are contradictions (legitimate under the
+audit's own question 2), 345 other/unclear, and **123 are PURE ABSENCE** — the words say X, the picture
+does not show X, no contradiction. That 123 is exactly the class `book-audit.txt`'s MAJOR clause already
+claimed to suppress. Hand-read in full: **86 (70%) are WRONG** — the text narrates an action, prop,
+gesture or facial detail the brief never commissioned (*"Facundo's tightly closed fists, mentioned in the
+text, are not visible"*; *"The picture does not show the man's shoulders dropping before he laughs."*) —
+and 37 are right. **A 70% wrong rate DESPITE the existing clause is the evidence that a hedge inside a
+weight definition was not enough**; the rule is now its own paragraph before the questions.
+
+**And the audit is not free.** `server/lib/repairLogic.js:169` — `AUDIT_ADMIT_SEVERITIES =
+new Set(['CRITICAL','CATASTROPHIC'])` — with `server/lib/repairPipeline.js:1997`: a final-audit
+CRITICAL/CATASTROPHIC IMG fault grants **one extra paid repair round**, and **9 of the 11 stories with a
+final audit granted one**, admitting 2-10 pages each. A false fault here buys a whole paid round, not
+just points. At that severity the two pure-absence classes are almost balanced (6 wrong CRITICALs
+suppressed against 5 right ones at risk), so the trade is good and it is bounded.
+
+**Why a severity ceiling cannot fix this — the question is CLOSED, not opened.** Of the 297 damaging
+points, `unverified_absence` (the only type in `MAX_SEVERITY_TYPES`) accounts for 5 findings and **10
+points**; they claimed MAJOR/MODERATE and would have cost 75, so the cap works. The other 22 findings
+carry **287 points — 97% of the damage — in uncapped types**, `action_interaction` alone 13 findings and
+165 points. Those types legitimately need their full severity for real defects, and capping them would
+blunt every genuine one. **The type each finding got is CORRECT; the reasoning behind it was wrong** —
+which makes it a prompt fix by definition, and no `server/lib/scoring.js` change. Per SETTLED:
+classification is the prompt's job, code may only change a severity; here neither needed changing. The
+owner's own emphasis — *"a text can be 3 actions the image must focus on one"* — is the half that was
+both unstated in every judge prompt and uncapped in code.
+
+**Method correction, which supersedes any earlier figure.** "Is this character staged on this page" must
+be read from **`sceneImages[].outlineCharacters`**, the brief's commissioned cast array — never from a
+substring search over `sceneDescription`, which embeds a diagnosis block of evaluator notes naming
+characters the brief never staged. Tobias scores **7 of 18 pages on prose and 1 of 18 on the structured
+field**. Every figure here is the cast measure; any prose-derived number is wrong and should not be
+quoted.
+
+**The scope of half two, checked against the 37 right faults, and the check that was REJECTED.** Split by
+the cast measure: **14 are whole-book vanishing** (the Tobias shape, staged in 1 brief of 18) — covered
+by half two; **4 are an ensemble trim** the Art Director made for one frame — correctly suppressed; and
+**13 are a single-character continuity break**, one named character staged on most pages with a line or a
+decisive action on THIS page, absent from THIS frame only. A mechanical cast-continuity check over
+`outlineCharacters` (staged on p(n-1) and p(n+1), absent from p(n)) was proposed for those 13 and
+**investigated and rejected**: the owner asked to see the pages first, and on the pixels **8 of the 13
+were misclassified** — one character was plainly in the frame, another was never named by the text that
+was supposed to have promised him; two of the findings are one fault restated; **none deducted a point
+and none bought a repair round on its own**; and the proposed detector matched 5 of the 13, was right
+once, and **missed the one case it was built for**. The two genuine cases are already covered by
+plan-check question 11 (the entry above), before any image is paid for. Recorded so it is not rebuilt.
+
+**Generator and critic move together.** The rule goes to the four brief authors as a permission (a page
+text may name more than the frame stages) and to the judges and audits as a prohibition — the
+`syncing-generator-and-critic` contract. It is registered as sibling set `text-not-a-checklist`
+(severity `block`, anchored on `{TEXT_NOT_A_CHECKLIST}`), so gate 9 refuses a commit that moves one
+member and not the rest; the set's `reason` and `anchorsNote` name `image-evaluation.txt` as
+deliberately not a member and state the condition that brings it back.
+
+**Touched files.** `server/lib/promptBuilders.js` (the constant, its export, four fill sites),
+`server/services/prompts.js` (`buildEvaluationPrompt` — the fill added in `587d8d755`, removed in
+`52c42a643`, with a comment recording why the absence is deliberate), `server/lib/evalPipeline.js` (the
+compliance judge), `server/lib/sceneValidator.js` (`buildSemanticPrompt`), `server/lib/bookAudit.js`
+(`judgeChunk`), the eight templates `prompts/{image-semantic,image-prompt-compliance,scene-expansion-all,`
+`scene-expansion,scene-iteration,scene-iteration-free,scene-review,book-audit}.txt` plus
+`prompts/image-evaluation.txt` (added, then reverted to its original bytes),
+`scripts/admin/sibling-registry.json`, `tests/unit/text-not-a-checklist-reach.test.ts` (18 tests).
+**Status:** ✅ active — commits `587d8d755` + `52c42a643`, staging, not pushed. **Unproven:** that a judge
+OBEYS the new wording; no run was made, and the removal's effect is a claim about prompt length and
+attention only, since the dropped line could not fire either way.
+
 ## 2026-09-18 — A plan line may carry the cast without naming it: the ROSTER says who a collective reference covers
 
 **Context.** `runPlanCounters` decided who stood on a page by matching cast names **literally** in
@@ -303,7 +665,12 @@ comment), `server/lib/beatsPipeline.js` (the guard in the re-plan merge),
 `server/lib/promptBuilders.js` (`buildReplanSection`), `tests/unit/beats-replan-cast-lost.test.ts`
 (20 tests whose fixtures are the five verbatim plan lines of this story, in both divisions),
 `tasks/bugs.json` (`replan-deletes-a-character-the-story-needs`).
-**Status:** ✅ active — commit `97ccc4128`, staging, not pushed.
+**Status:** 🗄 superseded 2026-09-18 (same day) — see "A re-plan declares its structural changes, and
+they are reviewed in both directions" at the top of this file (`981fcb27a`). The owner rejected the
+one-directional rule — *"We can not say delete only or add only. We must give a fair review and allow
+both fix types."* `castLostByReplan()` survives the supersession, revised: it now restores only the
+removals a round did **not** declare. The measurement above stands as written; what changed is the
+verdict it was used to justify. Commit `97ccc4128`, staging, not pushed.
 
 ## 2026-09-18 — A contested identity gets a third witness, and that witness may only ever WITHHOLD a correction
 

@@ -901,3 +901,17 @@ and its placement rule are one rule in two halves.
 - Launched 3 audit workflows (~hundreds of agents) alongside 5 code agents; owner: "you used the weekly budget in 10 min".
 - Rule: count agents (items × stages × verifiers) BEFORE any Workflow call and say the number; >15 agents needs an explicit yes. One careful reader per question, not five lenses. Audits never run parallel to the code agents that are the deliverable.
 - On "stop": TaskStop all, save half-applied agent edits to a scratchpad patch, revert those files, report what survived (commits + journals are safe).
+
+## 2026-09-18 — An absence is not a fault: name what was PROMISED, and by which artefact
+**What happened:** the owner corrected the same mistake three times in one day. First, on the eval
+prompts: *"Not all characters mentioned in text must appear in the image. Add that rule everywhere! A
+text can be 3 actions the image must focus on one. You keep getting this wrong."* Then, on 13 pages
+reported as absence faults: 8 of them were misclassified — one character was plainly in the frame, and
+one was never even named by the text that was supposed to have promised him. Then, on a report of
+peopleless pages: *"Pages without cast are ok. Stop repeating that as a fault."* A character the text
+names and the frame omits, a cast the Art Director trims to one instant, a page with no characters at
+all — each is normal, designed output, and each was filed as a defect on the same day.
+**Rule:** before calling an absence a fault, name what was **promised** and **by which artefact** — a
+beat the story gives a figure, a contact the brief states, a plan line that stages them — and then look
+at the pixels. A text naming something is not a promise; the brief and the plan are. "X is missing" is
+an observation, never a finding.
