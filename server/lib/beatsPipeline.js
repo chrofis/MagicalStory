@@ -696,6 +696,50 @@ async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
 }
 
 /**
+ * THE REPORT DESCRIBES THE DIVISION THAT SHIPPED (2026-09-18).
+ *
+ * The re-plan loop may run a round and then throw it away — the must-fix count
+ * did not fall, a guard caught a corrupt return, or the call failed. Until this
+ * function existed the canonical report fields were written from the LAST
+ * round's variables regardless: `changedPages` accumulated every round's pages
+ * including the discarded one, and `recheck` held the discarded round's
+ * findings. Measured on staging job_1789681157795_wkt20ckod: round 1 re-divided
+ * 4 pages and its recheck found 9; round 2 re-divided 14 and was discarded; the
+ * row reported 14 pages and 7 findings, so every reader of the row concluded
+ * the shipped plan had faults it does not have, on pages it never touched.
+ *
+ * The rounds are a ledger and this derives the shipped view from it: the union
+ * of the KEPT rounds' pages, the LAST kept round's recheck, and every round
+ * that did not ship under `discardedRounds` — never dropped, because a
+ * discarded round is the diagnostic evidence for why the loop stopped.
+ *
+ * @param {Array<{round:number, changedPages?:number[], recheck?:Object|null, kept:boolean, discardReason?:string}>} rounds
+ * @returns {{changedPages:number[], recheck:Object|null, discardedRounds:Array<{round:number, reason:string, changedPages:number[], recheck:Object|null}>}}
+ */
+function shippedReplanState(rounds = []) {
+  const changed = new Set();
+  let recheck = null;
+  const discardedRounds = [];
+  for (const r of (rounds || [])) {
+    if (!r) continue;
+    if (r.kept) {
+      for (const n of (r.changedPages || [])) changed.add(Number(n));
+      // The recheck that measured the division now standing. A later kept round
+      // supersedes an earlier one; a discarded round never does.
+      recheck = r.recheck || null;
+    } else {
+      discardedRounds.push({
+        round: r.round,
+        reason: r.discardReason || 'discarded',
+        changedPages: r.changedPages || [],
+        recheck: r.recheck || null,
+      });
+    }
+  }
+  return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds };
+}
+
+/**
  * Run the beats-first pipeline.
  *
  * @param {Object} inputData - the job's input data (same object the unified path gets)
@@ -1254,11 +1298,26 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt };
   };
 
+  // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
+  // and a discarded round's sit side by side in the stored report and a reader
+  // must be able to compare them without learning two layouts.
+  const recheckRecord = c => (c ? {
+    counterFindings: c.counters.lines,
+    counterStats: c.counters.stats,
+    modelFindings: c.modelFindings,
+    // The flat rendering (counter lines + `CHECK[n]: …`) the summary prose and
+    // the log line both read, so the record is self-contained and no reader
+    // re-derives it.
+    lines: c.lines,
+  } : null);
+
   t = Date.now();
   await stage(4, 'Checking the page division...', { next: 5, ms: 45000 });
   const check1 = await runCheck('plan_check', plan.pages, pagePlan);
-  let check2 = null;
-  let replannedPages = [];
+  // The LEDGER of re-plan rounds, kept and discarded alike. The report's
+  // canonical fields are derived from it by shippedReplanState() so they can
+  // only ever describe the division that shipped.
+  const replanRounds = [];
   if (check1.lines.length > 0) {
     try {
       // RE-PLAN ROUNDS (2026-09-09). The loop used to be check → re-plan →
@@ -1344,6 +1403,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           if (dupe) {
             log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
             gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
+            replanRounds.push({ round, changedPages: [], recheck: null, kept: false, discardReason: 'two pages returned with an identical plan line' });
             beats = bestBeats;
             pagePlan = bestPagePlan;
             break;
@@ -1359,6 +1419,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (second.parsed.pages.length !== beats.length) {
           log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
           gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
           beats = bestBeats;
           pagePlan = bestPagePlan;
           break;
@@ -1366,6 +1427,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (second.parsed.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
           gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
           break;
         }
         const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
@@ -1381,17 +1443,28 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // a line that had never been used. Deriving it from the pages makes the
         // two representations incapable of diverging.
         pagePlan = beats.map(pg => `Page ${pg.pageNumber}: ${pg.planLine || ''}`).join(String.fromCharCode(10));
-        replannedPages = [...new Set([...replannedPages, ...changedThisRound])].sort((a, b) => a - b);
         gl.info('beats_replan', `Round ${round}: planner re-divided ${changedThisRound.length} page(s) for ${pendingCheck.lines.length} finding(s)`, null, {
           round, replannedPages: changedThisRound, findings: pendingCheck.lines.length,
         });
-        check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
+        const check2 = await runCheck(round === 1 ? 'plan_recheck' : `plan_recheck_r${round}`, beats, pagePlan);
+        // Entered KEPT and demoted below if the round is thrown away, so the
+        // ledger records the round whichever way the verdict goes.
+        const roundRecord = {
+          round,
+          changedPages: changedThisRound,
+          findingsIn: pendingCheck.lines.length,
+          recheck: recheckRecord(check2),
+          kept: true,
+        };
+        replanRounds.push(roundRecord);
         const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
         if (stillMustFix.length >= bestMustFix && round > 1) {
           log.warn(`⚠️ [BEATS] Round ${round} did not reduce must-fix (${bestMustFix} → ${stillMustFix.length}) — discarding it, the previous division stands`);
           gl.warn('beats_replan_discarded', `Round ${round} did not reduce must-fix findings (${bestMustFix} → ${stillMustFix.length}) — the round was discarded and the previous division stands`, null, {
             round, before: bestMustFix, after: stillMustFix.length,
           });
+          roundRecord.kept = false;
+          roundRecord.discardReason = `did not reduce must-fix findings (${bestMustFix} → ${stillMustFix.length})`;
           beats = bestBeats;
           pagePlan = bestPagePlan;
           break;
@@ -1416,7 +1489,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.warn(`🚨 [BEATS] Re-plan failed (${err.message}) — the first division ships`);
       gl.warn('beats_replan_failed', `Re-plan failed: ${err.message} — the first division ships`);
       beats = plan.pages;
-      replannedPages = [];
+      // The FIRST division ships, so no round describes what shipped any more —
+      // including a round that had been kept before the failure. They stay on
+      // the ledger as discarded rather than being deleted (diagnostics).
+      for (const r of replanRounds) {
+        if (!r.kept) continue;
+        r.kept = false;
+        r.discardReason = `re-plan failed after this round (${err.message}) — the first division ships`;
+      }
     }
   }
   meta.timings.planCheckMs = Date.now() - t;
@@ -1426,11 +1506,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // storyJobPipeline, the dev-mode diff panels, and the cross-story challenge
     // memory (which reads `data->'beatsReviewReport'->>'arc'`) all key off it.
     // Renaming the key would silently empty a family's challenge history.
+    // EVERY canonical field below describes the division that SHIPPED. A round
+    // the loop threw away is kept verbatim under `discardedRounds` and nowhere
+    // else, so the row and the log can no longer disagree with the book.
+    const shipped = shippedReplanState(replanRounds);
     const beforePlan = new Map(plan.pages.map(p => [p.pageNumber, p.planLine || '']));
     const summary = [
       check1.lines.length ? `Findings on the first division:\n${check1.lines.join('\n')}` : 'The first division drew no findings.',
-      replannedPages.length ? `\nRe-divided page(s): ${replannedPages.join(', ')}` : '',
-      check2 ? `\nFindings after the re-plan:\n${check2.lines.join('\n') || '(none)'}` : '',
+      shipped.changedPages.length ? `\nRe-divided page(s): ${shipped.changedPages.join(', ')}` : '',
+      shipped.recheck ? `\nFindings after the re-plan:\n${(shipped.recheck.lines || []).join('\n') || '(none)'}` : '',
+      shipped.discardedRounds.length
+        ? `\nDiscarded re-plan round(s) (not in the shipped division, kept under discardedRounds): ${shipped.discardedRounds.map(d => `round ${d.round} — ${d.reason}`).join('; ')}`
+        : '',
     ].filter(Boolean).join('\n');
     beatsReviewReport = {
       check: 'counters+plan-check',
@@ -1443,25 +1530,30 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       counterStats: check1.counters.stats,
       cast: check1.counters.cast,
       modelFindings: check1.modelFindings,
-      changedPages: replannedPages,
-      pages: replannedPages.map(n => ({
+      changedPages: shipped.changedPages,
+      pages: shipped.changedPages.map(n => ({
         pageNumber: n,
         before: `PLAN: ${beforePlan.get(n) || ''}`,
         after: `PLAN: ${(beats.find(b => b.pageNumber === n) || {}).planLine || ''}`,
       })),
-      recheck: check2 ? {
-        counterFindings: check2.counters.lines,
-        counterStats: check2.counters.stats,
-        modelFindings: check2.modelFindings,
-      } : null,
+      recheck: shipped.recheck,
+      // Always written, empty array included: an empty list says "no round was
+      // thrown away", while a MISSING key says "this row predates the fix and
+      // its canonical fields may describe a discarded round" (2026-09-18).
+      discardedRounds: shipped.discardedRounds,
       prompt: check1.prompt || '',
       briefsIn: plan.pages.map(x => ({
         pageNumber: x.pageNumber,
         brief: `PLAN: ${x.planLine || ''}`,
       })),
     };
-    gl.info('beats_plan_checked', `Division checked: ${check1.lines.length} finding(s), ${replannedPages.length} page(s) re-divided${check2 ? `, ${check2.lines.length} remaining` : ''} (${(meta.timings.planCheckMs / 1000).toFixed(1)}s)`, null, {
-      findings: check1.lines.length, replanned: replannedPages.length, remaining: check2 ? check2.lines.length : null,
+    // Reads from `shipped`, same as the row: a reader of the log and a reader of
+    // the stored report must reach the same conclusion about the same book.
+    gl.info('beats_plan_checked', `Division checked: ${check1.lines.length} finding(s), ${shipped.changedPages.length} page(s) re-divided${shipped.recheck ? `, ${(shipped.recheck.lines || []).length} remaining` : ''}${shipped.discardedRounds.length ? `, ${shipped.discardedRounds.length} round(s) discarded` : ''} (${(meta.timings.planCheckMs / 1000).toFixed(1)}s)`, null, {
+      findings: check1.lines.length,
+      replanned: shipped.changedPages.length,
+      remaining: shipped.recheck ? (shipped.recheck.lines || []).length : null,
+      discardedRounds: shipped.discardedRounds.length,
     });
   }
 
@@ -2975,4 +3067,4 @@ ${bibleBody}` : bibleBody;
   return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

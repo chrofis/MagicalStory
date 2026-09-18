@@ -450,6 +450,67 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-18 — `beatsReviewReport` describes the division that SHIPPED; a discarded re-plan round moves to `discardedRounds`
+
+**Context.** The beats re-plan loop (`server/lib/beatsPipeline.js`) can run a round and throw it
+away — the must-fix count did not fall (`beats_replan_discarded`), a guard caught a duplicate plan
+line or a wrong page count, or the call threw. The report was written from the loop's last-round
+variables regardless: `replannedPages` was a running union across EVERY round (it was updated
+before the discard verdict), and `check2` held whatever the last `runCheck()` returned. So on a run
+whose round 2 was discarded, the row and the log described round 2 while the book shipped round 1.
+
+Measured on three stored staging runs by replaying the round ledger reconstructed from each run's
+own `generationLog` (`beats_replan`, `plan_recheck` / `plan_recheck_r2`, `beats_replan_discarded`):
+
+| run | rounds | stored (old code) | shipped (truth) |
+|---|---|---|---|
+| `job_1789681157795_wkt20ckod` | 1 kept, 2 discarded | 14 changed pages, recheck 7 counters | **4 changed pages `[8,12,16,18]`, recheck 1 counter + 8 model = 9 lines** |
+| `job_1789506283204_3kxqshifx` | 1 kept, 2 discarded | 3 changed pages `[3,9,17]`, recheck 4 counters | **2 changed pages `[3,17]`, recheck 1 counter = 1 line** |
+| `job_1789584708605_rts4wqupm` | 1 kept, 2 kept | 3 changed pages, recheck 4 counters | same — a run with nothing discarded was never wrong |
+
+A reader of `wkt20ckod` concluded the shipped plan carried 7 open findings across 14 re-divided
+pages. It carries 1 across 4, and the 7 name pages the shipped division never touched. The
+misreporting dates from **2026-09-09**, when bounded re-plan rounds and the must-fix discard
+shipped (`e177acb9f`, `3095e16a3`) — every two-round run with a discard since then is affected,
+and only a run with a discard is affected at all.
+
+**Decision.** The rounds are a LEDGER (`replanRounds`), and the report's canonical fields are
+derived from it by one pure exported function, `shippedReplanState(rounds)`:
+- `changedPages` = the union of the **kept** rounds' pages; `recheck` = the **last kept** round's;
+- every round that did not ship goes to a new **`discardedRounds[]`** field, verbatim — its round
+  number, its reason, its pages and its full recheck. Nothing is dropped: a discarded round is the
+  evidence for why the loop stopped.
+- `discardedRounds` is always written, empty array included, so `[]` means "nothing was discarded"
+  and a MISSING key means "this row predates the fix and its canonical fields may be a discarded
+  round's".
+- The `beats_plan_checked` log line reads from the same `shipped` object and appends
+  `N round(s) discarded`, so log and row can no longer disagree.
+- The `catch` (re-plan failed → the first division ships) demotes every kept round to discarded,
+  because after it nothing that ran describes what shipped. Previously it reset `replannedPages`
+  but left `check2` pointing at a recheck of a division that had just been thrown away.
+- The recheck record gained `lines` (the flat `counter line` + `CHECK[n]: …` rendering) so the
+  summary prose and the log line read it instead of re-deriving it, and one helper `recheckRecord`
+  writes that shape wherever a recheck is recorded.
+
+Chosen over "label every round and add a `shippedRound` pointer" because every existing consumer
+of `changedPages` — the dev-mode diff panel (`StoryDisplay.tsx`), `storyMetrics` churn +
+`outline_fix_count` (off `.pages`), `scripts/analysis/verify-toddler-carry.js` — would have had to
+learn the pointer, and any that did not would keep reading the wrong round. With canonical =
+shipped they are correct with no change at all. **No consumer reads `recheck`** (checked across
+server, client, scripts and tests), so widening its shape is free.
+
+**Rationale.** Same class as the silent-outcome work in `0fd27918b`: a record that describes work
+that was thrown away is worse than no record, because it is acted on. This is a REPORTING fix
+only — nothing about what the counters compute, what the replan decides, or which division ships
+changed; `job_1789584708605_rts4wqupm`, where both rounds were kept, replays byte-identical.
+
+**Touched:** `server/lib/beatsPipeline.js` (`shippedReplanState`, `recheckRecord`, the
+`replanRounds` ledger, the report block, `beats_plan_checked`),
+`tests/unit/beats-replan-shipped-report.test.ts` (11 tests, ledgers transcribed from the three runs
+above).
+**Status:** ✅ active — stored rows written before this keep whatever they have; readers were
+checked and none crashes on a row without `discardedRounds`.
+
 ## 2026-09-17 — A non-hand contact gets no hand row, and a face reaches the painter only through `expression`
 
 **Context.** Staging `job_1789584708605_rts4wqupm` p4. The page text has the child lay his EAR on
