@@ -489,7 +489,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   const rows = pages.map((p) => {
     const segs = planSegments(p.planLine);
     const complete = segs.length >= 4;
-    const who = segs.length >= 2 ? segs[1] : String(p.planLine || '');
+    const who = whoColumn(p.planLine);
     const present = namesIn(who, cast.all, cast.aliases);
     return {
       pageNumber: p.pageNumber,
@@ -591,11 +591,14 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   }
   // 6b. CROSS-CHECK the arc's own declared invented list against the one this
   //     module derives from the plan lines (2026-09-09). REPORTING ONLY, and
-  //     deliberately not in REPLAN_MUST_FIX_CODES: a re-plan is architecturally
-  //     forbidden from removing a character (prompts/story-beats.txt tells the
-  //     stage the arc is finished), so enforcement here would ask for something
-  //     the stage cannot do. A discrepancy means the arc under-declared — which
-  //     is exactly how job_1788903616404_iqvhj4l8m shipped four invented
+  //     deliberately not in REPLAN_MUST_FIX_CODES: a re-plan may not remove a
+  //     character, so enforcement here would ask for something the stage is not
+  //     allowed to do. That rule is now stated to the planner and enforced
+  //     (`buildReplanSection`, `castLostByReplan`); before 2026-09-18 this
+  //     comment read "architecturally forbidden" and nothing anywhere said or
+  //     checked it, which is how job_1789681157795_wkt20ckod lost its
+  //     antagonist off two pages. A discrepancy means the arc under-declared —
+  //     which is exactly how job_1788903616404_iqvhj4l8m shipped four invented
   //     figures on an allowance of two — and it must at least be visible.
   if (Array.isArray(declaredInvented)) {
     const declared = declaredInvented.map(n => String(n || '').trim()).filter(Boolean);
@@ -686,6 +689,97 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   };
 }
 
+/** The who-in-frame column of a plan line; the whole line when it has no segments. */
+function whoColumn(planLine) {
+  const segs = planSegments(planLine);
+  return segs.length >= 2 ? segs[1] : String(planLine || '');
+}
+
+/**
+ * Pages whose RE-PLAN dropped a character the standing division had in frame.
+ *
+ * A re-plan answers named findings on named pages. Nothing in the finding
+ * vocabulary asks for a character to leave: `NO_COMMISSIONED_ON_PAGE` is
+ * answered by bringing the commissioned cast in, `CAST_OVER_CEILING` by a
+ * justification in the plan line, plan-check Q3 likewise. So a name that is in
+ * a page's who-column before the round and gone after it was deleted, not
+ * repaired — and once the plan line stops naming a figure, the Art Director
+ * has no authority to stage them and the scene review's `[cast_not_in_plan]`
+ * check strips them from the brief by the book.
+ *
+ * Measured on staging job_1789681157795_wkt20ckod ("Das Ei im Lindenhof"): the
+ * arc's fourth declared challenge is "Tobias sits on the stone in the dark
+ * while Zünsli goes cold". `NO_COMMISSIONED_ON_PAGE` named pages 8, 12, 16 and
+ * 18; the re-plan answered pages 8 and 12 by ADDING the commissioned children
+ * and answered 16 and 18 by DELETING Tobias. His who-column pages went
+ * [8,9,16,18] → [8,9]; the briefs for 16 and 17 were then stripped
+ * (`castRemovals`: "not named by PAGE PLAN line"), and the book audit returned
+ * three CRITICAL and one MAJOR IMG faults for an antagonist the page text
+ * describes and no picture shows.
+ *
+ * A MOVE IS NOT A DELETION. A re-plan may shift a beat between two pages a
+ * finding named, and page N then loses a name page M gains. Restoring N would
+ * put the beat on both pages, so a name gained on any other changed page in
+ * the same round is not counted as lost anywhere.
+ *
+ * Pure set arithmetic over a declared cast list — no prose is read, no name is
+ * inferred from the line's grammar.
+ *
+ * THE CAST LIST IS THE ROSTER'S, INCLUDING ITS MISTAKES, and that is a measured
+ * choice rather than an oversight. The plan check's roster still reads a ship,
+ * a bridge or a summit as a person often enough to matter — `Gemüsebrücke`,
+ * `Zwirbelspitz`, `Silberkrabbe`, `Donnermöwe`, `La Nivéole` over the stored
+ * staging corpus — and three candidate filters were tried against it and all
+ * three failed: the arc's own declared invented list goes STALE when a retell
+ * renames its figures (on the motivating story the arc declared `Fünkli,
+ * Silvan` for figures the committed arc calls `Zünsli, Tobias`, and
+ * `arcInventedNames` was null there in any case); the roster's own
+ * people-vs-things split never contradicts itself (0 overlaps across 9 stories
+ * checked); and `placeNames` only knows the landmarks the planner was handed.
+ * Over 613 changed pages on staging the unfiltered rule restores 23 (3.8%) —
+ * 17 of them a real figure and 6 a mislabelled vessel or place — so the price
+ * of the roster's mistakes is declining a re-plan's repair on 1.0% of changed
+ * pages, and a page restored from the STANDING division is never corrupt: it
+ * is the line the planner itself wrote and the plan check already measured.
+ * The finding that named the page simply survives to the recheck, which is
+ * what `beats_replan_unfixed` reports. Against that, an unguarded round
+ * deletes a book's antagonist.
+ *
+ * @param {Array<{pageNumber:number, planLine:string}>} standing the division that stands
+ * @param {Array<{pageNumber:number, planLine:string}>} returned the merged re-plan result
+ * @param {string[]} castNames the resolved cast (`resolveCast().all`; the commissioned
+ *   names alone when the roster failed and there is no resolved cast)
+ * @param {Object} [aliases] name → other spellings (`resolveCast().aliases`)
+ * @returns {Array<{pageNumber:number, lost:string[]}>} one row per page to restore, page order
+ */
+function castLostByReplan(standing, returned, castNames = [], aliases = {}) {
+  const names = (Array.isArray(castNames) ? castNames : []).map(n => String(n || '').trim()).filter(Boolean);
+  if (!names.length) return [];
+  const before = new Map();
+  for (const p of (standing || [])) before.set(Number(p.pageNumber), String(p.planLine || ''));
+  const changed = (returned || []).filter((p) => {
+    const b = before.get(Number(p.pageNumber));
+    return b !== undefined && b !== String(p.planLine || '');
+  });
+  if (!changed.length) return [];
+
+  const lostOn = new Map();
+  const gained = new Set();
+  for (const p of changed) {
+    const nb = namesIn(whoColumn(before.get(Number(p.pageNumber))), names, aliases);
+    const na = namesIn(whoColumn(p.planLine), names, aliases);
+    const lost = nb.filter(n => !na.includes(n));
+    if (lost.length) lostOn.set(Number(p.pageNumber), lost);
+    for (const n of na) if (!nb.includes(n)) gained.add(n);
+  }
+  const out = [];
+  for (const [pageNumber, lost] of lostOn) {
+    const deleted = lost.filter(n => !gained.has(n));
+    if (deleted.length) out.push({ pageNumber, lost: deleted });
+  }
+  return out.sort((a, b) => a.pageNumber - b.pageNumber);
+}
+
 module.exports = {
   runPlanCounters,
   collectPlaceNames,
@@ -698,4 +792,6 @@ module.exports = {
   canonicalName,
   namesIn,
   stripQuoted,
+  whoColumn,
+  castLostByReplan,
 };

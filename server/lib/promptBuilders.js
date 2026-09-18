@@ -6302,6 +6302,7 @@ function buildReplanSection(pagePlan, findingLines) {
     '',
     'You divided this story once. Your plan and the findings against it follow. Return ONLY the pages a finding names, one line each in the same format, and nothing else — every other page stands exactly as it is and must not be repeated. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Every page number you return is already in the plan above.',
     'When a page is named for holding more than one action, its instant keeps the first action alone. What follows from it belongs in "what is true after", or on its own page when it earns a picture of its own. Dropping the action is not a fix: every action in the division above is still in the division you return. Keep the page count by merging two pages that each hold only presence or position, or by dropping the weakest.',
+    'Dropping a character is not a fix either: every name a page above puts in frame is in frame on that page in the division you return. A page faulted for holding none of the commissioned characters gains one — the story puts them there, and the page keeps whoever it already had. A page faulted for a crowded frame keeps every name and separates them by depth or distance. The story is settled, so a figure it gives a page is a figure that page shows.',
     '',
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',

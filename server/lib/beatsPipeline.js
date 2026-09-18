@@ -1,6 +1,6 @@
 
 
-const { runPlanCounters, collectPlaceNames } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames, castLostByReplan } = require('./planCounters');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -1389,6 +1389,38 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           }
           second.parsed.pages = kept;
           second.parsed.missing = [];
+        }
+        // A RE-PLAN ADDS A CHARACTER, IT NEVER DELETES ONE (2026-09-18).
+        // Nothing in the finding vocabulary asks for a figure to leave a page:
+        // `NO_COMMISSIONED_ON_PAGE` is answered by bringing the commissioned
+        // cast into frame, `CAST_OVER_CEILING` by a justification in the plan
+        // line, plan-check Q3 likewise. Measured on staging
+        // job_1789681157795_wkt20ckod: that finding named pages 8, 12, 16 and
+        // 18; the round answered 8 and 12 by ADDING the four children and
+        // answered 16 and 18 by DELETING Tobias — the invented antagonist whose
+        // blocking of the stone is the arc's fourth declared challenge. His
+        // who-column pages went [8,9,16,18] → [8,9]. The Art Director still
+        // wrote him into the briefs for 16 and 17 from the page text, and the
+        // scene review then stripped him by the book (`[cast_not_in_plan]`,
+        // castRemovals reason "not named by PAGE PLAN line"), because the plan
+        // line is the brief's authority. The book audit returned three CRITICAL
+        // and one MAJOR IMG faults for an antagonist the words describe and no
+        // picture shows. Same remedy as the unnamed-pages merge above: the page
+        // is restored from the standing division, per page, and the finding
+        // that named it survives to the recheck.
+        {
+          const guardCast = (pendingCheck.counters.cast && pendingCheck.counters.cast.all) || commissionedNames;
+          const guardAliases = (pendingCheck.counters.cast && pendingCheck.counters.cast.aliases) || {};
+          const lost = castLostByReplan(beats, second.parsed.pages, guardCast, guardAliases);
+          if (lost.length) {
+            const standing = new Map(beats.map(b => [b.pageNumber, b]));
+            second.parsed.pages = second.parsed.pages.map(pg => (
+              lost.some(l => l.pageNumber === pg.pageNumber) ? standing.get(pg.pageNumber) : pg
+            ));
+            const detail = lost.map(l => `p${l.pageNumber}: ${l.lost.join(', ')}`).join('; ');
+            log.warn(`⚠️ [BEATS] Round ${round}: the re-plan dropped cast from ${lost.length} page(s) (${detail}) - restored from the standing division`);
+            gl.warn('beats_replan_cast_lost', `Round ${round}: the re-plan removed ${detail} from the page plan; a re-plan adds a character, never deletes one, so ${lost.length === 1 ? 'that page was' : 'those pages were'} restored from the division that stands`, null, { round, pages: lost });
+          }
         }
         // A re-plan that answers "this page holds two actions" by copying a
         // neighbouring page has destroyed the page, not fixed it. Measured
