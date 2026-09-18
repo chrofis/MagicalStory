@@ -720,6 +720,116 @@ function adjacentSlotNounPair(src, prev, next) {
 }
 
 /**
+ * Function words, which identify nothing. Everything else a Visual Bible
+ * element declares about itself — colour, material, cut, fastening — is
+ * identifying, because a collision on one of those is handled below (a word two
+ * texts share simply stops discriminating) rather than by pruning the list.
+ * Words of two letters or fewer never reach this set; they are dropped by length.
+ */
+const IDENTITY_STOPWORDS = new Set([
+  'the', 'and', 'but', 'nor', 'for', 'yet', 'with', 'without', 'from', 'into', 'onto', 'upon',
+  'its', 'his', 'her', 'their', 'our', 'your', 'this', 'that', 'these', 'those', 'them',
+  'are', 'was', 'were', 'been', 'being', 'has', 'have', 'had', 'not', 'all', 'any', 'each',
+  'both', 'one', 'two', 'three', 'four', 'some', 'such', 'also', 'plus', 'than', 'then',
+  'when', 'while', 'which', 'who', 'whose', 'over', 'under', 'worn', 'wearing', 'wears',
+]);
+
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * The DECLARED identifying words of a Visual Bible element — its own `name`,
+ * `label`, any `aliases`, and its own description.
+ *
+ * Every one of these is a field the writer or Art Director WROTE for this
+ * element. None of it is inferred from the outfit prose, and none of it is a
+ * closed vocabulary of English garment nouns: the question this answers is
+ * never "is this a garment?" but "is this ART004?".
+ */
+function elementIdentityTerms(element) {
+  if (!element || typeof element !== 'object') return [];
+  const sources = [
+    element.name, element.label,
+    ...(Array.isArray(element.aliases) ? element.aliases : []),
+    element.extractedDescription, element.description,
+  ];
+  const terms = new Set();
+  for (const src of sources) {
+    for (const raw of String(src || '').toLowerCase().split(/[^a-z0-9'’-]+/)) {
+      const word = raw.replace(/^[-'’]+|[-'’]+$/g, '');
+      if (word.length < 3 || IDENTITY_STOPWORDS.has(word)) continue;
+      terms.add(word);
+    }
+  }
+  return [...terms];
+}
+
+/** The minimum number of the element's own words that must single one text out. */
+const MIN_DISCRIMINATING_TERMS = 2;
+
+/**
+ * WHICH of these texts is the declared element — asked of the element itself.
+ *
+ * THE RULING THIS IMPLEMENTS (2026-09-18). The module used to ask a closed list
+ * of English garment nouns "is this a garment?" and take the answer as "this is
+ * the item the page declared off". That fails whenever the contract names the
+ * garment in words the list does not hold: on staging
+ * job_1789584708605_rts4wqupm the writer linked ART004, *named* "fleece jacket",
+ * as `Levin.top`, and Levin's contract describes it as "red fleece fabric
+ * garment with a full front zipper … worn over a white long-sleeve shirt". Not
+ * one word of "red fleece fabric garment" is in SLOT_NOUNS, so the vocabulary
+ * counted ONE garment in that clause — the shirt — concluded the clause was
+ * only about the declared item, and dropped it whole. Levin lost the shirt on
+ * p15/p17/p18 as well as the jacket he had actually taken off. Worse, had the
+ * vocabulary been consulted for WHICH half to cut, the only `top` noun in the
+ * clause is "shirt", so it would have cut the shirt and kept the jacket.
+ *
+ * The element is declared, structured data that cannot drift, so it is asked
+ * directly. A term DISCRIMINATES only when it appears in exactly one of the
+ * texts: a word every text shares (a colour both garments happen to be) says
+ * nothing, and a word no text carries says nothing. Every discriminating term
+ * must point the same way.
+ *
+ * TWO discriminating terms at least, because an element's identity is the
+ * CONJUNCTION of the words declared for it, never any single one of them. One
+ * word shared between two English garment descriptions is a coincidence —
+ * colours and materials recur constantly — and a lone "red" pointing at a clause
+ * is not evidence the red thing in it is this element. An element whose declared
+ * name is a single word therefore never answers here at all, and the caller
+ * falls back to exactly the behaviour it had before this route existed.
+ *
+ * This is the safety bias `splitClauses` states, applied to identity: a wrong
+ * answer deletes a garment, while no answer only makes the caller refuse — and
+ * a refusal is visible in `removals[].reason` and recoverable, with the
+ * explicit "is NOT wearing" prompt line still carrying the instruction.
+ *
+ * @returns index of the text that IS the element, or -1 when its own declared
+ *          words cannot tell them apart.
+ */
+function indexOfElementAmong(texts, element) {
+  const list = (Array.isArray(texts) ? texts : []).map(t => String(t || ''));
+  if (list.length < 2) return -1;
+  const terms = elementIdentityTerms(element);
+  if (terms.length < MIN_DISCRIMINATING_TERMS) return -1;
+  let winner = -1;
+  let support = 0;
+  for (const term of terms) {
+    const re = new RegExp(`\\b${escapeRe(term)}\\b`, 'i');
+    let only = -1;
+    let count = 0;
+    for (let i = 0; i < list.length; i++) {
+      if (!re.test(list[i])) continue;
+      count += 1;
+      only = i;
+    }
+    if (count !== 1) continue;               // absent, or shared — says nothing
+    if (winner === -1) winner = only;
+    else if (winner !== only) return -1;     // its own words point two ways
+    support += 1;
+  }
+  return support >= MIN_DISCRIMINATING_TERMS ? winner : -1;
+}
+
+/**
  * What is left of ONE outfit clause once the declared item is taken out of it.
  *
  * Three answers, and the third is the one that keeps this bounded:
@@ -731,15 +841,40 @@ function adjacentSlotNounPair(src, prev, next) {
  *             the page never declared off. Nothing is removed; the explicit
  *             "is NOT wearing" prompt line still carries the instruction.
  *
- * `slotNouns` identifies the declared item when the element name is unknown.
+ * `element` is the Visual Bible entry the page declared off, and it is asked
+ * FIRST — see indexOfElementAmong. `slotNouns` / `itemName` are the older
+ * closed-vocabulary route, and answer only when the element cannot.
  */
-function clauseRemainderWithoutItem(clause, slotNouns, itemName) {
+function clauseRemainderWithoutItem(clause, slotNouns, itemName, element = null) {
+  const parts = String(clause).split(LAYER_SPLIT_RE).map(s => s.trim()).filter(Boolean);
+
+  // ROUTE A — the declared element identifies its own half of the clause.
+  // Ahead of the whole-clause shortcut below on purpose: that shortcut counts
+  // garments through the closed vocabulary, and a garment the vocabulary cannot
+  // see is exactly the case this route exists for.
+  if (parts.length >= 2) {
+    const mine = indexOfElementAmong(parts, element);
+    if (mine >= 0) {
+      const rest = parts.filter((_, i) => i !== mine);
+      const withGarment = rest.filter(p => countGarments(p) > 0);
+      // Everything left of the connective names a garment → it survives.
+      if (withGarment.length === rest.length) return rest.join(', ');
+      // Nothing left names a garment → the rest is this item's own trim, its
+      // fit or where it sits; the clause is about this item alone. Drop it whole.
+      if (withGarment.length === 0) return null;
+      // Mixed: one real garment and one loose fragment. Which garment the
+      // fragment belongs to is not declared anywhere — refuse rather than guess.
+      return false;
+    }
+  }
+
+  // ROUTE B — closed vocabulary. Unchanged, and reached only when the element's
+  // own declared words could not tell the halves apart.
   if (countGarments(clause) <= 1) return null;
   const itemNouns = (itemName ? garmentNounsIn(itemName, slotNouns) : []);
   const mine = itemNouns.length > 0 ? itemNouns : garmentNounsIn(clause, slotNouns);
   if (mine.length === 0) return false;
   const mineRe = new RegExp(`\\b(?:${mine.join('|')})\\b`, 'i');
-  const parts = String(clause).split(LAYER_SPLIT_RE).map(s => s.trim()).filter(Boolean);
   if (parts.length < 2) return false;
   const dropped = parts.filter(p => mineRe.test(p));
   const keptParts = parts.filter(p => !mineRe.test(p));
@@ -765,8 +900,12 @@ function clauseRemainderWithoutItem(clause, slotNouns, itemName) {
  *
  * Never removes more than one clause. That bound is what separates it from the
  * rejected 2026-08-08 filter, which sieved EVERY clause against prose.
+ *
+ * `element` is the Visual Bible entry itself. When the caller has one, the
+ * element's own declared words pick the clause and the half of it to cut, and
+ * the slot vocabulary is only the fallback — see indexOfElementAmong.
  */
-function removeWornItemFromOutfit(description, slot, itemName = null) {
+function removeWornItemFromOutfit(description, slot, itemName = null, element = null) {
   const raw = String(description || '').trim();
   const key = String(slot || '').trim().toLowerCase();
   if (!raw || !key) return { text: raw, removed: false, reason: 'no-input' };
@@ -793,19 +932,32 @@ function removeWornItemFromOutfit(description, slot, itemName = null) {
   if (!nouns) return { text: raw, removed: false, reason: 'unknown-slot' };
   const clauses = splitClauses(raw);
   if (clauses.length < 2) return { text: raw, removed: false, reason: 'single-clause-outfit' };
-  const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
-  let hits = clauses.map((c, i) => (nounRe.test(c) ? i : -1)).filter(i => i >= 0);
-  // A slot can hold two garments at once — a hoodie over a t-shirt, a cape over
-  // a jacket — and then the slot alone cannot say which clause the declaration
-  // is about. The ELEMENT'S OWN NAME can. Narrow by the garment nouns the name
-  // itself carries, drawn from the same closed vocabulary; nothing is inferred
-  // from prose and the one-clause bound below still holds.
-  if (hits.length > 1 && itemName) {
-    const nameNouns = nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(itemName)));
-    if (nameNouns.length > 0) {
-      const nameRe = new RegExp(`\\b(?:${nameNouns.join('|')})\\b`, 'i');
-      const narrowed = hits.filter(i => nameRe.test(clauses[i]));
-      if (narrowed.length === 1) hits = narrowed;
+  // THE DECLARED ELEMENT PICKS ITS OWN CLAUSE (2026-09-18), ahead of the slot
+  // vocabulary. The slot is the writer's `wornAs` link, which on staging
+  // job_1789584708605_rts4wqupm reads `Levin.top` for an element the Art
+  // Director typed `outer layer` — so the vocabulary consulted for that slot is
+  // the vocabulary of the wrong garment, and the only `top` noun in the jacket's
+  // clause belongs to the shirt underneath it. The element's own declared words
+  // do not depend on either being right. Same precedence as d104a283d: a
+  // declared field outranks a guess at English.
+  let hits = [];
+  const byElement = indexOfElementAmong(clauses, element);
+  if (byElement >= 0) hits = [byElement];
+  else {
+    const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
+    hits = clauses.map((c, i) => (nounRe.test(c) ? i : -1)).filter(i => i >= 0);
+    // A slot can hold two garments at once — a hoodie over a t-shirt, a cape over
+    // a jacket — and then the slot alone cannot say which clause the declaration
+    // is about. The ELEMENT'S OWN NAME can. Narrow by the garment nouns the name
+    // itself carries, drawn from the same closed vocabulary; nothing is inferred
+    // from prose and the one-clause bound below still holds.
+    if (hits.length > 1 && itemName) {
+      const nameNouns = nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(itemName)));
+      if (nameNouns.length > 0) {
+        const nameRe = new RegExp(`\\b(?:${nameNouns.join('|')})\\b`, 'i');
+        const narrowed = hits.filter(i => nameRe.test(clauses[i]));
+        if (narrowed.length === 1) hits = narrowed;
+      }
     }
   }
   if (hits.length !== 1) {
@@ -816,7 +968,7 @@ function removeWornItemFromOutfit(description, slot, itemName = null) {
   // — measured on staging job_1789348171785_9oxos7dwv p9/p13/p14, where a
   // whole-clause drop left the character with no top at all. Split the clause
   // on its layering connective and keep the part the declaration is NOT about.
-  const survivor = clauseRemainderWithoutItem(clauses[hits[0]], nouns, itemName);
+  const survivor = clauseRemainderWithoutItem(clauses[hits[0]], nouns, itemName, element);
   if (survivor === false) {
     return { text: raw, removed: false, reason: 'slot-clause-carries-another-garment' };
   }
@@ -842,7 +994,11 @@ function stripOffItemsFromOutfit(description, resolved, characterName) {
   const removals = [];
   for (const r of (resolved || [])) {
     if (!isOffForCharacter(r, characterName)) continue;
-    const res = removeWornItemFromOutfit(text, r.slot, r.name);
+    // The Visual Bible entry itself, so the strip identifies the garment by what
+    // the element DECLARES rather than by a closed list of English garment
+    // nouns. `{ name: r.name }` is the same question asked of the one declared
+    // field a hand-built row always carries.
+    const res = removeWornItemFromOutfit(text, r.slot, r.name, r.entry || { name: r.name });
     removals.push({ id: r.id, slot: r.slot, removed: res.removed, reason: res.reason });
     if (res.removed) text = res.text;
   }
@@ -923,7 +1079,9 @@ function applyWornItemsToOutfit(description, resolved, characterName) {
     // remove from the clause itself (`garmentNounsIn(clause, slotNouns)`);
     // passing `r.name` would narrow to the garment being put IN, which the
     // guard above has just established the clause does NOT name, and the
-    // removal would target the wrong half of a layered clause.
+    // removal would target the wrong half of a layered clause. The `element`
+    // argument is omitted for the same reason, and it matters more: the
+    // element's declared words would point squarely at the garment going IN.
     const res = removeWornItemFromOutfit(text, r.slot, null);
     if (!res.removed) {
       swaps.push({ id: r.id, slot: r.slot, applied: false, reason: res.reason });
@@ -1053,6 +1211,8 @@ module.exports = {
   findVbEntryById,
   deriveSlotFromName,
   slotFromType,
+  elementIdentityTerms,
+  indexOfElementAmong,
   unlinkedWornCandidates,
   isOffForCharacter,
   referenceCarriesItem,
@@ -1061,6 +1221,7 @@ module.exports = {
   wornStateById,
   wornItemLook,
   carryForwardWornItems,
+  splitClauses,
   buildWornStateLines,
   buildWornStateBlock,
   removeWornItemFromOutfit,
