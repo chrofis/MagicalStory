@@ -1410,6 +1410,176 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
 }
 
 /**
+ * THE THIRD WITNESS, ALONE, ON A STORED CONTESTED PAGE — one VLM call, no DINO.
+ *
+ * `reconcileIdentityWithSecondWitness` (4ef21cc6c) asks a second model who is
+ * who when the evaluator and the detector disagree, and lets that answer VETO
+ * the detector's rename. The plumbing is proven byte-identical under every
+ * stubbed witness; what was never measured is whether the REAL witness ever
+ * contradicts the detector — it answers the same question, from the same badged
+ * image, under the same prompt, so it is drawn from the detector's own
+ * distribution and confirmation is the expected failure mode.
+ *
+ * This stage measures exactly that, and nothing else. It replays the vote over
+ * ONE stored version: the page image as it was, the stored
+ * `bboxDetection.figures[]` and `expectedCharacters`, and the evaluator's OWN
+ * names (un-renamed via `evaluatorReference`). The `bbox` stage cannot answer
+ * the question — it would re-run DINO + SAM + the primary Gemini identity call,
+ * so the boxes, the conflict and the witness would all move at once.
+ *
+ * Both outcomes are computed on the same inputs: `reconcileIdentity` with no
+ * witness (what ships today) and `reconcileIdentityWithSecondWitness` with the
+ * real one. `renamesWithheld` is the difference, which is the only thing the
+ * veto can ever do.
+ *
+ * COSTS one OpenRouter Qwen2.5-VL-72B call per target (the tier below the
+ * `gemini-full` that answered every stored page), plus one local composite.
+ * THE WITNESS IS NOT GUARANTEED TO BE QWEN: the SoM chain falls through on a
+ * failure, and 3 of 19 targets in experiment 1325 met `Qwen-VL HTTP 429` and
+ * were answered by `haiku-full` instead — so `witnessModel` is reported per
+ * entry rather than assumed, and a run's model mix is part of its result.
+ *
+ * params.groundTruth  'detector' | 'evaluator' — a PIXEL-JUDGED verdict for
+ *                     this version, carried as data on the target rather than
+ *                     baked into this file. Lab set 66 / experiment 1324
+ *                     downloaded and eyeballed four such pages. With it the
+ *                     entry classifies itself: a withheld rename on a
+ *                     detector-right page is a FALSE veto, on an
+ *                     evaluator-right page a TRUE one.
+ */
+async function runIdentitySecondOpinionStage(ctx, { params = {} }) {
+  const { reconcileIdentity, reconcileIdentityWithSecondWitness } = require('./identityAgreement');
+  const { secondOpinionIdentity } = require('./figureDetection');
+
+  // A PIN IS MANDATORY HERE. The vote is a property of ONE stored version — the
+  // active version of a page is routinely the one whose conflict was already
+  // resolved, so an unpinned run would measure a different page than the one
+  // named. Fail loudly rather than answer a question nobody asked.
+  const versionIndex = ctx.versionIndex != null ? ctx.versionIndex : pinnedVersionIndex(params.versionIndex);
+  if (versionIndex == null) {
+    throw new Error('identity_second_opinion requires a pinned versionIndex — the contested conflict belongs to one stored version, not to whatever won pick-best');
+  }
+  const versions = Array.isArray(ctx.scene.imageVersions) ? ctx.scene.imageVersions : [];
+  const version = versions[versionIndex];
+  if (!version) throw new Error(`No stored imageVersions[${versionIndex}] for ${ctx.storyId} p${ctx.pageNumber} (page has ${versions.length})`);
+
+  const figures = JSON.parse(JSON.stringify(version.bboxDetection?.figures || []));
+  const expectedCharacters = JSON.parse(JSON.stringify(version.bboxDetection?.expectedCharacters || []));
+  if (figures.length === 0) throw new Error(`v${versionIndex} has no bboxDetection.figures — there is nothing to re-badge`);
+  if (expectedCharacters.length === 0) throw new Error(`v${versionIndex} has no bboxDetection.expectedCharacters — the witness would have no cast to choose from`);
+
+  // WHAT THE EVALUATOR SAID, not what the page ended up storing. A stored match
+  // whose name the detector overwrote carries the detector's name in
+  // `reference` and the evaluator's in `evaluatorReference`; replaying against
+  // the rewritten names would hand the witness a page the two sides agree on.
+  const evaluatorMatches = (version.matches || []).map(m => ({ ...m, reference: (m && m.evaluatorReference) || (m && m.reference) }));
+  const evalLikeOf = () => ({
+    matches: JSON.parse(JSON.stringify(evaluatorMatches)),
+    fixableIssues: JSON.parse(JSON.stringify(version.fixableIssues || [])),
+    fixTargets: [],
+  });
+
+  // Which model answered the PRIMARY identity pass, so the witness is not that
+  // model asked twice — production reads the same field.
+  const primaryModel = version.bboxDetection?.gdinoDiag?.identity?.model || null;
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, versionIndex);
+
+  // THE COUNTERFACTUAL, ON THE SAME INPUTS. Without it the entry can say what
+  // the witness answered but not whether that answer changed anything, and the
+  // veto's only possible effect is a difference in renames.
+  const baseline = reconcileIdentity(evalLikeOf(), JSON.parse(JSON.stringify(figures)), {});
+
+  let witnessRaw = null;
+  let witnessError = null;
+  const t0 = Date.now();
+  const report = await reconcileIdentityWithSecondWitness(evalLikeOf(), figures, {
+    secondOpinion: async () => {
+      try {
+        witnessRaw = await secondOpinionIdentity(
+          imageData, figures, expectedCharacters, `PAGE ${ctx.pageNumber} v${versionIndex}: `,
+          { excludeModel: primaryModel },
+        );
+      } catch (err) {
+        witnessError = err.message;
+        throw err;
+      }
+      return witnessRaw;
+    },
+  });
+  const elapsedMs = Date.now() - t0;
+
+  const conflicts = (report?.conflicts || []).map(c => ({
+    evaluator: c.evaluator, detector: c.detector, on: c.on,
+    centreDistance: c.centreDistance, detIndex: c.detIndex,
+  }));
+  const votes = report?.secondWitness?.votes || [];
+  const vetoed = report?.secondWitness?.vetoed || 0;
+  const renamesWithheld = (baseline?.renamed || 0) - (report?.renamed || 0);
+
+  // The witness's WHOLE answer, not only the contested figures — a witness that
+  // renamed every figure on the page is a different finding from one that
+  // disagreed about two, and the votes alone cannot tell them apart.
+  const witnessByFigure = [];
+  if (witnessRaw?.nameByFigure) {
+    for (const [figIdx, name] of witnessRaw.nameByFigure) {
+      witnessByFigure.push({ figureIndex: figIdx, detector: figures[figIdx]?.name || null, witness: name });
+    }
+    witnessByFigure.sort((a, b) => a.figureIndex - b.figureIndex);
+  }
+
+  // SELF-CLASSIFYING AGAINST A PIXEL VERDICT. A veto is only good or bad
+  // relative to who was actually right, and an agreement rate on its own
+  // cannot distinguish the two.
+  const groundTruth = params.groundTruth || null;
+  let vetoClass = null;
+  if (groundTruth === 'detector') vetoClass = renamesWithheld > 0 ? 'false-veto' : 'correct-no-veto';
+  else if (groundTruth === 'evaluator') vetoClass = renamesWithheld > 0 ? 'true-veto' : 'missed-veto';
+
+  const witnessModel = report?.secondWitness?.model || witnessRaw?.model || null;
+  const pairs = conflicts.map(c => `${c.evaluator}→${c.detector}`).join(', ');
+  const said = votes.length
+    ? votes.map(v => `${v.witness || '—'} (${v.verdict})`).join(', ')
+    : (witnessError ? `call failed: ${witnessError}` : 'no answer');
+  const note = [
+    `p${ctx.pageNumber} v${versionIndex} · conflict ${pairs || '(none)'}`,
+    `witness ${witnessModel || 'none'} said ${said}`,
+    `veto ${vetoed}/${conflicts.length}`,
+    `renames ${baseline?.renamed || 0} → ${report?.renamed || 0}${renamesWithheld > 0 ? ` (WITHHELD ${renamesWithheld})` : ''}`,
+    groundTruth ? `pixel truth: ${groundTruth}-right → ${vetoClass}` : 'no pixel truth',
+  ].join(' · ');
+  // Into the captured run log, which is what the Lab card renders today.
+  log.info(`🗳️ [TESTLAB] identity_second_opinion ${ctx.storyId} ${note}`);
+  for (const w of witnessByFigure) {
+    log.info(`🗳️ [TESTLAB]   figure ${w.figureIndex}: detector=${w.detector} witness=${w.witness}`);
+  }
+
+  return {
+    elapsedMs,
+    note,
+    versionIndex,
+    primaryIdentityModel: primaryModel,
+    witnessModel,
+    witnessAnswered: !!report?.secondWitness?.answered,
+    witnessReason: report?.secondWitness?.reason || null,
+    witnessError,
+    witnessAttempts: witnessRaw?.attempts || [],
+    expectedCharacters: expectedCharacters.map(c => c.name),
+    detectorFigures: figures.map((f, i) => ({ figureIndex: i, name: f.name })),
+    evaluatorMatches: evaluatorMatches.map(m => m.reference),
+    conflicts,
+    witnessByFigure,
+    votes,
+    vetoed,
+    renamesWithheld,
+    withoutWitness: { renamed: baseline?.renamed || 0, uncorrectable: !!baseline?.uncorrectable, uncorrectableReason: baseline?.uncorrectableReason || null },
+    withWitness: { renamed: report?.renamed || 0, uncorrectable: !!report?.uncorrectable, uncorrectableReason: report?.uncorrectableReason || null },
+    groundTruth,
+    vetoClass,
+  };
+}
+
+/**
  * Character box for a page: stored detection first, else run a fresh bbox
  * detection on the image (same call the bbox stage uses). Returns
  * {bbox, faceBbox, source} or null.
@@ -6785,6 +6955,7 @@ const STAGE_RUNNERS = {
   eval_variance: runEvalVarianceStage,
   semantic_eval: runSemanticEvalStage,
   bbox: runBboxStage,
+  identity_second_opinion: runIdentitySecondOpinionStage,
   char_repair: runCharRepairStage,
   entity: runEntityStage,
   text_zone: runTextZoneStage,
@@ -8872,6 +9043,11 @@ module.exports = {
   loadTestImage,
   resolveReplayParams,
   loadActivePageImage,
+  // The identity-vote replay, exported so its arithmetic can be pinned without
+  // a database, a story or a paid VLM call: what the witness said, whether the
+  // vote withheld a rename, and how that classifies against a pixel-judged
+  // verdict (tests/unit/testlab-identity-second-opinion.test.ts).
+  runIdentitySecondOpinionStage,
   checkRuleGenericity,
   // The scorecard judge itself. Every stage runner in this file already calls
   // it; exporting it lets a measurement score an arbitrary artifact (the text

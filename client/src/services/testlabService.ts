@@ -494,6 +494,12 @@ export const TESTLAB_STAGES = [
   { id: 'inventory_ab', label: 'Inventory A/B (split vs unified, blind)', producesImage: false, overridable: false },
   { id: 'semantic_eval', label: 'Semantic eval', producesImage: false, overridable: true },
   { id: 'bbox', label: 'Bbox detection', producesImage: false, overridable: false },
+  // Replays the identity VOTE alone over one stored version — no DINO, no SAM,
+  // no primary identity call. One Qwen-VL witness on the stored image + stored
+  // figures, against the evaluator's own (un-renamed) names. Needs a pinned
+  // versionIndex; params.groundTruth ('detector'|'evaluator') classifies the
+  // veto when the page has a pixel-judged verdict.
+  { id: 'identity_second_opinion', label: 'Identity second opinion (third witness on a stored contested page)', producesImage: false, overridable: false, noTemplate: true },
   { id: 'char_repair', label: 'Character repair', producesImage: true, overridable: false },
   { id: 'entity', label: 'Entity consistency', producesImage: false, overridable: false },
   { id: 'text_zone', label: 'Text zone (calm + wash)', producesImage: true, overridable: false },
