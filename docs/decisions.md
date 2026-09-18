@@ -611,10 +611,15 @@ supporting hint, which is what keeps a figure drawn in the wrong PLACE detectabl
 with a path that already works, not a new policy, so it needs no reversal protocol.
 
 Two related faults were MEASURED and deliberately NOT fixed here, both flagged in `tasks/BACKLOG.md`
-for the owner: (1) no production identity line carries HAIR at all — `buildCastIdentityDescription`
-reads `char.physical.hair` and the stored profile holds `hairColor` + `detailedHairAnalysis`, so
-every production call runs hairless while the Test Lab's own builder emits hair, meaning the Lab has
-been measuring identity on better input than production ever gets; (2) the SoM identity prompt never
+for the owner: (1) no identity line built since 2026-08-08 carries HAIR —
+`buildCastIdentityDescription` reads the RAW `char.physical.hair` key, while
+`extractCharacterVisualProfile` (which the Test Lab's builder goes through) COMPOSES hair via
+`buildHairDescription(physical, physicalTraitsSource)` from `hairColor` + `detailedHairAnalysis`. The
+data is therefore present essentially always and the production line simply does not use it: of 379
+stored character profiles on staging over 45 days, 379 carry `hairColor` and 365 carry
+`detailedHairAnalysis`, but only **16 (4.2%)** carry a `hair` key — all 16 a legacy bare-colour shape
+("blonde", "dark brown") from four stories all dated 2026-08-08, and **95.8% carry none**. So every
+Lab identity measurement has run on strictly better input than production receives; (2) the SoM identity prompt never
 received the "no single trait decides / a character can be wearing the wrong outfit" rule that
 `image-evaluation.txt` got in the same 2026-08-22 decision. Adding that rule flips p12 from 0/3 to
 3/3 in the Lab's richer line format but changes nothing in the production format, so it is a prompt
@@ -19334,6 +19339,20 @@ wrong child. And the disagreements are worth keeping: agreement means the image
 was easy, so sampling at random buys mostly easy pages, while the conflicts are
 precisely the hard cases both sides need to improve on. The corpus is a normal
 generic Lab set, not a new mechanism.
+
+**Correction (2026-09-18) — the measurement cited above is CONFOUNDED.** Part 1's evidence
+("measured: hpv76p0rokg p3 v0 — red kid named Julian in 4/4 gen-time calls, correct in 6/6 Lab calls
+whose builder sets it") was read as isolating the missing `clothing` field. It does not: those Lab
+calls differed from the gen-time calls in **two** ways, not one — the Lab builder also emits HAIR
+(composed from `hairColor` + `detailedHairAnalysis` by `extractCharacterVisualProfile`) which the
+gen-time line does not, plus an apparent-age label. So 4/4-vs-6/6 cannot attribute the failure to
+`clothing` alone. The fix stands on other grounds — the SANITIZED SoM tier strips the "Wearing:"
+tail out of `description` and rebuilds the wardrobe from `clothing`, so that field is independently
+required or those calls dress nobody — but the evidence as cited does not prove it. Only this class
+was flagged; every historical Lab identity experiment was NOT audited, and any Lab run whose cast is
+built through `buildExpectedCharactersForBbox` / `buildCharacterPhysicalDescription` (including the
+auto-harvested "Identity conflicts" set at stage `quality_eval`) inherits the same asymmetry. See
+the 2026-09-18 entry "The identity call is told WHERE a character stands".
 
 **Touched:**
 - `server/lib/identityAgreement.js` (`checkIdentityAgreement`, `reconcileIdentity`)
