@@ -106,7 +106,7 @@ const TEXT_MODELS = {
     provider: 'openrouter',
     modelId: 'qwen/qwen-max',
     maxOutputTokens: 8192, // NOT IN THE OPENROUTER CATALOGUE 2026-09-11 — this ceiling is unverifiable.
-    description: 'Qwen-Max (Alibaba) via OpenRouter - strongest Qwen, ~$1.6/$6.4 per 1M'
+    description: 'Qwen-Max (Alibaba) via OpenRouter - NOT IN THE OPENROUTER CATALOGUE 2026-09-18, so it has no price and no route'
   },
   'qwen-plus': {
     provider: 'openrouter',
@@ -118,7 +118,7 @@ const TEXT_MODELS = {
   // qwen-plus for severity discipline, still far cheaper than Sonnet.
   'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 65536, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
   'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 65536, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
-  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 16384, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.5/$2.0)' },
+  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 16384, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.43/$1.75)' },
   'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 100352, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
   'qwen-vl': {
     provider: 'openrouter',
@@ -149,20 +149,20 @@ const TEXT_MODELS = {
   },
   // GPT-5.6 family (2026-07-09) via OpenRouter. Luna = cheap tier, Sol = strong
   // tier. Pricing from the OpenRouter catalogue. For scoring/writer A/B in the Lab.
-  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 128000, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 128000, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.20/$1.20 per 1M)' },
   // Cheap reviewer candidates (2026-08-15 beats-reviewer bake-off; see docs/decisions.md)
   // Price verified 2026-09-07 on openrouter.ai and ai.google.dev: $0.75/$3.75
   // per 1M (Flex route, Google list through 2026), $1.50/$7.50 on the standard
   // route and Google list from 2027. The earlier "$0.38/$1.88" here matched no
   // vendor page and led to a wrong cost-neutral claim.
-  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 65536, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M Flex; $1.50/$7.50 standard)' },
-  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 384000, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
-  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 182476, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
-  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 512000, description: 'MiniMax M3 (text+image+video in) via OpenRouter ($0.23/$0.96 per 1M, verified 2026-09-07)' },
+  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 65536, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M; $1.50/$7.50 from 2027-01-01)' },
+  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 384000, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.58/$1.73 per 1M)' },
+  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 182476, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.55/$1.74 per 1M)' },
+  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 512000, description: 'MiniMax M3 (text+image+video in) via OpenRouter ($0.30/$1.20 per 1M, re-read 2026-09-18)' },
   // Vision-judge candidates for the blind inventory (Lab sets 25/27, 2026-09-07).
   // Prices from openrouter.ai the same day.
   'qwen3.6-plus': { provider: 'openrouter', modelId: 'qwen/qwen3.6-plus', maxOutputTokens: 65536, description: 'Qwen3.6 Plus (text+image+video in) via OpenRouter ($0.325/$1.95 per 1M)' },
-  'kimi-k2.6': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.6', maxOutputTokens: 235929, description: 'Kimi K2.6 (text+image in) via OpenRouter ($0.56/$3.39 per 1M)' },
+  'kimi-k2.6': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.6', maxOutputTokens: 235929, description: 'Kimi K2.6 (text+image in) via OpenRouter ($0.95/$4.00 per 1M, re-read 2026-09-18)' },
   // Neutral judge for reviewer bake-offs: third vendor, so it has no
   // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
   // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.
@@ -185,31 +185,33 @@ const TEXT_MODELS = {
   // text. Untested at this new limit — no paid call has been run against it yet.
   // NOT IN THE OPENROUTER CATALOGUE 2026-09-11. The catalogue has qwen3.8-max-0902 (131072) but NOT this bare id; per the no-inference rule they are not treated as the same model. The docs/decisions.md note about retesting qwen3.8-max at its true limit cannot run against this id. description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
   'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 131072, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
-  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 131072, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
-  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
-  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 128000, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
-  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter (~$5.00/$30.00 per 1M)' },
+  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 131072, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.21/$2.55 per 1M)' },
+  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.20/$1.20 per 1M)' },
+  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 128000, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier ($2.00/$10.00 default route; the Azure endpoints throughput routing often picks are $5.00/$30.00, and real Lab spend implies ~2.4x the default)' },
+  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter ($2.00/$10.00 default route; up to $5.50/$33.00 on the priciest endpoint)' },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
     maxOutputTokens: 16000,
-    description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.26/$1.03 per 1M'
+    description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.32/$0.89 per 1M'
   },
   // DeepSeek V4 (GA 2026-07-20) via OpenRouter. 1M context, up to 384K output —
   // high maxOutputTokens so the split outline-review call (asks 32K) and even
   // the full writer draft (64K) aren't truncated. Cheap reviewer candidate vs
-  // Opus 5 ($5/$25): Flash is ~85× cheaper output, Pro ~29×.
+  // Opus 5 ($5/$25): at the CORRECTED 2026-09-18 rates Flash is ~254× cheaper
+  // on output and Pro ~7.8× — not the ~85×/~29× this comment claimed while the
+  // table under-priced Pro 3.68× and over-priced Flash 2.84×.
   'deepseek-v4-pro': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-pro',
     maxOutputTokens: 384000,
-    description: 'DeepSeek V4 Pro via OpenRouter - top reasoning, 1M context (~$0.44/$0.87 per 1M)'
+    description: 'DeepSeek V4 Pro via OpenRouter - top reasoning, 1M context ($1.60/$3.20 per 1M, re-checked 2026-09-18)'
   },
   'deepseek-v4-flash': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-flash',
     maxOutputTokens: 384000,
-    description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context (~$0.14/$0.28 per 1M)'
+    description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context ($0.049/$0.099 per 1M, re-checked 2026-09-18)'
   }
 };
 
@@ -238,8 +240,11 @@ const MODEL_DEFAULTS = {
   //
   // Reviewer = DeepSeek V4 Pro (was claude-opus). Test Lab compare runs on the
   // same shared draft: pro raised 58 fixes vs claude-sonnet's 15 locally and 16
-  // vs 14 on staging — more findings per pass, at roughly a tenth of the
-  // Anthropic cost ($0.02 vs $0.22 per review). It is an OpenRouter model, so
+  // vs 14 on staging — more findings per pass, and cheaper than the Anthropic
+  // reviewer. The "$0.02 vs $0.22 per review" this comment used to claim was
+  // computed at the 3.68×-too-low deepseek rate; at the corrected 2026-09-18
+  // rates the same 8.7k-in/10.8k-out review is ~$0.048, not $0.02. Still ~4-5×
+  // cheaper than Opus on the same call, not ~10×. It is an OpenRouter model, so
   // its wall-clock depends on which upstream serves it; textModels.js sorts
   // OpenRouter routing by throughput for exactly that reason. Reviewer failure
   // is already non-fatal, so a bad route degrades to the unpatched draft rather
@@ -818,8 +823,11 @@ const MODEL_DEFAULTS = {
 const INPAINT_BACKENDS = {
   'gemini': {
     name: 'Gemini',
-    description: 'Gemini 2.5 Flash Image - High quality, more expensive (~$0.03/image)',
-    costPerImage: 0.03,
+    // $0.039/image: 1290 output tokens at $30/1M (ai.google.dev pricing, fetched
+    // 2026-09-18). Was 0.03 here while MODEL_PRICING said 0.04 for the same
+    // model — two hand-kept copies of one number, both wrong.
+    description: 'Gemini 2.5 Flash Image - High quality, more expensive ($0.039/image)',
+    costPerImage: 0.039,
     model: 'gemini-2.5-flash-image'
   },
   'runware-sdxl': {
@@ -847,8 +855,11 @@ const INPAINT_BACKENDS = {
 const IMAGE_BACKENDS = {
   'gemini': {
     name: 'Gemini',
-    description: 'Google Gemini - Best quality, higher cost (~$0.03-0.04/image)',
-    costPerImage: 0.035
+    // Same model as INPAINT_BACKENDS.gemini and MODEL_PRICING
+    // 'gemini-2.5-flash-image': $0.039 (ai.google.dev pricing, fetched
+    // 2026-09-18). Was 0.035 — a third hand-kept copy of the same number.
+    description: 'Google Gemini - Best quality, higher cost ($0.039/image)',
+    costPerImage: 0.039
   },
   'runware': {
     name: 'Runware FLUX Schnell',
@@ -939,7 +950,7 @@ const IMAGE_MODELS = {
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
-    description: 'Grok Imagine Pro - Higher quality ($0.07/image), ref image support',
+    description: 'Grok Imagine Pro - Higher quality ($0.05/image at 1K, $0.07 at 2K), ref image support',
     backend: 'grok',
     // Grok's API limit is 8000 chars. The 500-char margin was costing more than
     // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
@@ -1085,11 +1096,58 @@ const REPAIR_DEFAULTS = {
   inpaintMaxPasses: 1,             // Inpaint attempts per page per round
 };
 
-// Approximate pricing per 1M tokens (USD)
-// Updated Feb 2026 - check provider websites for latest pricing
-// Source: https://platform.claude.com/docs/en/about-claude/pricing
+// The date every entry below was last checked against the VENDOR's own page or
+// pricing API. Exported so a report can say how stale the table is, and so the
+// drift test has one place to read the claim from. Bump it only when you have
+// actually re-fetched the sources named in the section headers THAT DAY.
+const PRICING_VERIFIED_ON = '2026-09-18';
+
+// Pricing per 1M tokens (USD), except `perImage` entries.
+//
+// FULL RE-CHECK 2026-09-18 against sources fetched that day (backlog #27). The
+// table had been hand-maintained and had drifted badly in BOTH directions:
+// deepseek-v4-pro was 3.68x UNDER (0.435/0.87 vs the real 1.60/3.20 — a measured
+// call billed $0.0484 for 8,698 in / 10,761 out, which is 1.60/3.20 to the
+// cent), deepseek-v4-flash 2.84x OVER, qwen2.5-vl 3.2x under, and TWELVE models
+// wired up in TEXT_MODELS had no entry at all and therefore priced at $0.00 —
+// including x-ai/grok-4.6, the DEFAULT reviewer on four stages.
+//
+// HOW A PRICE GETS INTO THIS TABLE (the rule that was being broken):
+//   Never from memory, a commit message, or another comment in this repo. Fetch
+//   the vendor's page or pricing API on the day you edit the line, and name the
+//   source + date in the section header. A price you cannot cite to something
+//   fetched today does not belong here.
+//
+// WHOSE PRICE APPLIES — check how the model is ROUTED, not who built it:
+//   provider 'openrouter' in TEXT_MODELS  → OpenRouter's rate (openrouter.ai/api/v1/models)
+//   provider 'anthropic' / 'google' / 'xai' → that vendor's own page
+//   x-ai/grok-4.6 is billed by OpenRouter even though xAI made it.
+//
+// THIS TABLE IS A FALLBACK, NOT THE LEDGER. Where a provider reports what it
+// actually charged, that figure wins and these numbers are never consulted:
+//   - every OpenRouter text call (textModels.js asks for `usage: {include:true}`
+//     and stores the answer as usage.direct_cost)
+//   - every Runware call (result.cost)
+//   `storyJobPipeline.functionCost` and testlab both prefer direct_cost.
+//   The table is what prices Anthropic, Google, the OpenRouter call sites
+//   OUTSIDE textModels (evalJudges / evalPipeline / images / traitPanel /
+//   figureDetection ask for no cost), and every Grok IMAGE call — grok.js gets
+//   its "direct_cost" from `grokImageCost()`, i.e. from the perImage entries
+//   here, so those numbers are the only source of truth for Grok spend.
+//
+// REASONING MODELS: OpenRouter counts reasoning tokens inside completion_tokens
+// and bills them at the completion rate, so `thinking` = `output` for every
+// OpenRouter entry (and calculateTextCost already defaults thinking→output).
+// Billed output on a reasoning model is several times the visible answer —
+// that is normal, not a pricing error.
+//
+// LONG-CONTEXT / RESOLUTION TIERS are deliberately NOT modelled: each entry is
+// the base tier. Where a second tier exists it is named in the line's comment.
 const MODEL_PRICING = {
-  // Anthropic Claude models (Feb 2026)
+  // ── Anthropic, called directly (TEXT_MODELS provider 'anthropic').
+  // Source: https://platform.claude.com/docs/en/about-claude/pricing, fetched
+  // 2026-09-18. All ten entries below matched the page exactly — no change.
+  // `thinking` = `output`: Anthropic bills extended thinking at the output rate.
   'claude-opus-5': { input: 5.00, output: 25.00, thinking: 25.00 },
   'claude-opus': { input: 5.00, output: 25.00, thinking: 25.00 },
   'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
@@ -1101,63 +1159,159 @@ const MODEL_PRICING = {
   'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, thinking: 4.00 },
   'claude-haiku': { input: 1.00, output: 5.00, thinking: 5.00 },
 
-  // Google Gemini models (per 1M tokens) - Updated Jan 2026
-  // Source: https://ai.google.dev/gemini-api/docs/pricing
-  'gemini-2.5-pro': { input: 1.25, output: 10.00, thinking: 10.00 },
+  // ── Google Gemini, called directly (TEXT_MODELS provider 'google').
+  // Source: https://ai.google.dev/gemini-api/docs/pricing, fetched 2026-09-18.
+  // 2.5 Pro / Flash / Flash-Lite all matched the page — no change. Google's
+  // "output" column explicitly INCLUDES thinking tokens, hence thinking=output.
+  'gemini-2.5-pro': { input: 1.25, output: 10.00, thinking: 10.00 },   // >200k prompt: 2.50/15.00 (not modelled)
   'gemini-2.5-flash': { input: 0.30, output: 2.50, thinking: 2.50 },
   'gemini-2.5-flash-lite': { input: 0.10, output: 0.40, thinking: 0.40 },
+  // NOT SERVED. Absent from the pricing page AND from GET v1beta/models
+  // (both checked 2026-09-18) — the id 404s. The figures are the last known
+  // ones and are UNVERIFIABLE today; the entry stays only so an old stored
+  // usage row still prices. Never use it as a stand-in for a live model: it was
+  // storyJobPipeline's `gemini_quality` fallback price while the quality judge
+  // was actually gemini-2.5-flash, under-reporting that judge 3x in / 6.25x out.
   'gemini-2.0-flash': { input: 0.10, output: 0.40, thinking: 0.40 },
-  'gemini-pro-latest': { input: 1.25, output: 10.00, thinking: 10.00 },
+  // ALIAS, repriced 2026-09-18. Google publishes no pricing row for
+  // `gemini-pro-latest`; OpenRouter's mirror of the same alias
+  // (`~google/gemini-pro-latest`, GET /api/v1/models 2026-09-18) prices it at
+  // $2.00/$12.00 — Gemini 3.x Pro rates, not the 2.5 Pro rates ($1.25/$10.00)
+  // this entry used to carry. >200k prompt: 4.00/18.00 (not modelled).
+  'gemini-pro-latest': { input: 2.00, output: 12.00, thinking: 12.00 },
 
-  // xAI Grok models (Mar 2026)
-  // Source: https://docs.x.ai/docs/models
+  // ── xAI, called directly (TEXT_MODELS provider 'xai').
+  // Source: GET https://api.x.ai/v1/models, fetched 2026-09-18 (xAI reports
+  // prices as integers; value / 10_000 = USD per 1M tokens).
+  // ALL THREE IDS BELOW ARE NOT SERVED — the API returns only grok-4.20-*,
+  // grok-4.3, grok-4.5, grok-4.6 and grok-build-0.1. So these prices cannot be
+  // verified against anything today; they are kept so historical usage rows
+  // still price, and they are NOT evidence about any live model.
+  // ⚠️ 'grok-4-fast' (→ grok-4-1-fast-non-reasoning) is still used as the
+  // fallback model in evalJudges / evalPipeline / bboxDetection / sceneValidator
+  // and in textModels' Gemini-safety-block retry. Those calls hit a dead id.
   'grok-3-mini': { input: 0.30, output: 0.50 },
   'grok-3': { input: 3.00, output: 15.00 },
   'grok-4-1-fast-non-reasoning': { input: 0.20, output: 0.50 },
 
-  // OpenRouter-hosted Qwen / DeepSeek (approx list prices — verify at
-  // openrouter.ai; they vary by upstream provider and shift often).
-  'qwen/qwen-max': { input: 1.60, output: 6.40 },
-  'qwen/qwen-plus': { input: 0.26, output: 0.78 },
-  'qwen/qwen3-max': { input: 0.78, output: 3.9 },
-  'deepseek/deepseek-v3.2': { input: 0.27, output: 0.4 },
-  'z-ai/glm-4.6': { input: 0.5, output: 2.0 },
-  'moonshotai/kimi-k2': { input: 0.57, output: 2.3 },
-  'qwen/qwen2.5-vl-72b-instruct': { input: 0.25, output: 0.75 },
+  // ── OpenRouter-hosted models (TEXT_MODELS provider 'openrouter').
+  // Source: GET https://openrouter.ai/api/v1/models, fetched 2026-09-18 —
+  // `pricing.prompt` / `pricing.completion` per token, x1e6 for the per-1M
+  // figure. That is the price of the model's DEFAULT route; individual
+  // upstreams differ (deepseek-v4-pro spans $0.83-$1.91 in across 16
+  // endpoints), and textModels sorts routing by throughput, so the real charge
+  // can land either side. It is reported per call as direct_cost and always
+  // wins over these numbers.
+  //
+  // CROSS-CHECKED against what was actually billed (stories.data.tokenUsage
+  // direct_cost + tokens, prod + staging, 2026-09-18). Predicted/actual at the
+  // rates below: deepseek-v4-pro 1.001, gemini-3.1-pro 0.994, grok-4.6 0.998,
+  // qwen3-max 0.991, gemini-3.7-flash 1.000, luna-pro 0.956. Two exceptions are
+  // flagged on their own lines (qwen-plus, gpt-5.6-sol).
+  'qwen/qwen-plus': { input: 0.26, output: 0.78 },  // billing derives ~0.21/0.62 — prompt-cache hits on a fixed prefix; list price kept (conservative)
+  'qwen/qwen3-max': { input: 0.78, output: 3.90 },
+  'deepseek/deepseek-v3.2': { input: 0.269, output: 0.40 },  // was 0.27/0.40
+  'z-ai/glm-4.6': { input: 0.43, output: 1.75 },   // was 0.50/2.00
+  'z-ai/glm-5.2': { input: 0.5544, output: 1.7424 },  // ADDED — had no entry, priced $0.00
+  'moonshotai/kimi-k2': { input: 0.57, output: 2.30 },
+  'moonshotai/kimi-k2.6': { input: 0.95, output: 4.00 },  // ADDED — had no entry (TEXT_MODELS description says 0.56/3.39; the catalogue says this)
+  'qwen/qwen2.5-vl-72b-instruct': { input: 0.80, output: 1.00 },  // was 0.25/0.75 — 3.2x under on input; single endpoint (Parasail)
   'qwen/qwen3-vl-32b-instruct': { input: 0.104, output: 0.416 },
   'qwen/qwen3-vl-235b-a22b-instruct': { input: 0.21, output: 1.90 },
-  'deepseek/deepseek-chat': { input: 0.2574, output: 1.0287 },
-  'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
-  'deepseek/deepseek-v4-flash': { input: 0.14, output: 0.28 },
-  // Lector + reviewer model. Prices read from OpenRouter's own model catalogue
-  // (GET /api/v1/models, 2026-09-06): pricing.prompt 0.000002 and
-  // pricing.completion / pricing.internal_reasoning 0.000012 per token → $2.00
-  // and $12.00 per 1M. `thinking` matches `output` because reasoning bills at
-  // the completion rate and OpenRouter already counts reasoning tokens inside
-  // completion_tokens. NOTE: OpenRouter's `direct_cost` remains the
-  // AUTHORITATIVE figure wherever it is returned; this entry is the fallback so
-  // the call no longer reports $0.00. Prompts over 200k tokens bill at the
-  // higher $4/$18 long-context tier, which this flat entry does not model.
+  'qwen/qwen3.6-plus': { input: 0.325, output: 1.95 },  // ADDED — had no entry
+  'qwen/qwen3.8-27b': { input: 0.214, output: 2.55 },   // ADDED — had no entry (description says 0.45/3.20)
+  // ADDED. The bare id is NOT in the OpenRouter catalogue (only
+  // qwen/qwen3.8-max-0902, at exactly these rates), so the catalogue alone
+  // could not price it — but it HAS been billed: two Lab calls, 21,994 in /
+  // 72,280 out, $0.4777 charged, and 2.00/6.00 predicts $0.4777. Positive
+  // measurement, not a guess from the sibling id's name.
+  'qwen/qwen3.8-max': { input: 2.00, output: 6.00 },
+  'deepseek/deepseek-chat': { input: 0.32, output: 0.89 },  // was 0.2574/1.0287 (that is the StreamLake endpoint; the default route is DeepInfra)
+  // 3.68x UNDER before 2026-09-18 (0.435/0.87), and this is the reviewer on
+  // sceneReviewModel + clothingReviewModel + briefCorrectionModel, so every
+  // per-story figure that included it was low. Confirmed twice: OpenRouter's
+  // catalogue says 1.60/3.20, and 4.27M in / 6.38M out billed $27.18 across
+  // prod+staging, which 1.60/3.20 predicts to within 0.1%.
+  'deepseek/deepseek-v4-pro': { input: 1.60, output: 3.20, thinking: 3.20 },
+  // ADDED. Without its own entry the '-0813' suffix was stripped by
+  // calculateTextCost's normaliser and it silently borrowed deepseek-v4-pro's
+  // price, which is 2.8x/1.8x wrong for this revision.
+  'deepseek/deepseek-v4-pro-0813': { input: 0.5782, output: 1.7345, thinking: 1.7345 },
+  // 2.84x OVER before 2026-09-18 (0.14/0.28) — the only entry that was
+  // over-reporting. 16 endpoints span $0.049-$0.21 in; this is the default route.
+  'deepseek/deepseek-v4-flash': { input: 0.0493, output: 0.0986, thinking: 0.0986 },
+  // Lector + reviewer model. Re-read 2026-09-18, unchanged since 2026-09-06.
+  // `thinking` matches `output` because reasoning bills at the completion rate
+  // and OpenRouter already counts reasoning tokens inside completion_tokens.
+  // Prompts over 200k tokens bill at the higher $4/$18 long-context tier, which
+  // this flat entry does not model.
   'google/gemini-3.1-pro-preview': { input: 2.00, output: 12.00, thinking: 12.00 },
-  // Diff-pass model. Read from OpenRouter's own catalogue (GET /api/v1/models,
-  // 2026-09-06): pricing.prompt 0.0000002 and pricing.completion 0.0000012 per
-  // token → $0.20 / $1.20 per 1M. A reasoning model whose thinking bills at the
-  // completion rate, hence `thinking` = `output`. (The TEXT_MODELS description
-  // string still says ~$0.10/$0.60 — that is the stale figure, not this one.)
+  // ADDED — had no entry. Google list price is $0.75/$3.75 through 2026-12-31
+  // and $1.50/$7.50 from 2027-01-01 (ai.google.dev/gemini-api/docs/pricing,
+  // fetched 2026-09-18); OpenRouter's default route matches the current tier.
+  // Bump this line on 2027-01-01.
+  'google/gemini-3.7-flash': { input: 0.75, output: 3.75, thinking: 3.75 },
+  // Diff-pass model. Re-read 2026-09-18, unchanged. A reasoning model whose
+  // thinking bills at the completion rate, hence `thinking` = `output`. (The
+  // TEXT_MODELS description string still says ~$0.10/$0.60 — that is the stale
+  // figure, not this one; $0.10/$0.60 is one cheap OpenAI endpoint of five.)
   // Prompts over 272k tokens bill at $0.40/$1.80, which this flat entry does
-  // not model. OpenRouter's `direct_cost` stays authoritative where returned;
-  // this is the fallback so the call is not reported as $0.00.
+  // not model.
   'openai/gpt-5.6-luna-pro': { input: 0.20, output: 1.20, thinking: 1.20 },
   'openai/gpt-5.6-luna': { input: 0.20, output: 1.20, thinking: 1.20 },
+  // ADDED — had no entry. ⚠️ PUBLISHED AND BILLED DISAGREE: the catalogue's
+  // default route is $2.00/$10.00, but real Lab spend (1.34M in / 1.36M out,
+  // $39.48) implies ~2.4x that. Sol has seven endpoints from $1/$5 to $5.50/$33
+  // and throughput-sorted routing lands on the expensive end. direct_cost is
+  // recorded for these calls and overrides this entry, so the published rate is
+  // kept here rather than a route-specific one — but do not quote it as Sol's
+  // effective cost.
+  'openai/gpt-5.6-sol': { input: 2.00, output: 10.00, thinking: 10.00 },
+  'openai/gpt-5.6-sol-pro': { input: 2.00, output: 10.00, thinking: 10.00 },
+  'openai/gpt-4o-mini': { input: 0.15, output: 0.60 },  // ADDED — had no entry
+  'minimax/minimax-m3': { input: 0.30, output: 1.20 },  // ADDED — had no entry (description says 0.23/0.96)
+  // ADDED — had no entry, so the DEFAULT reviewer on outlineReviewModel,
+  // arcReviewModel, textAuditBlindModel and beatsReviewModel priced at $0.00
+  // wherever direct_cost was missing. xAI's own page and OpenRouter agree on
+  // $2.00/$6.00, and 983k in / 2.79M out billed $18.66 across prod+staging,
+  // which those rates predict to within 0.2%. ≥200k prompt: 4.00/12.00.
+  'x-ai/grok-4.6': { input: 2.00, output: 6.00, thinking: 6.00 },
+  // NOT IN THE OPENROUTER CATALOGUE 2026-09-18 — `qwen/qwen-max` returns no
+  // entry, so this price has no source. Kept for historical usage rows only.
+  'qwen/qwen-max': { input: 1.60, output: 6.40 },
 
-  // Grok Imagine models (fixed cost per image)
-  'grok-imagine-image': { perImage: 0.02 },
+  // ── Grok Imagine (fixed cost per image).
+  // Source: GET https://api.x.ai/v1/models + the per-model docs pages
+  // (docs.x.ai/docs/models/grok-imagine-image*), both fetched 2026-09-18.
+  // grok.js requests resolution '1k' everywhere and never sets a quality tier,
+  // so the 1K price is the one that applies. These numbers ARE the ledger for
+  // Grok: grokImageCost() reads them and reports the result as direct_cost.
+  'grok-imagine-image': { perImage: 0.02 },      // $0.02 at 1K and 2K alike — confirmed
+  // 1K low $0.04 (this entry) / 2K low $0.06 / 1K medium $0.06 / 2K medium
+  // $0.08. NOT MODELLED: xAI also bills $0.01 per INPUT image, and the edit
+  // path sends reference sheets — so a 2.0 edit with one reference really costs
+  // $0.05, not $0.04.
   'grok-imagine-image-2.0': { perImage: 0.04 },
-  'grok-imagine-image-pro': { perImage: 0.07 },
+  // Alias of `grok-imagine-image-quality`: 1K $0.05, 2K $0.07. Was 0.07 here —
+  // that is the 2K price, and nothing in this repo requests 2K.
+  'grok-imagine-image-pro': { perImage: 0.05 },
 
-  // Image generation models (fixed cost per image, not per token)
-  'gemini-2.5-flash-image': { perImage: 0.04 },
-  'gemini-3-pro-image-preview': { perImage: 0.15 },
+  // ── Image generation models (fixed cost per image, not per token).
+  // Gemini source: https://ai.google.dev/gemini-api/docs/pricing, fetched
+  // 2026-09-18 — image output is billed per token and the page states the
+  // per-image equivalents used here.
+  // 1290 tokens at $30/1M = $0.039 (was 0.04). ⚠️ Google lists this model as
+  // deprecated with shutdown on 2026-10-02.
+  'gemini-2.5-flash-image': { perImage: 0.039 },
+  // 1120 tokens at $120/1M = $0.134 for 1K/2K (was 0.15); 4K is $0.24. Input
+  // images add $0.0011 each, not modelled.
+  'gemini-3-pro-image-preview': { perImage: 0.134 },
+  // Runware publishes no per-model list price on any fetchable page (checked
+  // runware.ai/pricing 2026-09-18: "pricing varies across thousands of
+  // parameters", range $0.0006-$0.24). These three are UNVERIFIED fallbacks and
+  // are almost never reached: runware.js takes `result.cost` from the API
+  // response, i.e. the real charge, and only falls back to these on a response
+  // that omits it.
   'runware:5@1': { perImage: 0.0006 },  // FLUX Schnell
   'runware:6@1': { perImage: 0.004 },   // FLUX Dev
   'ace-plus-plus': { perImage: 0.005 }
@@ -1238,22 +1392,29 @@ function calculateImageCost(modelId, imageCount = 1) {
     return pricing.perImage * imageCount;
   }
 
-  // Resolve display name → backend via IMAGE_MODELS (e.g. 'grok-imagine' → backend 'grok')
   const imageModelConfig = IMAGE_MODELS[modelId];
-  if (imageModelConfig?.backend && IMAGE_BACKENDS[imageModelConfig.backend]) {
-    return IMAGE_BACKENDS[imageModelConfig.backend].costPerImage * imageCount;
-  }
-  // Also check the internal modelId (e.g. 'grok-imagine' → modelId 'grok-imagine-image')
+  // The model's OWN price before its backend's generic one — ORDER FIXED
+  // 2026-09-18. A backend holds one rate for a family whose members differ:
+  // asking for 'flux-dev' (runware:6@1, $0.004) returned the runware backend's
+  // $0.0006, i.e. FLUX Schnell's price, 6.7x under; 'grok-imagine-2' and
+  // 'grok-imagine-pro' both returned the grok backend's $0.02 instead of their
+  // own $0.04 / $0.05. The backend rate is the right answer only when the model
+  // itself has no line of its own, so it belongs after this, not before it.
   if (imageModelConfig?.modelId) {
     const internalPricing = MODEL_PRICING[imageModelConfig.modelId];
     if (internalPricing?.perImage) {
       return internalPricing.perImage * imageCount;
     }
   }
+  // Resolve display name → backend via IMAGE_MODELS (e.g. 'grok-imagine' → backend 'grok')
+  if (imageModelConfig?.backend && IMAGE_BACKENDS[imageModelConfig.backend]) {
+    return IMAGE_BACKENDS[imageModelConfig.backend].costPerImage * imageCount;
+  }
 
-  // Default to Gemini pricing if unknown
+  // Default to Gemini pricing if unknown — read from the backend rather than a
+  // fourth hardcoded copy of the same number.
   console.warn(`[COST] No image pricing found for model: ${modelId}, using default`);
-  return 0.035 * imageCount;
+  return IMAGE_BACKENDS.gemini.costPerImage * imageCount;
 }
 
 /**
@@ -1337,6 +1498,7 @@ module.exports = {
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,
   MODEL_PRICING,
+  PRICING_VERIFIED_ON,
   INPAINT_BACKENDS,
   REPAIR_DEFAULTS,
   // Cost calculation utilities

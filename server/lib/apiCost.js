@@ -107,7 +107,20 @@ async function buildApiCostReport({ pool, days = 7 }) {
       const imageModel = pickImageModel(fn.models);
 
       let tokenCost = 0;
-      if (input || output || thinking) {
+      // DOUBLE COUNT, fixed 2026-09-18. An OpenRouter TEXT call records BOTH
+      // direct_cost (OpenRouter's own reported charge — textModels asks for
+      // `usage: {include:true}`) AND its token counts, and the two were summed
+      // below, charging every such function twice. It was masked while the table
+      // under-priced deepseek-v4-pro 3.68x (the token half added only ~27% on
+      // top); at the corrected rates it would have become a clean 2x. The
+      // provider's own figure wins, exactly as storyJobPipeline's `functionCost`
+      // already does — the table is only ever the fallback.
+      // Narrow on purpose: only a TOKEN-priced function (no image model in the
+      // bucket) is suppressed. A mixed image+text function keeps the old
+      // behaviour, because there its direct_cost is the per-image charge and the
+      // text tokens really are billed on top.
+      const pricedByProvider = direct > 0 && !imageModel;
+      if ((input || output || thinking) && !pricedByProvider) {
         const fallback = PROVIDER_FALLBACK_MODEL[fn.provider];
         if (textModel) {
           tokenCost = calculateTextCost(textModel, {

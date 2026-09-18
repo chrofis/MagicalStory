@@ -530,7 +530,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
+    // Read the CONFIGURED quality model, never a hardcoded id: this line named
+    // 'gemini-2.0-flash' — a model Google shut down — while the judge actually
+    // running was MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and
+    // 6.25x the output price), so any quality-eval call that reached this
+    // fallback was priced at a sixth of its cost. Mirrors apiCost.js's
+    // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
+    gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
 
@@ -7837,7 +7843,13 @@ async function _processStoryJobImpl(jobId) {
   // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
+    // Read the CONFIGURED quality model, never a hardcoded id: this line named
+    // 'gemini-2.0-flash' — a model Google shut down — while the judge actually
+    // running was MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and
+    // 6.25x the output price), so any quality-eval call that reached this
+    // fallback was priced at a sixth of its cost. Mirrors apiCost.js's
+    // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
+    gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
 
