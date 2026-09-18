@@ -950,10 +950,12 @@ function replanChangeDirection(tag) {
  *             fewer. Under the ceiling there is room to add, so a removal is
  *             not what that finding asked for; at or over it, taking a name
  *             out to make room is exactly right and is allowed.
- *   balance   a page that takes another page's material with no page declaring
- *             the new material that freed number now stages, or the reverse.
- *             The book keeps its page count, so a merge and a split are one
- *             move and both halves are named.
+ *   balance   a page that takes another page's material where the freed page
+ *             declares no `material to page <N>` saying what it stages
+ *             instead, or the reverse. The book keeps its page count, so a
+ *             merge and a split are one move and both halves name each other's
+ *             page. `action in` — "this page now also stages X" — is the
+ *             common case, has its own verb, and is not judged here.
  *
  * @param {Object} args
  * @param {Array} args.changes   `parsePlanChanges().changes`
@@ -1034,20 +1036,30 @@ function reviewPlanChanges({ changes = [], standing = [], returned = [], castNam
   }
 
   // BALANCE: the book keeps its page count, so a merge frees exactly one number
-  // and that number is declared as staging something new.
-  const merges = list.filter(c => c.kind === 'material_from' && Number.isFinite(c.fromPage));
-  const fresh = list.filter(c => c.kind === 'new_material');
-  const freshPages = new Set(fresh.map(c => Number(c.pageNumber)));
-  const freedPages = new Set(merges.map(c => Number(c.fromPage)));
-  for (const c of merges) {
-    if (!freshPages.has(Number(c.fromPage))) {
-      refuse(c.pageNumber, 'balance', `page ${c.fromPage}'s material moves here and no page declares what page ${c.fromPage} now stages`, c.line);
+  // and BOTH halves of the move are declared, each naming the other's page.
+  //
+  // `action in` — "this page now also stages X" — is deliberately NOT a half of
+  // a merge and carries no obligation here. Until 2026-09-18 one verb, `new
+  // material`, meant both things, and this rule refused every use of it in the
+  // common sense: a widened shot answering CONSECUTIVE_SAME_SHOT_CAST (Lab
+  // 1327 p14) and a figure frozen behind the push answering CHECK[3] (Lab 1326
+  // p12) were both read as an unbalanced half of a page merge. Two verbs, so
+  // the strictness lands only where the page count is actually at stake.
+  const takes = list.filter(c => c.kind === 'material_from' && Number.isFinite(c.fromPage));
+  const gives = list.filter(c => c.kind === 'material_to' && Number.isFinite(c.toPage));
+  const givenBy = (freedPage, takerPage) => gives
+    .some(g => Number(g.pageNumber) === freedPage && Number(g.toPage) === takerPage);
+  const takenBy = (takerPage, freedPage) => takes
+    .some(t => Number(t.pageNumber) === takerPage && Number(t.fromPage) === freedPage);
+  for (const c of takes) {
+    if (!givenBy(Number(c.fromPage), Number(c.pageNumber))) {
+      refuse(c.pageNumber, 'balance', `page ${c.fromPage}'s material moves here and page ${c.fromPage} declares no "material to page ${c.pageNumber}" saying what it stages instead`, c.line);
       refuse(c.fromPage, 'balance', `its material moved to page ${c.pageNumber} and nothing was declared in its place`, c.line);
     }
   }
-  for (const c of fresh) {
-    if (!freedPages.has(Number(c.pageNumber))) {
-      refuse(c.pageNumber, 'balance', 'new material here, and no page declares taking over what this page used to stage', c.line);
+  for (const c of gives) {
+    if (!takenBy(Number(c.toPage), Number(c.pageNumber))) {
+      refuse(c.pageNumber, 'balance', `its material goes to page ${c.toPage} and page ${c.toPage} declares no "material from page ${c.pageNumber}"`, c.line);
     }
   }
   return { refusals, declaredOut, notes };

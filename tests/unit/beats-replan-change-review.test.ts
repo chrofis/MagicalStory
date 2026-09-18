@@ -77,9 +77,10 @@ describe('parsePlanChanges — the declaration is read as declared fields', () =
     'Page 5: cast in the main character — CHECK[3] — the page needs its owner',
     'Page 6: action to page 7 the rope going taut — CHECK[9] — the deed and its effect were one instant',
     'Page 7: material from page 6 — CHECK[9] — page 6 keeps the first action alone',
-    'Page 6: new material the rope going taut — CHECK[9] — the second action earns a picture',
+    'Page 6: material to page 7 the rope going taut — CHECK[9] — the freed number stages the second action',
     'Page 8: action out the second turn — CHECK[5] — the instant states position, not an action',
-    'Changes: 6',
+    'Page 9: action in the lamp lifted from the sill — CHECK[9] — the page now also stages the lift',
+    'Changes: 7',
   ].join('\n');
 
   const parsed = parsePlanChanges(BLOCK);
@@ -87,7 +88,7 @@ describe('parsePlanChanges — the declaration is read as declared fields', () =
   it('finds the block and every kind in the declared vocabulary', () => {
     expect(parsed.present).toBe(true);
     expect(parsed.changes.map((c: any) => c.kind)).toEqual([
-      'cast_out', 'cast_in', 'action_to', 'material_from', 'new_material', 'action_out',
+      'cast_out', 'cast_in', 'action_to', 'material_from', 'material_to', 'action_out', 'action_in',
     ]);
   });
 
@@ -108,11 +109,12 @@ describe('parsePlanChanges — the declaration is read as declared fields', () =
   it('re-counts the enumeration rather than trusting the declared total', () => {
     // A total is always self-certifiable: both numbers are kept so a caller can
     // see them disagree, and the enumeration is what code acts on.
-    expect(parsed.declaredCount).toBe(6);
-    expect(parsed.counted).toBe(6);
-    const lying = parsePlanChanges(BLOCK.replace('Changes: 6', 'Changes: 3'));
+    expect(parsed.declaredCount).toBe(7);
+    expect(parsed.counted).toBe(7);
+    expect(parsed.lines).toBe(7);
+    const lying = parsePlanChanges(BLOCK.replace('Changes: 7', 'Changes: 3'));
     expect(lying.declaredCount).toBe(3);
-    expect(lying.counted).toBe(6);
+    expect(lying.counted).toBe(7);
   });
 
   it('keeps a line it cannot read rather than dropping it', () => {
@@ -373,7 +375,7 @@ describe('reviewPlanChanges — a page is a bigger loss than a character', () =>
       changes: parsePlanChanges([
         '---CHANGES---',
         'Page 6: material from page 7 — CHECK[9] — page 7 held only position',
-        'Page 7: new material Ana setting the crate down — CHECK[9] — the effect earns its own picture',
+        'Page 7: material to page 6 Ana setting the crate down — CHECK[9] — the freed number stages the effect',
         'Changes: 2',
       ].join('\n')).changes,
       standing: STAND, returned: RET, castNames: ['Ana', 'Ben'], maxCast: 3,
@@ -390,13 +392,46 @@ describe('reviewPlanChanges — a page is a bigger loss than a character', () =>
     expect(r.refusals.every((x: any) => x.rule === 'balance')).toBe(true);
   });
 
-  it('refuses new material that no merge freed a number for', () => {
+  it('refuses a freed half whose material no page declares taking', () => {
     const r = reviewPlanChanges({
-      changes: parsePlanChanges('---CHANGES---\nPage 7: new material Ana setting the crate down — CHECK[9] — reasons\nChanges: 1').changes,
+      changes: parsePlanChanges('---CHANGES---\nPage 7: material to page 6 Ana setting the crate down — CHECK[9] — reasons\nChanges: 1').changes,
       standing: STAND, returned: RET, castNames: ['Ana', 'Ben'], maxCast: 3,
     });
     expect(r.refusals).toHaveLength(1);
     expect(r.refusals[0]).toMatchObject({ pageNumber: 7, rule: 'balance' });
+  });
+
+  it('refuses a pair whose halves name different pages', () => {
+    // Both halves declared, but page 5 never gave anything to page 6 — a merge
+    // is one move and the two halves have to name each other's number.
+    const r = reviewPlanChanges({
+      changes: parsePlanChanges([
+        '---CHANGES---',
+        'Page 6: material from page 7 — CHECK[9] — page 7 held only position',
+        'Page 5: material to page 6 Ana setting the crate down — CHECK[9] — reasons',
+        'Changes: 2',
+      ].join('\n')).changes,
+      standing: STAND, returned: RET, castNames: ['Ana', 'Ben'], maxCast: 3,
+    });
+    expect(r.refusals.map((x: any) => x.pageNumber).sort()).toEqual([5, 6, 7]);
+    expect(r.refusals.every((x: any) => x.rule === 'balance')).toBe(true);
+  });
+
+  it('leaves `action in` alone — staging one more thing is not half of a merge', () => {
+    // THE SECOND FAULT THE FIRST LIVE RUN FOUND (Lab 1326 p12, 1327 p14).
+    // `new material` was the only verb for "this page now also stages X", and
+    // the balance rule refused every such use because no merge freed a number.
+    // Both planner models hit it on their first attempt; the answer is two
+    // verbs, not a looser rule.
+    const r = reviewPlanChanges({
+      changes: parsePlanChanges([
+        '---CHANGES---',
+        'Page 6: action in Ben standing frozen a step behind — CHECK[3] — the page needs him visible and not lifting',
+        'Changes: 1',
+      ].join('\n')).changes,
+      standing: STAND, returned: RET, castNames: ['Ana', 'Ben'], maxCast: 3,
+    });
+    expect(r.refusals).toEqual([]);
   });
 });
 
@@ -452,6 +487,126 @@ describe('reviewPlanChanges — what it must NOT do', () => {
     });
     expect(r.refusals).toEqual([]);
     expect(r.notes.join(' ')).toMatch(/names no finding tag/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// THE FIRST LIVE RUN — Test Lab experiments 1326 and 1327, verbatim
+//
+// The blocks below are what two different planner models actually wrote on
+// 2026-09-18, the first time the declaration format was ever put to a live
+// model (staging job_1789681157795_wkt20ckod with claude-sonnet-4-6, and
+// job_1789147573901_m3uam0nxi). They are the only real output this format has,
+// so they are the fixtures.
+//
+// Both runs broke the same two rules, and the review fired three times across
+// them and was wrong all three times — no refusal was a removal the design
+// exists to catch. What these tests pin is that neither fault can MIS-READ a
+// block again: a packed line is split into its clauses, and a cast subject is
+// the name alone.
+// ---------------------------------------------------------------------------
+describe('the blocks the first live run produced', () => {
+  const BLOCK_1326 = [
+    '---CHANGES---',
+    'Page 1: action to page 2 Levin pulling red mittens tighter; new material Levin crouching at a leaf-drift with Julian leaning over his shoulder — CHECK[2] — the arrival and first sight of both brothers replaces a gesture that belonged to page 2',
+    "Page 4: cast out Julian; action to page 4 Max shouting at the egg on the ground — CHECK[1] — removing Julian leaves Max and Levin as the two who carry the discovery, making Max's shout the single felt moment",
+    "Page 6: cast out Max — CHECK[3] — two carry the spoken stake better than three and Max's presence added nothing the instant required",
+    'Page 7: action out egg resting on the sun-warmed stone; new material Max pointing at the rim while Levin watches with the egg — CHECK[9] — the moment before the egg is set down is the action; the egg already on the rim is the state after it',
+    'Page 8: cast in Levin; action out Kiaan standing opposite Tobias — PLAN[NO_COMMISSIONED_ON_PAGE] — Levin is a commissioned character and his presence makes the page legal; Kiaan is dropped to stay at two in frame',
+    'Page 9: cast out Julian; cast in Tobias — CHECK[1] — Tobias receiving the mittens is the necessary second figure and Julian is not required by the instant',
+    "Page 12: new material Julian standing frozen a step behind, arms at his sides — CHECK[3] — Julian's freeze is the story-demanded third presence; the fix requires him visible and not pushing so Levin can rally him on page 13",
+    "Page 13: action out Julian's hand now pressed to the stone; new material Levin's hand on Julian's shoulder and Julian's face turning toward the stone — CHECK[9] — the turn toward the stone is the action; Julian already pressing it is the state after",
+    "Page 16: cast out Zünsli lying still in Julian's hands; cast in Levin facing Tobias; action out others cannot reach the gap — CHECK[1] — one instant is kept: Tobias sitting on the stone shouting; Zünsli going still is the low-point material already carried by adjacent pages",
+    'Page 17: cast in Tobias kicking earth back into the hole — CHECK[11] — the antagonist whose action the digging works against must be named in the plan line',
+    'Changes: 10',
+  ].join('\n');
+
+  const BLOCK_1327 = [
+    '---CHANGES---',
+    'Page 4: cast in Levin — PLAN[NO_COMMISSIONED_ON_PAGE] — Levin must be in frame on this peopled page',
+    'Page 6: cast in Julian — PLAN[NO_COMMISSIONED_ON_PAGE] — Julian must be in frame on this peopled page so no commissioned page is empty of the cast',
+    'Page 11: cast in Julian; cast in Levin — PLAN[NO_COMMISSIONED_ON_PAGE] — both commissioned brothers must appear on this peopled page',
+    "Page 13: action out one guard's hand already moving toward the big scale — PLAN[CONSECUTIVE_SAME_SHOT_CAST] — page 13 and 14 were consecutive close-ups with one named character; keeping close-up on 13 but the shot change on 14 to wide breaks the consecutive same-shot pairing, so the guard's hand action stays as the instant and no further change to 13 is needed beyond confirming Julian carries it",
+    'Page 14: new material wide shot of Levin and Julian on summit with guard blocking crack — PLAN[CONSECUTIVE_SAME_SHOT_CAST] — changing page 14 from close-up to wide breaks the consecutive same-shot-same-cast sequence with page 13',
+    'Changes: 5',
+  ].join('\n');
+
+  const a = parsePlanChanges(BLOCK_1326);
+  const b = parsePlanChanges(BLOCK_1327);
+
+  it('counts CHANGES, not lines — the self-count certified the wrong thing', () => {
+    // "Changes: 10" over 18 actual changes, and "Changes: 5" over 6. A total
+    // that counts lines certifies nothing about a block that packs them, so the
+    // enumeration counts clauses and the caller sees the two disagree.
+    expect(a.lines).toBe(10);
+    expect(a.counted).toBe(18);
+    expect(a.declaredCount).toBe(10);
+    expect(b.lines).toBe(5);
+    expect(b.counted).toBe(6);
+    expect(b.declaredCount).toBe(5);
+  });
+
+  it('reads the packed page-16 line as its three changes, in order', () => {
+    const p16 = a.changes.filter((c: any) => c.pageNumber === 16);
+    expect(p16.map((c: any) => c.kind)).toEqual(['cast_out', 'cast_in', 'action_out']);
+    // THE MEASURED HARM. Before the split, only `cast out` matched and
+    // everything behind the semicolons was swallowed into its subject, so
+    // `namesIn` resolved Levin — the name being ADDED — as a name going OUT.
+    expect(p16[0].subject).toBe('Zünsli');
+    expect(p16[1].subject).toBe('Levin');
+  });
+
+  it('gives a cast line the bare name, so prose about a page cannot name a second figure', () => {
+    // `cast out <name> lying still in <other name>'s hands` resolved BOTH names
+    // against the cast list; the review then matched the second against that
+    // page's own OBSTACLES line and refused a correct fix.
+    const CAST = ['Levin', 'Julian', 'Max', 'Kiaan', 'Tobias', 'Zünsli'];
+    const declaredOut = reviewPlanChanges({
+      changes: a.changes, standing: [], returned: [], castNames: CAST, maxCast: 3,
+      obstacles: new Map([[16, ['Tobias']]]),
+    }).declaredOut;
+    expect(declaredOut.get(16)).toEqual(['Zünsli']);
+    expect(declaredOut.get(9)).toEqual(['Julian']);
+    expect([...declaredOut.values()].flat()).not.toContain('Levin');
+  });
+
+  it('records every format violation rather than accepting it silently', () => {
+    // 7 of 10 lines packed on 1326 and 1 of 5 on 1327 — measured on the first
+    // attempt of two different models, which is why the contract is recorded
+    // and not escalated into a paid re-ask.
+    const rules = (v: any[]) => v.reduce((m: any, x: any) => ({ ...m, [x.rule]: (m[x.rule] || 0) + 1 }), {});
+    expect(rules(a.violations)).toEqual({ packed: 7, cast_prose: 3, self_page: 1 });
+    expect(rules(b.violations)).toEqual({ packed: 1 });
+  });
+
+  it('catches the clause that was incoherent on its face', () => {
+    // "Page 4: … action to page 4 …" — a move to its own number declares no move.
+    const self = a.violations.filter((v: any) => v.rule === 'self_page');
+    expect(self).toHaveLength(1);
+    expect(self[0].pageNumber).toBe(4);
+  });
+
+  it('no longer knows the verb whose two meanings caused the other fault', () => {
+    // `new material` is retired: it meant both "this page now also stages X"
+    // and "this page took the number a merge freed", and the balance rule
+    // refused the first because no merge matched it. Both runs used it in the
+    // common sense and both were refused.
+    expect(a.changes.map((c: any) => c.kind)).not.toContain('new_material');
+    expect(b.changes.map((c: any) => c.kind)).not.toContain('new_material');
+    expect(PB.PLAN_CHANGE_VOCABULARY.map((v: any) => v.kind)).toContain('action_in');
+    expect(PB.PLAN_CHANGE_VOCABULARY.map((v: any) => v.kind)).toContain('material_to');
+    expect(PB.PLAN_CHANGE_VOCABULARY.map((v: any) => v.kind)).not.toContain('new_material');
+  });
+
+  it('the balance rule no longer fires on a page that merely stages one more thing', () => {
+    // 1326 p12 and 1327 p14 were both refused on balance for staging something
+    // additional. Neither is half of a merge, and nothing here refuses them now.
+    const CAST = ['Levin', 'Julian', 'Max', 'Kiaan', 'Tobias', 'Zünsli'];
+    const r = reviewPlanChanges({
+      changes: a.changes.filter((c: any) => c.pageNumber === 12),
+      standing: [], returned: [], castNames: CAST, maxCast: 3,
+    });
+    expect(r.refusals).toEqual([]);
   });
 });
 

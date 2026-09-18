@@ -6376,25 +6376,6 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
   ].join('\n').trimEnd();
 }
 
-/**
- * The change block's grammar, exactly as the planner is given it.
- *
- * ONE constant, so the format the prompt asks for and the format
- * `parsePlanChanges` reads cannot drift apart — a hand-kept copy on each side
- * is how a declared field quietly stops being parsed.
- *
- * The count comes LAST and is a re-count of the lines above it: a total is
- * always self-certifiable, and asking for it first invites an assertion.
- */
-const REPLAN_CHANGES_FORMAT = [
-  '',
-  '---CHANGES---',
-  'Page <N>: <the change> — <the finding it answers> — <why, one clause>',
-  'Changes: <how many lines stand above this one>',
-  '',
-  'One line per change. The change is one of: cast in <name>; cast out <name>; action out <the action>; action to page <M> <the action>; material from page <M>; new material <what this page now stages>. The finding it answers is its tag, PLAN[CODE] or CHECK[n]. The last line counts the lines above it.',
-].join('\n');
-
 /** A change line's declared finding tag: PLAN[CODE] or CHECK[n]. Null when it carries neither. */
 function parseFindingTag(text) {
   const t = String(text || '');
@@ -6405,20 +6386,124 @@ function parseFindingTag(text) {
   return null;
 }
 
-// The declared vocabulary, in match order — `action to page` before `action out`
-// so the longer form is never swallowed by the shorter one.
-const PLAN_CHANGE_GRAMMAR = [
-  [/^cast\s+in\b[:\s]*(.+)$/i, m => ({ kind: 'cast_in', subject: m[1].trim() })],
-  [/^cast\s+out\b[:\s]*(.+)$/i, m => ({ kind: 'cast_out', subject: m[1].trim() })],
-  [/^action\s+to\s+page\s+(\d+)\b[:\s]*(.*)$/i, m => ({ kind: 'action_to', toPage: Number(m[1]), subject: m[2].trim() })],
-  [/^action\s+out\b[:\s]*(.+)$/i, m => ({ kind: 'action_out', subject: m[1].trim() })],
-  [/^material\s+from\s+page\s+(\d+)\b[:\s]*(.*)$/i, m => ({ kind: 'material_from', fromPage: Number(m[1]), subject: m[2].trim() })],
-  [/^new\s+material\b[:\s]*(.*)$/i, m => ({ kind: 'new_material', subject: m[1].trim() })],
+/**
+ * THE CLOSED SET OF DECLARABLE CHANGES — one table, read twice.
+ *
+ * `syntax` is what the planner is shown; `re`/`build` is what
+ * `parsePlanChanges` reads. Generating the prompt sentence from the same list
+ * the parser matches on is what stops a verb from being renamed on one side and
+ * left standing on the other — a hand-kept copy on each side is how a declared
+ * field quietly stops being parsed.
+ *
+ * TWO VERBS FOR TWO MEANINGS (2026-09-18, Lab 1326 and 1327). `new material`
+ * used to be the only way to say either "this page now also stages X" or "this
+ * page took the number a merge freed", and the balance rule refuses the second
+ * when no `material from page N` matches it. Both planner models reached for the
+ * word in its common sense — a widened shot, a figure frozen behind the push —
+ * and both were refused. `action in` is the common case and carries no
+ * page-count obligation; `material to page <M>` is the freed half of a merge and
+ * names the page that took its material, so the balance rule can pair the two
+ * halves by number. A model reaching for "this page now stages X" cannot land on
+ * the merge verb by accident: the merge verb demands a page number it has none of.
+ *
+ * Match order is the order shown; no verb here is a prefix of another.
+ */
+const PLAN_CHANGE_VOCABULARY = [
+  {
+    kind: 'cast_in',
+    bareName: true,
+    syntax: 'cast in <name>',
+    re: /^cast\s+in\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'cast_out',
+    bareName: true,
+    syntax: 'cast out <name>',
+    re: /^cast\s+out\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'action_in',
+    syntax: 'action in <the action this page now stages>',
+    re: /^action\s+in\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'action_out',
+    syntax: 'action out <the action this page no longer stages>',
+    re: /^action\s+out\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'action_to',
+    syntax: 'action to page <M> <the action>',
+    re: /^action\s+to\s+page\s+(\d+)\b[:\s]*(.*)$/i,
+    build: m => ({ toPage: Number(m[1]), subject: m[2].trim() }),
+  },
+  {
+    kind: 'material_from',
+    syntax: 'material from page <M>',
+    re: /^material\s+from\s+page\s+(\d+)\b[:\s]*(.*)$/i,
+    build: m => ({ fromPage: Number(m[1]), subject: m[2].trim() }),
+  },
+  {
+    kind: 'material_to',
+    syntax: 'material to page <M> <what this page stages instead>',
+    re: /^material\s+to\s+page\s+(\d+)\b[:\s]*(.*)$/i,
+    build: m => ({ toPage: Number(m[1]), subject: m[2].trim() }),
+  },
 ];
+
+/**
+ * The change block's grammar, exactly as the planner is given it.
+ *
+ * The vocabulary sentence is generated from `PLAN_CHANGE_VOCABULARY`, so the
+ * set the prompt offers is the set the parser reads.
+ *
+ * ONE LINE, ONE CHANGE is stated as a contract because it was broken on the
+ * first live attempt by both planner models: 7 of 10 change lines on Lab 1326
+ * and 1 of 5 on 1327 packed several changes behind semicolons, and on one page
+ * that made the review read a `cast in` as a `cast out` and refuse a correct
+ * fix. The parser now splits such a line rather than mis-reading it; the
+ * contract is here so the violation is a violation and not the house style.
+ *
+ * The count comes LAST and is a re-count of the lines above it: a total is
+ * always self-certifiable, and asking for it first invites an assertion.
+ */
+const REPLAN_CHANGES_FORMAT = [
+  '',
+  '---CHANGES---',
+  'Page <N>: <the change> — <the finding it answers> — <why, one clause>',
+  'Changes: <how many lines stand above this one>',
+  '',
+  `One line, one change: a page you changed in two ways gets two lines, each repeating its page number, and no line holds two changes. The change is one of: ${PLAN_CHANGE_VOCABULARY.map(v => v.syntax).join('; ')}. A cast line gives the name alone, with nothing after it. A merge is two lines: the page that takes the material declares material from page <M>, and page <M> declares material to page <N> with what it stages instead. The finding it answers is its tag, PLAN[CODE] or CHECK[n]. The last line counts the lines above it.`,
+].join('\n');
 
 // The plan line's own column separator, so a change line is split the same way
 // a plan line is (planCounters.SEGMENT_SPLIT).
 const CHANGE_FIELD_SPLIT = /\s+[—–]\s+|\s+--\s+/;
+
+// Several changes behind semicolons on one line. Splitting here is what keeps a
+// packed line from being MIS-read: without it only the first verb matches and
+// everything after it is swallowed into the first change's subject.
+const CHANGE_CLAUSE_SPLIT = /\s*;\s*/;
+
+// A cast line's subject is the character and nothing else, so the bare name is
+// the leading run of capitalised words and the first word that does not start
+// with a capital begins the prose. Measured (Lab 1326 p16): the subject
+// `<name> lying still in <other name>'s hands` resolved BOTH names against the
+// cast list, so a second figure was recorded as removed and a correct fix was
+// refused. A subject that starts lower-case (an article, a lower-case name) is
+// kept whole — no worse than before the split existed.
+const BARE_NAME_RUN = /^(\p{Lu}[^\s]*(?:\s+\p{Lu}[^\s]*)*)(\s+\S[\s\S]*)?$/u;
+
+function splitBareName(subject) {
+  const s = String(subject || '').trim();
+  const m = s.match(BARE_NAME_RUN);
+  if (!m) return { name: s, trailing: '' };
+  return { name: m[1].trim(), trailing: String(m[2] || '').trim() };
+}
 
 /**
  * A re-plan's `---CHANGES---` block — the structural edits it DECLARES.
@@ -6433,14 +6518,24 @@ const CHANGE_FIELD_SPLIT = /\s+[—–]\s+|\s+--\s+/;
  * caller then treats every structural change as undeclared, which is exactly
  * the behaviour the re-plan merge had before 2026-09-18.
  *
- * @returns {{present:boolean, changes:Array, declaredCount:(number|null), counted:number}}
+ * FORGIVING, NEVER SILENT. The contract is one change per line; the parser
+ * still splits a packed line into its clauses and reads each one, so a
+ * violation can never be MIS-read — it is read correctly and recorded in
+ * `violations`. `counted` counts CHANGES, not lines, because a total that
+ * counts lines certifies nothing about a block that packs them: 1326 declared
+ * "Changes: 10" over 18 actual changes.
+ *
+ * @returns {{present:boolean, changes:Array, declaredCount:(number|null),
+ *            counted:number, lines:number, violations:Array}}
  */
 function parsePlanChanges(raw) {
   const full = String(raw || '');
   const m = full.match(/---\s*CHANGES\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i);
-  if (!m) return { present: false, changes: [], declaredCount: null, counted: 0 };
+  if (!m) return { present: false, changes: [], declaredCount: null, counted: 0, lines: 0, violations: [] };
   const changes = [];
+  const violations = [];
   let declaredCount = null;
+  let lines = 0;
   for (const rawLine of m[1].split('\n')) {
     const line = rawLine.trim().replace(/\*\*/g, '').trim();
     if (!line) continue;
@@ -6448,24 +6543,58 @@ function parsePlanChanges(raw) {
     if (total) { declaredCount = Number(total[1]); continue; }
     const p = line.match(/^(?:\d+[.)]\s*)?(?:Page|Seite|Pagina)\s*(\d+)\s*[:.)-]\s*(.+)$/i);
     if (!p) continue;
+    lines++;
+    const pageNumber = Number(p[1]);
     const fields = String(p[2]).split(CHANGE_FIELD_SPLIT).map(s => s.trim()).filter(Boolean);
-    const what = fields[0] || '';
     const answersText = fields[1] || '';
-    let parsed = { kind: 'other', subject: what };
-    for (const [re, build] of PLAN_CHANGE_GRAMMAR) {
-      const hit = what.match(re);
-      if (hit) { parsed = build(hit); break; }
+    const answers = parseFindingTag(answersText);
+    const reason = fields.slice(2).join(' — ');
+    const clauses = String(fields[0] || '').split(CHANGE_CLAUSE_SPLIT).map(s => s.trim()).filter(Boolean);
+    if (clauses.length > 1) {
+      violations.push({
+        pageNumber,
+        rule: 'packed',
+        detail: `one line declares ${clauses.length} changes; the contract is one change per line`,
+        line,
+      });
     }
-    changes.push({
-      pageNumber: Number(p[1]),
-      ...parsed,
-      answers: parseFindingTag(answersText),
-      answersText,
-      reason: fields.slice(2).join(' — '),
-      line,
-    });
+    for (const clause of (clauses.length ? clauses : [''])) {
+      let parsed = { kind: 'other', subject: clause };
+      for (const v of PLAN_CHANGE_VOCABULARY) {
+        const hit = clause.match(v.re);
+        if (!hit) continue;
+        parsed = { kind: v.kind, ...v.build(hit) };
+        if (v.bareName) {
+          const { name, trailing } = splitBareName(parsed.subject);
+          if (trailing) {
+            violations.push({
+              pageNumber,
+              rule: 'cast_prose',
+              detail: `"${clause}" describes the character; a cast line gives the name alone`,
+              line,
+            });
+          }
+          parsed.subject = name;
+        }
+        break;
+      }
+      // A move or a merge that points at its own number declares nothing —
+      // "Page 4: action to page 4 …" was written on the first live run.
+      const selfTarget = (parsed.kind === 'action_to' || parsed.kind === 'material_to')
+        ? parsed.toPage
+        : (parsed.kind === 'material_from' ? parsed.fromPage : null);
+      if (selfTarget != null && Number(selfTarget) === pageNumber) {
+        violations.push({
+          pageNumber,
+          rule: 'self_page',
+          detail: `"${clause}" points at its own page number, so it declares no move`,
+          line,
+        });
+      }
+      changes.push({ pageNumber, ...parsed, answers, answersText, reason, clause, line });
+    }
   }
-  return { present: true, changes, declaredCount, counted: changes.length };
+  return { present: true, changes, declaredCount, counted: changes.length, lines, violations };
 }
 
 /**
@@ -8866,6 +8995,7 @@ module.exports = {
   buildReplanSection,
   parsePlanChanges,
   REPLAN_CHANGES_FORMAT,
+  PLAN_CHANGE_VOCABULARY,
   replanRank,
   findingPages,
   buildArcReviewPrompt,

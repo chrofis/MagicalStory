@@ -8991,7 +8991,7 @@ function analyzeReplanCompliance({
     .map(pg => Number(pg.pageNumber));
   const restoredPages = changedRaw.filter(n => !changedApplied.includes(n));
 
-  // ── the eight checks ──────────────────────────────────────────────────────
+  // ── the plumbing checks ───────────────────────────────────────────────────
   const norm = s => String(s || '').trim().replace(/\*\*/g, '').trim();
   const isCountLine = l => /^changes?\s*:\s*\d+\s*$/i.test(l);
   const blockRaw = rawChangesBlock(replanText);
@@ -9037,6 +9037,16 @@ function analyzeReplanCompliance({
     check(8, obstacleLines.length > 0 && obstacles.size === namedObstacleLines.length,
       `parsePlanCheckObstacles read ${obstacles.size} page(s) from ${namedObstacleLines.length} line(s) naming somebody (${obstacleLines.length} raw)`,
       { parsedPages: [...obstacles.keys()].sort((a, b) => a - b) }),
+    // ONE LINE, ONE CHANGE. The parser reads a packed line correctly rather
+    // than mis-reading it, so this check costs the round nothing — it is the
+    // measurement of how often the planner keeps the contract, which is what
+    // decides whether an escalation is ever worth a paid re-ask.
+    check(9, declared.present && declared.violations.length === 0,
+      `${declared.violations.length} format violation(s) across ${declared.lines} change line(s): ${
+        declared.violations.length
+          ? [...new Set(declared.violations.map(v => v.rule))].join(', ')
+          : 'one change per line, every cast subject a bare name'}`,
+      { formatViolations: declared.violations, changeLines: declared.lines }),
   ];
 
   return {
@@ -9050,6 +9060,12 @@ function analyzeReplanCompliance({
     declaredChanges: declared.changes.map(c => ({
       page: c.pageNumber, kind: c.kind, subject: c.subject, answers: c.answersText, reason: c.reason,
     })),
+    // How many CHANGES the block declared, over how many lines, and every way
+    // the format was broken — the violation rate an escalation decision needs.
+    declaredCount: declared.declaredCount,
+    changesParsed: declared.counted,
+    changeLines: declared.lines,
+    formatViolations: declared.violations,
     refusals: review.refusals,
     reviewNotes: review.notes,
     undeclaredRemovals: lost,
@@ -9182,7 +9198,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
       input_tokens: (checkRes.usage?.input_tokens || 0) + (rpRes.usage?.input_tokens || 0),
       output_tokens: (checkRes.usage?.output_tokens || 0) + (rpRes.usage?.output_tokens || 0),
     },
-    note: `${verdict.passed}/8 plumbing checks pass — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}`,
+    note: `${verdict.passed}/${verdict.checks.length} plumbing checks pass — ${verdict.changesParsed} change(s) on ${verdict.changeLines} line(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s) — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}`,
     // `report` is what the Lab renders for this stage (client TestLab.tsx).
     // The applied division travels beside it rather than inside: the rendered
     // block stays the verdict, not a second copy of the page plan.
@@ -9390,7 +9406,7 @@ module.exports = {
   // vote withheld a rename, and how that classifies against a pixel-judged
   // verdict (tests/unit/testlab-identity-second-opinion.test.ts).
   runIdentitySecondOpinionStage,
-  // The re-plan compliance verdict, exported so the eight plumbing checks and
+  // The re-plan compliance verdict, exported so the plumbing checks and
   // the no-op comparison can be pinned on canned responses — no model, no
   // database (tests/unit/testlab-beats-replan.test.ts).
   analyzeReplanCompliance,

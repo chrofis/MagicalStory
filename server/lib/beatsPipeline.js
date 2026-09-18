@@ -1382,7 +1382,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         // and a count that disagrees with the enumeration is the enumeration's
         // word against an assertion. The lines win; the discrepancy is reported.
         if (declared.present && declared.declaredCount != null && declared.declaredCount !== declared.counted) {
-          gl.warn('beats_replan_change_count', `Round ${round}: the change block declares ${declared.declaredCount} change(s) and enumerates ${declared.counted}; the enumeration stands`, null, { round, declared: declared.declaredCount, counted: declared.counted });
+          gl.warn('beats_replan_change_count', `Round ${round}: the change block declares ${declared.declaredCount} change(s) and enumerates ${declared.counted} across ${declared.lines} line(s); the enumeration stands`, null, { round, declared: declared.declaredCount, counted: declared.counted, lines: declared.lines });
+        }
+        // ONE LINE, ONE CHANGE — recorded, not re-asked (2026-09-18). The
+        // parser splits a packed line into its clauses rather than mis-reading
+        // it, so a violation costs the round nothing; it is recorded because a
+        // format nobody polices is not a format. A re-ask is deliberately NOT
+        // wired: both planner models broke the contract on the first live
+        // attempt (Lab 1326: 7 of 10 lines; 1327: 1 of 5), so an automatic
+        // re-ask would buy a paid call on most rounds for a fault the parser
+        // already absorbs.
+        if (declared.violations.length) {
+          const detail = declared.violations.map(v => `p${v.pageNumber} (${v.rule})`).join(', ');
+          log.warn(`⚠️ [BEATS] Round ${round}: ${declared.violations.length} declared change(s) break the change-block format (${detail}) - read clause by clause, not refused`);
+          gl.warn('beats_replan_change_format', `Round ${round}: ${declared.violations.length} declared change(s) break the one-line-one-change format — ${detail}; each was read clause by clause rather than refused`, null, { round, violations: declared.violations });
         }
         const unreadable = declared.changes.filter(c => c.kind === 'other');
         if (unreadable.length) {

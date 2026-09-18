@@ -81,9 +81,16 @@ const passed = (v: any, id: number) => v.checks.find((c: any) => c.id === id).pa
 describe('a compliant re-plan', () => {
   const v = run(PAGE_PLAN + '\n' + CHANGES);
 
-  it('passes all eight plumbing checks', () => {
+  it('passes every plumbing check', () => {
     expect(v.failed).toEqual([]);
-    expect(v.passed).toBe(8);
+    expect(v.passed).toBe(9);
+    expect(v.checks).toHaveLength(9);
+  });
+
+  it('keeps the one-line-one-change contract, so nothing is recorded against it', () => {
+    expect(v.formatViolations).toEqual([]);
+    expect(v.changeLines).toBe(2);
+    expect(v.changesParsed).toBe(2);
   });
 
   it('declares every removal, so nothing is restored as undeclared', () => {
@@ -172,6 +179,35 @@ describe('a change block in a shape the parser reads only partly', () => {
     expect(v.declaredChanges.map((c: any) => c.kind)).toContain('other');
     // And because the vocabulary failed, the removal is undeclared after all.
     expect(v.undeclaredRemovalCount).toBe(1);
+  });
+
+  it('a packed line is read clause by clause, not mis-read, and recorded', () => {
+    // THE FAULT THE FIRST LIVE RUN FOUND (Lab 1326, 7 of 10 lines; 1327, 1 of
+    // 5). Before the split only the first verb matched and everything behind
+    // the semicolons was swallowed into its subject, which `namesIn` then
+    // resolved over — on one page that read a `cast in` as a `cast out` and
+    // refused a correct fix. The remedy is to read it correctly AND record it.
+    const v = run(PAGE_PLAN + '\n' + CHANGES.replace(
+      'Page 4: cast out Julian \u2014 CHECK[3] \u2014 four names in one frame and the page was at the ceiling',
+      'Page 4: cast out Julian; cast out Max \u2014 CHECK[3] \u2014 four names in one frame and the page was at the ceiling',
+    ));
+    expect(v.changeLines).toBe(2);
+    expect(v.changesParsed).toBe(3);
+    expect(v.declaredChanges.map((c: any) => c.subject)).toEqual(['Levin', 'Julian', 'Max']);
+    expect(v.formatViolations.map((x: any) => x.rule)).toEqual(['packed']);
+    expect(passed(v, 9)).toBe(false);
+    // Read correctly means reviewed: neither removal is a silent one.
+    expect(v.undeclaredRemovalCount).toBe(0);
+  });
+
+  it('a cast subject carrying prose is cut to the bare name and recorded', () => {
+    const v = run(PAGE_PLAN + '\n' + CHANGES.replace(
+      'Page 4: cast out Julian \u2014 CHECK[3]',
+      "Page 4: cast out Julian standing at the end of Max's line \u2014 CHECK[3]",
+    ));
+    expect(v.declaredChanges.find((c: any) => c.page === 4).subject).toBe('Julian');
+    expect(v.formatViolations.map((x: any) => x.rule)).toEqual(['cast_prose']);
+    expect(passed(v, 9)).toBe(false);
   });
 
   it('a line with no finding tag fails the tag check', () => {

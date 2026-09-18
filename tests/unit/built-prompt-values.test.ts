@@ -545,10 +545,24 @@ describe('the re-plan asks for only the pages it changes', () => {
     // reads has to be proven present in the string the model sees.
     const p = replanPrompt();
     expect(p).toContain(PB.REPLAN_CHANGES_FORMAT.trim());
-    for (const kind of ['cast in <name>', 'cast out <name>', 'action out <the action>',
-      'action to page <M>', 'material from page <M>', 'new material']) {
-      expect(p, `the declared vocabulary lost "${kind}"`).toContain(kind);
+    // The sentence the planner reads is GENERATED from the table the parser
+    // matches on, so every verb in the closed set has to be in the built string.
+    for (const v of PB.PLAN_CHANGE_VOCABULARY) {
+      expect(p, `the declared vocabulary lost "${v.syntax}"`).toContain(v.syntax);
     }
+    expect(PB.PLAN_CHANGE_VOCABULARY.map((v: any) => v.kind)).toEqual([
+      'cast_in', 'cast_out', 'action_in', 'action_out', 'action_to', 'material_from', 'material_to',
+    ]);
+    // The retired verb is gone from the prompt too — `new material` meant both
+    // "this page now also stages X" and "this page took the number a merge
+    // freed", and a model reaching for the first landed on the balance rule.
+    expect(p).not.toContain('new material');
+    // ONE LINE, ONE CHANGE is a stated contract, not an implied one: both
+    // planner models packed several changes behind semicolons on their first
+    // live attempt (Lab 1326 and 1327).
+    expect(p).toContain('One line, one change');
+    expect(p).toMatch(/no line holds two changes/);
+    expect(p).toMatch(/A cast line gives the name alone/);
     // The total is re-counted, never asserted up front.
     expect(p).toMatch(/counts the lines above it/);
   });
