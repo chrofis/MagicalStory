@@ -21,6 +21,175 @@ superseded and link forward.
 
 ---
 
+## 2026-09-18 — A plan line may carry the cast without naming it: the ROSTER says who a collective reference covers
+
+**Context.** `runPlanCounters` decided who stood on a page by matching cast names **literally** in
+the plan line's who column (`namesIn(whoColumn(line))`). A who column that carries the commissioned
+cast as a GROUP therefore read as holding nobody, and `NO_COMMISSIONED_ON_PAGE` — one of the five
+`REPLAN_MUST_FIX_CODES` — fired on it. On staging `job_1789681157795_wkt20ckod` ("Das Ei im
+Lindenhof") the code named pages 8, 12, 16 and 18, and **two of the four were false**: p12 *"all four
+boys braced shoulder to shoulder against the big wedged stone in the gap"* and p18 *"…the four boys
+sitting together in the leaf-scattered dark"* hold the whole commissioned cast, referred to as a
+group. The re-plan answered 16 and 18 by **deleting the story's invented antagonist**, which cost
+three of that book's six CRITICAL image faults. `97ccc4128` (the entry below) stopped the deletion
+and deliberately left the false alarm standing; this is the other half.
+
+It is not a one-story quirk. Over the whole stored corpus — 109 `beatsReviewReport` rows, 90 staging
++ 19 production — the code has **95 page-hits, and 40 of them (42%) are collective references to the
+commissioned cast**, spread over **16 stored rows / 15 distinct job ids** (15 staging rows, and one
+production row that is the same job id as a staging one). Beyond the motivating story: `csjcyp1q9`
+p2 *"all five children in the kitchen"*, `xqmtk2gcs` p8 *"the whole line of children moving onto the
+Holzbrücke"*, `d7472jys3` p4 *"the whole patrol seen from behind"*.
+
+**Decision.** The language question goes to the model; the arithmetic stays in code.
+
+1. **`prompts/plan-check.txt`'s ROSTER gains a third field, `covers`** — the names a who column
+   reaches without naming them (a count of the cast, a word for the group, a description standing in
+   for one figure), written out one by one. The output contract becomes
+   `ROSTER <page>: people = …; things = …; covers = …`. **No pattern and no noun list in code**:
+   recognising *"all four boys"* or *"the children"* in prose is language, and the thing-marker
+   grammar (deleted 2026-09-11) and the mirror-guard (removed 2026-08-09) are what pattern-matching
+   prose in code has cost before.
+2. **`people` keeps its meaning** — only what the column NAMES — so `resolveCast`, `cast.invented`
+   and every `ARC_INVENTED_*` cross-check riding on it are byte-identical. `covers` adds per-page
+   presence and nothing else.
+3. **Credit is re-counted, never trusted.** `coveredNames()` (`planCounters.js`) credits a claim only
+   where it resolves — through the same `namesIn` the counters and the re-plan guard use, aliases
+   included — to a character the book already has. An unknown name is dropped and logged; a `covers`
+   that enumerates nobody (*"the whole cast"*) credits nobody and the finding stands. That is the
+   arc's invented-figure rule (2026-09-09) one stage later: **an enumeration cannot be
+   self-certified.**
+4. **What was credited is stored**: `counterStats.castPerPage[].covered`, present only when the
+   roster declared coverage, so a stored report says whether the model used the field at all.
+5. `parsePlanCheckRoster` reads `covers` as OPTIONAL — a roster line without it parses exactly as
+   before, and a `things` value carrying its own semicolon still lands whole in `things`.
+
+**Rationale — measured by replay over both environments.** 28 stories carry both a resolved cast and
+their plan lines: 55 check rounds, 880 page-readings. The replay reproduces the stored
+`NO_COMMISSIONED_ON_PAGE` **exactly on 28/28 first-division rounds** (19/27 rechecks, where the
+second division is reconstructed rather than stored).
+
+| replay arm | rounds differing | page-hits cleared | page-hits newly raised |
+|---|---|---|---|
+| the field ABSENT (the model ignores it) | **0 / 55** | 0 | 0 |
+| the 40 collective pages covered | 20 / 55 | **exactly those 40** | **0** |
+
+- **Inert until the model answers it.** 55/55 rounds identical with `covers` absent. Nothing changes
+  on any stored story unless the check's model fills the field in.
+- **Nothing true is lost.** The 40 genuine hits and the 14 other-class false alarms all stay flagged,
+  and every round's removal set is exactly its covered set.
+- **The same false absence was being counted four more ways.** 21 further findings go with the 40:
+  6 `INVENTED_DOMINANT_EXCESS`, 7 `INVENTED_DOMINANT_CONSECUTIVE`, 6 `UNDER_COVERED_CHARACTER`,
+  2 `MAIN_UNDER_HALF`.
+- **Three new `CAST_OVER_CEILING` findings**, each on a page whose roster had already mislabelled one
+  to three places as people (`Limmat`; `Uetliberg` with its two towers). Without the mislabel those
+  pages hold 6 and 4 against a ceiling of 6. That is a known people-vs-things roster fault amplified,
+  not this rule — and `CAST_OVER_CEILING` is not a must-fix code: it is answered by a justification
+  in the plan line, never by a deletion.
+- **The generator deliberately does not move.** `plan-generator-vs-critic` was checked and excused:
+  this is the critic's OUTPUT FORMAT, not a constraint a plan must satisfy. `story-beats.txt:42`
+  already tells the planner to write the whole-cast page as one group (*"all sharing one simple
+  action or seen from behind moving off"*), so a collective who column is a line the planner wrote
+  **by the book** and the counter was misreading. No counter's rule changed, and the planner gets no
+  new permission — only fewer false findings.
+
+**Unproven, and stated as such.** No run has been made, so nothing yet shows the check's model
+actually emits `covers`. The cheapest settlement is a `plan_check_replay` Lab stage — there is no Lab
+stage for the plan check at all — tracked in `tasks/BACKLOG.md`.
+
+**Correction to the commit message.** `d7c5da362` says the 40 collective hits span *"over 17
+stories"*. The measured figure is **16 stored rows / 15 distinct job ids**. Every other number in
+that message is as measured; an amend was not available, so the correct number lives here.
+
+**Touched files.** `prompts/plan-check.txt` (§ THE ROSTER and the `ROSTER <page>:` output contract),
+`server/lib/promptBuilders.js` (`parsePlanCheckRoster`), `server/lib/planCounters.js`
+(`coveredNames`, the row build, `stats.castPerPage`), `tests/unit/plan-collective-cast.test.ts`
+(19 tests, fixtures verbatim from the motivating story's first division).
+**Status:** ✅ active, prompt half unverified — commit `d7c5da362`, staging, not pushed.
+
+## 2026-09-18 — The third identity witness does contradict the detector, and its one measured veto is the page it was built for
+
+**Context.** `4ef21cc6c` (its entry below) gave a contested identity page a third witness with a
+**veto-only** vote: detector + witness renames as today, evaluator + witness withholds, a third name
+/ silence / a failed call renames as today. The plumbing was proven byte-identical under every
+stubbed witness that does not contradict the detector (1,194/1,194 staging versions, 317/317
+production). What it could not prove — and what it named as the thing most likely to make the
+mechanism worthless — is whether the REAL witness ever contradicts the detector at all. It answers
+the same question, from the same badged image, under the same prompt (one that ranks clothing first
+and demotes position to *"a supporting hint only"*, `figureDetection.js:1222`), and all 19 stored
+answers came from `gemini-full`: model diversity is real, question diversity is not. *Expect
+confirmation for reasons that are not evidence.*
+
+**Decision.** Measure it before anything is built on top of it — and on the measurement, the
+mechanism stays. A new Lab stage `identity_second_opinion` replays
+`reconcileIdentityWithSecondWitness` over ONE stored version and nothing else: the stored page image
+at a **pinned** `versionIndex` (the active version of a page is routinely not the contested one, so
+a pin is mandatory), the stored `bboxDetection.figures[]` and `expectedCharacters`, and the
+evaluator's OWN names un-renamed via `evaluatorReference` — a stored match whose name the detector
+overwrote would otherwise hand the witness a page the two sides already agree on. No DINO, no SAM,
+no primary identity call, so the witness is the only moving part; the existing `bbox` stage would
+move the boxes, the conflict and the witness at once. `reconcileIdentity` runs on the same inputs
+with no witness, so an entry reports what the vote CHANGED (`renamesWithheld`) and not merely what
+the witness said, and `params.groundTruth` (`'detector'` | `'evaluator'`) carries a pixel verdict as
+data on the target, so an entry classifies its own veto as true or false rather than against a table
+baked into a file.
+
+**Rationale — experiment 1325, all 19 staging trigger versions, 2026-09-18 19:01:36 → 19:03:42 CH,
+~$0.07.**
+
+- **The witness does NOT merely echo the detector.** 40 per-conflict votes across the 19 versions:
+  **detector 32, evaluator 3, a third name 3, silent 2.** It withheld a rename on **3 of 19
+  versions** — **16 of the 89 renames** the synchronous path would have made (18%). The suspicion was
+  right about the direction and wrong about it being total.
+- **Against the pixel-judged versions: 0 false vetoes, 1 true veto.** All five detector-right
+  versions renamed unchanged. The true veto is `job_1789584708605_rts4wqupm` **p18 v0** — the exact
+  page this mechanism was built for, which shipped at **q=45** with four boys relabelled where the
+  evaluator had all four right.
+- **One missed veto, exactly where `4ef21cc6c` predicted it by name.** `wkt20ckod` **p12 v1** is the
+  page whose corrupted channel IS clothing, and the prompt leads with clothing: the witness went
+  silent on one contested figure and backed the detector on the other, so the page renamed as today.
+  A clothing-led question cannot break a clothing-corrupted tie — the prediction is confirmed on its
+  own motivating page.
+
+| outcome | versions | renames withheld |
+|---|---|---|
+| agreed with the detector on every conflict | 14 | 0 |
+| **true veto** — `rts4wqupm` p18 v0 | 1 | 3 |
+| withheld, no pixel verdict — `ll5dyf4k8g` p4 v0, `z9bwoo3yp` p16 v2 | 2 | 13 |
+| missed veto — `wkt20ckod` p12 v1 | 1 | 0 |
+| **totals** (witness model: `qwen-vl-full` 16, `haiku-full` 3) | **19** | **16 of 89** |
+
+**Three caveats the run produced, none of them softened.**
+
+1. **Provenance is thinner than "7 judged".** Lab set 66 / experiment 1324 ran **unpinned** page
+   targets, so it judged `m3uam0nxi` p2 on **v1**, `vxnu60yjg` p16 on **v0** and `wkt20ckod` p12 on
+   **v1**; `rts4wqupm` p18 v0 was judged in `4ef21cc6c` itself. **Only 4 versions were judged on
+   their own pixels** — `m3uam0nxi` p2 v0 and `vxnu60yjg` p16 v1 and v3 INHERIT a verdict from a
+   different render.
+2. **The witness is not always the model the design names.** The SoM chain falls through on failure:
+   **3 of 19** targets met `Qwen-VL HTTP 429` and were silently answered by `haiku-full` — and one of
+   those (`z9bwoo3yp` p16 v2) produced a withhold that Qwen did not produce on the same page's other
+   versions. The witness's identity is a function of rate-limit luck.
+3. **A confused witness can still veto.** On `ll5dyf4k8g` **p4 v0** (a 4-conflict page) the witness
+   named a third party on **2 of 4** figures — it plainly had not read the page — and matched the
+   evaluator on 1. That single coincidental match **withheld all 9 renames**. The vote requires
+   **agreement, not coherence**, and no pixels have been judged on that page.
+
+**Where the experiment ran.** The stage is committed but **not deployed** — nothing had been pushed
+at the time — so experiment 1325 was driven by a local process writing real Lab rows into the
+staging database against the real stored targets. Until staging deploys, the Lab card renders the
+target, the run log and the `note` line rather than a custom renderer.
+
+**Touched files.** `server/lib/testlab.js` (`runIdentitySecondOpinionStage`, registered in
+`STAGE_RUNNERS`, exported for its tests), `client/src/services/testlabService.ts` (the
+`TESTLAB_STAGES` mirror), `tests/unit/testlab-identity-second-opinion.test.ts` (14 tests pinning the
+veto arithmetic with stubbed witnesses, so the suite spends nothing: the mandatory pin, the
+un-rename, silence-is-not-a-veto, the ground-truth classification, and that the witness is asked on
+exactly the 19 and on none of the other 17). Nothing in the vote, the witness prompt, scoring or
+`identityAgreement` is touched.
+**Status:** ✅ active — commit `a6cc517cf`, staging, not pushed; the stage itself is not yet deployed
+to staging.
+
 ## 2026-09-18 — A re-plan adds a character, it never deletes one
 
 **Context.** Staging `job_1789681157795_wkt20ckod` ("Das Ei im Lindenhof", 2026-09-17, 18 pages,
