@@ -4045,7 +4045,16 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           ? `${st.id} ("${st.name}")`
           : `${artifact.id} state "${(st && st.name) || '?'}"`);
         if (state && resolved.placementDropped.length > 0) {
-          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${stateDelta || '(nothing — the clause was placement only)'}"`);
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${stateDelta}"`);
+        }
+        // A SPLIT MAY SHORTEN A DELTA, NEVER REPLACE IT. Every segment read as
+        // placement, so the cut would have left the line with no state clause
+        // at all — undecidable from here (see visualBible.resolveObjectState),
+        // and the delta stands. Two positions reach the model on this page:
+        // the brief's, and whatever this delta asserts. Loud, because nothing
+        // downstream can see it happened.
+        if (state && resolved.placementOnly) {
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}" and the state's whole delta reads as placement: "${state.delta}". The delta STANDS (a cut here would leave no state clause at all, and the split cannot tell a placement-only delta from a look it misread) — the page prompt carries two positions for this object. The delta should state the object's own look and nothing else.`);
         }
         if (resolved.contradicted) {
           // A DELETION NOBODY CAN SEE THE REASON FOR IS A DELETION NOBODY CAN
@@ -4253,10 +4262,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // read as several across the book, which is the defect this whole
         // model exists to remove.
         // `stateDelta` is the state's delta minus any placement half the page's
-        // own brief already states (visualBible.splitStatePlacement). It is
-        // empty when the whole delta was placement — then the object is listed
-        // with no state clause and the scene description's placement stands
-        // alone, which is what the header promises.
+        // own brief already states (visualBible.splitStatePlacement), and the
+        // delta WHOLE wherever that cut would leave nothing — a split may
+        // shorten a delta, never replace it. It is empty only where an axis
+        // above dropped the state outright (contradiction, receiver), and then
+        // `obj.state` is null too, so no dangling dash reaches the line.
         const stateNote = (obj.state && obj.stateDelta) ? ` — ${trimStateClause(obj.stateDelta, obj.state)}` : '';
         requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${wornOn}${offWhere}\n`;
       }

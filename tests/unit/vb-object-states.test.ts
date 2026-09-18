@@ -866,12 +866,60 @@ describe('state placement vs the page`s own placement', () => {
     expect(line).toContain('shell split open, brown seed visible inside');
   });
 
-  it('a delta that is placement ONLY leaves no state clause at all — never a dangling dash', () => {
+  // -- A SPLIT MAY SHORTEN A DELTA, NEVER REPLACE IT (2026-09-18) -----------
+  // Replayed over every stored staging state delta — 126 stories with a Visual
+  // Bible, 165 deltas — the split leaves 110 whole, shortens 44 and EMPTIES 11.
+  // The eleven are not all placement: two of them are the object's own look and
+  // nothing else, read as placement because one comma-segment carries both
+  // halves. With nothing left on the line the verdict is unfalsifiable, so the
+  // delta stands and the warning says the page now carries two positions.
+  const emptiedByTheSplit = [
+    // job_..._erw6xc01 ART009.1 "rope snapped" — the state IS the severing.
+    'the rope hanging from the rim is severed midway, the lower half dangling free inside the cistern walls',
+    // job_..._ly5rcdej ART003.1 "unaltered" — slack vs taut is the whole state.
+    'lies slack in loose curling loops',
+  ];
+
+  it('a delta the split empties is NOT a delta the split may delete', () => {
+    for (const delta of emptiedByTheSplit) {
+      expect(splitStatePlacement(delta).kept).toBe('');   // the split claims it is all placement
+      const vb = MIXED();
+      vb.artifacts[0].states[1].delta = delta;
+      const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }]);
+      expect(line).toContain(delta.split(',')[0]);        // and the line keeps it anyway
+    }
+  });
+
+  it('a delta that genuinely IS placement stands too, and the warning says the page carries two positions', () => {
+    // job_..._18dmvnt6 ART001.3 "held by crayfish", verbatim: no look at all,
+    // only a holder — the authoring rule's own counter-example.
+    const warnings: string[] = [];
     const vb = MIXED();
-    vb.artifacts[0].states[1].delta = 'cupped in a small hand';
-    const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }]);
-    expect(line).not.toMatch(/cupped in a small hand/);
-    expect(line.trim()).toMatch(/— fits in one hand$/);
+    vb.artifacts[0].states[1].delta = 'gripped between both raised claws of the crayfish';
+    const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }], warnings);
+    expect(line).toContain('gripped between both raised claws of the crayfish');
+    const w = warnings.find(x => /VB-STATE/.test(x) && /two positions/.test(x))!;
+    expect(w).toBeDefined();
+    expect(w).toContain('wedged between roots');
+    expect(w).toContain('The delta STANDS');
+  });
+
+  it('a delta with a look half still loses its placement half — the measured shapes', () => {
+    // The ten page-citations where this actually trimmed a stored prompt, by
+    // shape: job_1789337873076_qf2at21ui (the chestnut) and
+    // job_1788725396265_p3dh87hsv (the bracelet).
+    for (const [delta, kept] of [
+      ['cupped in a small hand, cream patch facing upward', 'cream patch facing upward'],
+      ['resting in the grass at the base of the tree, fully visible', 'fully visible'],
+      ["on Mia's wrist, shells catching the sunlight", 'shells catching the sunlight'],
+      ["dripping wet but intact, held up in Lily's cupped hands", 'dripping wet but intact'],
+    ]) {
+      const vb = MIXED();
+      vb.artifacts[0].states[1].delta = delta;
+      const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }]);
+      expect(line).toContain(kept);
+      expect(line).not.toContain(delta);
+    }
   });
 });
 

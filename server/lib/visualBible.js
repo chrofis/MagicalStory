@@ -269,7 +269,20 @@ const PLACEMENT_PAIR_RE = new RegExp(`\\b${PLACEMENT_VERB}\\b[^,;]*?\\b${PLACEME
  * object itself; the look half is never dropped, because a state's whole job is
  * to say which variant of the object this page shows.
  *
- * @returns {{kept: string, dropped: string[]}}
+ * A SEGMENT IS THE FINEST CUT THIS CAN MAKE, and a segment that carries both
+ * ("the rope hanging from the rim is severed midway") is read as placement
+ * whole. `resolveObjectState` therefore treats `kept: ''` — the case where the
+ * split claims the delta says nothing about the object's look — as UNDECIDED
+ * and keeps the delta, rather than trusting the vocabulary with the last word.
+ * Measured over every stored staging state delta (126 stories, 165 deltas):
+ * 110 untouched, 44 shortened, 11 emptied — and the emptied eleven include
+ * "the rope hanging from the rim is severed midway, the lower half dangling
+ * free inside the cistern walls" and "lies slack in loose curling loops",
+ * which are the object's own look and nothing else.
+ *
+ * @returns {{kept: string, dropped: string[]}} `kept` is '' when every segment
+ *   read as placement — a verdict the caller is expected to distrust, not a
+ *   licence to print nothing.
  */
 function splitStatePlacement(delta) {
   const raw = String(delta || '').trim();
@@ -551,7 +564,11 @@ function appearanceContradiction(entry, state, sceneMetadata, visualBible) {
  * instant asserts a sibling state's look (`appearanceContradiction`).
  * `contradictedBy` says which.
  *
- * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean, contradictedBy:('held'|'appearance'|null), rival:Object|null, evidence:string|null, evidenceTokens:string[]|null}}
+ * `promptDelta` is the clause the REQUIRED OBJECTS line prints: the delta minus
+ * any placement half the page's own brief already states, and the delta WHOLE
+ * wherever that cut would leave nothing (`placementOnly`).
+ *
+ * @returns {{state:Object|null, cited:Object|null, declared:Object|null, held:boolean|null, contradicted:boolean, contradictedBy:('held'|'appearance'|null), rival:Object|null, evidence:string|null, evidenceTokens:string[]|null, scenePlacement:string|null, promptDelta:string, placementDropped:string[], placementOnly:boolean}}
  */
 function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetadata = null, { silent = false, visualBible = null } = {}) {
   const cited = handle ? objectStateFor(entry, handle) : null;
@@ -583,6 +600,23 @@ function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetada
   // an "on ground" and a "held" state, both with `held: null`) trips neither.
   const scenePlacement = scenePlacesObject(entry, sceneMetadata);
   const split = splitStatePlacement(state?.delta);
+  const wholeDelta = String(state?.delta || '').trim();
+  // A SPLIT MAY SHORTEN A DELTA, NEVER REPLACE IT (2026-09-18).
+  // `splitStatePlacement` decides by preposition, one comma-segment at a time,
+  // and a segment holding both halves ("the rope hanging from the rim is
+  // severed midway") reads as placement whole. While something survives the
+  // cut, the verdict is checkable — a look clause is still on the line, and on
+  // the ten stored pages where this actually trimmed a prompt it was right ten
+  // times. When NOTHING survives, the two readings are indistinguishable from
+  // here: either the state says only where the object is (an authoring-rule
+  // violation — `scene-expansion-all.txt` requires "the object's own look and
+  // nothing else" — and dropping it is right), or the vocabulary just ate the
+  // object's look and the state loses its only channel. 11 of the 165 stored
+  // deltas empty out, and two of those are pure appearance. This resolves the
+  // undecidable case the way the appearance axis above already resolves its
+  // own: the wrong delta shipping is the failure we already had, a stripped
+  // good delta is a new one. `placementOnly` carries it to the log.
+  const trims = !!scenePlacement && split.dropped.length > 0 && !!split.kept;
   return {
     state, cited, declared, held,
     contradicted: heldContradicted || !!appearance,
@@ -591,8 +625,9 @@ function resolveObjectState(entry, handle = null, pageNumber = null, sceneMetada
     evidence: appearance?.evidence || null,
     evidenceTokens: appearance?.tokens || null,
     scenePlacement,
-    promptDelta: scenePlacement ? split.kept : String(state?.delta || '').trim(),
-    placementDropped: scenePlacement ? split.dropped : [],
+    promptDelta: trims ? split.kept : wholeDelta,
+    placementDropped: trims ? split.dropped : [],
+    placementOnly: !!scenePlacement && split.dropped.length > 0 && !split.kept,
   };
 }
 

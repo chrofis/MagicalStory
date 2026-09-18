@@ -450,6 +450,114 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-18 — A split may SHORTEN a state delta, never replace it; and the appearance guard's look-half was never the thing that fixed it
+
+**Context.** `splitStatePlacement` (`server/lib/visualBible.js`) cuts a Visual Bible object state's
+`delta` into a LOOK half and a PLACEMENT half using a hand-written vocabulary — 34 locative
+prepositions and 32 locative verbs, applied one comma-segment at a time. Two readers consume the
+result: the `REQUIRED OBJECTS` line of the page prompt (`promptDelta`, since fd041f28a) and
+`appearanceContradiction`'s accuser (`lookOf`, since a4d3d49a7). An audit constructed 19
+appearance-only deltas, found 16 of them emptied to `""`, and reported two consequences: the
+appearance guard can accuse with an empty evidence half, and object appearance may be silently
+stripped from every render.
+
+**Measured on the real corpus, not constructed strings.** Replayed over every Visual Bible stored on
+staging — **126 stories, 2,202 entries, 71 entries with states, 165 state deltas**, and every page
+that cites one (**226 page-citations**, 214 of them artifacts):
+
+| what the split does to a stored delta | count |
+|---|---|
+| leaves it whole | 110 of 165 |
+| shortens it (drops a placement segment, a look survives) | 44 of 165 |
+| **empties it** (`kept === ''`) | **11 of 165** |
+
+The constructed 16-of-19 does not reproduce: the real rate is 11 of 165 (6.7%), and the same 33%
+placement-bearing rate holds on the trial path (4 of 12) and the full path (51 of 153) alike — even
+though only `scene-expansion-all.txt` carries the "the object's own look and nothing else" rule and
+`story-trial.txt` does not. A prompt-side rule for this field is not being honoured today.
+
+**What actually shipped: nothing.** `promptDelta` trims only where the page's own brief places the
+object structurally (`scenePlacesObject`, reading `objects[].position`), and **only
+`story-trial.txt` writes `objects[]` as records with a `position`** — `scene-expansion-all.txt` and
+`scene-expansion.txt` write plain id lists. Measured: all 18 corpus stories carrying structured
+positions are 6-page trial stories; of 214 artifact citations, **17** had a brief position, **10**
+had a placement clause to drop, and all 10 were SHORTENED — **zero emptied**. The audit's "every
+image prompt" is a trial-path-only effect on 10 of 214 citations, and the 40 citations where the
+split *would* have trimmed all had `scenePlacement === null` and shipped their delta whole.
+
+**Hand-classified, the 55 touched deltas are mostly right and the failures cluster.** Of the 44
+shortened, ~32 drop a clean placement ("on Mia's wrist", "cupped in a small hand", "resting in the
+grass at the base of the tree"); ~12 lose appearance riding in the same comma-segment ("cloth
+folded once and tucked into an open belt loop" loses *folded once*; "chain lies taut and horizontal
+above the waterline" loses *taut*; "in motion" is dropped outright as a lead preposition). Of the
+11 emptied, two are the object's own look and nothing else — `"the rope hanging from the rim is
+severed midway, the lower half dangling free inside the cistern walls"` (the state IS the severing)
+and `"lies slack in loose curling loops"` (slack vs taut IS the state).
+
+**Decision.** One rule, at the one place that prints the clause (`resolveObjectState`): **a split
+may shorten a delta, never replace it.** While a look clause survives the cut the verdict is
+checkable, and on the ten stored pages where this actually trimmed a prompt it was right ten times.
+When nothing survives, the two readings are indistinguishable from inside the function — either the
+state says only where the object is (an authoring-rule violation, and dropping it is right) or the
+vocabulary ate the object's look — so the delta STANDS and a new `[VB-STATE]` warn says the page
+now carries two positions. This is the same asymmetry `appearanceContradiction` already documents:
+*the wrong delta shipping is the failure we already had, a stripped good delta is a new one.*
+
+**`appearanceContradiction` is NOT changed**, because the measurement says its look-half never
+mattered. Replaying all 226 citations across four configurations:
+
+| | MIN_APPEARANCE_EVIDENCE = 1 | = 2 (current) |
+|---|---|---|
+| **with** the look-half split | 8 fires | **1 fire** |
+| **without** it (whole delta accuses) | 10 fires | **1 fire** |
+
+The 10→1 result of a4d3d49a7 reproduces *without* narrowing 1: the same single true positive
+(`job_1789343124794_z2c779f7i` p3, ART003.1 vs ART003.2, on `glow`/`warm`/`light`), and **zero**
+verdict differences on 226 citations. The threshold does all the work; the split kills only the two
+single-token cases the threshold kills anyway. And the audit's finding (a) is directionally safe on
+its own terms: 10 of the 161 states in multi-state entries have an empty look half, and an empty
+accuser cannot accuse — it makes the guard quieter, which is the direction it is designed to fail
+in. Left alone deliberately; a change there would be churn on a measured no-op.
+
+**Rationale — the options rejected, with what each was measured against.**
+
+- **Delete the split entirely** (both readers take the whole delta). Free on the guard side (0 of
+  226 verdicts change). Not free on the prompt side: it reverts fd041f28a and returns the defect
+  that fix was written for — `job_1789337873076_qf2at21ui` pages 2-6, where the line said "cupped in
+  a small hand" against a brief that said "wedged between roots at ground level" and the render
+  obeyed the state. Those 6 citations are inside the 10 the split still trims. Trading a latent
+  harm (0 shipped) for a demonstrated one.
+- **Narrow the vocabulary.** Another word list for the same class of sin, and it cannot reach the
+  larger failure: 12 of the 44 shortened deltas lose appearance from *inside* a segment the
+  vocabulary judged correctly. The granularity is the defect, not the word list.
+- **Ask the Art Director for `look` and `placement` as separate structured fields.** The right shape
+  eventually, and the only option that would also fix `referenceSheets.js:1063`, where the WHOLE
+  delta becomes the reference cell's render prompt (`description: "<base>, <delta>"`) and a
+  placement clause drags another element into a cell that must draw the object alone. Not now, and
+  not to fix this: it costs four authoring sites (`scene-expansion-all.txt` ×2 state schemas +
+  the rule line, `story-trial.txt`, `scene-review.txt`'s correction schema), `normaliseObjectStates`,
+  and a legacy reader for all 165 stored deltas, which will never grow the field (the scale work's
+  precedent: keep legacy shapes, don't reinterpret old data). Against it: the field would have no
+  consumer that wants the placement — the cell must not have it, the page takes its position from
+  the scene description, the guard wants the look — and a field nobody reads is a field nobody
+  validates. Decisive: the full path already states the rule and violates it at the same 33% as the
+  trial path that does not, so a new slot is a new place for the same 33% to land. Filed in
+  `tasks/BACKLOG.md` with the two open residuals.
+
+**Blast radius.** `promptDelta` feeds every page render, but only the trial path can reach the trim
+at all (structured `objects[].position`), and on the stored corpus the new rule changes **0 of 226**
+prompt clauses — it removes a latent failure, it does not alter a shipped one. `resolveObjectState`
+gains one field (`placementOnly`); its other two callers (`sceneBriefCheck.checkObjectStateContradiction`,
+`elementRefCell`) read neither it nor `promptDelta`. No prompt template, no scored type, no severity.
+
+**Touched files.** `server/lib/visualBible.js` (the rule, in `resolveObjectState`; the split's
+contract documented), `server/lib/promptBuilders.js` (the placement-only warn; the stale
+"empty when the whole delta was placement" comment), `tests/unit/vb-object-states.test.ts` (3 tests
+on the measured corpus deltas, replacing the one that locked the old emptying behaviour),
+`tasks/BACKLOG.md`.
+
+**Status:** ✅ active.
+
 ## 2026-09-18 — Restaging an object for reach is CONDITIONAL on its placement carrying no story meaning, and the placement travels in `where`
 
 **Context.** `REACHABLE_CONTACT_RULE` (`server/lib/promptBuilders.js`, injected as `{REACHABLE_CONTACT}`
