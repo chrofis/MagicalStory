@@ -77,7 +77,9 @@ second division is reconstructed rather than stored).
 - **Inert until the model answers it.** 55/55 rounds identical with `covers` absent. Nothing changes
   on any stored story unless the check's model fills the field in.
 - **Nothing true is lost.** The 40 genuine hits and the 14 other-class false alarms all stay flagged,
-  and every round's removal set is exactly its covered set.
+  and every round's removal set is exactly its covered set. (That is 94 of the 95. The 95th is a
+  single commissioned child referred to by description rather than by name — a case the `covers`
+  spec also answers, but it was not in the 40 the measured arm covered, so it is not claimed here.)
 - **The same false absence was being counted four more ways.** 21 further findings go with the 40:
   6 `INVENTED_DOMINANT_EXCESS`, 7 `INVENTED_DOMINANT_CONSECUTIVE`, 6 `UNDER_COVERED_CHARACTER`,
   2 `MAIN_UNDER_HALF`.
