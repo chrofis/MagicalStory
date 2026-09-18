@@ -2810,7 +2810,7 @@ function ResultCard({ result, stage, onRedo, redoing, onReplayBlend, isRedo, sup
                       } catch (e) { alert(`Pin failed: ${e instanceof Error ? e.message : e}`); }
                     }}><Plus size={14} /> Pin to set</Button>
                   )}
-                  {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval' || stage === 'repair_verify') && result.report != null && (
+                  {(stage === 'entity' || stage === 'style_check' || stage === 'avatar_eval' || stage === 'repair_verify' || stage === 'beats_replan') && result.report != null && (
                     <pre className="text-xs bg-gray-50 rounded-lg p-3 overflow-x-auto max-h-64">{JSON.stringify(result.report, null, 2)}</pre>
                   )}
                   {result.comparedVersions && (

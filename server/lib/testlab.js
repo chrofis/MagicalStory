@@ -8861,6 +8861,347 @@ async function runTrialChallengeDrawStage(target, { params = {}, promptOverride 
   };
 }
 
+/**
+ * BEATS RE-PLAN PLUMBING — does the planner emit the blocks the parsers read?
+ *
+ * Commits 981fcb27a + 7ed94f65c made the re-plan DECLARE its structural changes
+ * under `---CHANGES---` and the plan check answer its obstacle question as
+ * `OBSTACLES <page>: <name>` data. The merge then enforces the rule that gives
+ * the design its teeth: **a change you do not declare is undone**.
+ *
+ * Every result behind that design so far is a REPLAY over stored rows, and no
+ * stored row carries either block — neither existed before 2026-09-18. So the
+ * load-bearing question was untested: if the planner does not emit a parseable
+ * change block (wrong marker, markdown fence, renamed, omitted), then every
+ * change it made reads as undeclared, every one is restored, and the round is a
+ * silent NO-OP. On a paid run that is invisible — no error, no warning, a book
+ * that ships round one's division while the log says the plan was re-divided.
+ *
+ * This stage answers that and only that. It is a PLUMBING check, not an
+ * accuracy measurement: it asks whether the two blocks arrive in the shape
+ * `parsePlanChanges` and `parsePlanCheckObstacles` expect, not whether the
+ * re-plan's judgement was good.
+ *
+ * WHAT IT RUNS. Round one's division is the story's OWN first division, frozen
+ * (`beatsReviewReport.briefsIn`, written before any re-plan touched it), so no
+ * paid planner call is spent re-deriving a division that is already stored.
+ * Two paid text calls follow, in production's order and with production's
+ * arguments: the plan check, then the re-plan. The merge, the review and the
+ * restore are then replayed by `analyzeReplanCompliance` below.
+ *
+ * WHAT IT CANNOT SEE. A replay has no arc-machine commit, so `declaredInvented`
+ * and `inventedAllowance` are null and the premise figures are absent from
+ * `commissionedNames` — the INVENTED_* counters may therefore differ from the
+ * ones this story drew when it ran. The cast-per-page counters, which are what
+ * a re-plan's removals are judged against, are unaffected.
+ */
+
+/** The `---CHANGES---` segment exactly as the model wrote it, marker included. */
+function rawChangesBlock(text) {
+  const m = String(text || '').match(/---\s*CHANGES\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i);
+  return m ? m[0] : '';
+}
+
+/** Every line that LOOKS like an obstacle declaration, before any parsing. */
+function rawObstacleLines(text) {
+  return String(text || '')
+    .split('\n')
+    .map(l => l.trim().replace(/\*\*/g, '').trim())
+    .filter(l => /^OBSTACLES?\s+\d+\s*:/i.test(l));
+}
+
+/**
+ * The verdict on one re-plan response: are the two blocks there, do the
+ * production parsers read them without loss, and — the headline — would the
+ * round have been a no-op?
+ *
+ * The parsers, the reviewer and the restore are the PRODUCTION functions
+ * (`parsePlanChanges`, `parsePlanCheckObstacles`, `reviewPlanChanges`,
+ * `castLostByReplan`). The merge around them is replayed from
+ * beatsPipeline.js's re-plan round (the loop is inline there, so it cannot be
+ * called) and must be kept in step with it — the guards below are that loop's
+ * duplicate-line and page-count guards in the same order.
+ *
+ * Pure: no model, no database, no clock. Canned text in, verdict out.
+ */
+function analyzeReplanCompliance({
+  replanText = '', checkText = '', standing = [], findings = [],
+  castNames = [], aliases = {}, maxCast = 3,
+} = {}) {
+  const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, findingPages } = require('./promptBuilders');
+  const { reviewPlanChanges, castLostByReplan } = require('./planCounters');
+
+  const standingBy = new Map(standing.map(b => [Number(b.pageNumber), b]));
+  const parsed = parsePlanResponse(String(replanText || ''), [...standingBy.keys()]);
+  const declared = parsePlanChanges(String(replanText || ''));
+  const obstacles = parsePlanCheckObstacles(String(checkText || ''));
+
+  // ── the merge, as beatsPipeline runs it ───────────────────────────────────
+  const namedPages = new Set();
+  for (const f of findings || []) for (const n of findingPages(f)) namedPages.add(Number(n));
+  const declaredPages = new Set();
+  for (const c of declared.changes) {
+    if (Number.isFinite(c.pageNumber)) declaredPages.add(Number(c.pageNumber));
+    if (Number.isFinite(c.toPage)) declaredPages.add(Number(c.toPage));
+    if (Number.isFinite(c.fromPage)) declaredPages.add(Number(c.fromPage));
+  }
+  const scopeAll = namedPages.size === 0;
+  const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
+  let merged = [];
+  for (const pg of parsed.pages) {
+    const n = Number(pg.pageNumber);
+    merged.push(scopeAll || inScope(n) || !standingBy.has(n) ? pg : standingBy.get(n));
+  }
+  for (const [num, pg] of standingBy) if (!merged.some(k => Number(k.pageNumber) === num)) merged.push(pg);
+  merged.sort((a, b) => Number(a.pageNumber) - Number(b.pageNumber));
+  const overridden = scopeAll ? [] : parsed.pages
+    .map(pg => Number(pg.pageNumber))
+    .filter(n => !inScope(n) && standingBy.has(n));
+
+  // ── review, then apply ────────────────────────────────────────────────────
+  const restore = (nums) => {
+    const want = new Set(nums.map(Number));
+    merged = merged.map(pg => (want.has(Number(pg.pageNumber)) && standingBy.has(Number(pg.pageNumber))
+      ? standingBy.get(Number(pg.pageNumber))
+      : pg));
+  };
+  const review = reviewPlanChanges({
+    changes: declared.changes, standing, returned: merged, castNames, aliases, maxCast, obstacles,
+  });
+  restore(review.refusals.map(r => r.pageNumber));
+  const lost = castLostByReplan(standing, merged, castNames, aliases, review.declaredOut);
+  restore(lost.map(l => l.pageNumber));
+
+  // ── the round-level guards, in beatsPipeline's order ──────────────────────
+  const instants = merged.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
+  const duplicate = instants.find((t, k) => t && instants.indexOf(t) !== k) || null;
+  const discardReason = duplicate
+    ? `two pages returned with an identical plan line: "${duplicate.slice(0, 120)}"`
+    : (merged.length !== standing.length
+      ? `returned ${merged.length} page(s) for a ${standing.length}-page book`
+      : null);
+
+  // ── what actually changed ─────────────────────────────────────────────────
+  const lineOf = (pg) => String((pg && pg.planLine) || '').trim();
+  const changedRaw = parsed.pages
+    .filter(pg => standingBy.has(Number(pg.pageNumber)) && lineOf(standingBy.get(Number(pg.pageNumber))) !== lineOf(pg))
+    .map(pg => Number(pg.pageNumber));
+  const changedApplied = discardReason ? [] : merged
+    .filter(pg => standingBy.has(Number(pg.pageNumber)) && lineOf(standingBy.get(Number(pg.pageNumber))) !== lineOf(pg))
+    .map(pg => Number(pg.pageNumber));
+  const restoredPages = changedRaw.filter(n => !changedApplied.includes(n));
+
+  // ── the eight checks ──────────────────────────────────────────────────────
+  const norm = s => String(s || '').trim().replace(/\*\*/g, '').trim();
+  const isCountLine = l => /^changes?\s*:\s*\d+\s*$/i.test(l);
+  const blockRaw = rawChangesBlock(replanText);
+  const blockLines = blockRaw ? blockRaw.split('\n').slice(1).map(norm).filter(Boolean) : [];
+  const consumed = new Set(declared.changes.map(c => norm(c.line)));
+  const unparsedLines = blockLines.filter(l => !consumed.has(l) && !isCountLine(l));
+  const countMatches = declared.declaredCount != null && declared.declaredCount === declared.counted;
+  const unreadableVerbs = declared.changes.filter(c => c.kind === 'other');
+  const untagged = declared.changes.filter(c => !c.answers);
+  const reasonless = declared.changes.filter(c => !String(c.reason || '').trim());
+  const outsidePlan = parsed.pages.map(pg => Number(pg.pageNumber)).filter(n => !standingBy.has(n));
+  const obstacleLines = rawObstacleLines(checkText);
+  // A line whose names column is empty or "none" declares no obstacle, so the
+  // parser skipping it is correct — not a line it failed to read.
+  const namedObstacleLines = obstacleLines.filter(l => !/:\s*(none)?\s*$/i.test(l));
+
+  const check = (id, pass, detail, extra = {}) => ({ id, pass: !!pass, detail, ...extra });
+  const checks = [
+    check(1, declared.present,
+      declared.present
+        ? `a ---CHANGES--- block is present and carries ${declared.counted} change line(s)`
+        : 'NO ---CHANGES--- block in the response — every structural change reads as undeclared'),
+    check(2, declared.present && unparsedLines.length === 0 && countMatches,
+      `${unparsedLines.length} block line(s) the parser did not read; declared count ${declared.declaredCount == null ? '(absent)' : declared.declaredCount} vs ${declared.counted} enumerated`,
+      { unparsedLines, declaredCount: declared.declaredCount, counted: declared.counted, countMatches }),
+    check(3, declared.present && unreadableVerbs.length === 0,
+      `${unreadableVerbs.length} change line(s) outside the declared vocabulary`,
+      { unreadable: unreadableVerbs.map(c => c.line), kinds: declared.changes.map(c => c.kind) }),
+    check(4, declared.present && untagged.length === 0 && reasonless.length === 0,
+      `${untagged.length} change line(s) carry no PLAN[CODE]/CHECK[n] tag, ${reasonless.length} carry no reason`,
+      { untagged: untagged.map(c => c.line), reasonless: reasonless.map(c => c.line) }),
+    check(5, lost.length === 0,
+      `${lost.length} page(s) lost cast the round never declared`,
+      { undeclaredRemovals: lost }),
+    check(6, outsidePlan.length === 0,
+      outsidePlan.length ? `returned page number(s) not in the plan: ${outsidePlan.join(', ')}` : 'every returned page number is already in the plan',
+      { outsidePlan }),
+    check(7, obstacleLines.length > 0,
+      `${obstacleLines.length} OBSTACLES line(s) in the plan-check response`),
+    // Read, not merely present: a line naming somebody must arrive in the map.
+    // A response with no lines at all fails here as well as at check 7 — there
+    // is nothing for the parser to hand the review.
+    check(8, obstacleLines.length > 0 && obstacles.size === namedObstacleLines.length,
+      `parsePlanCheckObstacles read ${obstacles.size} page(s) from ${namedObstacleLines.length} line(s) naming somebody (${obstacleLines.length} raw)`,
+      { parsedPages: [...obstacles.keys()].sort((a, b) => a - b) }),
+  ];
+
+  return {
+    checks,
+    passed: checks.filter(c => c.pass).length,
+    failed: checks.filter(c => !c.pass).map(c => c.id),
+    // The raw blocks, line by line, so a reader sees what the model wrote
+    // rather than a verdict about it.
+    changesBlockLines: blockRaw ? blockRaw.split('\n') : [],
+    obstaclesLines: obstacleLines,
+    declaredChanges: declared.changes.map(c => ({
+      page: c.pageNumber, kind: c.kind, subject: c.subject, answers: c.answersText, reason: c.reason,
+    })),
+    refusals: review.refusals,
+    reviewNotes: review.notes,
+    undeclaredRemovals: lost,
+    undeclaredRemovalCount: lost.length,
+    // THE HEADLINE. A round whose applied division equals the standing one
+    // changed nothing the book will ever see.
+    noOp: changedApplied.length === 0,
+    discardReason,
+    changedPagesReturned: changedRaw,
+    changedPagesApplied: changedApplied,
+    restoredPages,
+    restoredOnlyDifference: changedApplied.length > 0 && restoredPages.length > 0,
+    pagesTheMergeOverrode: overridden,
+    returnedPages: parsed.pages.map(pg => Number(pg.pageNumber)),
+    appliedPlan: merged.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: lineOf(pg) })),
+  };
+}
+
+/**
+ * ONE plan check + ONE re-plan against a stored story's first division, then
+ * the compliance verdict. Text only — no image spend, no story run.
+ *
+ * params.planModel  — the re-planner (default: production's outline model)
+ * params.checkModel — the plan checker (default: production's planCheckModel)
+ */
+async function runBeatsReplanStage(target, { params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const {
+    buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster,
+    parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
+  } = require('./promptBuilders');
+  const { parseBeats } = require('./storyHelpers');
+  const { runPlanCounters, collectPlaceNames } = require('./planCounters');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+
+  // ROUND ONE'S DIVISION, FROZEN. `briefsIn` is written from `plan.pages` — the
+  // FIRST division, before any re-plan round touched it — so the findings this
+  // stage raises are findings against the same division the story's own check
+  // saw. `pagePlan` on the report is the SHIPPED division and is deliberately
+  // not used: re-checking the post-re-plan division would measure a different
+  // round from the one the stored findings describe.
+  const briefsIn = storyData?.beatsReviewReport?.briefsIn || [];
+  const standing = briefsIn
+    .filter(b => b && b.pageNumber != null)
+    .map(b => ({ pageNumber: Number(b.pageNumber), planLine: String(b.brief || '').replace(/^\s*PLAN:\s*/i, '').trim() }))
+    .filter(b => b.planLine)
+    .sort((a, b) => a.pageNumber - b.pageNumber);
+  if (standing.length === 0) {
+    throw new Error(`story ${target.storyId} carries no beatsReviewReport.briefsIn plan lines — nothing to re-divide`);
+  }
+  const pagePlan = standing.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n');
+  const pageCount = standing.length;
+
+  const approvedArc = resolveReplayArc(storyData, { parseBeats });
+  const arcHints = resolveReplayArcHints(storyData);
+
+  const checkModel = params.checkModel || MODEL_DEFAULTS.planCheckModel;
+  const planModel = params.planModel || MODEL_DEFAULTS.outline;
+  for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+
+  // Production's counter inputs, as far as a stored story carries them (see the
+  // header: the arc machine's premise figures and invented allowance do not
+  // survive into the row).
+  const commissionedNames = (storyData?.characters || []).map(c => c && c.name).filter(Boolean);
+  const placeNames = collectPlaceNames(storyData, [
+    ...(storyData?.storyCategory === 'historical'
+      ? [...getHistoricalLocations(storyData.storyTopic), ...getHistoricalObjects(storyData.storyTopic)].map(e => e && e.name)
+      : []),
+  ]);
+  const maxCast = IMAGE_MODELS[storyData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
+
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+
+  // ── the plan check ────────────────────────────────────────────────────────
+  const checkPrompt = buildPlanCheckPrompt(storyData, standing, approvedArc, pagePlan, []);
+  if (!checkPrompt) throw new Error('plan-check template unavailable');
+  let t = Date.now();
+  const checkRes = await callTextModelStreaming(checkPrompt, null, null, checkModel, {
+    usageLabel: 'testlab_beats_replan_check',
+    ...(TEXT_MODELS[checkModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
+  });
+  if (!String(checkRes.text || '').trim()) throw new Error(`plan checker ${checkModel} returned an empty response — provider failure, not a result`);
+  const checkMs = Date.now() - t;
+  const modelFindings = parsePlanCheck(checkRes.text || '');
+  const roster = parsePlanCheckRoster(checkRes.text || '');
+  const obstacles = parsePlanCheckObstacles(checkRes.text || '');
+  const counters = runPlanCounters({
+    pages: standing, commissionedNames, placeNames, maxCharactersPerScene: maxCast, roster,
+  });
+  const findings = [
+    ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
+    ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+  ];
+  if (findings.length === 0) {
+    throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
+  }
+
+  // ── the re-plan ───────────────────────────────────────────────────────────
+  const replanSection = buildReplanSection(pagePlan, findings, { pageCount });
+  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, replan: replanSection });
+  if (!replanPrompt) throw new Error('story-beats template unavailable');
+  t = Date.now();
+  const rpRes = await callTextModelStreaming(replanPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan' });
+  if (!String(rpRes.text || '').trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
+  const replanMs = Date.now() - t;
+
+  const verdict = analyzeReplanCompliance({
+    replanText: rpRes.text || '',
+    checkText: checkRes.text || '',
+    standing,
+    findings,
+    castNames: (counters.cast && counters.cast.all) || commissionedNames,
+    aliases: (counters.cast && counters.cast.aliases) || {},
+    maxCast,
+  });
+
+  const { appliedPlan, ...reportFields } = verdict;
+
+  return {
+    storyId: target.storyId,
+    pages: pageCount,
+    models: { checkModel, checkModelId: checkRes.modelId || checkModel, planModel, planModelId: rpRes.modelId || planModel },
+    elapsedMs: checkMs + replanMs,
+    cost: costOf(checkRes) + costOf(rpRes),
+    usage: {
+      input_tokens: (checkRes.usage?.input_tokens || 0) + (rpRes.usage?.input_tokens || 0),
+      output_tokens: (checkRes.usage?.output_tokens || 0) + (rpRes.usage?.output_tokens || 0),
+    },
+    note: `${verdict.passed}/8 plumbing checks pass — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}`,
+    // `report` is what the Lab renders for this stage (client TestLab.tsx).
+    // The applied division travels beside it rather than inside: the rendered
+    // block stays the verdict, not a second copy of the page plan.
+    report: reportFields,
+    appliedPlan,
+    standingPlan: standing,
+    findings: findings.map(f => f.line),
+    counterStats: counters.stats,
+    cast: counters.cast,
+    rosterPages: roster ? roster.size : 0,
+    obstaclePages: [...obstacles.keys()].sort((a, b) => a - b),
+    replanSection,
+    checkPrompt,
+    replanPrompt,
+    checkRawResponse: (checkRes.text || '').slice(0, 40000),
+    replanRawResponse: (rpRes.text || '').slice(0, 40000),
+  };
+}
+
 const STORY_STAGES = {
   trial_idea_variety: runTrialIdeaVarietyStage,
   trial_challenge_draw: runTrialChallengeDrawStage,
@@ -8876,6 +9217,7 @@ const STORY_STAGES = {
   // outline_review retired 2026-09-13 — see the note above runTextRefineStage.
   text_refine: runTextRefineStage,
   beats_scenes: runBeatsScenesStage,
+  beats_replan: runBeatsReplanStage,
   scene_review_replay: runSceneReviewReplayStage,
   story_bible_replay: runStoryBibleReplayStage,
   story_text_replay: runStoryTextReplayStage,
@@ -9048,6 +9390,10 @@ module.exports = {
   // vote withheld a rename, and how that classifies against a pixel-judged
   // verdict (tests/unit/testlab-identity-second-opinion.test.ts).
   runIdentitySecondOpinionStage,
+  // The re-plan compliance verdict, exported so the eight plumbing checks and
+  // the no-op comparison can be pinned on canned responses — no model, no
+  // database (tests/unit/testlab-beats-replan.test.ts).
+  analyzeReplanCompliance,
   checkRuleGenericity,
   // The scorecard judge itself. Every stage runner in this file already calls
   // it; exporting it lets a measurement score an arbitrary artifact (the text

@@ -539,6 +539,11 @@ export const TESTLAB_STAGES = [
   // Step 2 (fast structural review) retired 2026-09-01 — this stage now only
   // plans + expands scenes; historical rows with a review still display.
   { id: 'beats_scenes', label: 'Beats + scenes (time-to-lock)', producesImage: false, overridable: true, storyLevel: true },
+  // ONE plan check + ONE re-plan against a story's stored FIRST division, then
+  // the plumbing verdict: does the planner emit a parseable ---CHANGES--- block
+  // and the checker its OBSTACLES lines? A round whose changes are all
+  // undeclared is restored page by page and ships nothing.
+  { id: 'beats_replan', label: 'Beats re-plan (does it declare its changes? would the round be a no-op?)', producesImage: false, overridable: false, storyLevel: true },
   // Replays the scene review over a story's STORED briefs, so a reviewer-prompt
   // change is measurable: the clothing findings are deterministic, and the
   // briefs are frozen, so the only variable is the prompt (or the model).
