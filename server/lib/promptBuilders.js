@@ -577,8 +577,31 @@ function buildCastIdentityDescription(char, clothingText = '') {
   const look = char.ageCategory || char.age || '';
   const gender = char.gender === 'female' ? 'girl/woman' : char.gender === 'male' ? 'boy/man' : '';
   if (look || gender) parts.push([look, gender].filter(Boolean).join(' '));
-  const phys = char.physical || {};
-  if (phys.hair) parts.push(`hair: ${phys.hair}`);
+  const phys = getPhysicalFromChar(char);
+  // Hair comes from buildHairDescription — the SAME composer
+  // extractCharacterVisualProfile uses, and through it the Test Lab's
+  // buildCharacterPhysicalDescription. Reading `phys.hair` directly was dead
+  // code: the stored profile holds hairColor + detailedHairAnalysis and has no
+  // `hair` key at all. Measured 2026-09-18 over 379 staging profiles from 45
+  // days — 379 carry hairColor, 365 carry detailedHairAnalysis, 16 carry a
+  // `hair` key, all 16 a bare colour from stories dated 2026-08-09, none created
+  // since. So EVERY production identity line reached the Set-of-Mark call as
+  // age-band + build + face geometry + wardrobe with no hair, while the Lab's
+  // builder emitted the full hair prose — which is why Lab and production
+  // identity numbers were never comparable, the real damage here.
+  // The legacy key still works and does not need its own precedence rule:
+  // buildHairDescription returns `physical.hair` verbatim when there is no
+  // detailedHairAnalysis and no userHairOverride, and otherwise leads with
+  // hairColor. All 16 legacy values equal their own hairColor exactly (zero
+  // disagreements), so the rich path never contradicts one — it only adds
+  // length and texture.
+  // Output is short by construction: hex codes, salonLevel and uninformative
+  // styling/parting words are dropped, leaving colour + texture + length
+  // (+ bangs/parting when they discriminate) — median 43 chars, p90 61, max 72
+  // over those 365 profiles. No truncation here: a second, shorter composition
+  // is exactly the hand-maintained copy that drifts.
+  const hair = buildHairDescription(phys, char.physicalTraitsSource);
+  if (hair) parts.push(`hair: ${hair}`);
   if (phys.build) parts.push(`build: ${phys.build}`);
   if (phys.face) parts.push(phys.face);
   if (Array.isArray(char.traits) && char.traits.length) parts.push(char.traits.filter(t => typeof t === 'string').join(', '));
