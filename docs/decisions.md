@@ -21,6 +21,243 @@ superseded and link forward.
 
 ---
 
+## 2026-09-18 — A re-plan adds a character, it never deletes one
+
+**Context.** Staging `job_1789681157795_wkt20ckod` ("Das Ei im Lindenhof", 2026-09-17, 18 pages,
+Levin 5 / Julian 3 / Max 3 / Kiaan 3) invents a six-year-old rival, **Tobias**, and he is
+load-bearing: `arcReviewReport`'s FOURTH declared challenge is *"Tobias sits on the stone in the
+dark while Zünsli goes cold"*, `keeping` names *"Tobias sitting on the stone"*, and the shipped page
+text has him on pages 8, 9, 16, 17 and 18 — he takes the egg, trades it for Levin's mittens, comes
+back with a tin box and sits on the stone blocking the gap, kicks earth back into the hole, and
+lands in the leaves when the stone tips. (This story, not dragon run 3 —
+`job_1788614817116_vxnu60yjg` — which is where a session note filed it.)
+
+The first division put him in the who-column of pages 8, 16 and 18. The plan check then emitted
+`PLAN[INVENTED_DOMINANT_EXCESS]` on 8, 16, 18 and `PLAN[NO_COMMISSIONED_ON_PAGE]` — a **must-fix**
+code — on 8, 12, 16, 18, and the re-plan answered pages 8 and 12 by **adding** the commissioned
+children and pages 16 and 18 by **deleting Tobias**. His who-column pages went
+`[8,9,16,18] → [8,9]`. The proof is stored and independent of the round bookkeeping:
+
+| page | first division (`beatsReviewReport.briefsIn`) | shipped (`beatsReviewReport.pagePlan`) |
+|---|---|---|
+| 16 | *"Tobias sitting on the wedged stone in the dark, tin box under his arm, shouting"* | *"Levin and Julian at the stone in the dark, Julian cupping Zünsli"* |
+| 18 | *"Tobias stumbling back into the leaves, the stone tipped sideways…"* | *"Levin, Julian, Max, and Kiaan sitting together in the leaf-scattered dark…"* |
+
+Everything downstream then worked exactly as designed and made it worse. The Art Director still
+wrote Tobias into the briefs for 16 and 17 from the page text; the scene review removed him **by the
+book** — `sceneReviewReport.castRemovals` records both pages with the reason *"not named by PAGE
+PLAN line"*, which is check 5a `[cast_not_in_plan]` doing its job, because the plan line is the
+brief's only authority. No page prompt in the finished book names Tobias.
+
+The damage, stated precisely because a looser version of it has been repeated: the book audit
+returned 29 IMG faults of which **6 are CRITICAL**, and **three** of those six are this defect (p9,
+p17, p18 — *"the picture omits Tobias…"*), with a fourth Tobias fault on p16 at **MAJOR**;
+`survivingCriticals` contains **zero**. It was never "4 of 6" — that figure came from the owner's
+session notes and is corrected here.
+
+**Two of the four must-fix page hits that forced the re-plan were themselves false.** p12 (*"all
+four boys braced shoulder to shoulder"*) and p18 (*"…the four boys sitting together…"*) name the
+whole commissioned cast collectively, and `runPlanCounters` matches literal names only, so both read
+as zero commissioned characters in frame. That half is **reported, not fixed** — it is a change to
+the plan check's ROSTER spec, a classification change, and the owner's call (`tasks/BACKLOG.md`).
+
+A comment in `planCounters.js` asserted *"a re-plan is architecturally forbidden from removing a
+character (prompts/story-beats.txt tells the stage the arc is finished)"*. No prompt said it and no
+code checked it. Now both do.
+
+**Decision.** State the rule to the planner and enforce it mechanically, in one commit.
+
+1. **The rule.** `buildReplanSection`'s RE-DIVIDE block gains the character-symmetric counterpart of
+   the sentence it already carries about actions: **"Dropping a character is not a fix either: every
+   name a page above puts in frame is in frame on that page in the division you return."** Nothing
+   in the finding vocabulary ever asked for a removal — `NO_COMMISSIONED_ON_PAGE` is answered by
+   bringing the cast in, `CAST_OVER_CEILING` by *"a justification in its plan line"*, plan-check Q3
+   likewise.
+2. **The check.** `castLostByReplan()` (`planCounters.js`, pure and exported) is name-set arithmetic
+   over the standing line's who-column against the returned line's, per page, through the same
+   `namesIn` / `planSegments` the counters use — the who-column read is now the shared
+   `whoColumn()`, so the counter and the guard cannot diverge. A name gained on **any other changed
+   page in the same round** is not counted as lost anywhere, so a beat *moved* between two
+   finding-named pages is not mistaken for a deletion. `beatsPipeline.js` runs it on the merged
+   return, immediately after the unnamed-pages merge and before `changedThisRound` is computed, and
+   restores each flagged page from the standing division — per page, the same remedy and the same
+   shape as the `beats_replan_unnamed_pages` merge above it — logging `beats_replan_cast_lost`. The
+   finding that named the page survives to the recheck and is reported by the existing
+   `beats_replan_unfixed`.
+3. **The cast list is the roster's, mistakes included.** Three candidate filters were tried and all
+   three failed. The arc's own declared invented list goes **stale** when a retell renames its
+   figures — on this very story the arc declared `Fünkli, Silvan` for figures the committed arc
+   calls `Zünsli, Tobias`, and `arcInventedNames` was null there in any case, which is why no
+   `ARC_INVENTED_UNDECLARED` fired. The roster's own people-vs-things split never contradicts itself
+   (0 overlaps over 9 stories). `placeNames` knows only the landmarks the planner was handed. So the
+   guard runs on `resolveCast().all` and accepts that a ship or a bridge occasionally triggers a
+   restore.
+
+**Rationale.** A page restored from the **standing** division is never corrupt — it is the line the
+planner itself wrote and the plan check already measured — so the whole cost of a mislabelled name
+is declining one repair, while the cost of the deletion this prevents is a figure the arc declared
+load-bearing vanishing from the plan, the briefs, the prompts and the book. The asymmetry decides
+the filter question: a guard that accepts a few false restores is right, a guard that needs a
+trustworthy invented-cast list would not run at all, because no such list exists that is not stale.
+Generator and critic move together, which is the `plan-generator-vs-critic` sibling set: the rule is
+injected into `story-beats.txt` through `{REPLAN_SECTION}` and its critic side is the guard, in this
+same commit.
+
+**Measured — replay of the first-division-vs-shipped transition of every stored beats story**
+(51 staging stories / 753 pages and 9 production stories / 155 pages carry both divisions):
+
+| | staging | prod |
+|---|---|---|
+| pages changed by the guard | **23** (14 stories) | **2** (1 story) |
+| byte-identical | 730 | 153 |
+| previously-correct pages changed | **0** | **0** |
+
+Zero, because the guard can only act on a page whose plan line lost a cast name. Of the 23 staging
+changes **17 restore a real figure** (Tobias ×2, Frau Brunner, Maman, Emma, Lily, Sarah + Hans,
+Hans, Nia ×3, Pfiff, Fenn, Flügi, Gian + Vroni, Krümel ×2) and **6 restore a name the roster
+mislabelled** (Gemüsebrücke, Zwirbelspitz, La Nivéole, Silberkrabbe ×3, Donnermöwe) — 1.0% of the
+613 changed pages. Three of those stories had lost an invented figure from the **whole book**: Pfiff
+(`job_1788957347999_ijseol49a`), Silberkrabbe (`job_1788378719225_8hpr0mzzh`), Krümel
+(`job_1788295892348_l028ggiq7a`).
+
+**Not fixed here, deliberately** — both are classification changes and the owner's call, both in
+`tasks/BACKLOG.md`: the counters' blindness to a collective reference to the commissioned cast
+("the four boys"), whose candidate site is the ROSTER spec in `prompts/plan-check.txt`; and p17,
+which never named Tobias **even in the first division** although the arc beat for that page does and
+`prompts/story-beats.txt:62` already states the rule — the guard cannot reach a page the re-plan
+never touched, and a check for it is a new plan-check question.
+
+**Touched files.** `server/lib/planCounters.js` (`whoColumn`, `castLostByReplan`, the corrected 6b
+comment), `server/lib/beatsPipeline.js` (the guard in the re-plan merge),
+`server/lib/promptBuilders.js` (`buildReplanSection`), `tests/unit/beats-replan-cast-lost.test.ts`
+(20 tests whose fixtures are the five verbatim plan lines of this story, in both divisions),
+`tasks/bugs.json` (`replan-deletes-a-character-the-story-needs`).
+**Status:** ✅ active — commit `97ccc4128`, staging, not pushed.
+
+## 2026-09-18 — A contested identity gets a third witness, and that witness may only ever WITHHOLD a correction
+
+**Context.** Two witnesses name the figures on a page: the image evaluator (`matches[]`, which
+reached its names by matching faces against the reference photos) and the figure detector
+(`figures[]`, a Set-of-Mark call — letter badges on the page plus each character's identity prose).
+`reconcileIdentity` makes the detector overwrite the evaluator on every disagreement.
+
+Part 1 of this change (`d1c9a9d1f`, same day, its own entry above) made the pairing between the two
+a one-to-one name-aware assignment, which removed the disagreements that were pairing **artefacts**:
+staging versions carrying a conflict 76 → 32, characters erased 2 → 0, 1,186 of 1,194 versions
+byte-identical. What it could not touch is the genuine who-is-who disagreement that survives on
+roughly one page in six. Lab set 66 / experiment 1324 judged ten contested shipped pages on the
+pixels: **detector right 5, evaluator right 1**. A good prior, not a certainty — and the exception
+costs real pages: `job_1789584708605_rts4wqupm` p18 shipped at q=45 with four boys relabelled where,
+judged against the stored clothing contract, the evaluator had all four right.
+
+**Decision.**
+
+1. **On a contested page a THIRD witness is asked, out of wiring that already exists.**
+   `_somIdentifyFigures` runs `gemini-full → qwen-vl-full → haiku-full → gemini-sanitized` as a
+   fallback chain that **stops at the first success**, and every stored SoM answer on all 19 staging
+   versions the trigger fires on came from `gemini-full` — tiers 1–3 have never been asked about any
+   of them. A `startTier` option plus `secondOpinionIdentity()` runs the same chain from tier 1 on
+   the same page, re-badged from the **stored figures** rather than the detector's internal
+   `persons` array (duplicate masks are spliced out of the figure list AFTER the identity pass, so a
+   badge's `detIdx` can sit one slot off the figure it named). `skipTiers` drops the model that
+   already answered, because a first witness asked twice is not a second one.
+2. **Its only power is a veto.** Detector + witness → rename, exactly as today. Evaluator + witness
+   → **withhold**, the evaluator's labels stay. A third name, silence, a timeout, an HTTP 502, or no
+   witness tier left → rename, exactly as today. The outcome is therefore never MORE renames than
+   the synchronous path, only the same or fewer. The asymmetry is deliberate and is not a hedge:
+   acting on a wrong identity **deletes a character** from the page and relabels every finding about
+   them, while leaving a wrong label alone costs one page of already-wrong findings. The two errors
+   are not the same size, so the witness does not get a symmetric vote.
+3. **It is asked only where its answer can change what happens** — a surviving conflict that is
+   body-paired AND that `buildRenameMap` would actually apply. Never on a clean page, never on a
+   page whose conflict Part 1 dissolved, never on a face-paired or non-permutation page where
+   nothing is applied either way.
+4. **A partial veto withholds the whole permutation.** Veto one leg of a two-name swap and the other
+   leg would write a name a match still holds — `buildRenameMap` refuses exactly that, which is
+   `bc3cbe062`'s guarantee covering the veto path for free. Every one of the 19 trigger versions is
+   a 2-cycle or a pair of them, so a one-leg veto withholds all of it.
+5. **`reconcileIdentity` stays, synchronous and unchanged**, and the async sibling shares its
+   application code (`applyConflicts`) rather than copying it. `repairPipeline.js` only MEASURES
+   (`checkIdentityAgreement`) and is untouched.
+
+**Rationale.** "Detector always wins" is right 5 times in 6 and catastrophic the sixth. The cheapest
+way to find the sixth is to ask somebody else, and the chain already holds three models nobody has
+ever asked because it stops at the first answer. Giving that third answer only a veto is what makes
+it shippable before the paid measurement that would say whether it is any good: the mechanism cannot
+make anything worse than today even if the witness is useless.
+
+**Measured — the trigger, replayed over every stored version carrying both `matches[]` and
+`bboxDetection.figures[]`** (1,194 versions / 59 stories staging; 317 / 13 prod):
+
+| | staging | prod |
+|---|---|---|
+| contested versions surviving Part 1 | 32 | 15 |
+| — face-paired (never acted on) | 8 | 13 |
+| — not a permutation (a vote cannot change it) | 5 | 2 |
+| — **would rename today → the vote fires** | **19** | **0** |
+| calls per story | **0.32** | **0** |
+| share of versions | **1.6%** | **0%** |
+| worst single story | 4 (`job_1789078732136_622wecmhj`) | — |
+
+Prod's contested records are all legacy face-only ones, so the vote never fires on the stored
+production corpus at all.
+
+**Measured — the outcome, per stubbed witness** (no paid call; every vendor answer stubbed):
+
+| witness | byte-identical | changed | duplicates | erased | more renames |
+|---|---|---|---|---|---|
+| backs the detector | **1194 / 1194** | 0 | 0 | 0 | 0 |
+| names a third party | **1194 / 1194** | 0 | 0 | 0 | 0 |
+| throws (HTTP 502) | **1194 / 1194** | 0 | 0 | 0 | 0 |
+| returns nothing | **1194 / 1194** | 0 | 0 | 0 | 0 |
+| backs the evaluator | 1175 / 1194 | 19 | **0** | **0** | **0** |
+| vetoes one leg only | 1175 / 1194 | 19 | **0** | **0** | **0** |
+
+Production: **317 / 317** byte-identical under every witness, 0 calls. So the change is provably
+inert unless the witness positively contradicts the detector, and when it does it can only withdraw
+a rename — never fabricate a duplicate, never erase a character, never rename anything the
+synchronous path would have left alone.
+
+**What is NOT proven, and which way it leans.** The witness answers the SAME question, on the SAME
+badged image, under the SAME prompt — which ranks clothing first and demotes position to "a
+supporting hint only". On the motivating page (`job_1789681157795_wkt20ckod` p12) the corrupted
+channel IS clothing: the back child was painted in a second copy of another boy's coat, so a second
+clothing-first reader may reproduce the detector's answer. MODEL diversity is real (all 19 stored
+answers came from `gemini-full`, and the witness starts at Qwen2.5-VL-72B); QUESTION diversity is
+not, and the question is the DETECTOR's question, while the evaluator reached its names by matching
+faces to the reference photos. **Expect confirmation more often than contradiction, for reasons that
+are not evidence.** Nothing here claims an accuracy improvement. The claim is exactly this: on
+`wkt20ckod` p12 and `rts4wqupm` p18 the disagreement is now *asked about* rather than silently
+overwritten, and the mechanism cannot make anything worse. Whether the real witness ever vetoes is
+**unmeasured**. It also cuts the other way: of the 19 trigger versions, two pages (5 versions) were
+Lab-judged **detector-right**, so a witness wrongly backing the evaluator there would withdraw a
+correct rename — which is the price the asymmetry knowingly accepts.
+
+**The cheapest experiment that settles it** — approved and being built, tracked in
+`tasks/BACKLOG.md`: replay `secondOpinionIdentity` over the 19 stored staging trigger versions using
+each one's stored page image, stored `figures[]` and stored `expectedCharacters`. ~19 Qwen-VL calls,
+no DINO, no SAM, no story run. **7 of the 19, across 4 pages, already have pixel-judged ground
+truth** (`m3uam0nxi` p2 v0/v1 and `vxnu60yjg` p16 v0/v1/v3 detector-right; `wkt20ckod` p12 v1 and
+`rts4wqupm` p18 v0 evaluator-right), so it measures false vetoes (a correct rename withdrawn) AND
+true vetoes (the whole point) rather than only agreement. It needs a small Lab stage — the existing
+`bbox` stage re-runs DINO + SAM + `gemini-full` and would not isolate the question. If the answer is
+"it merely echoes the detector", the follow-up is a differently FRAMED question for the second
+witness — one that does not lead with the channel the page has corrupted — and that is a prompt
+change and the owner's call.
+
+**Explicitly not done.** `figures[].confidence` gating stays rejected (the detector was
+`confidence: 'high'` and wrong on `wkt20ckod` p12). Whether a contested identity should DISCOUNT the
+findings built on it remains an open scoring question the owner has not ruled on; nothing here
+touches scoring.
+
+**Touched files.** `server/lib/figureDetection.js` (`startTier` / `skipTiers` on
+`_somIdentifyFigures`, `secondOpinionIdentity`, `SECOND_OPINION_START_TIER`),
+`server/lib/identityAgreement.js` (`detIndex` on a conflict, `applyConflicts` split out,
+`reconcileIdentityWithSecondWitness`), `server/lib/images.js` (the one call site, now awaited),
+`tests/unit/identity-second-witness.test.ts` (+ its stored fixture),
+`tests/unit/second-opinion-identity.test.ts`.
+**Status:** ✅ active — commit `4ef21cc6c`, staging, not pushed.
+
 ## 2026-09-18 — A declared-off garment is identified by its Visual Bible element, not by a noun vocabulary; and a slot the writer invented no longer pre-empts that route
 
 **Context.** `server/lib/wornItems.js` removes one clause from a character's outfit contract when a
