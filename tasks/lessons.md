@@ -896,3 +896,8 @@ departing ship, drawn as an empty quay with a coil of rope.
 may NOT go. Whenever you add or review a plan counter of the form "at least one page must be X", ask
 what the worst page to spend it on would be, and write that constraint in the same change. The quota
 and its placement rule are one rule in two halves.
+
+## 2026-09-16 — Workflow fan-out burned the weekly budget
+- Launched 3 audit workflows (~hundreds of agents) alongside 5 code agents; owner: "you used the weekly budget in 10 min".
+- Rule: count agents (items × stages × verifiers) BEFORE any Workflow call and say the number; >15 agents needs an explicit yes. One careful reader per question, not five lenses. Audits never run parallel to the code agents that are the deliverable.
+- On "stop": TaskStop all, save half-applied agent edits to a scratchpad patch, revert those files, report what survived (commits + journals are safe).

@@ -7,6 +7,669 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-18 — `outfit_misattributed` is deleted from code; borrowed wardrobe is the scene reviewer's `[clothing_owner]`
+
+**Context.** `server/lib/clothingCheck.js` rule 2 decided from a page's PROSE that one character
+had been put in another character's clothes, and its findings were `REVIEWABLE` — sent to the
+scene review as mechanical faults. The machinery: `tokens()` (≥4-char significant words), a
+`distinctive()` filter (a token exactly one cast member's outfit uses), an `ATTACHES` regex
+("wearing / dressed in / in his…"), a per-sentence split on `/(?<=[.!?])\s+/`, a
+≥3-distinctive-token threshold with at least one `GARMENT_NOUNS` hit, and a `licensedWords`
+exemption for an item a `wornItems` row hands to another wearer.
+
+**Measured — the rule has sent 9 findings in its entire history, and all 9 were false.**
+Replayed `checkScenes` over all 120 stored staging stories / 1,322 brief pages, the 70 that kept
+`stories.data.sceneReviewReport.briefsIn` from the exact pre-review briefs the check ran on.
+**Production: 0 fires** over 227 brief pages / 13 stories. Every fire cost a MANDATORY page
+rewrite — `scene-review.txt` check 0 says the mechanical faults "are facts, not opinions: do not
+re-judge them … Rewrite EVERY page listed there" — and a rewritten brief becomes the image
+prompt, so each one changed a picture. All 9 pages are in `changedPages`.
+
+| code | `outfit_misattributed` | every other finding |
+|---|---|---|
+| pre-narrowing (`e1bd11014^`) | 19 | 490 |
+| after the owner-named narrowing (`e1bd11014`) | 10 | 490 |
+| after this deletion (`43c7d89b0`) | **0** | **490, byte-identical** |
+
+Three false-fire mechanisms, none tunable:
+
+1. **Vacuous attribution.** The rule concluded "these words describe B, not A" from one fact: the
+   sentence carries B's name and not A's. `ATTACHES` proves only that *somebody's* clothing is
+   attached in the sentence, never whose. The Art Director routinely introduces a figure by
+   appearance rather than by name — "the preschooler little girl of average build … wearing a red
+   quilted gilet" — and then every sentence passes the owner-exclusion, including the one
+   describing A. **6 of the 9** were this shape: `job_1788681313413_xqmtk2gcs` p9/p11/p12/p14
+   (Lily's own outfit read as Ethan's; a third boy in an anorak; Ethan himself, correctly dressed;
+   a fourth girl in an orange puffer) and `job_1789147573901_m3uam0nxi` p6 ×2 (the toddler who
+   *is* Julian, written by appearance).
+2. **The sentence splitter.** `/(?<=[.!?])\s+/` cuts a character description at a `.` inside its
+   own parenthetical. On `job_1788820396445_9erw6xc01` p11 that left Fiona's name on one side of
+   the break and her whole outfit on the other, in a fragment whose only name was Saira's.
+3. **Colour words as evidence.** The file's own `GARMENT_NOUNS` comment states that colours
+   attribute nothing, but only ONE of the three matches had to be a garment noun — so on
+   `job_1789584708605_rts4wqupm` p11/p17 `"brown"`, drawn from **"brown eyes"**, counted toward
+   the threshold on Ramon's own correctly-described clothing.
+
+**Decision.** Two steps, the same day. `e1bd11014` narrowed rule 2 to skip an owner whose name
+does not appear in the page prose — the existing guard's unstated precondition, made explicit,
+shipped rather than asked because it added no judgement about language. `43c7d89b0` then deleted
+the rule outright (the `outfit_misattributed` block, `ATTACHES`, and the type from `REVIEWABLE`,
+which is now `new Set(['removal_unstated'])`) and moved the judgement into
+`prompts/scene-review.txt` as check **3c `[clothing_owner]`**, which judges by figure rather than
+by wording, exempts a character this book never dresses, and honours a `wornItems` handover.
+
+**Rationale.** The judgement is linguistic and belongs in the prompt — the owner's ruling, the
+same week and in the same words as the `element_uncited` removal (`ea8e36198`): *"To me this is
+language and according our rules belongs to prompts."* Nine fires, zero true, nine forced
+rewrites of correct pages is not a rule worth tuning; the precondition fix removed 6 of the 9 and
+the other 3 were false for two further structural reasons, so "keep it and narrow twice more"
+lands on a rule that is silent on the whole corpus — which is deletion with more code.
+
+**The reviewer has no outfit contract, so the new check is grounded in what it holds.** Verified
+on a real built prompt (`buildSceneReviewPrompt` over `job_1789681157795_wkt20ckod`, 70,373
+chars): the reviewer's `# CHARACTER DETAILS` block is `buildStoryContextFields`'s — age, gender,
+personality, strengths, flaws, special details — and carries **no clothing**. The Art Director's
+`{CHARACTER_DESCRIPTIONS}` is the block built from `clothingRequirements`, and does. So 3c is
+worded against the briefs as a set, `characters[]` and `wornItems`, not against a contract the
+reviewer never receives. (Checks 3b and 10c already name CHARACTER DETAILS as if it carried
+outfits — pre-existing, left alone, in `tasks/BACKLOG.md`.)
+
+**Generator side — no new text.** Rule 10 of `scene-expansion.txt` and `scene-expansion-all.txt`
+already states the counterpart verbatim ("A character wears the outfit CHARACTER DETAILS gives
+them; never move a garment onto a character of the other sex…"), and `{WORN_ON_OTHER}`
+(`WORN_ON_OTHER_RULE`, one constant filled at all four brief-authoring sites) carries the handover
+case. No third copy was written.
+
+**What survives and what does not.** Mechanisms 1 and 2 die with the rule (`namedInProse`,
+`tokenOwners`/`distinctive`, `licensedWords` and the sentence split are gone). Mechanism 3
+survives as `colourBefore`, which rule 3 `garment_colour_wrong` uses on a different basis — per
+garment, inside one character's own `characterWindow`, stopping at the previous garment noun. It
+is reachable by construction there but measured to fire on nothing: all 120 stored
+`garment_colour_wrong` findings were reproduced with their source window captured and **0** read
+their colour out of an eye/hair/skin phrase. Latent shape, not a live defect; backlogged.
+
+**Check 0 trimmed.** With `REVIEWABLE` down to one type, check 0's fix list named two branches
+that can no longer arrive ("move the garment onto its rightful owner", "state the outfit the fault
+says is missing" — `outfit_missing` was never sendable either). Both removed, in the template and
+in `renderFindingsBlock`'s trailing line.
+
+**Known, NOT fixed.** `clothingCheck.js` still compares character names with `===` and hand-built
+`\bName\b` regexes rather than `castResolver.canonicalName`, against the 2026-09-13 SETTLED line.
+Every name in this corpus matched exactly, so there is no measured defect and no evidence to act
+on.
+
+**Touched files.** `server/lib/clothingCheck.js`, `prompts/scene-review.txt`,
+`tests/unit/clothing-owner-rule-removed.test.ts` (was `clothing-misattribution-owner-named.test.ts`),
+`tests/unit/worn-item-handover.test.ts`, `tests/unit/landmark-guard-scope-evidence.test.ts`.
+**Status:** ✅ active — commits `e1bd11014` + `43c7d89b0`, staging, not pushed. Full suite 3,379
+passed / 0 failed.
+
+## 2026-09-18 — The landmark guard triggers on the finding's SUBJECT, and every judge is told the page depicts a real place
+
+**Context.** The era-aware landmark guard (2026-09-05, `server/lib/landmarkProtection.js`) drops
+removal-shaped fixes on a page that carries a real landmark reference photo in a present-day
+story, so an unmasked whole-frame edit can never paint the real place out. Its trigger was
+`type === 'object_presence'` — which per `image-prompt-compliance.txt:213` means "present but
+wrong, misplaced or unrequested" and, at line 159, a named object rendered in the wrong colour.
+It is the type for **props**. The guard was aimed at the half of the finding space where the
+landmark almost never is.
+
+**Measured** 2026-09-18 over every stored page carrying a landmark reference photo — 429 staging
++ 413 production = 842 pages, 796 protected after the era test, 1,019 removal-shaped fixes on
+them:
+
+- **63** of the 1,019 carry the old trigger's type. **13** are about the real place; the other
+  **50** are props — a held shell, a scattered map, a wax seal, a story's own dragon egg the
+  inventory read as "a large red-and-grey ball", a bike handlebar lamp read as a black flashlight.
+- **61** removal-shaped fixes whose subject plainly **is** the real place carry one of the other
+  types (`setting`, `object`, `extra_object`, `background`, `environment`, `anachronism`) and the
+  trigger could not see one of them.
+- Production's compliance judge has never once emitted `object_presence` (0 of 113 findings over
+  413 landmark pages), so the compliance gate is **inert in production**; every production fire
+  came from the semantic judge or the merged page-level list.
+
+**The damage that shipped: 13 false drops on staging, 1 on production.** Each inflated the stored
+compliance subscore by 10-40 points and removed the finding from the consolidator's input, so no
+repair instruction was ever written for it. Two of them left a page storing a **perfect 100 with
+no findings at all** while the story's own plot object was suppressed: `job_1789348171785_9oxos7dwv`
+p2, the dragon egg rendered as a red-and-grey ball (would be 70); `job_1788903616404_iqvhj4l8m`
+p1, the bike lamp rendered as a flashlight (would be 80, one version, no regeneration). On 3
+pages / 4 findings no other evaluator flagged the object either, so the defect reached nobody.
+Production's exposure is one page: `job_1789227389389_z18dmvnt6`, 2026-09-12, dropped at the
+consolidator gate and shipped at 98.
+
+One page carries both halves. Staging `job_1789681157795_wkt20ckod` p11, landmark "Lindenhof
+plaza with linden trees", era "present day":
+
+| stored type | stored fix | old guard |
+|---|---|---|
+| `object_presence` | "Remove windows and white frames from stone wall …" | **dropped** |
+| `setting` | "Replace urban background with natural hillside or wooded area …" | **kept** |
+
+It dropped the narrow one and passed the one that repaints the real Zurich cityscape out of frame.
+
+**Decision.**
+
+1. **The trigger is the declared SUBJECT, not the type.** Every judge that can emit a
+   removal-shaped finding declares `landmark_element: true|false` on each `fixable_issues[]`
+   entry, and the guard drops a removal-shaped fix when it is true, whatever the type says.
+   Classification stays in the prompt (`docs/SETTLED.md`: classification is the PROMPT's job);
+   code reads a declared field and never prose.
+2. **Absent is a third state, never `false`.** `landmarkSubject()` returns
+   `landmark | other | undeclared`, and `undeclared` — a stored finding from before the field
+   existed, or a judge or Lab template that does not ask — falls back to the pre-2026-09-18 type
+   rule verbatim, and logs that it did. Two guard bugs the same day worked by letting an unknown
+   value mean "safe to act on"; this one cannot.
+3. **Every judge gets the block.** `{LANDMARK_CONTEXT}` existed in `image-prompt-compliance.txt`
+   only. The semantic and quality judges had never been told the page carries a real place, which
+   is why they kept proposing the removals the guard then had to catch — and the one landmark
+   removal that reached production was the semantic judge's. ONE builder
+   (`buildLandmarkContextBlock`) now fills the placeholder in all three templates, at the fill
+   site every caller crosses (`buildEvaluationPrompt`, `buildSemanticPrompt`,
+   `evaluateThreeStage`), defaulting to `(none)` so no path ships a prompt with a hole. The
+   `landmark_element` contract rides **inside** that block (`LANDMARK_SUBJECT_CONTRACT`) rather
+   than being hand-written into three prompt files.
+4. **Two repairs inside the detector.** `isRemovalShapedFix` was running its regex over a `fix`
+   the compliance/quality parsers had stood in from the description
+   (`fix: i.fix || 'Fix: ' + i.description`) — classifying a finding from its description prose,
+   which SETTLED forbids; the stand-in now carries `fixAuthored: false` and the detector declines
+   it (latent: 0 of 15 stored fires had one). And `strip` in `REMOVAL_FIX` matched the **noun** —
+   all five corpus matches were "a bright strip at the top of the frame" / "the sky strip" — so
+   the verb now needs an object.
+
+**Rationale.** The guard's value was never in doubt: 13 genuine catches, including the Uetliberg
+Fernsehturm that motivated it, the Town-Hall Bridge clock, the Lindenhofbrunnen statue a story
+wanted replaced by an owl, and three pieces of the Lindenhof's own furniture — a real square whose
+public chess pieces and retaining wall the judges keep reporting as unrequested clutter. What was
+wrong is where it pointed.
+
+**Measured outcome** (replay, `landmark_element` supplied as an analyst would): 13 true catches
+kept, 50 false drops eliminated, 60 misses now caught, **0** previously-correct outcomes changed.
+Replayed over the stored corpus exactly as stored, the new guard and the old one differ on
+**0 of 1,019** findings — because every stored finding predates the field and takes the
+`undeclared` fallback.
+
+**Known cost, accepted.** Of the 60 newly-guarded findings, roughly half are *corrective* rather
+than destructive — the judge asking that the landmark be rendered to match its own reference
+("Replace the Grossmünster with the Fraumünster's single spire"). Those are now dropped too. That
+is consistent with the 2026-09-05 ruling rather than a deviation: the hazard is the **mechanism**,
+an unmasked whole-frame replace on a page that depicts a real place, not the judge's intent. A
+finding about the landmark whose fix removes nothing ("Redraw the tower silhouette to match the
+reference photo") survives, and is the shape a landmark finding should take.
+
+**What the replay cannot prove.** That the judges will declare the field accurately. That needs a
+live run on a landmark story and a read of the stored `landmark_element` values; until then the
+undeclared fallback is what actually runs on any judge that ignores the instruction.
+
+**Residual, not fixed here.** `feedbackConsolidator.js:70-78` still carries a hand-written second
+wording of the landmark block aimed at the fixer rather than a judge; `evalJudges.js:75`
+synthesises a description-derived `fix` without the `fixAuthored` marker and the jury merge does
+not carry `landmark_element` through `bucketsToIssues` (neither can mislead the guard today);
+`routes/regeneration.js:4448` calls `evaluateSemanticFidelity` with no eval context and so gets
+`(none)`. The drops also remain invisible in stored data — all 15 old fires had to be
+reconstructed from `complianceResult.fixable_issues`, the only other record being a WARN that ages
+out of Railway.
+
+**Touched files.** `server/lib/landmarkProtection.js`, `server/lib/evalPipeline.js`,
+`server/services/prompts.js`, `server/lib/sceneValidator.js`, `server/lib/testlab.js`,
+`prompts/image-prompt-compliance.txt`, `prompts/image-semantic.txt`,
+`prompts/image-evaluation.txt`, `tests/unit/landmark-subject-trigger.test.ts`,
+`tests/unit/extra-character-type.test.ts`, `tests/unit/built-prompt-values.test.ts`.
+**Status:** ✅ active — commit `d1cb33171`, staging, not pushed. Supersedes in part the
+2026-09-05 "Landmark protection is era-aware" entry: the guard stands, its trigger and its reach
+change.
+
+## 2026-09-18 — A refused image prompt is retried as SENT, and never mutilated: the 78-word list is deleted and the Grok chin rule is bounded
+
+**Context.** Both halves of image generation carried a local prompt-surgery step for a provider
+refusal. `generateImageOnly`'s Gemini fallback ran a three-rung ladder: level 0 = the prompt as
+sent, level 1 = `sanitizePromptLevel1` (delete all 78 `PROBLEMATIC_WORDS` whole-word,
+case-insensitively, from the WHOLE prompt), level 2 = a text-model rewrite of the scene block.
+`editImageWithPrompt`'s Grok branch ran five `String.replace` passes over the built edit prompt on
+a content-moderation 400 and retried.
+
+**Measured on stored data, both environments.**
+
+*The word list matched our own instructions, not violence.* `bleeding` is in
+`prompts/image-generation.txt` line 3 — *"filling the canvas, **bleeding** off all four edges"* —
+and appears in **81.8%** of stored staging page prompts (27.5% of production ones); stripping it
+leaves "filling the canvas, off all four edges". `weapon` (118 staging prompts, 8.9%) is in the
+text-zone rule "(hats, embroidery, patterns, weapon edges)". `skull` (38) is anatomy — "horns
+curving upward from the top of the skull". `wound` (17) is "the working rope is **wound** in a
+figure". `hell` (21, production) is **German** for *bright* — "der Kiel ist hell und fest". `dead`
+is "the **dead end** of the path"; `shooting` is "her right brow is shooting upward in surprise";
+`bones` is a pirate sail's "crossed-bones shape".
+
+*What the rung bought.* **14 level-1 events on staging, across 5 Lab experiments
+(#815/#959/#963/#964/#965). Zero on production, ever** — page renders resolve to
+`grok-imagine-2`, so the Gemini ladder is reached only when a Grok call throws or on a model
+override. Level 1 rescued **1 of the 14**, and that image was rendered from a prompt carrying
+`{weapon: 1, bleeding: 2}` in the original — i.e. **without the full-bleed instruction**. The
+rewrite rung rescued 2, and it rebuilds from the original prompt, so level-1 damage was never
+cumulative: the rewrite, not the word list, is the rung that works.
+
+*Shipped degraded: zero pages, both environments* — a positive test, not an inference. Of the 975
+staging and 271 production stored page prompts carrying the full-bleed sentence, 975 and 271 hold
+it intact and **0** hold the stripped form.
+
+*The Grok table.* Corpus = the 529 stored inpaint instructions that actually reach
+`editImageWithPrompt` (219 production + 310 staging). The branch has **fired 0 times** in either
+environment, and no stored Grok content-moderation block belongs to this call path (they are
+`styledAvatarGeneration`, the avatar attempt loop, `char_repair`, `scene_composite`, and
+`generateImageOnly`'s own Grok→Gemini fallback). Of the 529 instructions, **4 would be rewritten
+if a moderation block ever hit one, and all 4 wrongly**: "Move the sealed letter from the grass
+**into the chest** interior" → "**near the chest**" (it is a treasure chest — the instruction is
+inverted); "white **buzz-cut** hair" → "buzz-**touch**" ×2; "his hands and left shoulder
+**strike** flat against the pillar" → "**touch** flat against". `cut` is the commonest listed word
+in the corpus and it arrives inside `buzz-cut`, `close-cropped`, `cut flowers`.
+
+**Decision — three mechanics repaired (`d32aa9303`), then the word list deleted (`c2dc65d0e`).**
+
+1. **Every rung retries the string level 0 actually SENT.** Levels 1 and 2 rebuilt from the raw
+   `prompt` argument while level 0 had sent `parts[0].text`, the post-shrink string. On the
+   Grok→Gemini fallback `shrinkPromptForModel` runs against Grok's 7,900-char cap *before* the
+   swap to `gemini-2.5-flash-image`, so the "sanitization retry" silently re-expanded the prompt:
+   a 7,850-char level-0 send was retried at **34,921 chars**, past Gemini's own 30,000 cap. Same
+   sent-equals-stored equality that `stored-prompt-is-sent-prompt.test.ts` pins for level 0.
+2. **Model-authored rewrite text is spliced literally.** Level 2 used
+   `String.replace(scene, modelText)`, so a `$&` / `$'` / `$1` in the rewrite is a substitution
+   pattern — reproduced: `"Cost $& …"` spliced the whole matched scene back into the prompt. Now
+   a replacer function.
+3. **`PROBLEMATIC_WORDS`, `sanitizePromptLevel1` and `findProblematicWords` are deleted.** A
+   Gemini refusal escalates straight to the scene rewrite; the ladder is two rungs, and if the
+   rewrite is still refused the function throws. (`d32aa9303` had first given level 1 a real
+   no-op guard — `sanitizePromptLevel1` always returned a new string, since it collapses double
+   spaces unconditionally, so `!==` could never detect a no-op and the ladder paid for a retry
+   differing from the refused request only in whitespace on the 58.4% of prod and 16.8% of
+   staging prompts that contain no listed word. That guard died with the rung it guarded.)
+4. **The Grok chin rule is bounded and moved first.** `/touch.*chin/gi → 'be positioned near the
+   face'` was greedy, unanchored, and ran AFTER the pass that injects the word `touch` throughout
+   (`stab|…|hit|cut|wound|…` → `touch`); `chin` matched inside `crouching`, `reaching`,
+   `catching`, `chin-length`, so one injected `touch` plus any such word later on the same line
+   swallowed every character between them. It now runs FIRST — it was written for an
+   author-written "touch … chin", not an injected one — as
+   `/\btouch\w*[^.\n]{0,40}?\bchin(?![\w-])/gi`. Latent only: 19 production and 36 staging
+   instructions carry a `chin` substring, and **0** have a trigger and a `chin` on the same line.
+
+**Rationale.** Buying one render in fourteen by deleting the instructions the page needs is a
+worse trade than one text-model rewrite call — the same reason the generic "happy child in a
+magical setting" rungs were deleted earlier: a rung that "succeeds" by destroying the brief
+produces a page that has nothing to do with the story. The other three are mechanics, not
+judgement: the ladder retried the wrong string, charged for a rung that could not change the
+verdict, and let a model's text act as a regex.
+
+**Nobody read the level numbers.** `sanitizationLevel` / `sanitizationLevels` /
+`PROBLEMATIC_WORDS` / `sanitizePromptLevel1` appear nowhere in the repo outside
+`server/lib/images.js` (all `.js/.ts/.tsx/.json`, `dist/` bundles included), `sanitizePromptLevel1`
+was never exported, and `jsonb_path_query(data, '$.**.sanitizationLevel')` returns **zero rows**
+in both databases.
+
+**Left standing, deliberately.** The Grok moderation substitution table itself. Deleting it is
+prompt-vs-code and the owner's call; the correctness fix above makes it safe, and it has never
+fired. The case for deletion — 0% precision on real text, a never-observed branch, and Grok's own
+error (`imagine:content-moderated`, with a non-zero `cost_in_usd_ticks`) being a verdict on the
+GENERATED IMAGE rather than on the prompt — is in `tasks/BACKLOG.md`, together with the
+sibling-registry pair the two sanitisers should form and the `going into → pointing at` rule that
+is shadowed by the body-part pass above it.
+
+**Touched files.** `server/lib/images.js` (the `generateImageOnly` ladder, the PROMPT SANITIZATION
+header note, the `editImageWithPrompt` moderation branch),
+`tests/unit/image-sanitization-ladder.test.ts`.
+**Status:** ✅ active — commits `d32aa9303` + `c2dc65d0e`, staging, not pushed.
+
+## 2026-09-18 — An outfit clause is delimited by rank, a worn-item swap needs proof of disagreement, and a DECLARED type outranks the name regex
+
+**Context.** `server/lib/wornItems.js` is the single resolver that turns a story-level clothing
+contract plus a page's declared `wornItems[]` into THE outfit of that page. Every reader goes
+through it: the generator's `missingGarments` check, the CLOTHING_CONTRACT block handed to the
+quality, semantic and prompt-compliance judges (`evalPipeline.buildEvalClothingContract`), the
+entity-consistency grid, and all three character-repair entry points. Three defects in it were
+deleting garments the page never declared off, or slotting a garment from a guess at English.
+
+**Measured, from stored data.**
+
+*The clause splitter cut inside a clause.* `splitClauses` treated `;` and `,` alike, so
+"a solid red, visibly hand-knitted wool cap with a small rolled-up brim around the bottom edge,
+shaped slightly oversized and wide" — one hat, its colour in front and its fit behind — became
+three clauses. Stripping the declared-off cap removed only the middle one and left
+`"A solid red; shaped slightly oversized and wide; …"`. Staging `job_1789506283204_3kxqshifx`,
+Levin, pages 8/9/11/13/15/17/18. **The corruption reached the entity judge on 9 stored findings**
+in that story, including a MAJOR `clothing_inconsistent` quoting it back — *"The expected red hat,
+described as 'A solid red; shaped slightly oversized and wide', is missing in cells B (page 13)
+and D (page 17)"* — demanding the hat be painted onto the two pages the brief had taken it off,
+beside two more MAJOR findings that contradict it and each other.
+
+*The swap fired without proof.* `applyWornItemsToOutfit`'s same-garment guard only proved
+"different garment" when the declared item's name carried a noun from its slot's closed
+vocabulary — and fell through to the swap when it proved nothing. The writer had linked ART004
+"fleece jacket" as `Levin.top`, so no `top` noun appears in the name; the contract already opened
+with that same jacket; the swap fired anyway, deleted the clause holding the white long-sleeve
+shirt and appended a second copy of the jacket. Staging `job_1789584708605_rts4wqupm`, Levin,
+pages 1/4/6/7/8/9/10/11/12/13/14/16; two stored artifacts carry the result
+(`sceneImages[0].retryHistory[1].inpaintInstruction` and the matching
+`imageVersions[1].inpaintInstruction`).
+
+*The name regex slots props.* `deriveSlotFromName` matches garment nouns from `SLOT_NOUNS` against
+a Visual Bible element's NAME. Its design note claimed it "never decides whether something is
+clothing" because every caller pre-filters to an id the Art Director declared worn — **that claim
+was false**: three of its six call sites sweep raw Visual Bible pools, and two more pass an outfit
+CLAUSE rather than a name, against the note's own "NAME only" rule. Over every stored story in
+both environments (125 + 125 stories; 1,714 elements in the artifacts/clothing/vehicles pools) the
+regex slots 64 staging / 11 prod elements, **4 of them props**: "bottle cap" → headwear,
+"Gessler's hat pole" → headwear, "Gessler's feathered hat on pole" → headwear, "Knotted sash line"
+→ belt/waist. The declared `type` slots 5 / 0, and the two **never disagreed** on any of the 1,714.
+**Outfit lines changed by a wrong slot: 0 in both environments** — every call site applies a
+second gate, and the cover dedupe path produced 0 `conflict` verdicts over 3,324 artifact×segment
+matches. The matcher is wrong in principle; the damage is zero.
+
+**Decision.**
+
+1. **Delimiters are ranked, and the rank is structural.** A semicolon is always a top-level clause
+   boundary — over 833 stored staging+prod contracts it never appears inside a garment
+   description. A comma is a boundary only between two texts that EACH name a garment, through the
+   same closed `SLOT_NOUNS` vocabulary every other decision in the module uses. A fragment naming
+   no garment is not a clause; it is a colour, a fit or a trim, and it merges back into the clause
+   beside it. Clause text is returned verbatim so a caller that drops one clause and rejoins the
+   rest changes nothing else.
+2. **A worn-item swap requires positive evidence of disagreement.** When the declared item's name
+   carries no noun from its slot's vocabulary, the branch cannot tell "same garment" from
+   "different garment" and does not swap; it records
+   `{applied: false, reason: 'item-name-carries-no-slot-noun'}` and the WORN ITEMS block still
+   states in words that the item is worn.
+3. **`itemName: null` at that call site is correct and stays.** What comes out of
+   `removeWornItemFromOutfit` there is the contract's INCUMBENT garment, whose name is nowhere on
+   record; null is what makes `clauseRemainderWithoutItem` identify it from the clause itself.
+   Passing `r.name` would narrow to the garment being put IN — which the guard has just
+   established the clause does not name. The reason is now written at the call site instead of a
+   bare `null`.
+4. **The declared `type` beats the name regex on the path that edits an outfit.** Two functions
+   answered the same question differently: `unlinkedWornCandidates` read
+   `slotFromType(type) || deriveSlotFromName(name)`, while source 2 of `resolveWornItemsForPage` —
+   the path that actually strips and swaps a rendered outfit line — read the name regex alone. The
+   declaration now wins there too, and the false design note is replaced with the measurement.
+
+**Rationale.** The bias in all four is the module's own stated one: a wrong deletion is far worse
+than a redundant mention. Over-splitting deletes a garment; under-splitting only makes the strip
+refuse (`slot-clause-carries-another-garment`), and the explicit "is NOT wearing" prompt line
+still carries the instruction. Nothing is inferred from prose — the only question asked of a
+fragment is whether the closed vocabulary appears in it. And the declaration is the Art Director's
+own word for what an element is, where the regex is a guess at English made from its label.
+
+**Blast-radius proof.** The resolver was replayed over every stored page of every story on staging
+AND production carrying a `visualBible`, `clothingRequirements` and `sceneImages` — 236 stories,
+3,203 (page, character) pairs. It rewrote 33 pairs before and 21 after; exactly **22 pairs change,
+all inside the two stories above, and ZERO pairs it had previously left alone are touched**. The
+declared-type change was separately replayed over every stored page and produced **byte-identical**
+output, so it changes no shipped outfit — what it removes is the fork.
+
+**Open, NOT decided — needs the owner.** On `job_1789584708605_rts4wqupm` pages 15/17/18 the
+fleece is declared **off** and the resolved outfit still loses the white long-sleeve shirt with
+it, before and after this fix: the clause is *"red fleece fabric garment with a full front zipper,
+ribbed cuffs and hem — worn over a white long-sleeve shirt"*, and `clauseRemainderWithoutItem`
+takes the "whole clause" shortcut whenever `countGarments(clause) <= 1`. "fleece fabric garment"
+is not in the closed vocabulary, so a clause that visibly layers two garments counts as one. The
+structural signal exists — the clause carries a `LAYER_SPLIT_RE` connective ("worn over") — so the
+shortcut could be gated on it, and that was deliberately not shipped because the two outcomes
+serve two of this module's rules that point opposite ways here: gate it and the contract keeps a
+jacket the page took off, so the judge can order a paid repair to repaint it; leave it and a
+garment the character is actually wearing goes unjudged. Three pages of one staging story, no prod
+instance.
+
+**Retiring the regex entirely is also the owner's call.** Declared `type` alone would answer
+**11 of 37** stored source-2 resolutions on staging and **0 of 2** on production, so deleting
+`deriveSlotFromName` today silently disables five of the seven elements that drove an outfit
+change and makes the removable-worn-item path inert again — the exact regression `e403345b1` was
+written to fix. The viable prompt-side shape is not "delete" but "make the Art Director emit the
+slot as a CLOSED ENUM", then retire the regex once stored data shows the enum populated.
+
+**Also noted, not damaging.** `parseWornAs` accepts any slot string, so
+`job_1789681157795_wkt20ckod` ART002/ART003 carry `wornAs: "Levin.hands"` / `"Levin.neck"` —
+slots outside `WORN_SLOTS`. Every downstream strip/swap bails with `unknown-slot`, so the items
+are inert rather than mis-stripped, but the WORN ITEMS prompt block still emits the instruction
+and no check reports the malformed slot.
+
+**Touched files.** `server/lib/wornItems.js`, `tests/unit/worn-outfit-clause-corruption.test.ts`,
+`tests/unit/worn-slot-declared-type-first.test.ts`, `tasks/bugs.json`
+(`worn-outfit-clause-split-inside-a-clause`, `worn-swap-fires-without-proof-of-disagreement`).
+**Status:** ✅ active — commits `d104a283d` + `b1d117e2b`, with the two bugs.json entries closed
+against their fix hash in `45b6f69eb`. Staging, not pushed. See also the companion entry below:
+the same "declaration, not prose" ruling applied to the page prompt builder.
+
+## 2026-09-18 — The page worn-vs-held guard reads the declared `wornItems` row, not prose
+
+**Context.** `NON_WORN_STRONG_RE` and `sceneDeclaresNonWornState` (`server/lib/promptBuilders.js`)
+inferred from a brief's prose and `interactions[]` whether a Visual Bible element was placed off
+the body, so REQUIRED OBJECTS would not describe an item as worn while the scene held it. It
+arrived 2026-07-31 (`32c825a61`) as the page sibling of the cover dedupe — two months before the
+structured `wornItems` field existed.
+
+**Measured 2026-09-18** over 247 stored stories / 1,912 pages / 2,944 element-checks on staging
+and production, with fires already covered by a structured `state: "off"` row excluded:
+
+- it fires on **68.5%** (staging) and **56.9%** (prod) of every element a brief cites;
+- **96%** of staging fires and **99.5%** of prod fires are on an entry that can never be worn — an
+  animal, a vehicle, a plain prop;
+- **14 fires directly contradict an explicit `wornItems: state:"worn"` row** the Art Director
+  wrote for that page (12 staging, 2 prod);
+- precision against the Art Director's own declared `off` rows is **0.73%** (staging, 10 of 1,368)
+  and **0.18%** (prod); recall is 10 of 17 declared `off` rows;
+- a random sample of 18 fires is **10 false / 8 true** on "did the matched verb belong to this
+  entry": `Pirate Hat` on *"pale blue sky **overhead**"*, `Wooden Chest` on *"her gaze **dropped**
+  onto the lid"*, `Heavy wooden chest` on its own description's *"iron **drop** handles"*, a
+  marten on a sentence about a scarf (shared tokens `neck / narrow / throat`), `Submerged Stepping
+  Stones` on *"arms **held** stiff"*, and a hat named "Pirate Hat — Emma" firing because a sentence
+  contained the word *Emma*;
+- **damage that shipped is zero.** REQUIRED OBJECTS has been name-only since the 2026-09-02
+  ruling, so the only thing the verdict can still change is a ≤6-word lead label — and computed
+  with the real `elementLeadLabel` + `stripWornStateFromDescription`, that label was identical in
+  all **1,905** fires. (An earlier pass of the same investigation reported 16 "damage" cases by
+  diffing the description before/after the strip; that was wrong — every deletion sat deeper than
+  word 6.)
+
+**Decision.** The prose matcher is deleted. `placedElsewhere` reads only the brief's declared
+`wornItems` row (`state: "off"`). `stripWornStateFromDescription` stays, on that branch.
+
+**Rationale.** The same function was already deleted from one consumer on 2026-08-08
+(`5f174cba5`, `filterWornClothingAgainstScene` — 34% of outfits gutted over 30 stories / 457
+clothing lines), and the replacement it was deleted in favour of is now complete:
+`GARMENT_REMOVED_RULE` is filled into all four brief-authoring templates, `wornItems[]` is the
+declared field (`91da5920e`), `server/lib/wornItems.js` reads it ("Nothing is inferred from
+prose"), and `clothingCheck.removal_unstated` already reports a page that omits the row — which is
+exactly what both of the matcher's recorded misses are. The cover sibling
+(`coverIterate.applyCoverWornHeldDedupe`) reached the same shape from the other side on 2026-09-15
+(`566042c10`, `80548cfd5`): its token matcher was left loose on purpose and the verdict moved onto
+declared slot identity, never onto verbs. **Structured declaration decides; prose does not.**
+
+**Proof.** Every stored page's image prompt was rebuilt with the real `buildImagePrompt` before
+and after the deletion, from identical inputs — 247 stories (124 staging + 123 production),
+**2,216 pages**, 1,802 of them carrying a REQUIRED OBJECTS block, ~20 MB of rendered prompt text.
+The `placedElsewhere` branch fired 2,060 times in the BEFORE run and 16 times in the AFTER run
+(the declared `state: "off"` rows). The two dumps are **byte-identical**: sha256 over the
+concatenated prompts matches per environment — staging `c8064148…b570`, production
+`919dd66c…2974`, zero differing pages.
+
+**Left alone, deliberately.** `refEntry = { ...obj.entry, description }` (`promptBuilders.js:4174`)
+overwrites only `description` while `englishEntityRef` reads `extractedDescription || description`,
+so the strip is a no-op for any entry with an extracted description. It sits in the SURVIVING
+structured branch, so this deletion narrows its reach from 2,060 fires to 16 rather than making it
+moot. Measured on the same 247 stories: of the 18 element-cases carrying a declared `state: "off"`
+row, **none** has an `extractedDescription`, the strip changes the text in **none** of them, and
+fixing the shadow would change **zero** labels — it would *create* damage that is currently zero.
+Pinned as a property in `tests/unit/page-prompt-worn-state.test.ts`, and logged in
+`tasks/BACKLOG.md`.
+
+**Sibling registry.** The page and cover worn≠held resolvers were in no set, which is how they
+drifted for seven weeks. `worn-vs-held-resolvers` (`promptBuilders.js` ↔ `coverIterate.js`) was
+added with this entry.
+
+**Touched files.** `server/lib/promptBuilders.js` (`NON_WORN_STRONG_RE`, `NON_WORN_WEAK_RE`,
+`BODY_ANCHORED_DRAPE_RE`, `textDeclaresNonWornPlacement`, `sceneDeclaresNonWornState`, their five
+export lines, the disjunct at 4158 and the now-dead `significantEntityTokens` import),
+`server/lib/storyHelpers.js` (two facade re-exports), `tests/manual/test-page-prompt-builder.js`
+(five assertions removed, one inverted — that fixture declares no `wornItems` row, so the
+`(worn by …)` suffix must now survive), `tests/unit/page-prompt-worn-state.test.ts` (new, 20
+assertions), `scripts/admin/sibling-registry.json`.
+**Status:** ✅ active — commit `d60b26938`, staging, not pushed.
+
+## 2026-09-18 — A rename target is taken by ANY match that holds it, not just an agreeing one
+
+**Context.** The 2026-09-14 entry fixed `buildRenameMap` so a rename could not target a name an
+**AGREED** match already held. That closed the case it was measured on
+(`job_1789348171785_9oxos7dwv` p7) and left every other holder unprotected — which is the common
+case, not the rare one. `checkIdentityAgreement` pairs evaluator matches to detector figures by
+greedy nearest centre, and only pairs an evaluator name the detector used *somewhere* and found
+within `maxCentreDistance`. Everything else lands in `unpaired`: a name the detector never
+assigned, a figure whose nearest counterpart was too far away, an animal the detector does not
+name. A match carrying no bbox is filtered out before pairing and appears in neither list. All of
+them still hold their name in `matches[]`, and `reconcileIdentity` rewrites `matches[]` — so a
+conflict pointing at an unpaired holder's name passed the agreed-only check and was applied: one
+name onto two matches, the other name gone, and every finding about the erased character
+relabelled onto somebody the spec never cast in that role.
+
+**Measured** by replaying the real `reconcileIdentity` over every stored version carrying both an
+evaluator `matches[]` and a detector `bboxDetection.figures[]` — 1,194 versions / 59 stories on
+staging, 317 / 13 on production — with `evaluatorReference` / `evaluatorCharacter` restored so the
+replay receives exactly what production received:
+
+| | staging | prod |
+|---|---|---|
+| versions with ≥1 identity conflict | 76 | 20 |
+| renames applied by the agreed-only code | 30 | 15 |
+| **…of those, fabricating a duplicate** | **11** | **12** |
+| renames applied after this fix | 19 | 3 |
+| **…of those, fabricating a duplicate** | **0** | **0** |
+| versions the fix CHANGES | 11 | 12 |
+| …of which were previously clean | **0** | **0** |
+| versions byte-identical before/after | 1,183 | 305 |
+
+Historically — before the 09-14 guard — the rate was worse: of the 52 staging records that stored
+a rename, **36 (69%) produced a duplicate name and erased a character from `matches[]`**, and 35
+still carry that duplicate today. The fixed code refuses every one of those renames. Two of the
+three test fixtures are duplicates production actually stored: `job_1787469664089_9e27p42el7l` p6
+lost **Saira** to a second *Facundo*; `job_1788727233899_1dpnym94p` p18 lost **Julian** to a
+second *Levin*, on four separate versions of that page. The third,
+`job_1787436913379_mfedxinwqd` p4, predates the reconciler and stored no rename — it is one
+**today's** code would newly introduce, on a page where `agreed` is 0 so `agreedNames` is empty
+and the 09-14 guard is structurally blind. On all three pages the detector's roster is a subset of
+the evaluator's own names, spelled identically: there was no identity dispute at all, only a
+greedy-nearest-centre artefact.
+
+**Decision.** `buildRenameMap`'s second argument becomes `heldNames` — every name this evaluation
+has on a figure, read off the raw `matches[]` before the pairing filter and reported by
+`checkIdentityAgreement` as `report.heldNames`. The function expresses **one** rule instead of a
+list of holder kinds: *a rename must leave every name on exactly one figure.* A target is
+available only when nobody holds it, or when its holder is itself renamed away in the same pass —
+which is exactly what makes a two-name swap, and any longer cycle or chain, lossless. Targets
+occupy as they land, so two conflicts pointing at one name are refused by the same loop, replacing
+the separate `targets.size !== map.size` check. Held names are compared through `canonicalName`,
+the space the pairing itself decides agreement in, so a title or a diacritic cannot hide a
+duplicate. `agreedNames` stays in the report as a measurement; it is no longer the guard.
+
+**Rationale.** Same verdict as 09-14, applied at the right altitude: leaving the evaluator's own
+name in place is strictly better than writing one name onto two figures. A wrong name on one
+figure is one wrong finding; a duplicated name erases a character and misroutes every finding
+about them. The guard refuses *duplicates*, not renames — a permutation stays lossless and still
+goes through, which is why 19 of 30 staging renames still apply. The previous fix enumerated a
+kind of holder (agreed), and enumerating kinds is what let the next kind through, so the rule is
+now stated over the set it actually has to be true of.
+
+**Deliberately not touched.** **123 staging and 71 prod versions hold one name on two matches
+BEFORE any rename** — the evaluator's own `matches[]` naming two figures the same. That is larger
+than the bug fixed here and has a different cause: it is evaluator output, not reconciliation.
+This module carries such a pair across a swap and adds nothing to it (pinned by a test). Logged in
+`tasks/BACKLOG.md` at the owner's request. Four identity-policy proposals on the owner's desk —
+one-to-one pairing, gating on `figures[].confidence`, using the fallback chain's second witness as
+a vote, and discounting findings on a contested identity — are all untouched.
+
+**Touched files.** `server/lib/identityAgreement.js`,
+`tests/unit/identity-rename-unpaired-holder.test.ts` (14 tests, 8 of which fail against the
+pre-fix code), `tests/unit/fixtures/identity-rename-unpaired-holder.json` (the three verbatim
+stored versions, no field pruned).
+**Status:** ✅ active — commit `bc3cbe062`, staging, not pushed.
+
+## 2026-09-18 — The detector's identity line gets hair, composed by the shared builder
+
+**Context.** `buildCastIdentityDescription` (`server/lib/promptBuilders.js`) builds the per-figure
+identity line the Set-of-Mark call names badged figures from. It emitted hair with
+`if (phys.hair) parts.push(...)`, reading `char.physical.hair`. The stored character profile has
+no `hair` key — it holds `hairColor` (e.g. "light blonde") plus a `detailedHairAnalysis` object.
+The branch therefore never fired, and every production identity line on every detection path went
+out as age-band + build + face geometry + wardrobe, with **no hair at all**.
+
+Measured over 379 staging profiles from 45 days of stories: 379 carry `hairColor`, 365 carry
+`detailedHairAnalysis`, and **16 (4.2%) carry a `hair` key** — all 16 a bare colour, all from
+stories dated 2026-08-09, nothing created since. The damage is larger than the missing field: the
+Test Lab's builder routes through `buildCharacterPhysicalDescription`, which composes hair
+correctly, so the Lab prompt for the same page reads `Hair: dark brown, straight, short, bangs at
+eyebrows` while production got nothing. **Every Lab identity measurement ever made ran on richer
+input than production received, so Lab-vs-production identity numbers were never comparable** —
+which also confounds the 2026-08-22 entry's cited 4/4-vs-6/6 result, since those Lab calls
+differed by hair as well as by `clothing`.
+
+Motivating page: staging `job_1789681157795_wkt20ckod` p12, four preschooler boys. Their real
+stored lines gave `build: average` to all four, and Max and Kiaan were byte-identical apart from
+the wardrobe tail:
+
+```
+Max   : preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips. Wearing: …
+Kiaan : preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips. Wearing: …
+```
+
+The detector swapped two of the boys and the page shipped at finalScore 0 on findings attributed
+to the wrong child.
+
+**Decision.** Hair is emitted from `buildHairDescription(getPhysicalFromChar(char),
+char.physicalTraitsSource)` — the SAME composer `extractCharacterVisualProfile` already uses, and
+through it the Lab's `buildCharacterPhysicalDescription`. One composition, not two. `char.physical`
+was also swapped for `getPhysicalFromChar(char)`, a strict superset that only fills legacy
+snake_case fields otherwise missing. Resulting p12 lines:
+
+```
+Max   : preschooler boy/man, hair: light brown, curly, short, build: average, …
+Kiaan : preschooler boy/man, hair: dark brown, straight, short, bangs at eyebrows, build: average, …
+```
+
+**Precedence: `hairColor` + `detailedHairAnalysis` wins, legacy bare `hair` is the fallback.** This
+needed no new rule — it is `buildHairDescription`'s existing documented precedence. Justified from
+data: all 16 legacy `hair` values are bare colours, all 16 also carry `hairColor`, and **all 16
+agree with their own `hairColor` exactly**. The legacy key carries strictly less information and
+never contradicts the rich path.
+
+**Length: the full shared composition, not a trimmed one.** `buildHairDescription` already drops
+the hex codes and `salonLevel` and gates out uninformative `styling` and `parting` values, leaving
+colour + texture-type + length plus bangs/parting only when they discriminate. Measured over the
+365 profiles that have the analysis: **median 43 chars, p90 61, max 72** — never a paragraph.
+Truncating further was rejected: a second, shorter composition is exactly the hand-maintained copy
+that drifts ("fix the mirror class, not the instance"), and matching the Lab's string is the point
+of the fix.
+
+**Rationale for touching one file only.** All four builders in the registered
+`detector-identity-lines` sibling set — generation (`storyJobPipeline.js` phase 5b-pre), iterate
+(`images.js` `iteratePageCore`), character repair (`charRepairTarget.js` `buildPageCast`) and
+covers (`coverIterate.js` `buildExpectedCoverCharacters`) — call `buildIdentityLine`, which falls
+through to `buildCastIdentityDescription`. Fixing the shared function reaches all four with no
+sibling edit. Max and Kiaan are now separable on appearance alone, without the wardrobe tail —
+which matters because the sanitized SoM tier strips "Wearing:" out of the description, and because
+a figure drawn in the other child's clothes is exactly the case the line has to survive.
+
+**Hair alone would not have rescued p12 — do not read this as the fix for that page.** The Lab
+re-run (set 66, experiment 1324) sent hair, clothing AND position for all four boys and the judge
+still produced the same wrong answer, because `_somIdentifyFigures`' own prompt ranks clothing
+above position ("use the expected position/action as a supporting hint only") and p12's clothing
+is the corrupted channel — the back child is rendered in a second copy of Kiaan's red duffle coat.
+What this fix buys is that production's identity line stops being strictly weaker than the one
+every Lab measurement used.
+
+**Side finding, not fixed.** `tests/manual/identityDescriptions.test.js` has two failing assertions
+naming `server/lib/repairPipeline.js` as the char-repair identity site. That is a stale path: the
+logic moved into `server/lib/charRepairTarget.js` (`buildPageCast`), which `repairPipeline.js`
+calls at line 1743 and which the sibling registry already lists correctly. There is no fifth
+unconverted site.
+
+**Touched files.** `server/lib/promptBuilders.js` (`buildCastIdentityDescription`),
+`tests/unit/identity-line-hair.test.ts` (new, 10 tests).
+**Status:** ✅ active — commit `f0f3c3346`, staging, not pushed.
+
 ## 2026-09-18 — The IMAGE paths' refusal test is an allow-list too, and one module holds both vocabularies
 
 **Context.** Hours after `textReplyGuard` was inverted (the entry below, `a5052d176`), the image half

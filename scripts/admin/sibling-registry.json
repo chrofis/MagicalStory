@@ -371,6 +371,27 @@
         "server/lib/imageReplyGuard.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "worn-vs-held-resolvers",
+      "axis": "page worn-vs-held vs cover worn-vs-held",
+      "reason": "The page path (buildImagePrompt's REQUIRED OBJECTS loop, promptBuilders.js) and the cover path (applyCoverWornHeldDedupe, coverIterate.js) each answer the same question - is this element worn on a body, or held/placed off it - for the SAME Visual Bible entries of the SAME story. They drifted for seven weeks: the page side inferred the verdict from a prose verb regex while the cover side rode the structured cover-hint 'holds:' field and on 2026-09-15 (566042c10, 80548cfd5) deliberately left its token matcher loose and moved the verdict onto declared slot identity. The page side's regex was deleted on 2026-09-18 for 0.73% precision over 247 stories. A worn-vs-held rule added to one resolver and not the other puts the same garment on the body on the cover and in the hero's hands on page 5.",
+      "members": [
+        "server/lib/promptBuilders.js",
+        "server/lib/coverIterate.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "clothing-findings-producer-vs-consumers",
+      "axis": "mechanical clothing findings: producer vs the prompt that fixes them vs the Lab mirror",
+      "reason": "clothingCheck.js decides WHICH clothing faults are sendable (REVIEWABLE) and words each one as its own fix; scene-review.txt check 0 is the only consumer and states what a reviewer may do about them; testlab.js's scene-review replay keeps a THIRD, hand-copied set of the same type list for its faults-in/faults-out measurement. A type added, removed or re-worded in one is silently absent or stale in the others - on 2026-09-18 the deletion of outfit_misattributed left check 0 instructing a garment move that can never be asked for, and left the Lab counting a type the module no longer emits.",
+      "members": [
+        "server/lib/clothingCheck.js",
+        "prompts/scene-review.txt",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [
