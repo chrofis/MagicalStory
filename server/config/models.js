@@ -60,11 +60,21 @@ const TEXT_MODELS = {
     maxOutputTokens: 65536,
     description: 'Gemini 2.5 Flash Lite - Cheapest ($0.10/$0.40 per 1M, ~6× cheaper than Flash)'
   },
+  // STILL SERVED, despite the 2026-09-11 note this replaces. That note read
+  // "NOT SERVED … the id 404s rather than caps", inferred from the model's
+  // absence from GET /v1beta/models. Absence from a LIST is not death: the
+  // per-model read `GET /v1beta/models/gemini-2.0-flash` returns 200 with
+  // supportedGenerationMethods including generateContent, and outputTokenLimit
+  // 8192 — so the ceiling below is now VERIFIED, not unverifiable. Control
+  // probes the same day: gemini-1.5-flash and gemini-2.0-flash-exp both 404
+  // with "Model is not found", so 200 here means served, not a catch-all.
+  // (Fetched 2026-09-18. The model is delisted, i.e. absent from the listing
+  // while still answering — the list is one page, 58 models, no nextPageToken.)
   'gemini-2.0-flash': {
     provider: 'google',
     modelId: 'gemini-2.0-flash',
-    maxOutputTokens: 8192, // NOT SERVED 2026-09-11 — listed under "Previous models (Shut down)" on ai.google.dev and absent from v1beta/models. This ceiling is unverifiable; the id 404s rather than caps.
-    description: 'Gemini 2.0 Flash - Very fast'
+    maxOutputTokens: 8192, // verified 2026-09-18 against outputTokenLimit on the per-model read
+    description: 'Gemini 2.0 Flash - Very fast (delisted by Google but still serving)'
   },
   'gemini-pro-latest': {
     provider: 'google',
@@ -72,26 +82,62 @@ const TEXT_MODELS = {
     maxOutputTokens: 65536,
     description: 'Gemini Pro Latest (2.5 Pro) - High quality'
   },
+  // ── RETIRED xAI ids. xAI has removed the whole Grok 3.x / 4.x-fast tier:
+  // GET /v1/models returns only grok-4.20-*, grok-4.3, grok-4.5, grok-4.6 and
+  // grok-build-0.1 (fetched 2026-09-18).
+  //
+  // They do NOT 404. A per-model read of each id below returns HTTP 200 with
+  // `{"id":"grok-4.3"}` — xAI keeps a deprecation redirect for the retired
+  // 3.x/4.x families. It is a curated map, not a catch-all: grok-2-vision-1212
+  // and invented ids 404 properly on the same endpoint the same day. So the
+  // cost of leaving one of these wired was never an outage, it was SILENCE —
+  // grok-4.3 answers, bills $1.25/$2.50, and the caller records a model id and
+  // a $0.20/$0.50 rate that describe a model that no longer exists.
+  //
+  // `retired` / `redirectsTo` are machine-readable on purpose: the unit test
+  // uses them to keep live code off these entries, and
+  // scripts/admin/check-model-pricing.js re-reads liveness from the vendors.
+  // They are KEPT (not deleted) so historical usage rows still price.
   'grok-3-mini': {
     provider: 'xai',
     modelId: 'grok-3-mini',
-    maxOutputTokens: 32768, // NOT SERVED 2026-09-11 — xAI lists only grok-4.20-*/4.3/4.5/4.6. xAI also publishes NO output ceiling anywhere, so any xai entry is unverifiable in principle.
-    description: 'Grok 3 Mini - Fast and cheap ($0.30/$0.50 per 1M tokens)'
+    retired: '2026-09-18',
+    redirectsTo: 'grok-4.3',
+    maxOutputTokens: 32768, // xAI publishes NO output ceiling anywhere, so any xai entry is unverifiable in principle.
+    description: 'Grok 3 Mini - RETIRED ($0.30/$0.50 per 1M while it existed); xAI now redirects the id to grok-4.3, which bills 1.25/2.50'
   },
   'grok-3': {
     provider: 'xai',
     modelId: 'grok-3',
-    maxOutputTokens: 32768, // NOT SERVED 2026-09-11 — see grok-3-mini.
-    description: 'Grok 3 - Good quality ($3.00/$15.00 per 1M tokens)'
+    retired: '2026-09-18',
+    redirectsTo: 'grok-4.3',
+    maxOutputTokens: 32768,
+    description: 'Grok 3 - RETIRED ($3.00/$15.00 per 1M while it existed); xAI now redirects the id to grok-4.3, which bills 1.25/2.50'
   },
   'grok-4-fast': {
     provider: 'xai',
     modelId: 'grok-4-1-fast-non-reasoning',
-    maxOutputTokens: 65536, // NOT SERVED 2026-09-11 — see grok-3-mini.
-    description: 'Grok 4 Fast - Very cheap, 2M context ($0.20/$0.50 per 1M tokens)'
+    retired: '2026-09-18',
+    redirectsTo: 'grok-4.3',
+    maxOutputTokens: 65536,
+    description: 'Grok 4 Fast - RETIRED ($0.20/$0.50 per 1M while it existed); xAI now redirects the id to grok-4.3, which bills 1.25/2.50 — 6.25x/5x this tier'
   },
-  // Latest Grok (2026-08-12) via OpenRouter. No separate 4.x "flash" exists —
-  // grok-4-fast above is the cheap tier. Pricing from the OpenRouter catalogue.
+  // The live cheap-tier Grok, and what every id above actually resolves to at
+  // xAI today. Called DIRECTLY (api.x.ai), which is what callGrokVisionAPI
+  // does, so it is the drop-in for the Grok vision fallback — see
+  // GROK_VISION_FALLBACK below. Vision is vendor-confirmed, not assumed:
+  // GET /v1/language-models/grok-4.3 reports input_modalities ["text","image"]
+  // and a prompt_image_token_price, fetched 2026-09-18. Context 1,000,000.
+  'grok-4.3': {
+    provider: 'xai',
+    modelId: 'grok-4.3',
+    // xAI publishes no output ceiling for any model; this carries over the
+    // figure the fallback slot has used all along rather than inventing one.
+    maxOutputTokens: 65536,
+    description: 'Grok 4.3 (xAI direct) - cheapest live Grok, vision-capable ($1.25/$2.50 per 1M)'
+  },
+  // Latest Grok (2026-08-12) via OpenRouter. Pricing from the OpenRouter
+  // catalogue; xAI's own API quotes the same $2.00/$6.00 for it directly.
   'grok-4.6': {
     provider: 'openrouter',
     modelId: 'x-ai/grok-4.6',
@@ -102,11 +148,21 @@ const TEXT_MODELS = {
   // alternatives on eval/consolidation. Needs OPENROUTER_API_KEY. Use via
   // model override (dev panel / MODEL_DEFAULTS), never the default for German
   // story prose until a quality A/B proves it.
+  // RETIRED. Unlike the Grok ids above, this one really has no route: OpenRouter
+  // still answers GET /models/qwen/qwen-max/endpoints with 200 but the endpoint
+  // list is EMPTY, so no upstream serves it and a call cannot be fulfilled
+  // (checked 2026-09-18; qwen/qwen3.8-max returns 1 endpoint on the same probe,
+  // which is why that one is NOT marked retired even though it too is missing
+  // from the catalogue listing). No MODEL_DEFAULTS slot points here; it is
+  // reachable only by an explicit dev-mode override. Picking its successor
+  // (qwen3-max is already registered at $0.78/$3.90) is a routing choice, so it
+  // is left to the owner rather than silently repointed.
   'qwen-max': {
     provider: 'openrouter',
     modelId: 'qwen/qwen-max',
-    maxOutputTokens: 8192, // NOT IN THE OPENROUTER CATALOGUE 2026-09-11 — this ceiling is unverifiable.
-    description: 'Qwen-Max (Alibaba) via OpenRouter - NOT IN THE OPENROUTER CATALOGUE 2026-09-18, so it has no price and no route'
+    retired: '2026-09-18',
+    maxOutputTokens: 8192, // unverifiable — no endpoint serves the id
+    description: 'Qwen-Max (Alibaba) via OpenRouter - RETIRED, zero live endpoints; no successor chosen'
   },
   'qwen-plus': {
     provider: 'openrouter',
@@ -214,6 +270,26 @@ const TEXT_MODELS = {
     description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context ($0.049/$0.099 per 1M, re-checked 2026-09-18)'
   }
 };
+
+/**
+ * The xAI model the vision FALLBACKS use when the primary judge (Gemini) errors
+ * or safety-blocks on an image.
+ *
+ * ONE constant because there were six hand-kept copies of the string
+ * 'grok-4-fast' — evalJudges, evalPipeline x3, bboxDetection x2, sceneValidator,
+ * textModels — and when xAI retired that tier in 2026 not one of them moved.
+ * Nothing caught it, for a reason worth remembering: every one of those sites
+ * guarded with `TEXT_MODELS[id]?.provider === 'xai'`, which asks whether the
+ * repo has a config entry, never whether the VENDOR still serves the model. The
+ * guard passed for nine months on an id xAI had withdrawn.
+ *
+ * A fallback also hides its own breakage by construction: it only runs once the
+ * primary has already failed, so a bad id here costs nothing on a good day and
+ * everything on a bad one. That is why liveness is now checked from outside the
+ * code (scripts/admin/check-model-pricing.js, against the vendors) instead of
+ * being assumed by a guard inside it.
+ */
+const GROK_VISION_FALLBACK = 'grok-4.3';
 
 // Which Grok image tier renders a final page / a cover in THIS environment.
 // Declared in server/config/runtime.js, where every deliberate prod/staging
@@ -1181,15 +1257,21 @@ const MODEL_PRICING = {
   'gemini-pro-latest': { input: 2.00, output: 12.00, thinking: 12.00 },
 
   // ── xAI, called directly (TEXT_MODELS provider 'xai').
-  // Source: GET https://api.x.ai/v1/models, fetched 2026-09-18 (xAI reports
-  // prices as integers; value / 10_000 = USD per 1M tokens).
-  // ALL THREE IDS BELOW ARE NOT SERVED — the API returns only grok-4.20-*,
-  // grok-4.3, grok-4.5, grok-4.6 and grok-build-0.1. So these prices cannot be
-  // verified against anything today; they are kept so historical usage rows
-  // still price, and they are NOT evidence about any live model.
-  // ⚠️ 'grok-4-fast' (→ grok-4-1-fast-non-reasoning) is still used as the
-  // fallback model in evalJudges / evalPipeline / bboxDetection / sceneValidator
-  // and in textModels' Gemini-safety-block retry. Those calls hit a dead id.
+  // Source: GET https://api.x.ai/v1/models and /v1/language-models, fetched
+  // 2026-09-18 (xAI reports prices as integers; value / 10_000 = USD per 1M).
+  //
+  // The live cheap tier. Every retired Grok id below REDIRECTS here, so this is
+  // the rate xAI actually charged for any of them.
+  'grok-4.3': { input: 1.25, output: 2.50 },
+  //
+  // RETIRED ids — the API serves only grok-4.20-*, grok-4.3, grok-4.5, grok-4.6
+  // and grok-build-0.1. Kept so historical usage rows still price; they are NOT
+  // evidence about any live model. Note what they are NOT: the three rates below
+  // are not what a call to those ids costs TODAY. xAI redirects all three to
+  // grok-4.3, so a caller reaching one of them was being charged $1.25/$2.50 and
+  // booking it at these figures — which is how a fallback can be 6.25x over
+  // budget without any error appearing anywhere. The fallback call sites moved
+  // to GROK_VISION_FALLBACK ('grok-4.3') on 2026-09-18 for exactly that reason.
   'grok-3-mini': { input: 0.30, output: 0.50 },
   'grok-3': { input: 3.00, output: 15.00 },
   'grok-4-1-fast-non-reasoning': { input: 0.20, output: 0.50 },
@@ -1220,11 +1302,15 @@ const MODEL_PRICING = {
   'qwen/qwen3-vl-235b-a22b-instruct': { input: 0.21, output: 1.90 },
   'qwen/qwen3.6-plus': { input: 0.325, output: 1.95 },  // ADDED — had no entry
   'qwen/qwen3.8-27b': { input: 0.214, output: 2.55 },   // ADDED — had no entry (description says 0.45/3.20)
-  // ADDED. The bare id is NOT in the OpenRouter catalogue (only
-  // qwen/qwen3.8-max-0902, at exactly these rates), so the catalogue alone
-  // could not price it — but it HAS been billed: two Lab calls, 21,994 in /
-  // 72,280 out, $0.4777 charged, and 2.00/6.00 predicts $0.4777. Positive
-  // measurement, not a guess from the sibling id's name.
+  // ADDED. The bare id is NOT in the OpenRouter catalogue LISTING (only
+  // qwen/qwen3.8-max-0902, at exactly these rates), so the listing alone could
+  // not price it — but it is alive and this price is measured twice over:
+  // GET /models/qwen/qwen3.8-max/endpoints returns 1 live endpoint
+  // (2026-09-18), and it HAS been billed — two Lab calls, 21,994 in / 72,280
+  // out, $0.4777 charged, which 2.00/6.00 predicts to the cent. Positive
+  // measurement, not a guess from the sibling id's name. Do NOT mark this
+  // retired on catalogue absence alone; the endpoints probe is the liveness
+  // test, the listing is not.
   'qwen/qwen3.8-max': { input: 2.00, output: 6.00 },
   'deepseek/deepseek-chat': { input: 0.32, output: 0.89 },  // was 0.2574/1.0287 (that is the StreamLake endpoint; the default route is DeepInfra)
   // 3.68x UNDER before 2026-09-18 (0.435/0.87), and this is the reviewer on
@@ -1276,8 +1362,9 @@ const MODEL_PRICING = {
   // $2.00/$6.00, and 983k in / 2.79M out billed $18.66 across prod+staging,
   // which those rates predict to within 0.2%. ≥200k prompt: 4.00/12.00.
   'x-ai/grok-4.6': { input: 2.00, output: 6.00, thinking: 6.00 },
-  // NOT IN THE OPENROUTER CATALOGUE 2026-09-18 — `qwen/qwen-max` returns no
-  // entry, so this price has no source. Kept for historical usage rows only.
+  // RETIRED — absent from the catalogue AND zero live endpoints on
+  // GET /models/qwen/qwen-max/endpoints (2026-09-18), so nothing serves it and
+  // this price has no source. Kept for historical usage rows only.
   'qwen/qwen-max': { input: 1.60, output: 6.40 },
 
   // ── Grok Imagine (fixed cost per image).
@@ -1483,6 +1570,7 @@ function maxOutputTokensFor(modelKeyOrId) {
 module.exports = {
   EVAL_TEMPERATURE,
   TEXT_MODELS,
+  GROK_VISION_FALLBACK,
   MODEL_DEFAULTS,
   maxOutputTokensFor,
   resolveEvalModel,

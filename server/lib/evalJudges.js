@@ -12,7 +12,7 @@
 // to whoever answered.
 const { log } = require('../utils/logger');
 const { withRetry } = require('./textModels');
-const { TEXT_MODELS } = require('../config/models');
+const { TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
 const { assertPromptFilled } = require('../services/prompts');
 
 // EVAL_JUDGES=gemini            (default — single judge, no jury)
@@ -27,7 +27,7 @@ function getEvalJudges() {
 }
 
 // Judge key → model registry key (server/config/models.js TEXT_MODELS).
-const JUDGE_MODEL = { grok: 'grok-4-fast', qwen: 'qwen-vl' };
+const JUDGE_MODEL = { grok: GROK_VISION_FALLBACK, qwen: 'qwen-vl' };
 
 // OpenRouter vision call — mirrors callGrokVisionAPI (Gemini parts → OpenAI
 // image_url content), returns the raw text or null on any failure.

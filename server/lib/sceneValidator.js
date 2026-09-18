@@ -29,7 +29,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // forever (stuck-at-51% incident, 2026-07-07). The SDK aborts after this, the
 // error propagates, and callers skip the eval instead of hanging.
 const EVAL_REQUEST_OPTIONS = { timeout: 120000 };
-const { MODEL_DEFAULTS, resolveSceneValidationModel } = require('../config/models');
+const { MODEL_DEFAULTS, resolveSceneValidationModel, GROK_VISION_FALLBACK } = require('../config/models');
 const VISION_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
 const COMPARISON_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
 
@@ -955,7 +955,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
 
   // Grok vision fallback
   try {
-    const grokModelId = 'grok-4-fast';
+    const grokModelId = GROK_VISION_FALLBACK;
     const grokModel = TEXT_MODELS[grokModelId];
     if (!grokModel || grokModel.provider !== 'xai') {
       log.warn('[SEMANTIC] No Grok model available for fallback');

@@ -10,7 +10,13 @@
  * wrong number. tests/unit/model-pricing-integrity.test.ts pins the shape of the
  * table; only a live fetch can tell you a well-formed number is wrong.
  *
- * Three independent checks, none of which costs a paid model call:
+ * Four independent checks, none of which costs a paid model call:
+ *   0. LIVENESS   — does each vendor still SERVE every configured id? A price
+ *                   can be perfectly accurate for a model that no longer
+ *                   exists, and a fallback pointing at one stays invisible
+ *                   until the primary fails. Per-model probes, per vendor —
+ *                   see checkLiveness for why a catalogue listing is the wrong
+ *                   test on all three of xAI, OpenRouter and Google.
  *   1. PUBLISHED  — OpenRouter's catalogue (free, no auth) and xAI's models API
  *                   (needs XAI_API_KEY) vs the table, per model.
  *   2. BILLED     — with --db, the effective rate implied by real spend:
@@ -31,7 +37,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..', '..');
 require('dotenv').config({ path: path.join(ROOT, '.env') });
 
-const { MODEL_PRICING, TEXT_MODELS, PRICING_VERIFIED_ON } = require(path.join(ROOT, 'server/config/models'));
+const { MODEL_PRICING, TEXT_MODELS, IMAGE_MODELS, PRICING_VERIFIED_ON } = require(path.join(ROOT, 'server/config/models'));
 
 const TOLERANCE = 0.02;               // 2% — rounding in a catalogue, not drift
 const STALE_DAYS = 90;
@@ -78,7 +84,24 @@ async function checkOpenRouter(routedBy) {
     if (price.perImage) continue;
     if (!key.includes('/')) continue;                 // vendor-direct id, not an OpenRouter slug
     const live = byId.get(key);
-    if (!live) { flag(`${key}: NOT IN THE CATALOGUE — no source for its price, and calls to it have no route`); continue; }
+    if (!live) {
+      // "Absent from the catalogue" is NOT "has no route" — this message used
+      // to claim both. OpenRouter's listing omits live aliases: qwen/qwen3.8-max
+      // is missing from it and has a working endpoint (2026-09-18). All that
+      // absence proves is that the LISTING cannot source the price; whether the
+      // id is dead is checkLiveness's question, answered by the endpoints probe.
+      const retiredAs = Object.values(TEXT_MODELS).find((c) => c.modelId === key && c.retired);
+      if (retiredAs) console.log(`  · ${key}: retired ${retiredAs.retired}, price kept for historical rows only — nothing live to verify against`);
+      // Informational, not a flag: LIVENESS below is the authority on an
+      // unlisted id, and it reports exactly one verdict per model. Nothing is
+      // lost — a typo'd or withdrawn id fails there (not retired, no endpoint),
+      // and an unlisted id with no price at all is caught by the
+      // NO MODEL_PRICING ENTRY sweep further down. Flagging here as well made
+      // qwen/qwen3.8-max — alive, and priced from measured billing — a
+      // permanent red, which is how a checker gets ignored.
+      else console.log(`  · ${key}: not in the catalogue listing, so the listing cannot source its price — see LIVENESS below for whether it still routes`);
+      continue;
+    }
     const pIn = Number(live.pricing.prompt) * 1e6;
     const pOut = Number(live.pricing.completion) * 1e6;
     if (off(price.input, pIn) > TOLERANCE || off(price.output, pOut) > TOLERANCE) {
@@ -123,7 +146,15 @@ async function checkXai() {
     if (key2.includes('/')) continue;
     if (!/^grok/.test(key2)) continue;
     const m = byId.get(key2);
-    if (!m) { flag(`${key2}: xAI does not serve this id — its price cannot be verified and calls to it 404`); continue; }
+    if (!m) {
+      // Retired ids are KEPT on purpose so historical usage rows still price.
+      // checkLiveness is what judges whether they are really gone; this check
+      // is only about whether a price can be verified, and for these it cannot.
+      const retiredAs = Object.values(TEXT_MODELS).find((c) => c.modelId === key2 && c.retired);
+      if (retiredAs) console.log(`  · ${key2}: retired ${retiredAs.retired}, price kept for historical rows only — nothing live to verify against`);
+      else flag(`${key2}: xAI does not list this id, and no TEXT_MODELS entry marks it retired — its price has no source`);
+      continue;
+    }
     if (price.perImage !== undefined) {
       // grok.js requests resolution '1k' everywhere and sets no quality tier, so
       // compare against the 1k rows. `image_price` at the top level is the 2k /
@@ -144,6 +175,142 @@ async function checkXai() {
       } else ok(`${key2}  $${pIn.toFixed(4)}/$${pOut.toFixed(4)}`);
     }
   }
+}
+
+/**
+ * LIVENESS — does the vendor still serve every id this repo is configured with?
+ *
+ * WHY THIS LIVES HERE AND NOT IN A UNIT TEST (added 2026-09-18). A fallback
+ * model is invisible by construction: it runs only after the primary has
+ * already failed, so a withdrawn id sits there costing nothing until the one
+ * day it matters. Six call sites carried the string 'grok-4-fast' for nine
+ * months after xAI retired that tier, and every one of them "checked" the model
+ * first — with `TEXT_MODELS[id]?.provider === 'xai'`, which asks whether the
+ * REPO has a config entry, never whether the VENDOR has a model. Only a live
+ * fetch can answer the second question, and only from outside the code.
+ *
+ * Each vendor needs its own test, because "absent from the catalogue listing"
+ * turned out to mean three different things on the same day:
+ *
+ *   xAI         GET /v1/models/:id — 200 is NOT enough. xAI keeps deprecation
+ *               redirects: asking for grok-3 returns 200 with `{"id":"grok-4.3"}`.
+ *               So the test is `returned id === requested id`; anything else is
+ *               a retired id being silently served by a different, differently
+ *               priced model. (Curated, not a catch-all — invented ids 404.)
+ *   OpenRouter  GET /models/:id/endpoints — the catalogue LISTING omits live
+ *               aliases (qwen/qwen3.8-max is missing from it yet has a working
+ *               endpoint), so membership is the wrong test. An empty endpoint
+ *               array is the real death certificate.
+ *   Google      GET /v1beta/models/:id — gemini-2.0-flash is absent from the
+ *               list and still answers generateContent. Per-model read only.
+ *   Anthropic   GET /v1/models/:id.
+ *
+ * Both directions are reported: an unmarked entry the vendor dropped, and an
+ * entry marked `retired` that the vendor still serves (un-retire it). The
+ * second direction is not pedantry — a false "Google shut this down" note was
+ * copied into three files and would have driven a pointless migration.
+ *
+ * No catalogue is hardcoded anywhere here; every verdict comes from the fetch.
+ */
+async function checkLiveness() {
+  console.log('\n── LIVENESS: does the vendor still serve each configured id?');
+
+  const xaiKey = process.env.XAI_API_KEY;
+  const orKey = process.env.OPENROUTER_API_KEY;
+  const gKey = process.env.GEMINI_API_KEY;
+  const aKey = process.env.ANTHROPIC_API_KEY;
+
+  // → { alive: boolean, note: string } | null when the vendor cannot be reached
+  //   or no key is configured (unknown is never reported as dead).
+  const probes = {
+    async xai(id) {
+      if (!xaiKey) return null;
+      const res = await fetch(`https://api.x.ai/v1/models/${encodeURIComponent(id)}`,
+        { headers: { Authorization: `Bearer ${xaiKey}` } });
+      if (res.status === 404) return { alive: false, note: '404' };
+      if (!res.ok) return null;
+      const served = (await res.json()).id;
+      return served === id
+        ? { alive: true, note: '' }
+        : { alive: false, note: `retired — xAI redirects it to ${served}, which has its own price` };
+    },
+    async openrouter(id) {
+      if (!orKey) return null;
+      const res = await fetch(`https://openrouter.ai/api/v1/models/${id}/endpoints`,
+        { headers: { Authorization: `Bearer ${orKey}` } });
+      if (res.status === 404) return { alive: false, note: '404' };
+      if (!res.ok) return null;
+      const n = ((await res.json()).data?.endpoints || []).length;
+      return n > 0 ? { alive: true, note: `${n} endpoint(s)` } : { alive: false, note: 'zero live endpoints' };
+    },
+    async google(id) {
+      if (!gKey) return null;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${id}?key=${gKey}`);
+      if (res.status === 404) return { alive: false, note: 'model is not found' };
+      if (!res.ok) return null;
+      const methods = (await res.json()).supportedGenerationMethods || [];
+      return methods.includes('generateContent')
+        ? { alive: true, note: '' }
+        : { alive: false, note: `served but no generateContent (${methods.join(',') || 'none'})` };
+    },
+    async anthropic(id) {
+      if (!aKey) return null;
+      const res = await fetch(`https://api.anthropic.com/v1/models/${id}`,
+        { headers: { 'x-api-key': aKey, 'anthropic-version': '2023-06-01' } });
+      if (res.status === 404) return { alive: false, note: '404' };
+      return res.ok ? { alive: true, note: '' } : null;
+    },
+  };
+
+  const all = [
+    ...Object.entries(TEXT_MODELS).map(([key, cfg]) => ({ key, cfg, where: 'TEXT_MODELS' })),
+    ...Object.entries(IMAGE_MODELS || {}).map(([key, cfg]) => ({ key, cfg, where: 'IMAGE_MODELS' })),
+  ];
+  const entries = all.filter(({ cfg }) => cfg.modelId && probes[cfg.provider]);
+
+  // Say out loud what this check does NOT cover. A guard that quietly skips the
+  // rows it cannot handle reads exactly like a guard that passed them — which is
+  // the failure this whole section exists to answer for. IMAGE_MODELS entries
+  // carry no `provider` field today, so none of them can be probed; give any
+  // entry one and it starts being checked here with no further change.
+  const unprobed = all.filter(({ cfg }) => cfg.modelId && !probes[cfg.provider]);
+  if (unprobed.length) {
+    console.log(`  … ${unprobed.length} entr(ies) NOT CHECKED — no probe for provider '${[...new Set(unprobed.map((e) => String(e.cfg.provider)))].join("', '")}':`);
+    for (const { key, cfg, where } of unprobed) console.log(`      ${where} ${key} -> ${cfg.modelId}`);
+  }
+
+  const skipped = [];
+  const results = await Promise.all(entries.map(async ({ key, cfg, where }) => {
+    let r = null;
+    try { r = await probes[cfg.provider](cfg.modelId); } catch (e) { r = null; void e; }
+    return { key, cfg, where, r };
+  }));
+
+  for (const { key, cfg, where, r } of results) {
+    const label = `${where} ${key} -> ${cfg.provider}:${cfg.modelId}`;
+    if (!r) { skipped.push(label); continue; }
+    if (!r.alive && !cfg.retired) {
+      flag(`${label}: THE VENDOR NO LONGER SERVES THIS — ${r.note}. Anything that falls back to it is broken and will only show it once the primary fails.`);
+    } else if (r.alive && cfg.retired) {
+      flag(`${label}: marked retired:'${cfg.retired}' but the vendor DOES serve it${r.note ? ` (${r.note})` : ''} — drop the marker rather than migrating away from a live model.`);
+    } else if (!r.alive && cfg.retired) {
+      ok(`${label}: retired ${cfg.retired}, confirmed gone (${r.note})`);
+    } else {
+      ok(`${label}${r.note ? `  ${r.note}` : ''}`);
+    }
+  }
+
+  // A retired entry that still points somewhere must point somewhere real.
+  for (const [key, cfg] of Object.entries(TEXT_MODELS)) {
+    if (cfg.redirectsTo && !TEXT_MODELS[cfg.redirectsTo]) {
+      flag(`${key}: redirectsTo '${cfg.redirectsTo}', which is not a TEXT_MODELS key`);
+    }
+  }
+
+  const noKey = Object.entries({ xai: xaiKey, openrouter: orKey, google: gKey, anthropic: aKey })
+    .filter(([, v]) => !v).map(([k]) => k);
+  if (noKey.length) console.log(`  (no API key for: ${noKey.join(', ')} — those ids were not checked)`);
+  if (skipped.length) console.log(`  (unreachable, not judged: ${skipped.length} id(s))`);
 }
 
 async function checkBilled(which) {
@@ -214,6 +381,7 @@ function checkStaleness() {
   const routedBy = providerByModelId();
   await checkOpenRouter(routedBy);
   await checkXai();
+  await checkLiveness();
   if (dbArg) await checkBilled(dbArg);
   checkStaleness();
   console.log(`\n${problems === 0 ? 'No drift found.' : `${problems} problem(s) above.`}`);

@@ -531,11 +531,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
     // Read the CONFIGURED quality model, never a hardcoded id: this line named
-    // 'gemini-2.0-flash' — a model Google shut down — while the judge actually
-    // running was MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and
-    // 6.25x the output price), so any quality-eval call that reached this
-    // fallback was priced at a sixth of its cost. Mirrors apiCost.js's
+    // 'gemini-2.0-flash' while the judge actually running was
+    // MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and 6.25x the
+    // output price), so any quality-eval call that reached this fallback was
+    // priced at a sixth of its cost. Mirrors apiCost.js's
     // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
+    // (This comment used to add "a model Google shut down". It is not shut
+    // down — delisted from GET /v1beta/models but still answering, verified
+    // 2026-09-18. The hardcoding was the bug; the id's liveness never was.)
     gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
@@ -7844,11 +7847,14 @@ async function _processStoryJobImpl(jobId) {
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
     // Read the CONFIGURED quality model, never a hardcoded id: this line named
-    // 'gemini-2.0-flash' — a model Google shut down — while the judge actually
-    // running was MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and
-    // 6.25x the output price), so any quality-eval call that reached this
-    // fallback was priced at a sixth of its cost. Mirrors apiCost.js's
+    // 'gemini-2.0-flash' while the judge actually running was
+    // MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and 6.25x the
+    // output price), so any quality-eval call that reached this fallback was
+    // priced at a sixth of its cost. Mirrors apiCost.js's
     // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
+    // (This comment used to add "a model Google shut down". It is not shut
+    // down — delisted from GET /v1beta/models but still answering, verified
+    // 2026-09-18. The hardcoding was the bug; the id's liveness never was.)
     gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };

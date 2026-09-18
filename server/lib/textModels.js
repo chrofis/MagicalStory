@@ -5,7 +5,7 @@
  */
 
 const { log } = require('../utils/logger');
-const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
+const { TEXT_MODELS, MODEL_DEFAULTS, GROK_VISION_FALLBACK } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
 const { stripDataUriPrefix } = require('./r2');
@@ -630,13 +630,17 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
     const blockReason = data.promptFeedback?.blockReason || 'empty response';
 
     // Try fallback to Grok (no PROHIBITED_CONTENT issues), then a second Gemini
-    // tier as last resort. NOTE: gemini-2.0-flash was RETIRED by Google (404),
-    // so the last resort is gemini-2.5-flash-lite.
+    // tier as last resort. gemini-2.5-flash-lite is the last resort because it
+    // is a different, cheaper tier — NOT, as this comment used to say, because
+    // "gemini-2.0-flash was RETIRED by Google (404)". That was inferred from the
+    // model's absence from GET /v1beta/models; a per-model read returns 200 and
+    // still advertises generateContent (2026-09-18). Leaving the false claim in
+    // place is how a non-bug gets "fixed" later.
     const LAST_RESORT_GEMINI = 'gemini-2.5-flash-lite';
     if (modelId !== LAST_RESORT_GEMINI) {
-      const grokFallbackModel = TEXT_MODELS['grok-4-fast'];
+      const grokFallbackModel = TEXT_MODELS[GROK_VISION_FALLBACK];
       if (grokFallbackModel && process.env.XAI_API_KEY) {
-        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with grok-4-fast...`);
+        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with ${GROK_VISION_FALLBACK}...`);
         try {
           const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, prefill ? { prefill } : {});
           return { ...grokResult, modelId: grokFallbackModel.modelId };

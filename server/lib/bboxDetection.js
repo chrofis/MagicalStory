@@ -41,7 +41,7 @@ const { PROMPT_TEMPLATES, fillTemplate, applyRepairStyleGuard } = require('../se
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { canonicalName } = require('./castResolver');
-const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS } = require('../config/models');
+const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
 const { detectFiguresWithGroundingDino, attachSamMasksToFigures, _shortGarmentPhrase } = require('./figureDetection');
@@ -645,7 +645,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
           const errorOneLine = error.replace(/[\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').substring(0, 200);
           log.warn(`⚠️ [BBOX-DETECT] API error ${response.status} (${modelId}): ${errorOneLine}`);
           // Try Grok fallback on API error
-          const grokFallbackId = (bboxModelOverride && TEXT_MODELS[bboxModelOverride]?.provider === 'xai') ? bboxModelOverride : 'grok-4-fast';
+          const grokFallbackId = (bboxModelOverride && TEXT_MODELS[bboxModelOverride]?.provider === 'xai') ? bboxModelOverride : GROK_VISION_FALLBACK;
           const grokModel = TEXT_MODELS[grokFallbackId];
           if (grokModel?.provider === 'xai') {
             log.info(`🔄 [BBOX-DETECT] Gemini API error, falling back to Grok vision (${grokFallbackId})...`);
@@ -714,7 +714,7 @@ async function _detectAllBoundingBoxesImpl(imageData, options = {}) {
           await new Promise(resolve => setTimeout(resolve, 2000));
         } else {
           // Gemini failed — try Grok vision as fallback
-          const grokFallbackId2 = (bboxModelOverride && TEXT_MODELS[bboxModelOverride]?.provider === 'xai') ? bboxModelOverride : 'grok-4-fast';
+          const grokFallbackId2 = (bboxModelOverride && TEXT_MODELS[bboxModelOverride]?.provider === 'xai') ? bboxModelOverride : GROK_VISION_FALLBACK;
           const grokFallbackModel = TEXT_MODELS[grokFallbackId2];
           if (grokFallbackModel?.provider === 'xai') {
             log.info(`🔄 [BBOX-DETECT] Gemini failed, falling back to Grok vision (${grokFallbackId2})...`);

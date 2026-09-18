@@ -186,8 +186,8 @@ const { getFacePhoto, loadVbReferenceBytes } = require('./characterPhotos');
 /**
  * Call Grok vision API for image analysis (OpenAI-compatible chat completions with images).
  * Converts Gemini parts format to Grok messages format and returns a Gemini-like response.
- * @param {string} modelKey - Model key in TEXT_MODELS (e.g., 'grok-4-fast')
- * @param {string} modelId - Actual model ID (e.g., 'grok-4-1-fast-non-reasoning')
+ * @param {string} modelKey - Model key in TEXT_MODELS (e.g., 'grok-4.3')
+ * @param {string} modelId - Actual model ID (e.g., 'grok-4.3')
  * @param {Array} geminiParts - Gemini parts array (inline_data + text)
  * @param {string} promptText - The evaluation prompt text
  * @returns {Response} Fake Response object matching Gemini API shape

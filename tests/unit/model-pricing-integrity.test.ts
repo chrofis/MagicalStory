@@ -26,6 +26,8 @@
  * scripts/admin/check-model-pricing.js is for, against the live vendor APIs.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
 
 const {
   TEXT_MODELS,
@@ -33,6 +35,8 @@ const {
   IMAGE_BACKENDS,
   INPAINT_BACKENDS,
   IMAGE_MODELS,
+  GROK_VISION_FALLBACK,
+  MODEL_DEFAULTS,
   PRICING_VERIFIED_ON,
   calculateTextCost,
   calculateImageCost,
@@ -183,5 +187,122 @@ describe('MODEL_PRICING — the prose figure matches the billed figure', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+});
+
+/**
+ * RETIRED MODELS — the offline half of the dead-id guard.
+ *
+ * WHY THIS EXISTS — 2026-09-18. Six call sites (evalJudges, evalPipeline x3,
+ * bboxDetection x2, sceneValidator, textModels) each hardcoded the string
+ * 'grok-4-fast' as the Grok vision fallback. xAI retired that whole tier; not
+ * one of the six moved, and nothing noticed for months, because:
+ *
+ *   1. A FALLBACK IS INVISIBLE BY CONSTRUCTION. It runs only after the primary
+ *      has already failed, so a withdrawn id costs nothing on a normal day and
+ *      shows up only in the moment it is most needed.
+ *   2. THE GUARD MEASURED THE WRONG THING. Every site tested
+ *      `TEXT_MODELS[id]?.provider === 'xai'` before calling — which asks
+ *      whether the REPO has a config entry, not whether the VENDOR has a model.
+ *      It passed happily on a dead id.
+ *   3. IT DID NOT EVEN FAIL LOUDLY. xAI answers a retired id with a redirect to
+ *      grok-4.3, so the call succeeded — at 6.25x the input price the code
+ *      believed it was paying, recorded under a model id that no longer exists.
+ *
+ * Liveness itself cannot be asserted here: a unit test must not depend on the
+ * network, and a hardcoded vendor catalogue would go stale and teach people to
+ * edit the test instead of checking the vendor — the same reasoning that keeps
+ * today's prices out of this file. scripts/admin/check-model-pricing.js does
+ * the live half against the vendors' own APIs.
+ *
+ * What IS assertable offline is the consequence: once a model is known dead and
+ * marked `retired`, no live code path may still resolve to it.
+ */
+describe('retired models — nothing live may resolve to one', () => {
+  type Cfg = { provider: string; modelId: string; retired?: string; redirectsTo?: string };
+  const entries = Object.entries(TEXT_MODELS as Record<string, Cfg>);
+  const retiredKeys = entries.filter(([, c]) => c.retired).map(([k]) => k);
+
+  it('every `retired` marker is an ISO date, not a truthy flag', () => {
+    // A bare `retired: true` loses the one fact that matters later: when it was
+    // checked, and therefore how much to trust it.
+    for (const [key, cfg] of entries) {
+      if (cfg.retired === undefined) continue;
+      expect(`${key}=${cfg.retired}`).toMatch(/^[^=]+=\d{4}-\d{2}-\d{2}$/);
+      expect(Date.parse(cfg.retired)).not.toBeNaN();
+    }
+  });
+
+  it('a retired entry keeps its price, so historical usage rows still cost out', () => {
+    // These entries are deliberately NOT deleted: stories generated while the
+    // model was alive still name it in tokenUsage, and dropping the row would
+    // silently re-price months of history at $0.00.
+    for (const key of retiredKeys) {
+      const cfg = TEXT_MODELS[key] as Cfg;
+      expect(`${key}:priced=${!!MODEL_PRICING[cfg.modelId]}`).toBe(`${key}:priced=true`);
+    }
+  });
+
+  it('`redirectsTo`, where present, names a live TEXT_MODELS entry', () => {
+    for (const [key, cfg] of entries) {
+      if (!cfg.redirectsTo) continue;
+      const target = TEXT_MODELS[cfg.redirectsTo] as Cfg | undefined;
+      expect(`${key}->${cfg.redirectsTo}: exists=${!!target}, retired=${!!target?.retired}`)
+        .toBe(`${key}->${cfg.redirectsTo}: exists=true, retired=false`);
+    }
+  });
+
+  it('no MODEL_DEFAULTS slot points at a retired model', () => {
+    const bad = Object.entries(MODEL_DEFAULTS as Record<string, unknown>)
+      .filter(([, v]) => typeof v === 'string' && (TEXT_MODELS[v as string] as Cfg | undefined)?.retired)
+      .map(([slot, v]) => `${slot} -> ${v}`);
+    expect(bad).toEqual([]);
+  });
+
+  it('GROK_VISION_FALLBACK names a live xAI entry', () => {
+    // The specific slot this whole class of bug lived in. It must be xAI —
+    // every call site hands it to callGrokVisionAPI, which posts to api.x.ai
+    // regardless of what `provider` says — and it must not be retired.
+    const cfg = TEXT_MODELS[GROK_VISION_FALLBACK] as Cfg | undefined;
+    expect(`${GROK_VISION_FALLBACK}: exists=${!!cfg}, provider=${cfg?.provider}, retired=${cfg?.retired ?? 'no'}`)
+      .toBe(`${GROK_VISION_FALLBACK}: exists=true, provider=xai, retired=no`);
+  });
+
+  it('no server source file hardcodes a retired model key', () => {
+    // The actual reintroduction path. Not "does a dead id exist in the repo" —
+    // the retired entries and their prices are supposed to exist, and so are
+    // the comments explaining them. This asks the narrower question: does any
+    // file OUTSIDE the config hand a retired key to code as a live value?
+    const ROOT = join(__dirname, '..', '..');
+    const SEARCH = ['server'];
+    const SKIP_FILES = new Set([join(ROOT, 'server', 'config', 'models.js')]);
+
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        if (name === 'node_modules' || name.startsWith('.')) continue;
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (name.endsWith('.js') && !SKIP_FILES.has(full)) files.push(full);
+      }
+    };
+    for (const d of SEARCH) walk(join(ROOT, d));
+
+    const offenders: string[] = [];
+    for (const file of files) {
+      const lines = readFileSync(file, 'utf8').split(/\r?\n/);
+      lines.forEach((line, i) => {
+        // Comments are where a retirement gets EXPLAINED, so they are allowed;
+        // a quoted key in executable code is not.
+        const code = line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '');
+        if (!code.trim() || /^\s*\*/.test(line)) return;
+        for (const key of retiredKeys) {
+          if (code.includes(`'${key}'`) || code.includes(`"${key}"`)) {
+            offenders.push(`${file.slice(ROOT.length + 1)}:${i + 1} uses retired '${key}' — ${line.trim().slice(0, 90)}`);
+          }
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
   });
 });

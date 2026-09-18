@@ -842,7 +842,7 @@ const SHEET_JUDGE_SAFETY = [
 ];
 
 // Vision-judge dispatcher for the sheet evaluators. `model` is a TEXT_MODELS
-// key (e.g. 'gemini-2.5-flash', 'grok-4-fast', 'qwen3-vl') or a bare Gemini
+// key (e.g. 'gemini-2.5-flash', 'grok-4.3', 'qwen3-vl') or a bare Gemini
 // modelId (defaults to google). Production passes nothing → gemini-2.5-flash,
 // so the google branch stays byte-identical to the old inline fetch. Grok/Qwen
 // reuse the SAME `parts` array (images + prompt) via the existing vision

@@ -31,7 +31,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate, promptSections } = require('../services/prompts');
 const { assertPromptFilled, guardPromptString } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
-const { TEXT_MODELS } = require('../config/models');
+const { TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
 const r2Lib = require('./r2');
 
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
@@ -172,7 +172,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       // Fall back to Grok vision so a transient Gemini outage doesn't degrade
       // the page's eval. Same fallback path as the safety-block branch below.
       if (modelConfig?.provider !== 'xai') {
-        const grokFallbackId = 'grok-4-fast';
+        const grokFallbackId = GROK_VISION_FALLBACK;
         const grokFallbackModel = TEXT_MODELS[grokFallbackId];
         if (grokFallbackModel?.provider === 'xai') {
           log.info(`🔄 [QUALITY P1] ${pageLabel}Falling back to Grok vision (${grokFallbackId}) after HTTP error...`);
@@ -220,7 +220,7 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext, opts = {}
       log.warn(`⚠️ [QUALITY P1] ${pageLabel}Inventory ${describeImageBlock(p1Block)}`);
       // Fall back to Grok vision if we weren't already using xAI
       if (modelConfig?.provider !== 'xai') {
-        const grokFallbackId = 'grok-4-fast';
+        const grokFallbackId = GROK_VISION_FALLBACK;
         const grokFallbackModel = TEXT_MODELS[grokFallbackId];
         if (grokFallbackModel?.provider === 'xai') {
           log.info(`🔄 [QUALITY P1] ${pageLabel}Falling back to Grok vision (${grokFallbackId})...`);
@@ -2395,7 +2395,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       if (isBlockedResponse(data)) {
         const usedModelConfig = TEXT_MODELS[modelId];
         if (usedModelConfig?.provider !== 'xai') {
-          const grokFallbackId = 'grok-4-fast';
+          const grokFallbackId = GROK_VISION_FALLBACK;
           const grokFallbackModel = TEXT_MODELS[grokFallbackId];
           if (grokFallbackModel?.provider === 'xai') {
             log.info(`🔄 [QUALITY] ${pageLabel}Still blocked, falling back to Grok vision (${grokFallbackId})...`);
