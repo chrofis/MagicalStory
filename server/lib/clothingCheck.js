@@ -236,8 +236,28 @@ function checkPage(page, clothingRequirements, opts = {}) {
     }
   }
   const distinctive = (w) => (tokenOwners.get(w)?.size || 0) === 1;
+  // THE OWNER MUST BE NAMED IN THIS PAGE'S PROSE. Everything below concludes
+  // "these words describe `other`, not `owner`" from exactly one fact: the
+  // sentence carries `other`'s name and not `owner`'s. When `owner` is not on
+  // the page under their name at all, that test is vacuous — every sentence
+  // passes it, INCLUDING the one that describes the owner themselves — and the
+  // ATTACHES rule above ("Hans is only a landmark") is left proving nothing,
+  // because it only shows that SOMEBODY's clothing is attached in the sentence.
+  //
+  // The Art Director routinely writes a figure by appearance rather than by
+  // name ("the preschooler little girl of average build … wearing a red
+  // quilted gilet"), so this is the normal case, not an edge one. MEASURED
+  // over the 941 stored staging brief pages: of the 9 findings this rule ever
+  // sent to the scene review, 6 had the owner's name nowhere in the page prose
+  // — staging job_1788681313413_xqmtk2gcs p9/p11/p12/p14 and
+  // job_1789147573901_m3uam0nxi p6 (twice) — and every one of those 6 faulted
+  // a page whose clothing was correct, naming a sentence that describes a
+  // third figure. Each cost a mandatory page rewrite: the scene review's
+  // check 0 forbids re-judging a mechanical fault.
+  const namedInProse = (name) => new RegExp(`\\b${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(prose);
 
   for (const [owner, { parts }] of outfits) {
+    if (!namedInProse(owner)) continue;
     for (const part of parts) {
       const t = [...tokens(part.text)].filter(distinctive);
       if (t.length < 3) continue;
