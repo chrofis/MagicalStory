@@ -847,6 +847,12 @@ function buildEvaluationPrompt(opts = {}) {
     // rule reading the tail out of it can never fire. Empty when the caller
     // could not resolve the list — D-16b then skips.
     REQUIRED_OBJECTS: opts.requiredObjects || '',
+    // The page's real-world landmark block, built by ONE builder shared with
+    // the semantic and compliance judges (landmarkProtection.buildLandmarkContextBlock).
+    // '(none)' — never an empty hole — when the caller has no landmark: this
+    // template is also built by the Test Lab and the re-evaluate route, and an
+    // unfilled placeholder would be stripped with a warning instead.
+    LANDMARK_CONTEXT: opts.landmarkContext || '(none)',
   });
 }
 

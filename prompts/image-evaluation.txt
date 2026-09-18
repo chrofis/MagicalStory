@@ -12,6 +12,7 @@ Report only defects a reader would notice. Rule codes (N-xx, D-xx) exist so a fi
 7. CLOTHING CONTRACT (the outfit each character wears on this page — empty if not supplied): {CLOTHING_CONTRACT}
 8. EXPECTED CAST (every person and animal this frame was written for, with the count — blank if not supplied, and only then do not judge the figure count; a roster reading "(0): none" is a frame written for nobody, and every person or animal in it is a surplus figure): {EXPECTED_CAST}
 9. REQUIRED OBJECTS (the props this frame was commissioned with, by name — blank if not supplied, and only then skip the rules that read it; the USER_PROMPT's own prose says where each one belongs): {REQUIRED_OBJECTS}
+10. LANDMARK CONTEXT (empty when this page carries no real-world landmark reference): {LANDMARK_CONTEXT}
 
 ---
 
@@ -228,5 +229,7 @@ Return JSON only, no other text. Emit exactly these keys.
 `matches` carries exactly one entry per figure in `figures`, using the same ids and order. `reference` is an EXPECTED CAST name (or a reference-photo label when no cast was supplied) or the literal `unmatched` with `confidence: 0` — never a name that appears in neither, and never a missing entry. An `unmatched` person or animal outside a populated setting the USER_PROMPT calls for is D-04b. Every entry carries `body_bbox`. Weigh age, gender, hair and clothing together, with each character's declared position and action as a supporting hint; no single trait decides. A character can be wearing the wrong outfit, so never let clothing alone override hair, build and age — when traits disagree, follow the majority and drop `confidence` below 0.5. `rendering` carries the booleans the pipeline reads plus a plain-text `issues` list for physics detail; `composite_seam` is true when a straight or jagged boundary crosses the picture and the rendering, lighting or background changes across it.
 
 `character` names WHICH FIGURE the finding is about and is required on every finding that belongs to one — clothing, garment colour, clothing detail, hair, age, identity, accessories, anatomy, pose, orientation, and an object a figure is wearing, holding or handling. Copy the EXPECTED CAST name exactly as that block writes it; for a figure matching no cast entry use its `figures` id (`figure 3`). Spell one figure identically on every entry. Two figures with the same defect are two entries with different `character` values; one figure's defect is never split across entries. `character` is null only when the finding belongs to no figure — the setting, the weather, rendered text, the frame as a whole.
+
+Every finding also carries `landmark_element` whenever LANDMARK CONTEXT (input 10) is not `(none)`. That block defines the field — answer it there, never omit it.
 
 Use only the `type` codes from section C — never invent one, never combine two with an underscore.

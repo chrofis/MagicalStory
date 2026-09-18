@@ -33,8 +33,10 @@
 import { describe, it, beforeAll, expect, vi, afterEach } from 'vitest';
 
 const PB = require('../../server/lib/promptBuilders');
-const { loadPromptTemplates, buildEmptyScenePrompt, buildEvaluationPrompt } = require('../../server/services/prompts');
+const { loadPromptTemplates, PROMPT_TEMPLATES, buildEmptyScenePrompt, buildEvaluationPrompt } = require('../../server/services/prompts');
 const { buildReferenceSheetPrompt } = require('../../server/lib/referenceSheets');
+const { buildSemanticPrompt } = require('../../server/lib/sceneValidator');
+const { buildLandmarkContextBlock } = require('../../server/lib/landmarkProtection');
 const sheetMod = require('../../server/lib/character2x4Sheet');
 // The 2×4 sheet module exposes its builders under `_internal` (it has done so
 // since the sheet pipeline was written); `buildStyleTransferPrompt` is the one
@@ -53,6 +55,11 @@ const ARC_LINE = 'The keeper must relight the lamp before the tide turns.';
 const PLAN_LINE = 'wide — the main character on the pier — she lifts the lantern — the lamp is lit';
 const BRIEF_PROSE = `The main character stands on ${PLACE}, lifting a brass lantern above her head.`;
 const STYLE = 'Soft watercolour with visible paper grain. Never photographic.';
+// The landmark block, from the ONE builder all three judges are filled from.
+const LANDMARK_NAME = 'Lindenhof plaza with linden trees';
+const LANDMARK_BLOCK = buildLandmarkContextBlock({
+  protect: true, landmarkPresent: true, names: [LANDMARK_NAME],
+});
 const ELEMENT_DESC = 'a dented brass lantern with a cracked green glass pane';
 
 const unfilled = (p: string) => [...new Set(String(p).match(/\{[A-Z][A-Z0-9_]*\}/g) || [])];
@@ -276,6 +283,28 @@ const CASES: Case[] = [
     probe: GARMENT,
     build: () => sheet.buildHeadRowPrompt(CHARACTERS[0], GARMENT),
     blind: () => sheet.buildHeadRowPrompt(CHARACTERS[0], ''),
+  },
+  {
+    // THE LANDMARK BLOCK reaches all three judges from ONE builder
+    // (landmarkProtection.buildLandmarkContextBlock). The semantic judge went
+    // without it for two weeks and produced the one landmark removal that
+    // reached production; the placeholder is filled in a different file for
+    // each judge, so each fill site is pinned separately.
+    name: 'buildEvaluationPrompt (quality eval) — the landmark block',
+    probe: LANDMARK_NAME,
+    build: () => buildEvaluationPrompt({ originalPrompt: BRIEF_PROSE, artStyle: STYLE, landmarkContext: LANDMARK_BLOCK }),
+    blind: () => buildEvaluationPrompt({ originalPrompt: BRIEF_PROSE, artStyle: STYLE }),
+  },
+  {
+    name: 'buildSemanticPrompt (semantic judge) — the landmark block',
+    probe: LANDMARK_NAME,
+    build: () => buildSemanticPrompt(PROMPT_TEMPLATES.imageSemantic, {
+      storyText: PAGE_TEXT, sceneHint: BRIEF_PROSE, imagePrompt: BRIEF_PROSE,
+      evalContext: { landmarkContext: LANDMARK_BLOCK },
+    }),
+    blind: () => buildSemanticPrompt(PROMPT_TEMPLATES.imageSemantic, {
+      storyText: PAGE_TEXT, sceneHint: BRIEF_PROSE, imagePrompt: BRIEF_PROSE,
+    }),
   },
   {
     name: 'buildStyleTransferPrompt (2×4 sheet, pass 2) — the commissioned style',

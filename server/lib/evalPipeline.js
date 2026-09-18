@@ -744,7 +744,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // caller without a bible still gets the ids replaced by generic nouns.
     visualBible = null,
   } = options;
-  const { computeLandmarkProtection, buildLandmarkComplianceBlock, filterProtectedRemovals } = require('./landmarkProtection');
+  const { computeLandmarkProtection, buildLandmarkContextBlock, filterProtectedRemovals } = require('./landmarkProtection');
   const landmarkProtection = computeLandmarkProtection({ landmarkPhotos, era });
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
   // A dimension this judge could not look at is part of its RESULT, not only a
@@ -873,7 +873,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       EXPECTED_CAST: expectedCast || '',
       INTERACTIONS_BLOCK: interactionsBlock,
       STORY_TEXT: (storyText || '(not provided)').substring(0, 2000),
-      LANDMARK_CONTEXT: buildLandmarkComplianceBlock(landmarkProtection) || '(none)'
+      LANDMARK_CONTEXT: buildLandmarkContextBlock(landmarkProtection) || '(none)'
     });
 
     const { callTextModel } = require('./textModels');
@@ -929,6 +929,22 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
         severity: i.severity || 'MODERATE',
         type: i.type || 'default',
         fix: i.fix || `Fix: ${i.description}`,
+        // WHOSE SENTENCE `fix` IS. When the judge wrote no edit instruction the
+        // line above stands one in from the description — and any code that
+        // then reads `fix` to decide what the finding MEANS is classifying it
+        // from its description prose, which docs/SETTLED.md forbids. The
+        // landmark guard's removal-shape detector is exactly such a reader
+        // (landmarkProtection.isRemovalShapedFix), so the stand-in is MARKED
+        // rather than left indistinguishable. Only the stand-in carries the
+        // flag: an ordinary finding's shape is unchanged. Latent, not
+        // theoretical — measured 0 of 15 guard fires, so no stored outcome moves.
+        ...(i.fix ? {} : { fixAuthored: false }),
+        // THE DECLARED SUBJECT (2026-09-18). `landmark_element` is the judge's
+        // answer to "is this finding about the real place this page depicts?",
+        // and the landmark guard triggers on it. Passed through only when the
+        // judge answered — an absent field stays absent, and the guard reads
+        // that as UNDECLARED, never as false (landmarkProtection.landmarkSubject).
+        ...(i.landmark_element === undefined ? {} : { landmark_element: i.landmark_element }),
         // WHO the finding is about. The compliance template has always emitted
         // this (its fixable_issues example leads with `"character"`), and this
         // mapper silently dropped it — measured, 0 of 308 stored compliance
@@ -1319,7 +1335,13 @@ function parseFixableIssues(parsedJson) {
       severity: i.severity || 'MODERATE',
       type: i.type || 'default',
       character: i.character || null,  // Preserved for bbox matching (incl. STEP 2C proportion issues)
-      fix: i.fix || `Fix: ${i.description}`
+      fix: i.fix || `Fix: ${i.description}`,
+      // See the compliance mapper: a stand-in `fix` is not an edit instruction,
+      // and the landmark guard must not read one as though it were.
+      ...(i.fix ? {} : { fixAuthored: false }),
+      // The quality judge's declared landmark subject, passed through when it
+      // answered; absent stays absent, which the guard reads as UNDECLARED.
+      ...(i.landmark_element === undefined ? {} : { landmark_element: i.landmark_element }),
     }));
 }
 
@@ -1808,6 +1830,16 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       originalPrompt,
     });
     const clothingContractBlock = contract.block;
+    // LANDMARK CONTEXT — the fourth block in this family, and for the same
+    // reason (2026-09-18). It reached the compliance judge ALONE, so the
+    // semantic and quality judges were never told this page depicts a real
+    // place and kept proposing that the real place be painted out; the one
+    // production landmark fire on record came from the semantic judge. ONE
+    // builder for all three (landmarkProtection.buildLandmarkContextBlock) —
+    // never a second hand-written copy of the wording.
+    const landmarkProtection = require('./landmarkProtection')
+      .computeLandmarkProtection({ landmarkPhotos: evalOptions.landmarkPhotos || null, era: evalOptions.era || null });
+    const landmarkContextBlock = require('./landmarkProtection').buildLandmarkContextBlock(landmarkProtection);
     if (contract.error) {
       log.debug(`[EVAL] clothing contract block skipped: ${contract.error}`);
       notEvaluated.record('clothing', 'clothing_contract_build_failed', contract.error);
@@ -1914,6 +1946,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // ONE ROSTER for the blind judges too (2026-09-14): the kind labels are
         // what keep an `(animal)` entry out of the named-character count.
         expectedCast: expectedCast.block,
+        // THE LANDMARK BLOCK (2026-09-18). This judge had none, and it is the
+        // judge that produced the one landmark removal that reached production.
+        landmarkContext: landmarkContextBlock,
       });
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
@@ -2118,6 +2153,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           clothingContract: clothingContractBlock,
           requiredObjects: requiredObjectsBlock,
           expectedCast: expectedCast.block,
+          // THE LANDMARK BLOCK (2026-09-18) — same block the other two judges
+          // get, from the same builder.
+          landmarkContext: landmarkContextBlock,
           template: evalOptions.evalTemplateOverride || undefined,
         })
       : 'Evaluate this AI-generated children\'s storybook illustration on a scale of 0-100. Consider: visual appeal, clarity, artistic quality, age-appropriateness, and technical quality. Respond with ONLY a number between 0-100, nothing else.';
@@ -2628,6 +2666,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
               // (bucket, subject) — see the bySubject note above.
               character: m.character || null,
               fix: `Fix: ${m.description}`,
+              // The merge has no judge's edit instruction to carry — this line
+              // is built from the description, so it is never an edit
+              // instruction and the landmark guard must not read it as one.
+              fixAuthored: false,
               agreement: m.agreement,
             }));
           }

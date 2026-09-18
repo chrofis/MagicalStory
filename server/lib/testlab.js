@@ -1155,6 +1155,14 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
       storyData: replay.options.storyData,
       pageNumber: replay.options.pageNumber,
     }).block,
+    // THE LANDMARK BLOCK — the fourth input production hands this judge since
+    // 2026-09-18. Built from the replay's own landmarkPhotos + era, by the same
+    // builder evalPipeline uses, so a Lab arm judges the page production judges.
+    landmarkContext: require('./landmarkProtection').buildLandmarkContextBlock(
+      require('./landmarkProtection').computeLandmarkProtection({
+        landmarkPhotos: replay.options.landmarkPhotos,
+        era: replay.options.era,
+      })),
   };
 
   const t0 = Date.now();

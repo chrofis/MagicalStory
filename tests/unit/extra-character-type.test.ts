@@ -466,7 +466,13 @@ describe('derivePresenceFinding — the one presence signal', () => {
 describe('parseFixableIssues — the evaluator side, unchanged', () => {
   it('drops entries without a description and defaults the rest', () => {
     const out = parseFixableIssues({ fixable_issues: [{ type: 'x' }, { description: 'd' }] });
-    expect(out).toEqual([{ description: 'd', severity: 'MODERATE', type: 'default', character: null, fix: 'Fix: d' }]);
+    // `fixAuthored: false` marks the stand-in `fix` this mapper built from the
+    // description — the landmark guard must not read it as an edit instruction
+    // (docs/SETTLED.md: never classify a finding from its description prose).
+    // A finding that carries the judge's own `fix` gets no such field.
+    expect(out).toEqual([{ description: 'd', severity: 'MODERATE', type: 'default', character: null, fix: 'Fix: d', fixAuthored: false }]);
+    expect(parseFixableIssues({ fixable_issues: [{ description: 'd', fix: 'Repaint the sky.' }] }))
+      .toEqual([{ description: 'd', severity: 'MODERATE', type: 'default', character: null, fix: 'Repaint the sky.' }]);
     expect(parseFixableIssues(null)).toEqual([]);
   });
 });

@@ -786,6 +786,13 @@ function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, inte
     // '' for a caller that has no roster — the prompt then judges from the
     // hint alone, exactly as before.
     EXPECTED_CAST: evalContext.expectedCast || '',
+    // THE LANDMARK BLOCK (2026-09-18). This judge had none: on a page rendered
+    // from a real landmark photo it kept proposing that the real place be
+    // replaced, and the one such fix that reached production came from here.
+    // Same builder as the other two judges — never a second copy of the wording
+    // (landmarkProtection.buildLandmarkContextBlock). '(none)' when the caller
+    // supplies no landmark, so no path is left with a hole in the prompt.
+    LANDMARK_CONTEXT: evalContext.landmarkContext || '(none)',
   });
 }
 
