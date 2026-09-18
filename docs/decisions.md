@@ -7,6 +7,268 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-18 — A declared-off garment is identified by its Visual Bible element, not by a noun vocabulary; and a slot the writer invented no longer pre-empts that route
+
+**Context.** `server/lib/wornItems.js` removes one clause from a character's outfit contract when a
+page declares a garment off. Every decision about *which* garment a piece of text was about went
+through `SLOT_NOUNS`, a closed list of ~60 English garment nouns, and two of those decisions
+mattered: which clause of the contract belongs to the item, and — inside a layered clause
+("A over B") — which half of it to cut. What comes out is not a log line: it is what
+`promptBuilders` sends the image model, what `evalPipeline.buildEvalClothingContract` hands the
+quality, semantic and prompt-compliance judges, what the entity grid compares against, and what all
+three character-repair entry points dress the character in.
+
+Two stored stories show the two ways a word list fails, and they are the same failure:
+
+- **The vocabulary cannot see the garment.** Staging `job_1789584708605_rts4wqupm` (Levin,
+  p15/p17/p18): the writer linked ART004 — *named* `fleece jacket`, *typed* `outer layer` — as
+  `wornAs: "Levin.top"`, and the contract describes it as `red fleece fabric garment with a full
+  front zipper, ribbed cuffs and hem — worn over a white long-sleeve shirt, dark blue corduroy
+  trousers, and brown lace-up ankle boots.` Not one word of "red fleece fabric garment" is in
+  `SLOT_NOUNS`, so `clauseRemainderWithoutItem` counted **one** garment in that clause — the
+  *shirt* — concluded the clause was only about the declared item, and dropped it whole. Stored
+  resolved text: `"Dark blue corduroy trousers, and brown lace-up ankle boots."` — a boy on a cold
+  autumn night with no top at all. **Widening the list would have made it worse.** The `wornAs`
+  slot is `top` for an `outer layer` element, so the only `top` noun in that clause is *shirt*:
+  asked which half to cut, a wider vocabulary would have **cut the shirt and kept the jacket**, the
+  exact inverse of the declaration.
+- **The slot is not in the vocabulary at all.** Staging `job_1789681157795_wkt20ckod` (Levin, pages
+  9/10/12–18, 14 stored (page, item) pairs): the writer linked ART002 "red knitted mittens"
+  (`type: "handwear"`) as `Levin.hands` and ART003 "rust-orange wool scarf" (`type: "neckwear"`) as
+  `Levin.neck`. Both garments are `accessories`. `removeWornItemFromOutfit` hit
+  `SLOT_NOUNS[key] === undefined` and returned `unknown-slot` before the clause split, before the
+  element-identity route, before anything — nothing was stripped on any of the nine pages. On pages
+  14–18 the brief has the scarf wrapped around an egg, spread on the earth or out of frame while
+  that one string still says "a long rust-orange wool scarf wound twice around the neck with both
+  ends hanging down the front". `parseWornAs` accepted `"Levin.hands"` without a word, so the fault
+  was invisible from the moment it was authored: nothing logged, nothing counted, no finding.
+
+Corpus survey over both environments: **15 stored `wornAs` values, 13 naming a real slot**
+(headwear 5, outer layer 4, belt/waist 3, top 1) and **2 outside `WORN_SLOTS`, both in that one
+story**. The load-bearing fact is not the two: it is that **`accessories` has never once been
+used, and both authoring prompts listed six slots and omitted it.** On the only two occasions a
+character wore an accessory, the writer invented a word for the slot it was not given — which
+points at the prompt, not at the model.
+
+The first half was left open by `b1d117e2b` earlier the same day and written up there as needing
+the owner's call, because the module's own two rules pointed opposite ways: gating the whole-clause
+shortcut on the layering connective keeps the shirt but makes the strip **refuse**, and a refusal
+leaves the judge demanding a jacket the page took off — a paid repair round. Neither answer was
+right, because both were still asking a word list.
+
+**Decision.** The garment is identified by the **declared Visual Bible element** — its own `name`,
+`label`, `aliases` and `description` — and the element is asked **first**, at both decision points.
+The closed vocabulary is the fallback, reached only when the element's own words cannot answer.
+
+1. **Identity.** `elementIdentityTerms` takes the content words of the fields the writer or Art
+   Director wrote *for that element* (function words and words under three letters dropped);
+   nothing is read out of the outfit prose. `indexOfElementAmong` then asks which candidate text is
+   itself: a term **discriminates** only when it appears in exactly one candidate — a word every
+   candidate shares (a colour both garments happen to be) says nothing, a word none carries says
+   nothing; **every** discriminating term must point the same way, and at least **two** must point
+   there. One word shared between two English garment descriptions is a coincidence, not an
+   identification — a lone "red" is not evidence, and an element whose declared name is a single
+   word therefore never answers, so the caller falls back to exactly its pre-existing behaviour.
+   `removeWornItemFromOutfit` takes the element as a fourth argument and `stripOffItemsFromOutfit`
+   passes `r.entry`. `applyWornItemsToOutfit` deliberately passes **none**, for the same reason it
+   passes `itemName: null`: what comes out there is the contract's *incumbent* garment, and the
+   declared element's words would point squarely at the garment going **in**.
+2. **An unknown slot is the loss of the FALLBACK, not an exit.** The identity route never needed a
+   slot, so a `SLOT_NOUNS` miss no longer returns early; `clauseRemainderWithoutItem` reads an
+   absent vocabulary as an empty one — a refusal, never a crash and never a guess. `unknown-slot`
+   is still the reason returned when identity declines, so the fault never becomes invisible.
+3. **`parseWornAs` MARKS and never rejects.** It returns `slotKnown` alongside `owner` and `slot`.
+   Rejecting the link would take the entry out of `wornAsEntries` entirely — losing the "is NOT
+   wearing this" prompt line, the reference drop and the strip attempt — which is strictly worse
+   than the silent no-op it replaces, and would put the identity route out of reach for the one
+   case it can still answer.
+4. **Loud in two places, once per fault each.** `auditVisualBibleContract`
+   (`server/lib/outlineParser/shared.js`) reports `worn-as-unknown-slot` at authoring time, where
+   the fault is created and the whole bible is seen once, naming the entry, the invented slot and
+   the closed vocabulary. `stripOffItemsFromOutfit` logs an error on the pages where the garment
+   actually stays in the contract — keyed on the SLOT and not on the returned reason, because a
+   plain-sentence contract answers `unknown-slot` while a slot-LABELLED one answers
+   `slot-not-in-contract`, which a real slot also legitimately answers (401 of the 4,757 stored
+   pairs are labelled). `applyWornItemsToOutfit` records `{applied: false, reason: 'unknown-slot'}`
+   instead of a bare `continue`. Neither site repairs the entry.
+5. **The vocabulary is stated where the field is authored.** Both live Visual Bible authoring
+   sites — `prompts/scene-expansion-all.txt` (beats path) and `prompts/story-trial.txt` (/try
+   funnel), the registered `vb-authoring-sites` pair — now state the slot list as closed and
+   include `accessories`, with neckwear, handwear and eyewear named as `accessories`.
+
+**Rationale.** Same ruling, same day, as `d104a283d` (a declared `type` outranks a name regex),
+`d60b26938` (the off-body verdict is declared, never read from prose) and `43c7d89b0`
+(classification moved out of code into the reviewer's prompt): **stop inferring from language, read
+the declared field.** The Visual Bible element is structured data the writer authored; `SLOT_NOUNS`
+is a guess at English. Widening the vocabulary was offered and rejected — it is the same
+name-matching machinery this audit has been removing, and it would not have helped here anyway,
+because the vocabulary consulted was the wrong garment's. The mirror temptation on the other half —
+mapping `neck` onto `accessories` in JS — is rejected for the same reason: that is the module
+inferring what the writer meant, which is the whole failure mode of the `filterWornClothingAgainstScene`
+filter this subsystem exists to replace. A closed enum belongs in the prompt that authors the field.
+
+The safety bias `b1d117e2b` established is kept and extended to identity: an uncertain answer is a
+**refusal**, never a guess. A refusal is visible in `removals[].reason` and recoverable, and the
+explicit "is NOT wearing" prompt line still carries the instruction; a deleted shirt is neither.
+Crucially the fix **succeeds** on the three target pages rather than converting a wrong answer into
+a refusal — the outcome the owner ruled out.
+
+The 2026-09-05 leak caution ("a list a model is shown is a list a model will echo") was checked
+against the prompt half and is low risk here: the list is a **field-value enum** that already sat
+at both sites, its members are category tokens rather than renderable scene nouns, and the added
+examples (neckwear, handwear, eyewear) are category words nothing can draw.
+
+**Measured.** The resolver was replayed over every stored (page, character) pair on staging **and**
+prod — every page carrying `referencePhotos[].clothingDescription` against its own brief METADATA
+and its story's Visual Bible — on **both** resolver paths: the generator path (`resolveOutfitForPage`
+with the page's real cast) and the eval-side recompute (`resolveGeneratedOutfit`). **219 stories,
+4,757 pairs**, twice, once per commit:
+
+| replay (219 stories / 4,757 pairs, both paths) | pairs the resolver rewrites | pairs that differ | previously-correct pairs changed |
+|---|---|---|---|
+| element identity (`4984be189`, baseline `b1d117e2b`) | 44 → 44 | **3** | **0** |
+| unknown slot (`e57f3a535`, baseline `4984be189`) | 44 → 49 | **5** | **0** |
+
+The **3** are p15/p17/p18 of `rts4wqupm`: before `"Dark blue corduroy trousers, and brown lace-up
+ankle boots."` (`slot-clause`), after `"A white long-sleeve shirt, dark blue corduroy trousers, and
+brown lace-up ankle boots."` (`slot-clause-layer`). Byte-identical on the other 4,754 on both
+paths, including all four other stored contracts the resolver rewrites anywhere in staging or prod.
+
+The **5** are p14–p18 of `wkt20ckod`, Levin, the scarf clause now cut (`slot-clause`) — all five
+previously untouched, zero previously-rewritten pairs changed, 4,752 byte-identical on both paths.
+
+Route coverage across the corpus's 44 off-item strips: identity and the vocabulary pick the **same**
+clause 18 times, identity **never** contradicts a confident vocabulary answer (0), and identity
+declines 21 times — the vocabulary then decides, unchanged. `job_1789348171785_9oxos7dwv` is a
+clean decline: the hoodie element's own description says "made of thick cotton" and the trousers
+are cotton too, so its words point two ways and it correctly refuses to answer.
+
+**Deliberately not touched.**
+
+- **The mittens are still refused on all nine pages, and that is correct.** "wool" is in ART002's
+  own description and in the *scarf's* clause but not in the mittens' own clause of the contract,
+  so the element's words point two ways and an ambiguous identity is a refusal by design. The
+  explicit "is NOT wearing" prompt line still carries the instruction for them.
+- **The nine already-generated pages of `wkt20ckod` are left as they are** — this is a forward fix
+  on the code path, not a backfill. Whether those pages want a backfill or a rerun is in
+  `tasks/BACKLOG.md`.
+- **Route 1 (slot-LABELLED contracts) still answers `slot-not-in-contract` for an invented slot
+  without asking identity.** 401 of the 4,757 stored pairs use the labelled shape, so the route is
+  live, but no stored story combines it with an invented `wornAs` slot today; extending identity to
+  it was outside the approved scope and the loud log already covers it. Backlogged.
+- **Rejoining a semicolon-delimited contract after a strip normalises every separator to `"; "`**,
+  so a comma inside a surviving clause comes back as a semicolon. Cosmetic, pre-existing to every
+  strip on a semicolon contract, and repairing it would move the 44 stored rewrites this replay
+  proves unchanged. Backlogged.
+
+**Touched files.** `server/lib/wornItems.js` (`elementIdentityTerms`, `indexOfElementAmong`,
+`IDENTITY_STOPWORDS`, `MIN_DISCRIMINATING_TERMS`, identity-first clause selection in
+`removeWornItemFromOutfit`, Route A in `clauseRemainderWithoutItem`, `slotKnown` on `parseWornAs`,
+the two loud sites, `splitClauses` exported), `server/lib/outlineParser/shared.js`
+(`auditVisualBibleContract` → `worn-as-unknown-slot`), `prompts/scene-expansion-all.txt`,
+`prompts/story-trial.txt`, `tests/unit/worn-element-identity.test.ts` (21 tests),
+`tests/unit/worn-unknown-slot.test.ts` (24 tests), `tests/unit/worn-items.test.ts`,
+`tasks/bugs.json` (`worn-as-unknown-slot-silently-disables-the-strip`).
+**Status:** ✅ active — commits `4984be189` and `e57f3a535`, staging, not pushed. Written as one
+entry because the second deletes the guard that stopped the first from running: the `unknown-slot`
+early return pre-empted the element-identity route, so "the element is asked first, at both
+decision points" only became true of every contract once both had landed.
+
+## 2026-09-18 — The evaluator↔detector identity pairing is a one-to-one assignment, and the name is part of the cost
+
+**Context.** Two witnesses name the figures on a page: the detector (GroundingDINO → MobileSAM →
+Set-of-Mark identity call) and the image evaluator (`matches[]`). `reconcileIdentity` makes the
+detector overwrite the evaluator on every disagreement. What counted as a disagreement was decided
+by `checkIdentityAgreement`, which paired each evaluator match to its nearest detector figure
+INDEPENDENTLY — greedy nearest-centre, no exclusivity — and compared whatever box each side
+happened to have, an evaluator FACE centre against a detector BODY centre on records written before
+`body_bbox`.
+
+Lab set 66 / experiment 1324 pulled the 10 contested shipped pages, downloaded every image and
+judged them by eye: **detector right 5, evaluator right 1, and on the remaining 4 nobody disagreed
+at all** — both witnesses had named the same people, in the same spelling, and the pairing
+manufactured the conflict. On `job_1787867402809_z9bwoo3yp` p3 all five pirates were named
+correctly by both sides; the evaluator emitted a compressed ladder of boxes shifted right, greedy
+matched every name one slot over, the resulting "clean 3-cycle" passed `buildRenameMap`, and it
+**erased Fiona while putting Saira on the page twice**. Across all 132 individual conflicts on
+staging, 36% were decided by a margin under 0.05 *against* the figure carrying the evaluator's own
+name (19% under 0.02; shipped examples at 0.002, 0.005, 0.007).
+
+**Decision.**
+
+1. **The pairing is a global minimum-cost one-to-one assignment** (Hungarian, written out in
+   `identityAgreement.js` and verified against exhaustive brute force in the unit tests). The cost
+   of putting match *i* on figure *j* is their centre distance, **minus `NAME_AGREEMENT_BONUS`
+   (0.08) when both sides produced the same name**. Leaving a match unpaired costs
+   `maxCentreDistance` (0.15) — the worst pairing that would still be accepted — which preserves
+   the gate's meaning and, for a same-name pair, extends its reach by exactly the bonus. An unused
+   detector figure is free. 0.08 is anchored on the measured p75 of same-name centre distances
+   (0.084 staging n=2,121 / 0.079 prod n=361): one typical inter-witness box spread. The five
+   detector-right Lab pages bound it from above — the tightest (`vxnu60yjg` p16) flips at ≈0.13,
+   and a test pins the constant below that — and `z9bwoo3yp` p3 bounds it from below at ≈0.04.
+2. **A pair is compared on the strongest channel BOTH sides have** — body↔body, else head↔head,
+   never a head against a torso. The old cross-channel comparison had median **0.242** (staging) /
+   0.234 (prod) against a 0.15 gate, so **82 of 95** and 114 of 129 same-name pairs were thrown out
+   by the comparison itself, before identity was considered at all. Head-to-head brings them to
+   0.064 / 0.074, in line with body-to-body's 0.049 / 0.047. A figure with no face box gets a
+   derived head point at 0.21 of its body-box height below the top — the measured p50 of 3,874
+   stored figures that carry both boxes. **The weak signal did NOT get a wider tolerance: it got
+   the right reference point.** Its p90 tail (0.278 against the body's 0.132) is why widening the
+   gate for it would start admitting genuinely different people.
+3. **A conflict paired head-to-head is measured, never applied.** Three such pages were pulled and
+   judged against the stored clothing contract — `job_1787349305313_hpv76p0rokg` p2, p12, p18 — and
+   on all three the EVALUATOR had every child right and the detector was the wrong witness (on p12,
+   three of four). Those records predate `body_bbox`, which is the same era as the detector's
+   pre-SoM identity pass. `reconcileIdentity` now returns `uncorrectable: true` with
+   `uncorrectableReason: 'face-paired'`. 2,776 of 2,882 boxed staging matches carry a body box, so
+   this is a legacy guard and costs nothing on current output.
+
+**Rationale.** "Detector always wins" is right about WHO to believe (5:1) and wrong about WHEN to
+act: it fired on pages where nobody disagreed, and the cost of acting on an artefact is a deleted
+character, which is strictly worse than leaving correct labels alone. The name both witnesses
+independently produced is stronger evidence than a centre distance that 36% of the time separates
+the candidates by less than the noise floor.
+
+**Measured — replay over every stored version carrying both `matches[]` and
+`bboxDetection.figures[]`** (1,194 versions / 59 stories staging; 317 / 13 prod):
+
+| | staging before → after | prod before → after |
+|---|---|---|
+| versions with ≥1 conflict | 76 → **32** | 20 → **15** |
+| individual conflicts | 132 → **65** | 30 → 36 |
+| renames applied | 19 → 19 | 3 → **0** |
+| duplicates produced | 0 → **0** | 0 → **0** |
+| characters erased | **2 → 0** | **1 → 0** |
+| byte-identical outcome | **1,186 / 1,194** | **314 / 317** |
+
+Prod's individual-conflict count *rises* (30 → 36) while its versions-with-a-conflict falls: the
+face-paired conflicts are now recorded rather than silently acted on, and prod's old face-only
+records dominate its corpus. Of the 8 staging changes, 4 **withdraw** a rename the pairing had
+invented (one at margin 0.001, renaming a named pirate into a crowd label) and 4 **apply** one the
+artefact had blocked; three of those four were checked on the pixels and improve the labelling.
+
+All five duplicate-producing versions the 2026-09-14 / 2026-09-18 rename guards were measured on
+(`9oxos7dwv` p7, `mfedxinwqd` p4, `9e27p42el7l` p6, `1dpnym94p` p18) now produce **zero conflicts**:
+every one was a pairing artefact. Those guards still hold and are still tested, now on shapes that
+genuinely conflict.
+
+**Known limit, not fixed here.** On `job_1789584708605_rts4wqupm` p18 (shipped, q=45) the clean
+pairing exposes a **genuine** disagreement where — judged on the pixels against the clothing
+contract — the detector is the wrong witness, and the rename now applies where the artefact had
+accidentally blocked it. That is the 1-in-6 class the Lab measured, not a pairing fault.
+`wkt20ckod` p12 is **unchanged** for the same reason: both sides mean the same two figures and
+disagree about who. The remedy is a third witness, not a wider gate; the wiring is in
+`tasks/BACKLOG.md` and will carry its own entry when it lands.
+
+**Explicitly not done.** Gating on `figures[].confidence` was considered and rejected — the
+detector was `confidence: 'high'` and wrong on `wkt20ckod` p12. Nothing in scoring is touched.
+
+**Touched files.** `server/lib/identityAgreement.js`,
+`tests/unit/identity-pairing-assignment.test.ts` (+ its verbatim stored fixture),
+`tests/unit/identity-rename-duplicate.test.ts`, `tests/unit/identity-rename-unpaired-holder.test.ts`,
+`tests/manual/identityAgreement.test.js`.
+**Status:** ✅ active — commit `d1c9a9d1f`, staging, not pushed.
+
 ## 2026-09-18 — `outfit_misattributed` is deleted from code; borrowed wardrobe is the scene reviewer's `[clothing_owner]`
 
 **Context.** `server/lib/clothingCheck.js` rule 2 decided from a page's PROSE that one character
