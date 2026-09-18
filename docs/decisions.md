@@ -21,6 +21,405 @@ superseded and link forward.
 
 ---
 
+## 2026-09-18 — The Grok vision fallback names a model xAI still serves, and retirement becomes a field rather than a comment
+
+**Context.** The pricing audit below (`d19c2dc50`) left a ⚠️ in `MODEL_PRICING` saying that
+`grok-4-fast` "is still used as the fallback model in evalJudges / evalPipeline / bboxDetection /
+sceneValidator and in textModels' Gemini-safety-block retry. Those calls hit a dead id." It listed
+`grok-3`, `grok-3-mini`, `grok-4-1-fast-non-reasoning`, `gemini-2.0-flash` and `qwen/qwen-max` as
+unserved — every one of those claims resting on the same evidence: **absence from a vendor's LIST
+endpoint**. Re-probed per id, with controls, on 2026-09-18. **Three of the six claims were wrong, and
+the one that mattered was wrong about *how*.**
+
+| id | probe | result |
+|---|---|---|
+| `grok-4-1-fast-non-reasoning` (what `grok-4-fast` resolves to) | `GET api.x.ai/v1/models/:id` | **200 → `{"id":"grok-4.3"}`** — retired, silently redirected |
+| `grok-3`, `grok-3-mini`, `grok-4`, `grok-4-fast-reasoning` | same | **200 → `grok-4.3`** — the same redirect |
+| `grok-2-vision-1212`, `grok-9.9`, `not-a-model`, `gpt-4o` | same | **404** — so the redirect is a curated map, not a catch-all |
+| `gemini-2.0-flash` | `GET v1beta/models/:id` | **200**, `supportedGenerationMethods` carries `generateContent` — **ALIVE** |
+| `gemini-1.5-flash`, `gemini-2.0-flash-exp`, `gemini-0.1-nonexistent` | same | **404 "Model is not found"** — the control passes |
+| `qwen/qwen-max` | `GET openrouter/models/:id/endpoints` | **200, 0 endpoints** — genuinely unroutable |
+| `qwen/qwen3.8-max` | same | **200, 1 endpoint** — ALIVE despite being absent from the catalogue listing |
+| `grok-4.3` | `GET api.x.ai/v1/language-models/:id` | `input_modalities: ["text","image"]`, $1.25/$2.50, 1M context |
+
+Three vendors, three mechanisms, one lesson: **absence from a LIST is not death.** xAI redirects,
+OpenRouter's listing omits live aliases, Google delists models that still answer.
+
+**Decision.**
+
+1. **The Grok vision fallback points at `grok-4.3`**, through one exported constant
+   `GROK_VISION_FALLBACK` (`server/config/models.js:292`) replacing six hand-kept copies of the
+   string `'grok-4-fast'`. This is **not a routing choice** — `grok-4.3` is literally what xAI
+   resolves the old id to, so behaviour is unchanged and only the bookkeeping is corrected. Vision
+   support is vendor-confirmed, not assumed.
+2. **Retirement becomes machine-readable**: `retired: 'YYYY-MM-DD'` (plus an optional `redirectsTo`)
+   on `grok-3`, `grok-3-mini`, `grok-4-fast` and `qwen-max`. Entries are **KEPT, not deleted**, so
+   historical `tokenUsage` rows still price.
+3. **Two false "this model is dead" notes corrected** — `gemini-2.0-flash` in `models.js`,
+   `textModels.js` and twice in `storyJobPipeline.js`. It is delisted, not shut down. A false
+   obituary in a comment is how a non-bug gets "fixed" later.
+4. **`qwen-max` gets no successor.** Nothing defaults to it; choosing between `qwen3-max`
+   ($0.78/$3.90, already registered), `qwen/qwen3.7-max` ($1.475/$4.425) and
+   `qwen/qwen3.8-max-0902` ($2.00/$6.00) is a routing call and is the owner's.
+
+**Rationale — why this class hid for about six months.** `grok-4-fast` stopped being a primary on
+2026-03-29 (`100ef4e49`, scene expansion → claude-haiku) and has been fallback-only since. Three
+properties compounded:
+
+- **A fallback is invisible by construction.** It runs only once the primary has already failed, so
+  a bad id costs nothing on a normal day — the failure is unreachable until both are needed at once.
+- **The guard measured an adjacent property.** All six sites tested
+  `TEXT_MODELS[id]?.provider === 'xai'` — whether the *repo* has a config entry, never whether the
+  *vendor* has a model. It passed happily for months.
+- **It did not even fail loudly.** xAI's redirect means the call *succeeds*, billing $1.25/$2.50
+  while the code books $0.20/$0.50 and records a model id that no longer exists. There is no error to
+  notice. The real cost is a 6.25x/5x silent rate overrun plus wrong model attribution in any A/B
+  whose arm fell through to the fallback.
+
+**Has it bitten? No — the fix is preventive, and that is stated plainly.** Fires: **0** since the id
+was retired (the only stored usage naming `grok-4-1-fast-non-reasoning` is 10 production buckets
+across 2026-03-16 … 2026-03-29, the window when it was the *primary* scene-expansion model and alive;
+nothing after). Failures: **0**, by positive test rather than by a missing counter — the paths that
+would leave a trace store one (`sceneValidator` writes `verdict:'ERROR'` with `'Grok fallback failed'`
+/ `'Blocked by Gemini, no Grok fallback'`), and both databases hold zero rows for every such marker
+and zero stories containing `"verdict":"ERROR"` in 120 days. Damage shipped: **0**. The value of the
+change is that the failure mode was a silent 6x cost overrun in the exact moment the primary judge is
+already down.
+
+**The guard extends the two artefacts the pricing audit shipped rather than adding a third**, split
+the way that file's own header argues for — invariants offline, facts online.
+`scripts/admin/check-model-pricing.js` gains `checkLiveness()`: per-model probes, per vendor, because
+the right test differs per vendor (the table above), reporting **both** directions — an unmarked entry
+the vendor dropped, *and* an entry marked retired that the vendor still serves. The second direction is
+what would have caught the wrong `gemini-2.0-flash` note. No vendor catalogue is hardcoded; every
+verdict comes from the fetch, and entries it cannot probe are listed rather than skipped silently.
+`tests/unit/model-pricing-integrity.test.ts` gains 6 invariants, the load-bearing one being **no server
+source file hardcodes a retired model key** (comments exempt, `models.js` exempt) — verified to have
+teeth by reintroducing `'grok-4-fast'` in `evalJudges.js`, which fails it naming the exact offending
+line. **Liveness is deliberately NOT asserted in the unit test**: network in a unit test, or a
+hardcoded catalogue that goes stale, both teach people to edit the test instead of checking the vendor
+— the same reasoning that keeps today's prices out of that file. Two pre-existing checker messages were
+corrected as the same class of wrong inference: `checkXai` and `checkOpenRouter` both said catalogue
+absence meant "calls to it 404" / "have no route".
+
+**Touched files.** `server/config/models.js` (`GROK_VISION_FALLBACK`, `retired` / `redirectsTo`),
+`server/lib/evalJudges.js`, `server/lib/evalPipeline.js`, `server/lib/bboxDetection.js`,
+`server/lib/sceneValidator.js`, `server/lib/textModels.js`, `server/lib/images.js` (jsdoc),
+`server/lib/character2x4Sheet.js` (comment), `storyJobPipeline.js` (comments),
+`scripts/admin/check-model-pricing.js`, `tests/unit/model-pricing-integrity.test.ts`.
+**Status:** ✅ active — commit `09934ae42`, staging, not pushed. Three follow-ups are the owner's and
+are in `tasks/BACKLOG.md`: a cheaper vision fallback than `grok-4.3` (none proposed — `grok-4.3` is the
+no-op), a `qwen-max` successor (nothing routes there today), and **six client dropdowns that still
+offer the retired ids** — the server-side guard does not cover `client/src`, and picking one there
+silently gets `grok-4.3` at `grok-4.3` prices.
+
+## 2026-09-18 — The Test Lab's Art Director and page-image stages build the prompt production sends
+
+**Context.** The Test Lab is where a change to the Art Director or to the image prompt is measured.
+Where the Lab builds a *different* prompt than the pipeline sends, every measurement taken there is
+about a situation that never occurs in a real book — and nothing in the tree says the two call sites
+are related, so the drift is visible only if somebody diffs two built prompts by hand. Four gaps were
+found and closed here, on top of four closed earlier the same day.
+
+**Decision.** Four fixes, each proved with a built-prompt diff taken from real stored staging stories
+and **no model calls**:
+
+1. **`runImageStage` passes `vbRefElementIds`, and the grid is resolved BEFORE the prompt.**
+   `vbRefElementIds` is the set of Visual Bible element ids whose reference render rides with the
+   generation call; it decides whether the REQUIRED OBJECTS block ends with *"The attached reference
+   images include a rough image of X — match its look"*. It appeared nowhere in `testlab.js`. The
+   honest set for the page-render stage is the grid's own `rawElements` — the cells whose bytes
+   actually loaded — so the plate + grid block moved above the prompt build, the same ordering
+   production settled on 2026-09-15 (`storyJobPipeline.js` `makeImagePrompt` plus the 5a-pre-grid
+   rebuild) and that `images.js` `iterate` already had. The composite stage's blend prompt now states
+   an **explicit empty set**: its only attached images are the pasted canvas and `ctx.visualBibleGrid`,
+   which `loadSceneContext` never sets.
+2. **The beats per-page `expandOnePage` gets production's arguments.** It passed neither
+   `clothingRequirements` nor `story`, and used the *stored* bible where production expands a recovered
+   page against the bible **the batch wrote** (`beatsPipeline.js`: "so a recovered page is expanded
+   against the same bible the batch wrote"). All three now route through existing seams: one hoisted
+   `buildReplaySceneOptions(storyData, …)` serves both the all-pages builder and the per-page fallback,
+   and one memoized `runVisualBible()` parses the authored bible once for both the expansion and the
+   scene-review pre-check — that parse used to exist only in the pre-check, so the two read different
+   id spaces, which is the Lab #1195 failure.
+3. **`runSceneDescriptionStage` passes the page's plan line and the clothing contract.** Ten positional
+   arguments left `rawOutlineContext` on its default, which is the hazard `images.js` was written
+   about: *"with a null, `buildSceneDescriptionPrompt` fills the authoritative SCENE_SUMMARY slot from
+   the previous brief's own `imageSummary`, and the rewrite has no narrative anchor outside the
+   artefact it is rewriting."* The plan line now comes from `resolvePlanLine(storedScene, storedImage)`
+   — the same resolver `/regenerate/scene-description` uses.
+4. **The silent season fallback is gone.** `seasonLabel(x || {})` was written out at three page-brief
+   fill sites; with no story it resolves from `new Date()`, which `server/lib/season.js` forbids
+   ("derived from the story's own date …, never from 'now' at render time"). One construction now —
+   `pageSeasonLabel(story, builderName)` (`server/lib/promptBuilders.js:54`) — returns exactly what
+   `seasonLabel` returned and says so **at error level, naming the builder**, when there is neither a
+   season nor a story date. **It does not throw:** a season is never worth killing a paid run over.
+
+**Rationale.** The built-prompt diff is the only evidence that settles this class — a difference at a
+call site that both paths normalise away is not real. All four were measured, and one of the two claims
+that motivated the task did **not** reproduce, which is why the measurement and not the reading decides.
+
+**Not reproduced.** The claim that a missing `vbRefElementIds` also *changes which objects are listed*
+does not hold. The worn-item omission in REQUIRED OBJECTS is gated by `referenceCarriesItem(wornState)`
+— `wornAsLinked && !handedOver` (`server/lib/wornItems.js:486`) — and never reads the attachment set.
+Measured on `job_1789584708605_rts4wqupm` p7, where ART004 (a fleece jacket, `wornAs: Levin.top`,
+declared `worn`) is omitted identically with and without the set. **The whole difference between the
+two prompts is one line, 161 chars.**
+
+**Impact is real in code and latent in effect, and that is stated rather than inflated.** Of 58 stored
+`beats_scenes` experiments, **6** used the per-page template, all on 2026-08-04/05 before the all-pages
+path existed, and **0 since 2026-08-10**. `scene_description` has **0 experiments ever**. Production's
+own per-page fallback fired in **2 of 112** staging stories and **0 of 25** production stories. **No
+decision on record rests on a run through these paths.**
+
+**Production behaviour unchanged.** 25 stored staging stories replayed through production's own three
+call shapes (all-pages AD, per-page AD, iterate): **0 season values changed**, **0 of the new loud logs
+fired**. The only functional change to a production path is that one log line.
+
+**Touched files.** `server/lib/testlab.js`, `server/lib/promptBuilders.js`,
+`tests/unit/testlab-prod-prompt-parity.test.ts` (new, 19 assertions),
+`tests/unit/beats-replay-inputs.test.ts` (its "built through the resolver" check now accepts a local the
+resolver assigns, which is what the hoist produces).
+**Status:** ✅ active — commit `9533d919b`, staging, not pushed. Four measured findings it deliberately
+did NOT fix — two of them production defects on `server/routes/regeneration.js`, a file the authoring
+session did not own — are in `tasks/BACKLOG.md`.
+
+## 2026-09-18 — Every price in `MODEL_PRICING` is re-read from the vendor, and the table is only ever a fallback
+
+**Context.** `server/config/models.js` priced `deepseek-v4-pro` at $0.435/$0.87 per 1M. A measured call
+billed **$0.0484 for 8,698 in / 10,761 out**, which is **$1.60/$3.20 to the cent** — **3.68x the
+table**. DeepSeek is the reviewer on `sceneReviewModel`, `clothingReviewModel` and
+`briefCorrectionModel`, and it is a reasoning model, so its billed output is several times the visible
+answer. The owner asked for the whole table to be re-checked, not just that line (`tasks/BACKLOG.md`
+item #27, now closed).
+
+**Decision.** Every entry re-read against a source fetched **2026-09-18**, chosen by **how each model is
+routed** rather than by vendor brand — a model called through OpenRouter bills at OpenRouter's rate
+whoever built it, `x-ai/grok-4.6` included. Sources: `openrouter.ai/api/v1/models`;
+`platform.claude.com/docs/en/about-claude/pricing`; `ai.google.dev/gemini-api/docs/pricing`;
+`GET https://api.x.ai/v1/models` plus the per-model docs pages for the Imagine tiers.
+`PRICING_VERIFIED_ON` (`server/config/models.js:1179`) is exported beside the table so a report can
+state how stale it is.
+
+**Wrong, and fixed.** All ten Anthropic entries matched exactly. The rest:
+
+| key | file said | vendor says | delta |
+|---|---|---|---|
+| `deepseek/deepseek-v4-pro` | 0.435/0.87 | **1.60/3.20** | **3.68x UNDER** (billing confirms: 4.27M in / 6.38M out → $27.18, predicted $27.16) |
+| `deepseek/deepseek-v4-flash` | 0.14/0.28 | **0.0493/0.0986** | **2.84x OVER** |
+| `qwen/qwen2.5-vl-72b-instruct` | 0.25/0.75 | **0.80/1.00** | **3.2x / 1.33x under** |
+| `deepseek/deepseek-chat` | 0.2574/1.0287 | **0.32/0.89** | the old pair is the StreamLake endpoint's rate, not the default route's |
+| `z-ai/glm-4.6` | 0.50/2.00 | **0.43/1.75** | 14% over |
+| `gemini-pro-latest` | 1.25/10.00 | **2.00/12.00** | Google publishes no row for the alias; OpenRouter's mirror prices it at Gemini 3.x Pro rates |
+| `gemini-2.5-flash-image` | $0.04/img | **$0.039** | 2.6% over (and deprecated, shutdown 2026-10-02) |
+| `gemini-3-pro-image-preview` | $0.15/img | **$0.134** at 1K/2K | 12% over |
+| `grok-imagine-image-pro` | $0.07/img | **$0.05 at 1K** | 40% over at the resolution this repo asks for — `grok.js` always sends `1k` |
+
+**Twelve models were wired into `TEXT_MODELS` with no `MODEL_PRICING` entry at all**, so
+`calculateTextCost` billed them **$0.00** — including **`x-ai/grok-4.6`, the default reviewer on
+`outlineReviewModel` / `arcReviewModel` / `textAuditBlindModel` and the beats reviewer**. One of them,
+`deepseek-v4-pro-0813`, had been silently borrowing v4-pro's rate through `calculateTextCost`'s `-\d+$`
+normaliser. **One price had three disagreeing copies**: the Gemini image rate was 0.03 in
+`INPAINT_BACKENDS`, 0.035 in `IMAGE_BACKENDS` and 0.04 in `MODEL_PRICING`; the vendor says **$0.039**
+(1290 output tokens at $30/1M). All three now read 0.039 and a test pins that they agree.
+
+**Three further faults, none of them in the table itself:**
+
+- **`calculateImageCost` consulted the backend's family rate before the model's own line.** `flux-dev`
+  (runware:6@1, $0.004) returned the runware backend's $0.0006 — FLUX Schnell's price, **6.7x under** —
+  and `grok-imagine-2` / `grok-imagine-pro` both returned the grok backend's $0.02 instead of their own
+  $0.04 / $0.05.
+- **`apiCost.js` double-charged every OpenRouter text function**, summing the provider's reported
+  `direct_cost` **AND** the token-math estimate for the same call. It was masked while the table
+  under-priced DeepSeek 3.68x (the token half added only ~27%); at the corrected rates it would have
+  become a clean 2x. Measured over 400 stored stories: **+$17.19 on top of $53.13 of real reported
+  spend, +32.4%**. Fixed to the rule `storyJobPipeline.functionCost` already used — the provider's own
+  figure wins, the table is only ever the fallback.
+- **`storyJobPipeline`'s `gemini_quality` fallback priced from `gemini-2.0-flash`** while the judge
+  actually running is `MODEL_DEFAULTS.qualityEval` (`gemini-2.5-flash`, 3x the input and 6.25x the
+  output price). It now reads the configured model, mirroring `apiCost.js`. The one bucket this reaches
+  in stored data is `cover_quality`: production's 204,339 in / 41,796 out over 11 calls was priced at
+  **$0.037 instead of $0.166**, 4.5x low. *(That commit called `gemini-2.0-flash` a shut-down model. It
+  is not — delisted, not dead; corrected in the `GROK_VISION_FALLBACK` entry above. The fix stands
+  either way: it was the wrong model regardless of whether it still answers.)*
+
+**Rationale — and the reassuring half of the finding.** The table is a **fallback**, and that is why the
+error survived so long: every OpenRouter text call and every Runware call reports what it actually cost,
+and both `storyJobPipeline.functionCost` and the Lab prefer that figure. **Replaying 400 stored stories
+with the old table and with the new one moves the mean per-story total by 0.0%.** The per-story numbers
+in `stories.data` were always right. What was wrong is everything computed *from* the table: model
+comparisons, projections, the weekly `apiCost` report, and **the Lab's model picker**
+(`server/routes/admin/testlab.js:210` renders `MODEL_PRICING[m.modelId]` — twelve models showed no price
+there and DeepSeek showed 3.68x too cheap, on the panel where a model gets chosen). That is the
+dangerous shape: a number that is only wrong where a human reads it to make a decision.
+
+**Cross-checked against what was actually billed.** `stories.data.tokenUsage.byFunction` buckets that
+carry both the provider's `direct_cost` and token counts give an effective rate. Predicted-over-actual at
+the corrected rates: `deepseek-v4-pro` **1.001**, `gemini-3.1-pro` 0.994, `grok-4.6` 0.998, `qwen3-max`
+0.991, `gemini-3.7-flash` 1.000, `luna-pro` 0.956. Re-measured production spend, stories ≥12pp over 120
+days: **$2.20–$7.02, median $3.25, mean $3.41**; the two most recent are **$6.6 and $7.0**, so the
+"~$4.4 production story" quoted elsewhere in this file is a stale era average, not a table artefact.
+
+**Rejected: using the derived-from-billing rate as the table value.** It is route-dependent
+(`deepseek-v4-pro` spans $0.83–$1.91 in across 16 upstreams and `textModels` sorts by throughput) and
+cache-dependent. Two models disagree with their list price and both keep it, with the discrepancy
+recorded on the line: **`qwen/qwen-plus`** bills **0.68x** list (668 production calls: $1.21 against a
+predicted $1.78) from prompt-cache hits on the fixed `eval_consolidation` prefix — list kept because it
+is the citable figure and it errs high; **`openai/gpt-5.6-sol`** bills **~2.4x** its catalogue default
+route (1.34M in / 1.36M out → $39.48 against a predicted $16.24) because seven endpoints span $1/$5 to
+$5.50/$33 and throughput-sorted routing lands on the expensive end — `direct_cost` overrides the entry
+in practice. Everything else agrees to within 5%.
+
+**No code path selects a cheaper model, refuses work, or falls back on these numbers**, so the 3.68x
+error was changing reporting and human decisions, not pipeline behaviour. The one gate that reads them is
+`JOB_SPEND_CAP_USD = 15` (`storyJobPipeline.js:563`), and `jobSpentUsd` prefers `usage.direct_cost` — so
+the DeepSeek error never moved it. It now counts more accurately, which makes it very slightly more
+likely to trip; headroom is fine (median full story $3.25 against a $15 cap). Two gaps in that cap remain
+and are in `tasks/BACKLOG.md`.
+
+**The drift guard, split invariants-offline / facts-online.**
+`tests/unit/model-pricing-integrity.test.ts` — **13 assertions, none of which hardcodes a price**, so a
+vendor price change does not fail it: every `TEXT_MODELS` model has an entry; `calculateTextCost` never
+returns 0 for one; a model resolves to its own line and not a lookalike the normaliser landed on; entries
+are token-priced XOR per-image; all values finite and positive; output ≥ input; `thinking` === `output`;
+`PRICING_VERIFIED_ON` is a real past date; the three copies of the Gemini image price agree, likewise
+Grok and Runware; `calculateImageCost` agrees with the table for every `IMAGE_MODELS` key; and **no
+`description` string quotes a price that contradicts the table** (10% tolerance for rounded prose) —
+that last one is the check that would have caught this drift class, since 15 `TEXT_MODELS` descriptions
+were a second hand-kept copy of the table and all 15 were wrong.
+`scripts/admin/check-model-pricing.js` does the part a test cannot: it live-fetches OpenRouter's
+catalogue and xAI's models API (free, no model call), compares every entry, and with
+`--db=prod|staging` derives the effective rate from real billing and flags anything more than 15% off. It
+prints how stale `PRICING_VERIFIED_ON` is, lists the Anthropic/Google ids that must be eyeballed by hand
+(those vendors publish HTML only), exits non-zero on drift, and takes `--warn-only`.
+
+**Touched files.** `server/config/models.js` (`MODEL_PRICING`, `PRICING_VERIFIED_ON`,
+`calculateImageCost` lookup order, `IMAGE_BACKENDS` / `INPAINT_BACKENDS` Gemini rate, 17 stale price
+figures in `TEXT_MODELS` descriptions and `MODEL_DEFAULTS` comments), `server/lib/apiCost.js`,
+`storyJobPipeline.js` (two copies of `PROVIDER_PRICING`), `scripts/admin/check-model-pricing.js` (new),
+`tests/unit/model-pricing-integrity.test.ts` (new).
+**Status:** ✅ active — commit `d19c2dc50`, staging, not pushed. Running
+`check-model-pricing.js --db=prod --warn-only` from the daily Railway housekeeping is **proposed, not
+built** — it is the only thing that catches a rate that moves after today, and a pre-push gate would be
+the wrong place, since a vendor's price change is not the pusher's fault. That, Grok 2.0's unmodelled
+**$0.01-per-input-image** charge, and the two `JOB_SPEND_CAP_USD` gaps are in `tasks/BACKLOG.md`.
+
+## 2026-09-18 — One line, one change; and a verb each for the two things `new material` meant
+
+**Context.** `981fcb27a` + `7ed94f65c` (their entry below) made the beats re-plan declare its structural
+changes under `---CHANGES---` and made the merge enforce "a change you do not declare is undone".
+`97ee8b679` put that design in front of a live model for the first time — Lab experiments **1326** and
+**1327**, two stories, two planner samples. The blocks arrived and parsed, and neither round was a no-op;
+the design works. But **the review fired 3 times across the two runs and was wrong all 3 times.** Two
+faults caused all three, and both were left unfixed during the verification on purpose: **a verification
+that tunes its own subject stops being a measurement.**
+
+**Fault 1 — a line may declare only one change, and the parser must read a packed one anyway.** Both
+planner models packed several changes behind semicolons on their first attempt (1326: **7 of 10 lines**;
+1327: **1 of 5**). Only the first verb matched, and everything after it was swallowed into that change's
+`subject`, which `namesIn()` then resolved over. On 1326 page 16 the model wrote `cast out Zünsli …;
+cast in Levin …; action out …`; the review read **Levin and Julian** as cast out, matched them against
+that page's own OBSTACLES line, and **refused a correct fix**. The self-count counted LINES:
+`Changes: 10` described **18** actual changes, `Changes: 5` described **6**.
+
+Both available fixes, together, because they compose:
+
+1. `parsePlanChanges` splits a change line's first field on `;` and parses each clause as its own change,
+   so a packed line is read CORRECTLY rather than mis-read, and `counted` counts **changes, not lines**,
+   so the self-count certifies the enumeration it claims to.
+2. The prompt states the contract — *"One line, one change: a page you changed in two ways gets two
+   lines, each repeating its page number, and no line holds two changes"* — and a line that breaks it is
+   a **recorded violation** (`parsePlanChanges().violations`), surfaced as `beats_replan_change_format`
+   in the generation log (`server/lib/beatsPipeline.js:1398`) and as check 9 of the Lab stage.
+
+**No automatic re-ask, and that is a decision.** A re-ask costs a paid call, and **2 of 2 models broke
+the format on the first attempt**, so it would have fired on essentially every round — to buy what the
+parser now absorbs for free. The violation is RECORDED, never escalated.
+
+**The cast verbs take a bare name.** `cast out <name>` is a name and nothing else: the parser cuts the
+subject at the first word that does not start with a capital and records the remainder as a `cast_prose`
+violation. That is what stops `cast out Zünsli lying still in Julian's hands` from resolving Julian as a
+second removal. A subject that begins lower-case (an article, a lower-case name) is kept whole — never
+worse than before. **A move or merge that points at its own page number is a violation** too
+(`self_page`): 1326 p4 wrote `Page 4: … action to page 4 …`, which declares no move.
+
+**Fault 2 — `new material` meant two different things, so the common one was refused.** The balance rule
+refuses any `new material` on a page no `material from page N` freed. Both models used the verb in its
+common sense — *"this page now ALSO stages X"* (1326 p12: a figure frozen behind the push, answering
+CHECK[3]; 1327 p14: a widened shot answering CONSECUTIVE_SAME_SHOT_CAST) — and both were refused. One
+word meant two things because only one existed. Now there are two:
+
+- **`action in <the action this page now stages>`** — the common case, the mirror of `action out`,
+  carrying no page-count obligation.
+- **`material to page <M> <what this page stages instead>`** — the freed half of a merge, naming the page
+  that took its material, so the balance rule pairs the two halves **by number** (`material from page M`
+  on page N ⟷ `material to page N` on page M). The rule stays strict exactly where the page count is at
+  stake, which is the reason page structure was worth covering at all.
+
+A model reaching for the common case cannot land on the merge verb by accident: the merge verb demands a
+page number the common case has none of. `new material` is **retired**; a model still writing it parses
+as `kind: 'other'` and is reported, never silently balanced.
+
+**The closed set is one table, read twice.** `PLAN_CHANGE_VOCABULARY`
+(`server/lib/promptBuilders.js:6447`) carries each verb's `syntax` — what the prompt shows — beside its
+`re` / `build` — what the parser reads — and `REPLAN_CHANGES_FORMAT`'s vocabulary sentence is generated
+from it. The prompt half and the parser half can no longer be renamed apart.
+
+**Measured — replay of the two STORED blocks through the new code** (apples to apples: same model output,
+old parser vs new):
+
+| | 1326 stored → new | 1327 stored → new |
+|---|---|---|
+| changes parsed | 10 → **18** (on 10 lines) | 5 → **6** (on 5 lines) |
+| self-count matches the changes | true → **false** (it had counted lines) | true → **false** |
+| format violations | — → **11** (7 packed, 3 `cast_prose`, 1 `self_page`) | — → **1** (packed) |
+| undeclared removals reported | 1 → **0** | 0 → 0 |
+| refusals | 2 → 2 | 1 → **0** |
+| pages surviving to the book | 7 → **8** | 4 → **5** |
+
+**All 3 wrong refusals are gone** (1326 p16 `obstacle` on the mis-read subject; 1326 p12 and 1327 p14
+`balance` on the two-meaning verb). The 2 refusals still standing on 1326 are `direction` refusals of
+`cast in` clauses the old parser never saw, and both are **genuine**: CHECK[1] said pages 9 and 16 are
+highlight pages holding a second actor, and the re-plan answered each by putting a second actor in the
+who column. The `1 → 0` on undeclared removals is honest but is not a repair: 1326's one true undeclared
+removal (page 17 losing Max and Kiaan with no line saying so) is no longer reported because page 12 now
+survives, and its returned line names all four boys where the standing line said "all four boys", so
+`castLostByReplan`'s move-is-not-a-deletion arithmetic sees them gained elsewhere. **That is the
+literal-name counter's known blind spot, not a new rule.**
+
+**Measured — live re-run, experiment 1329** (same two stories, same stage, same call path; run locally
+because the fix is committed and not pushed, so the Lab route would have measured `origin/staging`'s
+prompts):
+
+- `job_1789147573901_m3uam0nxi`: **9/9 checks**, 5 changes on 5 lines, count matches, **0 format
+  violations**, 1 refusal — genuine (`cast out Fauchi` answering NO_COMMISSIONED_ON_PAGE, a finding that
+  asks for MORE in frame, on a page under the ceiling), 4 pages survive.
+- `job_1789681157795_wkt20ckod`: **8/9**, 6 changes on 6 lines, count matches, 2 violations (both
+  `cast_prose`, both the phrase `cast out Tobias dominant`), 2 refusals — **both genuine, and both the
+  design's own motivating case**: `cast out Tobias` declared against INVENTED_DOMINANT_EXCESS, which is
+  ranked "more". The round is a no-op *because* every page it changed carried a refused deletion of the
+  antagonist; the findings survive to the recheck.
+
+Packed lines across the story-runs measured after the change fell from **8 of 15 lines (53%)** to **0 of
+11** on the two clean re-runs, and ~4 of 32 on a third.
+
+**Regression.** Replaying **all 109 stored `beatsReviewReport` rows** (27 replayable rounds, 23 removal
+pages) is **byte-identical** before and after: **0 previously-correct outcomes changed**, the declared arm
+still refuses the same 20 and allows the same 3, by the same rules (`span` 15, `direction` 7).
+
+**Spend: $0.207**, of which **$0.095 was lost to a Railway connection dropped mid-stream**; experiment
+1329 itself cost $0.1118.
+
+**Touched files.** `server/lib/promptBuilders.js` (`PLAN_CHANGE_VOCABULARY`, `REPLAN_CHANGES_FORMAT`,
+`parsePlanChanges`, `splitBareName`), `server/lib/planCounters.js` (the balance rule in
+`reviewPlanChanges`), `server/lib/beatsPipeline.js` (the `beats_replan_change_format` warning),
+`server/lib/testlab.js` (check 9 plus the violation fields on the report),
+`tests/unit/beats-replan-change-review.test.ts`, `tests/unit/built-prompt-values.test.ts`,
+`tests/unit/testlab-beats-replan.test.ts`.
+**Status:** ✅ active — commit `14b39dc76`, staging, not pushed. It closes the "unproven against a live
+planner" item the re-plan entry below opened: the block **is** emitted and parsed, by two independent
+planner models. The 2 surviving `cast_prose` violations are in `tasks/BACKLOG.md`.
+
 ## 2026-09-18 — A re-plan declares its structural changes, and they are reviewed in both directions
 
 **Context.** `97ccc4128` (its entry below, now superseded) answered the loss of an invented antagonist
