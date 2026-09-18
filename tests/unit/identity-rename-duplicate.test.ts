@@ -46,15 +46,21 @@ describe('a rename never fabricates a duplicate identity (real p7 shapes)', () =
     expect(fx.storedRenameOutcome.renames).toHaveLength(1);
   });
 
-  it('measures the conflict but refuses to apply it', () => {
+  it('no longer produces the conflict at all — it was the pairing, not the sides', () => {
+    // UPDATED 2026-09-18. The guard below still holds, but on THIS page it now
+    // has nothing to refuse: the pairing became a one-to-one assignment whose
+    // cost carries the name agreement, so all five subjects land on their own
+    // figure and the "conflict" — which the first assertion above already shows
+    // was never a disagreement — is gone at the root.
+    //
+    // The guard is exercised on shapes that still conflict: the two-name swap
+    // below, and the refusals in identity-pairing-assignment.test.ts.
     const evalLike = { matches: clone(fx.matches), fixableIssues: clone(fx.fixableIssues) };
     const report = reconcileIdentity(evalLike, clone(fx.detectorFigures));
 
-    // The disagreement is still MEASURED and still surfaced — the guard is not
-    // "pretend the sides agree".
-    expect(report.conflicts.length).toBeGreaterThan(0);
-    expect(report.uncorrectable).toBe(true);
-    expect(report.renamed).toBe(0);
+    expect(report.conflicts).toEqual([]);
+    expect(report.agreed).toBe(report.compared);
+    expect(report.renamed || 0).toBe(0);
   });
 
   it('leaves every evaluator name on exactly one figure', () => {

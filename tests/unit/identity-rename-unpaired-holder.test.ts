@@ -85,30 +85,38 @@ describe('a rename never targets a name another match still holds (real stored v
       const report = reconcileIdentity(evalLike, clone(v.detectorFigures));
       const after = evalLike.matches.map((m: any) => m.reference);
 
-      // The disagreement is still MEASURED — the guard is not "pretend they agree".
-      expect(report.conflicts.length).toBeGreaterThan(0);
-      expect(report.uncorrectable).toBe(true);
-      expect(report.renamed).toBe(0);
+      // UPDATED 2026-09-18. These three versions no longer disagree at all: the
+      // pairing became a one-to-one assignment whose cost carries the name
+      // agreement, and the first assertion in this file already shows the
+      // detector's roster was a SUBSET of the evaluator's names, spelled the
+      // same way. There was never anything to reconcile — which is why the
+      // rename that erased a character was so indefensible.
+      expect(report.conflicts).toEqual([]);
+      expect(report.renamed || 0).toBe(0);
 
-      // No duplicate fabricated, and nobody dropped off the page.
+      // The guarantee this file exists for, unchanged: no duplicate fabricated,
+      // and nobody dropped off the page.
       expect(dupes(after)).toEqual(dupes(before));
       expect(after.map(canon)).toEqual(before.map(canon));
     });
   }
 
-  it('the target was held by an UNPAIRED match, which is why agreedNames could not see it', () => {
-    // p4: the detector named all four people, so NOTHING agreed — agreedNames is
-    // empty and the 09-14 guard has nothing to test against. Levin is unpaired
-    // (its nearest detector centre is another figure's) and still holds "Levin".
+  it('heldNames still reports every name on a figure, agreed or not', () => {
+    // p4 used to produce `Julian->Levin` against an UNPAIRED holder of "Levin",
+    // which is the hole the 09-14 agreed-only guard had. The one-to-one pairing
+    // now puts all four boys on their own figure, so nothing is contested — but
+    // heldNames is still the set the guard needs, and it is still built from the
+    // raw matches rather than from what the pairing reached.
     const v = byStory('mfedxinwqd');
     const report = checkIdentityAgreement(clone(v.matches), clone(v.detectorFigures));
-    expect(report.agreed).toBe(0);
-    expect(report.agreedNames).toEqual([]);
-    expect(report.conflicts.map((c: any) => `${c.evaluator}->${c.detector}`)).toEqual(['Julian->Levin']);
-    expect(report.unpaired).toContain('Levin');
-    // heldNames is the set the guard actually needs: every name on a figure.
+    expect(report.conflicts).toEqual([]);
+    expect(report.agreedNames.sort()).toEqual(['Julian', 'Kiaan', 'Levin', 'Max']);
+    // ANI001 is an animal the detector never names — unpaired, never forced onto
+    // the nearest child, and still holding its name.
+    expect(report.unpaired).toEqual(['ANI001']);
     expect(report.heldNames).toContain('Levin');
     expect(report.heldNames).toContain('Julian');
+    expect(report.heldNames).toContain('ANI001');
   });
 
   it('heldNames counts a match the pairing never looked at — one with no box', () => {
