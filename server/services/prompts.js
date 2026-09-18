@@ -853,18 +853,14 @@ function buildEvaluationPrompt(opts = {}) {
     // template is also built by the Test Lab and the re-evaluate route, and an
     // unfilled placeholder would be stripped with a warning instead.
     LANDMARK_CONTEXT: opts.landmarkContext || '(none)',
-    // ONE rule for every template that authors or judges a page against its
-    // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). Lazy
-    // require: promptBuilders loads this module at its top, so a top-level
-    // require here would close the cycle.
-    //
-    // This judge is the one of the nine that receives no page text at all —
-    // its ORIGINAL_PROMPT is the BRIEF, which is the contract. The rule is
-    // therefore inert here today and carried anyway: the owner's instruction
-    // was "everywhere", this is the heaviest-deducting judge, and wiring the
-    // page text in would be a one-line change at a call site that would
-    // otherwise arrive with the rule missing.
-    TEXT_NOT_A_CHECKLIST: require('../lib/promptBuilders').TEXT_NOT_A_CHECKLIST_RULE,
+    // NO TEXT_NOT_A_CHECKLIST here, deliberately (owner, 2026-09-18). That rule
+    // goes to every template that judges a page against its TEXT; this judge is
+    // handed no page text on any path — all three call sites pass a brief as
+    // ORIGINAL_PROMPT (evalPipeline's primary + safety-retry builds, and the
+    // re-evaluate route), and `storyText` is a separate argument that only the
+    // semantic and compliance judges receive. A rule that cannot fire still
+    // competes for attention in the heaviest-deducting prompt in the system.
+    // Wiring the page text in here later means adding the fill back with it.
   });
 }
 

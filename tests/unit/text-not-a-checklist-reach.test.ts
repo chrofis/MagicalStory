@@ -1,23 +1,34 @@
 /**
- * THE PAGE TEXT IS NOT A CHECKLIST FOR THE PICTURE — reaching all nine sites.
+ * THE PAGE TEXT IS NOT A CHECKLIST FOR THE PICTURE — reaching all eight sites.
  *
  * Owner directive, 2026-09-18: "Not all characters mentioned in text must
  * appear in the image. Add that rule everywhere! A text can be 3 actions the
  * image must focus on one. You keep getting this wrong."
  *
  * It is ONE exported constant (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE) filled
- * into nine templates from five files — four fill sites in promptBuilders.js and
- * one each in prompts.js, evalPipeline.js, sceneValidator.js and bookAudit.js.
+ * into eight templates from four files — five templates through four builders in
+ * promptBuilders.js (buildSceneDescriptionPrompt serves both scene-iteration
+ * templates) and one each in evalPipeline.js, sceneValidator.js and bookAudit.js.
  * Hand-kept copies of a shared rule drifted four times in one week in this repo,
  * and this rule already HAD three partial copies that had drifted: two of them
  * covered characters and never actions.
  *
  * WHAT IS PINNED — the constant reaches the BUILT prompt of every one of the
- * nine consumers, byte-identically, with no unfilled placeholder left behind.
+ * eight consumers, byte-identically, with no unfilled placeholder left behind.
  * fillTemplate deletes an undeclared key silently, so a template that "has the
  * rule" can still ship with a hole where it was. Nothing here asserts what the
  * rule SAYS beyond the two halves being structurally present and distinct:
  * wording is the owner's to change without breaking a test.
+ *
+ * AND THE NINTH, PINNED ABSENT. image-evaluation.txt carried the rule as N-17
+ * for one commit (587d8d755) and the owner dropped it the same day: that judge
+ * is handed no page text on any path — all three sites that build its prompt
+ * pass a BRIEF as ORIGINAL_PROMPT, and `storyText` is a separate argument of
+ * evaluateImageQuality that only the semantic and compliance judges receive —
+ * so the rule could never fire, and an unreachable line still competes for
+ * attention in the heaviest-deducting prompt in the system. The last describe
+ * block below keeps it out: template, built prompt, builder contract and
+ * sibling set. Re-add it only together with a call site that passes page text.
  *
  * Every judge prompt is captured from the REAL call path with only the network
  * boundary stubbed — never re-filled from the template with a hand-copied key
@@ -179,20 +190,8 @@ beforeAll(async () => {
   await loadPromptTemplates();
 
   BUILT.push(
-    // The three judges.
-    {
-      name: 'image-evaluation.txt (quality judge)',
-      template: 'prompts/image-evaluation.txt',
-      text: String(buildEvaluationPrompt({
-        originalPrompt: BRIEF,
-        artStyle: 'watercolor',
-        interactionsBlock: 'Mira — brass lantern — both hands around the handle',
-        sceneIntent: 'she lifts the lantern on the pier',
-        clothingContract: 'Mira: red raincoat, navy trousers, yellow boots',
-        expectedCast: 'EXPECTED CAST (1): Mira',
-        requiredObjects: 'brass lantern',
-      })),
-    },
+    // The two judges that are handed the page text. (The quality judge is not —
+    // see the pinned-absent block at the bottom of this file.)
     {
       name: 'image-semantic.txt (semantic judge)',
       template: 'prompts/image-semantic.txt',
@@ -301,11 +300,11 @@ describe('the rule is one exported constant carrying both halves', () => {
   });
 });
 
-// ── The nine built prompts ──────────────────────────────────────────────────
+// ── The eight built prompts ─────────────────────────────────────────────────
 
-describe('the constant reaches all nine BUILT prompts', () => {
-  it('all nine build non-empty', () => {
-    expect(BUILT).toHaveLength(9);
+describe('the constant reaches all eight BUILT prompts', () => {
+  it('all eight build non-empty', () => {
+    expect(BUILT).toHaveLength(8);
     for (const b of BUILT) expect(b.text.length, `${b.name} built empty`).toBeGreaterThan(400);
   });
 
@@ -325,7 +324,7 @@ describe('the constant reaches all nine BUILT prompts', () => {
     expect(gaps).toEqual([]);
   });
 
-  it('each one states the rule exactly once — nine copies, not nine-plus-a-hand-copy', () => {
+  it('each one states the rule exactly once — eight copies, not eight-plus-a-hand-copy', () => {
     const dupes = BUILT
       .map(b => ({ name: b.name, n: b.text.split(RULE).length - 1 }))
       .filter(e => e.n !== 1);
@@ -333,10 +332,10 @@ describe('the constant reaches all nine BUILT prompts', () => {
   });
 });
 
-// ── The registry keeps the nine together ────────────────────────────────────
+// ── The registry keeps the eight together ───────────────────────────────────
 
-describe('the sibling set holds the nine', () => {
-  it('is registered, blocks, and names exactly the nine templates the builders fill', () => {
+describe('the sibling set holds the eight', () => {
+  it('is registered, blocks, and names exactly the eight templates the builders fill', () => {
     expect(SET, 'sibling set text-not-a-checklist is gone from the registry').toBeTruthy();
     expect(SET.severity).toBe('block');
     expect(SET.members.slice().sort()).toEqual(BUILT.map(b => b.template).sort());
@@ -355,5 +354,81 @@ describe('the sibling set holds the nine', () => {
       (m: string) => fs.readFileSync(path.join(ROOT, m), 'utf8').includes(RULE)
     );
     expect(gaps, 'the prose is in the template as well as the constant — that is the drift this set exists to stop').toEqual([]);
+  });
+});
+
+// ── The ninth, pinned ABSENT ────────────────────────────────────────────────
+//
+// image-evaluation.txt carried the rule as N-17 for exactly one commit
+// (587d8d755, 2026-09-18) and the owner dropped it the same day. The judge is
+// handed no page text on any path: all three sites that build its prompt pass a
+// BRIEF as ORIGINAL_PROMPT (evalPipeline's primary build, its safety-retry
+// rebuild, and the admin re-evaluate route), while `storyText` is a separate
+// argument of evaluateImageQuality that only reaches the semantic and
+// compliance judges. A rule that cannot fire still competes for attention in
+// the heaviest-deducting prompt in the system.
+//
+// Pinned so an "add it everywhere" sweep cannot put it back silently — and so
+// that WIRING the page text in trips a test rather than arriving with the rule
+// missing. If a page-text input is ever added to this judge, both halves change
+// together: the placeholder AND the fill in services/prompts.js.
+describe('the quality judge is deliberately NOT a consumer', () => {
+  const EVAL_TPL = () => String(PROMPT_TEMPLATES.imageEvaluation || '');
+
+  const evalPrompt = () => String(buildEvaluationPrompt({
+    originalPrompt: BRIEF,
+    artStyle: 'watercolor',
+    interactionsBlock: 'Mira — brass lantern — both hands around the handle',
+    sceneIntent: 'she lifts the lantern on the pier',
+    clothingContract: 'Mira: red raincoat, navy trousers, yellow boots',
+    expectedCast: 'EXPECTED CAST (1): Mira',
+    requiredObjects: 'brass lantern',
+  }));
+
+  it('image-evaluation.txt carries neither the placeholder nor the prose', () => {
+    const tpl = EVAL_TPL();
+    expect(tpl.length, 'the quality template did not load').toBeGreaterThan(400);
+    expect(tpl, 'the placeholder is back in the quality judge — it has no page text to judge against')
+      .not.toContain('{TEXT_NOT_A_CHECKLIST}');
+    expect(tpl, 'a hand-written copy of the rule is back in the quality judge')
+      .not.toContain(RULE);
+  });
+
+  it('its BUILT prompt carries neither, and no hole where the rule was', () => {
+    const p = evalPrompt();
+    expect(p.length).toBeGreaterThan(400);
+    expect(p).not.toContain(RULE);
+    expect(p).not.toContain('{TEXT_NOT_A_CHECKLIST}');
+    expect(unfilled(p), 'the quality prompt ships with a hole').toEqual([]);
+  });
+
+  it('the builder has no page-text input — a caller cannot smuggle one in', () => {
+    // The premise the removal rests on. buildEvaluationPrompt fills a closed
+    // set of named keys, so a page text handed to it under any other name is
+    // dropped: the judge scores the picture against its BRIEF, full stop.
+    const smuggled = String(buildEvaluationPrompt({
+      originalPrompt: BRIEF,
+      artStyle: 'watercolor',
+      storyText: PAGE_TEXT,
+      pageText: PAGE_TEXT,
+      STORY_TEXT: PAGE_TEXT,
+    } as any));
+    expect(smuggled, 'a page text reached the quality judge — the rule belongs back in the template')
+      .not.toContain('harbour master');
+  });
+
+  it('no page-text placeholder has been wired into the template', () => {
+    // The tripwire for the one change that would reverse this decision. Wiring
+    // page text in means adding a placeholder for it; when that happens the
+    // rule has to come back in the same commit.
+    const stray = [...new Set(EVAL_TPL().match(/\{[A-Z][A-Z0-9_]*\}/g) || [])]
+      .filter((p: string) => /(STORY|PAGE)_TEXT|^\{TEXT_/.test(p));
+    expect(stray, 'the quality judge now receives page text — re-add the rule (it was dropped only because it could never fire)')
+      .toEqual([]);
+  });
+
+  it('the sibling set does not name it, so gate 9 does not demand it move', () => {
+    expect(SET.members).not.toContain('prompts/image-evaluation.txt');
+    expect(SET.members).toHaveLength(8);
   });
 });
