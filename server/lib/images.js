@@ -4676,7 +4676,25 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
                 c, iterClothing[cname], artStyle, storyData?.clothingRequirements || null) || '';
             } catch { /* identity line goes without clothing */ }
           }
-          return { name: cname, description: getStoryHelpers().buildIdentityLine(c, clothingText) };
+          // `clothing` AND `position` ride along as their own fields, exactly as
+          // the generation-time builder supplies them (storyJobPipeline, phase
+          // 5b-pre). Both were missing here, and both matter:
+          //   clothing — the SoM prompt's sanitized tier STRIPS "Wearing:…" from
+          //     the description and rebuilds the wardrobe from `c.clothing`, so
+          //     without it every sanitized-tier identity line goes out undressed
+          //     (bug som-identity-lines-undressed, fixed on the generation path
+          //     2026-08-22 and never mirrored here).
+          //   position — the SoM prompt's only non-appearance cue, and the
+          //     layout fallback's xTarget/depth source. When the render has drawn
+          //     a character with someone else's clothes and hair, appearance
+          //     CANNOT separate the two and the declared placement is the only
+          //     thing that can. Measured on job_1789681157795_wkt20ckod p12 v1
+          //     (an iterate-round-1 detection, so this path): without the hint
+          //     the identity call named the midground figure after the
+          //     foreground one 3/3 runs; with it, 3/3 correct — same image, same
+          //     badges, same model.
+          return { name: cname, description: getStoryHelpers().buildIdentityLine(c, clothingText), clothing: clothingText,
+            position: iterateSceneMetadata?.characterPositions?.[cname] || c.position || null };
         });
         iterExpectedCharacters.push(...getStoryHelpers().buildSecondaryExpectedCharacters(
           visualBible, iterateSceneMetadata, iterExpectedCharacters.map(c => c.name),

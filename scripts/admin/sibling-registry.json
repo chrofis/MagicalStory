@@ -343,6 +343,24 @@
           "require('./briefCorrection')"
         ]
       }
+    },
+    {
+      "id": "detector-identity-lines",
+      "axis": "generation-time identity lines vs iterate / char-repair / cover identity lines",
+      "reason": "Four builders assemble the expectedCharacters the SoM identity call names figures from — storyJobPipeline.js phase 5b-pre (generation), images.js iteratePageCore (iterate), charRepairTarget.js buildPageCast (character repair) and coverIterate.js buildExpectedCoverCharacters (covers). Each entry needs name, description, clothing AND position: the sanitized SoM tier strips the \"Wearing:\" tail out of the description and rebuilds the wardrobe from the clothing field, and the position field is the only cue left when a figure is drawn in another character’s clothes and hair. The generation builder was given both on 2026-08-22 and the other three were not, so every iterate, repair and cover detection ran on appearance alone — measured on job_1789681157795_wkt20ckod p12 v1, where that cost a two-child name swap and a page scored 0 on findings attributed to the wrong figure.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js",
+        "server/lib/charRepairTarget.js",
+        "server/lib/coverIterate.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "clothing: clothingText",
+          ".position || null"
+        ]
+      }
     }
   ],
   "withinFile": [

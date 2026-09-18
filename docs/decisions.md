@@ -450,6 +450,71 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-18 — The identity call is told WHERE a character stands, on every path that calls it
+
+**Context.** Staging `job_1789681157795_wkt20ckod` p12 shipped with `finalScore 0` on two CRITICAL
+findings, both attributed through a name swap: `identityAgreement` recorded `agreementRate 0.5`,
+`renameMap {kiaan: "Julian", julian: "Kiaan"}`, `contestedCharacters ["Kiaan","Julian"]`.
+
+Two witnesses name figures on a page and they are genuinely independent calls: the EVALUATOR
+matches figures against the reference sheets and emits `matches[].reference`; the DETECTOR badges
+the DINO person boxes and asks Gemini to name them (`_somIdentifyFigures`). Since 2026-08-22 the
+detector wins every disagreement (`reconcileIdentity`), and the entity-consistency check crops its
+grid cells from `bboxDetection.figures` too — so after reconciliation there is only ONE identity in
+the system, the detector's. On p12 the evaluator was right and the detector was wrong, and the
+correct answer was overwritten: the shipped `matches[]` put "Julian" on the child the brief casts as
+Kiaan, so both CRITICALs point at the wrong figure and any repair would have repainted it.
+
+The render had drawn the toddler (light blonde curly hair, sunshine-yellow fleece hoodie) with dark
+brown hair AND the other boy's brick-red duffle coat. Appearance therefore could not separate the
+two: naming the duffle wearer after the character whose contract names that coat is the only reading
+the evidence supports. The cue that DOES separate them is the scene plan's placement — three
+children pressed against the stone in the foreground, one standing behind them in the midground with
+his head lowered — and it never reached the call. Four builders assemble the detector's
+`expectedCharacters`, and only the generation-time one (storyJobPipeline phase 5b-pre) passed
+`clothing` and `position`; the iterate builder in `images.js`, `charRepairTarget.buildPageCast` and
+`coverIterate.buildExpectedCoverCharacters` passed neither. p12's shipped version is an
+`iterate-round-1` detection, so it ran on appearance alone.
+
+Measured on that exact image, those exact badges, gemini-2.5-flash at temperature 0, 3 runs a cell:
+placement hint absent → **0/3 correct**; placement hint present → **3/3 correct** — the same both with
+and without hair in the identity line, and under two different prompt wordings. Across 45 days of
+staging stories, 76 of 924 comparable evaluated versions (8.2%) carry an identity conflict and 30 of
+those had a rename applied.
+
+**Decision.** All four builders pass `clothing` and `position`, exactly as the generation-time one
+has since 2026-08-22. `position` comes from the scene plan's `characterPositions` and is `null` when
+the plan declared none — never an invented one; a cover hint carries no per-character placement, so
+a cover entry passes whatever the character itself declares. The four sites are registered as the
+sibling set `detector-identity-lines` (severity `block`) with field anchors, so `sibling-parity`
+fails if a fifth builder appears without them or one of the four loses them again.
+
+**Rationale.** `clothing` was already documented as mandatory — the sanitized SoM tier strips the
+"Wearing:" tail out of `description` and rebuilds the wardrobe from that field, so without it those
+calls dress nobody (bug `som-identity-lines-undressed`). `position` is the only cue that survives the
+case the identity call exists to handle: a figure drawn in another character's clothes and hair.
+Supplying it does not let placement override appearance — the prompt still demotes it to a
+supporting hint, which is what keeps a figure drawn in the wrong PLACE detectable. This is parity
+with a path that already works, not a new policy, so it needs no reversal protocol.
+
+Two related faults were MEASURED and deliberately NOT fixed here, both flagged in `tasks/BACKLOG.md`
+for the owner: (1) no production identity line carries HAIR at all — `buildCastIdentityDescription`
+reads `char.physical.hair` and the stored profile holds `hairColor` + `detailedHairAnalysis`, so
+every production call runs hairless while the Test Lab's own builder emits hair, meaning the Lab has
+been measuring identity on better input than production ever gets; (2) the SoM identity prompt never
+received the "no single trait decides / a character can be wearing the wrong outfit" rule that
+`image-evaluation.txt` got in the same 2026-08-22 decision. Adding that rule flips p12 from 0/3 to
+3/3 in the Lab's richer line format but changes nothing in the production format, so it is a prompt
+classification change on one page's evidence — owner's call, not shipped on this measurement.
+
+**Touched files.** `server/lib/images.js` (iterate builder), `server/lib/charRepairTarget.js`
+(`buildPageCast`, both entry shapes), `server/lib/coverIterate.js`
+(`buildExpectedCoverCharacters`), `scripts/admin/sibling-registry.json` (set
+`detector-identity-lines`), `tests/unit/detector-identity-lines.test.ts`,
+`tests/unit/fixtures/detector-identity-lines-job_1789681157795_wkt20ckod-p12.json`.
+
+**Status:** ✅ active
+
 ## 2026-09-18 — `element_uncited` is deleted from the code; the rule stays in the reviewer's prompt
 
 **Context.** `sceneBriefCheck.checkElementCoverage` shipped on 2026-09-12 in `4d169a6a3`, together

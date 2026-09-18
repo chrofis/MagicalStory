@@ -1001,7 +1001,14 @@ async function iterateCover(coverKey, storyData, options = {}) {
         const clothingText = sh.buildIdentityClothingText(
           c, coverClothingByName[name], artStyleId, storyData.clothingRequirements || null,
           { label: `${coverKey} ` });
-        return { name, description: sh.buildIdentityLine(c, clothingText) };
+        // `clothing` as its own field for the same reason as the page builders:
+        // the SoM prompt's sanitized tier strips "Wearing:…" from the description
+        // and rebuilds the wardrobe from it, so without this a cover that falls
+        // to that tier sends every figure out undressed. A cover hint carries no
+        // per-character placement, so `position` is whatever the character
+        // itself declares — null for the ordinary case, never a fabricated one.
+        return { name, description: sh.buildIdentityLine(c, clothingText), clothing: clothingText,
+          position: c.position || null };
       });
     };
 

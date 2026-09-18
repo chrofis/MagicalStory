@@ -58,7 +58,12 @@ function buildPageCast({
     const clothingText = sh.buildIdentityClothingText(
       c, clothing[name], style, storyData?.clothingRequirements || null, { label },
     );
-    return { name, description: sh.buildIdentityLine(c, clothingText) };
+    // Same two fields the generation-time builder supplies: `clothing` because
+    // the SoM prompt's sanitized tier rebuilds the wardrobe from it, `position`
+    // because it is the only cue that survives a figure drawn in the wrong
+    // clothes and hair. See the note at the iterate builder in images.js.
+    return { name, description: sh.buildIdentityLine(c, clothingText), clothing: clothingText,
+      position: sceneMetadata?.characterPositions?.[name] || c.position || null };
   }).filter(c => c.name);
 
   // Story-invented people (VB secondaries, animals). Without these the detector
@@ -78,7 +83,8 @@ function buildPageCast({
     const clothingText = ch
       ? sh.buildIdentityClothingText(ch, clothing[requiredName], style, storyData?.clothingRequirements || null, { label })
       : '';
-    expected.push({ name: requiredName, description: ch ? sh.buildIdentityLine(ch, clothingText) : '' });
+    expected.push({ name: requiredName, description: ch ? sh.buildIdentityLine(ch, clothingText) : '', clothing: clothingText,
+      position: sceneMetadata?.characterPositions?.[requiredName] || ch?.position || null });
   }
 
   // ONE ROSTER (2026-09-13). Membership is buildExpectedCastBlock's answer for
