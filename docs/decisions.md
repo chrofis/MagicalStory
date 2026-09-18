@@ -7,6 +7,20 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## Title (one sentence verdict)
+**Context:**   what problem / constraint led here
+**Decision:**  what we actually do
+**Rationale:** why we picked this over the alternative
+**Touched:**   files that implement the decision
+**Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
+```
+
+Append new entries at the bottom of the matching section. Don't rewrite
+history — if a decision is reversed, add a new entry marking the old one
+superseded and link forward.
+
+---
+
 ## 2026-09-18 — A declared-off garment is identified by its Visual Bible element, not by a noun vocabulary; and a slot the writer invented no longer pre-empts that route
 
 **Context.** `server/lib/wornItems.js` removes one clause from a character's outfit contract when a
@@ -1615,13 +1629,6 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 `prompts/story-unified-imagefirst.txt`, `tests/unit/risk-framing-rule-reach.test.ts`.
 **Status:** ✅ active — no corpus run yet (no paid calls were authorised for this change).
 
-## Title (one sentence verdict)
-**Context:**   what problem / constraint led here
-**Decision:**  what we actually do
-**Rationale:** why we picked this over the alternative
-**Touched:**   files that implement the decision
-**Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
-```
 
 ## 2026-09-18 — A split may SHORTEN a state delta, never replace it; and the appearance guard's look-half was never the thing that fixed it
 
@@ -3862,11 +3869,6 @@ because both had a prose rule that the model ignored.
 `tests/unit/iterate-budget-and-page-range.test.ts`, `tests/unit/built-prompt-values.test.ts`,
 `tests/unit/iterate-cast-writeback.test.ts`.
 
-Append new entries at the bottom of the matching section. Don't rewrite
-history — if a decision is reversed, add a new entry marking the old one
-superseded and link forward.
-
----
 
 ## A reference-cell claim resolves from the citation UNION, not from `objects[]` alone (2026-09-14)
 
