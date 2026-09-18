@@ -123,12 +123,33 @@ function findVbEntryById(visualBible, id) {
 /**
  * Which outfit slot a VB element belongs to, from its own NAME.
  *
- * Read the SLOT_NOUNS caveat above: this never decides whether something is
- * clothing and never decides a state — the Art Director has already DECLARED
- * this id as a worn item of a named owner, and the only open question is which
- * clause of that owner's outfit text the declaration is about. When the name
- * matches nouns from more than one slot, or from none, the answer is null and
- * the caller must treat the item as unmappable rather than guess.
+ * WHAT THIS IS NOT (corrected 2026-09-18 — the previous note here was wrong and
+ * the error mattered). It used to claim the caller has always pre-filtered to an
+ * id the Art Director declared worn, so the function "never decides whether
+ * something is clothing". Three of its six call sites do no such thing: they
+ * sweep RAW Visual Bible pools and this regex is the only thing standing between
+ * a prop and an outfit slot —
+ *   - `unlinkedWornCandidates` below (every unlinked artifact/clothing/vehicle);
+ *   - `clothingCheck.bibleEntrySlot` (every artifact/clothing entry);
+ *   - `coverIterate`'s `artifactMeta` (every artifact).
+ * Two more pass an outfit CLAUSE rather than a name (`clothingCheck` line ~637,
+ * `coverIterate` line ~407), against the paragraph below.
+ *
+ * So it DOES decide, and it is wrong on names where a slot noun is not the
+ * garment: measured over 937 stored staging elements it derives a slot for 64,
+ * and 4 of those are props — "bottle cap" and "Gessler's hat pole" land in
+ * headwear, "Knotted sash line" in belt/waist (jobs job_1788551692337_bc479p945
+ * ART004, job_1785513128428_fw26s7r7y ART003, job_1777923092665_wkhxd3mg9
+ * ART001, job_1789207854566_l43qgl34w ART007). None of the four reached a
+ * consumer — every call site applies a second gate — so the measured shipped
+ * damage is zero, but the matcher is not the safe lookup this note used to
+ * promise. The standing proposal is to have the writer/Art Director emit the
+ * slot as a closed enum and retire the regex; until that is ruled on, a DECLARED
+ * `type` always wins over this (see `slotFromType`, and source 2 of
+ * `resolveWornItemsForPage`).
+ *
+ * When the name matches nouns from more than one slot, or from none, the answer
+ * is null and the caller must treat the item as unmappable rather than guess.
  *
  * The NAME only, never the description: a description ("a scarf-sized square of
  * cloth she ties over her hair") can carry nouns from slots the item is not in.
@@ -285,11 +306,12 @@ function resolveWearer({ id, owner, declaredWearer, state, location, castNames, 
  *     garment and every judge kept demanding it.
  *
  *     A declared row is itself authoritative: it names the id AND the owner.
- *     What it does not name is the outfit SLOT, which is derived from the VB
- *     entry's own name through the closed SLOT_NOUNS vocabulary. When no single
- *     slot can be derived the item is UNMAPPABLE — it is left out and, if the
- *     row declared it `off`, logged as an error. Silence here is what made this
- *     bug invisible for a day.
+ *     What it does not name is the outfit SLOT, which comes from the VB entry's
+ *     own declared `type` when that IS a slot, and only otherwise from its name
+ *     through the closed SLOT_NOUNS vocabulary. When neither yields a single
+ *     slot the item is UNMAPPABLE — it is left out and, if the row declared it
+ *     `off`, logged as an error. Silence here is what made this bug invisible
+ *     for a day.
  *
  * `state` is always one of 'worn' | 'off'. Source-2 items are never `missing`:
  * they were declared, and the `removal_unstated` check's scope stays exactly
@@ -355,7 +377,18 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
     const found = findVbEntryById(visualBible, d.id);
     const entry = found ? found.entry : null;
     const owner = String((entry && entry.wornBy) || d.owner || '').trim();
-    const slot = entry ? deriveSlotFromName(entry.name || entry.id) : null;
+    // DECLARED TYPE FIRST (2026-09-18). `unlinkedWornCandidates` has always read
+    // `slotFromType(entry.type) || deriveSlotFromName(entry.name)`; this path —
+    // the one that actually strips and swaps a rendered outfit line — read the
+    // name regex alone, so the same element could be slotted two different ways
+    // by two functions in this file. The declaration is the Art Director's own
+    // word for what the element IS; the regex is a guess at English made from
+    // its label, and it is the guess that mis-slots props (see
+    // deriveSlotFromName). Over every stored staging/prod story the two never
+    // disagreed (0 of 937 + 777 elements), so this changes no shipped outfit —
+    // it removes the fork, and puts the declared field in front of the regex on
+    // the path where a wrong slot deletes a garment.
+    const slot = entry ? (slotFromType(entry.type) || deriveSlotFromName(entry.name || entry.id)) : null;
     if (!entry || !owner || !slot) {
       // Loud, and only for the state that silently changes nothing downstream:
       // an `off` the resolver cannot map leaves the garment in the generator's
@@ -365,7 +398,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
         const why = !entry
           ? 'no Visual Bible element carries that id'
           : (!owner ? 'the element names no wearer and the row names no owner'
-            : `no single outfit slot can be derived from its name "${entry.name || entry.id}"`);
+            : `its type "${entry.type || ''}" is not an outfit slot and no single slot can be derived from its name "${entry.name || entry.id}"`);
         log.error(`[WORN] Page ${pageLabel}: ${d.id} is declared "off" but cannot be mapped to an outfit — ${why}. `
           + `Nothing is stripped: the image model is still told to draw it and every clothing judge still demands it.`);
       }
