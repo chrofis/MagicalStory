@@ -108,10 +108,16 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
     pairedOn: evs.every(e => e.on === 'body') ? 'body' : 'face',
     compared,
     agreed: agreed.length,
-    // The names both sides already landed on the same figure. A rename may
-    // never target one of these: that name is taken, and handing it to a
-    // second figure fabricates a duplicate (see buildRenameMap).
+    // The names both sides already landed on the same figure.
     agreedNames: agreed.slice(),
+    // EVERY name this evaluation currently has on a figure — agreed, contested,
+    // unpaired, and the box-less matches the pairing above never looked at. A
+    // rename may not target one of these unless its holder is renamed away in
+    // the same pass: the name is taken, and handing it to a second figure
+    // fabricates a duplicate and erases somebody (see buildRenameMap). Taken
+    // from the raw matches, not from `evs`, because the rename rewrites the raw
+    // matches — a holder the pairing skipped still holds its name.
+    heldNames: (evalMatches || []).map(m => m && m.reference).filter(Boolean).map(String),
     conflicts,
     unpaired: unpaired.length > 0 ? unpaired : undefined,
     // The names the two sides disagree about. A per-character finding naming one
@@ -144,37 +150,57 @@ function describeIdentityAgreement(report, pageLabel = '') {
  * the same way twice over, and renaming would fabricate a duplicate. Those stay
  * flagged and uncorrected.
  *
- * A name is equally taken when an AGREED match already holds it. The pairing
- * above is greedy nearest-centre with no mutual exclusion, so two evaluator
- * figures can both land on one detector figure: one agrees, the other becomes a
- * conflict pointing at the name the first already owns. Applying that rename
- * writes the same name onto two matches and erases the evaluator's other name
- * from the page — and every finding about the erased character is then
- * relabelled onto a character the spec never cast in that role. Measured on
- * staging job_1789348171785_9oxos7dwv p7: one evaluator name was renamed onto a
- * name an agreed match already held, the original name vanished from `matches[]`
- * entirely, and its CRITICAL finding shipped attributed to the wrong child.
+ * A name is equally taken when ANY OTHER MATCH already holds it — agreed,
+ * unpaired, or box-less. The pairing above is greedy nearest-centre with no
+ * mutual exclusion, so two evaluator figures can land on one detector figure:
+ * one agrees, the other becomes a conflict pointing at the name the first
+ * already owns. And a name the pairing never even reached — the detector never
+ * assigned it, the nearest figure was too far, the match carries no box — is
+ * still written on a figure this map is about to rewrite. Applying such a
+ * rename writes one name onto two matches and erases the other from the page,
+ * and every finding about the erased character is then relabelled onto a
+ * character the spec never cast in that role. Measured on staging
+ * job_1789348171785_9oxos7dwv p7 (an AGREED holder) and on
+ * job_1787436913379_mfedxinwqd p4 (an UNPAIRED holder, on a page where nothing
+ * agreed at all): the original name vanished from `matches[]` entirely and its
+ * findings shipped attributed to the wrong child.
+ *
+ * So the rule is one rule, not a list of holder kinds: a rename must leave every
+ * name on exactly one figure. A target is available only when nobody holds it,
+ * or when its holder is itself being renamed away in this same pass — which is
+ * what makes a two-name swap, and any longer cycle or chain, lossless. Held
+ * names are compared through `canonicalName`, the space the pairing above
+ * decided agreement in, so a title or a diacritic cannot hide a duplicate.
  *
  * @param {Array} conflicts
- * @param {Array<string>} [agreedNames] names already assigned by agreeing matches
+ * @param {Array<string>} [heldNames] every name this evaluation has on a figure
  * @returns {Map<string,string>|null} lowercased evaluator name → detector name
  */
-function buildRenameMap(conflicts, agreedNames = []) {
+function buildRenameMap(conflicts, heldNames = []) {
+  const { canonicalName } = require('./castResolver');
   const map = new Map();
   for (const c of conflicts) {
     const from = String(c.evaluator).toLowerCase();
     if (map.has(from) && map.get(from) !== c.detector) return null; // one name, two verdicts
     map.set(from, c.detector);
   }
-  const targets = new Set([...map.values()].map(v => v.toLowerCase()));
-  if (targets.size !== map.size) return null;                       // two names, one verdict
 
-  // A target already held by an agreeing match is taken. The only way that is
-  // still a clean permutation is if that holder is itself being renamed away in
-  // the same map — a true swap. Otherwise the rename would duplicate it.
-  for (const held of agreedNames) {
-    const lower = String(held).toLowerCase();
-    if (targets.has(lower) && !map.has(lower)) return null;         // target already taken
+  // The names that will still be on a figure after this map is applied. A
+  // holder keyed in the map is renamed away, so it vacates its name — tested on
+  // the lowercased key the rename itself uses, because a name this map will not
+  // actually rewrite has not actually been vacated.
+  const taken = new Set();
+  for (const held of heldNames) {
+    if (map.has(String(held).toLowerCase())) continue;              // renamed away
+    const canon = canonicalName(held);
+    if (canon) taken.add(canon);
+  }
+  // Each target must land on free ground — and then it occupies it, which is
+  // also how two conflicts pointing at one name are refused.
+  for (const to of map.values()) {
+    const canon = canonicalName(to);
+    if (taken.has(canon)) return null;                              // target already taken
+    taken.add(canon);
   }
   return map;
 }
@@ -205,7 +231,7 @@ function reconcileIdentity(evalLike, detFigures, opts = {}) {
   const report = checkIdentityAgreement(evalLike?.matches, detFigures, opts);
   if (!report || report.conflicts.length === 0) return report;
 
-  const map = buildRenameMap(report.conflicts, report.agreedNames || []);
+  const map = buildRenameMap(report.conflicts, report.heldNames || []);
   if (!map) {
     report.uncorrectable = true;   // not a clean swap — flag it, touch nothing
     report.renamed = 0;
