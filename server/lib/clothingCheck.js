@@ -15,13 +15,19 @@
  * for the scene review to fix (owner decision 2026-08-08: findings go to the
  * scene review, and nowhere else).
  *
- * Three findings, in the order they matter:
+ * Four findings, in the order they matter:
  *   outfit_missing       the prose never names this character's outfit
- *   outfit_misattributed a garment of character A appears on character B
+ *   garment_colour_wrong the prose gives a character's garment a colour their
+ *                        contract gives the SAME garment differently
  *   removal_unstated     a wornAs item whose owner is on the page has no
  *                        `wornItems` state (or an "off" state with no place)
  *   worn_link_missing    a Visual Bible element that is clearly a worn garment
  *                        carries no `wornAs` link, so nothing above can see it
+ *
+ * A fifth, `outfit_misattributed`, lived here from 2026-08-08 to 2026-09-18 and
+ * is DELETED — see the block above REVIEWABLE. It decided from prose that one
+ * character had been put in another's clothes, which is a language judgement;
+ * the rule now lives in prompts/scene-review.txt as `[clothing_owner]`.
  *
  * Deliberately NOT a fixer. It reports; the review rewrites; the caller re-runs
  * it afterwards and logs whatever survived rather than shipping it silently.
@@ -45,11 +51,13 @@ const STOPWORDS = new Set([
   'none', 'slot', 'chest', 'waist', 'shoulder', 'sleeve', 'sleeves', 'cotton', 'linen',
 ]);
 
-// A word only attributes an outfit if it NAMES A GARMENT. Colours, materials
-// and shapes do not: "The open buried treasure chest — dark brown planks …
-// spilling round coins — lies in front of Hans" tripped the misattribution rule
-// because "open", "brown" and "round" each happen to appear in exactly one
-// character's outfit (Lab #451, p13). A chest is not clothing.
+// The garment vocabulary: which nouns name a thing worn on a body. `colourBefore`
+// walks it to find the colour a garment carries, `contractPairs` builds the
+// (garment, colour) contract from it, and `deriveSlotFromName` in wornItems has
+// its own for slots. A word here is a garment; a colour, material or shape is
+// not one and never stands in for one — an object described in a page's prose
+// ("dark brown planks … round coins") shares those words with every wardrobe in
+// the story and attributes nothing.
 const GARMENT_NOUNS = new Set([
   'shirt', 'blouse', 'coat', 'jacket', 'vest', 'waistcoat', 'cardigan', 'jumper', 'sweater',
   'hoodie', 'tunic', 'dress', 'skirt', 'trousers', 'pants', 'shorts', 'breeches', 'jeans',
@@ -105,9 +113,10 @@ function contractPairs(parts) {
   return pairs;
 }
 
-// The sentence must ATTACH the clothing to the character, not merely mention
-// their name. "To Hans's right sits Noah — in his white linen shirt" describes
-// Noah; Hans is only a landmark.
+// Prose only states an outfit where it ATTACHES clothing to a body. Rule 3
+// reads a colour only inside a window that carries one of these — a window that
+// merely names a character, without dressing anyone, states no garment colour to
+// disagree with.
 const ATTACHES = /\b(wearing|wears|dressed in|clad in|in (?:his|her|their|a|an|the))/i;
 
 /** Significant lowercase tokens (≥4 chars, not stopwords). */
@@ -201,106 +210,45 @@ function checkPage(page, clothingRequirements, opts = {}) {
     }
   }
 
-  // The page's worn rows, resolved once: the misattribution rule below needs
-  // them (an item legitimately handed to another character must not read as
-  // borrowed clothing) and the removal check further down reads the same list.
+  // The page's worn rows, resolved once: the removal check further down reads
+  // this list.
   const vbForWorn = opts.visualBible || { artifacts: opts.artifacts || [], clothing: opts.clothing || [] };
   const wornRows = resolveWornItemsForPage(vbForWorn, cast, { wornItems: page.wornItems || [] }, { pageNumber: page.pageNumber });
-  // Words that belong to an item THIS character is declared to be wearing this
-  // page, even though the story-level outfit files it under its owner. Without
-  // this, the correct rendering of a handover is reported as a garment of A
-  // appearing on B — the one check that would fire on exactly the right page.
-  const licensedWords = new Map();   // wearer -> Set(words)
-  for (const r of wornRows) {
-    if (r.state !== 'worn' || !r.handedOver) continue;
-    const set = licensedWords.get(r.wearer) || new Set();
-    for (const w of tokens(`${r.name || ''} ${(r.entry && (r.entry.description || r.entry.extractedDescription)) || ''}`)) set.add(w);
-    for (const n of (SLOT_NOUNS[r.slot] || [])) if (new RegExp(`\\b${n}\\b`, 'i').test(String(r.name || ''))) set.add(n);
-    licensedWords.set(r.wearer, set);
-  }
 
-  // 2. outfit_misattributed — a garment belonging to A is described on B.
-  // Only slots distinctive enough to be identifiable are tested, and only when
-  // the owner is NOT on this page or is not the one the prose attaches it to.
-  // Tokens shared by two or more characters on this page cannot attribute
-  // anything — matching pirate crews wear the same striped shirts, and a shared
-  // word then "proves" every character is wearing everyone else's clothes.
-  // Measured: without this, one 4-page story produced 28 misattributions.
-  const tokenOwners = new Map();
-  for (const [owner, { parts }] of outfits) {
-    for (const part of parts) {
-      for (const w of tokens(part.text)) {
-        if (!tokenOwners.has(w)) tokenOwners.set(w, new Set());
-        tokenOwners.get(w).add(owner);
-      }
-    }
-  }
-  const distinctive = (w) => (tokenOwners.get(w)?.size || 0) === 1;
-  // THE OWNER MUST BE NAMED IN THIS PAGE'S PROSE. Everything below concludes
-  // "these words describe `other`, not `owner`" from exactly one fact: the
-  // sentence carries `other`'s name and not `owner`'s. When `owner` is not on
-  // the page under their name at all, that test is vacuous — every sentence
-  // passes it, INCLUDING the one that describes the owner themselves — and the
-  // ATTACHES rule above ("Hans is only a landmark") is left proving nothing,
-  // because it only shows that SOMEBODY's clothing is attached in the sentence.
+  // 2. DELETED 2026-09-18 — `outfit_misattributed`, "a garment belonging to A is
+  // described on B". It read the page's PROSE and decided, from token overlap
+  // against the story's wardrobe text, that one character had been put in
+  // another's clothes. That is a language judgement, and the owner's rule is
+  // that language belongs in the prompt, not in code: the rule now lives in
+  // prompts/scene-review.txt as check 3c `[clothing_owner]` (same ruling, same
+  // week, as the `element_uncited` removal in ea8e36198).
   //
-  // The Art Director routinely writes a figure by appearance rather than by
-  // name ("the preschooler little girl of average build … wearing a red
-  // quilted gilet"), so this is the normal case, not an edge one. MEASURED
-  // over the 941 stored staging brief pages: of the 9 findings this rule ever
-  // sent to the scene review, 6 had the owner's name nowhere in the page prose
-  // — staging job_1788681313413_xqmtk2gcs p9/p11/p12/p14 and
-  // job_1789147573901_m3uam0nxi p6 (twice) — and every one of those 6 faulted
-  // a page whose clothing was correct, naming a sentence that describes a
-  // third figure. Each cost a mandatory page rewrite: the scene review's
-  // check 0 forbids re-judging a mechanical fault.
-  const namedInProse = (name) => new RegExp(`\\b${String(name).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(prose);
-
-  for (const [owner, { parts }] of outfits) {
-    if (!namedInProse(owner)) continue;
-    for (const part of parts) {
-      const t = [...tokens(part.text)].filter(distinctive);
-      if (t.length < 3) continue;
-      for (const other of cast) {
-        if (other === owner) continue;
-        // "<Other> … <≥3 of owner's slot tokens>" inside one sentence.
-        const sentences = prose.split(/(?<=[.!?])\s+/);
-        for (const sentence of sentences) {
-          if (!new RegExp(`\\b${other.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(sentence)) continue;
-          if (new RegExp(`\\b${owner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(sentence)) continue;
-          if (!ATTACHES.test(sentence)) continue;
-          const st = tokens(sentence);
-          const licensed = licensedWords.get(other) || null;
-          const matched = t.filter(w => st.has(w) && !(licensed && licensed.has(w)));
-          // At least one match must be a garment noun — otherwise the "evidence"
-          // is colours and shapes that belong to no one in particular.
-          if (!matched.some(w => GARMENT_NOUNS.has(w))) continue;
-          const hits = matched.length;
-          if (hits >= 3) {
-            // WORD THE FAULT AS THE FIX. The first version said "the prose puts
-            // Sarah's blouse on Hans" — and Hans was not wearing a blouse, he was
-            // wearing a burgundy COAT. The reviewer looked for a blouse, found
-            // none, and left it (Lab #446: 14 pages rewritten, 0 faults fixed).
-            // What is actually wrong is that words belonging only to another
-            // character's outfit appear on this one, so name those words and
-            // state this character's own outfit as the replacement.
-            const borrowed = matched;
-            const ownOutfit = outfits.get(other);
-            const ownText = ownOutfit ? ownOutfit.parts.map(x => (x.slot ? `${x.slot}: ` : '') + x.text).join('; ') : null;
-            findings.push({
-              pageNumber: page.pageNumber, type: 'outfit_misattributed', character: other, slot: part.slot,
-              detail: `${other} is described with wording that belongs to ${owner}'s outfit (${borrowed.map(w => `"${w}"`).join(', ')}). `
-                + (ownText
-                  ? `Rewrite ${other}'s description to their own outfit: ${ownText}. `
-                  : `${other} has no outfit of their own in this story — say nothing about their clothing. `)
-                + `Do not reuse any of ${owner}'s garments or colours on ${other}.`,
-            });
-            break;
-          }
-        }
-      }
-    }
-  }
+  // MEASURED before removal, over all 120 stored staging stories / 1,322 brief
+  // pages (the 70 stories that kept `sceneReviewReport.briefsIn` replayed from
+  // the exact pre-review briefs the check ran on): 9 fires on staging, 9 FALSE,
+  // 0 true. In PRODUCTION it never fired at all. Every fire cost a mandatory
+  // rewrite of a correct page — scene-review check 0 forbids declining a
+  // mechanical finding ("facts, not opinions") — and a rewritten brief becomes
+  // the image prompt, so each one changed a picture.
+  //
+  // Three false-fire mechanisms, none of them tunable:
+  //   - The attribution test was vacuous whenever the owner was not named in
+  //     the prose: the Art Director routinely writes a figure by appearance
+  //     ("the preschooler little girl … wearing a red quilted gilet"), and then
+  //     every sentence passes "carries `other`'s name and not `owner`'s",
+  //     INCLUDING the one describing the owner. 6 of the 9 were this shape.
+  //     e1bd11014 narrowed it with a `namedInProse` precondition the same day;
+  //     this deletion supersedes that stopgap.
+  //   - The evidence was gathered per SENTENCE, split on `/(?<=[.!?])\s+/`,
+  //     which cuts a character description at a `.` inside a parenthetical and
+  //     hands half a figure's clothing to whoever is named in the other half.
+  //   - Colour words counted toward the ≥3-token evidence threshold although
+  //     this file's own GARMENT_NOUNS comment says colours attribute nothing:
+  //     only ONE of the three matches had to be a garment noun, so "brown" out
+  //     of "brown eyes" was evidence that a garment had moved.
+  // The first two die with the rule. The colour-word reading survives in
+  // `colourBefore`, which rule 3 below uses on a different basis — per garment,
+  // inside one character's own window — and is not this defect.
 
   // 3. garment_colour_wrong — the prose gives a character's garment a colour
   // their contract gives the SAME garment differently. The five-identical-robes
@@ -418,8 +366,13 @@ function checkScenes(pages, clothingRequirements, opts = {}) {
 
 // Which findings are worth a reviewer's time. MEASURED over the 25 most recent
 // staging stories, not assumed:
-//   outfit_misattributed — fires on the two worst stories (avg 11 and 17) and
-//     is silent on every story scoring ≥60. Real signal. SENT.
+//   outfit_misattributed — was SENT from 2026-08-08 to 2026-09-18 on the claim
+//     that it "fires on the two worst stories and is silent on every story
+//     scoring ≥60". A full replay over all 120 stored staging stories found 9
+//     fires, 9 of them false and none in production, each one costing a
+//     mandatory rewrite of a correct page. DELETED, not demoted — see the
+//     block where rule 2 used to run. `[clothing_owner]` in scene-review.txt
+//     is the replacement.
 //   removal_unstated     — rare and unambiguous by construction (it needs a
 //     `wornAs` link, which only exists where the writer declared the duality).
 //     Since 2026-09-06 it is a MISSING-FIELD fault, so it is also mechanically
@@ -433,7 +386,7 @@ function checkScenes(pages, clothingRequirements, opts = {}) {
 //     review rewrites pages and cannot add a field to the bible, so sending it
 //     would ask for a fix the reviewer has no way to make. Reported and LOGGED
 //     (checkScenes) so the miss is on the record, NOT sent.
-const REVIEWABLE = new Set(['outfit_misattributed', 'removal_unstated']);
+const REVIEWABLE = new Set(['removal_unstated']);
 
 /** Render findings as the {CLOTHING_FINDINGS} block for scene-review.txt. */
 function renderFindingsBlock(byPage) {
@@ -453,7 +406,7 @@ function renderFindingsBlock(byPage) {
     '',
     ...lines,
     '',
-    'For each page above: move the garment onto its rightful owner, or state the outfit the fault says is missing. Change nothing else on the page.',
+    'For each page above: make the change the fault asks for, in the field it names, with the prose agreeing. Change nothing else on the page.',
   ].join('\n');
 }
 

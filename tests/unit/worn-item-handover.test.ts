@@ -97,46 +97,16 @@ describe('GAP 2 — the item changes hands', () => {
     expect(text).toMatch(/coat/i);
   });
 
-  it('does not flag the true wearer as outfit_misattributed', () => {
-    const f = checkPage(page({ wornItems: handover }), reqs, { visualBible: { artifacts: [CAP] } });
-    expect(f.filter((x: any) => x.type === 'outfit_misattributed')).toHaveLength(0);
-  });
-
-  // MEASURED, not assumed. With this story's own words the misattribution rule
-  // is silent either way: its evidence tokens are ≥4 characters, and the
-  // garment noun here is "cap". Pinned so a future widening of that vocabulary
-  // cannot start faulting the correct render unnoticed.
-  it('is silent on this story either way — the garment noun is too short to be evidence', () => {
-    expect(checkPage(page(), reqs, { visualBible: { artifacts: [CAP] } })
-      .filter((x: any) => x.type === 'outfit_misattributed')).toHaveLength(0);
-  });
-
-  // The same handover with a garment noun the rule CAN see: without the row it
-  // reads as Sarah's jacket on Emma; with the row it is the correct render.
-  const JACKET = { id: 'ART005', name: "navy-blue wool captain's jacket", type: 'outerwear', wornAs: 'Sarah.outer layer', appearsInPages: [14] };
-  const jacketPage = (extra: any = {}) => page({
-    prose: "Sarah leans over the railing in her black leather boots. Emma stands beside the bollard, wearing the long navy-blue wool captain's jacket with its gold anchor buttons.",
-    ...extra,
-  });
-  const jacketReqs = {
-    ...reqs,
-    Sarah: { costumed: { used: true, costume: 'pirate', description: "A long navy-blue wool captain's jacket with gold anchor buttons, black trousers, black leather boots" } },
-  };
-
-  it('WOULD flag the true wearer without a handover row', () => {
-    const mis = checkPage(jacketPage(), jacketReqs, { visualBible: { artifacts: [JACKET] } })
-      .filter((x: any) => x.type === 'outfit_misattributed');
-    expect(mis.length).toBeGreaterThan(0);
-    expect(mis[0].character).toBe('Emma');
-  });
-
-  it('does NOT flag the true wearer once the row names her', () => {
-    const mis = checkPage(
-      jacketPage({ wornItems: [{ id: 'ART005', owner: 'Sarah', state: 'worn', wearer: 'Emma' }] }),
-      jacketReqs, { visualBible: { artifacts: [JACKET] } },
-    ).filter((x: any) => x.type === 'outfit_misattributed');
-    expect(mis).toHaveLength(0);
-  });
+  // The handover's OTHER consumer was `outfit_misattributed`, whose
+  // `licensedWords` exemption existed so a correctly-rendered handover did not
+  // read as a garment of one character on another. That rule was DELETED on
+  // 2026-09-18 (clothingCheck rule 2; the judgement moved to
+  // prompts/scene-review.txt check 3c `[clothing_owner]`), and the exemption
+  // went with it — there is no longer a code finding for the handover to be
+  // exempt from. Four cases here pinned that pairing and are gone with it; see
+  // tests/unit/clothing-owner-rule-removed.test.ts. What the handover still
+  // drives is pinned above and below: the resolved row, the worn-state lines,
+  // the owner's stripped outfit, and `removal_unstated`.
 
   it('still faults the owner with no state at all', () => {
     const f = checkPage(page(), reqs, { visualBible: { artifacts: [CAP] } });
