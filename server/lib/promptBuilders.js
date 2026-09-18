@@ -12,7 +12,10 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
-const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
+// significantEntityTokens is NOT imported here any more: its only consumer in
+// this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
+// exported from visualBible.js for coverIterate.js, which still uses it.
+const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_DEFINITIONS } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
@@ -3405,67 +3408,29 @@ function collectSecondaryCastForPage(visualBible, metadata, sceneCharacters, ref
 // 2026-07-31). A garment the scene holds/drops must not ALSO be described as
 // worn ("tied around his neck" + "held overhead in his hands" is unpaintable —
 // the model draws the item twice).
+//
+// REMOVED 2026-09-18: NON_WORN_STRONG_RE / NON_WORN_WEAK_RE /
+// BODY_ANCHORED_DRAPE_RE / textDeclaresNonWornPlacement /
+// sceneDeclaresNonWornState — the PROSE half of that guard. It INFERRED the
+// off-body state by sieving the brief's prose and interactions[] for verbs
+// that sounded off-body. Measured over 247 stored stories (staging + prod):
+// it fired on 68.5% / 56.9% of every element a brief cites, 96% of those on an
+// entry that can never be worn (an animal, a vehicle, a plain prop), 14 fires
+// directly contradicting an explicit `wornItems: state:"worn"` row the Art
+// Director wrote — precision against declared `off` rows 0.73% / 0.18%. Its
+// one surviving effect was a ≤6-word lead label (REQUIRED OBJECTS has been
+// name-only since 2026-09-02), and that label came out identical in all 1,905
+// fires: zero shipped damage. The same function was already deleted from its
+// other consumer on 2026-08-08 (5f174cba5, filterWornClothingAgainstScene).
+//
+// The state is now DECLARED, never inferred, exactly as server/lib/wornItems.js
+// says: the Art Director writes a `wornItems` row (GARMENT_REMOVED_RULE is
+// filled into all four brief templates), `placedElsewhere` below reads only
+// that row's `state: "off"`, and clothingCheck's `removal_unstated` reports a
+// page that omits the row. The cover sibling reached the same shape from the
+// other side on 2026-09-15: its verdict rides declared slot identity, never a
+// verb regex. docs/decisions.md 2026-09-18.
 // ============================================================================
-
-// Placement wording that means an item is NOT worn on the body: held/carried/
-// waved, lying/dropped on a surface, or explicitly removed.
-const NON_WORN_STRONG_RE = /\b(?:held|holds?|holding|clutch(?:es|ed|ing)?|grip(?:s|ped|ping)?|carr(?:y|ies|ied|ying)|wav(?:es|ed|ing)|swing(?:s|ing)?|brandish(?:es|ed|ing)?|overhead|in\s+(?:his|her|their|both|one)\s+hands?|l(?:ies|ying)|lays?|laid|crumpled|dropp(?:ed|ing)|drops?|on\s+the\s+(?:ground|floor|grass|sand|bench|chair|bed|rock|table)|tak(?:es|en|ing)\s+off|took\s+off|pull(?:s|ed|ing)\s+off|remov(?:es|ed|ing)|without\s+(?:the|his|her|their))\b/i;
-// draped / hangs / slung are off-body ONLY when not anchored to a body part
-// ("cape draped over his shoulders" is worn; "cape draped over the chair" is not).
-const NON_WORN_WEAK_RE = /\b(?:drap(?:es|ed|ing)|hangs?|hanging|hung|slung)\b/i;
-const BODY_ANCHORED_DRAPE_RE = /\b(?:drap(?:es|ed|ing)|hangs?|hanging|hung|slung)\b[^.;]{0,50}\b(?:shoulders?|neck|waist|head|back|hips?|arms?|torso|chest|body)\b/i;
-
-function textDeclaresNonWornPlacement(text) {
-  const t = String(text || '');
-  if (!t) return false;
-  if (NON_WORN_STRONG_RE.test(t)) return true;
-  return NON_WORN_WEAK_RE.test(t) && !BODY_ANCHORED_DRAPE_RE.test(t);
-}
-
-/**
- * Does the scene place this VB entry somewhere other than ON a body?
- * Checks the structured interactions[] first (VB id match or token overlap),
- * then the prose sentences (token overlap + non-worn placement wording).
- * Overlap rule = the cover dedupe's: ≥2 shared significant tokens, or ≥1
- * token from the entry NAME (names are short and specific).
- *
- * Cross-language caveat: token matching cannot bridge a story-language entry
- * ("Roter Umhang") against English prose ("red cape") — that gap is closed at
- * the ROOT by the VB language rule (English name + description for
- * artifacts/locations/vehicles/clothing — prompts/scene-expansion-all.txt:140).
- */
-function sceneDeclaresNonWornState(entry, proseText, interactions) {
-  const nameTokens = significantEntityTokens(entry?.name);
-  const allTokens = new Set([
-    ...nameTokens,
-    ...significantEntityTokens(entry?.extractedDescription || entry?.description),
-  ]);
-  if (allTokens.size === 0) return false;
-  const entryId = String(entry?.id || '').toUpperCase();
-  const overlaps = (text) => {
-    const tokens = significantEntityTokens(text);
-    let overlap = 0;
-    let nameHit = false;
-    for (const t of tokens) {
-      if (allTokens.has(t)) overlap++;
-      if (nameTokens.has(t)) nameHit = true;
-    }
-    return overlap >= 2 || nameHit;
-  };
-  for (const i of (Array.isArray(interactions) ? interactions : [])) {
-    if (!i || typeof i !== 'object') continue;
-    const combined = `${i.object || ''} ${i.where || ''}`;
-    const idHit = entryId && combined.toUpperCase().includes(entryId);
-    if (!idHit && !overlaps(combined)) continue;
-    if (textDeclaresNonWornPlacement(combined)) return true;
-  }
-  const sentences = String(proseText || '').split(/(?<=[.!?])\s+|\n+/);
-  for (const s of sentences) {
-    if (!overlaps(s)) continue;
-    if (textDeclaresNonWornPlacement(s)) return true;
-  }
-  return false;
-}
 
 // Attachment clauses ("tied at the neck", "fastened around her waist") inside
 // an object description contradict a scene that holds/drops the item. The
@@ -3504,8 +3469,10 @@ function stripWornStateFromDescription(description) {
  * writes "she is without the bandana, it lies in the chest". See
  * docs/decisions.md, 2026-08-08.
  *
- * sceneDeclaresNonWornState / stripWornStateFromDescription survive — the
- * REQUIRED OBJECTS path still uses them to describe an object's own state.
+ * stripWornStateFromDescription survives — the REQUIRED OBJECTS path still
+ * uses it to describe an object's own state, but only on the DECLARED
+ * `wornItems: state:"off"` branch. sceneDeclaresNonWornState, the prose half,
+ * followed this one out on 2026-09-18 (see the tombstone above it).
  */
 
 /**
@@ -4185,8 +4152,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // (held, draped over furniture, lying on the ground), the emitted
         // description must not contradict it — attachment clauses like "tied
         // at the neck" and the clothing "(worn by X)" suffix are dropped.
-        const placedElsewhere = (wornState && wornState.state === 'off')
-          || sceneDeclaresNonWornState(obj.entry, cleanSceneDescription, metadata?.interactions);
+        // DECLARED, never inferred: the Art Director's own `wornItems` row is
+        // the only signal. The prose matcher that used to sit in this
+        // disjunct was deleted 2026-09-18 — see the tombstone above.
+        const placedElsewhere = !!(wornState && wornState.state === 'off');
         const description = placedElsewhere ? stripWornStateFromDescription(obj.description) : obj.description;
         const wornSuffix = (obj.type === 'clothing' && obj.wornBy && !placedElsewhere)
           ? ` (worn by ${obj.wornBy})`
@@ -8585,11 +8554,6 @@ module.exports = {
   buildSceneExpansionAllPrompt,
   buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
-  NON_WORN_STRONG_RE,
-  NON_WORN_WEAK_RE,
-  BODY_ANCHORED_DRAPE_RE,
-  textDeclaresNonWornPlacement,
-  sceneDeclaresNonWornState,
   WORN_ATTACHMENT_CLAUSE_RE,
   stripWornStateFromDescription,
   buildImagePrompt,

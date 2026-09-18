@@ -15,8 +15,6 @@ process.chdir(path.join(__dirname, '..', '..'));
 
 const {
   buildImagePrompt,
-  textDeclaresNonWornPlacement,
-  sceneDeclaresNonWornState,
   stripWornStateFromDescription,
   sanitizeVbIdsInPrompt,
 } = require('../../server/lib/storyHelpers');
@@ -95,19 +93,9 @@ const referencePhotos = [{
 }];
 
 // ---- Low-level guards ----
-console.log('\n--- textDeclaresNonWornPlacement ---');
-check(textDeclaresNonWornPlacement('held overhead in both hands'), 'held overhead = off-body');
-check(textDeclaresNonWornPlacement('the cape lies crumpled on the ground'), 'lying on the ground = off-body');
-check(textDeclaresNonWornPlacement('the cape draped over the chair'), 'draped over furniture = off-body');
-check(!textDeclaresNonWornPlacement('the cape draped over his shoulders'), 'draped over shoulders = still worn');
-check(!textDeclaresNonWornPlacement('a red cape tied at the neck'), 'plain worn description = not off-body');
-
-console.log('\n--- sceneDeclaresNonWornState ---');
-const meta = JSON.parse(metadataJson);
-check(sceneDeclaresNonWornState(visualBible.clothing[0], prose, meta.interactions),
-  'cape (CLO001) detected as scene-placed off-body');
-check(!sceneDeclaresNonWornState(visualBible.artifacts[0], 'Hero wears the scissors charm on a cord', []),
-  'unrelated worn phrasing does not flag off-body');
+// textDeclaresNonWornPlacement / sceneDeclaresNonWornState were deleted
+// 2026-09-18: the page path reads the Art Director's declared `wornItems`
+// row instead of sieving prose for off-body verbs (docs/decisions.md).
 
 console.log('\n--- stripWornStateFromDescription ---');
 const stripped = stripWornStateFromDescription(visualBible.clothing[0].description);
@@ -167,7 +155,12 @@ check(/Flocke/.test(vbSection), 'animal keeps its given name in fallback section
   const reqSection = (prompt.match(/\*\*REQUIRED OBJECTS[\s\S]*?(?=\n\n)/) || [''])[0];
   console.log(`  required objects:\n${reqSection}`);
   check(!/tied at the neck|tied around/i.test(reqSection), 'REQUIRED OBJECTS omit the attachment clause for the held cape');
-  check(!/worn by/i.test(reqSection), 'no "(worn by …)" suffix for an off-body item');
+  // CHANGED 2026-09-18: this fixture's brief declares NO `wornItems` row — the
+  // off-body reading came only from the prose ("holding … overhead"), and the
+  // prose matcher that produced it was deleted. Without a declared row the item
+  // is worn, so the suffix must SURVIVE. The declared `state: "off"` path is
+  // pinned in tests/unit/page-prompt-worn-state.test.ts.
+  check(/worn by/i.test(reqSection), '"(worn by …)" suffix survives when no wornItems row declares the item off');
   check(/red superhero cape/i.test(reqSection), 'cape still listed (as English ref) in REQUIRED OBJECTS');
   check(/silver scissors/i.test(reqSection), 'artifact listed via English ref');
 
