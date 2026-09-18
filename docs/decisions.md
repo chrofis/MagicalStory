@@ -450,6 +450,119 @@ unified and trial fill maps), `prompts/story-trial.txt`, `prompts/story-unified.
 **Status:**    ✅ active | 🟡 conditional | 🗄 superseded (with link)
 ```
 
+## 2026-09-18 — Restaging an object for reach is CONDITIONAL on its placement carrying no story meaning, and the placement travels in `where`
+
+**Context.** `REACHABLE_CONTACT_RULE` (`server/lib/promptBuilders.js`, injected as `{REACHABLE_CONTACT}`
+into all four brief-authoring templates) shipped on 2026-09-17 unconditional: an object more than one
+character touches is staged out in the open where every one of them can reach it. It fixed the defect it
+was written for — an object recessed in a hollow under four pairs of stacked hands, which the model
+answered by drawing TWO of it — and the next run had zero duplicate objects.
+
+On that same next run it destroyed a page. Staging `job_1789681157795_wkt20ckod` p12: the page text is
+*«In der Lücke steckt ein schwerer Stein»* — a heavy stone wedged in a gap in a retaining wall — and the
+entire beat is three children failing to shift it while a fourth gives up. The render put the stone on
+open ground in front of the wall. Semantic eval, `setting` / MAJOR: *“the stone is on the ground in front
+of the wall, not in a gap or wedged within the wall itself”*; the book audit raised it to CRITICAL; the
+page scored **0**.
+
+Owner, 2026-09-18, verbatim:
+
+> “You can not take a stone that is blocking the entrance into the middle of the open space. So the
+> pushing can be rendered! That is only an option if the location carries no story meaning. Holding an
+> egg can be anywhere. Pushing a blocking object must be where it blocks.”
+
+**Decision.** The rule now branches, and the branch condition is a QUESTION the Art Director answers, not
+a keyword list code matches (classification belongs to the prompt):
+
+- *Would moving the object change what the page is about?* **No** — held, carried, passed, examined —
+  the old rule stands unchanged: stage it in the open where every toucher can reach it.
+- **Yes** — an object whose position is the point — it stays exactly where the plan line and the page
+  text put it, **still held by whatever holds it there**, and the COMPOSITION gives way instead: fewer
+  characters in contact at once, the rest in frame straining/bracing/watching, an angle showing the
+  position and the hands in one view, the touchers ranged along the side they can actually reach.
+
+And, decisively, **on that second kind of page every toucher's `where` names the object together with
+what holds it in place** — which the rule states is naming the object, not the pose detail the
+field-shape section keeps out of `where`. The anti-duplication half is untouched: the `where` still
+names the object itself, never another character's hands or hold.
+
+No scored type was added and no severity changed. The critic side has no counterpart at all; it is
+logged in `tasks/BACKLOG.md` as an owner decision.
+
+**Rationale — what was measured.** Six real staging pages, found by searching every stored staging story
+for a page whose plan line or text places an object so that its position is the problem AND more than one
+character acts on it. Five are load-bearing, one is the control whose placement is incidental (the page
+the original rule was written for). Each case was re-authored through the real Art Director path
+(Test Lab `scene_expansion`, the template with the revised constant substituted) and rendered
+(`image` stage, `grok-imagine-2`).
+
+| # | page | object, and why its position is the point | placement | contact |
+|---|---|---|---|---|
+| C1 | `job_1789681157795_wkt20ckod` p12 | a stone wedged in a gap in a low wall; three push it, a fourth gives up | v2 ❌ free on open ground · v3 ❌ (empty scene hint, see below) · **v3 + plan line ✅ in the wall** | one direct toucher, two pushing HIS back — a push-train the brief never asked for |
+| C2 | `job_1788816451791_25b31uqlp` p10 | a boulder blocking a narrow cliff trail; one levers with a branch, one pushes | v2 ✅ · v3 ✅ — on the trail, blocking it (the stored render had it in an open clearing) | v2 ✅ lever tip under the edge · v3 ◑ branch not engaged |
+| C3 | `job_1786917840874_rur4nskfv` p8 | a chest wedged between two stone blocks at a pillar base; two lift the lid together | v2 ❌ flat riverbed · v3 ◑ on the stones · v3 + plan line ◑ among the stones, not visibly between two blocks | ✅ both on the lid — but stacked hands, copied from the plan line's own beat |
+| C4 | `job_1788471969309_9cg9dqyirre` p15 | a chest wedged in a flooding hold, tipped so coin can be passed out | v2 ✅ · v3 ✅ — tipped, immovable, in the flooded chamber | v2 ✅ both palms on the chest · v3 ❌ chained (the stored render was chained too) |
+| C5 | `job_1787423677246_r9llf5yi9` p8 | a hull grounded on a sandbank; one poles with an oar, two push the planking | v2 ✅ · v3 ✅ — beached on dry sand (the stored render had the boat afloat and the crew smiling) | v2 ✅ three straining, oar under the hull · v3 ✅ palms on the planking, oar not engaged |
+| C6 | `job_1789584708605_rts4wqupm` p6 (**control**) | an egg four characters hold at once — placement INCIDENTAL | v2 ✅ · v3 ✅ — out in the open, no hollow | ✅ four pairs of hands, **exactly one egg**, no duplicate |
+
+**The mechanism, measured.** Across the six v2 renders the correlation with the rendered placement is
+exact, and it is not the prose: every page whose EXACT POSES line encoded the object's position or state
+kept it (C2 “shaft angled upward from the boulder's base”, C4 “the tipped chest”, C5 “the blade end
+driven into the wet sand beneath the hull”), and every page whose pose line named the object alone lost
+it (C1 “against the stone's rough mossy face”, C3 “grips the rim of the open lid”) — even though the
+brief's prose and its `sceneIntent` said “wedged” in all five. That is the p12 defect's real mechanism and
+it is the same one as the p7/p11 concealment defect: on these pages the built image prompt runs
+10,778–12,487 chars against Grok's 7,900-char body budget, so `shrinkPromptForModel` compresses the HEAD
+on every one of them — as production does on the same pages — and only the protected tail (REQUIRED
+OBJECTS → EXACT POSES) is reattached verbatim. A placement that lives in the paragraph is advisory by
+construction.
+
+**Three wordings.** v1 (branch only) left every `where` position-free — 5 of 5 load-bearing pages.
+v2 (“the `where` states that position in the same phrase as the contact”) also left them position-free:
+the field-shape section in all four templates says `where` takes “no body-part positioning, no pose
+detail”, and the Art Director resolved the collision in favour of the older, more specific rule.
+v3 — shipped — says the `where` names the object **together with what holds it in place**, and states
+that this is naming the object, not pose detail. That reconciliation is what made it land.
+
+**What still does not work.** Three things, all reported rather than fixed:
+
+1. **The `where` clause is obeyed intermittently**, not always — C1 carried the position with no plan
+   line and dropped it when the plan line was supplied; C3 never carried it (its toucher-object is the
+   chest's LID, while the thing that is wedged is the chest body). One sentence in a 30k-char prompt is
+   a preference, not a guarantee.
+2. **The plan line outranks the rule's anti-chain half.** C3's plan line says the second child's hands
+   “cover” the first's, and the Art Director wrote exactly that into `where` — the one thing the rule's
+   last sentence forbids. And on C1 the Art Director fused three names into one interaction row with one
+   identical `where`; `buildExactPosesBlock` split it into three identical pose lines and the model
+   resolved them as a push-train, one child on the stone and two on his back.
+
+3. **Whether the render chains the touchers is not decided by the brief.** C4's v2 and v3 briefs both
+   declare two independent palms-on-the-chest rows and nothing else; the v2 render drew both on the
+   chest, the v3 render drew the second character's hands on the first's shoulder. Same contract, two
+   outcomes — so the contact column above compares model variance, not wordings, and no wording round
+   was spent chasing it.
+
+None of the three is a reason to hold the branch: without it the motivating page cannot be rendered correctly at
+all, and with it the four other load-bearing pages and the incidental control all come out right.
+
+**Lab-stage finding, incidental but load-bearing for anyone repeating this.** The Test Lab
+`scene_expansion` stage calls `buildSceneExpansionPrompt` with `rawOutlineContext = null`, so
+**`{DRAFT_SCENE_DESCRIPTION}` — the SCENE HINT, the plan line — is EMPTY**. Production's Art Director
+never authors without one. On C1 that alone changed the verdict: with an empty hint the Art Director read
+«in der Lücke» as a gap in the GROUND (visually indistinguishable from a stone lying on it) and the
+render was judged a failure twice; fed the page's real stored plan line, the same rule produced the wall
+and the render put the stone in it. The stage is measuring the Art Director on strictly less input than
+production gives it.
+
+**Touched files.** `server/lib/promptBuilders.js` (`REACHABLE_CONTACT_RULE` + its rationale block; the
+four templates are unchanged — they already carry `{REACHABLE_CONTACT}`),
+`tests/unit/brief-authoring-contracts.test.ts` (§8: the contract reaches all four built prompts exactly
+once, no unfilled placeholder, the stored p12 brief reaches both rewriters, and no template hardcodes a
+second copy), `tasks/BACKLOG.md` (the critic-side counterpart, an owner decision).
+
+**Status.** ✅ active. Lab experiments: AD #1314 (v1), #1315 (v2), #1318 (v3), #1320/#1321 (v3 + plan
+line); renders #1316, #1319, #1322, #1323 — 14 renders, `grok-imagine-2` on every arm.
+
 ## 2026-09-18 — The identity call is told WHERE a character stands, on every path that calls it
 
 **Context.** Staging `job_1789681157795_wkt20ckod` p12 shipped with `finalScore 0` on two CRITICAL

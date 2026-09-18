@@ -6763,8 +6763,41 @@ const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the char
  * again under this rule, Lab #1303), and buildExactPosesBlock already splits
  * such a row into one pose line per figure, so the protected tail states each
  * toucher's contact either way.
+ *
+ * THE BRANCH (2026-09-18). The first version of this rule was unconditional and
+ * bought its zero duplicate objects at the cost of the plot. Staging
+ * job_1789681157795_wkt20ckod p12: the page text is an object wedged in a gap in
+ * a wall and the whole beat is three characters failing to shift it. The brief
+ * obeyed the rule, staged it out on open ground, and the render put it on the
+ * ground in front of the wall — semantic eval setting/MAJOR, the book audit
+ * raised it to CRITICAL, the page scored 0.
+ *
+ * Owner's principle, verbatim: "You can not take a stone that is blocking the
+ * entrance into the middle of the open space. So the pushing can be rendered!
+ * That is only an option if the location carries no story meaning. Holding an
+ * egg can be anywhere. Pushing a blocking object must be where it blocks."
+ *
+ * So the restaging is CONDITIONAL and the condition is a question the Art
+ * Director answers, not a word list code matches: would moving the object change
+ * what the page is about? Where it would, the object holds its position and the
+ * COMPOSITION absorbs the reach problem instead — fewer simultaneous touchers,
+ * an angle showing obstacle and hands together, the touchers ranged along the
+ * reachable side. That is the same lever that stopped the duplication (an object
+ * asked to take more hands than its space allows), applied to the figures rather
+ * than to the object.
+ *
+ * WHERE THE POSITION HAS TO TRAVEL. p12's stored brief did not lose the
+ * placement in its prose — that paragraph says "wedged tightly between the
+ * stones", and the emptyScenePrompt says "a dark rectangular gap where a stone
+ * is wedged". What it lost was the one channel the model obeys: all three
+ * `where` values read "presses both hands flat against the ... stone" and the
+ * protected tail carried three EXACT POSES lines with no gap and no wall in
+ * them. Same shape as the p7/p11 concealment defect — a page-critical physical
+ * fact that reaches only the prose is advisory. So the load-bearing branch puts
+ * the position INTO the `where`, beside the contact, not merely into the
+ * paragraph.
  */
-const REACHABLE_CONTACT_RULE = "An object more than one character touches is staged where every one of them can reach it: out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or sunk below something a named toucher would have to reach through. The prose puts it in that same open spot. Each toucher's `where` names the object itself, never another character's hands or hold.";
+const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask first whether moving it would change what the page is about. If it would not — a thing held, carried, passed or examined — stage it where every one of them can reach it: out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or sunk below something a named toucher would have to reach through, and the prose puts it in that same open spot. If it would — an object whose position is the point, blocking, wedged, stuck fast, buried, sealed in or out of reach — it stays exactly where the plan line and the page text put it, still held by whatever holds it there, and the composition gives way instead: fewer characters in contact at once, the rest in frame straining, bracing or watching; an angle that shows the object's position and the hands in one view; the touchers ranged along the side they can actually reach. On such a page every toucher's `where` names the object together with what holds it in place — that is naming the object, not pose detail. Either way each toucher's `where` names the object itself, never another character's hands or hold.";
 
 /**
  * ONE contract for the page a Visual Bible element ENTERS the story on, for

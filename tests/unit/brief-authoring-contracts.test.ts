@@ -36,7 +36,7 @@ import { describe, it, beforeAll, expect } from 'vitest';
 
 const PB = require('../../server/lib/promptBuilders');
 const { collectPlanLineCast, planStagedSegment } = require('../../server/lib/iterateBeat');
-const { loadPromptTemplates } = require('../../server/services/prompts');
+const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../../server/services/prompts');
 
 // ── Real stored fixtures ────────────────────────────────────────────────────
 
@@ -348,6 +348,88 @@ describe('the reach contract reaches every site that writes or rewrites this pag
       expect(prompt.includes(PB.REACHABLE_CONTACT_RULE), 'one repair round would delete the reach contract').toBe(true);
       expect(unfilled(prompt), 'the rewrite prompt shipped an unfilled placeholder').toEqual([]);
     });
+});
+
+// ── 8. An object whose PLACEMENT is what the page is about ───────────────
+
+/**
+ * The other half of the same contract (staging job_1789681157795_wkt20ckod p12,
+ * 2026-09-18). The reach rule shipped unconditional and this page is where that
+ * cost the plot: the page text wedges a heavy object into a gap in a wall and
+ * the whole beat is three characters failing to shift it. The render put it on
+ * open ground in front of the wall — semantic setting/MAJOR, raised to CRITICAL
+ * by the book audit, page scored 0.
+ *
+ * The stored brief is the evidence for WHERE the fact has to travel: its prose
+ * says "wedged tightly between the stones" and its emptyScenePrompt says "a dark
+ * rectangular gap where a stone is wedged", but all three `where` values read
+ * "presses both hands flat against the ... stone" and the three EXACT POSES
+ * lines in the protected tail named no gap and no wall. Prose is advisory; the
+ * tail is the instruction.
+ *
+ * Fixtures are that page's stored plan line and brief prose, verbatim. What is
+ * pinned is ARRIVAL and SINGLE SOURCE — the contract reaches all four
+ * brief-authoring prompts, exactly once each, out of one exported constant, with
+ * no placeholder left unfilled. No wording is asserted.
+ */
+const P12_PLAN_LINE =
+  "PLAN: ultra-wide — Levin, Max, Kiaan, and Julian braced against the big wedged stone in the gap, feet dug into the earth — Julian's hands fall away from the stone as the others push — the stone does not move and Julian has frozen";
+
+/** sceneImages[11].sceneDescription prose, verbatim (character sheets trimmed). */
+const P12_BRIEF_PROSE =
+  'Max stands in the foreground at the dark gap in the stone retaining wall, both hands pressed flat against the heavy blocky grey limestone stone wedged tightly between the stones, feet dug deep into the earth. Kiaan stands beside Max, also in the foreground, both hands pressed flat against the same stone, feet dug into the earth. Levin stands to the right of Kiaan, also in the foreground, both hands pressed flat against the stone, feet dug into the earth. Julian stands just behind the trio, centered slightly back in the midground, arms falling loosely at his sides, head lowered, hands empty and not touching the stone. The stone remains unmoved. Ultra-wide shot, eye-level perspective, shallow depth.';
+
+const occurrences = (haystack: string, needle: string) => haystack.split(needle).length - 1;
+
+describe('the reach contract survives on the page whose placement is the point', () => {
+  let p12: Record<string, string>;
+
+  beforeAll(async () => {
+    await loadPromptTemplates();
+    p12 = {
+      'AD all-pages': String(PB.buildSceneExpansionAllPrompt(
+        inputData, [{ pageNumber: 12, planLine: P12_PLAN_LINE.replace(/^PLAN:\s*/, '') }], {})),
+      'AD per-page': String(PB.buildSceneExpansionPrompt(
+        12, 'page text', ROSTER, 'de-ch', VISUAL_BIBLE, '', null, {})),
+      'iterate strict': String(PB.buildSceneDescriptionPrompt(
+        12, 'page text', ROSTER, P12_BRIEF_PROSE, 'de-ch', VISUAL_BIBLE, [], 'standard', '', '',
+        { planLine: P12_PLAN_LINE },
+        { fixIssues: ['object not in the position the text gives it'], previousScore: 0 },
+        { freeIterate: false })),
+      'iterate free': String(PB.buildSceneDescriptionPrompt(
+        12, 'page text', ROSTER, P12_BRIEF_PROSE, 'de-ch', VISUAL_BIBLE, [], 'standard', '', '',
+        { planLine: P12_PLAN_LINE },
+        { fixIssues: ['object not in the position the text gives it'], previousScore: 0 },
+        { freeIterate: true })),
+    };
+  });
+
+  it('reaches all four brief-authoring prompts, exactly once each', () => {
+    for (const [site, prompt] of Object.entries(p12)) {
+      expect(occurrences(prompt, PB.REACHABLE_CONTACT_RULE), `${site} does not carry the contract exactly once`).toBe(1);
+    }
+  });
+
+  it('leaves no placeholder unfilled at any of the four sites', () => {
+    for (const [site, prompt] of Object.entries(p12)) {
+      expect(unfilled(prompt), `${site} shipped an unfilled placeholder`).toEqual([]);
+    }
+  });
+
+  it("carries the page's stored brief into both rewriters, so a repair round starts from it", () => {
+    for (const site of ['iterate strict', 'iterate free']) {
+      expect(p12[site].includes(P12_BRIEF_PROSE), `${site} never got the stored brief`).toBe(true);
+    }
+  });
+
+  it('every template sources the contract from the placeholder — no second, drifting copy', () => {
+    for (const key of ['sceneExpansion', 'sceneExpansionAll', 'sceneIteration', 'sceneIterationFree']) {
+      const tpl = String(PROMPT_TEMPLATES[key] || '');
+      expect(tpl.length, `${key} did not load`).toBeGreaterThan(0);
+      expect(occurrences(tpl, '{REACHABLE_CONTACT}'), `${key} does not hold the placeholder exactly once`).toBe(1);
+      expect(occurrences(tpl, PB.REACHABLE_CONTACT_RULE), `${key} hardcodes a copy of the contract`).toBe(0);
+    }
+  });
 });
 
 // ── 9. A non-hand contact leaves the hands out of the rows ──────────────────
