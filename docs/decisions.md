@@ -7,6 +7,134 @@ asking the user to explain a deliberate mode-specific shortcut.
 Per `CLAUDE.md`: every architectural decision is logged here. Format:
 
 ```
+## 2026-09-18 — A reply's stop reason is an ALLOW-LIST: a refusal, and an unknown reason, fail loudly
+
+**Context.** `server/lib/textReplyGuard.js` stamps `result.truncation` on EVERY reply leaving
+`callTextModel` / `callTextModelStreaming`, and nine call sites act on it — three in `textRefine.js`
+**throw** (rewrite, diff, lector), the audit pass drops a source's findings from the merge,
+`evalPipeline.js` returns `evalFailed` rather than "no findings", `storyJobPipeline.js` retries the
+outline review once then ships the draft unpatched, and `sceneReviewGuard` / `iterateBriefGuard`
+refuse the artifact. Everything downstream of a text model therefore hangs off one predicate.
+
+That predicate was a **blacklist**: `TRUNCATING_STOP = /^(max_tokens|length|MAX_TOKENS)$/`. Any
+other value fell through to "clean natural completion". Run against the then-current code, these all
+returned **`not truncated`**:
+
+| stop reason | provider | what it actually means |
+|---|---|---|
+| `SAFETY`, `RECITATION`, `PROHIBITED_CONTENT` | Gemini | candidate blocked |
+| `content_filter` | OpenAI / OpenRouter / DeepSeek | content filtered |
+| `refusal` | Anthropic | streaming classifier intervened |
+| `model_context_window_exceeded` | Anthropic | **a cut**, and not in the blacklist |
+| `OTHER`, `error`, `insufficient_system_resource` | Gemini / OpenRouter / DeepSeek | provider-side abort |
+| `LENGTH` (any non-exact casing) | any | **a cut**, missed by the literal regex |
+| any value a provider invents later | — | unknown |
+
+`callGeminiTextAPIStreaming` is where this is reachable today: unlike the non-streaming Gemini path
+(which detects a missing candidate and falls back to Grok), the streaming path returns whatever text
+arrived before a block with `stop_reason: 'SAFETY'` and no error. Its own comment says "'STOP',
+'MAX_TOKENS', 'SAFETY', ... — the truncation guard reads it". It did not. This contradicts the rule
+CLAUDE.md records for the avatar path: **a refusal must fail loudly, never ship an empty page.**
+
+**Has it bitten yet? Not on the guarded text path — this was LATENT, not live.** Searched staging
+(never prod): the only durable record of a text stop reason is `testlab_experiments.results`
+(`beats_scenes` stores `stopReason`) — **1,287 experiments scanned, 28 stored values: `stop` × 16
+and null × 12**, no abnormal reason ever. `stories.data` and `story_jobs.progress` store no stop
+reason at all (0 rows of 138 / 14), and the in-memory `/api/health/config` → `textTruncation`
+counter on staging reads `suspected: 0` for the current container.
+
+The refusal **class**, however, is demonstrably live on an adjacent Gemini path that has its own
+handling: `PROHIBITED_CONTENT` appears in **13 staging stories** — every one of them
+`figureDetection.js`'s SoM identity call recording `prompt blocked (PROHIBITED_CONTENT)` on the
+`gemini-full` tier before falling back to Qwen-VL. So Gemini refuses this project's prompts as a
+matter of routine; only the fact that no refusal has yet landed on a *text* call kept the hole from
+costing a story.
+
+One further fact from that data shaped the fix: **12 of the 28 stored samples carried NO finish
+reason at all** (deepseek-v4-pro via OpenRouter). "Absent" therefore had to stay distinct from
+"unrecognised", or 43% of real replies would have started failing.
+
+**Decision.** Invert it. `NATURAL_STOP` is the **only** list that grants a pass; everything else
+fails. The other two sets never pass anything — they exist solely to word the diagnosis:
+
+- **natural** (pass) — `end_turn`, `stop_sequence`, `stop`, `STOP`, `eos`, `eos_token`, plus
+  `tool_use` / `tool_calls` / `function_call` (the model chose to end its turn; this codebase sends
+  no tools, so failing on them would only invent alarms on a paid run).
+- **truncation** → existing `stop_reason` handling, unchanged — `max_tokens`,
+  `model_context_window_exceeded`, `pause_turn` (Anthropic's resumable pause is an unfinished
+  reply), `length`, `MAX_TOKENS`.
+- **refusal** → new, loud, names the reason — `refusal`; `SAFETY`, `RECITATION`, `LANGUAGE`,
+  `BLOCKLIST`, `PROHIBITED_CONTENT`, `SPII`, `ESCALATION`; `content_filter`.
+- **unknown** → new, loud, names the reason — anything else, including `OTHER`, `error`,
+  `insufficient_system_resource`, `aborted`, `FINISH_REASON_UNSPECIFIED`, `MALFORMED_RESPONSE`.
+- **absent** (no value anywhere) → unchanged: falls through to the `cap_hit` / `near_cap` token
+  arithmetic, exactly as before.
+
+Matching is case-insensitive. `TRUNCATING_STOP` is still exported but is now **derived from** the
+truncation set, so the regex cannot drift from the classifier.
+
+**Nesting.** `collectStopReasons()` reads `stop_reason`, `native_finish_reason`, `finish_reason`,
+`finishReason`, `choices[0].finish_reason`, `choices[0].native_finish_reason` and
+`candidates[0].finishReason`. When several disagree the worst class wins — **refusal > truncation >
+natural > unknown** — so OpenRouter reporting a normalised `stop` over an upstream that said
+`SAFETY` fails. `unknown` ranks *below* `natural` deliberately: an unrecognised companion value
+beside a recognised natural one is not evidence of failure, and ranking it higher would fabricate
+alarms from every upstream vocabulary not enumerated here. `callOpenRouterAPIStreaming` now captures
+`native_finish_reason` (it was named in a comment and never read); `callOpenRouterAPI` delegates to
+it, so both OpenRouter entry points get it.
+
+**Rationale.** A blacklist is the wrong shape for a field whose vocabulary the vendors own and keep
+extending. The enumeration below was built on 2026-09-18 from vendor docs and SDK types, and it
+says why:
+
+- **Anthropic** — `StopReason` union in `anthropic-sdk-typescript` `messages.ts`, and
+  platform.claude.com/docs/en/api/handling-stop-reasons: `end_turn`, `max_tokens`, `stop_sequence`,
+  `tool_use`, `pause_turn`, `refusal`, `model_context_window_exceeded`. Same union on
+  `Message.stop_reason` and `message_delta.delta.stop_reason`.
+- **Gemini** — `FinishReason`, ai.google.dev/api/generate-content: **21 values**, of which the
+  installed `@google/generative-ai` 0.24.1 enum carries 11 and the current Python SDK 18. The REST
+  list has already grown past its own SDKs (`ESCALATION`, `MALFORMED_RESPONSE`,
+  `MISSING_THOUGHT_SIGNATURE` are REST-only).
+- **OpenAI** — `openai-node` `completions.ts`: `stop`, `length`, `tool_calls`, `content_filter`,
+  `function_call` (deprecated).
+- **OpenRouter** — openrouter.ai/docs + openapi.json: normalises to `tool_calls`, `stop`, `length`,
+  `content_filter`, `error`, and the enum is **formally open**
+  (`x-speakeasy-unknown-values: "allow"`). Raw upstream value rides on `native_finish_reason`, typed
+  free-form `string | null` on both streaming and non-streaming choices. This matters
+  disproportionately here: DeepSeek, Qwen **and** OpenAI all reach this codebase *through*
+  OpenRouter — `server/config/models.js` configures only four providers (anthropic, google, xai,
+  openrouter).
+- **xAI** — docs.x.ai/openapi.json: `finish_reason` is typed as a bare string with **no `enum` at
+  all**; the description names `stop`, `length`, `end_turn`, `null`. A refusal surfaces on
+  `message.refusal`, not on `finish_reason`.
+- **DeepSeek** — api-docs.deepseek.com: `stop`, `length`, `content_filter`, `tool_calls`,
+  `insufficient_system_resource`, `aborted`. The last two are infrastructure aborts that return a
+  200 with a partial body — precisely what a blacklist reads as success.
+- **Qwen / DashScope** — alibabacloud.com model-studio docs: only `stop`, `length`, `tool_calls`.
+  Moderation is an HTTP error (`data_inspection_failed`), never an in-band finish reason.
+
+Two of those enums are explicitly open and a third keeps growing, so no failure list can ever be
+complete — which is the whole argument for making the *pass* list the closed one. Nothing here reads
+prose: it is a structured field, compared against a set.
+
+**Scope note.** The image paths keep their own separate refusal checks
+(`server/lib/images.js` ~2139, `server/lib/evalPipeline.js` ~1046, `figureDetection.js`), which test
+`finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT'` only and would miss
+`RECITATION`, `BLOCKLIST`, `SPII`, `LANGUAGE`, `ESCALATION` and the `IMAGE_*` block family. Those
+were NOT changed here — different subsystem, different call semantics — and are reported for
+triage rather than fixed.
+
+**Touched files.** `server/lib/textReplyGuard.js` (the inversion: `NATURAL_STOP` /
+`TRUNCATING_STOP_REASONS` / `REFUSING_STOP_REASONS`, `classifyStopReason`, `collectStopReasons`,
+`resolveStopReason`; new `refusal` and `unknown_stop` verdicts and their `describeTruncation`
+wording; `stopReasonClass` / `stopReasons` on the verdict and `stopReasonClass` on the health
+counter's `last`), `server/lib/textModels.js` (`callOpenRouterAPIStreaming` captures and returns
+`native_finish_reason`), `tests/unit/text-reply-guard.test.ts` (12 behaviour tests: natural passes,
+truncation unchanged and case-insensitive, every refusal reason loud and named, unknown loud,
+unknown never swallowed into a default-OK branch, nesting, unknown-does-not-override-natural,
+absent-is-not-unknown, counter buckets, classifier, OpenRouter wiring).
+
+
 ## 2026-09-17 — A state contradiction needs TWO of the rival's own look-words, and it says which
 
 **Context.** `appearanceContradiction` (server/lib/visualBible.js) deletes an object state's whole

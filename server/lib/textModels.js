@@ -1023,6 +1023,13 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       let upstream = null;      // which provider actually served this
       let actualCost = null;    // OpenRouter's real charge, when it reports one
       let finishReason = null;  // 'stop' | 'length' (cut at max_tokens) | null when the upstream omits it
+      // The UPSTREAM's own reason, unnormalised. OpenRouter is how DeepSeek,
+      // Qwen and OpenAI reach this codebase, and its normalised enum is
+      // formally open — so when an upstream stops for a reason OpenRouter has
+      // no mapping for, this field is the only place that reason appears.
+      // textReplyGuard reads it alongside finish_reason (a refusal in either
+      // one fails the reply).
+      let nativeFinishReason = null;
       resetInactivity();
 
       try {
@@ -1067,6 +1074,7 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
               // OpenRouter normalises upstream finish reasons to OpenAI's
               // ('length' = max_tokens hit); native_finish_reason is the raw one.
               if (event.choices?.[0]?.finish_reason) finishReason = event.choices[0].finish_reason;
+              if (event.choices?.[0]?.native_finish_reason) nativeFinishReason = event.choices[0].native_finish_reason;
               if (event.usage) {
                 inputTokens = event.usage.prompt_tokens || inputTokens;
                 outputTokens = event.usage.completion_tokens || outputTokens;
@@ -1096,6 +1104,7 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       return {
         text: responseText,
         stop_reason: finishReason,
+        native_finish_reason: nativeFinishReason,
         usage: {
           input_tokens: inputTokens,
           output_tokens: outputTokens,

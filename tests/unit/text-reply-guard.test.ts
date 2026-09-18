@@ -164,3 +164,136 @@ describe('a reported natural stop beats token arithmetic (D5, measured 2026-09-1
     expect(t.reason).toBe('empty');
   });
 });
+
+describe('stop reasons are an ALLOW-LIST, not a blacklist (2026-09-18)', () => {
+  // Until this change the stop-reason test was `/^(max_tokens|length|MAX_TOKENS)$/`
+  // and EVERYTHING else fell through as a clean natural completion — so every
+  // provider refusal read as success. Enumerations sourced from vendor docs and
+  // SDK types (docs/decisions.md 2026-09-18).
+  const reply = (stop: any, over: any = {}) => ({ text: 'a partial answer', usage: { output_tokens: 40 }, stop_reason: stop, ...over });
+
+  it('a natural completion still passes, on every provider vocabulary', () => {
+    // Anthropic end_turn/stop_sequence; OpenAI/OpenRouter/DeepSeek/Qwen stop;
+    // xAI documents stop AND end_turn on the same field; Gemini STOP.
+    for (const stop of ['end_turn', 'stop_sequence', 'stop', 'STOP', 'eos', 'eos_token', 'tool_use', 'tool_calls', 'function_call']) {
+      const t = assessTextReply(reply(stop), { capInForce: 64000 });
+      expect(t.suspected, `${stop} must pass`).toBe(false);
+      expect(t.stopReasonClass).toBe('natural');
+    }
+  });
+
+  it('truncation keeps its existing handling, and is now case-insensitive', () => {
+    for (const stop of ['max_tokens', 'length', 'MAX_TOKENS', 'LENGTH', 'Length', 'model_context_window_exceeded', 'pause_turn']) {
+      const t = assessTextReply(reply(stop), { capInForce: 64000 });
+      expect(t.suspected, `${stop} must be loud`).toBe(true);
+      expect(t.reason).toBe('stop_reason');
+      expect(t.stopReasonClass).toBe('truncation');
+      expect(describeTruncation(t)).toContain(stop);
+    }
+  });
+
+  it('a REFUSAL fails loudly with the reason named', () => {
+    // Gemini candidate blocks, the OpenAI-shaped content_filter, Anthropic refusal.
+    for (const stop of ['SAFETY', 'RECITATION', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'LANGUAGE', 'ESCALATION', 'content_filter', 'refusal']) {
+      const t = assessTextReply(reply(stop), { capInForce: 64000 });
+      expect(t.suspected, `${stop} must be loud`).toBe(true);
+      expect(t.reason).toBe('refusal');
+      expect(t.stopReasonClass).toBe('refusal');
+      expect(describeTruncation(t)).toMatch(new RegExp(`REFUSED.*${stop}`));
+    }
+  });
+
+  it('a refusal is named even when the reply came back empty', () => {
+    const t = assessTextReply({ text: '', usage: { output_tokens: 0 }, stop_reason: 'SAFETY' }, { capInForce: 64000 });
+    expect(t.reason).toBe('refusal');
+    expect(describeTruncation(t)).toContain('SAFETY');
+  });
+
+  it('an UNKNOWN reason fails loudly — the case a blacklist passes silently', () => {
+    // Real values no allow-list entry covers (DeepSeek infra aborts, OpenRouter's
+    // normalised `error`, Gemini's own "unknown reason"), plus one nobody has.
+    for (const stop of ['insufficient_system_resource', 'aborted', 'error', 'OTHER', 'FINISH_REASON_UNSPECIFIED', 'MALFORMED_RESPONSE', 'a_reason_invented_next_year']) {
+      const t = assessTextReply(reply(stop), { capInForce: 64000 });
+      expect(t.suspected, `${stop} must be loud`).toBe(true);
+      expect(t.reason).toBe('unknown_stop');
+      expect(t.stopReasonClass).toBe('unknown');
+      expect(describeTruncation(t)).toContain(stop);
+    }
+  });
+
+  it('an unknown reason is never swallowed into the default-OK branch', () => {
+    // No cap known, well under any ceiling, non-empty text, nothing to parse:
+    // every other rule in the guard is silent, so only the stop class can fire.
+    const t = assessTextReply({ text: 'x'.repeat(50), usage: { output_tokens: 12 }, stop_reason: 'SOMETHING_NEW' });
+    expect(t.suspected).toBe(true);
+    expect(t.reason).toBe('unknown_stop');
+  });
+
+  it('nesting: the reason is found wherever the provider put it', () => {
+    // OpenRouter passes the upstream's raw reason through as native_finish_reason.
+    expect(assessTextReply({ text: 'partial', stop_reason: 'stop', native_finish_reason: 'SAFETY' }, { capInForce: 64000 }))
+      .toMatchObject({ suspected: true, reason: 'refusal', stopReason: 'SAFETY' });
+    // A raw Gemini payload handed straight to the guard.
+    expect(assessTextReply({ text: 'partial', candidates: [{ finishReason: 'RECITATION' }] }, { capInForce: 64000 }))
+      .toMatchObject({ suspected: true, reason: 'refusal', stopReason: 'RECITATION' });
+    // A raw OpenAI-shaped payload.
+    expect(assessTextReply({ text: 'partial', choices: [{ finish_reason: 'content_filter' }] }, { capInForce: 64000 }))
+      .toMatchObject({ suspected: true, reason: 'refusal', stopReason: 'content_filter' });
+    expect(assessTextReply({ text: 'partial', choices: [{ finish_reason: 'length' }] }, { capInForce: 64000 }))
+      .toMatchObject({ suspected: true, reason: 'stop_reason', stopReason: 'length' });
+  });
+
+  it('an unrecognised companion value does NOT override a recognised natural stop', () => {
+    // OpenRouter routes upstreams whose native vocabulary is not enumerated here.
+    // Ranking `unknown` above `natural` would invent alarms on complete replies.
+    const t = assessTextReply({ text: 'a complete reply', usage: { output_tokens: 40 }, stop_reason: 'stop', native_finish_reason: 'COMPLETE' }, { capInForce: 64000 });
+    expect(t.suspected).toBe(false);
+    expect(t.stopReasonClass).toBe('natural');
+  });
+
+  it('NO reason at all is "absent", not "unknown" — token arithmetic still decides', () => {
+    // Measured on staging: deepseek-v4-pro via OpenRouter reported no finish
+    // reason on 12 of 28 stored Lab reviewer results. Absent must keep falling
+    // through to the cap rules rather than failing as unrecognised.
+    expect(assessTextReply({ text: 'fine', usage: { output_tokens: 40 }, stop_reason: null }, { capInForce: 64000 }))
+      .toMatchObject({ suspected: false, stopReasonClass: 'absent' });
+    expect(assessTextReply({ text: 'fine', usage: { output_tokens: 64000 }, stop_reason: null }, { capInForce: 64000 }))
+      .toMatchObject({ suspected: true, reason: 'cap_hit', stopReasonClass: 'absent' });
+    // An all-whitespace value is absent, not an unknown value.
+    expect(assessTextReply({ text: 'fine', usage: { output_tokens: 40 }, stop_reason: '  ' }, { capInForce: 64000 }).stopReasonClass).toBe('absent');
+  });
+
+  it('the counter buckets refusals and unknown stops separately', () => {
+    _resetTruncationStats();
+    noteTruncation(assessTextReply({ text: 'p', usage: { output_tokens: 9 }, stop_reason: 'SAFETY' }, {}), { usageLabel: 'unified_story' });
+    noteTruncation(assessTextReply({ text: 'p', usage: { output_tokens: 9 }, stop_reason: 'error' }, {}), { usageLabel: 'unified_story' });
+    const s = getTruncationStats();
+    expect(s.byReason).toEqual({ refusal: 1, unknown_stop: 1 });
+    expect(s.last).toMatchObject({ reason: 'unknown_stop', stopReason: 'error', stopReasonClass: 'unknown' });
+  });
+
+  it('classifyStopReason is the single source of truth and is case-insensitive', () => {
+    const { classifyStopReason, TRUNCATING_STOP } = require('../../server/lib/textReplyGuard.js');
+    expect(classifyStopReason('End_Turn')).toBe('natural');
+    expect(classifyStopReason('Max_Tokens')).toBe('truncation');
+    expect(classifyStopReason('safety')).toBe('refusal');
+    expect(classifyStopReason('nonsense')).toBe('unknown');
+    expect(classifyStopReason(null)).toBe('absent');
+    // The back-compat regex is derived from the same set, so it cannot drift.
+    expect(TRUNCATING_STOP.test('LENGTH')).toBe(true);
+    expect(TRUNCATING_STOP.test('SAFETY')).toBe(false);
+  });
+});
+
+describe('OpenRouter carries the upstream raw reason through (textModels.js wiring)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '../../server/lib/textModels.js'), 'utf8');
+  it('captures native_finish_reason and returns it for the guard to read', () => {
+    // OpenRouter is how DeepSeek, Qwen and OpenAI reach this codebase, and its
+    // normalised finish_reason enum is formally open — the native field is the
+    // only place an unmapped upstream reason ever appears.
+    expect(src).toMatch(/if \(event\.choices\?\.\[0\]\?\.native_finish_reason\) nativeFinishReason = event\.choices\[0\]\.native_finish_reason;/);
+    expect(src).toMatch(/native_finish_reason: nativeFinishReason,/);
+  });
+});
