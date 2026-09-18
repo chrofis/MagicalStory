@@ -410,6 +410,22 @@ const PROBLEMATIC_WORDS = [
 ];
 
 /**
+ * Which PROBLEMATIC_WORDS actually occur in `prompt` (deduplicated).
+ *
+ * The ladder needs this to tell a real strip from a no-op: sanitizePromptLevel1
+ * ALWAYS returns a different string — it collapses double spaces and triple
+ * newlines whether or not it removed a word — so `!==` cannot answer "did level
+ * 1 change anything that matters?". Measured 2026-09-18: 16.8% of stored staging
+ * page prompts and 58.4% of production ones contain none of the 78 words, so on
+ * those a level-1 retry re-sends a request that differs from the refused one
+ * only in whitespace.
+ */
+function findProblematicWords(prompt) {
+  if (!prompt) return [];
+  return PROBLEMATIC_WORDS.filter(word => new RegExp(`\\b${word}\\b`, 'i').test(prompt));
+}
+
+/**
  * Remove problematic words from a prompt (Level 1 sanitization)
  */
 function sanitizePromptLevel1(prompt) {
@@ -2064,28 +2080,60 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   // fairy/bubbles image shipped as a Tell-saga crossbow scene on
   // job_1781289599516 p4). If the rewritten scene is STILL blocked, this
   // function throws — a wrong image is worse than no image.
+  // Every rung rebuilds from what level 0 actually SENT — `parts[0].text`, the
+  // post-shrink string — not from the raw `prompt` argument. The two diverge on
+  // the Grok→Gemini fallback: shrinkPromptForModel ran against the GROK model's
+  // 7,900-char cap (models.js) before the swap to gemini-2.5-flash-image, while
+  // `prompt` can be 22k (measured max in stories.data). Rebuilding a "retry"
+  // from `prompt` silently re-expanded it by thousands of characters, so what
+  // got retried was not the request that had just been refused. Same
+  // sent-equals-stored equality that stored-prompt-is-sent-prompt.test.ts pins
+  // for the level-0 path.
+  const sentPrompt = parts[0]?.text || effectivePrompt;
+
   const rewriteSceneInPrompt = async () => {
     const { callTextModel } = require('./textModels');
-    const sceneMatch = prompt.match(/\*\*THIS IMAGE DEPICTS:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
-      || prompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
-      || prompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
+    const sceneMatch = sentPrompt.match(/\*\*THIS IMAGE DEPICTS:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+      || sentPrompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+      || sentPrompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
     const originalScene = sceneMatch?.[1]?.trim();
-    const rewriteResult = await rewriteBlockedScene(originalScene || prompt, callTextModel);
+    const rewriteResult = await rewriteBlockedScene(originalScene || sentPrompt, callTextModel);
     // Replace the scene block in place so style / reference / no-text rules
     // survive; when no scene block was found (custom prompts like
     // scale-repair or empty-scene), use the rewrite as the whole prompt.
-    return originalScene ? prompt.replace(originalScene, rewriteResult.text) : rewriteResult.text;
+    // The replacement is a FUNCTION: a `$&`, `$'` or `$1` sequence in
+    // MODEL-authored text is a substitution pattern to String.replace, which
+    // would splice a copy of the matched scene back into the prompt. A replacer
+    // function is taken literally.
+    return originalScene ? sentPrompt.replace(originalScene, () => rewriteResult.text) : rewriteResult.text;
   };
   const sanitizationLevels = [
-    null,                                       // Level 0: original prompt
-    () => sanitizePromptLevel1(prompt),         // Level 1: strip safety-trigger words
+    null,                                       // Level 0: the prompt as sent
+    () => sanitizePromptLevel1(sentPrompt),     // Level 1: strip safety-trigger words
     rewriteSceneInPrompt,                       // Level 2: Claude scene rewrite (keeps the story moment)
   ];
 
   for (let sanitizationLevel = 0; sanitizationLevel < sanitizationLevels.length; sanitizationLevel++) {
     // Apply sanitization if needed
-    let currentPrompt = prompt;
+    let currentPrompt = sentPrompt;
     if (sanitizationLevel > 0) {
+      // A level-1 pass over a prompt that contains none of the 78 words removes
+      // nothing: sanitizePromptLevel1 still returns a NEW string (it collapses
+      // double spaces and triple newlines unconditionally), so the retry differs
+      // from the request just refused only in whitespace — a paid image call
+      // that cannot change the verdict, and, if the provider's nondeterminism
+      // happens to let it through, one that records sanitizationLevel 1 and
+      // stores a whitespace-mangled prompt as the page's prompt. Escalate to the
+      // rewrite instead. The sibling sanitizer on the Grok moderation path
+      // (editImageWithPrompt) has always had this guard as `sanitized !== editPrompt`.
+      if (sanitizationLevel === 1) {
+        const strippable = findProblematicWords(sentPrompt);
+        if (strippable.length === 0) {
+          log.info(`⏭️ [IMAGE GEN-ONLY] Level 1 has no listed word to strip — escalating straight to the scene rewrite`);
+          continue;
+        }
+        log.debug(`🧹 [IMAGE GEN-ONLY] Level 1 will strip: ${strippable.join(', ')}`);
+      }
       try {
         currentPrompt = await sanitizationLevels[sanitizationLevel]();
       } catch (rewriteErr) {
