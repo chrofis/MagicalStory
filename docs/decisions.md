@@ -46690,6 +46690,57 @@ covers the age-band files and none is needed — there is no second copy.
 **Status:** ✅ active, NOT yet measured — committed on `staging`, not pushed. The next idea round is
 what tests it, under the methodology entry of 2026-09-16 (structural counts, one rater, both rounds).
 
+### Verification — round 6, measured 2026-09-19
+
+**Method.** Round 6 against round 5, one rater recounting BOTH rounds in one pass, per the
+2026-09-16 methodology entry. Alignment check: the recount reproduced round 5 exactly on word counts
+(65.4 / 90 / 24-of-28 over the cap), on non-resolving (0/28) and on non-child resolvers (2, both age
+1). That rater is harsher on the parent axis than the round-5 rater, so **only within-table
+comparison is valid** — no number here may be compared against a figure from an earlier entry.
+
+| Measure | R5 | R6 |
+|---|---|---|
+| Obstacle IS the commissioned challenge | 21/28 | 24/28 |
+| Attempt addresses that same obstacle | 27/28 | 25/28 |
+| Setting load-bearing | 22/28 | 24/28 |
+| Challenge named outright (A's risk) | 0/28 | 0/28 |
+| Non-child agent resolves | 2/28 | 2/28 |
+| Words mean / max / over-50 | 65.4 / 90 / 24 | 72.3 / 108 / 27 |
+| Non-resolving | 0/28 | 0/28 |
+| Age 8 child / parent | 3.25 / 2.75 | 3.75 / 3.75 |
+| Age 12 child / parent | 3.75 / 3.50 | 4.00 / 4.00 |
+| Overall child / parent | 3.46 / 3.11 | 3.61 / 3.39 |
+
+**Change A (bound slots) — KEPT, measured win.** Substitute obstacles 7 → 4, setting load-bearing up
+22 → 24, and the over-tightening risk it was accepted against did not materialise: 0/28 name the
+topic outright. Worth recording as the shape of the win: the card that in R5 substituted fear of a
+dark cave for the commissioned `waiting-turn` now dramatises waiting itself, as staying with an
+anxious creature until it lets go.
+
+**Change D (one sentence, one job) — REVERTED** (`670784332`). It was meant to CUT length; length
+rose on all three counts: mean 65.4 → 72.3, max 90 → 108, over the 50-word cap 24/28 → 27/28. The
+model satisfied it **on a technicality** — instead of splitting the extra job into its own sentence
+it packed the second job into a **subordinate clause of the same sentence** (one card's sentence 1
+carried the setting, the garment, the destination and the reason). It also caused both of the
+round's only regressions, on "the attempt addresses that same obstacle" (27/28 → 25/28), and
+produced three grammatically broken German constructions absent from R5, one unreadable aloud. No
+target metric improved; the risk it was accepted against (a flattened voice) did not materialise
+either, so it bought nothing measurable.
+**The transferable lesson: a rule phrased on the SENTENCE boundary is satisfiable by moving work
+into a clause.** A future length rule must bind the work, not the sentence count.
+
+**Change C (the age-0-1 agency rule, `prompts/age-band-routine.txt`, `af13e4e63`) — KEPT but NOT
+WORKING; the owner accepted that on 2026-09-19.** The rule is provably present in the built prompt
+at both idea arms, yet the same age-1 cell resolved with an adult's hand in both rounds, and the
+age-1 band means moved by **exactly zero** (2.75 / 2.25 in both). This is a **present-but-ignored**
+case, and it is distinct from every earlier band-view gap, all of which were **absences** — the fix
+for an absence (render the rule into the view) does not apply here and must not be reached for.
+Recorded as a **known-ineffective rule the owner chose to leave**, NOT as an open defect: an adult
+helping a one-year-old is realistic, and the band may simply be hard rather than broken.
+
+**Where the gain is.** Concentrated at ages 8 and 12 — the two bands that had failed for four
+consecutive rounds, now 3.75/3.75 and 4.00/4.00. The bottom of the range did not move.
+
 ---
 
 ## 2026-09-19 — "Not set" and "they don't know each other" are two different answers, and only the second reaches the writer
