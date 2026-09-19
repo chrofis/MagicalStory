@@ -43,14 +43,17 @@ describe('8f no longer demands the thing the creature bands forbid', () => {
 
   it('a creature is named as the exception, and told where its size comes from', () => {
     const r = pb.TRUE_RELATIVE_SIZE_RULE;
-    expect(r).toContain('A CREATURE is the exception');
+    // Merged into the "Nothing else takes a ratio" clause when 8f was scoped
+    // (A6) — the creature case was being stated twice.
+    expect(r).toContain('a CREATURE by the creature rule above');
     expect(r).toContain('in metres or against a familiar room for a young reader');
     expect(r).toContain('a ratio against a child is what makes a creature loom over one');
+    expect((r.match(/creature rule/g) || []).length, 'the creature case is stated once').toBe(1);
   });
 
   it('keeps the ratio demand for everything that is NOT a creature', () => {
     const r = pb.TRUE_RELATIVE_SIZE_RULE;
-    expect(r).toContain('names that element’s size as a ratio against a figure in the prose');
+    expect(r).toContain('names its size as a ratio against a figure in the prose');
     expect(r).toContain('the mast rises five times her height');
     expect(r).toContain('An adjective is not a ratio');
   });

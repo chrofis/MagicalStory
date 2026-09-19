@@ -203,10 +203,18 @@ describe('the Art Director size-ratio rule survives the field swap', () => {
   for (const file of ['scene-expansion.txt', 'scene-expansion-all.txt']) {
     it(file + ' states the ratio obligation without a size-field condition', () => {
       const text = read(file);
-      expect(text).toContain('Every page that cites an element and holds a figure too names');
+      // Scoped 2026-09-19 to the things the rule's own first sentence names — a
+      // vessel, a building, a vehicle. It previously said "every page that cites
+      // AN ELEMENT", which demanded a figure-ratio for a wool cap while rule 8g
+      // sizes a garment "by where it falls on the body". That is a scope by
+      // ELEMENT TYPE, which is not the retired size-FIELD condition this guard
+      // exists for.
+      expect(text).toContain('cites one of THOSE — a vessel, a building, a vehicle');
       expect(text).toContain('as a ratio against a figure in the prose');
       // the retired condition must not linger — it would gate the rule off
       expect(text).not.toContain('whose Visual Bible entry states a size');
+      // nor may the obligation return to being conditioned on a field at all
+      expect(text).not.toMatch(/ratio[^.]{0,80}if its entry/i);
     });
 
     it(file + ' keeps a creature\u2019s scale on every page, now keyed on the band', () => {
