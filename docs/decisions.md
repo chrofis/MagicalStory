@@ -49687,3 +49687,86 @@ list), `prompts/scene-expansion.txt`, `prompts/scene-iteration.txt`,
 `tests/unit/shot-vocabulary-one-source.test.ts`.
 
 **Status:** ✅ active
+
+## 2026-09-19 — An identity-blind inventory can never be asked for a name: the animal rule pairs on KIND, in the PROMPT
+
+**Context:** The 2026-09-19 stage-1 audit found the compliance judge filing a
+declared animal ABSENT on a page the animal is in. On p8 of staging story
+`job_1789759147125_p08djwhbl` it emitted `unverified_absence` ("add light brown
+curly-furred terrier mix dog standing beside Max") plus a `scene.missing` array,
+for a dog stage 1 had described accurately. Both inputs were already correct:
+the roster, rebuilt offline from the stored page, reads `EXPECTED CAST (6): …
+Nia (animal, terrier mix dog), Raven (animal, common raven)`, and the inventory
+carries `{"what": "a small dog", "colour": "light brown, curly fur"}`. An
+animal-pairing rule had shipped on 2026-09-14 (`9715cabef`) and was in the built
+prompt. It still failed.
+
+**Decision:** Fixed in `prompts/image-prompt-compliance.txt` — the PROMPT layer,
+not the inventory template and not code. The rule read "Named in `objects` →
+present". Stage 1 is identity-blind by construction (its template opens "Do not
+name or identify anyone"), so it can never write the roster's name into an
+`objects[]` entry: the rule's only positive test was unsatisfiable, and the
+judge's remaining path was the absence. The rule now pairs on KIND — a roster
+entry tagged with its species matches the `objects[]` entry of that species,
+whatever words, colour or markings the inventory used. Separately, the output
+RULES now state that `scene` carries `extra` and `setting_match` and no other
+key, closing the invented `missing` array.
+
+**Rationale:** The three candidate layers were weighed against the evidence, not
+preference. (a) The INVENTORY template telling stage 1 to file cast animals in
+`figures[]` would make a blind describer resolve identity — the one thing it is
+built not to do — and would break the `objects[]` contract the rest of the judge
+and `figure_completeness` depend on. (c) CODE reconciling the two arrays before
+the judge sees them cannot work without semantic matching: nothing in
+`{"what": "a small dog"}` names the roster entry, so the code would be
+classifying a finding from description prose, which docs/SETTLED.md forbids.
+(b) is what remained, and it is not a judgement call: the existing instruction is
+factually broken, and repairing a broken instruction is prompt work by
+definition. The severity lever was already pulled and needed nothing —
+`MAX_SEVERITY_TYPES.unverified_absence` has capped this type at MINOR since
+2026-08-09, so the stored MAJOR never cost MAJOR; what it cost was a repair
+instruction to add an animal that is already drawn.
+
+**Scope, stated plainly:** the blind compliance judge is OFF since `c1c119ad8`
+(docs/SETTLED.md, 2026-09-19), so this changes no production page today. It is a
+precision fix on a stage that is re-armable with `PROMPT_COMPLIANCE_JUDGE=true`,
+and it removes one of the false-finding classes that argued for switching it off.
+It is NOT evidence for re-enabling it; that reversal needs its own protocol.
+
+**Touched:** `prompts/image-prompt-compliance.txt`,
+`tests/unit/stage1-inventory-audit.test.ts`,
+`tests/unit/fixtures/stage1-inventory-job_1789759147125_p08djwhbl.json`.
+
+**Status:** ✅ active
+
+## 2026-09-19 — `visionInventory` is a JSON STRING by design; the reported char-indexed storage does not exist
+
+**Context:** The same audit reported that
+`stories.data.sceneImages[].threeStageResult.visionInventory`,
+`complianceResult` and `fixableIssues` are persisted char-indexed
+(`{"0":"{","1":"\"f",…}`) — a string spread into an object — so any consumer
+doing `vi.figures` silently reads `undefined`.
+
+**Decision:** Not reproduced; nothing changed in the writer. Measured read-only
+on staging: 40 recent stories, 365 pages carrying a `threeStageResult`, plus a
+recursive walk of every `sceneImages[]`, `coverImages` and nested
+`imageVersions[]` record and every `testlab_*` jsonb column — zero char-indexed
+records for any of the three fields. On the audited story all 18 pages hold
+`visionInventory` as a plain JSON string.
+
+**Rationale:** `visionInventory` is a string on purpose —
+`evalPipeline.js:1010` writes `JSON.stringify({figures, interactions, objects,
+setting, lettering, rendering}, null, 2)` because the field's consumer is the
+compliance judge's prompt, which needs text — and `client/src/types/story.ts:766`
+declares it `string`. So `vi.figures` is `undefined` because it is a string, not
+because anything spread it, and `{...thatString}` in a reader's own probe
+produces exactly the reported shape. No code path in the repo spreads it. The
+consumer sweep found ONE reader of `visionInventory`,
+`client/src/components/generation/story/ImageHistoryModal.tsx:830`, which renders
+it as text — correct, and nothing reads `.figures` off it. No migration, no
+read-time repair, no dual-format reader.
+
+**Touched:** `tests/unit/stage1-inventory-audit.test.ts` (round-trip pin, so a
+real spread fails a test), `tasks/BACKLOG.md`.
+
+**Status:** ✅ active
