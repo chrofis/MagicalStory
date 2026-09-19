@@ -85,6 +85,49 @@ const THEME_PLAY_SENTENCE = {
 };
 
 /**
+ * The make-believe ARM of the trial idea generator, and the trial writer that
+ * follows it, both have to say what the invented world IS. They said
+ * "a make-believe ${themeId} world", which failed twice over: the raw ID
+ * reached the prompt ("a make-believe mothers-day world"), and — the larger
+ * fault — it treated every theme as a WORLD. A role is something a child plays
+ * AS; a place is somewhere they go TO. "A make-believe firefighter world" is
+ * not an elsewhere at all, which is why the make-believe card kept coming back
+ * as a helmet in a bedroom: indistinguishable from the own-town card that was
+ * handed the very same theme.
+ *
+ * One sentence per KIND, no theme named in any of them — a new theme needs a
+ * row in THEME_PLAY and nothing else.
+ */
+const FANTASY_WORLD_SENTENCE = {
+  // The theme IS the world.
+  place: (phrase) => `That make-believe is ${phrase}.`,
+  // A role is not a world: the world is the place such a person belongs in, and
+  // the model has to invent it rather than be handed the label.
+  role: (phrase) => `That make-believe is where ${phrase} belongs; invent that place — the role itself is not a world.`,
+  // An occasion is a DAY, not a place. Nothing about a date describes an
+  // elsewhere, so the world is invented freely and the occasion stays what it
+  // actually is — when the story happens.
+  occasion: (phrase) => `That make-believe is freely invented; ${phrase} is the day it happens on, not a place.`,
+};
+
+/**
+ * What the make-believe world IS, as one sentence to follow "a make-believe
+ * world." Returns '' when there is no wrapper (empty / `realistic`), so callers
+ * can concatenate it unconditionally.
+ * @param {string} themeId a storyTypes.ts adventure theme ID
+ * @returns {string} a grammatical English sentence, or ''
+ */
+function buildFantasyWorldSentence(themeId) {
+  const id = String(themeId || '').trim();
+  if (!id || id === 'realistic') return '';
+  const entry = THEME_PLAY[id];
+  // Unknown ID (a new theme, or `custom`'s free text): quoting sidesteps both
+  // the article and the kind.
+  if (!entry) return `That make-believe grows out of "${id}".`;
+  return FANTASY_WORLD_SENTENCE[entry[0]](entry[1]);
+}
+
+/**
  * Which of the three kinds a theme ID is, or null when it is not a make-believe
  * wrapper at all (missing, empty, or the explicit `realistic` setting).
  * @param {string} themeId
@@ -113,4 +156,11 @@ function buildThemePlaySentence(themeId) {
   return THEME_PLAY_SENTENCE[entry[0]](entry[1]);
 }
 
-module.exports = { THEME_PLAY, THEME_PLAY_SENTENCE, themeKind, buildThemePlaySentence };
+module.exports = {
+  THEME_PLAY,
+  THEME_PLAY_SENTENCE,
+  FANTASY_WORLD_SENTENCE,
+  themeKind,
+  buildThemePlaySentence,
+  buildFantasyWorldSentence,
+};

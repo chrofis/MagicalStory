@@ -21,6 +21,74 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — A ROLE is not a WORLD: the make-believe idea arm words its world by the theme's KIND
+
+**Context.** The `/try` idea endpoint returns two cards per cell — one in the child's own town, one
+in a make-believe world — which by owner decision (2026-08-25) must differ in KIND. Both arms are
+handed the SAME `storyTheme`: the local arm through its category context (`server/routes/trial.js`,
+"The child plays at being a pirate"), the make-believe arm through one line in
+`buildTrialIdeaPrompts`:
+
+```
+Set this idea in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world.
+```
+
+Two faults in that one line. The lesser: the raw catalogue ID reached the prompt — *"a make-believe
+mothers-day world"*, *"a make-believe fireman world"* — one of the three raw-`storyTheme` sites
+still open from the 2026-09-15 "plays at being a farm" fix. The one that mattered: **it treats every
+theme as a world.** A role is something a child plays AS; a place is somewhere they go TO. Measured
+over rounds 6 and 7, **10-11 of 14 cells produced duplicate or near-duplicate premise shapes across
+the two arms**, and in **three cells card 2 was not a make-believe world at all** — a helmet thrown
+in a room, a chestnut crown, a cardboard helmet in a cellar. The split in the data is clean:
+place/creature themes (dinosaur, mermaid, unicorn, ocean, space, jungle, forest, farm) produced a
+genuine elsewhere; role themes (fireman, detective, princess, ninja, pirate, knight, wizard, doctor,
+police, cowboy, superhero, samurai, viking) did not. "A make-believe firefighter world" is barely
+distinguishable from playing firefighter in a bedroom — which is exactly the own-town card.
+
+**The want-axis fix earlier the same day (`d348b5b4f`) addressed the wrong half of the premise.**
+Shape-class want draws were a real defect and that fix stands, but a want is what the character is
+after; the convergence measured here is in the WORLD the premise is set in. Handed the same theme
+and told only "a make-believe <role> world", both arms wrote the same room. This is the actual cause.
+
+**Decision.** The make-believe world sentence is worded by the theme's **KIND**, from the existing
+`server/config/storyThemes.js` classification (`themeKind` / `THEME_PLAY`, built for the 2026-09-15
+fix — no second classification). `buildFantasyWorldSentence(themeId)` returns ONE sentence per kind,
+with no theme named in any template, so a new theme needs a `THEME_PLAY` row and nothing else:
+
+| kind | sentence | example |
+|---|---|---|
+| place | the theme IS the world | `That make-believe is the deep ocean.` |
+| role | the world is where such a person belongs, invented rather than labelled | `That make-believe is where a firefighter belongs; invent that place — the role itself is not a world.` |
+| occasion | an occasion is a DAY, not a place | `That make-believe is freely invented; Mother's Day is the day it happens on, not a place.` |
+| none / `realistic` | `''` — the generic "a make-believe world." stands alone | |
+| unknown ID / `custom` | quoted, so free text can never be inflected | `That make-believe grows out of "…".` |
+
+**Occasions, and why.** Nothing about a date describes an elsewhere; "a make-believe Christmas
+world" was the worst of the raw-ID renders. Forcing an occasion into a setting would invent
+Christmas-land for a story whose subject is a day at home. So the occasion is demoted to what it
+actually is — WHEN the story happens — and the world is left to be invented freely. The occasion
+still reaches the prompt through `buildThemePlaySentence`, unchanged.
+
+**The sibling.** `buildStoryPrompt`'s trial `# World` block emitted the same sentence
+(`A make-believe ${theme}world.`) to the writer that follows the accepted idea; fixing the idea arm
+alone would have handed the writer "a make-believe fireman world" for the premise the visitor
+accepted. Both sites now call the one builder. The `/try` route and the Lab's idea stage both go
+through `buildTrialIdeaPrompts` (verified, not assumed), so the Lab mirror gets this for free.
+
+**Not touched:** the local arm's category context, the three-slot contract, change A, the
+animal-fate rule, the axis classes and the want-shape draw. Verified present in the built prompts
+for both arms at ages 3 and 8 on one role theme and one place theme, with rule D still absent.
+
+**Also noted, not changed:** `mermaid` is classified `role` in `THEME_PLAY` (correct for "plays at
+being a mermaid") while it behaves as a creature-world in the idea data. Reclassifying it would
+need a second noun phrase per theme; left as an open observation.
+
+**Touched:** `server/config/storyThemes.js` (`FANTASY_WORLD_SENTENCE`, `buildFantasyWorldSentence`),
+`server/lib/promptBuilders.js` (`buildTrialIdeaPrompts`, the trial `# World` block),
+`tests/unit/theme-play-sentence.test.ts` (7 contract tests).
+**Status:** ✅ active — local commit only, not pushed.
+
+
 ## 2026-09-19 — The central-object coverage rule is REVERTED: it fires on the lost-object stories it was meant to protect, and it reads an object out of a column of characters
 
 **Context.** Earlier today `b1e298926` shipped two rules from one story. One was about the arc
