@@ -10,7 +10,9 @@ Characters: {CHARACTER_NAMES}
 
 {STORY_BRIEF}
 
-# CHARACTER DETAILS (source of truth for who these children are: never contradict a trait, never invent one)
+# CHARACTER DETAILS
+
+{CHARACTER_SOURCE_RULE}
 
 {CHARACTER_DETAILS}
 

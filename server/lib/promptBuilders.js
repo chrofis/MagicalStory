@@ -11,6 +11,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
+const { buildFantasyWorldSentence } = require('../config/storyThemes');
 const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
 // significantEntityTokens is NOT imported here any more: its only consumer in
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
@@ -6210,16 +6211,33 @@ function buildStoryBriefBody(inputData) {
  *
  * The split is by KIND, not by precedence in general: a saved profile knows who
  * a child IS and cannot know what happens in a book not yet written.
+ *
+ * @param {Object} opts
+ *   master  which document outranks the saved profile on the SITUATION.
+ *           'premise' for the stages that still answer to the commission — the
+ *           arc creator, its re-telling and its reviewer. 'arc' for the stages
+ *           that divide or dress a SETTLED arc, where the commission is history
+ *           and the arc is the master.
+ *
+ * Two variants, one construction. story-beats.txt divides a finished story, so
+ * telling its planner that the premise outranks the profile would point it at a
+ * document it is explicitly forbidden to act on ("divide it, never retell or
+ * repair it").
  */
-const CHARACTER_SOURCE_RULE = [
-  'These details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.',
-  "The commission decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the premise — a friendship where the premise stages a first meeting — the premise stands, and the detail is simply not true yet in this book.",
-].join('\n');
+function characterSourceRule({ master = 'premise' } = {}) {
+  const situation = master === 'arc'
+    ? 'The arc above is settled and decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the arc — a friendship where the arc stages a first meeting — the arc stands, and the detail is simply not true in this book.'
+    : 'The commission decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the premise — a friendship where the premise stages a first meeting — the premise stands, and the detail is simply not true yet in this book.';
+  return [
+    'These details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.',
+    situation,
+  ].join('\n');
+}
 
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
   const brief = buildStoryBriefBody(inputData);
-  const characterSourceRule = CHARACTER_SOURCE_RULE;
+  const characterSourceRuleText = characterSourceRule();
 
   const mainIds = inputData.mainCharacters || [];
   const characterDetails = (inputData.characters || []).map(char => {
@@ -6294,7 +6312,7 @@ function buildStoryContextFields(inputData) {
       brief,
     ].join('\n'),
     STORY_GUIDE_SECTION: guideSection,
-    CHARACTER_SOURCE_RULE: characterSourceRule,
+    CHARACTER_SOURCE_RULE: characterSourceRuleText,
     CHARACTER_DETAILS: characterDetails,
     MAX_CHARACTERS_PER_SCENE: IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3,
   };
@@ -6844,6 +6862,10 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
   return fillTemplate(template, {
     LANGUAGE: ctx.LANGUAGE,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
+    // 'arc', not the default 'premise': this stage divides a story that is
+    // already settled ("divide it, never retell or repair it"), so the document
+    // that outranks a saved profile here is the ARC, never the commission.
+    CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
     MAX_CHARACTERS_PER_SCENE: ctx.MAX_CHARACTERS_PER_SCENE,
     PAGE_COUNT: pageCount,
     // The output scope follows the mode. A first plan (no replan section)
@@ -8838,9 +8860,12 @@ The main character has two avatar styles available:
       // between are the invented world. No landmark mandate — with it, every
       // "mermaid world" trial was written at the local lake.
       const city = inputData.userLocation?.city || '';
-      const theme = inputData.storyTheme && inputData.storyTheme !== 'realistic' ? `${inputData.storyTheme} ` : '';
+      // What that world IS comes from the theme's KIND, never the raw ID: a
+      // role is someone a child plays AS, not an elsewhere they go TO
+      // (server/config/storyThemes.js).
+      const worldSentence = buildFantasyWorldSentence(inputData.storyTheme);
       landmarksInstruction = `# World
-A make-believe ${theme}world. The first scene shows the child where they really are${city ? ` (${city})` : ''}, dressing up or starting to play, and the last scene brings them back there; every scene between is inside the make-believe world, with its own invented places and no real place names.`;
+A make-believe world.${worldSentence ? ` ${worldSentence}` : ''} The first scene shows the child where they really are${city ? ` (${city})` : ''}, dressing up or starting to play, and the last scene brings them back there; every scene between is inside the make-believe world, with its own invented places and no real place names.`;
     } else if (inputData.availableLandmarks?.length > 0) {
       const top3 = inputData.availableLandmarks.slice(0, 3);
       const cityName = inputData.userLocation?.city || '';
@@ -9259,7 +9284,11 @@ function buildTrialIdeaPrompts({
     ? '\nName no place beyond the landmarks listed above - no other river, lake, mountain, street, square or building. Any further setting must be generic ("the market", "the woods").'
     : '';
   const localIdea = `\n${landmarksText}\nSet this idea ${townClause}, at the real local places named above.${noInventedPlaces} ${themeShows} — the play is the story, never a trip somewhere else.`;
-  const fantasyIdea = `\nSet this idea in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
+  // The make-believe arm's world is worded by the theme's KIND. Handed the
+  // same theme as the local arm and told only "a make-believe <id> world", a
+  // ROLE theme produced no elsewhere at all and the two cards converged.
+  const fantasyWorld = buildFantasyWorldSentence(storyTheme);
+  const fantasyIdea = `\nSet this idea in a make-believe world.${fantasyWorld ? ` ${fantasyWorld}` : ''} It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
 
   return {
     local: base('premise', axes.local) + localIdea,
@@ -9367,6 +9396,7 @@ module.exports = {
   buildArcHintsPrompt,
   buildArcBudgetSection,
   buildTellingRulesSection,
+  characterSourceRule,
   arcCritiqueSpec,
   RISK_FRAMING_RULE,
   ANIMAL_FATE_RULE,

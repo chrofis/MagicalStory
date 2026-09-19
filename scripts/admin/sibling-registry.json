@@ -446,6 +446,18 @@
         ],
         "anchorsNote": "The three keys of the shared table, which every member must read: the JSON declares them, and each predicate module resolves all three (legacyNotSet folds into the unanswered set - a pre-split save is not distinguishable from the default retroactively, so it emits nothing). A fourth sentinel added to the table and read by only one runtime is exactly the drift this set exists to catch. The predicates themselves are named identically on both sides - isNotSetRelationship and isStrangersRelationship - so a call site cannot silently get the question it did not mean; that the two agree on every label in every UI language is asserted in tests/unit/beats-brief-relationships.test.ts, which imports the client module and the server module into one test, because an anchor cannot check agreement."
       }
+    },
+    {
+      "id": "character-source-claim",
+      "axis": "which document outranks the saved character profile",
+      "reason": "Four prompts state what a saved character profile is AUTHORITATIVE FOR, and they must not disagree. The arc creator, its re-telling and its reviewer answer to the COMMISSION; the beats planner divides a settled arc and answers to the ARC. All four fill {CHARACTER_SOURCE_RULE} from characterSourceRule() in promptBuilders.js, with the planner passing master:'arc'. This set exists because the rule drifted the day it was written (2026-09-19): the split landed on arc-create and arc-retell, while story-arc-review still called the profile the source of truth — so the arc creator was told the premise outranks a saved detail while its own CRITIC was told the opposite. The motivating story is staging job_1789759147125_p08djwhbl, whose premise stages four boys meeting as strangers over one egg while every profile calls them good friends.",
+      "members": [
+        "prompts/arc-create.txt",
+        "prompts/arc-retell.txt",
+        "prompts/story-arc-review.txt",
+        "prompts/story-beats.txt"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

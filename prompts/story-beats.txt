@@ -14,7 +14,9 @@ The arc above delivers the commission; keep its names and world as written.
 
 {STORY_PREMISE}
 
-# CHARACTER DETAILS (source of truth for who these characters are, their ages included: never contradict a trait, never invent one)
+# CHARACTER DETAILS
+
+{CHARACTER_SOURCE_RULE}
 
 {CHARACTER_DETAILS}
 

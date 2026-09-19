@@ -48018,3 +48018,55 @@ on a parser succeeding upstream is not a guard.
 `server/lib/beatsPipeline.js` (the `diffCastRemovals` call site),
 `tests/unit/worn-handover-owner-offcast.test.ts`.
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The character-source rule reaches all four stages that claim one, and names the right master for each
+
+**Context.** The split shipped earlier today ("the commission owns the situation, the
+saved profile owns the person") landed on `arc-create.txt` and `arc-retell.txt` and
+stopped there. Two other prompts still asserted the opposite:
+
+- `story-arc-review.txt`: *"CHARACTER DETAILS (source of truth for who these children
+  are: never contradict a trait, never invent one)"* — this is the arc creator's own
+  **critic**. The generator was told the premise outranks a saved detail while the
+  critic was told the profile is the source of truth, so the critic had every reason to
+  flag the strangers-meeting as contradicting the profile.
+- `story-beats.txt`: *"(source of truth for who these characters are, their ages
+  included…)"* — the planner dividing the settled arc.
+
+**Decision.** `CHARACTER_SOURCE_RULE` becomes `characterSourceRule({ master })`, filled
+into all four templates. The trait half is identical everywhere; only the SITUATION half
+moves:
+
+- `master: 'premise'` (default) — the arc creator, its re-telling and its reviewer, all
+  of which still answer to the commission.
+- `master: 'arc'` — `buildBeatsPrompt` alone: *"The arc above is settled and decides the
+  SITUATION… Where a saved detail contradicts the arc, the arc stands."*
+
+The planner variant is not cosmetic. `story-beats.txt` opens *"The story below is
+finished… divide it, never retell or repair it"*, so telling it the premise outranks the
+profile would point it at a document it is forbidden to act on.
+
+Registered as sibling set `character-source-claim` (severity `block`) — four prompts,
+one builder. The set exists because this rule drifted **the day it was written**.
+
+**What was NOT changed.** `story-beats.txt` mentions traits exactly once — in the
+heading this replaced — and not one of its 36 rules uses a strength, a flaw or a
+personality, so Levin's 25 strengths and 7 flaws (2,106 chars) reach a shot-planning
+prompt to be "never contradicted" and for nothing else. Trimming the block per stage was
+deliberately not done: the owner's 2026-09-19 ruling on the trait cap chose the wizard
+over the prompt precisely so the saved profile means the same thing to every consumer.
+The volume is a wizard-side matter, and the cap now fixes it going forward.
+
+`prompts/arc-panel.txt` and `prompts/arc-hints.txt` head the block with a bare
+`# CHARACTER DETAILS` and make no source claim, so they cannot contradict and are left
+alone. `prompts/story-text-from-beats.txt` deliberately says something different and
+correct for its own stage ("optional colour — use a trait where it fits a moment, never
+contradict one, never work through a whole list") and is untouched.
+
+**Touched:** `server/lib/promptBuilders.js` (`characterSourceRule`, `buildBeatsPrompt`),
+`prompts/story-beats.txt`, `prompts/story-arc-review.txt`,
+`scripts/admin/sibling-registry.json`, `tests/unit/character-source-rule-reach.test.ts`.
+
+**Status:** ✅ active
