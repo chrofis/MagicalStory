@@ -50424,3 +50424,47 @@ out of the people-vs-people arithmetic, and `charRepairTarget` does not pass
 `tests/unit/creature-declares-page-roster.test.ts`
 **Status:** ✅ active
 
+
+---
+
+## 2026-09-19 — `TEXT_NOT_A_CHECKLIST` is cut to its reader: the author gets the permission, the judge gets the verdict
+
+**Context.** The owner's 2026-09-18 directive ("a text can be 3 actions, the image must focus on
+one") became one exported constant filled into eight templates: four that AUTHOR a page brief
+(`scene-expansion-all.txt`, `scene-expansion.txt`, `scene-iteration.txt`,
+`scene-iteration-free.txt`) and four that JUDGE one (`scene-review.txt`, `image-semantic.txt`,
+`image-prompt-compliance.txt`, `book-audit.txt`).
+
+The constant has two halves. The first is a PERMISSION every reader needs — a picture stages the one
+moment its brief names, and staging fewer than the text names is the brief working. The second is a
+VERDICT rule, addressed to something that scores: what severity an absence may carry, that it may not
+be laundered as support for another finding, and that a character lost across the whole book is
+"charged to the plan, never to a picture".
+
+Every site filled the same full string. The fill-site comments already named the split — *"The brief
+author's half is the PERMISSION"* — and then filled both halves anyway. So the Art Director, which
+writes briefs and scores nothing, was told what severity a finding may carry and to charge one to the
+plan. It has no finding, no severity and no plan to charge. Instructions a reader cannot act on
+compete for attention with the ones it can, in the longest prompt in the pipeline.
+
+**Decision.** `textNotAChecklistRule({ role })` returns the view. `role: 'author'` is the permission
+half alone; `role: 'judge'` is both, and is a **strict prefix extension** of the author view, so this
+remains one constant cut to its reader rather than two strings that can drift. The default is
+`'judge'`: a new call site that forgets the argument gets the COMPLETE rule, never a silently
+weakened one. `TEXT_NOT_A_CHECKLIST_RULE` keeps its name and its judge value, so the three judge fill
+sites outside `promptBuilders.js` (`bookAudit.js`, `evalPipeline.js`, `sceneValidator.js`) are
+untouched.
+
+**Rationale.** The alternative — two independent constants — is the hand-kept-copy failure this repo
+has already had four times in one week. A prefix relationship is testable: the reach test asserts the
+judge view contains the author view byte for byte, that no author template carries the verdict half,
+and that no judge template is short of it.
+
+`image-evaluation.txt` remains deliberately excluded (owner, 2026-09-18) — that judge is handed no
+page text on any path, so the rule could never fire there.
+
+**Touched:** `server/lib/promptBuilders.js` (`textNotAChecklistRule`, three author fill sites at the
+Art Director and iterate builders), `tests/unit/text-checklist-by-reader.test.ts` (new),
+`tests/unit/text-not-a-checklist-reach.test.ts` (per-reader contract).
+
+**Status:** ✅ active

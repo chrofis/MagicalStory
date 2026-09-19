@@ -2612,7 +2612,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
     // PERMISSION: the page text may name more than the frame stages.
-    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    TEXT_NOT_A_CHECKLIST: textNotAChecklistRule({ role: 'author' }),
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -2908,7 +2908,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
     // PERMISSION: the page text may name more than the frame stages.
-    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    TEXT_NOT_A_CHECKLIST: textNotAChecklistRule({ role: 'author' }),
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
@@ -3347,7 +3347,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // ONE rule for every template that authors or judges a page against its
     // text — see TEXT_NOT_A_CHECKLIST_RULE. An iterate rewrites the WHOLE
     // brief, so the permission to stage one moment has to travel with it.
-    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    TEXT_NOT_A_CHECKLIST: textNotAChecklistRule({ role: 'author' }),
       // The rewrite restates every character's appearance from CHARACTER
       // DETAILS, which is where a declared colour drifts — see
       // DECLARED_TRAIT_VERBATIM_RULE. One constant, both iterate templates,
@@ -7753,7 +7753,40 @@ const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single m
  * tests/unit/text-not-a-checklist-reach.test.ts — a placeholder nobody declares
  * is stripped by fillTemplate silently.
  */
-const TEXT_NOT_A_CHECKLIST_RULE = "A page's text may name several characters and several actions; its picture stages one moment — the one its brief names. A character or an action the text names and the frame does not show is not a fault: not at any severity, and not as support for another finding. Where the whole book is in view, one absence is a fault: a character the story gives a moment of their own — an obstacle they raise, a turn they cause — that no page's plan line stages. Charge that one to the plan, never to a picture.";
+/**
+ * TWO READERS, TWO HALVES (2026-09-19).
+ *
+ * This rule reaches eight templates, and they are not the same kind of reader:
+ * four AUTHOR a brief (the two Art Director templates and the two iterate
+ * templates) and four JUDGE one (scene review, the semantic and compliance
+ * judges, the book audit).
+ *
+ * The halves were already named in the comments at the fill sites — "the brief
+ * author's half is the PERMISSION", "this reviewer ... the second half ... is
+ * nameable here" — and every site nonetheless filled the whole string. So an
+ * Art Director writing a brief was told what severity a finding may carry and
+ * to "charge that one to the plan, never to a picture". It cannot charge
+ * anything to anything: it does not score, does not assign severity and does
+ * not make findings. Two thirds of the rule was verdict language in an author's
+ * prompt.
+ *
+ * The permission is what an author needs and the judge needs too — it is the
+ * premise its verdict rests on — so the judge view is the whole rule and the
+ * author view is its first half. `judge` is the default: a new call site that
+ * forgets to say gets the complete rule rather than a silently weakened one.
+ *
+ * @param {Object} opts
+ *   role  `author` for a stage that WRITES a brief, `judge` for one that rules
+ *         on a page against its text.
+ */
+function textNotAChecklistRule({ role = 'judge' } = {}) {
+  const permission = "A page's text may name several characters and several actions; its picture stages one moment — the one its brief names. Staging fewer than the text names is the brief working, not a shortfall to make up.";
+  if (role === 'author') return permission;
+  return permission + " A character or an action the text names and the frame does not show is not a fault: not at any severity, and not as support for another finding. Where the whole book is in view, one absence is a fault: a character the story gives a moment of their own — an obstacle they raise, a turn they cause — that no page's plan line stages. Charge that one to the plan, never to a picture.";
+}
+
+/** The judge view, for the four call sites that rule on a page. */
+const TEXT_NOT_A_CHECKLIST_RULE = textNotAChecklistRule({ role: 'judge' });
 
 /**
  * What may become of an animal a character cares about. ONE constant, two
@@ -9728,6 +9761,7 @@ module.exports = {
   // live outside this file (prompts.js, evalPipeline.js, sceneValidator.js,
   // bookAudit.js) read the same string, never a copy of it.
   TEXT_NOT_A_CHECKLIST_RULE,
+  textNotAChecklistRule,
   ELEMENT_ENTRY_PAGE_RULE,
   TRUE_RELATIVE_SIZE_RULE,
   NO_CHARACTER_MARKING_RULE,

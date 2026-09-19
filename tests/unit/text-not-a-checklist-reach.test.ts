@@ -15,6 +15,10 @@
  *
  * WHAT IS PINNED — the constant reaches the BUILT prompt of every one of the
  * eight consumers, byte-identically, with no unfilled placeholder left behind.
+ * Since A7 (2026-09-19) it reaches them in TWO VIEWS from one function: a
+ * template that authors a brief gets the permission half, a template that
+ * judges one gets both, and the author view is a strict prefix of the judge
+ * view. See AUTHOR_TEMPLATES below — still one constant, cut to its reader.
  * fillTemplate deletes an undeclared key silently, so a template that "has the
  * rule" can still ship with a hole where it was. Nothing here asserts what the
  * rule SAYS beyond the two halves being structurally present and distinct:
@@ -43,7 +47,7 @@ const require_ = createRequire(import.meta.url);
 const ROOT = path.join(__dirname, '..', '..');
 
 const PB = require_('../../server/lib/promptBuilders.js');
-const { TEXT_NOT_A_CHECKLIST_RULE: RULE } = PB;
+const { TEXT_NOT_A_CHECKLIST_RULE: RULE, textNotAChecklistRule } = PB;
 const { loadPromptTemplates, buildEvaluationPrompt, PROMPT_TEMPLATES } = require_('../../server/services/prompts.js');
 const { buildSemanticPrompt } = require_('../../server/lib/sceneValidator.js');
 const { evaluateThreeStage, buildExpectedCastBlock } = require_('../../server/lib/evalPipeline.js');
@@ -120,6 +124,21 @@ const complianceFixture = require_('./fixtures/animal-cast-job_1789348171785_9ox
 const CP = complianceFixture.pages.find((p: any) => p.pageNumber === 7);
 
 const BUILT: Array<{ name: string; template: string; text: string }> = [];
+
+// WHICH VIEW EACH SITE GETS (A7, owner, 2026-09-19). The rule has two halves,
+// and only one of its readers can act on the second. A template that AUTHORS a
+// brief gets the PERMISSION half; a template that JUDGES one gets both — the
+// author view is a strict prefix of the judge view, so "reaches every site"
+// still means one constant, cut to its reader, never a hand-kept copy.
+const AUTHOR_TEMPLATES = new Set([
+  'prompts/scene-expansion-all.txt',
+  'prompts/scene-expansion.txt',
+  'prompts/scene-iteration.txt',
+  'prompts/scene-iteration-free.txt',
+]);
+const AUTHOR_RULE = textNotAChecklistRule({ role: 'author' });
+/** The exact string this site must carry, byte for byte. */
+const viewFor = (b: { template: string }) => (AUTHOR_TEMPLATES.has(b.template) ? AUTHOR_RULE : RULE);
 
 // ── Build every one of the nine, once ───────────────────────────────────────
 
@@ -308,9 +327,19 @@ describe('the constant reaches all eight BUILT prompts', () => {
     for (const b of BUILT) expect(b.text.length, `${b.name} built empty`).toBeGreaterThan(400);
   });
 
-  it('every one carries the constant byte-identically', () => {
-    const gaps = BUILT.filter(b => !b.text.includes(RULE)).map(b => b.name);
+  it('every one carries its view of the constant byte-identically', () => {
+    const gaps = BUILT.filter(b => !b.text.includes(viewFor(b))).map(b => b.name);
     expect(gaps, 'fillTemplate deletes an undeclared key silently — the rule ships as a hole').toEqual([]);
+  });
+
+  it('no brief author is handed the verdict half it cannot act on', () => {
+    const over = BUILT.filter(b => AUTHOR_TEMPLATES.has(b.template) && b.text.includes(RULE)).map(b => b.name);
+    expect(over, 'an Art Director cannot charge a finding to the plan — it writes briefs and scores nothing').toEqual([]);
+  });
+
+  it('every judge still gets BOTH halves', () => {
+    const short = BUILT.filter(b => !AUTHOR_TEMPLATES.has(b.template) && !b.text.includes(RULE)).map(b => b.name);
+    expect(short, 'a judge on the permission half alone would excuse a character lost across the whole book').toEqual([]);
   });
 
   it('none leaves {TEXT_NOT_A_CHECKLIST} unfilled', () => {
@@ -326,7 +355,7 @@ describe('the constant reaches all eight BUILT prompts', () => {
 
   it('each one states the rule exactly once — eight copies, not eight-plus-a-hand-copy', () => {
     const dupes = BUILT
-      .map(b => ({ name: b.name, n: b.text.split(RULE).length - 1 }))
+      .map(b => ({ name: b.name, n: b.text.split(viewFor(b)).length - 1 }))
       .filter(e => e.n !== 1);
     expect(dupes, 'a second occurrence means a hand-kept copy is back').toEqual([]);
   });
