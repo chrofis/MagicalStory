@@ -1780,6 +1780,61 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  * @param {Array<string>} opts.removedItems - the garment names being taken off
  * @returns {Promise<{imageData, verdict, attempts, prompt}|null>}
  */
+/**
+ * The redress instruction: keep everything in the picture, change one thing.
+ *
+ * NAME THE STAYING GARMENTS, DO NOT DESCRIBE THEM (owner, 2026-09-19). The
+ * first version of this prompt repeated the full contract text for every
+ * garment that stays, and the provider repainted those garments to match the
+ * WORDS rather than leave the picture alone — Levin's variant came back with a
+ * knitted cap because the contract said "chunky-knit" where the sheet shows
+ * smooth flat weave, and with corduroy wales where the sheet shows denim seams.
+ * That is cross-page wardrobe drift inside one story, which is the exact
+ * failure this whole feature exists to prevent. So a staying garment is named
+ * by a short label — colour plus garment noun, derived structurally from its
+ * clause head by `shortGarmentLabel` — and the attached sheet is named as the
+ * authority for how it looks. No adjective of the contract's reaches the
+ * provider for a garment it is not being asked to change.
+ *
+ * The ONE garment that does change is described in full: the under-layer the
+ * removal exposes has to be DRAWN, and in the turned-away cells the sheet has
+ * never shown it. `headIsUnderLayer` picks that clause out syntactically; when
+ * no clause declares itself an under-layer, every garment is short-labelled and
+ * the line is omitted rather than guessed at.
+ *
+ * LEAD WITH WHAT IS WORN (owner, 2026-09-19) — the removal stays second,
+ * because the provider anchors on what it is asked to draw and tends to keep a
+ * garment it is only asked to take away.
+ *
+ * And nothing is "revealed" in a cell that faces away: the front and side cells
+ * already show the under-layer at the chest opening, while the rear cells show
+ * only the removed garment's back panel, so there the back of the under-layer
+ * has to be drawn, not uncovered.
+ */
+function buildRedressPrompt(resolvedOutfit, removedItems) {
+  const { splitClausesDetailed, shortGarmentLabel, headIsUnderLayer } = require('./wornItems');
+  const items = (removedItems || []).map(s => String(s || '').trim()).filter(Boolean);
+  const clauses = splitClausesDetailed(resolvedOutfit);
+  const exposed = clauses.find(c => headIsUnderLayer(c.head)) || null;
+  const staying = clauses.filter(c => c !== exposed).map(c => shortGarmentLabel(c.head).label).filter(Boolean);
+
+  const keepLine = staying.length
+    ? `Keep what the character already wears exactly as Image 1 draws it — ${staying.join(', ')}. Image 1 is the only authority for their colour, cut, fabric and weave: copy them, do not redraw them from words.`
+    : 'Keep what the character already wears exactly as Image 1 draws it — Image 1 is the only authority for colour, cut, fabric and weave.';
+  const removalLine = items.length === 1
+    ? `One thing changes. The ${items[0]} is off: not on the character, no replacement garment in its place, and nowhere else in the sheet.`
+    : `These change. Off — ${items.join('; ')}: not on the character, no replacement garment in their place, and nowhere else in the sheet.`;
+  const exposedLine = exposed
+    ? `\nWith that gone the garment under it is the outer one there, so draw it in full: ${exposed.text.replace(/[.;]\s*$/, '')}.`
+    : '';
+
+  return `Edit Image 1 — a 2×4 character reference sheet (8 cells).
+${keepLine}
+Draw each of those garments right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
+${removalLine}${exposedLine}
+Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style.`;
+}
+
 async function redressSheetVariant(baseSheetImageData, opts = {}) {
   const {
     characterName = 'character', characterAge = null, facePhoto = null,
@@ -1790,25 +1845,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 
   const items = (Array.isArray(removedItems) ? removedItems : []).map(s => String(s || '').trim()).filter(Boolean);
   if (items.length === 0) return null;
-  // LEAD WITH WHAT IS WORN (owner, 2026-09-19). The instruction states the
-  // variant's outfit POSITIVELY and puts the removal second: the provider
-  // anchors on what it is asked to draw and tends to keep a garment it is only
-  // asked to take away (memory `feedback_grok_pose_category_words`).
-  //
-  // And nothing is "revealed" in a cell that faces away. Measured on the real
-  // base sheet: the under-layer is already visible at the chest opening in the
-  // front and side cells, while the rear cells show only the removed garment's
-  // back panel — so in those the back of the under-layer has to be DRAWN, and a
-  // prompt that says it becomes visible is asking for something that is not
-  // there.
-  const removalLine = items.length === 1
-    ? `The ${items[0]} is off:`
-    : `These are off — ${items.join('; ')}:`;
-  const prompt = `Edit Image 1 — a 2×4 character reference sheet (8 cells).
-In every cell the character wears exactly this, and no layer over it: ${resolvedOutfit}
-Draw each of those garments right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
-${removalLine} not on the character, no replacement garment in its place, and nowhere else in the sheet.
-Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style, same colours for every garment that stays.`;
+  const prompt = buildRedressPrompt(resolvedOutfit, items);
 
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
@@ -1880,6 +1917,7 @@ Change nothing else. Same character, same face, same hair, same body, same poses
 module.exports = {
   generateCharacter2x4Sheet,
   redressSheetVariant,
+  buildRedressPrompt,
   // Exported for tests: the declared-age proportion block must reach the prompt.
   declaredAgeBlock,
   buildPrompt,

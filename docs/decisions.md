@@ -47207,3 +47207,83 @@ test that compares the rendered block across both.
 `tests/unit/character-source-precedence.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — A wardrobe clause OWNS its dependent phrases, and they leave with it
+
+**Context.** An outfit contract is one sentence of semicolon- and comma-separated items, and
+`splitClauses` in `server/lib/wornItems.js` cut it at every top-level separator. A garment clause
+often carries a trailing phrase that describes it rather than naming a new garment — a phrase that
+opens with a preposition or a participle of wearing. Measured on staging job_1789759147125_p08djwhbl,
+a character's contract read "… a forest-green zip-up fleece jacket with a wide body and two front
+pockets, worn open in scenes where the jacket becomes the egg's bed; …". The comma rule made the
+second half its own top-level clause; removing the jacket left that half standing in the outfit as a
+free-floating fragment, still describing the garment that had just been taken off, now dangling off
+the clause beside it.
+
+**Decision.** `splitClausesDetailed` returns each clause as `{text, head}`. A segment that OPENS with
+a dependent opener (`DEPENDENT_OPENER_RE` — a closed list of prepositions and wearing/attachment
+participles) is attached to the clause before it: it stays inside `text`, so a caller that keeps the
+clause keeps it verbatim, and it leaves with the clause when the clause is removed. It is excluded
+from `head`, and `head` is the only part any garment question is asked of — how many garments the
+clause names, which clause a declared element is, where the layering connective falls. A dependent
+that names a garment its head does not (`dependentCarriesOtherGarment`) makes the module REFUSE the
+strip rather than silently drop an undeclared garment.
+
+**Rationale.** The test is SYNTACTIC and asks only how a segment opens: a top-level item of an outfit
+list is a noun phrase, and a preposition or participle cannot head one. Nothing is read from what the
+segment means, so the rule does not generalise off the one story it was found on. Blast radius,
+measured by sweeping every stored contract before shipping: **501 contracts swept, 30 changed, 471
+byte-identical** — the change is inert on contracts that never had a dependent tail. The list
+conjunctions are deliberately NOT dependent openers ("and a rust-orange scarf" is the last item of a
+list, not a tail), and neither are participial adjectives that premodify a noun ("matching brown
+boots").
+
+**Touched:** `server/lib/wornItems.js` (`splitClauses`, `splitClausesDetailed`,
+`DEPENDENT_OPENER_RE`, `dependentCarriesOtherGarment`, and every clause consumer below it),
+`tests/unit/worn-dependent-clause.test.ts`.
+**Status:** ✅ active (commit 02433d22b)
+
+---
+
+## 2026-09-19 — A redress prompt NAMES the garments that stay and DESCRIBES only the one that changes
+
+**Context.** `redressSheetVariant` edits a character's already-approved 2×4 sheet to take one garment
+off. Its first instruction repeated the FULL CONTRACT TEXT of every garment that stays ("In every cell
+the character wears exactly this …: A chunky-knit red wool pull-on cap with a folded cuff; …
+straight-leg dark navy corduroy trousers; …"). Measured on the Levin variant for
+job_1789759147125_p08djwhbl: the provider repainted the staying garments to match the WORDS instead of
+the PICTURE. The base sheet's cap is smooth flat-woven; the contract says "chunky-knit"; the variant
+came back knitted. The base sheet's trousers are denim with jean seams; the contract says "corduroy";
+the variant came back with corduroy wales. That is cross-page wardrobe drift inside a single story —
+the exact failure the wardrobe-variant feature exists to prevent.
+
+**Decision.** `buildRedressPrompt` (`server/lib/character2x4Sheet.js`) names each staying garment by a
+SHORT LABEL — colour plus garment noun, nothing else ("the red cap", "the navy trousers", "the brown
+boots") — and names the attached sheet as the only authority for their colour, cut, fabric and weave.
+No adjective from the contract reaches the provider for a garment it is not being asked to change. The
+ONE garment that does change is still described in full: the under-layer a removal exposes has to be
+DRAWN, and in the turned-away cells the sheet has never shown it. Labels are derived STRUCTURALLY by
+`shortGarmentLabel` (`server/lib/wornItems.js`) from the clause head produced by
+`splitClausesDetailed` — the rightmost garment noun of the closed `SLOT_NOUNS` vocabulary, and the last
+colour word standing before it in a closed `BASE_COLOURS` word class. The exposed clause is picked out
+by `headIsUnderLayer`, a syntactic test for an under-layer marker; when no clause declares itself one,
+every garment is short-labelled and the line is omitted rather than guessed at. A head with no garment
+noun falls back to its own text verbatim, never to an invented name.
+
+**Rationale.** The picture the provider is editing is a better authority than the prose that produced
+it, and prose the provider is given is prose it will act on. Naming a garment without describing it is
+the only way to say "leave this alone" that cannot be executed as a repaint. Derivation is structural,
+never a hand-written table of garments, so the rule holds for wardrobes it was not tuned on.
+**Verified** by regenerating the same variant: the cap came back to the base sheet's smooth flat weave
+and the trousers to denim, the jacket was gone in all 8 cells, the rear cells stayed correct, identity
+did not drift, and the split evaluator scored it 9/10 valid. The single known cost is that the
+described garment is drawn from its words, so a detail the base sheet showed differently (a crew-neck
+under-layer rendered as a collared shirt) can change on the ONE garment that is meant to change.
+
+**Touched:** `server/lib/character2x4Sheet.js` (`buildRedressPrompt`, `redressSheetVariant`),
+`server/lib/wornItems.js` (`BASE_COLOURS`, `shortGarmentLabel`, `UNDER_LAYER_RE`, `headIsUnderLayer`),
+`tests/unit/redress-prompt-scoping.test.ts`.
+**Status:** ✅ active
+

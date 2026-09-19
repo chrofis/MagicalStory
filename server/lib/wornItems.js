@@ -598,6 +598,74 @@ const ALL_GARMENT_NOUNS = [...new Set(Object.values(SLOT_NOUNS).flat())];
 
 const ANY_GARMENT_RE = new RegExp(`\\b(?:${ALL_GARMENT_NOUNS.join('|')})\\b`, 'i');
 
+/**
+ * The colour words a wardrobe contract uses. Closed and small, the same shape
+ * as SLOT_NOUNS above: a word class, not a lookup of things. A hyphenated
+ * compound whose last part is one of these ("forest-green", "slate-grey") is a
+ * colour too, and is kept whole.
+ */
+const BASE_COLOURS = [
+  'black', 'white', 'grey', 'gray', 'silver', 'gold', 'beige', 'cream', 'ivory', 'tan',
+  'brown', 'chestnut', 'rust', 'orange', 'amber', 'yellow', 'ochre',
+  'green', 'olive', 'teal', 'turquoise', 'blue', 'navy', 'indigo',
+  'purple', 'violet', 'lilac', 'lavender', 'plum', 'burgundy', 'maroon',
+  'red', 'crimson', 'scarlet', 'pink', 'coral',
+];
+const COLOUR_WORD_RE = new RegExp(`^(?:[a-z]+-)?(?:${BASE_COLOURS.join('|')})$`, 'i');
+
+/**
+ * A garment named the way a person naming what they see would: colour +
+ * garment noun, nothing else. Derived STRUCTURALLY from a clause head — the
+ * rightmost garment noun of the closed vocabulary, and the last colour word
+ * standing before it — so no garment is ever hand-listed here.
+ *
+ * WHY A SHORT LABEL (owner, 2026-09-19). A redress instruction that repeats a
+ * staying garment's full contract text makes the provider repaint that garment
+ * to the WORDS instead of leaving the picture alone: measured on Levin's
+ * variant, a smooth flat-woven cap came back knitted because the contract said
+ * "chunky-knit", and denim trousers came back with wales because it said
+ * "corduroy". The short label names the garment without describing it, so the
+ * attached sheet stays the only authority for how it looks.
+ *
+ * `derived` is false when the head carries no garment noun. The caller then
+ * gets the head text back verbatim rather than an invented name.
+ *
+ * @param {string} head - a clause head from splitClausesDetailed
+ * @returns {{label: string, derived: boolean}}
+ */
+function shortGarmentLabel(head) {
+  const text = String(head || '').trim();
+  if (!text) return { label: '', derived: false };
+  const nouns = garmentNounsIn(text, ALL_GARMENT_NOUNS);
+  if (nouns.length === 0) return { label: text, derived: false };
+  // Rightmost noun wins: "zip-up fleece jacket" ends on its head noun, and a
+  // premodifying noun ("t-shirt dress") is never the thing being named.
+  let noun = null;
+  let nounAt = -1;
+  for (const n of nouns) {
+    const m = new RegExp(`\\b${n}\\b`, 'ig');
+    let hit;
+    while ((hit = m.exec(text)) !== null) {
+      if (hit.index >= nounAt) { nounAt = hit.index; noun = hit[0]; }
+    }
+  }
+  if (!noun) return { label: text, derived: false };
+  const before = text.slice(0, nounAt).split(/[^A-Za-z-]+/).filter(Boolean);
+  let colour = null;
+  for (const w of before) if (COLOUR_WORD_RE.test(w)) colour = w;
+  return { label: colour ? `the ${colour.toLowerCase()} ${noun.toLowerCase()}` : `the ${noun.toLowerCase()}`, derived: true };
+}
+
+/**
+ * Does this clause head say its garment sits UNDER another one? Such a garment
+ * is the one a removal makes visible, so it is the one clause a redress
+ * instruction still describes in full — the provider has to draw it, and in the
+ * turned-away cells has never seen it. Syntactic, like every other test here.
+ */
+const UNDER_LAYER_RE = /\b(?:underneath|beneath|under(?:\s+(?:the|a|an|it|that))?|base\s+layer|next\s+to\s+the\s+skin|innermost)\b/i;
+const headIsUnderLayer = (head) => UNDER_LAYER_RE.test(String(head || ''));
+
+
 /** Does this text name a garment at all, through the closed vocabulary? */
 const namesAGarment = (text) => ANY_GARMENT_RE.test(String(text || ''));
 
@@ -1375,6 +1443,8 @@ module.exports = {
   carryForwardWornItems,
   splitClauses,
   splitClausesDetailed,
+  shortGarmentLabel,
+  headIsUnderLayer,
   buildWornStateLines,
   buildWornStateBlock,
   removeWornItemFromOutfit,
