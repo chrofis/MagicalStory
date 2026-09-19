@@ -48729,3 +48729,102 @@ enforced, which is worse than either enforcing it or dropping it.
 `tests/unit/cast-cap-and-peopleless-page.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The entity BODY grid is keyed by wardrobe state; the HEAD grid is not, and the union-drop that stood in for both is deleted
+
+**Context.** `runEntityConsistencyChecks` builds cross-page grids per character and judges
+clothing from pixels against an expected-clothing text. `groupAppearancesByClothing` keyed on
+the bare normalized clothing category, so the `--off:` wardrobe state a page declares never
+reached it: jacket-on and jacket-off cells landed in ONE grid, against ONE reference cell R that
+can only be in one of the two states. Measured on staging `job_1789759147125_p08djwhbl`, stored
+verbatim: *"Levin's green jacket is entirely missing in cell C, but it is part of the standard
+clothing description"* — MAJOR, on a page that correctly did without it.
+
+The mitigation in place was a UNION-DROP: a garment declared off on ANY page of the group was
+stripped from the expected text for ALL of them (`resolveGeneratedOutfit`'s `sceneMetadatas`).
+Its measured cost on that one story: Levin's expected text lost BOTH cap and jacket for all 17
+appearances; the cap, correctly worn on 15 of 17 pages, read as "unexpected" → 2 spurious MAJORs;
+the jacket went UNJUDGED on the 8 pages it was correctly worn; and the false "jacket missing"
+fault fired anyway, because the judge reads the garment off cell R and reinstates the expectation
+the code had deleted. It deleted the right expectation and left the wrong one standing. The
+wardrobe-variant feature makes the untreated fault strictly worse: off-pages now render the
+removal correctly, so each becomes a confident "garment missing".
+
+**Decision.**
+1. The BODY grid groups on `buildOffCategory(normalizeClothingCategory(clothing), offIds)`, so
+   `standard`, `standard--off:CLO002` and `standard--off:CLO001+CLO002` are distinct groups, each
+   resolving its own `--off:` sheet as cell R. Each appearance carries the state, stamped once at
+   collection time from the existing `offIdsForCharacter` — no second derivation.
+2. The HEAD grid is NOT split. Identity is state-independent: taking a jacket off does not change
+   a face, and fragmenting a 17-cell identity corpus into four small ones would weaken every one
+   and multiply the calls. Identity batches over the BASE category, wardrobe per state. A base
+   category with exactly ONE state still emits a single combined task — a story with no
+   off-declarations behaves exactly as before, byte for byte.
+3. A single-page off-group is JUDGED, `minRequired = 1` — the same treatment `costumed` already
+   gets. It is precisely the page the variant sheet was built for.
+4. No matching `--off:` sheet (the Art Director wrote no `redressNote` — the documented loud
+   absence) ⇒ the wardrobe half is NOT judged: the group records `notEvaluated:
+   'no-wardrobe-variant-sheet'` and logs it at error level, while identity still covers those
+   pages through the unsplit head grid. Never the worn sheet — that is the fault itself.
+5. The union-drop is DELETED, not left inert, and with it `resolveGeneratedOutfit`'s
+   `sceneMetadatas` parameter (this was its only caller; every other caller passes one page).
+6. Removals are stated POSITIVELY to the judge — "on these pages the character has deliberately
+   removed: <garment>" — instead of being silently omitted from the expected text. Silent
+   omission is exactly what the judge demonstrated it can undo from the picture.
+
+**Rationale.** Homogeneous groups need no union: one state, one reference, one expectation.
+Replayed read-only against the motivating story (which predates the variant sheets, so every
+off-group is unjudgeable there): Levin's single 17-cell grid becomes one 17-cell identity grid,
+one 8-cell wardrobe grid judged against the full contract (the 8 the union had blinded), and
+three unjudgeable off-groups covering pages 6,7,8,11,12,14,15,16,18 — the pages every false
+"missing garment" MAJOR came from. Julian likewise: p10 (scarf off) leaves the fully-dressed
+group instead of poisoning it. Max and Kiaan, who take nothing off, are unchanged.
+
+**Touched:** `server/lib/entityConsistency.js` (`groupAppearancesByClothing`,
+`planEntityGridTasks`, `hasWardrobeVariantSheet`, `collectEntityAppearances`, the task loop and
+the clothing context), `server/lib/wornItems.js` (`resolveGeneratedOutfit` union removed),
+`prompts/entity-consistency-check.txt`, `scripts/admin/sibling-registry.json`
+(`entity-grid-generator-vs-critic`), `tests/unit/entity-wardrobe-state-grids.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-19 — Two more from the beats review: the invented allowance counts the book, and the divider's commission block keeps its word
+
+**B12 — the allowance was checked against what the arc ADMITTED to.**
+`ARC_INVENTED_OVER_ALLOWANCE` compared `declared.length` alone, so an arc that
+under-declared had its allowance checked against its own understatement and always
+passed. The two findings sat side by side and neither said the book was over.
+`job_1788903616404_iqvhj4l8m` (already named in that function's comment) shipped four
+invented figures on an allowance of two exactly this way. On
+`job_1789759147125_p08djwhbl` the arc declared **none** while its story turns on an
+invented raven — the antagonist that takes the bedding, blocks the warm window and
+trades the cap at the low point — plus a baker.
+
+The effective count is now the union of declared and undeclared. `cast.invented` holds
+only names the plan check's roster reported as PEOPLE, so a ship or a town cannot inflate
+it. The message names the shortfall, so a reader sees which half the arc omitted.
+
+**B6 — "names and world reference only" is now true.** The block carrying that title, and
+the sentence *"The arc above delivers the commission"*, shipped the whole brief including
+the user's raw idea prose — its plot, its obstacles, its deadline. The arc has already
+ruled on those: which obstacles survive, which are dropped as unsuited to the cast's age.
+Re-showing a settled stage the raw idea re-opens those rulings, which is why the two late
+text judges carry no `{STORY_BRIEF}` at all (2026-09-13) and why this stage's own header
+promised not to.
+
+`buildStoryBriefBody(inputData, { worldOnly: true })` keeps the structured world — season,
+setting, category, theme, relationships — and drops the idea prose. The `<user_input>`
+safety wrapper goes with it: with no user text in the block there is nothing to wrap. The
+arc stage is untouched and still receives the idea in full, because it is the stage that
+rules on it.
+
+**Touched:** `server/lib/planCounters.js`, `server/lib/promptBuilders.js`
+(`buildStoryBriefBody`, `buildBeatsPrompt`),
+`tests/unit/invented-allowance-counts-the-book.test.ts`,
+`tests/unit/beats-premise-world-only.test.ts`.
+
+**Status:** ✅ active

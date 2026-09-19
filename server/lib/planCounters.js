@@ -666,9 +666,28 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       add('ARC_INVENTED_UNDECLARED', [],
         `the plan names invented ${undeclared.length === 1 ? 'figure' : 'figures'} ${undeclared.join(', ')} that the arc's own invented list does not carry (arc declared: ${declared.length ? declared.join(', ') : 'none'})`);
     }
-    if (inventedAllowance != null && declared.length > inventedAllowance) {
+    // THE ALLOWANCE IS CHECKED AGAINST WHAT THE BOOK HAS, NOT AGAINST WHAT THE
+    // ARC ADMITTED TO (2026-09-19).
+    //
+    // This compared `declared.length` alone, so an arc that under-declared got
+    // its allowance checked against its own understatement and always passed —
+    // the two findings sat side by side and neither said the book was over.
+    // `job_1788903616404_iqvhj4l8m` (named in the comment above) shipped four
+    // invented figures on an allowance of two exactly this way. On
+    // `job_1789759147125_p08djwhbl` the arc declared NONE while its story turns
+    // on an invented raven — the antagonist that takes the bedding, blocks the
+    // warm window and trades the cap at the low point — plus a baker.
+    //
+    // The effective count is the union: what the arc declared, plus what the
+    // plan names and the arc did not. `cast.invented` holds only names the plan
+    // check's roster reported as PEOPLE, so a ship or a town cannot inflate it.
+    const effective = [...declared, ...undeclared];
+    if (inventedAllowance != null && effective.length > inventedAllowance) {
+      const shortfall = undeclared.length
+        ? ` — ${declared.length} declared (${declared.join(', ') || 'none'}) plus ${undeclared.length} the arc did not name (${undeclared.join(', ')})`
+        : '';
       add('ARC_INVENTED_OVER_ALLOWANCE', [],
-        `the arc declares ${declared.length} invented figures (${declared.join(', ')}) against an allowance of ${inventedAllowance}`);
+        `the book carries ${effective.length} invented figures (${effective.join(', ')}) against an allowance of ${inventedAllowance}${shortfall}`);
     }
   }
 
