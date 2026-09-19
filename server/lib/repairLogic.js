@@ -344,6 +344,62 @@ function resolveVersionCompressedScene(version, page) {
 }
 
 /**
+ * THE PROMPT A VERSION WAS RENDERED FROM, by lineage — for the PAGE/COVER ROOT.
+ *
+ * A version entry's own `prompt` is STRICT: the string that render was handed,
+ * or null. It never borrows a neighbour's (repairPipeline's buildVersionEntry
+ * stamps `v.prompt || null`, deliberately without a page fallback). Measured on
+ * staging job_1789759147125_p08djwhbl `coverImages.initialPage`: all three
+ * versions reported the SAME 7,366-char string — the ORIGINAL render's prompt —
+ * because the version builder fell back to the page-level field, so a reader of
+ * `imageVersions[1].prompt` got a confident wrong answer. That cost three
+ * investigation rounds.
+ *
+ * The page/cover ROOT is a different field with a different job: it names the
+ * prompt of the version that SHIPPED. Same DIRECTION as
+ * `resolveVersionCompressedScene` — the picked version's own value wins, so the
+ * root can never describe an earlier render than its sibling `compressedScene`
+ * does — but deliberately WITHOUT that helper's "authored its own brief → null"
+ * branch, because the two fields are read by different kinds of consumer:
+ *   - `compressedScene` is a JUDGE input, where a stale string silently grades a
+ *     picture against prose it was never painted from. Null is strictly better.
+ *   - the root `prompt` is a MODEL input on the re-run path — repairPipeline's
+ *     non-iterate regen interpolates `${img.prompt}` straight into the string it
+ *     hands the image model, unguarded — and `buildEvalInputs` uses it as the
+ *     page-level fallback every version record now relies on. A null there ships
+ *     the literal "null" to an image model, so the original-lineage fallback
+ *     stays. The root is never null when the page rendered at all.
+ *
+ * @param {object|null} version  the picked version entry
+ * @param {object|null} page     the page record it belongs to
+ * @returns {string|null} the prompt of the render that shipped
+ */
+function resolveVersionPrompt(version, page) {
+  const usable = v => (typeof v === 'string' && v.trim() ? v : null);
+  return usable(version?.prompt) || usable(page?.prompt);
+}
+
+/**
+ * THE PROMPT A VERSION RECORD MAY CLAIM — its own, or nothing.
+ *
+ * The counterpart to `resolveVersionPrompt` above, and deliberately a NAMED
+ * function rather than the inline `v.prompt || null` it replaces: the bug it
+ * closes was one extra `|| img.prompt` on that expression, and an inline chain
+ * invites it straight back. There is no page argument here BY CONSTRUCTION — a
+ * version cannot borrow what it was not given.
+ *
+ * Empty and whitespace strings normalise to null: "" is not a prompt anyone
+ * sent, and a reader must be able to tell "no prompt recorded" from one.
+ *
+ * @param {object|null} version  the version entry being stored
+ * @returns {string|null} the string THIS render was handed, or null
+ */
+function resolveOwnRenderPrompt(version) {
+  const p = version?.prompt;
+  return (typeof p === 'string' && p.trim()) ? p : null;
+}
+
+/**
  * The pages that SHIP KNOWN-BROKEN, worst first (D7, 2026-09-11).
  *
  * A page qualifies when the repair budget is spent and it is still below the
@@ -1121,4 +1177,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

@@ -310,7 +310,7 @@ function planStyleRepair(detection, storyData, opts = {}) {
  *   null so editImageWithPrompt measures the source's own aspect.
  * @param {Function} [opts.editFn] - injectable editImageWithPrompt (tests).
  * @param {Function} [opts.styleMatchFn] - injectable checkStyleMatch (tests).
- * @returns {Promise<{imageData, model, modelId, beforeStyleMatch, afterStyleMatch, passedGate, usage}>}
+ * @returns {Promise<{imageData, model, modelId, prompt, beforeStyleMatch, afterStyleMatch, passedGate, usage}>}
  */
 async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
   const {
@@ -414,6 +414,11 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
     imageData: result.imageData,
     model,
     modelId,
+    // WHAT THIS REPAINT WAS ACTUALLY SENT. Returned so the version record can
+    // stamp its own prompt instead of inheriting the page's original render
+    // prompt; `promptOverride` means the Lab's wording is reported, not the
+    // production default it replaced.
+    prompt,
     beforeStyleMatch,
     afterStyleMatch,
     styleComparison,

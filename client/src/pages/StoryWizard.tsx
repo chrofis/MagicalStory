@@ -5606,7 +5606,14 @@ export default function StoryWizard() {
                         ...(activeVersion.qualityScore !== undefined && { qualityScore: activeVersion.qualityScore }),
                         ...(activeVersion.qualityReasoning !== undefined && { qualityReasoning: activeVersion.qualityReasoning }),
                         ...(activeVersion.fixTargets !== undefined && { fixTargets: activeVersion.fixTargets }),
-                        ...(activeVersion.prompt !== undefined && { prompt: activeVersion.prompt }),
+                        // A version's `prompt` is now strictly its OWN render's,
+                        // so an inpaint / recolour version legitimately has none
+                        // (server: buildVersionEntry stopped substituting the
+                        // page's). `!== undefined` let that null overwrite the
+                        // page-level prompt, which is what the prompt preview
+                        // and the dev panel fall back to — require a real string.
+                        ...(typeof activeVersion.prompt === 'string' && activeVersion.prompt
+                          ? { prompt: activeVersion.prompt } : {}),
                         ...(activeVersion.description !== undefined && { description: activeVersion.description }),
                         ...(activeVersion.totalAttempts !== undefined && { totalAttempts: activeVersion.totalAttempts }),
                         ...(activeVersion.modelId !== undefined && { modelId: activeVersion.modelId }),

@@ -461,6 +461,19 @@
       ],
       "excludeReason": "module.exports is the terminator that closes partitionAnchoredObjects' block so its body is measured exactly; it is not a staging site.",
       "severity": "block"
+    },
+    {
+      "id": "pipeline-page-record-vs-cover-record",
+      "axis": "the page record vs the cover pseudo-page fed to the repair pipeline",
+      "reason": "storyJobPipeline builds the records the repair pipeline consumes at TWO sites: the per-page objects returned from the Phase-5a map, and the cover pseudo-pages pushed at `rawImages.push({...})`. They are read by ONE consumer (runUnifiedRepairPipeline, whose buildVersionEntry stamps v0 from whatever the record carries), so a provenance field the page side carries and the cover push does not is silently undefined on every cover. It has happened three times: `compressedScene` (added to the cover push after every cover root stored none), `modelId` (this set's anchor — the page path has carried `modelId: activeModelId` since it was written, the cover push carried nothing, so every cover's v0 recorded modelId undefined and no cover could say which model painted it), and the cover ROOT mirror further down the file, which moved `compressedScene` onto the shipped version and left `prompt` describing the first render. An absent field here raises no error anywhere, which is why all three survived. The block is measured exactly: `evaluationType: 'cover'` is the pushed object's last key and terminates it.",
+      "file": "storyJobPipeline.js",
+      "blockPattern": "rawImages\\.push\\(\\{|evaluationType: 'cover'",
+      "mustContain": "modelId:",
+      "exclude": [
+        "evaluationType: 'cover'"
+      ],
+      "excludeReason": "evaluationType: 'cover' is the terminator that closes the push block so its body is measured exactly; it is not a record-building site.",
+      "severity": "block"
     }
   ]
 }

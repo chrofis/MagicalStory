@@ -28,7 +28,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, AUDIT_ADMIT_MAX } = require('./repairLogic');
+const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
@@ -930,6 +930,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           modelId: img.modelId,
           grokRefImages: img.grokRefImages || null,
           referencePhotos: img.referencePhotos || null,
+          // THE LINEAGE ROOT'S OWN PROMPT. v0 IS the page's first render, so the
+          // page-level prompt is genuinely this version's — it is stamped HERE,
+          // at creation, instead of being reached for by a fallback in the
+          // version builder. That fallback (`v.prompt || img.prompt`) handed the
+          // SAME string to every later version: staging
+          // job_1789759147125_p08djwhbl initialPage stored one 7,366-char prompt
+          // on v0, v1 (iterate) and v2 (style-repair) alike, so reading
+          // `imageVersions[1].prompt` gave a confident wrong answer.
+          prompt: img.prompt || null,
           // The page's post-shrink prose: this IS the original render, and
           // every repair layered on it inherits from here.
           compressedScene: img.compressedScene || null,
@@ -953,6 +962,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           modelId: img.modelId,
           grokRefImages: img.scaleRepairGrokRefImages || null,
           inpaintInstruction: img.scaleRepairPrompt || null,
+          // Its OWN render prompt — the scale-repair edit instruction, not the
+          // page's first-render prompt.
+          prompt: img.scaleRepairPrompt || null,
           entityPenalty: baseEntityPenalty,
           entityPenaltyRaw: baseEntityPenaltyRaw,
           entityIssues: baseEntityIssues,
@@ -996,6 +1008,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           evaluatedAt: new Date().toISOString(),
           // Surface the text-space repair inputs in the viewer's repair section.
           inpaintInstruction: c.prompt || null,
+          // Each candidate's OWN render prompt: a repair attempt carries the
+          // text-space prompt it was rendered from; the untouched `original`
+          // candidate IS the page's first render, so the page prompt is its own.
+          // Nothing else borrows — this branch REPLACES the version list, so
+          // without a stamp here every candidate fell back to the page prompt.
+          prompt: c.prompt || (isOriginal ? (img.prompt || null) : null),
           textSpaceCoveragePct: c.coveragePct,
           textSpacePosition: c.position,
         };
@@ -1577,6 +1595,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       source: `char-fix-round-${roundNum}`,
       modelId: `grok-imagine (${repairResult.method || 'grok_blended'})`,
       grokRefImages: null,
+      // The string THIS render was handed. `promptSent` is always returned by
+      // repairCharacterMismatchWithGrok; debug.prompt only with includeDebug.
+      // It already reached charFixDetails above and stopped there, so the stored
+      // version had no prompt of its own and inherited the page's.
+      prompt: repairResult.promptSent || repairResult.debug?.prompt || null,
       inpaintInstruction: repairResult.debug?.prompt || null,
       inpaintReferenceImages: [
         repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
@@ -2475,6 +2498,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 imageData: inpaintResult.imageData,
                 source: `inpaint-round-${round}`,
                 modelId: inpaintResult.usage?.model || 'grok-text-edit',
+                // The full string handed to the editor for THIS render
+                // (`instruction` is the un-wrapped core of it). Stamped so the
+                // version stops falling back to the original page prompt.
+                prompt: inpaintResult.promptSent || inpaintResult.instruction || null,
                 inpaintInstruction: inpaintResult.instruction,
                 inpaintReferenceImages: inpaintResult.referenceImages || null,
                 inpaintReferenceSources: inpaintResult.referenceImageSources || null,
@@ -2520,7 +2547,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 // page prompt), which makes the dev panel + audit trail show
                 // the wrong text and hides whether feedback was actually
                 // appended.
-                prompt: result.imagePrompt || null,
+                //
+                // THREE BRANCHES, NOT ONE (2026-09-19). executeIterateAction
+                // dispatches to iteratePage (returns `imagePrompt`, plus
+                // `promptSent` — the post-shrink string the model really got),
+                // to iterateCover (returns `prompt`) and to a plain
+                // generateImageOnly regen (also `prompt`). Reading only
+                // `imagePrompt` meant EVERY cover iterate stored null and
+                // inherited the original cover prompt — measured on staging
+                // job_1789759147125_p08djwhbl initialPage v1.
+                prompt: result.promptSent || result.imagePrompt || result.prompt || null,
                 // The rewrite's own post-shrink prose, when ITS prompt went over
                 // the model's cap. Its brief differs from the page's, so the
                 // page's sent prose can never stand in for it.
@@ -3417,7 +3453,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               modelId: rep.modelId,
               entityIssues: prevBest.entityIssues || [],
               evaluatedAt: new Date().toISOString(),
-              prompt: null,
+              // The repaint prompt repairPageStyle actually sent. This was
+              // hardcoded null and the version builder then substituted the
+              // PAGE prompt, so a style-repair version reported the original
+              // render's 7,366-char scene prompt as the string that produced a
+              // ~40-char restyle edit (staging job_1789759147125_p08djwhbl
+              // initialPage v2). null only if the repainter reported none.
+              prompt: rep.prompt || null,
               description: prevBest.description || null,
               styleRepair: {
                 targetRefPage: target.targetRefPage,
@@ -3674,7 +3716,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // is a new contract, and the picked version's contract is promoted to
       // the scene level at final assembly.
       description: v.description || img.sceneDescription || null,
-      prompt: v.prompt || img.prompt || null,
+      // A VERSION'S PROMPT IS ITS OWN OR IT IS NOTHING (2026-09-19). This read
+      // `v.prompt || img.prompt || null`, so a version that recorded no prompt
+      // of its own reported the PAGE's — i.e. the FIRST render's — as the string
+      // that produced its pixels. Measured on staging job_1789759147125_p08djwhbl
+      // `coverImages.initialPage`: v0 (original), v1 (iterate-round-1) and v2
+      // (style-repair-grok) all carried the identical 7,366-char string, while
+      // `compressedScene` — resolved per version two lines below — correctly
+      // differed (4,227 / 1,370 / 1,370 chars). The field was not missing, it was
+      // WRONG, which is worse: it answers confidently. Every render path now
+      // stamps its own prompt at creation (original, scale-repair, text-space,
+      // inpaint, char-fix, iterate, style-repair); a mechanical pass that sent no
+      // prompt at all (garment recolour) legitimately stores null. Consumers that
+      // need the page's prompt read the PAGE record explicitly — buildEvalInputs
+      // above already does (`entry.prompt || orig.prompt`).
+      prompt: resolveOwnRenderPrompt(v),
       // The prose the model received for THIS version's bytes. Persisted so a
       // repair rerun from the stored story resolves the same lineage.
       compressedScene: resolveVersionCompressedScene(v, img),
@@ -3746,7 +3802,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // plan it superseded.
       sceneDescription: best?.description || img.sceneDescription,
       scene: img.scene,
-      prompt: best?.prompt || img.prompt,
+      // THE ROOT DESCRIBES THE VERSION THAT SHIPPED — same direction as
+      // `compressedScene` below, so the two can never name different renders.
+      // One named rule instead of an inline `||` chain, because the fallback
+      // here is deliberate and the one on the VERSION entry is not: see
+      // resolveVersionPrompt's docstring for why the root keeps it.
+      prompt: resolveVersionPrompt(best, img),
       // …and the prose that prompt was SHRUNK to, by the same lineage rule the
       // evaluation used. This whitelist carried no such key, so the field the
       // generation path had stamped was dropped here and storyJobPipeline wrote

@@ -729,7 +729,12 @@ export interface ImageVersion {
   versionIndex?: number; // DB version_index for correct metadata mapping
   userInput?: string;    // User's input before expansion (for dev mode)
   description?: string;  // Expanded scene description (AI's output)
-  prompt?: string;       // Full API prompt (for dev mode)
+  // The prompt THIS version's render was handed — never a neighbour's. `null`
+  // is a real, meaningful value: a render that sent no prompt of its own (a
+  // mechanical recolour) stores null rather than inheriting the page's, so the
+  // version record can't answer confidently and wrongly. Read the page-level
+  // `prompt` when you need the page's.
+  prompt?: string | null;
   modelId?: string;
   createdAt: string;
   type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair' | 'scale-repair' | 'text-space-repair';

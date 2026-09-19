@@ -3415,6 +3415,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         imageData: editResult.imageData,
         repaired: true,
         instruction: editInstruction,
+        // The COMPLETE string handed to the editor — `instruction` is only its
+        // core. Returned so the version this render becomes can record its own
+        // prompt instead of inheriting the page's first-render prompt.
+        promptSent: fullInstruction,
         referenceImages,
         referenceImageSources,
         consolidatedPlan,
@@ -4794,6 +4798,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       ...(iterQuality || {}),
       imageData: genResult.imageData,
       modelId: genResult.modelId,
+      // The full string the provider received (generateImageOnly stamps the
+      // post-shrink text on `prompt`). Carried out of here so the version this
+      // rewrite becomes records ITS OWN prompt.
+      promptSent: genResult.prompt || null,
       // The rewrite's prompt goes over the model cap as readily as the original
       // build did; `compressedScene` is what shrinkPromptForModel actually sent.
       // Dropped here, an iterate version had no sent prose of its own and the
@@ -4813,6 +4821,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   return {
     imageData: imageResult.imageData,
     imagePrompt,
+    // THE STRING THE MODEL WAS HANDED, not the pre-shrink build. `imagePrompt`
+    // above is what we ASSEMBLED; when that went over the model's cap,
+    // shrinkPromptForModel rewrote or cut it and the provider saw something
+    // else. The version record stamps this so a version's `prompt` and its
+    // `compressedScene` (the head of this same string) describe ONE render —
+    // the containment that made the cross-version prompt bug diagnosable.
+    promptSent: imageResult.promptSent || imageResult.prompt || null,
     newScene: newSceneDescription,
     newSceneMetadata,
     // The rewritten scene is a NEW contract — its character set can legitimately

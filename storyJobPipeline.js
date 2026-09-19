@@ -5906,6 +5906,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               expectedText,
               textMode,
               imageData: coverData.imageData,
+              // WHICH MODEL PAINTED IT. The page path has carried
+              // `modelId: activeModelId` since it was written; this push never
+              // did, so every cover entered the repair pipeline model-less and
+              // its v0 version record stamped `modelId: img.modelId` = undefined
+              // — a cover could not answer "Grok or Gemini" after the fact.
+              modelId: coverData.modelId || null,
               prompt: coverData.prompt,
               // The sent prose of the ORIGINAL cover render. The repair
               // pipeline's version builder resolves a version's own
@@ -6588,6 +6594,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // because this is the scene contract, not an eval verdict — the
               // mirror's own docstring reserves those for the caller.
               coverImages[coverKey].compressedScene = img.compressedScene ?? null;
+              // …AND ITS PROMPT, FOR THE SAME REASON (2026-09-19). The line
+              // above moved `compressedScene` onto the shipped version while
+              // `prompt` was left describing the FIRST render, so one cover
+              // record narrated two different renders — measured on staging
+              // job_1789759147125_p08djwhbl initialPage, where the root prompt
+              // was the original's and the root compressedScene the iterate's.
+              // Both now name the version that shipped (repairPipeline resolves
+              // it via resolveVersionPrompt, which keeps the original-lineage
+              // fallback: this field is a model input on the re-run path, so it
+              // is never null while the cover rendered at all).
+              coverImages[coverKey].prompt = img.prompt ?? coverImages[coverKey].prompt ?? null;
               if (img.wasRegenerated) coverImages[coverKey].wasRegenerated = true;
               log.info(`📸 [UNIFIED] ${coverKey} pipeline result: score ${img.qualityScore}, ${img.wasRegenerated ? 'regenerated' : 'original'}`);
             }

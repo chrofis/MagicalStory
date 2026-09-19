@@ -3123,7 +3123,12 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     const previousVersionEntry = previousCover?.imageVersions?.[previousCover.imageVersions.length - 1];
     const previousScore = previousVersionEntry?.qualityScore ?? previousCover?.qualityScore ?? null;
     const previousReasoning = previousVersionEntry?.qualityReasoning ?? previousCover?.qualityReasoning ?? null;
-    const previousPrompt = previousVersionEntry?.prompt ?? previousCover?.prompt ?? null;
+    // `||`, not `??`: a version's `prompt` is now STRICTLY its own render's, so
+    // a version that recorded none stores null (repairPipeline buildVersionEntry
+    // — it used to inherit the cover's, which is how three versions of one cover
+    // all reported the first render's prompt). `??` treats that null as an
+    // answer and short-circuits the cover-root fallback this line exists for.
+    const previousPrompt = previousVersionEntry?.prompt || previousCover?.prompt || null;
     // Keep the true original if this was already regenerated before
     const trueOriginalImage = previousCover?.originalImage || previousImageData;
     const trueOriginalScore = previousCover?.originalScore || previousScore;

@@ -46824,3 +46824,67 @@ they must not be deleted for storage cost either.
 `docs/SETTLED.md`, `docs/image-generation-methods.html`, `tasks/BACKLOG.md`, `.gitignore`,
 `diagnostics/vb-cell-area-2026-09-19/README.md`.
 **Status:** ✅ settled — size verdict on `docs/SETTLED.md`, identity finding open on the backlog.
+
+---
+
+## 2026-09-19 — A version with no recorded prompt stores `null` rather than inheriting one; the page/cover ROOT keeps its fallback
+
+**Context.** `buildVersionEntry` (`server/lib/repairPipeline.js`) stored an image version's prompt as
+`v.prompt || img.prompt || null`, and the round-0 `source:'original'` version never set `prompt` at all. The
+result was not a missing field but a wrong one. Measured on staging `job_1789759147125_p08djwhbl`,
+`coverImages.initialPage`: v0 (`original`), v1 (`iterate-round-1`) and v2 (`style-repair-grok`) all carried the
+identical 7,366-char string (sha `e40958bb51`) while their `compressedScene` — resolved per version by
+`resolveVersionCompressedScene` — correctly differed (4,227 / 1,370 / 1,370 chars). That shared string contains
+v0's `compressedScene` and neither v1's nor v2's, so it is demonstrably v0's prompt stamped onto all three. A
+reader of `imageVersions[1].prompt` therefore got a confident wrong answer, which cost three investigation
+rounds. Four render paths recorded no prompt of their own and so were the ones substituted into: style-repair
+(hardcoded `null` — `repairPageStyle` never returned the repaint prompt it sent), every **cover** iterate (the
+round result read only `result.imagePrompt`, which `iteratePage` returns but `iterateCover` and the plain-regen
+branch of `executeIterateAction` do not), char-fix (`repairResult.promptSent` went only into `charFixDetails`),
+and inpaint (the full sent string was never returned from `inpaintPageRegion`).
+
+**Decision.** Two fields, two rules, both named.
+
+1. **A version's `prompt` is its own render's, or it is `null`.** `buildVersionEntry` calls
+   `resolveOwnRenderPrompt(v)` — a one-argument resolver in `repairLogic.js` with **no page parameter**, so the
+   `|| img.prompt` that caused this cannot be re-added without changing the call site; `''` and whitespace
+   normalise to `null`, because "no prompt recorded" must be distinguishable from an empty one. Every render
+   path now stamps its own at creation: v0 takes `img.prompt` as genuinely its own (it *is* the first render),
+   scale-repair takes `img.scaleRepairPrompt`, each text-space candidate takes its own (the untouched
+   `original` candidate takes the page's), inpaint takes the new `promptSent`, char-fix takes
+   `repairResult.promptSent`, iterate reads all three branches it dispatches to, style-repair takes the prompt
+   `repairPageStyle` now returns. A path that sent no prompt at all — the mechanical garment recolour — stores
+   `null`.
+2. **The page/cover ROOT names the version that SHIPPED, and keeps its original-lineage fallback**, via
+   `resolveVersionPrompt(best, img)`. Same *direction* as `resolveVersionCompressedScene`, deliberately
+   **without** that helper's "authored its own brief → null" branch. The cover root's `prompt` is now mirrored
+   next to its `compressedScene` (previously only the latter was, so one cover record narrated two different
+   renders), and the cover push into the repair pipeline stamps `modelId` like the page path always has.
+
+`iteratePageCore` additionally returns `promptSent`, the POST-shrink string the model actually received rather
+than the pre-shrink build, so a version's `prompt` and its `compressedScene` describe one render.
+
+**Rationale.** For a version record, silence is safe and a wrong value is not: the version row is read to answer
+"what produced *these* pixels", and an inherited neighbour's prompt answers it confidently and wrongly. The
+root is the opposite case, and that asymmetry is the whole reason the two rules differ. The root `prompt` is a
+**model input** on the repair re-run path — `executeIterateAction`'s non-iterate branch interpolates
+`` `${img.prompt}` `` straight into the string it hands the image model, unguarded by `guardPromptString`,
+`shrinkPromptForModel` or `generateImageCacheKey` — and it is the page-level fallback every version consumer now
+relies on (`buildEvalInputs`: `entry.prompt || orig.prompt`). A `null` there would ship the literal `"null"` to
+an image model and strip `ORIGINAL_PROMPT` off the judges. So the root is never null while the page rendered at
+all. The containment property this bug was diagnosed with — a render's recorded prose is a slice of the string
+that render was sent — now holds by construction and is pinned, so the same diagnosis works next time.
+
+**Not done, deliberately:** the unguarded `${img.prompt}` interpolation at the regen branch is a *pre-existing*
+latent bug, unreachable from this change (the root is never nulled). It is reported, not fixed here — fixing
+what was not asked is its own rule.
+
+**Touched:** `server/lib/repairLogic.js` (`resolveOwnRenderPrompt`, `resolveVersionPrompt`),
+`server/lib/repairPipeline.js` (seven version-creation sites + the page-root promotion),
+`server/lib/styleRepair.js` (`repairPageStyle` returns `prompt`), `server/lib/images.js`
+(`inpaintPageRegion` and `iteratePageCore` return `promptSent`), `storyJobPipeline.js` (cover push `modelId`,
+cover root `prompt` mirror), `server/routes/regeneration.js` (`??` → `||` on the cover-regen previous-prompt
+capture), `client/src/pages/StoryWizard.tsx` (version-switch copies a prompt only when it is a non-empty
+string), `client/src/types/story.ts` (`ImageVersion.prompt: string | null`),
+`tests/unit/version-prompt-is-own-render.test.ts`.
+**Status:** ✅ active.
