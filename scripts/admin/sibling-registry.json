@@ -458,6 +458,17 @@
         "prompts/story-beats.txt"
       ],
       "severity": "block"
+    },
+    {
+      "id": "arc-hint-handoff",
+      "axis": "who applies an arc hint the other side could not",
+      "reason": "The SAME arcHints string is injected into two stages under two headings that form one contract: the beats planner applies what a picture can hold, and the text writer applies 'what the beats have not'. If one heading changes without the other, a hint is either dropped by both or honoured twice. Both headings are built in promptBuilders.js (buildBeatsPrompt's ARC_HINTS and the text builder's ARC_HINTS), not in the templates. The planner's half was a bare imperative until 2026-09-19: measured over the 42 CHANGE lines stored across 14 staging runs, 16 mandate a figure's continued presence against the three-named cast cap and 10 mandate simultaneity against 'two characters given different actions at one instant lose one of them', so the planner honoured hints by breaking its own picture rules.",
+      "members": [
+        "server/lib/promptBuilders.js",
+        "prompts/story-beats.txt",
+        "prompts/story-text-from-beats.txt"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

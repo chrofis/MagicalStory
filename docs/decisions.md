@@ -48355,3 +48355,56 @@ one non-child-resolves case (1/28).
 
 **Touched:** nothing — documentation only.
 **Status:** 🟡 open observations, awaiting an owner decision.
+
+---
+
+## 2026-09-19 — An arc hint is a story change, not a licence to break a picture rule
+
+**Context.** The hint pass (`arc-hints.txt`) reviews the finished ARC and emits three
+`ISSUE → CHANGE` lines. The same string is injected into two stages:
+
+- the beats planner, under **"FIX WHILE DIVIDING — apply these while dividing the pages"**
+- the text writer, under **"HINTS — apply these in the text where the beats have not"**
+
+The hint pass has never seen the planner's picture rules, and its own brief is a story
+one (*"each change stays inside the existing structure and costs no suspense"*). So its
+changes routinely ask for exactly what those rules forbid. Measured over the **42 CHANGE
+lines stored across 14 staging runs**:
+
+- **16 mandate a figure's continued presence** — *"Keep Nia on a short leash beside Max
+  through every later beat"*, *"leaving every later beat untouched"* — against *"At most
+  three named characters in frame… a named animal that acts counts as one of them."*
+- **10 mandate simultaneity** — *"while they first lift the jacket together"*, *"while
+  the others work"* — against *"Two characters given different actions at one instant
+  lose one of them."*
+
+On `job_1789759147125_p08djwhbl` both fired: Nia beside Max put five named characters on
+pages 5, 8 and 18, and the names-while-lifting hint produced a page 5 whose instant is two
+simultaneous actions over a shared grip on one object.
+
+**Decision.** The planner's heading gains the clause the other side already had:
+
+> **# FIX WHILE DIVIDING — apply these where the division can carry them**
+> Each is a change to the STORY. Apply it in the pages where a picture can hold it. Where
+> it cannot — a figure kept in frame past the cast limit, two actions at one instant —
+> leave it to the text, which is told to apply what the division has not. Never break a
+> rule below to honour a hint.
+
+**Rationale.** The escape already existed; only the planner was not told about it. The
+text writer receives the same hints under *"apply these in the text where the beats have
+not"*, so a hint the division cannot draw is picked up rather than lost. This is the
+other half of a contract that was only ever written on one side.
+
+**Constraining the hint AUTHOR was considered and rejected.** Telling a story reviewer
+not to propose simultaneity would corrupt its job — story fixes legitimately involve two
+things happening at once, and it is the PICTURE that renders one moment of it. The rule
+belongs to the consumer, which is the only party that knows its own constraints.
+
+Registered as sibling set `arc-hint-handoff` — both headings are built in
+`promptBuilders.js`, not in the templates, and if one changes without the other a hint is
+dropped by both stages or honoured twice.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildBeatsPrompt`'s `ARC_HINTS`),
+`scripts/admin/sibling-registry.json`, `tests/unit/arc-hint-handoff.test.ts`.
+
+**Status:** ✅ active

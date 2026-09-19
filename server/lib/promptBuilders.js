@@ -6880,8 +6880,33 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     CHANGES_FORMAT: String(replan || '').trim() ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
+    // A HINT IS A STORY CHANGE, NOT A LICENCE TO BREAK A PICTURE RULE
+    // (2026-09-19).
+    //
+    // The hint pass reviews the ARC. It has never seen the picture rules below,
+    // and its own brief is a story one ("each change stays inside the existing
+    // structure and costs no suspense"), so its changes routinely ask for the
+    // two things those rules forbid. Measured over the 42 CHANGE lines stored
+    // across 14 staging runs: 16 mandate a figure's continued presence ("keep X
+    // beside Y through every later beat") against a cap of three named
+    // characters in frame, and 10 mandate simultaneity ("while they lift the
+    // jacket", "while the others work") against "two characters given different
+    // actions at one instant lose one of them".
+    //
+    // The heading used to be a bare imperative — "apply these while dividing the
+    // pages" — so the planner honoured the hint and broke the rule. The escape
+    // already existed and only this side was not told: the text writer receives
+    // the same hints under "apply these in the text WHERE THE BEATS HAVE NOT",
+    // so a hint the division cannot carry is picked up rather than lost. This
+    // is the other half of that contract.
     ARC_HINTS: String(arcHints || '').trim()
-      ? `# FIX WHILE DIVIDING — apply these while dividing the pages\n\n${String(arcHints).trim()}`
+      ? [
+        '# FIX WHILE DIVIDING — apply these where the division can carry them',
+        '',
+        'Each is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.',
+        '',
+        String(arcHints).trim(),
+      ].join('\n')
       : '',
     REPLAN_SECTION: String(replan || '').trim(),
     STORY_PREMISE: [
