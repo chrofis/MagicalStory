@@ -9,10 +9,12 @@ Generate one image laid out as a {GRID_SHAPE_PHRASE}.{GRID_SEPARATION} Each cell
 
 **REQUIREMENTS:**
 - Each cell must show ONLY that single element, clearly visible and centered
+- Only the element itself is drawn. A person, animal or object the description names to convey its size or scale, or to say what it attaches to, is part of, or is used with, is never drawn
+- Each cell reads as the element it is named as. When the shapes and parts described also fit a commoner everyday object, the cell shows the named one
 - Consistent art style across ALL cells matching the style description above
 - Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)
 {CELL_LAYOUT_REQ}
-- Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.
+{TEXT_RULE}
 - All content must be safe, family-friendly, and age-appropriate{BATCH_GUARD}
 
 **FOR CHARACTERS:**

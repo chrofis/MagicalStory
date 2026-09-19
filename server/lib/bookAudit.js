@@ -25,6 +25,7 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
+const { assertPromptFilled } = require('../services/prompts');
 
 // Pages per vision call. Six pages = six images + six text parts per request,
 // which keeps a chunk well under the inline-data request ceiling and keeps the
@@ -96,6 +97,41 @@ async function loadShippedImage(scene, { pool, imageLoader, storyId, activeVersi
   return `data:${mime};base64,${buf.toString('base64')}`;
 }
 
+/**
+ * THE PAGES THE AUDIT READS — one resolver, used by every caller.
+ *
+ * The audit is the reader's-eye pass, so it must be handed the book that
+ * SHIPS: the FINAL page text and the PICKED image version. Two ways to get
+ * that wrong, both of which have happened:
+ *   - the picked version: `imageVersions[last]` is not the shipped image when
+ *     a page keeps its original after five repair passes (see
+ *     shippedVersionIndex). `pickVersion` answers it for the in-flight
+ *     pipeline, where nothing is pinned yet.
+ *   - the final text: the in-flight pipeline's page objects carried PRE-REFINE
+ *     prose until 2026-09-13, because the text-refine join ran after the
+ *     repair pipeline. Measured: 97% of pages are rewritten by the refiner.
+ *     The join now happens before the pipeline (storyJobPipeline.js,
+ *     joinTextRefinement), so `img.text` here is the shipped wording.
+ *
+ * A page with no resolvable image is dropped — half a page tells the judge
+ * nothing about whether words and picture agree.
+ *
+ * @param {Array} images        page objects carrying pageNumber, text, imageData
+ * @param {Function} [pickVersion] (pageNumber) => version — the picked version
+ * @returns {Array<{pageNumber:number, text:string, imageData:string}>}
+ */
+function buildAuditPages(images, pickVersion) {
+  const out = [];
+  for (const img of images || []) {
+    if (!img || typeof img.pageNumber !== 'number') continue;
+    const picked = typeof pickVersion === 'function' ? pickVersion(img.pageNumber) : null;
+    const imageData = picked?.imageData || img.imageData;
+    if (!imageData) continue;
+    out.push({ pageNumber: img.pageNumber, text: img.text || '', imageData });
+  }
+  return out;
+}
+
 /** Split a data URI (or bare base64) into the shape a Gemini inline_data part wants. */
 function inlinePart(imageData) {
   const mime = String(imageData).match(/^data:(image\/[\w+.-]+);base64,/)?.[1] || 'image/jpeg';
@@ -104,14 +140,73 @@ function inlinePart(imageData) {
   return { inline_data: { mime_type: mime, data } };
 }
 
-/** One vision call over one chunk of pages. Returns raw text + usage. */
-async function judgeChunk(template, chunk, modelId) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY missing');
+/**
+ * A model id carrying a vendor prefix (`x-ai/grok-4.6`, `openai/gpt-5.6-sol`)
+ * is an OpenRouter id; a bare `gemini-*` id is a native Google one. Production
+ * passes no override and lands on the Google path with the body it always sent.
+ */
+function isOpenRouterId(modelId) {
+  return String(modelId || '').includes('/');
+}
 
+/**
+ * Same chunk, same prompt, same interleaving — sent as OpenAI chat parts with
+ * the images as data URIs. Lab-only path: nothing in production reaches it.
+ */
+async function judgeChunkOpenRouter(parts, modelId, thinkingLevel) {
+  assertPromptFilled(parts, 'bookAudit.judgeChunkOpenRouter');
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error('OPENROUTER_API_KEY missing');
+  const content = parts.map(p => (
+    p.inline_data
+      ? { type: 'image_url', image_url: { url: `data:${p.inline_data.mime_type};base64,${p.inline_data.data}` } }
+      : { type: 'text', text: p.text }
+  ));
+  // No max_tokens (owner rule: no output caps). Reasoning effort only when the
+  // caller names one — thinking tokens bill as output.
+  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model: modelId,
+      temperature: 0,
+      messages: [{ role: 'user', content }],
+      usage: { include: true },
+      ...(thinkingLevel ? { reasoning: { effort: thinkingLevel } } : {}),
+    }),
+    signal: AbortSignal.timeout(600_000),
+  });
+  if (!response.ok) {
+    throw new Error(`book audit HTTP ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  }
+  const data = await response.json();
+  if (data.error) throw new Error(`book audit openrouter error: ${JSON.stringify(data.error).slice(0, 300)}`);
+  const choice = data.choices?.[0];
+  if (choice?.finish_reason && !['stop', 'end_turn'].includes(String(choice.finish_reason))) {
+    log.warn(`⚠️ [BOOK-AUDIT] chunk finished as ${choice.finish_reason} — faults may be missing`);
+  }
+  return {
+    text: String(choice?.message?.content || '').trim(),
+    usage: {
+      input_tokens: data.usage?.prompt_tokens || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
+      thinking_tokens: data.usage?.completion_tokens_details?.reasoning_tokens || 0,
+      cost_usd: data.usage?.cost ?? null,
+    },
+  };
+}
+
+/** One vision call over one chunk of pages. Returns raw text + usage. */
+async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   const { fillTemplate } = require('../services/prompts');
   const instructions = fillTemplate(template, {
     PAGE_LIST: chunk.map(p => p.pageNumber).join(', '),
+    // ONE rule for every template that authors or judges a page against its
+    // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). This audit
+    // is the ONE stage that compares a page's words against its picture, so it
+    // is the one that can commit the fault outright — and, reading the whole
+    // book in order, the one place the rule's second half can actually fire.
+    TEXT_NOT_A_CHECKLIST: require('./promptBuilders').TEXT_NOT_A_CHECKLIST_RULE,
   });
 
   // Instructions FIRST, then the book. The judge must know what it is looking
@@ -123,6 +218,13 @@ async function judgeChunk(template, chunk, modelId) {
     parts.push(p.part);
   }
 
+  assertPromptFilled(parts, 'bookAudit.judgeChunk');
+
+  if (isOpenRouterId(modelId)) return judgeChunkOpenRouter(parts, modelId, thinkingLevel);
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY missing');
+
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
   const response = await fetch(url, {
     method: 'POST',
@@ -130,13 +232,19 @@ async function judgeChunk(template, chunk, modelId) {
     body: JSON.stringify({
       contents: [{ parts }],
       generationConfig: {
-        // Headroom for the judge's own reasoning. Measured: a 6-page chunk
-        // spends ~9k tokens thinking before writing, and a 4000 cap truncated
-        // two chunks of three mid-sentence — a truncated audit reads as a clean
-        // one, which is the worst failure a measurement can have.
-        maxOutputTokens: 16000,
+        // No maxOutputTokens (owner rule: no output caps) — Gemini's default is
+        // the model's own ceiling. Measured: a 6-page chunk spends ~9k tokens
+        // thinking before writing, and a 4000 cap truncated two chunks of three
+        // mid-sentence — a truncated audit reads as a clean one, which is the
+        // worst failure a measurement can have.
         // Eval judges run at temperature 0, always (docs/SETTLED.md).
         temperature: 0,
+        // Gemini 3 models take a thinking LEVEL ('low'|'medium'|'high'), not a
+        // budget. Lab-only knob: OMITTED entirely unless a caller asks, so every
+        // production audit sends the exact same body it always has and each
+        // model keeps its own default. Measured 2026-09-13: an unknown field
+        // here is a hard 400, so a typo cannot be silently ignored.
+        ...(thinkingLevel ? { thinkingConfig: { thinkingLevel } } : {}),
       },
     }),
     signal: AbortSignal.timeout(180_000),
@@ -210,6 +318,8 @@ async function auditStoryBook(storyData, opts = {}) {
     activeVersions = null,
     usageTracker = null,
     modelId = MODEL_DEFAULTS.utility || 'gemini-2.5-flash',
+    // Lab-only. Absent = today's behaviour, byte-identical.
+    thinkingLevel = null,
   } = opts;
   const storyId = opts.storyId || storyData?.id || null;
 
@@ -250,14 +360,23 @@ async function auditStoryBook(storyData, opts = {}) {
     for (let i = 0; i < prepared.length; i += CHUNK_PAGES) chunks.push(prepared.slice(i, i + CHUNK_PAGES));
 
     const usage = { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 };
+    // Per-chunk usage, kept so a Lab run can PROVE a thinking level took effect
+    // rather than assuming it. Report-only; nothing reads it in production.
+    const chunkUsage = [];
     const raws = [];
     for (const chunk of chunks) {
       try {
-        const r = await judgeChunk(template, chunk, modelId);
+        const r = await judgeChunk(template, chunk, modelId, thinkingLevel);
         raws.push(r.text);
+        chunkUsage.push({
+          pages: `${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber}`,
+          ...r.usage,
+        });
         usage.input_tokens += r.usage.input_tokens;
         usage.output_tokens += r.usage.output_tokens;
         usage.thinking_tokens += r.usage.thinking_tokens;
+        // OpenRouter reports the billed dollars per call; Gemini native does not.
+        if (typeof r.usage.cost_usd === 'number') usage.cost_usd = (usage.cost_usd || 0) + r.usage.cost_usd;
       } catch (err) {
         // One bad chunk must not cost the other chunks' findings.
         log.warn(`⚠️ [BOOK-AUDIT] chunk p${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber} failed: ${err.message}`);
@@ -278,7 +397,9 @@ async function auditStoryBook(storyData, opts = {}) {
       byRoute,
       raw,
       usage,
+      chunkUsage,
       modelId,
+      thinkingLevel,
       pagesRead: prepared.map(p => p.pageNumber),
       pagesSkipped: missing.sort((a, b) => a - b),
     };
@@ -288,4 +409,4 @@ async function auditStoryBook(storyData, opts = {}) {
   }
 }
 
-module.exports = { auditStoryBook, shippedVersionIndex, parseRoutes, CHUNK_PAGES };
+module.exports = { auditStoryBook, buildAuditPages, shippedVersionIndex, parseRoutes, CHUNK_PAGES };

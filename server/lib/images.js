@@ -11,8 +11,9 @@ const sharp = require('sharp');
 const crypto = require('crypto');
 const pLimit = require('p-limit');
 const { log } = require('../utils/logger');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, guardPromptString, assertPromptFilled } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
+const { buildCastIndex, resolveEntity } = require('./castResolver');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn } = require('./grok');
 const { MODEL_PRICING } = require('../config/models');
@@ -27,6 +28,31 @@ const { sanitizeIssueForInpaint, stripCharacterNames } = require('./imageComposi
 const { blackoutIssueRegions } = require('./imageInpainting');
 const { buildEmptySceneVbGrid, buildPageCompositeRefs } = require('./referenceSheets');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
+const { assessImageResponse, describeImageBlock } = require('./imageReplyGuard');
+
+/**
+ * The evaluator-derived EVIDENCE fields that every result-assembly whitelist in
+ * this module must carry.
+ *
+ * Each provider branch of `generateImageOnly` (and `evaluateImagesBatch`)
+ * rebuilds its own whitelisted object from the `evaluateImageQuality` return —
+ * "a field not listed here never reaches the stored version, however faithfully
+ * the evaluator produced it." `notEvaluated` (the per-dimension "could not be
+ * judged" record) and `threeStageResult` (the prompt-compliance judge's raw
+ * record) are produced by the evaluator and listed by all three DOWNSTREAM
+ * whitelists, yet no assembly here named them — so every stored page had
+ * `notEvaluated: null` while the run's generationLog showed the recorder
+ * firing. One helper spread into every branch so the next evidence field added
+ * cannot go missing from four of five siblings.
+ */
+function carryEvalEvidence(qualityResult) {
+  return {
+    // null = the dimension record never reached us; [] = evaluated, nothing skipped.
+    notEvaluated: qualityResult?.notEvaluated ?? null,
+    // Stage-1 vision inventory + Stage-2 compliance JSON, verbatim.
+    threeStageResult: qualityResult?.threeStageResult ?? null,
+  };
+}
 // Eval cluster now lives in evalPipeline.js (verbatim move; see its header).
 // Destructured here both to re-export (facade — external top-level destructures
 // in server.js / regeneration.js / entityConsistency.js depend on it) and
@@ -41,7 +67,25 @@ const {
   sanitizeForGemini,
   evaluateImageQuality,
   IMAGE_QUALITY_THRESHOLD,
+  // Forwarded only (facade): consumers import these from './images'.
+  presenceCounterName,
+  largestInteriorUniformFraction,
+  buildEvalClothingContract,
+  buildEvalRequiredObjects,
+  buildExpectedCastBlock,
+  resolveExpectedCastNames,
+  reconcileDetectorCast,
+  parseFixableIssues,
+  derivePresenceFinding,
+  supersedePresenceFindings,
+  PRESENCE_DERIVED_MARKER,
+  PRESENCE_COUNT_TYPES,
 } = require('./evalPipeline');
+// Forwarded by CONSTRUCTION, not by a hand-written list — the rule the
+// storyHelpers facade settled on (docs/decisions.md, 2026-09-13). A name added
+// to evalPipeline.js is exported here the moment it exists; a hand-maintained
+// list silently binds `undefined` for whatever it forgets.
+const evalPipelineModule = require('./evalPipeline');
 
 // STR-6: image-prompt strings that used to be inline template literals in this
 // file (Gemini/Grok repair, edit, bbox-refine, iterative placement, style
@@ -117,8 +161,16 @@ const {
   escapeXml,
   enrichWithBoundingBoxes,
   FIGURE_COLORS,
+  isMicroFigure,
+  countRealFigures,
+  vbNonHumanNames,
 } = require('./bboxDetection');
+// Forwarded by construction — see the note above evalPipelineModule.
+const bboxDetectionModule = require('./bboxDetection');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
+// IMAGE_PROMPT for the judges = the string the model actually received.
+// Sibling of resolveEvalSceneHint; see its comment in sceneMetadata.js.
+const { resolveEvalImagePrompt, resolveEvalSceneDescription } = require('./sceneMetadata');
 // storyHelpers functions (lazy-loaded to avoid circular dependencies)
 let storyHelpersModule = null;
 function getStoryHelpers() {
@@ -134,13 +186,14 @@ const { getFacePhoto, loadVbReferenceBytes } = require('./characterPhotos');
 /**
  * Call Grok vision API for image analysis (OpenAI-compatible chat completions with images).
  * Converts Gemini parts format to Grok messages format and returns a Gemini-like response.
- * @param {string} modelKey - Model key in TEXT_MODELS (e.g., 'grok-4-fast')
- * @param {string} modelId - Actual model ID (e.g., 'grok-4-1-fast-non-reasoning')
+ * @param {string} modelKey - Model key in TEXT_MODELS (e.g., 'grok-4.3')
+ * @param {string} modelId - Actual model ID (e.g., 'grok-4.3')
  * @param {Array} geminiParts - Gemini parts array (inline_data + text)
  * @param {string} promptText - The evaluation prompt text
  * @returns {Response} Fake Response object matching Gemini API shape
  */
 async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
+  assertPromptFilled(geminiParts, 'images.callGrokVisionAPI');
   const xaiApiKey = process.env.XAI_API_KEY;
   if (!xaiApiKey) {
     log.error('❌ [GROK VISION] XAI_API_KEY not configured');
@@ -160,9 +213,10 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
     }
   }
 
+  // No max_tokens (owner rule: no output caps): xAI defaults to the model's
+  // own ceiling; a truncated eval is caught downstream by finishReason.
   const body = {
     model: modelId,
-    max_tokens: 16000,
     temperature: 0.3,
     messages: [{ role: 'user', content }]
   };
@@ -206,6 +260,66 @@ async function callGrokVisionAPI(modelKey, modelId, geminiParts, promptText) {
         candidatesTokenCount: outputTokens,
         thoughtsTokenCount: 0
       }
+    })
+  };
+}
+
+/**
+ * OpenRouter vision call in the same Gemini-compatible response shape as
+ * callGrokVisionAPI, so the blind inventory can run a Chinese/OpenRouter
+ * vision judge (Qwen3-VL, Qwen3.6 Plus, Kimi K2.6, MiniMax M3) through the
+ * same parsing. Temperature 0 (SETTLED: eval judges run at temperature 0).
+ */
+async function callOpenRouterVisionAPI(modelKey, modelId, geminiParts, promptText, options = {}) {
+  assertPromptFilled(geminiParts, 'images.callOpenRouterVisionAPI');
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    log.error('❌ [OPENROUTER VISION] OPENROUTER_API_KEY not configured');
+    return { ok: false, text: () => 'OPENROUTER_API_KEY not configured', json: () => ({}) };
+  }
+  const content = [];
+  for (const part of geminiParts) {
+    if (part.inline_data) {
+      content.push({ type: 'image_url', image_url: { url: `data:${part.inline_data.mime_type};base64,${part.inline_data.data}` } });
+    } else if (part.text) {
+      content.push({ type: 'text', text: part.text });
+    }
+  }
+  // No max_tokens (owner rule: no output caps): OpenRouter defaults to the upstream model's ceiling.
+  // `reasoning` is a passthrough, absent unless a caller asks: thinking tokens
+  // bill as output, and a describe-what-you-see pass has nothing to reason over.
+  // Measure per model before trusting a level — on deepseek-v4-pro {enabled:false}
+  // zeroed them while {effort:'low'} was ignored and cost 9x (textModels.js).
+  const body = {
+    model: modelId, temperature: 0, messages: [{ role: 'user', content }],
+    ...(options.reasoning ? { reasoning: options.reasoning } : {}),
+  };
+  const startTime = Date.now();
+  const response = await withRetry(async () => fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body),
+    // 120s like the Grok path, one retry: 3 of 20 Lab pages stalled on the
+    // single upstream provider (experiment 1053), and the inventory has a
+    // Gemini fallback waiting — a bounded wait then falling back beats a
+    // nine-minute retry ladder on a page render's critical path.
+    signal: AbortSignal.timeout(120000)
+  }), { maxRetries: 1, baseDelay: 2000 });
+  if (!response.ok) {
+    const errText = await response.text();
+    log.error(`❌ [OPENROUTER VISION] ${modelKey} API error (${response.status}): ${errText.substring(0, 200)}`);
+    return response;
+  }
+  const result = await response.json();
+  const inputTokens = result.usage?.prompt_tokens || 0;
+  const outputTokens = result.usage?.completion_tokens || 0;
+  log.debug(`📊 [OPENROUTER VISION] ${modelKey} (${Date.now() - startTime}ms): ${inputTokens} in, ${outputTokens} out`);
+  const text = result.choices?.[0]?.message?.content || '';
+  return {
+    ok: true,
+    json: async () => ({
+      candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }],
+      usageMetadata: { promptTokenCount: inputTokens, candidatesTokenCount: outputTokens, thoughtsTokenCount: 0 }
     })
   };
 }
@@ -268,52 +382,32 @@ function extractThinkingFromParts(parts, logPrefix = 'IMAGE GEN') {
 
 // =============================================================================
 // PROMPT SANITIZATION FOR GEMINI SAFETY BLOCKS
-// Progressive sanitization levels for retrying blocked image prompts
 // =============================================================================
-
-// Problematic words that may trigger Gemini content filtering
-const PROBLEMATIC_WORDS = [
-  // Violence
-  'weapon', 'sword', 'knife', 'dagger', 'spear', 'axe', 'bow and arrow',
-  'blood', 'bleeding', 'wound', 'injured', 'injury',
-  'kill', 'killing', 'death', 'dead', 'dying', 'corpse',
-  'attack', 'attacking', 'fight', 'fighting', 'combat', 'battle', 'war',
-  'explosion', 'exploding', 'bomb', 'gun', 'pistol', 'rifle', 'shoot', 'shooting',
-  'violent', 'violence', 'aggressive',
-  // Horror
-  'scary', 'horror', 'terrifying', 'nightmare', 'monster',
-  'torture', 'torment', 'suffering', 'agony',
-  'poison', 'poisonous', 'toxic', 'venom',
-  // Fire/destruction
-  'fire', 'burning', 'flames', 'ablaze', 'inferno',
-  'destroy', 'destruction', 'devastation', 'ruins',
-  // Other
-  'slave', 'slavery', 'chains', 'shackles', 'prisoner',
-  'drunk', 'alcohol', 'wine', 'beer',
-  'naked', 'nude', 'undressed',
-  'evil', 'demonic', 'devil', 'satan', 'hell',
-  'skull', 'skeleton', 'bones'
-];
-
-/**
- * Remove problematic words from a prompt (Level 1 sanitization)
- */
-function sanitizePromptLevel1(prompt) {
-  let sanitized = prompt;
-  for (const word of PROBLEMATIC_WORDS) {
-    // Replace whole words only (case-insensitive)
-    const regex = new RegExp(`\\b${word}\\b`, 'gi');
-    sanitized = sanitized.replace(regex, '');
-  }
-  // Clean up double spaces and empty lines
-  sanitized = sanitized.replace(/  +/g, ' ').replace(/\n\s*\n\s*\n/g, '\n\n');
-  return sanitized;
-}
-
-// Former sanitization levels 2-3 (generic "simplified scene" / "happy child
-// in a magical setting" prompts) are GONE — they produced images unrelated
-// to the page. Blocked generations now get a Claude scene rewrite instead
-// (see the sanitization ladder in generateImageOnly).
+// There is no word list here any more, and no local string surgery: a Gemini
+// safety refusal gets exactly ONE retry, with the scene REWRITTEN by a text
+// model (rewriteBlockedScene). The ladder lives in generateImageOnly.
+//
+// Two earlier rungs were deleted, both for the same reason — they bought a
+// render by silently destroying the instructions the page needed:
+//
+//  • Generic "simplified scene" / "happy child in a magical setting" prompts
+//    (former levels 2-3): the "successful" image had nothing to do with the
+//    page — a fairy/bubbles picture shipped as a Tell-saga crossbow scene on
+//    job_1781289599516 p4.
+//
+//  • PROBLEMATIC_WORDS + sanitizePromptLevel1 (deleted 2026-09-18, owner
+//    approved): 78 words deleted whole-word, case-insensitively, from the WHOLE
+//    prompt. Measured on stored data first — the list matched OUR OWN
+//    INSTRUCTIONS far more often than any violence. `bleeding` is in
+//    image-generation.txt's "filling the canvas, bleeding off all four edges"
+//    (81.8% of stored staging page prompts, 27.5% of production ones); `weapon`
+//    is in the text-zone rule "(hats, embroidery, patterns, weapon edges)";
+//    `wound`, `hell`, `dead` and `shooting` match ordinary English and German
+//    prose ("the rope is wound", "der Kiel ist hell", "the dead end of the
+//    path", "her brow is shooting upward"). The rung fired 14 times on staging
+//    and never once in production; it rescued 1 of those 14, and THAT render
+//    went out without the full-bleed instruction. The rewrite rung rescued 2.
+//    A refusal now escalates straight to the rewrite.
 
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
@@ -608,7 +702,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
       SCENE_DESCRIPTION: sceneDescription
     });
 
-    const rewriteResult = await callTextModel(rewritePrompt, 1000, require('../config/models').resolveSceneRewriteModel(), { usageLabel: 'scene_rewrite' });
+    const rewriteResult = await callTextModel(rewritePrompt, null, require('../config/models').resolveSceneRewriteModel(), { usageLabel: 'scene_rewrite' });
     const rewrittenScene = rewriteResult.text;
 
     // Log token usage
@@ -751,13 +845,42 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
   return head.trimEnd() + '\n' + tail;
 }
 
-async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null) {
+/**
+ * The scene block of a prompt: everything strictly before the protected tail
+ * (`**REQUIRED OBJECTS` / `**ART STYLE`). Returns '' when there is no tail
+ * marker, so a caller can tell "no scene block found" from a real one.
+ */
+function sceneHeadOf(prompt) {
+  const o = prompt.indexOf('**REQUIRED OBJECTS');
+  const tailStart = o >= 0 ? o : prompt.indexOf('**ART STYLE');
+  return tailStart > 0 ? prompt.slice(0, tailStart).trim() : '';
+}
+
+/**
+ * @param {Object|null} meta - optional out-param. Whenever this function
+ *   actually CHANGES the prompt, `meta.compressedScene` receives the SCENE
+ *   BLOCK OF THE STRING IT RETURNS — the scene prose the image model really
+ *   got. That is the LLM-rewritten head on the compression branch, and the
+ *   post-dedupe / post-cut head on the other two. Stamping only the LLM branch
+ *   was measured leaving the field null on the one over-cap page of staging
+ *   job_1789348171785_9oxos7dwv (p7, 8,002 chars against grok-imagine-image-2.0's
+ *   7,900 cap): dedupe alone brought it to 7,242, so the compression branch
+ *   never ran and nothing recorded that the sent prose differed from the built
+ *   prose at all. The
+ *   batch image eval judges the render against that description rather than the
+ *   pre-shrink one (sceneMetadata.resolveEvalSceneDescription). It is the head
+ *   ALONE: taken from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE`
+ *   tail split, so it carries no ART STYLE block, and it is not a second copy
+ *   of the whole prompt.
+ */
+async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null, meta = null) {
   if (!prompt || prompt.length <= maxPromptLength) return prompt;
 
   // 1. Deterministic: merge duplicated bullet bodies, collapse blank runs.
   let out = dedupeIdenticalBullets(prompt);
   if (out.length <= maxPromptLength) {
     log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${out.length} chars via dedupe (budget ${maxPromptLength})`);
+    if (meta) meta.compressedScene = sceneHeadOf(out) || undefined;
     return out;
   }
 
@@ -836,13 +959,16 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
         let newHead = '';
         for (let attempt = 1; attempt <= 2; attempt++) {
           const over = attempt === 1 ? 0 : newHead.length;
-          const res = await callTextModel(buildInstruction(over), 12000, compressModel, callOpts);
+          const res = await callTextModel(buildInstruction(over), null, compressModel, callOpts);
           newHead = (res?.text || '').trim();
           if (newHead.length > 500 && newHead.length <= headBudget) break;
           log.warn(`✂️ [${logLabel}] Compression attempt ${attempt} by ${compressModel}: ${newHead.length} chars vs ${headBudget} allowed`);
         }
         if (newHead.length > 500 && newHead.length <= headBudget) {
           const assembled = newHead + (rulesBlock ? '\n\n' + rulesBlock : '') + (frameBlock ? '\n\n' + frameBlock : '') + '\n\n' + tail;
+          // The description the model really received — the one string the
+          // batch eval needs and nothing stored today holds.
+          if (meta) meta.compressedScene = newHead;
           // The head/allowance ratio is the number that matters: a model that
           // writes far under its allowance silently deletes scene facts, and
           // nothing downstream can tell that from a legitimately terse rewrite.
@@ -857,7 +983,9 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
   }
 
   // 3. Guarantee: section-aware cut that never drops the tail sections.
-  return sectionAwareCut(out, maxPromptLength, logLabel);
+  const cut = sectionAwareCut(out, maxPromptLength, logLabel);
+  if (meta) meta.compressedScene = sceneHeadOf(cut) || undefined;
+  return cut;
 }
 
 /**
@@ -925,9 +1053,15 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     pageLabel = '',                      // Grok packReferences pageLabel
     defaultModel,                        // eval path cover-aware; gen-only pageImage
     includeSceneBackgroundPart = false,  // gen-only adds a [Background] Gemini part
+    vbColumnFraction = null,             // Test Lab only: widen the VB element column
     maxRefSlots = null,                  // Test Lab only: raise packReferences/editWithGrok's
                                           // slot budget above the production default of 3
                                           // (xAI's edit cap is 5). null = production default.
+    // Out-param: receives `compressedScene` when the prompt went over the
+    // model's cap and shrinkPromptForModel LLM-compressed the scene prose.
+    // Callers stamp it onto the page record so the batch eval judges the render
+    // against the description that was actually sent.
+    promptMeta = null,
   } = opts;
 
   // Whether slot-0 scene plates get magenta-extension padding (gen-only only).
@@ -987,12 +1121,12 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
     // Truncate to Grok's prompt-length cap BEFORE the API call.
     const grokMaxPrompt = IMAGE_MODELS[grokTier.key]?.maxPromptLength || 7500;
-    const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel);
+    const grokPrompt = await shrinkPromptForModel(prompt, grokMaxPrompt, logLabel, grokModel, promptMeta);
 
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
-        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}) }
+        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
       );
 
       let result;
@@ -1179,7 +1313,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
 
   const modelConfig = IMAGE_MODELS[modelId];
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  const effectivePrompt = await shrinkPromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null);
+  const effectivePrompt = await shrinkPromptForModel(prompt, maxPromptLength, logLabel, verbose ? modelId : null, promptMeta);
   if (effectivePrompt !== prompt) {
     parts[0] = { text: effectivePrompt };
   }
@@ -1281,6 +1415,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
 async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null, sceneBackground = null, aspectRatioOverride = null, sceneCharacters = null) {
+  prompt = guardPromptString(prompt, 'images.callGeminiAPIForImage');
   // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
@@ -1331,8 +1466,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   });
 
   // Same 9-arg quality eval every non-avatar branch ran inline before.
+  // IMAGE_PROMPT = the string the provider actually received. `prompt` is the
+  // PRE-shrink text; over the model's cap _dispatchImageGeneration compresses
+  // it and returns the sent string as `raw.promptSent`. See
+  // sceneMetadata.resolveEvalImagePrompt for why judging the pre-shrink text
+  // manufactures "missing X" findings against instructions never given.
   const runEval = () => evaluateImageQuality(
-    raw.imageData, prompt, characterPhotos, evaluationType,
+    raw.imageData, resolveEvalImagePrompt({ promptSent: raw.promptSent, originalPrompt: prompt }),
+    characterPhotos, evaluationType,
     qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters
   );
 
@@ -1360,6 +1501,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       verdict: qualityResult?.verdict || null,
       usage: raw.usage
@@ -1405,6 +1547,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       verdict: qualityResult?.verdict || null,
       // `imageUsage` is the field provider-style usage trackers read.
@@ -1439,6 +1582,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       qualityModelId: qualityResult?.qualityModelId ?? null,
       imageUsage: raw.usage,
@@ -1466,6 +1610,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       fixableIssues: qualityResult?.fixableIssues || [],
       semanticResult: qualityResult?.semanticResult || null,
       semanticScore: qualityResult?.semanticScore ?? null,
+      ...carryEvalEvidence(qualityResult),
       issuesSummary: qualityResult?.issuesSummary || null,
       qualityModelId: qualityResult?.qualityModelId ?? null,
       imageUsage: raw.usage,
@@ -1594,7 +1739,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
         // Evaluate image quality with prompt and reference images
         log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
+        // Same rule as the runEval above: judge against what Gemini received.
+        // parts[0].text is the post-shrink text (it is also what this branch
+        // stamps as the result's `prompt`, a few lines down).
+        const qualityResult = await evaluateImageQuality(compressedImageData, resolveEvalImagePrompt({ promptSent: parts[0]?.text, originalPrompt: prompt }), characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint, sceneCharacters);
 
         // Extract score, reasoning, and text error info from quality result
         const score = qualityResult ? qualityResult.score : null;
@@ -1627,6 +1775,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           objectMatches, // Object/animal/landmark matches from evaluation
           semanticResult: qualityResult?.semanticResult || null,
           semanticScore: qualityResult?.semanticScore ?? null,
+          ...carryEvalEvidence(qualityResult),
           issuesSummary: qualityResult?.issuesSummary || null,
           verdict: qualityResult?.verdict || null,
           modelId,  // Include which model was used for image generation
@@ -1689,6 +1838,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
  * @returns {Promise<{imageData: string, modelId: string, usage: Object}>}
  */
 async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
+  prompt = guardPromptString(prompt, 'images.generateImageOnly');
   const {
     previousImage = null,
     imageModelOverride = null,
@@ -1720,6 +1870,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // Test Lab only: raise the Grok reference-slot budget above the production
     // default of 3 (xAI's edit cap is 5, re-verified 2026-09-02).
     maxRefSlots = null,
+    // Test Lab only: widen the VB element column (cell-geometry experiment).
+    vbColumnFraction = null,
   } = options;
 
   if (captureLabel) {
@@ -1747,9 +1899,19 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   log.debug(`🆕 [IMAGE GEN-ONLY] Cache MISS - key: ${genOnlyCacheKey.substring(0, 24)}...`);
 
+  // Over-cap prompts are LLM-compressed before they are sent. `shrinkMeta`
+  // collects the COMPRESSED SCENE BLOCK so it can be stamped onto the result
+  // (and from there onto the page record) — the batch image eval scores the
+  // render against that description, not the pre-shrink one. Empty on the
+  // overwhelmingly common under-cap path, and the field is then omitted
+  // entirely, so unshrunk pages carry exactly what they carried before.
+  const shrinkMeta = {};
+  const sceneStamp = () => (shrinkMeta.compressedScene ? { compressedScene: shrinkMeta.compressedScene } : {});
+
   // Shared provider-dispatch ladder (Runware/Grok/Gemini selection + reference
   // packing + truncation + aspect + onImageReady). See _dispatchImageGeneration.
   const raw = await _dispatchImageGeneration(prompt, characterPhotos, {
+    promptMeta: shrinkMeta,
     logLabel: 'IMAGE GEN-ONLY',
     verbose: false,
     previousImage,
@@ -1768,6 +1930,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     defaultModel: MODEL_DEFAULTS.pageImage,
     includeSceneBackgroundPart: true,
     maxRefSlots,
+    vbColumnFraction,
   });
 
   // Strip a stray uniform frame the model painted despite the D-01 prompt ban
@@ -1793,7 +1956,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     const finalResult = {
       imageData: raw.imageData,
       modelId: raw.modelId,
-      usage: raw.usage
+      usage: raw.usage,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -1802,10 +1966,19 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   if (raw.provider === 'grok-primary') {
     const finalResult = {
       imageData: raw.imageData,
-      prompt,
+      // The PROMPT ACTUALLY SENT, like every sibling branch in this function
+      // (runware-routed, grok-routed, the Gemini fallback). This one alone
+      // stamped the pre-shrink text, and grok-primary is the default page
+      // path — which is why staging job_1789301291267_ueh8h145m stores a
+      // 7,939-char prompt for a model whose cap is 7,900. Everything
+      // downstream that reads this field (the batch eval's ORIGINAL_PROMPT
+      // fallback, coverIterate's eval, the dev-mode "sent to Grok" panel)
+      // was therefore shown a string the model never received.
+      prompt: raw.promptSent,
       modelId: raw.modelId,
       usage: raw.usage,
       grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -1818,7 +1991,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       modelId: raw.modelId,
       usage: raw.usage,
       // Reconstruction record — refs were built above but never stamped.
-      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined
+      grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -1831,6 +2005,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       modelId: raw.modelId,
       usage: raw.usage,
       grokRefImages: raw.packedRefs.length > 0 ? raw.packedRefs : undefined,
+      ...sceneStamp()
     };
     if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
     return finalResult;
@@ -1863,37 +2038,49 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, sampling: ${JSON.stringify(geminiSampling(modelId))}, aspect: ${aspectRatio}, systemInstruction: ${!!systemInstruction}`);
 
-  // Progressive retry with sanitization on safety blocks
-  // Progressive retries on safety blocks. Level 1 is a cheap local word
-  // strip; level 2 asks Claude to REWRITE the scene — defuse the safety
-  // trigger while keeping the story moment (same rewriteBlockedScene used
-  // by the main generation path). The former levels 2-3 replaced the prompt
-  // with a generic "happy child in a magical setting" one-liner, so the
-  // "successful" image had nothing to do with the page (observed: a
-  // fairy/bubbles image shipped as a Tell-saga crossbow scene on
-  // job_1781289599516 p4). If the rewritten scene is STILL blocked, this
-  // function throws — a wrong image is worse than no image.
+  // Safety-block ladder: level 0 is the prompt as built, level 1 asks a text
+  // model to REWRITE the scene — defuse the safety trigger while keeping the
+  // story moment (same rewriteBlockedScene used by the main generation path).
+  // If the rewritten scene is STILL blocked, this function throws — a wrong
+  // image is worse than no image, and so is a mutilated prompt. Every earlier
+  // rung (the generic one-liner prompts, then the 78-word local strip) is gone;
+  // the PROMPT SANITIZATION note near the top of this file records what each
+  // one cost and the measurements that retired it.
+  // Every rung rebuilds from what level 0 actually SENT — `parts[0].text`, the
+  // post-shrink string — not from the raw `prompt` argument. The two diverge on
+  // the Grok→Gemini fallback: shrinkPromptForModel ran against the GROK model's
+  // 7,900-char cap (models.js) before the swap to gemini-2.5-flash-image, while
+  // `prompt` can be 22k (measured max in stories.data). Rebuilding a "retry"
+  // from `prompt` silently re-expanded it by thousands of characters, so what
+  // got retried was not the request that had just been refused. Same
+  // sent-equals-stored equality that stored-prompt-is-sent-prompt.test.ts pins
+  // for the level-0 path.
+  const sentPrompt = parts[0]?.text || effectivePrompt;
+
   const rewriteSceneInPrompt = async () => {
     const { callTextModel } = require('./textModels');
-    const sceneMatch = prompt.match(/\*\*THIS IMAGE DEPICTS:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
-      || prompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
-      || prompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
+    const sceneMatch = sentPrompt.match(/\*\*THIS IMAGE DEPICTS:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+      || sentPrompt.match(/\*\*SCENE:\*\*\s*([\s\S]*?)(?=\n\n\*\*|$)/i)
+      || sentPrompt.match(/Scene Description:\s*([\s\S]*?)(?=\n\n\*\*|$)/i);
     const originalScene = sceneMatch?.[1]?.trim();
-    const rewriteResult = await rewriteBlockedScene(originalScene || prompt, callTextModel);
+    const rewriteResult = await rewriteBlockedScene(originalScene || sentPrompt, callTextModel);
     // Replace the scene block in place so style / reference / no-text rules
     // survive; when no scene block was found (custom prompts like
     // scale-repair or empty-scene), use the rewrite as the whole prompt.
-    return originalScene ? prompt.replace(originalScene, rewriteResult.text) : rewriteResult.text;
+    // The replacement is a FUNCTION: a `$&`, `$'` or `$1` sequence in
+    // MODEL-authored text is a substitution pattern to String.replace, which
+    // would splice a copy of the matched scene back into the prompt. A replacer
+    // function is taken literally.
+    return originalScene ? sentPrompt.replace(originalScene, () => rewriteResult.text) : rewriteResult.text;
   };
   const sanitizationLevels = [
-    null,                                       // Level 0: original prompt
-    () => sanitizePromptLevel1(prompt),         // Level 1: strip safety-trigger words
-    rewriteSceneInPrompt,                       // Level 2: Claude scene rewrite (keeps the story moment)
+    null,                   // Level 0: the prompt as sent
+    rewriteSceneInPrompt,   // Level 1: text-model scene rewrite (keeps the story moment)
   ];
 
   for (let sanitizationLevel = 0; sanitizationLevel < sanitizationLevels.length; sanitizationLevel++) {
     // Apply sanitization if needed
-    let currentPrompt = prompt;
+    let currentPrompt = sentPrompt;
     if (sanitizationLevel > 0) {
       try {
         currentPrompt = await sanitizationLevels[sanitizationLevel]();
@@ -1902,7 +2089,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         throw new Error(`Image blocked and scene rewrite failed: ${rewriteErr.message}`);
       }
       parts[0] = { text: currentPrompt };
-      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel}${sanitizationLevel === 2 ? ' (Claude scene rewrite)' : ''}, prompt: ${currentPrompt.substring(0, 100)}...`);
+      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel} (scene rewrite), prompt: ${currentPrompt.substring(0, 100)}...`);
     }
 
     try {
@@ -1944,12 +2131,19 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       const candidate = data.candidates[0];
       const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN-ONLY');
 
-      // Check for safety block at candidate level
-      const finishReason = candidate.finishReason;
-      if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
-        log.warn(`⚠️ [IMAGE GEN-ONLY] Content blocked (${finishReason}) at level ${sanitizationLevel}`);
+      // Candidate-level refusal. ALLOW-LIST since 2026-09-18 (imageReplyGuard):
+      // only a finish reason that MEANS the model finished lets the response
+      // through. The old test named SAFETY and PROHIBITED_CONTENT alone, so
+      // every other refusal — RECITATION, BLOCKLIST, SPII, LANGUAGE, OTHER and
+      // the whole IMAGE_* family, IMAGE_OTHER included — fell past it into the
+      // parts loop and was caught only by the "no image data" fall-through
+      // below, under a vaguer log line. MAX_TOKENS is deliberately NOT a block
+      // here: it keeps falling through exactly as before.
+      const block = assessImageResponse(data);
+      if (block.blocked) {
+        log.warn(`⚠️ [IMAGE GEN-ONLY] Content ${describeImageBlock(block)} at level ${sanitizationLevel}`);
         if (sanitizationLevel < sanitizationLevels.length - 1) continue;
-        throw new Error(`Image blocked by API: reason=${finishReason}`);
+        throw new Error(`Image blocked by API: reason=${block.reason}`);
       }
 
       if (candidate.content && candidate.content.parts) {
@@ -1975,7 +2169,12 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
               modelId,
               thinkingText,
               usage,
-              sanitizationLevel, // Track which level succeeded
+              // Which rung produced this image: 0 = the prompt as built,
+              // 1 = after the scene rewrite. (Level 1 meant the local word
+              // strip until 2026-09-18; nothing reads this field — verified
+              // repo-wide, and `$.**.sanitizationLevel` returns zero rows in
+              // both environments' stories.data — so the renumber is safe.)
+              sanitizationLevel,
               // Reconstruction record — refs were in parts but never stamped.
               // NOTE ON THE COUNT (documented 2026-08-29): on this GEMINI
               // FALLBACK path the field holds the UNPACKED part list — one
@@ -1989,7 +2188,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
               // grok-imagine-image page has ≤3.
               grokRefImages: parts
                 .filter(p => p.inline_data)
-                .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`)
+                .map(p => `data:${p.inline_data.mime_type};base64,${p.inline_data.data}`),
+              ...sceneStamp()
             };
 
             if (!skipCache) imageCache.set(genOnlyCacheKey, result);
@@ -2214,6 +2414,25 @@ async function generateWithIterativePlacement(prompt, allCharacterPhotos, sceneM
  * @param {string|null} options.qualityModelOverride - Model override for quality evaluation
  * @returns {Promise<Array<Object>>} Array of evaluation results per page
  */
+/**
+ * Compose the reference list a page eval is judged against.
+ *
+ * Page photos win per name — they hold the outfit the page was generated
+ * against — and the whole-cast list only appends the names the page omits.
+ * Either side may legitimately be empty; an empty one never wins.
+ *
+ * @param {Array} pagePhotos - The page's own characterPhotos
+ * @param {Array} wholeCastPhotos - Story-level reference photos (all characters)
+ * @returns {Array} Merged reference list
+ */
+function composeEvalReferencePhotos(pagePhotos, wholeCastPhotos) {
+  const page = Array.isArray(pagePhotos) ? pagePhotos.filter(Boolean) : [];
+  const cast = Array.isArray(wholeCastPhotos) ? wholeCastPhotos.filter(Boolean) : [];
+  const key = (p) => String(p?.name || '').trim().toLowerCase();
+  const onPage = new Set(page.map(key).filter(Boolean));
+  return [...page, ...cast.filter(p => !onPage.has(key(p)))];
+}
+
 async function evaluateImageBatch(images, options = {}) {
   const {
     concurrency = 100,
@@ -2221,6 +2440,9 @@ async function evaluateImageBatch(images, options = {}) {
     visualBible = null,
     clothingRequirements = null,
     artStyle = null,
+    // Story context for the judge's cast resolver (main cast index) and the
+    // clothing contract — without it every main-cast token logged unresolved.
+    storyData = null,
     // Story-level context for eval_findings stats (best-effort; per-style works
     // from artStyle alone, the rest populate once the batch caller threads them).
     storyId = null,
@@ -2253,7 +2475,26 @@ async function evaluateImageBatch(images, options = {}) {
       // The clothing facts now travel as the CLOTHING CONTRACT input, built
       // inside evaluateImageQuality from these same photos — prepending them to
       // the prompt as well would state the outfit twice.
-      const sceneDescWithClothing = `${img.sceneDescription || img.prompt || ''}`;
+      //
+      // NOT the sent prompt, deliberately: this site feeds the judge the scene
+      // DESCRIPTION, and the resolveEvalArtStyle call below depends on that —
+      // ORIGINAL_PROMPT here must carry no ART STYLE block.
+      //
+      // But when the page's built prompt went over the model cap,
+      // shrinkPromptForModel COMPRESSED the scene prose before sending it, and
+      // the description stored on the page still names clauses the model never
+      // received. The shrink path now hands its compressed scene block back
+      // (`compressedScene`), so that is what the judge scores against when it
+      // exists. No shrink → the exact chain this site always used. The resolver
+      // also re-checks the ART STYLE invariant on the compressed string, since
+      // that head is LLM-rewritten. See
+      // sceneMetadata.resolveEvalSceneDescription (sibling of
+      // resolveEvalImagePrompt, which closed the six prompt-side sites).
+      const sceneDescWithClothing = resolveEvalSceneDescription({
+        compressedScene: img.compressedScene,
+        sceneDescription: img.sceneDescription,
+        prompt: img.prompt,
+      });
 
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
@@ -2262,22 +2503,15 @@ async function evaluateImageBatch(images, options = {}) {
       // scene DESCRIPTION (no ART STYLE block), so without this every
       // style-dependent evaluator rule skipped silently in production too.
       //
-      // allCharacterPhotos (batch-global identity list, {name, photoUrl} only)
-      // wins the refs slot, and the eval's clothing-contract builder reads
-      // clothingDescription off THESE refs — so the contract was empty for
-      // every batch eval. Pages hid it (scene prose weaves the outfits into
-      // ORIGINAL_PROMPT); a cover's description has no clothing text, so the
-      // judge ruled the requested costume "unrequested" and the repair
-      // stripped it (verified: identical cover + prompt scores 0 without
-      // clothingDescription on refs, 100 with). Merge the per-page outfit in.
-      const richClothingByName = new Map((img.characterPhotos || [])
-        .filter(p => p?.name && p?.clothingDescription)
-        .map(p => [String(p.name).toLowerCase(), p.clothingDescription]));
-      const refsForEval = (img.allCharacterPhotos || img.characterPhotos || []).map(p =>
-        p?.clothingDescription ? p : {
-          ...p,
-          clothingDescription: richClothingByName.get(String(p?.name || '').toLowerCase()) || null,
-        });
+      // The judge's reference list, and with it the CLOTHING CONTRACT the
+      // eval builds from these refs' clothingDescription. The page's own
+      // photos come first: they carry the outfit the page was actually
+      // generated against (costumes, worn-item strips). A cover's description
+      // has no clothing text, so a contract built from the story-level outfit
+      // ruled the requested costume "unrequested" and the repair stripped it.
+      // The whole-cast list then adds the characters the page did not list,
+      // so identity checks still see the full cast.
+      const refsForEval = composeEvalReferencePhotos(img.characterPhotos, img.allCharacterPhotos);
       const qualityResult = await evaluateImageQuality(
         img.imageData,
         sceneDescWithClothing,
@@ -2296,6 +2530,14 @@ async function evaluateImageBatch(images, options = {}) {
           // used to render raw VB ids into a judge's prompt.
           visualBible,
           artStyle: require('../services/prompts').resolveEvalArtStyle(artStyle, img.prompt || null),
+          // Same reason the style is read off the built prompt here: the
+          // REQUIRED OBJECTS checklist lives in the prompt TAIL, which the
+          // judge's ORIGINAL_PROMPT (the scene description) deliberately does
+          // not carry. Passed as its own input so D-16b can fire; falls back to
+          // sceneMetadata.objects when no prompt was stored.
+          pagePrompt: img.prompt || null,
+          storyData,
+          clothingRequirements,
           // Structured cover text contract from the pseudo-page record
           // (expectedText / textMode) — see evaluateImageQuality's cover branch.
           expectedText: img.expectedText ?? null,
@@ -2304,6 +2546,21 @@ async function evaluateImageBatch(images, options = {}) {
           // pipeline (landmark refs + scene era). Absent → no protection.
           landmarkPhotos: img.landmarkPhotos || null,
           era: img.era || null,
+          // The page's PARSED metadata, so the EXPECTED CAST roster reads the
+          // brief's `objects[]` even when sceneHint is a plan line.
+          sceneMetadata: img.sceneMetadata || null,
+          // Covers only: the characters the generator was ORDERED to leave off
+          // (cap + exclusion list, server/lib/coverCastRoster.js). The cover
+          // branch of buildExpectedCastBlock reads the cover prose, which still
+          // names them — without this the judge holds a roster the generator
+          // was told to violate.
+          excludedCastNames: img.excludedCastNames || null,
+          // Detector figure count for the EXPECTED CAST block — present on
+          // repair-round re-evaluations that carry the previous detection;
+          // null on a first-round eval, which runs before detection.
+          // Phase 5b-pre already detected on these exact bytes; the repair
+          // rounds carry their own. Shared first, page second — never a new call.
+          detectedFigures: img.sharedBboxDetection?.figures || img.bboxDetection?.figures || null,
           storyMeta: {
           storyId, pageNumber: img.pageNumber, artStyle, genre, language,
           charCount: Array.isArray(img.sceneCharacters) ? img.sceneCharacters.length : null,
@@ -2387,6 +2644,36 @@ async function evaluateImageBatch(images, options = {}) {
         log.debug(`📦 [BATCH EVAL] PAGE ${img.pageNumber}: ${Object.keys(sceneOnly).length} secondary character(s) from the Visual Bible: ${Object.keys(sceneOnly).join(', ')}`);
       }
 
+      // ONE ROSTER (2026-09-13): membership comes from buildExpectedCastBlock,
+      // the same answer the evaluator above was given. The rich descriptions
+      // assembled here are untouched — only names the roster holds and this map
+      // lacks are appended, so the detector can never be asked about a smaller
+      // cast than the judge is scoring against.
+      const { resolveExpectedCastNames, reconcileDetectorCast } = require('./evalPipeline');
+      const authoritativeCast = resolveExpectedCastNames({
+        sceneCharacters: img.sceneCharacters || null,
+        sceneHint: img.sceneHint || null,
+        originalPrompt: img.sceneDescription || '',
+        visualBible,
+        evaluationType: img.evaluationType || 'scene',
+        pageLabel: `PAGE ${img.pageNumber} `,
+        sceneMetadata,
+        pageNumber: img.pageNumber,
+        extraNames: img.outlineCharacters || img.scene?.outlineCharacters || [],
+        storyData,
+      });
+      const castReconciled = reconcileDetectorCast(
+        Object.entries(characterDescriptions).map(([name, d]) => ({ name, description: d?.richDescription || '' })),
+        authoritativeCast,
+        { visualBible, pageLabel: `PAGE ${img.pageNumber} `, storyData }
+      );
+      for (const name of castReconciled.added) {
+        if (!characterDescriptions[name]) {
+          const e = castReconciled.entries.find(x => x.name === name);
+          characterDescriptions[name] = { richDescription: e?.description || '', clothingDescriptions: {} };
+        }
+      }
+
       // Parse Visual Bible objects from prompt
       const vbObjects = parseVisualBibleObjects(img.prompt || '');
       // Scene metadata emits VB IDs ("ART003", "LOC001.2"); translate them to
@@ -2424,6 +2711,8 @@ async function evaluateImageBatch(images, options = {}) {
         );
         bboxDetection = enrichResult.detectionHistory;
         enrichedFixTargets = enrichResult.targets || [];
+        // Alongside expectedCharacters, never instead of it (see site A).
+        if (bboxDetection) bboxDetection.expectedCastNames = castReconciled.names;
       }
 
       // WHO IS WHO — reconcile the evaluator against the detector before any
@@ -2431,11 +2720,33 @@ async function evaluateImageBatch(images, options = {}) {
       // point where both identities exist side by side; after it, `matches` and
       // every per-character finding carry the detector's names. Enrichment above
       // pairs on geometry, not names, so it is unaffected by the correction.
+      //
+      // AWAITED (2026-09-18). Reconciliation used to be a pure function of two
+      // stored lists. It now asks a THIRD witness on the pages where the two
+      // genuinely disagree AND the detector is about to overwrite the
+      // evaluator — one Set-of-Mark call from a later tier of the same chain,
+      // measured at 19 of 1,194 stored staging versions and 0 of 317 on
+      // production. That makes this a network call, so it is awaited here. It
+      // sits inside the per-page eval task (pLimit, one per page, default
+      // concurrency 100), so a contested page waits for its own witness and no
+      // other page waits for it.
       let identityAgreement = null;
       if (qualityResult && bboxDetection?.figures?.length) {
-        const { reconcileIdentity, describeIdentityAgreement } = require('./identityAgreement');
-        identityAgreement = reconcileIdentity(qualityResult, bboxDetection.figures, {
+        const { reconcileIdentityWithSecondWitness, describeIdentityAgreement } = require('./identityAgreement');
+        identityAgreement = await reconcileIdentityWithSecondWitness(qualityResult, bboxDetection.figures, {
           alsoRename: [enrichedFixTargets],
+          // Closure, not an import inside identityAgreement: that module is a
+          // leaf and stays one. Never called on an uncontested page — the
+          // reconciler decides whether the answer can change anything before it
+          // spends the call.
+          secondOpinion: () => require('./figureDetection').secondOpinionIdentity(
+            img.imageData,
+            bboxDetection.figures,
+            bboxDetection.expectedCharacters,
+            `PAGE ${img.pageNumber}: `,
+            // The tier that already answered is not a second witness.
+            { excludeModel: bboxDetection.gdinoDiag?.identity?.model || null },
+          ),
         });
         if (identityAgreement?.conflicts?.length) {
           log.warn(describeIdentityAgreement(identityAgreement, `PAGE ${img.pageNumber}: `));
@@ -2448,52 +2759,14 @@ async function evaluateImageBatch(images, options = {}) {
         }
       }
 
-      // TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27). missing_character is
-      // the only finding built on NOT seeing something, so one blind spot can
-      // fabricate it. Here — and only here — both enumerations of this image
-      // exist: the detector's named figures and the evaluator's matches[]. If
-      // EITHER placed the character in the picture, the absence claim is
-      // contradicted and is dropped before it can be billed.
-      //
-      // The eval already deducts for a genuine absence; this does not add a
-      // second charge, it removes a wrong one. Both witnesses silent ->
-      // untouched, and the existing deduction stands.
-      let presenceDrops = [];
-      if (qualityResult) {
-        const { charactersSeenByAnyWitness, dropContradictedAbsences } = require('./identityAgreement');
-        const seen = charactersSeenByAnyWitness(qualityResult, bboxDetection?.figures);
-        if (seen.size > 0) {
-          presenceDrops = dropContradictedAbsences(
-            [qualityResult.fixableIssues, qualityResult.threeStageResult?.fixableIssues,
-             qualityResult.threeStageResult?.issues, qualityResult.semanticResult?.semanticIssues],
-            seen,
-            { pageLabel: `PAGE ${img.pageNumber}: ` }
-          );
-          // RESCORE after a drop (review 2026-09-01). score/qualityScore were
-          // derived from the issue lists INSIDE evaluateImageQuality — before
-          // this filter can run, because the filter needs the detector, which
-          // needs the eval. Dropping the claim without recomputing left its
-          // −20/−30 baked into the number while the finding vanished from the
-          // list: the page was silently under-scored and the repair-method
-          // gates acted on a charge with no finding behind it. Same rubric,
-          // same clamp as evalPipeline (visual = (10 − Σ SEVERITY_PENALTY) ×
-          // 10; final = visual − semanticPenaltyPoints), recomputed from the
-          // now-filtered lists so the invariant "score derives from the
-          // current issues" holds again.
-          if (presenceDrops.length) {
-            const SEVERITY_PENALTY = { CATASTROPHIC: 5, CRITICAL: 3, MAJOR: 2, MODERATE: 1, MINOR: 0.5 };
-            const visual = Math.max(0, Math.min(10, 10 - (qualityResult.fixableIssues || []).reduce(
-              (sum, i) => sum + (SEVERITY_PENALTY[String(i.severity).toUpperCase()] ?? 1), 0))) * 10;
-            // Shared table (scoring.js semanticPenaltyPoints) — the hand-copied
-            // chain here billed a CATASTROPHIC semantic issue 10, half of MAJOR.
-            const semanticPenalty = require('./scoring').semanticPenaltyPoints(qualityResult.semanticResult?.semanticIssues);
-            const before = qualityResult.score;
-            qualityResult.qualityScore = visual;
-            qualityResult.score = visual - semanticPenalty;
-            log.info(`👥 [PRESENCE] PAGE ${img.pageNumber}: rescored after ${presenceDrops.length} dropped absence claim(s): ${before} → ${qualityResult.score}`);
-          }
-        }
-      }
+      // TWO WITNESSES FOR AN ABSENCE (owner, 2026-08-27) — FOLDED INTO THE
+      // DERIVATION (owner, 2026-09-13). The principle stands: an absence claim
+      // is the one finding built on NOT seeing something, so a single blind
+      // spot can fabricate it. It no longer runs here as an after-the-fact
+      // filter deleting claims one at a time (and rescoring behind them).
+      // evalPipeline.derivePresenceFinding now compares the detector count
+      // against the evaluator own enumeration BEFORE any claim is made, and
+      // declines to derive at all when they disagree.
 
       // Create bbox overlay image for dev mode display
       let bboxOverlayImage = null;
@@ -2526,10 +2799,6 @@ async function evaluateImageBatch(images, options = {}) {
         verdict: qualityResult?.verdict || null,
         issuesSummary: qualityResult?.issuesSummary || null,
         fixableIssues: qualityResult?.fixableIssues || [],
-        // Absence claims removed because a witness saw the character (see the
-        // two-witness block above). Recorded, not silent: a drop is evidence
-        // about the evaluator, not just a quieter score.
-        ...(presenceDrops.length ? { presenceDrops } : {}),
         fixTargets: qualityResult?.fixTargets || [],
         enrichedFixTargets,
         figures: qualityResult?.figures || [],
@@ -2562,7 +2831,7 @@ async function evaluateImageBatch(images, options = {}) {
         // verbatim so the dev panel can show Stage-1's free-form "what I see"
         // text and Stage-2's raw compliance JSON. Was being dropped before
         // this — only the score + issuesSummary survived.
-        threeStageResult: qualityResult?.threeStageResult || null,
+        ...carryEvalEvidence(qualityResult),
         // Text error info for covers
         textIssue: qualityResult?.textIssue || null,
         expectedText: qualityResult?.expectedText || null,
@@ -2648,6 +2917,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // whole-frame edit. See server/lib/landmarkProtection.js.
     landmarkPhotos = null,
     era = null,
+    // The page's scene metadata, so an element cited in a state (ART002.4)
+    // resolves to the cell for the state THIS page needs.
+    sceneMetadata = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -2688,7 +2960,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       description: require('./scoring').findingText(si),
       source: 'semantic',
       type: si.type,
-      item: si.item
+      item: si.item,
+      // The bible id the judge copied off PAGE ELEMENTS; the repair attaches
+      // that element's reference by id below.
+      element: si.element || null,
     }));
 
   // Combine and deduplicate
@@ -2832,11 +3107,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // A single alternation over the ORIGINAL text fixes it by construction:
     // replacement output is never re-examined. Longest name first so a name
     // that contains another ("Anna Maria" over "Anna") wins.
-    const stripNames = (text, ownVisualId) => stripCharacterNames(text, {
+    const stripNames = (text, ownVisualId, ownName = null) => stripCharacterNames(text, {
       names: characterNames,
       vidByName: visualIdByName,
       fallbackByName: descriptorByName,
       ownVisualId,
+      ownName,
     });
 
     const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';
@@ -2877,7 +3153,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
           log.warn(`[INPAINT PAGE] P${pageNumber}: per-character fix for ${p.characterName || visualId} has no fix_instruction — dropped (a diagnosis is not an edit instruction)`);
           return null;
         }
-        const fix = stripNames(fixRaw, visualId);
+        const fix = stripNames(fixRaw, visualId, p.characterName || null);
         return { severity: p.severity, text: `For ${visualId}: ${fix}` };
       })
       .filter(x => x && x.text);
@@ -2955,15 +3231,58 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     log.warn(`[INPAINT PAGE] Consolidator failed (${consolidation?.error || 'no plan'}), fallback to top-${ranked.length} of ${combinedIssues.length} issues by severity`);
   }
 
+  // References BY ID. The semantic judge is shown PAGE ELEMENTS (id — name)
+  // and copies the id onto each finding as `element`; here that id is looked
+  // up in the bible and the cell for THIS page's state of it is attached, so
+  // the repair is shown the thing it is asked to paint. Measured before this
+  // existed (Lab set 32): a repair with no picture of the object never once
+  // painted it, and with one it did — not reliably, but never without.
+  // Nothing is read out of prose; an id the bible does not know is skipped.
+  {
+    const { VB_ID_PATTERN, baseVbId } = require('./vbIdGuard');
+    const { elementRefCell } = require('./visualBible');
+    const pools = ['artifacts', 'animals', 'secondaryCharacters', 'vehicles'];
+    const attached = new Set();
+    const MAX_ELEMENT_REFS = 2;
+    const exactId = new RegExp('^' + VB_ID_PATTERN.source + '$');
+    for (const issue of combinedIssues) {
+      if (attached.size >= MAX_ELEMENT_REFS) break;
+      const handle = String(issue.element || '').trim();
+      if (!handle || !exactId.test(handle)) continue;
+      const base = baseVbId(handle);
+      if (!base || attached.has(base)) continue;
+      let entry = null;
+      for (const pool of pools) {
+        entry = (visualBible?.[pool] || []).find(e => String(e?.id || '').toUpperCase() === base.toUpperCase());
+        if (entry) break;
+      }
+      if (!entry) { log.info(`[INPAINT PAGE] P${pageNumber}: finding names ${handle} but the bible has no such element — no reference`); continue; }
+      const { cell } = elementRefCell(entry, handle, pageNumber, sceneMetadata, visualBible);
+      const bytes = await loadVbReferenceBytes(cell);
+      if (!bytes) { log.info(`[INPAINT PAGE] P${pageNumber}: ${handle} ("${entry.name}") has no rendered reference — skipped`); continue; }
+      referenceImages.push(`data:image/jpeg;base64,${bytes}`);
+      referenceImageSources.push(`vb-element:${cell?.id || base}`);
+      attached.add(base);
+      log.info(`[INPAINT PAGE] P${pageNumber}: attaching ${cell?.id || base} ("${entry.name}") — the ${issue.type} finding names it`);
+    }
+  }
   // Find reference images for missing characters/animals from Visual Bible (still useful)
   const missingItems = combinedIssues.filter(i => i.type === 'missing_character' || i.type === 'missing_element');
+  const missingIdx = buildCastIndex({ characters: characters || [] }, visualBible);
   for (const missing of missingItems) {
     const itemName = (missing.item || '').toLowerCase().trim();
     if (!itemName) continue;
 
-    const hasRef = (e) => !!(e?.referenceImageData || e?.referenceImageUrl);
+    // hasElementReference, not a raw field read: a stated artifact's render
+    // lives on a state row, so a raw check drops it from repair references.
+    const hasRef = require('./visualBible').hasElementReference;
 
-    const vbAnimal = visualBible?.animals?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
+    // RESOLVE: one resolver decides who "item" names across the three people
+    // pools; artifacts stay on their own (name/id) matching below — an
+    // artifact is not a character.
+    const missingEntry = resolveEntity(missing.item, missingIdx, { log, pageLabel: `P${pageNumber} ` });
+    const vbAnimal = (missingEntry && missingEntry.kind === 'animal' && hasRef(missingEntry.entry))
+      ? missingEntry.entry : null;
     if (vbAnimal) {
       const bytes = await loadVbReferenceBytes(vbAnimal);
       if (bytes) {
@@ -2973,7 +3292,8 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         continue;
       }
     }
-    const vbChar = visualBible?.secondaryCharacters?.find(c => (c.name?.toLowerCase() === itemName || c.id?.toLowerCase() === itemName) && hasRef(c));
+    const vbChar = (missingEntry && missingEntry.kind === 'secondary' && hasRef(missingEntry.entry))
+      ? missingEntry.entry : null;
     if (vbChar) {
       const bytes = await loadVbReferenceBytes(vbChar);
       if (bytes) {
@@ -2985,7 +3305,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     }
     const vbArtifact = visualBible?.artifacts?.find(a => a.name?.toLowerCase() === itemName && hasRef(a));
     if (vbArtifact) {
-      const bytes = await loadVbReferenceBytes(vbArtifact);
+      const bytes = await loadVbReferenceBytes(require('./visualBible').elementRefCell(vbArtifact).cell);
       if (bytes) {
         referenceImages.push(`data:image/jpeg;base64,${bytes}`);
         referenceImageSources.push(`vb-artifact:${missing.item}`);
@@ -2994,7 +3314,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       }
     }
     if (characters) {
-      const mainChar = characters.find(c => c.name?.toLowerCase() === itemName);
+      const mainChar = (missingEntry && missingEntry.kind === 'cast') ? missingEntry.entry : null;
       if (mainChar) {
         const pageClothing = clothingFor(mainChar.name);
         if (!pageClothing) {
@@ -3080,7 +3400,12 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // there are no surrounding pixels to match and "match the source" drifts to
     // photoreal — anchor the medium explicitly for that case only.
     const reframe = consolidatedPlan?.scene_fix?.requires_regeneration === true;
-    const editResult = await editImageWithPrompt(imageData, fullInstruction, undefined, referenceImages, reframe ? (artStyle || null) : null, aspectRatio);
+    // The page inpaint is painted by the PAGE RENDER tier (owner, 2026-09-07,
+    // reversing the 2026-09-06 pin). A Standard-tier whole-frame edit of a
+    // 2.0 render repaints everything it was not told to keep: it removed a
+    // named animal's head (job_1788727233899 p7) and wiped two real landmarks
+    // (job_1788614817116 p2). Char repair keeps its own 1.x pin.
+    const editResult = await editImageWithPrompt(imageData, fullInstruction, CONFIG_DEFAULTS.pageRenderImage, referenceImages, reframe ? (artStyle || null) : null, aspectRatio);
     if (editResult?.imageData) {
       if (editResult.imageData.length < 1000) {
         log.warn(`[INPAINT PAGE] Edit produced too-small image (${editResult.imageData.length} chars), rejecting`);
@@ -3090,6 +3415,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         imageData: editResult.imageData,
         repaired: true,
         instruction: editInstruction,
+        // The COMPLETE string handed to the editor — `instruction` is only its
+        // core. Returned so the version this render becomes can record its own
+        // prompt instead of inheriting the page's first-render prompt.
+        promptSent: fullInstruction,
         referenceImages,
         referenceImageSources,
         consolidatedPlan,
@@ -3328,7 +3657,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // every page of job_1786147254924_8nuyywjii. If we do not know who is on the
   // page, we do not guess — we fail here.
   const analysisCharacters = (() => {
-    const names = (savedScene.sceneCharacters || []).map(c => String(c?.name || '').trim().toLowerCase()).filter(Boolean);
+    // RESOLVE: page cast names → roster entries through the one resolver.
+    const iterateIdx = buildCastIndex({ characters: characters || [] }, visualBible);
+    const names = (savedScene.sceneCharacters || []).map(c => String(c?.name || '').trim()).filter(Boolean);
     if (names.length === 0) {
       // An EMPTY cast and an UNKNOWN cast are different states. A landscape page
       // legitimately has nobody in it; a page whose prose names people the roster
@@ -3351,19 +3682,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       // the ROSTER only, so a page whose cast is entirely secondary yields an
       // empty sceneCharacters — that is correct, not unknown. Only a name that
       // is in neither place means we genuinely do not know who is in the picture.
-      const secondaryNames = new Set(
-        ((visualBible?.secondaryCharacters) || [])
-          .map(sc => String(sc?.name || '').trim().toLowerCase())
-          .filter(Boolean)
-      );
-      const unknown = metaNames.filter(n => !secondaryNames.has(n.trim().toLowerCase()));
+      const unknown = metaNames.filter((n) => {
+        const e = resolveEntity(n, iterateIdx, { log, pageLabel: `P${pageNumber} ` });
+        return !(e && e.kind === 'secondary');
+      });
       if (unknown.length === 0) {
         log.info(`🔄 [ITERATE] Page ${pageNumber}: cast is entirely secondary characters (${metaNames.join(', ')}) — no roster identities to analyse`);
         return [];
       }
       throw new Error(`[ITERATE] Page ${pageNumber}: the scene names ${unknown.join(', ')}, who are in neither the story roster (${characters.map(c => c.name).join(', ')}) nor the Visual Bible's secondary characters. Refusing to fall back to the whole roster.`);
     }
-    const matched = characters.filter(c => names.includes(String(c.name || '').trim().toLowerCase()));
+    const wanted = new Set(names
+      .map(n => resolveEntity(n, iterateIdx, { log, pageLabel: `P${pageNumber} ` }))
+      .filter(e => e && e.kind === 'cast')
+      .map(e => e.entry));
+    const matched = characters.filter(c => wanted.has(c));
     if (matched.length === 0) {
       throw new Error(`[ITERATE] Page ${pageNumber}: none of the page's characters (${names.join(', ')}) match the story roster (${characters.map(c => c.name).join(', ')}). Refusing to fall back to the whole roster.`);
     }
@@ -3441,6 +3774,19 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   const sceneDescText = currentScene.description || currentScene.sceneDescription || '';
   let shortSceneDesc = '';
   const sceneMetadata = extractSceneMetadata(sceneDescText);
+  // THE PARENT BRIEF'S METADATA -- ONE RESOLVER (2026-09-17, staging
+  // job_1789584708605_rts4wqupm). Everything an iterate carries forward or
+  // checks against reads the brief this rewrite supersedes: the worn-item
+  // states, the declared-set allowance, the citation-drop check. Every one of
+  // them read `savedScene.sceneMetadata` alone -- and the repair pipeline
+  // builds its own `sceneImages[]` rows (storyJobPipeline.js,
+  // `pipelineStoryData`) from a whitelist that had no `sceneMetadata` key, so
+  // on EVERY pipeline iterate that object was `{}`. All six rewrites of that
+  // run came back with `wornItems: []`, and the jacket a page had taken OFF
+  // was painted back on: p16 shipped at -12 with the surviving critical naming
+  // exactly that. The page's own brief carries the same contract in the same
+  // shape and is always present, so it is the fallback -- never `{}`.
+  const parentSceneMetadata = savedScene?.sceneMetadata || sceneMetadata || {};
   if (sceneMetadata?.imageSummary) {
     shortSceneDesc = sceneMetadata.imageSummary;
   } else {
@@ -3448,6 +3794,33 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   }
 
   log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback (mode=${freeIterate ? 'free' : 'strict'})...`);
+
+  // THE BEAT (owner, 2026-09-14). An iterate rewrites the whole brief, so it
+  // needs the page's narrative intent — not a summary of the artefact it is
+  // rewriting. See iterateBeat.js for what this fixes and for the rule that
+  // keeps the rewriter's roster and the judge's roster the same one.
+  const {
+    resolvePlanLine, collectStagedFigures, collectPlanLineCast, renderStagedFiguresBlock,
+    checkRewrittenBrief, checkCarriedFields, describeBriefFindings,
+    declaredSetAllowance, checkDeclaredSet, partitionAnchoredObjects,
+    normalizeCitedHandles, restoreParentObjects,
+    renderEvaluatorReasoning, renderFixTargetLines, renderParentWornState,
+  } = require('./iterateBeat');
+  // The corrective loop itself is shared with the authored-brief path — one
+  // payload contract, one introduced-vs-survived verdict, one model name.
+  const { correctFindings, renderCorrectionRequest } = require('./briefCorrection');
+  const planLine = resolvePlanLine(currentScene, savedScene);
+  if (!planLine) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: no stored plan line (outlineExtract) — the rewrite runs on the previous brief alone`);
+  }
+  // Named non-roster figures staged on the page. They are cast, and the locked
+  // list below is roster-only by construction, so they are carried separately
+  // and named — a figure that reaches the rewriter only through the bulk
+  // recurring-elements dump comes back described by species.
+  const stagedFigures = collectStagedFigures({ visualBible, sceneMetadata, savedScene, planLine, pageNumber });
+  if (stagedFigures.length > 0) {
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: staged non-roster figures: ${stagedFigures.map(f => `${f.name} (${f.id})`).join(', ')}`);
+  }
 
   // Strict mode: lock cast to the original scene's characters so iterate can't
   // drop/swap them. Free mode: pass the full roster so iterate can reframe.
@@ -3457,20 +3830,41 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       try {
         const meta = sceneMetadata?.characters;
         if (Array.isArray(meta) && meta.length > 0) {
-          return meta.map(c => String(c?.name || '').trim().toLowerCase()).filter(Boolean);
+          return meta.map(c => String(c?.name || '').trim()).filter(Boolean);
         }
       } catch { /* fall through */ }
       return null;
     })();
-    const lockedCast = originalSceneCharNames
-      ? characters.filter(c => originalSceneCharNames.includes(String(c.name || '').trim().toLowerCase()))
-      : characters;
+    // RESOLVE: lock the cast by ENTRY, not by a lowercased string compare.
+    const lockIdx = buildCastIndex({ characters: characters || [] }, visualBible);
+    const lockWanted = originalSceneCharNames
+      ? new Set(originalSceneCharNames
+          .map(n => resolveEntity(n, lockIdx, { log, pageLabel: `P${pageNumber} ` }))
+          .filter(e => e && e.kind === 'cast')
+          .map(e => e.entry))
+      : null;
+    const lockedCast = lockWanted ? characters.filter(c => lockWanted.has(c)) : characters;
     if (originalSceneCharNames && lockedCast.length !== originalSceneCharNames.length) {
       log.warn(`🔄 [ITERATE] Page ${pageNumber}: Locked cast resolved ${lockedCast.length}/${originalSceneCharNames.length} from original scene metadata`);
     } else if (originalSceneCharNames) {
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Locked cast to original scene (${lockedCast.length} chars: ${lockedCast.map(c => c.name).join(', ')})`);
     }
-    promptCharacters = lockedCast;
+    // A REINSTATED FIGURE ARRIVES WITH ITS SHEET (2026-09-17, staging
+    // job_1789584708605_rts4wqupm p10). The lock above is the PARENT BRIEF's
+    // cast, and template rule 3a lets the rewrite bring back a roster character
+    // the plan line stages that the brief had dropped -- so the one figure the
+    // rewriter is invited to add is the one whose CHARACTER DETAILS entry the
+    // lock withholds. Step 2 then asks it to weave that character's appearance
+    // "from CHARACTER DETAILS" with nothing there to weave, and it wrote the
+    // template's own apparent-age example instead: a 4-year-old shipped as a
+    // bearded middle-aged man. `collectStagedFigures` already does exactly this
+    // for the non-roster pool; this is the roster half of the same job, and it
+    // only OFFERS the sheet -- rule 3a still decides who is in the frame.
+    const planLineCast = collectPlanLineCast({ characters, planLine, alreadyLocked: lockedCast });
+    if (planLineCast.length > 0) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: plan line stages ${planLineCast.map(c => c.name).join(', ')} — the previous brief dropped them, so their character details ride along with the locked cast`);
+    }
+    promptCharacters = [...lockedCast, ...planLineCast];
   }
 
   // Step 3: Build the scene description prompt with preview feedback
@@ -3495,13 +3889,39 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     expectedClothing,
     '',  // No correction notes for iteration
     availableAvatars,
-    null,  // rawOutlineContext
+    // rawOutlineContext — the page's plan line. NEVER `null` here again: with a
+    // null, buildSceneDescriptionPrompt fills the authoritative SCENE_SUMMARY
+    // slot from the previous brief's own imageSummary, and the rewrite has no
+    // narrative anchor outside the artefact it is rewriting.
+    { planLine },
     previewFeedback,  // The actual image analysis feedback!
     // clothingRequirements so the EXPECTED_CLOTHING block can state each
     // character's actual outfit TEXT. Without it the Art Director only sees the
     // category key and writes it into the prose ("wearing her standard clothes"),
     // which the evaluator then judges the render against.
-    { freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements }
+    {
+      freeIterate, textInImage: iterateTextInImage, extraRule: options.sceneExtraRule || null, clothingRequirements,
+      stagedFigures: renderStagedFiguresBlock(stagedFigures),
+      // THE STORY, for the two page facts the Art Director is given and the
+      // rewriter was not: the book's SEASON and the creature-tone band. A
+      // rewrite authors a whole new setting paragraph and `emptyScenePrompt`,
+      // so a season it is never told is a season it can contradict.
+      story: storyData,
+      // WHY THE PAGE SCORED WHAT IT SCORED. `evaluationFeedback.reasoning` has
+      // been handed to this function by the repair pipeline all along and read
+      // by nothing: the rewriter got a score and a list of findings and was
+      // asked to "name the root cause" of each with no sight of the evaluator's
+      // own figure-by-figure inventory. Same for the regions it named.
+      evaluatorReasoning: renderEvaluatorReasoning(evaluationFeedback),
+      fixTargets: renderFixTargetLines(evaluationFeedback, optionFixTargets),
+      // THE WORN STATE THE PAGE ALREADY DECLARED, rendered by the SAME builder
+      // the image prompt uses (wornItems.buildWornStateLines) so the rewriter
+      // and the illustrator read one sentence. Measured on staging
+      // job_1789584708605_rts4wqupm p16: the parent brief declared the jacket
+      // OFF and held as a bundle, the rewrite declared nothing, and the built
+      // image prompt flipped to "Levin IS wearing this".
+      wornState: renderParentWornState({ visualBible, promptCharacters, parentSceneMetadata, pageNumber }),
+    }
   );
 
   // Step 4: Call Claude to run 18 checks and generate corrected scene (uses iteration model).
@@ -3521,25 +3941,207 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     usageTracker('anthropic', sceneResult.usage, 'scene_iterate', sceneResult.modelId || effectiveSceneModel);
   }
 
-  // ENFORCE the sceneIntent contract. The template requires it (it becomes
-  // the image prompt's THIS IMAGE DEPICTS overview) but the model
-  // occasionally omits it and the prompt then shipped WITHOUT its overview
-  // (observed: an iterate-round version rendered from a header-less prompt).
-  // One retry; still missing → loud error, never a silent header-less send.
-  if (!extractSceneMetadata(newSceneDescription)?.sceneIntent) {
-    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration omitted sceneIntent — retrying once`);
+  // ENFORCE THE BRIEF CONTRACT: prose plus scene metadata that PARSES and
+  // carries sceneIntent (the marker, a ```json fence and bare JSON are all
+  // accepted — see iterateBriefGuard.js, all three shapes are real in stored
+  // rows). A reply that fails it is a CUT reply, not a shorter one — and a
+  // cut brief used to be persisted silently: job_1789207854566_l43qgl34w p7
+  // stored 1884 characters ending mid-word inside a character description with
+  // no metadata block at all, so the page's cast, objects, positions and text
+  // placement were all empty downstream and the roster shipped wrong. The
+  // generic truncation guard cannot see it (~500 output tokens against
+  // qwen-plus's 32,768 ceiling), so the detection is structural
+  // (iterateBriefGuard.js) and the guard's verdict is consulted alongside it.
+  // One retry; still unusable → THROW, so the round is recorded as failed and
+  // the previous good brief and image stand. Never overwrite good with cut.
+  const { assessIterateBrief, describeIterateBrief } = require('./iterateBriefGuard');
+  let briefCheck = assessIterateBrief(newSceneDescription, { truncation: sceneResult.truncation });
+  if (!briefCheck.usable) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: scene iteration returned an unusable brief (${describeIterateBrief(briefCheck)}) — retrying once`);
     const retry = await callClaudeAPI(
-      `${scenePrompt}\n\nYour previous answer omitted the required "sceneIntent" field in the metadata JSON. It is mandatory — include it.`,
+      `${scenePrompt}\n\nYour previous answer was incomplete: it must be the full prose brief followed by a ---METADATA--- block whose JSON includes the mandatory "sceneIntent" field. Return the whole thing.`,
       null, effectiveSceneModel, { usageLabel: 'scene_iterate_retry' }
     );
     if (usageTracker && retry.usage) {
       usageTracker('anthropic', retry.usage, 'scene_iterate', retry.modelId || effectiveSceneModel);
     }
-    if (extractSceneMetadata(retry.text)?.sceneIntent) {
+    const retryCheck = assessIterateBrief(retry.text, { truncation: retry.truncation });
+    if (retryCheck.usable) {
       sceneResult = retry;
       newSceneDescription = retry.text;
+      briefCheck = retryCheck;
     } else {
-      log.error(`❌ [ITERATE] Page ${pageNumber}: sceneIntent still missing after retry — the image prompt will lack its overview line`);
+      log.error(`❌ [ITERATE] Page ${pageNumber}: unusable brief after retry (first: ${describeIterateBrief(briefCheck)}; retry: ${describeIterateBrief(retryCheck)}) — REFUSING to overwrite the existing brief; this iterate round fails for this page`);
+      throw new Error(`iterate brief unusable for page ${pageNumber}: ${describeIterateBrief(retryCheck)}`);
+    }
+  }
+
+  // THE REINSTATEMENT BACKSTOP (owner, 2026-09-14). The rewriter now receives
+  // the page's beat, so it can bring back a figure the previous brief had
+  // trimmed. The semantic judge builds its expected roster from the brief's own
+  // `characters[]` / `objects[]` (buildExpectedCastBlock) and never from a plan
+  // line — commit 3b3070dce, which stands. A figure reinstated in the PROSE
+  // ALONE therefore renders as an extra character and is scored as one. The
+  // prompt states the rule; this verifies it happened, reusing the same
+  // sceneBriefCheck types the first-generation path already runs
+  // (cast_unlisted — and, until 2026-09-18, element_uncited) with the page's
+  // plan line set — the owner-sanctioned non-fidelity use of the beat.
+  //
+  // One corrective re-ask, then ship with a warning: a gate is a guideline and
+  // an iterate round is paid, so this never fails the round.
+  // Same roster the first-generation path checks against: main cast plus
+  // visual-bible SECONDARY characters, animals deliberately excluded (owner,
+  // 2026-08-16 — beatsPipeline.js:1955 carries the measurement). A named animal
+  // was covered by element_uncited through the plan line until that check was
+  // removed on 2026-09-18 (it classified by matching prose; see
+  // sceneBriefCheck's design block). A reinstated ANIMAL cited nowhere is
+  // therefore unguarded on this path — tasks/BACKLOG.md carries it.
+  const castNamesForCheck = (() => {
+    const secondaries = Array.isArray(visualBible?.secondaryCharacters)
+      ? visualBible.secondaryCharacters
+      : Object.values(visualBible?.secondaryCharacters || {});
+    const seen = new Set();
+    return [...(characters || []), ...secondaries]
+      .map(c => String(c?.name || '').trim())
+      .filter(n => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+  })();
+  // THE REWRITE IS CHECKED LIKE AN AUTHORED BRIEF (2026-09-17). Until now the
+  // filter above kept two of the eleven fault types `checkPage` computes, so a
+  // rewrite could ship a page the scene review would have sent back: a citation
+  // the bible's page table does not grant, an element the table claims and the
+  // rewrite stopped citing, two declared actions on a one-action pipeline. The
+  // parent brief is checked in the same breath, and only faults the parent was
+  // FREE of reach the re-ask — a rewrite inherits the bible and cannot be asked
+  // to fix what it was handed. Plus the metadata half of the same subtraction:
+  // 11 of 11 stored rewrites returned depth / looksAt / action on no row at
+  // all, which does not merely lose those fields, it silently switches the
+  // one-action and hand-off counts off. Both checks are free — pure code, no
+  // model call — and both feed the ONE corrective re-ask below, never a second.
+  const runBriefChecks = (text) => [
+    ...checkRewrittenBrief({
+      pageNumber, brief: text, parentBrief: sceneDescText, planLine, castNames: castNamesForCheck, visualBible,
+    }),
+    ...checkCarriedFields({
+      // The parent BRIEF's own metadata: it is the contract this rewrite
+      // replaces, and it always parses to the full row shape. (savedScene's
+      // stored copy flattens `characters` to a name list on some paths, and a
+      // flattened list would read as "never declared".)
+      parentMetadata: sceneMetadata,
+      rewriteMetadata: extractSceneMetadata(String(text || '')),
+    }),
+  ];
+  // ── ONE CORRECTIVE RE-ASK, FOR BOTH CHECK FAMILIES (2026-09-17) ───────────
+  // Owner: "All 3 same as pipeline. These should be siblings or even identical
+  // code." Two hand-rolled re-asks stood here — one for the declaration checks
+  // above, one for the declared set — and MEASURED over the 11 stored iterate
+  // rounds of staging job_1789584708605_rts4wqupm and
+  // job_1789506283204_3kxqshifx neither resolved anything on any page: each
+  // fired once, the count never fell, so the original was kept every time and
+  // every page shipped with a WARN. Detection worked; correction never landed.
+  // Three defects, all of them now answered in server/lib/briefCorrection.js,
+  // which the authored path reads from the same file:
+  //   - the corrector was sent the ORIGINAL prompt and never the answer it was
+  //     asked to revise, which is a re-roll, not a correction
+  //     (renderCorrectionRequest + assertCorrectorSeesText),
+  //   - acceptance was `after.length < before.length`, which scores a swap of
+  //     one fault for another as EQUAL and rejects it, and never asks WHICH
+  //     faults moved (judgeCorrection: introduced vs survived),
+  //   - the corrector was `sceneIteration`, the model that had just failed the
+  //     contract (MODEL_DEFAULTS.briefCorrectionModel).
+  //
+  // The two families are checked together and answered in ONE call. The
+  // declared set never depended on the declaration re-ask's output, and judging
+  // a correction on the UNION is what the second re-ask's hand-rolled
+  // cross-guard was reaching for: a correction that resolves one family by
+  // breaching the other introduces a finding, and an introduced finding is
+  // REPORTED, not a refusal — that refusal branch was deleted on 2026-09-18
+  // (74bcaa79e; briefCorrection.judgeCorrection, and docs/decisions.md "A brief
+  // correction is never refused for a finding it newly REPORTS"). `strict` now
+  // refuses only a correction that resolves nothing.
+  //
+  // THE DECLARED SET (2026-09-16): objects[] / characters[] may cite only
+  // original ∪ plan-line ∪ feedback. Measured on job_1789506283204_3kxqshifx,
+  // three of five rewrites cited a landmark or a creature none of their inputs
+  // named, and each invented citation became a critical on content that had
+  // been correct. The allowance is computed per CANDIDATE, because part of it
+  // ("an id this answer cites that the feedback names") is a property of the
+  // answer being judged, not of the first one.
+  const origObjects = (parentSceneMetadata.objects || parentSceneMetadata.fullData?.objects || []);
+  // ...and the SAME set in the other direction (2026-09-17). Zero additions
+  // occurred on job_1789584708605_rts4wqupm; SUBTRACTION did the damage -- p6
+  // and p16 both stopped citing the artefact their page is about, and p16's
+  // REQUIRED OBJECTS block shipped as a header with no entries. `nameIds` lets
+  // a named figure's NAME in `characters[]` satisfy its id: that is a refile,
+  // not a loss (p13 moved CHR001 to "Ramon" on the same run).
+  const declaredSetNameIds = (() => {
+    const map = {};
+    const secondaries = Array.isArray(visualBible?.secondaryCharacters)
+      ? visualBible.secondaryCharacters
+      : Object.values(visualBible?.secondaryCharacters || {});
+    for (const e of [...secondaries, ...(visualBible?.animals || [])]) {
+      if (e?.name && e?.id) map[String(e.name).trim()] = String(e.id);
+    }
+    return map;
+  })();
+  const runDeclaredSetCheck = (text) => {
+    const meta = extractSceneMetadata(String(text || ''));
+    const args = declaredSetAllowance({
+      origObjects,
+      rewriteObjects: meta?.objects,
+      evaluationFeedback, pageText, planLine,
+      origCharacters: parentSceneMetadata.characters,
+      promptCharacters,
+      stagedFigures,
+    });
+    args.requiredObjects = origObjects;
+    args.nameIds = declaredSetNameIds;
+    return checkDeclaredSet({ newMetadata: meta, ...args });
+  };
+  const runAllBriefChecks = (text) => [...runBriefChecks(text), ...runDeclaredSetCheck(text)];
+
+  let briefFindings = runAllBriefChecks(newSceneDescription);
+  if (briefFindings.length > 0) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewritten brief fails a check an authored brief is held to:\n${describeBriefFindings(briefFindings)}`);
+    const correctionModel = modelOverrides?.briefCorrectionModel || require('../config/models').resolveBriefCorrectionModel();
+    let correctionResult = null;
+    // ONE CORRECTIVE RE-ASK, THEN SHIP FLAGGED. The comment above the old
+    // re-asks claimed this ("a gate is a guideline and an iterate round is
+    // paid, so this never fails the round") and the code did not implement it:
+    // a provider error inside the re-ask threw straight out of iteratePageCore
+    // and destroyed the whole paid round. The correction is an improvement on
+    // a brief that already exists, so its failure costs the improvement and
+    // nothing else.
+    const correction = await correctFindings({
+      label: `iterate page ${pageNumber}`,
+      priorText: newSceneDescription,
+      before: briefFindings,
+      payload: renderCorrectionRequest({
+        context: scenePrompt,
+        priorText: newSceneDescription,
+        findingsText: describeBriefFindings(briefFindings),
+        instruction: 'Return the whole brief again. Keep the same moment and the same fixes, and resolve each line above: declare a figure in the picture (a person in "characters[]" by name, a staged animal or secondary figure in "objects[]" by its id) or take it out of the prose; cite an element the page stages and drop a citation the page does not; cite only the objects and characters the previous brief, the plan line and the feedback name, and keep citing every id the previous brief cited, either in "objects[]" or, for a named figure, by name in "characters[]"; state every field the metadata contract requires on every row. Change nothing else — a line above resolved by breaking another is not a fix.',
+      }),
+      invoke: async (payload) => {
+        const r = await callClaudeAPI(payload, null, correctionModel, { usageLabel: 'scene_iterate_correct' });
+        if (usageTracker && r.usage) {
+          usageTracker('anthropic', r.usage, 'scene_iterate', r.modelId || correctionModel);
+        }
+        const g = assessIterateBrief(r.text, { truncation: r.truncation });
+        correctionResult = r;
+        return { text: r.text, usable: g.usable, usage: r.usage, reason: g.usable ? null : describeIterateBrief(g) };
+      },
+      recheck: runAllBriefChecks,
+    }).catch((err) => {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: the corrective re-ask failed (${err.message}) — the rewrite stands and ships flagged`);
+      return { accepted: false };
+    });
+    if (correction.accepted) {
+      if (correctionResult) sceneResult = correctionResult;
+      newSceneDescription = correction.text;
+      briefFindings = correction.after;
+    }
+    if (briefFindings.length > 0) {
+      log.error(`❌ [ITERATE] Page ${pageNumber}: shipping a rewrite that fails a check an authored brief is held to:\n${describeBriefFindings(briefFindings)}`);
     }
   }
 
@@ -3566,44 +4168,84 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // Extract metadata from the new scene description for per-character clothing
   let newSceneMetadata = extractSceneMetadata(newSceneDescription);
 
-  // ANCHORED OBJECT ALLOW-LIST (user decision 2026-07-18): the rewrite may
-  // keep/drop objects freely and may ADD an object only when something asked
-  // for it — the original scene metadata, the eval feedback (e.g. "rowing
-  // boat missing"), or the page text. Unanchored additions are scrubbed
-  // (observed: a rewrite swapped the scene's vehicle for an unrelated statue
-  // and the model painted it into the scene). Matching is tolerant across
-  // the language boundary: entity id, entity name, or ≥5-char words from the
-  // name/English VB description against feedback + page text.
-  const rewriteObjects = Array.isArray(newSceneMetadata?.objects) ? newSceneMetadata.objects : [];
-  const origObjects = (savedScene.sceneMetadata?.objects || savedScene.sceneMetadata?.fullData?.objects || []);
-  if (rewriteObjects.length > 0) {
-    const baseId = (o) => String(o).trim().toUpperCase().split('.')[0];
-    const origSet = new Set(origObjects.map(baseId));
-    const haystack = `${JSON.stringify(evaluationFeedback || {})}\n${pageText || ''}`.toLowerCase();
-    const vbEntityById = new Map();
-    for (const pool of [visualBible?.artifacts, visualBible?.animals, visualBible?.vehicles, visualBible?.locations, visualBible?.secondaryCharacters]) {
-      for (const e of (pool || [])) if (e?.id) vbEntityById.set(baseId(e.id), e);
+  // ANCHORED OBJECT ALLOW-LIST (owner decision 2026-07-18). The rule, its
+  // page-range gate and the measurements live on
+  // iterateBeat.partitionAnchoredObjects, beside collectStagedFigures — the two
+  // sites that put a Visual Bible entity on a page, pinned together by the
+  // `iterate-page-staging-sites` sibling-registry set. This site only applies
+  // the verdict to the brief.
+  const { kept, scrubbed } = partitionAnchoredObjects({
+    rewriteObjects: newSceneMetadata?.objects, origObjects, evaluationFeedback, pageText, planLine, visualBible, pageNumber,
+  });
+  if (scrubbed.length > 0) {
+    log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite added unanchored VB object(s) ${JSON.stringify(scrubbed)} — scrubbed (not in original metadata, feedback, page text or plan line)`);
+    const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
+    if (objRe.test(newSceneDescription)) {
+      newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(kept)}`);
+      newSceneMetadata = extractSceneMetadata(newSceneDescription);
     }
-    const isAnchored = (obj) => {
-      const id = baseId(obj);
-      if (origSet.has(id)) return true;
-      if (haystack.includes(id.toLowerCase())) return true;
-      const ent = vbEntityById.get(id);
-      if (!ent) return true; // not a VB id — plain names pass through
-      const tokens = [String(ent.name || ''), ...String(ent.name || '').split(/\s|-/), ...String(ent.description || '').split(/[^A-Za-zÀ-ž]+/)]
-        .map(t => t.trim().toLowerCase()).filter(t => t.length >= 5);
-      return tokens.some(t => haystack.includes(t));
+  }
+
+  // THE CITED HANDLES ARE CHECKED AGAINST THE BIBLE, AND THE LIST CAN NEVER
+  // RESOLVE TO NOTHING (2026-09-17, staging job_1789584708605_rts4wqupm).
+  //
+  //  - A facet suffix on an entry that has no such facet, or whose facet covers
+  //    no page, is reduced to the bare parent id. Five of six rewrites appended
+  //    one (`LOC001.1`, `LOC002.1`, `LOC003.2` on location entries with an
+  //    EMPTY `vantages[]`, `ART001.2` on a state with an empty `pages[]`), and
+  //    every consumer silently fell back to the parent or to `.1`.
+  //  - A rewrite whose surviving citations are all locations lists NOTHING in
+  //    REQUIRED OBJECTS, because that block skips location entries by design.
+  //    p6 lost the egg the page is about that way, and p16 shipped a header
+  //    with no entries under it. The parent brief's listable ids come back.
+  //
+  // Structured throughout -- ids, pools and facet arrays, never a text match.
+  // Both rules rewrite the SAME `objects[]` array in the brief, through the one
+  // replacement the scrub above uses, so the stored brief and the metadata the
+  // prompt is built from can never disagree.
+  {
+    const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
+    const applyObjects = (list) => {
+      if (!objRe.test(newSceneDescription)) return false;
+      newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(list)}`);
+      newSceneMetadata = extractSceneMetadata(newSceneDescription);
+      return true;
     };
-    const scrubbed = rewriteObjects.filter(o => !isAnchored(o));
-    if (scrubbed.length > 0) {
-      const kept = rewriteObjects.filter(o => !scrubbed.includes(o));
-      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite added unanchored VB object(s) ${JSON.stringify(scrubbed)} — scrubbed (not in original metadata, feedback, or page text)`);
-      const objRe = /"objects"\s*:\s*\[[^\]]*\]/;
-      if (objRe.test(newSceneDescription)) {
-        newSceneDescription = newSceneDescription.replace(objRe, `"objects": ${JSON.stringify(kept)}`);
-        newSceneMetadata = extractSceneMetadata(newSceneDescription);
-      }
+    const normalized = normalizeCitedHandles({ objects: newSceneMetadata?.objects, visualBible });
+    if (normalized.rejected.length > 0) {
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: rewrite cited facet(s) the Visual Bible does not declare — `
+        + `${normalized.rejected.map(r => `${r.handle} (${r.reason})`).join(', ')} — reduced to the bare id`);
+      applyObjects(normalized.objects);
     }
+    const restored = restoreParentObjects({
+      rewriteObjects: newSceneMetadata?.objects, parentObjects: origObjects, visualBible,
+    });
+    if (restored.restored.length > 0) {
+      log.warn(`⚠️ [ITERATE] Page ${pageNumber}: the rewrite's objects[] resolves to no listable element — `
+        + `restoring ${restored.restored.join(', ')} from the parent brief so REQUIRED OBJECTS is not empty`);
+      applyObjects(restored.objects);
+    }
+  }
+
+  // A REWRITE THAT DROPS A CITED VB ID MUST SAY SO (2026-09-14, story B
+  // job_1789343124794_z2c779f7i p17). The `iterate-round-1` rewrite there —
+  // commissioned for a hammer artefact, a facing error and stray leaves —
+  // silently stopped citing ANI001/ANI002, and the shipped v1 prompt lost both
+  // size riders and the ANI reference cell with nothing logged. The union
+  // resolution in promptBuilders (objects[] ∪ characters[]) makes the
+  // reclassification harmless; this says it out loud when a citation is gone
+  // outright. LOG-ONLY — a gate is a guideline: the rewrite stands, the round
+  // is not failed.
+  try {
+    const { warnDroppedVbCitations } = require('./storyHelpers');
+    warnDroppedVbCitations(
+      pageNumber,
+      parentSceneMetadata,
+      newSceneMetadata || {},
+      { what: 'iterate rewrite' }
+    );
+  } catch (e) {
+    log.warn(`⚠️ [VB-CITATION] Page ${pageNumber}: citation-drop check could not run — ${e.message}`);
   }
 
 // Resolve clothing. The stored pageClothing was set by the unified Sonnet
@@ -3737,7 +4379,20 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // Pose + depth resolution is shared with applyStoryCellRefs — beats
     // metadata carries `perspective` prose, not `pose`, and the inline copy
     // here served threeQuarter to every declared back-view figure.
-    const { resolveCellPose, resolveSheetForRef } = require('./storyAvatars');
+    const { resolveCellPose, resolveSheetForRef, wornResolvedForPage } = require('./storyAvatars');
+    // WARDROBE STATE ON A REWRITTEN PAGE. scene-iteration.txt emits no
+    // `wornItems`, so the rewrite's own metadata says nothing about what this
+    // page takes off — the carry-forward is the ONLY thing that keeps an
+    // iterated page on its off-variant sheet, exactly as it keeps the page's
+    // "is NOT wearing this" prompt line (see iterateSceneMetadata below, same
+    // rule, same helper).
+    const { carryForwardWornItems } = require('./wornItems');
+    const wornResolved = wornResolvedForPage(
+      storyData?.visualBible || null,
+      { ...(newSceneMetadata || {}), wornItems: carryForwardWornItems(newSceneMetadata, parentSceneMetadata || {}) },
+      metaChars,
+      pageNumber
+    );
     const poseByName = new Map();
     for (const sc of metaChars) {
       const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
@@ -3749,10 +4404,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       if (!charName) continue;
       const story = storyData.characterAvatars[charName];
       if (!story) continue;
-      // Shared resolver: slot mapping, the loud costumed fallback (which also
-      // corrects ref.clothingCategory) lives in storyAvatars.js. The inline
-      // copy here fell back silently.
-      const resolved = resolveSheetForRef(story, ref);
+      // Shared resolver: slot mapping, the wardrobe-state variant, and the loud
+      // costumed fallback (which also corrects ref.clothingCategory) all live in
+      // storyAvatars.js. The inline copy here fell back silently.
+      const resolved = resolveSheetForRef(story, ref, { wornResolved });
       if (!resolved) continue;
       const { uri: sheetUri, slotKey } = resolved;
       const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };
@@ -3772,8 +4427,49 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     }
   }
 
-  // Build landmark photos
-  const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata, { pageNumber }) : [];
+  // The rewrite's metadata is the working copy, but scene-iteration.txt does
+  // not emit `era` or `textZoneDescription` — context fields iterate has no
+  // business re-deciding. Read them from the rewrite when present, else from
+  // the saved scene, or the anachronism guard and text-zone hint go dark on
+  // every repaired page (same disease 6738d7dca fixed for beats pages).
+  const savedMeta = parentSceneMetadata;
+  const iterateSceneMetadata = {
+    ...newSceneMetadata,
+    era: newSceneMetadata?.era || savedMeta.era || savedMeta.fullData?.era || null,
+    textZoneDescription: newSceneMetadata?.textZoneDescription || savedMeta.textZoneDescription || null,
+    aboard: newSceneMetadata?.aboard || savedMeta.aboard || savedMeta.fullData?.aboard || null,
+    // Same class as era/textZoneDescription: scene-iteration.txt does not emit
+    // the crowd flag, so a repaired page would lose it and its background
+    // extras would come back as a derived extra_character.
+    crowdExpected: newSceneMetadata?.crowdExpected === true
+      || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true,
+    // Same class again: scene-iteration.txt does not emit `wornItems`, and the
+    // metadata parser turns an absent field into `[]`. An undeclared row makes
+    // resolveWornItemsForPage default the item to `worn`, so an iterated page
+    // that had taken an item OFF came back with the affirmative "IS wearing
+    // this" override in the prompt and the item painted back on. One rule, in
+    // wornItems.carryForwardWornItems.
+    wornItems: require('./wornItems').carryForwardWornItems(newSceneMetadata, savedMeta),
+    // Same class, two more fields the rewrite may legitimately re-decide and
+    // must never silently drop: `shot` drives the background plate's framing,
+    // the scale repair's foreground/background split and the reference mode;
+    // `landmarkView` picks the landmark reference photo. Both were emitted by
+    // the Art Director on every page of both staging runs and by NONE of the 11
+    // rewrites. A rewrite that states one wins; a rewrite that is silent keeps
+    // the page's own.
+    shot: newSceneMetadata?.shot || newSceneMetadata?.fullData?.shot
+      || savedMeta.shot || savedMeta.fullData?.shot || null,
+    landmarkView: newSceneMetadata?.landmarkView || newSceneMetadata?.fullData?.landmarkView
+      || savedMeta.landmarkView || savedMeta.fullData?.landmarkView || null,
+  };
+
+  // Build landmark photos — from the MERGED metadata, not the raw rewrite.
+  // getLandmarkPhotosForScene reads `landmarkView` to pick the reference photo,
+  // and the rewrite emitted none on 11 of 11 stored iterate rounds across two
+  // staging runs, so every repaired page chose its landmark photo blind. The
+  // merge below is what restores the parent's value; running it first is the
+  // whole point. (2026-09-17.)
+  const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, iterateSceneMetadata, { pageNumber }) : [];
 
   // Determine image model and backend (needed before empty scene generation)
   // A page REDO renders on the page tier, not on the edit/inpaint tier. Falling
@@ -3781,18 +4477,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // .pageImage = the edit tier), so an iterate could redo on a different model
   // than the one that produced V1. pageRenderImage is that same page tier.
   let imageModelOverride = modelOverrides?.imageModel || CONFIG_DEFAULTS.pageRenderImage;
-  // The rewrite's metadata is the working copy, but scene-iteration.txt does
-  // not emit `era` or `textZoneDescription` — context fields iterate has no
-  // business re-deciding. Read them from the rewrite when present, else from
-  // the saved scene, or the anachronism guard and text-zone hint go dark on
-  // every repaired page (same disease 6738d7dca fixed for beats pages).
-  const savedMeta = savedScene?.sceneMetadata || {};
-  const iterateSceneMetadata = {
-    ...newSceneMetadata,
-    era: newSceneMetadata?.era || savedMeta.era || savedMeta.fullData?.era || null,
-    textZoneDescription: newSceneMetadata?.textZoneDescription || savedMeta.textZoneDescription || null,
-    aboard: newSceneMetadata?.aboard || savedMeta.aboard || savedMeta.fullData?.aboard || null,
-  };
 
   // Route by scene complexity when no explicit model override
   if (!imageModelOverride) {
@@ -3844,12 +4528,21 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
         const iterateAboardId = iterateSceneMetadata?.aboard || null;
         const { buildEmptyScenePrompt } = require('../services/prompts');
         const { buildLandmarkFidelityBlock } = getStoryHelpers();
+        // Built BEFORE the prompt: which reference family is attached decides
+        // the REFERENCE line (referenceKind below), exactly as at the
+        // production page/vantage plate call sites and the Lab stage.
+        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId, iterateSceneMetadata?.objects || null);
         const emptyPrompt = buildEmptyScenePrompt({
           style: artStyleDesc,
           description: iterateSceneMetadata.emptyScenePrompt,
           textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           eraGuard: buildEraGuard(iterateEra),
           landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0]),
+          // Tells the model what the attached reference IS (prompts.js
+          // REFERENCE line). Same expression every other plate call site uses —
+          // without it the repaired page's fresh plate got the landmark photo
+          // as pixels but no line saying the place in the scene IS that photo.
+          referenceKind: (pageLandmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
           visualBible,
           pageNumber,
           aboardId: iterateAboardId,
@@ -3857,7 +4550,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           // (AD is the authority on vehicle presence; VB pages is only the menu).
           sceneObjects: iterateSceneMetadata?.objects || null,
         });
-        const emptySceneVbGrid = await buildEmptySceneVbGrid(visualBible, pageNumber, pageLandmarkPhotos, iterateAboardId, iterateSceneMetadata?.objects || null);
         const isCoverPage = pageNumber < 0;
         const emptyResult = await generateImageOnly(emptyPrompt, [], {
           // Plates stay on the Standard tier regardless of the page tier.
@@ -4017,22 +4709,6 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     let iterDetection = null;
     if (!skipEval && genResult?.imageData) {
       try {
-        iterQuality = await evaluateImageQuality(
-          genResult.imageData, imagePrompt, refApplied.characterPhotos, 'scene', null,
-          iterLabel, null, null, sceneCharacters, {
-            // Era-aware landmark protection — iterate uses the same refs it
-            // just rendered from and the era it resolved above.
-            landmarkPhotos: refApplied.landmarkPhotos || null,
-            era: iterateSceneMetadata?.era || null,
-          }
-        );
-        if (usageTracker && iterQuality?.usage) {
-          usageTracker('gemini_quality', iterQuality.usage, 'page_quality', iterQuality.modelId);
-        }
-      } catch (evalErr) {
-        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored render`);
-      }
-      try {
         // sceneCharacters is the photo-backed cast; story-invented characters
         // live only in the Visual Bible and must be appended, or the identity
         // call assigns a cast name to the invented figure
@@ -4051,14 +4727,45 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
                 c, iterClothing[cname], artStyle, storyData?.clothingRequirements || null) || '';
             } catch { /* identity line goes without clothing */ }
           }
-          return { name: cname, description: getStoryHelpers().buildIdentityLine(c, clothingText) };
+          // `clothing` AND `position` ride along as their own fields, exactly as
+          // the generation-time builder supplies them (storyJobPipeline, phase
+          // 5b-pre). Both were missing here, and both matter:
+          //   clothing — the SoM prompt's sanitized tier STRIPS "Wearing:…" from
+          //     the description and rebuilds the wardrobe from `c.clothing`, so
+          //     without it every sanitized-tier identity line goes out undressed
+          //     (bug som-identity-lines-undressed, fixed on the generation path
+          //     2026-08-22 and never mirrored here).
+          //   position — the SoM prompt's only non-appearance cue, and the
+          //     layout fallback's xTarget/depth source. When the render has drawn
+          //     a character with someone else's clothes and hair, appearance
+          //     CANNOT separate the two and the declared placement is the only
+          //     thing that can. Measured on job_1789681157795_wkt20ckod p12 v1
+          //     (an iterate-round-1 detection, so this path): without the hint
+          //     the identity call named the midground figure after the
+          //     foreground one 3/3 runs; with it, 3/3 correct — same image, same
+          //     badges, same model.
+          return { name: cname, description: getStoryHelpers().buildIdentityLine(c, clothingText), clothing: clothingText,
+            position: iterateSceneMetadata?.characterPositions?.[cname] || c.position || null };
         });
         iterExpectedCharacters.push(...getStoryHelpers().buildSecondaryExpectedCharacters(
           visualBible, iterateSceneMetadata, iterExpectedCharacters.map(c => c.name),
           { pageLabel: `${iterLabel} ` }
         ));
+        // ONE ROSTER (2026-09-13) — same membership answer the iterate eval got.
+        const { resolveExpectedCastNames: _resolveCast, reconcileDetectorCast: _reconcileCast } = require('./evalPipeline');
+        const iterAuthoritative = _resolveCast({
+          sceneCharacters: sceneCharacters || null,
+          originalPrompt: newSceneDescription || '',
+          visualBible,
+          evaluationType: 'scene',
+          pageLabel: `${iterLabel} `,
+          sceneMetadata: iterateSceneMetadata,
+          pageNumber,
+        });
+        const iterReconciled = _reconcileCast(iterExpectedCharacters, iterAuthoritative,
+          { visualBible, pageLabel: `${iterLabel} ` });
         iterDetection = await detectAllBoundingBoxes(genResult.imageData, {
-          expectedCharacters: iterExpectedCharacters,
+          expectedCharacters: iterReconciled.entries,
           expectedObjects: Array.isArray(iterateSceneMetadata?.objects)
             ? iterateSceneMetadata.objects.filter(o => typeof o === 'string')
             : [],
@@ -4066,14 +4773,53 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           pageContext: iterLabel,
           artStyle,
         });
+        if (iterDetection) iterDetection.expectedCastNames = iterReconciled.names;
       } catch (bboxErr) {
         log.warn(`⚠️ [ITERATE] Page ${pageNumber}: detection failed (${bboxErr.message})`);
+      }
+      try {
+        iterQuality = await evaluateImageQuality(
+          // genResult.prompt is the string generateImageOnly actually sent
+          // (post-shrink); imagePrompt is the pre-shrink build.
+          genResult.imageData, resolveEvalImagePrompt({ promptSent: genResult.prompt, originalPrompt: imagePrompt }),
+          refApplied.characterPhotos, 'scene', null,
+          iterLabel, null, null, sceneCharacters, {
+            // Era-aware landmark protection — iterate uses the same refs it
+            // just rendered from and the era it resolved above.
+            landmarkPhotos: refApplied.landmarkPhotos || null,
+            era: iterateSceneMetadata?.era || null,
+            // The rewrite's PARSED metadata. Without it the iterate eval's
+            // EXPECTED CAST roster silently loses every figure the brief filed
+            // in objects[] — a VB secondary, an animal — and the page takes an
+            // extra_character CRITICAL for drawing its own commissioned cast.
+            sceneMetadata: iterateSceneMetadata || null,
+            pageNumber,
+            // DETECT-THEN-EVAL (2026-09-13). The detection above already runs
+            // on these exact bytes; ordering it first costs no extra call and
+            // gives the roster arithmetic its figure count.
+            detectedFigures: iterDetection?.figures || null,
+          }
+        );
+        if (usageTracker && iterQuality?.usage) {
+          usageTracker('gemini_quality', iterQuality.usage, 'page_quality', iterQuality.modelId);
+        }
+      } catch (evalErr) {
+        log.warn(`⚠️ [ITERATE] Page ${pageNumber}: eval failed (${evalErr.message}) — serving unscored render`);
       }
     }
     imageResult = {
       ...(iterQuality || {}),
       imageData: genResult.imageData,
       modelId: genResult.modelId,
+      // The full string the provider received (generateImageOnly stamps the
+      // post-shrink text on `prompt`). Carried out of here so the version this
+      // rewrite becomes records ITS OWN prompt.
+      promptSent: genResult.prompt || null,
+      // The rewrite's prompt goes over the model cap as readily as the original
+      // build did; `compressedScene` is what shrinkPromptForModel actually sent.
+      // Dropped here, an iterate version had no sent prose of its own and the
+      // judges fell back to a brief this image was never painted from.
+      compressedScene: genResult.compressedScene || null,
       qualityModelId: iterQuality?.modelId || null,
       grokRefImages: genResult.grokRefImages || null,
       totalAttempts: 1,
@@ -4088,6 +4834,13 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   return {
     imageData: imageResult.imageData,
     imagePrompt,
+    // THE STRING THE MODEL WAS HANDED, not the pre-shrink build. `imagePrompt`
+    // above is what we ASSEMBLED; when that went over the model's cap,
+    // shrinkPromptForModel rewrote or cut it and the provider saw something
+    // else. The version record stamps this so a version's `prompt` and its
+    // `compressedScene` (the head of this same string) describe ONE render —
+    // the containment that made the cross-version prompt bug diagnosable.
+    promptSent: imageResult.promptSent || imageResult.prompt || null,
     newScene: newSceneDescription,
     newSceneMetadata,
     // The rewritten scene is a NEW contract — its character set can legitimately
@@ -4103,6 +4856,9 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     qualityModelId: imageResult.qualityModelId || null,
     fixTargets: imageResult.fixTargets || [],
     fixableIssues: imageResult.fixableIssues || [],
+    // The post-shrink prose this rewrite was rendered from — null when its
+    // prompt fit under the cap. The pipeline stamps it on the version entry.
+    compressedScene: imageResult.compressedScene || null,
     totalAttempts: imageResult.totalAttempts,
     referencePhotos,
     landmarkPhotos: pageLandmarkPhotos,
@@ -4323,6 +5079,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
  * @returns {Promise<{imageData: string}|null>}
  */
 async function editImageWithPrompt(imageData, editInstruction, model, referenceImages = [], artStyle = null, aspectRatioOverride = null) {
+  editInstruction = guardPromptString(editInstruction, 'images.editImageWithPrompt');
   const modelId = model || MODEL_DEFAULTS.pageImage;
   const modelConfig = IMAGE_MODELS[modelId];
   const backend = modelConfig?.backend || 'gemini';
@@ -4408,13 +5165,30 @@ async function editImageWithPrompt(imageData, editInstruction, model, referenceI
       // Content moderation block — sanitize prompt and retry, then fall back to Gemini
       if (grokErr.message?.includes('content moderation') || grokErr.message?.includes('400')) {
         log.warn(`⚠️ [IMAGE EDIT] Grok blocked by content moderation, sanitizing prompt and retrying...`);
-        // Soften violent/weapon language for retry
+        // Soften violent/weapon language for retry.
+        //
+        // ORDER MATTERS, and the chin rule has to come FIRST. It is written for
+        // an instruction that already says "touch … chin" in the author's own
+        // words; the violence rule below injects the word "touch" throughout the
+        // prompt, so running the chin rule after it let an INJECTED "touch"
+        // anchor the match. Worse, the rule used to read `/touch.*chin/gi`: the
+        // `.*` is greedy and `chin` was unanchored, so it matched inside
+        // ordinary words — "crouching", "reaching", "catching", "chin-length",
+        // "etching" — and swallowed every character between the first injected
+        // "touch" and the last such word on the line. Measured 2026-09-18 across
+        // the 529 stored inpaint instructions that reach this function (219
+        // production, 310 staging): 19 production and 36 staging carry a `chin`
+        // substring and EVERY one of them is inside a word like "crouching" or
+        // "chin-length". None has yet shared a line with a violence word, so
+        // nothing has shipped mangled — but the collision is one edit
+        // instruction away, not a hypothesis. Bounded window, word-anchored
+        // `chin`, and no match on a hyphenated "chin-length" haircut.
         const sanitized = editPrompt
+          .replace(/\btouch\w*[^.\n]{0,40}?\bchin(?![\w-])/gi, 'be positioned near the face')
           .replace(/\b(stab|pierce|impale|kill|slay|attack|strike|hit|slash|cut|wound|bleed|blood|die|dead|death)\b/gi, 'touch')
           .replace(/\b(spear|sword|knife|blade|weapon|arrow|axe)\s+(go(?:es|ing)?|plung(?:es|ing)?|driv(?:es|ing)?|thrust(?:s|ing)?)\s+(into|through)\b/gi, '$1 reaches toward')
           .replace(/\b(into|through)\s+(the\s+)?(body|chest|stomach|head|neck|heart|flesh|skin)\b/gi, 'near the $3')
-          .replace(/going into/gi, 'pointing at')
-          .replace(/touch.*chin/gi, 'be positioned near the face');
+          .replace(/going into/gi, 'pointing at');
         if (sanitized !== editPrompt) {
           log.info(`🔄 [IMAGE EDIT] Retrying with sanitized prompt: "${sanitized.substring(0, 120)}..."`);
           try {
@@ -4806,6 +5580,14 @@ async function applyStyleTransfer(imageData, artStyle, options = {}) {
 }
 
 module.exports = {
+  // Everything the two domain modules export, forwarded by construction. The
+  // explicit list below keeps the documented surface and wins for any name this
+  // file defines locally — so every locally defined name belongs BELOW the
+  // spreads, never above them.
+  ...evalPipelineModule,
+  ...bboxDetectionModule,
+  carryEvalEvidence,
+
   // Gemini plumbing consumed by imageInpainting via lazy accessors (the
   // inpaint LLM-verify path); exported for that one consumer.
   withRetry,
@@ -4840,6 +5622,7 @@ module.exports = {
   generateWithIterativePlacement,
   applyStyleTransfer,
   evaluateImageBatch,
+  composeEvalReferencePhotos,
 
   // Unified repair pipeline (the only active repair pipeline)
   inpaintPage,
@@ -4880,7 +5663,11 @@ module.exports = {
   createCutoutSheetImage,      // The final cut-outs, full height, as their own image
   getBboxCacheStats, // Telemetry for the content-hashed bbox cache
   FIGURE_COLORS,  // Color palette for bbox overlay (shared with prompt building)
+  isMicroFigure,
+  countRealFigures,
+  vbNonHumanNames,
   callGrokVisionAPI,  // Grok vision API for bbox/quality eval
+  callOpenRouterVisionAPI,  // OpenRouter vision judges for the blind inventory (Lab)
   GEMINI_SAFETY_SETTINGS,  // Safety settings for Gemini API calls
   enrichWithBoundingBoxes,
 
@@ -4897,6 +5684,21 @@ module.exports = {
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,
+
+  // Remaining evalPipeline exports, forwarded so the facade is complete
+  // (tests/unit/images-facade-complete.test.ts pins this).
+  presenceCounterName,
+  largestInteriorUniformFraction,
+  buildEvalClothingContract,
+  buildEvalRequiredObjects,
+  buildExpectedCastBlock,
+  resolveExpectedCastNames,
+  reconcileDetectorCast,
+  parseFixableIssues,
+  derivePresenceFinding,
+  supersedePresenceFindings,
+  PRESENCE_DERIVED_MARKER,
+  PRESENCE_COUNT_TYPES,
 
   // Pure dispatch helpers (exported for unit tests / reuse)
   resolveOutputAspect,

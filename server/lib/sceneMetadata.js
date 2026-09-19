@@ -66,19 +66,32 @@ function extractJsonFromText(text) {
     if (depth === 0) jsonToParse = withoutLast;
   }
 
-  // First, try to extract from ```json ... ``` code block
-  const codeBlockMatch = jsonToParse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (codeBlockMatch) {
+  // A ```json ... ``` code block is the usual carrier. But when the text
+  // ITSELF starts with `{`, that leading object is the payload and any fenced
+  // block further down is an appended section — the scene review appends a
+  // fenced `---VISUAL BIBLE---` block after the metadata object, and preferring
+  // it silently dropped the whole brief (cast, clothing, wornItems) for every
+  // page the review re-emitted a VB for. So the leading object wins, and the
+  // fenced block stays as a fallback for when the leading object won't parse.
+  const tryCodeBlock = () => {
+    const codeBlockMatch = jsonToParse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    if (!codeBlockMatch) return null;
     let blockContent = codeBlockMatch[1].trim();
     // Also fix doubled braces inside code blocks
     while (blockContent.startsWith('{{') && blockContent.endsWith('}}')) {
       blockContent = blockContent.slice(1, -1);
     }
     try {
-      return JSON.parse(blockContent);
+      return { value: JSON.parse(blockContent) };
     } catch (e) {
       // Code block content wasn't valid JSON, continue
+      return null;
     }
+  };
+  const startsWithObject = jsonToParse.startsWith('{');
+  if (!startsWithObject) {
+    const fromBlock = tryCodeBlock();
+    if (fromBlock) return fromBlock.value;
   }
 
   // Try parsing the whole thing as JSON
@@ -140,6 +153,13 @@ function extractJsonFromText(text) {
         }
       }
     }
+  }
+
+  // The leading object didn't parse after all — now a fenced block further
+  // down is the best remaining candidate.
+  if (startsWithObject) {
+    const fromBlock = tryCodeBlock();
+    if (fromBlock) return fromBlock.value;
   }
 
   // Last resort: repair leading-zero number literals and retry once. Kept to
@@ -241,6 +261,15 @@ function sanitizeInteractions(rawInteractions) {
     // `where` prose. Only an explicit true is kept: absent means "not declared",
     // which must never read as a violation on briefs written before the field.
     if (i.hands === true) out.hands = true;
+    // `receiver` names the second object the action's RESULT later arrives at
+    // (a basin under a spout); `target` names what the tool acts on. Both are
+    // opaque strings passed through verbatim — the prompt builder strips the
+    // receiver's state clause and emits a fixed placement sentence from them
+    // (decisions.md 2026-09-08, "result at the contact, receiver clear").
+    const receiver = String(i.receiver || '').trim();
+    if (receiver) out.receiver = receiver.slice(0, 80);
+    const target = String(i.target || '').trim();
+    if (target) out.target = target.slice(0, 120);
     kept.push(out);
   }
   if (dropped.length > 0) {
@@ -450,7 +479,13 @@ function buildTextFromJson(scene) {
     const objectLines = scene.objects.map(obj => {
       const cleanName = stripEntityIds(obj.name || '');
       const expandedPos = stripEntityIds(expandPositionAbbreviations(obj.position) || '');
-      return `${cleanName}${expandedPos ? ': ' + expandedPos : ''}`;
+      // Per-page scale anchor. The trial path has no Art Director and no rule
+      // 8g, so this hint field is the only place a page can say how big the
+      // object is in THIS shot; the bible's own `size` still rides the
+      // REQUIRED OBJECTS line for every path.
+      const size = typeof obj.size === 'string' ? stripEntityIds(obj.size).trim() : '';
+      const sizeClause = size ? ` (${size})` : '';
+      return `${cleanName}${expandedPos ? ': ' + expandedPos : ''}${sizeClause}`;
     });
     if (objectLines.length > 0) {
       lines.push('');
@@ -865,10 +900,23 @@ function extractSceneMetadata(sceneDescription) {
         wornItems,
         imageSummary: prose,
         shot: metadata.shot || null,
+        crowdExpected: metadata.crowdExpected === true,
         setting: metadata.setting || null,
         // time/weather passthroughs removed 2026-08-11: written for months,
         // read by nothing (metadata-migration audit).
         background: metadata.background || null,
+        // The Art Director writes `sceneIntent` on every page, and this
+        // allowlist dropped it — so the two branches of this function
+        // disagreed: a JSON-format brief (fullData = the parsed object)
+        // carried it and a prose-format brief (the production AD format) did
+        // not. Consumers written as `meta.sceneIntent || meta.fullData
+        // .sceneIntent` (evalPipeline, routes/regeneration) therefore reached
+        // it through one shape only, and any caller handed a bare `fullData`
+        // lost it outright. Measured 2026-09-13 over five staging stories:
+        // present in 83/83 briefs, 0/83 stored. Null when a brief (or a row
+        // written before this date) carries none — readers must treat absent
+        // as "not declared".
+        sceneIntent: metadata.sceneIntent || null,
       },
       thinking: null,
       translatedSummary: metadata.translatedSummary || null,
@@ -885,6 +933,12 @@ function extractSceneMetadata(sceneDescription) {
       // VB id of the vehicle/structure the camera stands on or inside — makes
       // the plate render the surfaces around the camera, not the element's exterior.
       aboard: metadata.aboard || null,
+      // CROWD FLAG (2026-09-13). The brief saying this page holds unnamed
+      // background people beyond its cast. The presence derivation
+      // (evalPipeline.derivePresenceFinding) skips its surplus branch when set.
+      // Strictly `=== true`: absent, null and every stored row that predates
+      // the field read as "no crowd", which is the pre-existing behaviour.
+      crowdExpected: metadata.crowdExpected === true,
       emptyScenePrompt: metadata.emptyScenePrompt || null,
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
       textPosition: metadata.textPosition || null,
@@ -1044,6 +1098,8 @@ function extractSceneMetadata(sceneDescription) {
       // VB id of the vehicle/structure the camera stands on or inside — makes
       // the plate render the surfaces around the camera, not the element's exterior.
       aboard: parsedData.aboard || null,
+      // See the crowdExpected note in the prose-format branch above.
+      crowdExpected: parsedData.crowdExpected === true,
       emptyScenePrompt: parsedData.emptyScenePrompt || null,
       // Whether the existing empty scene background can be reused (iteration only)
       reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
@@ -1110,24 +1166,33 @@ function extractSceneMetadata(sceneDescription) {
     } else if (!looksLikeJson) {
       log.debug(`[SCENE META] tail after ---METADATA--- isn't JSON (input wasn't a metadata block); using prose fallback. Head: ${tailHead}`);
     } else {
-      log.error(`[SCENE META] ---METADATA--- delimiter present but JSON parse failed in BOTH prose+JSON and legacy paths. Sonnet emitted malformed metadata; returning prose-only fallback. Tail snippet (first 200 chars): ${tailHead}`);
+      log.error(`[SCENE META] ---METADATA--- delimiter present but JSON parse failed in BOTH prose+JSON and legacy paths. The scene-expansion model emitted malformed metadata; returning prose-only fallback. Tail snippet (first 200 chars): ${tailHead}`);
     }
     if (prose && prose.length > 50) {
+      // CONSEQUENCES, not just the fact (2026-09-15). A page that reaches here
+      // renders from prose alone: the image prompt gets no cast list, no
+      // clothing contract, no props, no interactions and no text placement,
+      // and every downstream judge then scores the picture against a brief
+      // that was stripped before it was sent. Page 16 of
+      // job_1789420511893_zly5rcdej took four CRITICAL findings this way.
+      log.error(`[SCENE META] DEGRADED PAGE — rendering on prose alone. Empty for this page: characters[] (no cast), clothing/characterClothing (no clothing contract), wornItems[] (no worn/handover state), objects[] (no props), interactions, textPosition, setting, emptyScenePrompt. Image prompt, clothing check, worn-state check, held-objects check and semantic eval all run against a stripped brief.`);
       return {
         characters: [],
         characterClothing: null,
         characterPositions: null,
         characterPerspectives: null,
         clothing: null,
+        wornItems: [],
         objects: [],
         interactions: null,
-        fullData: { characters: [], objects: [], interactions: [], imageSummary: prose },
+        fullData: { characters: [], objects: [], interactions: [], imageSummary: prose, crowdExpected: false },
         thinking: null,
         translatedSummary: null,
         imageSummary: prose,
         landmarkVariants: null,
         setting: null,
         sceneComplexity: 'simple',
+        crowdExpected: false,
         emptyScenePrompt: null,
         reuseEmptyScene: null,
         textPosition: null,
@@ -1177,6 +1242,58 @@ function collectSceneCharacterNames(sceneMetadata, extraNames = []) {
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(name);
+  }
+  return out;
+}
+
+/**
+ * The FIGURES a page files under `objects[]` — animals and secondary
+ * characters — resolved to their Visual Bible names.
+ *
+ * The Art Director puts every non-photo element in `objects[]` by id, figures
+ * included: page 12 of staging `job_1789163494908_kc2joi4ax` reads
+ * `characters: ["Max"], objects: ["LOC002","ANI001"]`, and ANI001 is the grey
+ * tomcat the page is about. `collectSceneCharacterNames` reads only the three
+ * cast carriers, so that cat never reached EXPECTED CAST and pages 12, 15 and
+ * 16 each took a false `extra_character` CRITICAL (75 / 50 / 54) for drawing
+ * the animal the prompt commissioned.
+ *
+ * Only `animals` and `secondaryCharacters` resolve. A location or an artifact
+ * is not a figure and must never join a cast roster — that is the whole reason
+ * this is a separate helper rather than a widening of the cast collector, whose
+ * other caller (the figure detector, images.js) must keep seeing people only.
+ *
+ * Ids arrive bare (`ANI001`) and state-suffixed (`ART002.1`); the suffix is a
+ * variant of the same entry, so it is stripped before resolving. A free-text
+ * entry that is not id-shaped is matched by name, so a brief that writes the
+ * animal's name instead of its id resolves too.
+ *
+ * @param {Object|null} sceneMetadata - extractSceneMetadata() result
+ * @param {Object|null} visualBible - story.data.visualBible
+ * @returns {string[]} Visual Bible names, deduplicated, first spelling wins
+ */
+function collectSceneObjectFigureNames(sceneMetadata, visualBible) {
+  const objects = Array.isArray(sceneMetadata?.objects) ? sceneMetadata.objects : [];
+  if (objects.length === 0) return [];
+  const vb = visualBible || {};
+  const asList = (v) => (Array.isArray(v) ? v : Object.values(v || {}));
+  const figures = [...asList(vb.animals), ...asList(vb.secondaryCharacters)].filter(e => e && e.name);
+  if (figures.length === 0) return [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of objects) {
+    const token = String(typeof raw === 'string' ? raw : (raw && (raw.id || raw.name)) || '').trim();
+    if (!token) continue;
+    // `ART002.1` → `ART002`; anything not id-shaped stays whole and is matched
+    // by name below.
+    const base = (/^[A-Za-z]{3}\d{3}(?:\.\d+)?$/.test(token) ? token.split('.')[0] : token).toLowerCase();
+    const entry = figures.find(e => String(e.id || '').toLowerCase() === base
+      || String(e.name || '').toLowerCase() === base);
+    if (!entry) continue;
+    const key = String(entry.name).toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry.name);
   }
   return out;
 }
@@ -1367,6 +1484,53 @@ function getCharactersInScene(sceneDescription, characters) {
 
     return nameRegex.test(sceneLower) || firstNameRegex.test(sceneLower);
   });
+}
+
+/**
+ * The page's cast is the UNION of what the outline hint commissioned and what
+ * the brief prose describes — never one of the two alone.
+ *
+ * Both sources lie in opposite directions, and each covers the other's gap:
+ *
+ * - The HINT lies by omission. `characters: []` with the people described in
+ *   free prose is a real shape (job_1789207854566_l43qgl34w p7: the brief
+ *   commissions Frau Amrein plus five soaked pirates, the metadata `characters`
+ *   array is empty, and the only names anywhere in the JSON are two
+ *   `wornItems[].owner` values — two garment owners read as a cast of two).
+ * - The PROSE lies by anonymity. A brief may describe a cast member without
+ *   ever naming them ("a blonde in a red tricorn"), so a scan of the prose
+ *   alone drops them (same job, p1: three of five named, two described).
+ *
+ * A REPLACEMENT in either direction therefore deletes real cast. Only the
+ * union is safe, and the roster is the one input the presence arithmetic
+ * cannot be wrong about.
+ *
+ * @param {string} sceneDescription - brief prose (+ any ---METADATA--- block)
+ * @param {Array<string>} hintNames - names the outline hint commissioned
+ * @param {Array} characters - the story's photo-backed character records
+ * @returns {Array} character records, in `characters` order, deduped
+ */
+function unionPageCast(sceneDescription, hintNames, characters) {
+  const all = Array.isArray(characters) ? characters : [];
+  if (all.length === 0) return [];
+  const fromProse = getCharactersInScene(sceneDescription, all);
+  const wanted = new Set(fromProse.map(c => String(c?.name || '').toLowerCase()));
+  for (const raw of (Array.isArray(hintNames) ? hintNames : [])) {
+    // Hint entries arrive as plain names or as records; they may carry a
+    // parenthetical qualifier ("Sarah (background)").
+    const parsed = String((raw && typeof raw === 'object' ? raw.name : raw) || '')
+      .toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
+    if (!parsed) continue;
+    const match = all.find(c => {
+      const n = String(c?.name || '').toLowerCase().trim();
+      if (!n) return false;
+      return parsed === n || parsed === n.split(' ')[0];
+    });
+    if (match) wanted.add(String(match.name).toLowerCase());
+  }
+  // Story order, not discovery order — every downstream roster compares by set,
+  // and a stable order keeps logs and prompts diffable.
+  return all.filter(c => c?.name && wanted.has(String(c.name).toLowerCase()));
 }
 
 /**
@@ -1655,6 +1819,12 @@ function getPrimaryVantageForPage(sceneMetadata, visualBible, opts = {}) {
       description: location.description
         || [location.setting, location.colors, location.features, location.signatureElement]
             .filter(Boolean).join('. '),
+      // A location shown from one viewpoint declares no `vantages[]` and
+      // carries its single plate on the entry itself (owner ruling 2026-09-17,
+      // one plate per vantage). The synthesized vantage IS that one viewpoint,
+      // so the entry's plate is its plate. Empty on a legacy bible, which
+      // authored no plate here at all — resolvePagePlate falls to the page's.
+      emptyScenePrompt: location.emptyScenePrompt || '',
     };
   }
 
@@ -1665,9 +1835,60 @@ function getPrimaryVantageForPage(sceneMetadata, visualBible, opts = {}) {
     name: vantage.name,
     shot: vantage.shot || 'wide',
     description: vantage.description || '',
+    // The vantage's backdrop plate, '' when the bible authored none.
+    emptyScenePrompt: vantage.emptyScenePrompt || '',
     location, // full LOC entry for landmark photo lookup, attribution, etc.
     vantage,  // raw vantage entry (in case caller needs canvasImage etc.)
   };
+}
+
+/**
+ * The backdrop plate a page is drawn on, and where it came from.
+ *
+ * The Art Director writes ONE plate per Visual Bible vantage — owner ruling
+ * 2026-09-17, "we either reuse a plate or create a new one, the AD decides" —
+ * so a plate is a property of the vantage, not of the page. Every stored story
+ * predates that and carries a per-page `emptyScenePrompt` in its brief
+ * metadata; that value is still used, exactly as written, whenever the bible
+ * offers no vantage plate. Nothing stored is reinterpreted or coerced.
+ *
+ * Ladder, first non-empty wins:
+ *   'outline'  a plate the caller already pulled off the outline hint (the
+ *              pre-beats path; absent on beats). Kept first because that is
+ *              where it has always sat.
+ *   'vantage'  the cited vantage's own plate. A location with no `vantages[]`
+ *              carries its single plate on the entry, and
+ *              getPrimaryVantageForPage copies it onto the synthesized vantage.
+ *   'page'     the brief's own `emptyScenePrompt`: legacy stories, and the
+ *              iterate rewrite, which authors a fresh plate for ONE page after
+ *              a failed render (`reuseEmptyScene: false`).
+ *   'missing'  nothing to build a plate from. Returned explicitly so a caller
+ *              reports it — never silently replaced by another page's plate.
+ *
+ * @param {Object} args
+ * @param {number} [args.pageNumber]
+ * @param {Object} [args.sceneMetadata] - the page's parsed brief metadata
+ * @param {Object} [args.visualBible]
+ * @param {string} [args.outlinePlate]  - outline-level plate, when the caller has one
+ * @param {Object} [args.vantage]       - an already-resolved getPrimaryVantageForPage
+ *                                        result, so a caller that grouped pages by
+ *                                        vantage does not resolve it twice
+ * @returns {{text: string, source: 'outline'|'vantage'|'page'|'missing', vantageId: string|null}}
+ */
+function resolvePagePlate({ pageNumber = null, sceneMetadata = null, visualBible = null, outlinePlate = '', vantage = undefined } = {}) {
+  const outline = String(outlinePlate || '').trim();
+  if (outline) return { text: outline, source: 'outline', vantageId: null };
+  // The page's own plate feeds rule 2 of the primary-LOC selection, so a legacy
+  // story resolves to exactly the vantage it resolves to today.
+  const v = vantage !== undefined ? vantage : getPrimaryVantageForPage(sceneMetadata, visualBible, {
+    pageNumber,
+    emptyScenePrompt: sceneMetadata?.emptyScenePrompt || '',
+  });
+  const fromVantage = String(v?.emptyScenePrompt || '').trim();
+  if (fromVantage) return { text: fromVantage, source: 'vantage', vantageId: v.vantageId || null };
+  const fromPage = String(sceneMetadata?.emptyScenePrompt || '').trim();
+  if (fromPage) return { text: fromPage, source: 'page', vantageId: v?.vantageId || null };
+  return { text: '', source: 'missing', vantageId: v?.vantageId || null };
 }
 
 /**
@@ -1701,6 +1922,79 @@ function groupPagesByVantage(pageDataArray, visualBible) {
   return groups;
 }
 
+/**
+ * Group the TRIAL empty-scene plate pages by vantage.
+ *
+ * Trial renders its backdrop plates during outline streaming, from
+ * `visualBible.backgrounds[]` prose — long before any page has scene metadata,
+ * so `groupPagesByVantage` cannot be called on a `pageDataArray` that does not
+ * exist yet. The grouping fact it needs, though, IS already in the bible:
+ * `locations[].pages[]` says which pages stand in which LOC, and that is the
+ * same LOC the page's own `setting.location` will name later (the trial prompt
+ * tells the model to reference the bible LOC id). So we synthesize the minimal
+ * page shape `groupPagesByVantage` reads — `objects: ["Name [LOC001]"]`, the
+ * exact string form `extractSceneMetadata` emits — and reuse the real grouper.
+ * No parallel grouping logic.
+ *
+ * Trial bibles carry no `vantages[]` (deliberately — `LOC001.N` means
+ * photo-variant in trial, vantage in full mode), so every group here is a
+ * synthesized `LOC###.1`: one plate per distinct location.
+ *
+ * A page with no LOC lands in `__unassigned__` and is returned as its OWN
+ * single-page group — it still gets a plate, it just cannot share one.
+ *
+ * DESCRIPTION when a group spans two different `backgrounds[]` entries: the
+ * FIRST page's prose wins. Same rule the full-mode vantage path uses for its
+ * representative page (`group.pageNumbers[0]` supplies framing, aspect, model
+ * and landmark refs) — one plate, one description, chosen deterministically.
+ *
+ * @param {Object} visualBible - needs `backgrounds[]`; uses `locations[]` when present
+ * @returns {Array<{vantageId: string|null, pages: number[], description: string}>}
+ *   ordered by first page; covers exactly the pages `backgrounds[]` names.
+ */
+function groupTrialPlatePagesByVantage(visualBible) {
+  const backgrounds = Array.isArray(visualBible?.backgrounds) ? visualBible.backgrounds : [];
+  // page → plate prose. First backgrounds[] entry naming a page wins, so a page
+  // listed twice is still rendered once (today's loop would render it twice).
+  const descByPage = new Map();
+  for (const bg of backgrounds) {
+    if (!bg?.description || !Array.isArray(bg.pages) || bg.pages.length === 0) continue;
+    for (const pn of bg.pages) {
+      if (typeof pn !== 'number' || descByPage.has(pn)) continue;
+      descByPage.set(pn, bg.description);
+    }
+  }
+  const pages = Array.from(descByPage.keys()).sort((a, b) => a - b);
+  if (pages.length === 0) return [];
+
+  const locations = Array.isArray(visualBible?.locations) ? visualBible.locations : [];
+  const synthetic = pages.map(pageNumber => {
+    const loc = locations.find(l => l?.id && Array.isArray(l.pages) && l.pages.includes(pageNumber)) || null;
+    return {
+      pageNumber,
+      sceneMetadata: { objects: loc ? [`${loc.name || ''} [${loc.id}]`.trim()] : [] },
+      emptyScenePrompt: '',
+    };
+  });
+
+  const grouped = groupPagesByVantage(synthetic, visualBible);
+  const out = [];
+  for (const [key, group] of grouped.entries()) {
+    if (key === '__unassigned__') {
+      // No LOC → no shared backdrop is knowable. One plate per page, exactly
+      // as trial does today.
+      for (const pn of group.pageNumbers) {
+        out.push({ vantageId: null, pages: [pn], description: descByPage.get(pn) });
+      }
+      continue;
+    }
+    const groupPages = group.pageNumbers.slice().sort((a, b) => a - b);
+    out.push({ vantageId: key, pages: groupPages, description: descByPage.get(groupPages[0]) });
+  }
+  out.sort((a, b) => a.pages[0] - b.pages[0]);
+  return out;
+}
+
 // ============================================================================
 // POSITION NORMALIZATION
 // ============================================================================
@@ -1724,6 +2018,38 @@ function normalizePositionToLCR(position) {
 // EXPORTS
 // ============================================================================
 
+
+/**
+ * Strip the text writer's page DELIMITER from the end of one page's text.
+ *
+ * The writer separates pages with a rule line ("---"). When it puts that rule
+ * INSIDE the last page's body instead of between the headings, the page parser
+ * (parseRefinedText) — which cuts a page at the NEXT "## Page N" heading — keeps
+ * it, and the rule ships under the illustration in the book and the PDF
+ * (job_1789348171785_9oxos7dwv, pages 1, 2 and 8: the body ends "... genau.",
+ * a blank line, then a bare "---").
+ *
+ * What counts as a delimiter, deliberately narrow:
+ *   - a run of TWO OR MORE dash characters (-, ‐ ‑ ‒ – — ―, mixed),
+ *   - standing at the VERY END of the page text, with nothing but whitespace
+ *     after it,
+ *   - preceded by whitespace (or being the whole string) — so it stands alone
+ *     rather than being attached to a word.
+ *
+ * Everything else is left byte-identical. In particular a SINGLE trailing dash
+ * is never stripped: German and French children's prose legitimately ends a
+ * line on an em-dash ("Und dann —"), and a two-dash run is not punctuation in
+ * any of our languages. A dash inside a sentence is never at the end, so it is
+ * never matched.
+ */
+const DELIMITER_DASHES = '\-\u2010\u2011\u2012\u2013\u2014\u2015';
+const TRAILING_DELIMITER_RE = new RegExp('(?:^|\\s)[' + DELIMITER_DASHES + ']{2,}\\s*$');
+
+function stripTrailingSeparator(text) {
+  const s = String(text == null ? '' : text);
+  if (!TRAILING_DELIMITER_RE.test(s)) return s;
+  return s.replace(TRAILING_DELIMITER_RE, '').replace(/\s+$/, '');
+}
 
 /**
  * Get text for a specific page from storyText
@@ -1791,6 +2117,269 @@ function updatePageText(storyText, pageNumber, newText) {
 }
 
 
+/**
+ * SCENE_HINT for the image evaluators = the spec the IMAGE GENERATOR consumed.
+ *
+ * The semantic judge calls SCENE_HINT "the authoritative source" and scores the
+ * render against it. Page images are built by buildImagePrompt() from
+ * `scene.sceneDescription` — the Art Director brief, after the scene reviewer
+ * edited it. The Art Director deliberately trims cast and simplifies action to
+ * keep an image readable (owner-confirmed, by design); feeding the judge the
+ * upstream plan line instead turns every deliberate trim into a full-severity
+ * semantic defect on a page that is correct.
+ *
+ * Fixed once on 2026-08-31 (c0928a079) on the reasoning "pages never set
+ * outlineExtract, so they fall through to the AD brief". 824fb02d9 (2026-09-02)
+ * then gave every beats page `outlineExtract: "PLAN: <planLine>"`, which won the
+ * `||` chain and silently reopened the bug for the whole beats pipeline — the
+ * pipeline in every environment. Measured on staging 2026-09-13: every page of
+ * every beats story stored a `PLAN: …` outlineExtract while its sceneDescription
+ * held the full brief.
+ *
+ * Covers are the genuine exception: their `outlineExtract` IS the cover brief
+ * the image was generated from.
+ *
+ * @param {Object} sources
+ * @param {string} sources.evaluationType - 'cover' takes the cover brief; anything else is a page
+ * @param {string|null} [sources.entryDescription] - this version's own rewritten brief (iterate)
+ * @param {string|null} [sources.sceneDescription] - the reviewed Art Director brief (page default)
+ * @param {string|null} [sources.outlineExtract] - cover brief; on beats pages a "PLAN: …" plan line
+ * @param {string|null} [sources.sceneHint] - legacy/plan hint, last resort
+ * @returns {string|null}
+ */
+function resolveEvalSceneHint({ evaluationType, entryDescription = null, sceneDescription = null, outlineExtract = null, sceneHint = null } = {}) {
+  const pick = (...vals) => vals.find(v => typeof v === 'string' && v.trim()) || null;
+  if (evaluationType === 'cover') return pick(outlineExtract, entryDescription, sceneDescription, sceneHint);
+  // A "PLAN: …" outlineExtract is the beats plan line. It is never what a page
+  // render was made from, so it is not a fallback either — drop it outright
+  // rather than let it resurface when a brief is missing.
+  const planLess = (typeof outlineExtract === 'string' && /^\s*PLAN:/i.test(outlineExtract)) ? null : outlineExtract;
+  return pick(entryDescription, sceneDescription, planLess, sceneHint);
+}
+
+/**
+ * IMAGE_PROMPT for the image evaluators = the string the image model ACTUALLY
+ * received.
+ *
+ * Every image judge is told IMAGE_PROMPT is "the expanded scene sent to the
+ * image model" and scores the render against it. But a prompt over the model's
+ * character cap does not reach the model as written: `shrinkPromptForModel`
+ * (images.js) LLM-compresses the HEAD of the prompt, holding back only the
+ * `**REQUIRED OBJECTS` / `**ART STYLE` tail, the reference-card colour map and
+ * the static rendering rules. Everything else — the scene prose itself — is
+ * rewritten shorter, and clauses go missing by design.
+ *
+ * Handing the judge the PRE-shrink text makes it score the image against
+ * instructions the generator never got: the compressor drops a clause, the
+ * model never draws it, and the judge files a full-severity "it is missing"
+ * against a render that obeyed everything it was told.
+ *
+ * Measured on staging 2026-09-13, job_1789301291267_ueh8h145m: page 1 stores a
+ * 7,939-char prompt and page 4 v0 an 8,317-char one, both rendered by
+ * grok-imagine-image-2.0 whose cap is 7,900 — i.e. the shrinker fired on those
+ * pages and the string the judge was given is not the string the model saw.
+ *
+ * The generation paths return the sent string as `promptSent` (stamped onto
+ * their result as `prompt`); `originalPrompt` is the pre-shrink text and stays
+ * as the last resort for callers/tests that have nothing else.
+ *
+ * @param {Object} sources
+ * @param {string|null} [sources.promptSent] - the string handed to the provider
+ * @param {string|null} [sources.originalPrompt] - pre-shrink prompt (fallback only)
+ * @returns {string|null}
+ */
+function resolveEvalImagePrompt({ promptSent = null, originalPrompt = null } = {}) {
+  const pick = (...vals) => vals.find(v => typeof v === 'string' && v.trim()) || null;
+  return pick(promptSent, originalPrompt);
+}
+
+/**
+ * ORIGINAL_PROMPT for the BATCH image eval = the scene DESCRIPTION the image
+ * model actually received.
+ *
+ * Sibling of resolveEvalImagePrompt, and the last open site of the same bug.
+ * The batch eval deliberately feeds the judge a scene DESCRIPTION rather than
+ * the full prompt, because `resolveEvalArtStyle` (services/prompts) depends on
+ * ORIGINAL_PROMPT carrying NO `**ART STYLE` block — a prompt would make every
+ * style-dependent evaluator rule read the style out of the wrong string.
+ *
+ * When the page's built prompt went over the image model's character cap,
+ * `shrinkPromptForModel` (images.js) LLM-compresses the prompt's HEAD — the
+ * scene prose — and sends that instead. It now hands the compressed head back
+ * as `compressedScene`, which the generation paths stamp onto the page record.
+ * That string is the description the generator was really given, so it is what
+ * the judge must score against; without it the judge files "the boat is
+ * missing" against a clause the compressor removed before the model ever saw
+ * it.
+ *
+ * Shrinking is the uncommon case: with no `compressedScene` the chain is
+ * exactly what this site did before (sceneDescription, then prompt), so an
+ * unshrunk page's eval input is byte-identical.
+ *
+ * THE ART STYLE INVARIANT IS ENFORCED HERE, not assumed. The compressed head is
+ * taken from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE` tail
+ * split, so it cannot contain a style block by construction — but the head is
+ * rewritten by an LLM, and a compressor that echoes a style heading back would
+ * silently poison resolveEvalArtStyle. A candidate carrying an ART STYLE block
+ * is therefore rejected and the page falls back to its stored description.
+ *
+ * @param {Object} sources
+ * @param {string|null} [sources.compressedScene] - post-shrink scene block, when the shrinker compressed
+ * @param {string|null} [sources.sceneDescription] - the page's stored scene description
+ * @param {string|null} [sources.prompt] - last-resort fallback (today's behaviour)
+ * @returns {string} - never null; '' when nothing is available (the batch eval passes a string)
+ */
+function resolveEvalSceneDescription({ compressedScene = null, sceneDescription = null, prompt = null } = {}) {
+  const usable = v => typeof v === 'string' && v.trim();
+  const carriesArtStyle = v => /\*\*ART STYLE/i.test(v);
+  if (usable(compressedScene) && !carriesArtStyle(compressedScene)) return compressedScene;
+  return [sceneDescription, prompt].find(usable) || '';
+}
+
+/**
+ * THE PICTURE SPEC for every text-stage consumer = the brief the WRITER was
+ * given, whole.
+ *
+ * The page text is written against the locked scene brief
+ * (buildStoryTextFromBeatsPrompt, promptBuilders.js — METADATA stripped, no
+ * length cut). The refine/repair pass that rewrites that text is shown the same
+ * brief. The arc-informed AUDITOR that decides what the repair pass must change
+ * was shown something else: `extractRefinablePages` (textRefine.js) falls back
+ * to `sceneDescription.slice(0, 600)` when no compact `sceneIntent` exists, and
+ * in the beats pipeline — the pipeline in every environment — nothing ever sets
+ * one: beatsPipeline.js sets no `sceneMetadata`, and `outlineExtract` is the
+ * string "PLAN: …", never JSON. So every beats page reached the auditor as a
+ * blind 600-character head cut.
+ *
+ * The failure that produces: an event stated in the brief's later paragraphs is
+ * absent from the auditor's copy, so it files
+ * `FAULT[MISMATCH]: the text has X, the picture shows no X` — and the repair
+ * pass, reading the WHOLE brief, deletes prose the illustration does contain.
+ * The truncation was never a budget decision; it was a fallback that became the
+ * only path.
+ *
+ * Same class as resolveEvalSceneHint (3b3070dce) and resolveGeneratedOutfit
+ * (e403345b1), and fixed the same way: one resolver, so judge and actor cannot
+ * drift apart again. METADATA is stripped here because it is machine data for
+ * the image call — the writer never saw it, so neither may its judge.
+ *
+ * @param {Object} sources
+ * @param {string|null} [sources.sceneBrief] - brief as extractRefinablePages carries it
+ * @param {string|null} [sources.sceneDescription] - the stored Art Director brief (Lab replay, stored stories)
+ * @param {string|null} [sources.sceneIntent] - compact one-line intent, last resort
+ * @returns {string|null}
+ */
+function resolveTextStagePictureSpec({ sceneBrief = null, sceneDescription = null, sceneIntent = null } = {}) {
+  const strip = v => (typeof v === 'string' ? v.split(/---\s*METADATA/i)[0].trim() : '');
+  return [sceneBrief, sceneDescription, sceneIntent].map(strip).find(v => v) || null;
+}
+
+/**
+ * THE SCENE CAST as OBJECTS — the only shape that carries position/action/depth.
+ *
+ * `extractSceneMetadata()` returns TWO cast lists and they are not the same
+ * shape: `metadata.characters` is `string[]` (names only, flattened here in
+ * both the prose branch and the JSON branch), while `metadata.fullData.
+ * characters` keeps the brief's objects (`{ name, position, action, depth,
+ * clothing, … }`). Reading `.position` / `.action` / `.depth` off an entry of
+ * the flat list yields `undefined` with no throw and no warning.
+ *
+ * That is exactly what entityConsistency's bbox disambiguation context did from
+ * the day it was written (24c8981aa, 2026-03-22 — the flat shape predates it,
+ * so the contract was never true): it emitted one `- undefined:` line per cast
+ * member into a prompt block headed "use to identify characters by position and
+ * action". The disambiguation payload was 100% lost while the prompt claimed to
+ * carry it. generateWithIterativePlacement (images.js) is the sibling that got
+ * it right and even documents the two shapes.
+ *
+ * One resolver so a third site cannot pick the wrong list, and a LOUD failure —
+ * never a silent `undefined` — when a string turns up where an object belongs.
+ * A bare name is still returned as `{ name }` with blank position/action so a
+ * degraded brief costs detail, not the cast: a paid run is never killed for it
+ * (gates are guidelines).
+ *
+ * @param {Object|null} metadata - an extractSceneMetadata() result
+ * @param {string} [where] - call-site label, for the log line
+ * @returns {Array<{name: string, position: string, action: string}>}
+ */
+function resolveSceneCastEntries(metadata, where = 'scene-cast') {
+  if (!metadata) return [];
+  const structured = Array.isArray(metadata.fullData?.characters) ? metadata.fullData.characters : null;
+  const flat = Array.isArray(metadata.characters) ? metadata.characters : [];
+  const usingFlat = !(structured && structured.length);
+  const raw = usingFlat ? flat : structured;
+  if (usingFlat && flat.length) {
+    log.warn(`⚠️  [SCENE-CAST] ${where}: no structured cast (fullData.characters) — falling back to the ${flat.length} bare name(s) in metadata.characters; position/action are unavailable for this scene`);
+  }
+  const out = [];
+  for (const entry of raw) {
+    if (entry && typeof entry === 'object') {
+      const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+      if (!name) {
+        log.error(`❌ [SCENE-CAST] ${where}: cast entry has no name (${JSON.stringify(entry).slice(0, 120)}) — dropped`);
+        continue;
+      }
+      out.push({
+        ...entry,
+        name,
+        position: typeof entry.position === 'string' ? entry.position.trim() : '',
+        action: typeof entry.action === 'string' ? entry.action.trim() : ''
+      });
+      continue;
+    }
+    if (typeof entry === 'string' && entry.trim()) {
+      // Loud only when the STRUCTURED list held a string — that is the contract
+      // violation. The flat-list fallback is strings by definition and has
+      // already warned once for the whole scene.
+      if (!usingFlat) {
+        log.error(`❌ [SCENE-CAST] ${where}: cast entry is a bare name string ("${entry.trim()}") where a cast OBJECT was expected — position/action are missing for this figure. Read fullData.characters, never metadata.characters.`);
+      }
+      out.push({ name: entry.trim(), position: '', action: '' });
+      continue;
+    }
+    log.error(`❌ [SCENE-CAST] ${where}: unusable cast entry ${JSON.stringify(entry)} — dropped`);
+  }
+  return out;
+}
+
+/**
+ * Was this page's metadata produced by the prose-only recovery path?
+ *
+ * `extractSceneMetadata` returns a degraded object when the ---METADATA---
+ * delimiter is present but every parser failed (server/lib/sceneMetadata.js,
+ * "Recovery path"). That object sets `isRecovered: true` — and, for a trap
+ * worth naming, it ALSO sets `isJsonFormat: true`, so looking for
+ * `isJsonFormat === false` finds nothing. `isRecovered` is the only marker.
+ *
+ * Measured over 45 days: production 1 page in 288, staging 3 in 1,086. Zero
+ * pages carry an absent `objects` field WITHOUT this marker, so the marker is
+ * the complete population — there is no quieter second failure mode.
+ *
+ * Recording only. This describes a known-degraded input; it is never a
+ * deduction, a severity or a repair trigger (same contract as notEvaluated).
+ *
+ * @param {Object|null} sceneMetadata - an extractSceneMetadata() result
+ * @returns {{recovered: true, emptyInputs: string[]}|null} null when the page
+ *   had a normally parsed brief.
+ */
+function describeDegradedSceneMetadata(sceneMetadata) {
+  if (!sceneMetadata || typeof sceneMetadata !== 'object') return null;
+  if (sceneMetadata.isRecovered !== true) return null;
+  const empty = [];
+  if (!Array.isArray(sceneMetadata.characters) || sceneMetadata.characters.length === 0) empty.push('characters');
+  if (!sceneMetadata.clothing && !sceneMetadata.characterClothing) empty.push('clothing');
+  if (!Array.isArray(sceneMetadata.wornItems) || sceneMetadata.wornItems.length === 0) empty.push('wornItems');
+  if (!Array.isArray(sceneMetadata.objects) || sceneMetadata.objects.length === 0) empty.push('objects');
+  if (!sceneMetadata.interactions) empty.push('interactions');
+  if (!sceneMetadata.textPosition) empty.push('textPosition');
+  if (!sceneMetadata.setting) empty.push('setting');
+  // `emptyScenePrompt` was on this list until 2026-09-17, when plate authoring
+  // moved from the page to the Visual Bible vantage. A page brief no longer
+  // carries one at all, so its absence says nothing about how the brief parsed
+  // — listing it marked every recovered page with an input it never had.
+  return { recovered: true, emptyInputs: empty };
+}
+
 module.exports = {
   extractJsonFromText,
   sanitizeInteractions,
@@ -1805,10 +2394,18 @@ module.exports = {
   enforceSpreadTextPosition,
   mirrorLeftRight,
   extractSceneMetadata,
+  describeDegradedSceneMetadata,
+  resolveEvalSceneHint,
+  resolveEvalImagePrompt,
+  resolveEvalSceneDescription,
+  resolveTextStagePictureSpec,
+  resolveSceneCastEntries,
   collectSceneCharacterNames,
+  collectSceneObjectFigureNames,
   findCastMissingFromMetadata,
   isSameFigureName,
   getCharactersInScene,
+  unionPageCast,
   parseSceneHintMetadata,
   parseStoryPages,
   parseSceneDescriptions,
@@ -1816,8 +2413,11 @@ module.exports = {
   extractCoverScenes,
   extractPageClothing,
   getPrimaryVantageForPage,
+  resolvePagePlate,
   groupPagesByVantage,
+  groupTrialPlatePagesByVantage,
   normalizePositionToLCR,
   getPageText,
-  updatePageText
+  updatePageText,
+  stripTrailingSeparator
 };

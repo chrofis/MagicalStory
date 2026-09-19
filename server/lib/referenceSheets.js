@@ -16,12 +16,44 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const r2Lib = require('./r2');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { guardPromptString } = require('../services/prompts');
 const { loadVbReferenceBytes } = require('./characterPhotos');
 const { escapeXml } = require('./repairGrid');
-const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
-const { detectSheetGrid, cropCells, labelCells, cellLabel, parseCellIdentification } = require('./sheetGrid');
+// The physical grid bound (one Grok slot, 1/n cell size) — no longer the
+// element budget, which is a prompt rule only since 2026-09-11.
+const { VB_SLOT_MAX_ELEMENTS } = require('./grok');
+const { detectSheetGrid, cropCells, labelCells, cellLabel, parseCellIdentification, rejectMultiPanelAssignments } = require('./sheetGrid');
 
 const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForImage(...args);
+
+/** byFunction bucket for the Visual Bible reference-sheet grid renders. */
+const REFERENCE_SHEET_USAGE_LABEL = 'vb_reference_sheet';
+
+/**
+ * Book one reference-sheet grid render into the running job's usage sink.
+ *
+ * These renders had NO accounting at all: on staging job_1789506283204_3kxqshifx
+ * `tokenUsage.grok` booked all 52 image calls (pages, covers, inpaint, 2x4
+ * sheets) and `gemini_image` booked 0, while the run's 4+ reference-sheet
+ * batches went through `callGeminiAPIForImage` here and appeared under no
+ * `byFunction` key whatsoever — paid renders invisible to every cost report.
+ *
+ * Provider is derived from the resolved model id exactly as the page and cover
+ * call sites do (storyJobPipeline.js / coverIterate.js), so a sheet rendered on
+ * Grok or Runware lands in that provider's bucket rather than always Gemini's.
+ * The sink is ambient (AsyncLocalStorage) because this module is reached
+ * without a `usageTracker` closure — the same route the cell gate below already
+ * uses for its text call. No-op outside a job (Test Lab, scripts, tests).
+ */
+function recordReferenceSheetUsage(result, label = REFERENCE_SHEET_USAGE_LABEL) {
+  if (!result?.usage) return;
+  const modelId = typeof result.modelId === 'string' ? result.modelId : '';
+  const provider = modelId.startsWith('runware:') ? 'runware'
+    : modelId.startsWith('grok-imagine') ? 'grok'
+      : 'gemini_image';
+  const { recordImageUsage } = require('./usageContext');
+  recordImageUsage(provider, result.usage, label, modelId || null);
+}
 
 /**
  * Ask the eval model which detected cell holds which requested element.
@@ -31,7 +63,7 @@ const callGeminiAPIForImage = (...args) => require('./images').callGeminiAPIForI
  *
  * @returns {Promise<{ map: Array<number|null>, missing: number[], unused: number[] }>}
  */
-async function identifySheetCells(buffer, cells, elements) {
+async function identifySheetCellsImpl(buffer, cells, elements) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
@@ -41,7 +73,7 @@ async function identifySheetCells(buffer, cells, elements) {
   const elementList = elements
     .map((e, i) => `${i + 1}. ${e.description || e.appearance || e.name || `element ${i + 1}`}`)
     .join('\n');
-  const prompt = fillTemplate(PROMPT_TEMPLATES.sheetCellIdentification, { ELEMENT_LIST: elementList });
+  const prompt = guardPromptString(fillTemplate(PROMPT_TEMPLATES.sheetCellIdentification, { ELEMENT_LIST: elementList }), 'identifySheetCellsImpl');
 
   const labelled = await labelCells(buffer, cells);
   const body = {
@@ -49,7 +81,7 @@ async function identifySheetCells(buffer, cells, elements) {
       { inlineData: { mimeType: 'image/png', data: labelled.toString('base64') } },
       { text: prompt },
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 1024, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
   };
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,
@@ -64,6 +96,191 @@ async function identifySheetCells(buffer, cells, elements) {
   }
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   return parseCellIdentification(raw, elements.length, cells.length);
+}
+
+/**
+ * The identification call, with ONE retry.
+ *
+ * The call is cheap (flash-lite, one image) and a single bad reply used to cost
+ * every element in the batch its reference — measured on staging
+ * job_1789348171785_9oxos7dwv, where the reply was valid JSON followed by prose
+ * and the catch below returned an all-null map. The tolerant parse in
+ * `parseCellIdentification` covers the shapes we have SEEN; the retry covers the
+ * ones we have not (a truncated reply, a transient HTTP error). Once only —
+ * a model that answers unusably twice will not answer usably on the third try.
+ *
+ * @param {Object|null} genLog current generation logger
+ * @param {Object} [deps] test seam: { identify }
+ */
+async function identifySheetCellsWithRetry(buffer, cells, elements, genLog = null, deps = {}) {
+  const identifySheetCells = deps.identify || identifySheetCellsImpl;
+  try {
+    return await identifySheetCells(buffer, cells, elements);
+  } catch (err) {
+    log.warn(`⚠️ [REF-SHEET] Cell identification failed (${err.message}) — retrying once`);
+    genLog?.warn('vb_sheet_identification_retry', `Cell identification failed (${err.message}) — retrying once`);
+    const retried = await identifySheetCells(buffer, cells, elements);
+    log.info(`✓ [REF-SHEET] Cell identification succeeded on the retry`);
+    genLog?.info('vb_sheet_identification_retry_ok', 'Cell identification succeeded on the retry');
+    return retried;
+  }
+}
+
+/**
+ * The grid shape a sheet of `count` elements is ASKED for — the single source
+ * of truth for the requested layout, the crop geometry and the cell/element
+ * mapping. Two sites used to compute `cols = count === 4 ? 2 : 1` separately
+ * (the prompt phrase and the sharp fallback); a helper keeps them from
+ * drifting, because a requested shape that disagrees with the crop geometry
+ * mis-crops every cell in silence.
+ *
+ * Until 2026-09-14 every count except 4 was requested as a single column, and
+ * image models routinely ignored it (five `vb_sheet_layout_mismatch` events
+ * across three stories on 2026-09-14: 9 cells drawn for 3, 1 for 2, 4 for 2).
+ * The shapes below are ones a model actually draws.
+ *
+ *   1 → one cell, no gridlines      4 → 2x2
+ *   2 → 2x2, both elements drawn    5-6 → 3 cols x 2 rows
+ *       twice (mirrored map)
+ *   3 → 2x2, element 0 drawn twice (top-left AND bottom-right)
+ *
+ * Count 2 was a 2 x 1 row until Test Lab 1268/1269: grok-imagine-image drew a
+ * 1x3 sheet on BOTH passes, and the recovery path then lost one reference on
+ * one pass and BOTH on the other. The same runs rendered the count-3 2x2
+ * exactly, twice. So count 2 asks for the shape the model demonstrably draws.
+ *
+ * A partial row is never left blank: a blank cell invites the model to fill it
+ * with an invented object or a stray duplicate (owner, 2026-09-14). The spare
+ * cells repeat element 0 instead — for a state batch that is `states[0]`, the
+ * unaltered look by construction (defaultObjectState in visualBible.js), i.e.
+ * the most load-bearing cell on the sheet, which therefore gets two shots.
+ *
+ * @param {number} count elements requested
+ * @returns {{cols:number, rows:number, cells:number, map:number[]}}
+ *          `map` is cell index -> element index, row-major, length `cells`.
+ */
+function referenceSheetLayout(count) {
+  const n = Math.max(1, Number(count) || 1);
+  let cols;
+  let rows;
+  if (n === 1) { cols = 1; rows = 1; }
+  else if (n <= 4) { cols = 2; rows = 2; }
+  else if (n <= 6) { cols = 3; rows = 2; }
+  else {
+    // Should not occur: buildReferenceSheetBatches caps a multi-element batch
+    // at 4, and a state batch is capped by the AD prompt at 4 states.
+    cols = 3;
+    rows = Math.ceil(n / 3);
+    log.error(`❌ [REF-SHEET] ${n} cells requested on one sheet — no layout is defined above six; falling back to ${cols}x${rows}`);
+  }
+  const cells = cols * rows;
+  // Row-major: the elements in order, then element 0 again in any spare cell.
+  // Count 2 is the deliberate exception (owner, 2026-09-14): its four cells are
+  // MIRRORED, [0, 1, 0, 1], not the generic [0, 1, 0, 0]. Two reasons, both of
+  // which someone will otherwise "simplify" away — (a) it is symmetric, so BOTH
+  // elements get a duplicate cell to fall back on when one crop is unusable,
+  // instead of only element 0; (b) the generic rule would ask the model to draw
+  // three identical cells out of four, a strange instruction that invites
+  // variation rather than repetition.
+  const map = n === 2
+    ? [0, 1, 0, 1]
+    : Array.from({ length: cells }, (_, i) => (i < n ? i : 0));
+  return { cols, rows, cells, map };
+}
+
+/**
+ * At most this many solo re-renders per sheet batch.
+ *
+ * An element that ends the split with no cell is re-rendered on its own rather
+ * than shipped without a reference (it would otherwise be re-invented on every
+ * page — the central prop of job_1789348171785_9oxos7dwv drew as a mottled
+ * stone, a glossy red egg, a speckled egg and, on one page, two eggs). Each
+ * re-render is a paid image call, so the count is bounded: a pathological sheet
+ * (identification mapping nothing at all) must not fire one call per element.
+ * Three covers every real case seen — batches are at most four cells and the
+ * measured losses were one or two elements — while capping the worst case at
+ * roughly one extra sheet's worth of spend.
+ */
+const MAX_SOLO_REFERENCE_RERENDERS = 3;
+
+/**
+ * Re-render, solo, every element the split left without a reference.
+ *
+ * `renderSolo([element])` is the EXISTING one-element path (it drops the
+ * gridline language — see buildReferenceSheetPrompt's count===1 branch), passed
+ * in so this is testable without an image model.
+ *
+ * Mutates `references` in place and returns what happened.
+ *
+ * @param {Array<string|null>} references cell-indexed, nulls are the losses
+ * @param {Array<Object>} batch the requested elements, same order
+ * @param {Function} renderSolo (cells) => Promise<Array<string>>
+ * @param {Object} [opts] { genLog, cap }
+ * @returns {Promise<{rerendered:number, recovered:string[], stillMissing:string[], cappedOut:string[]}>}
+ */
+async function fillMissingReferencesSolo(references, batch, renderSolo, opts = {}) {
+  const genLog = opts.genLog || null;
+  const cap = Number.isInteger(opts.cap) ? opts.cap : MAX_SOLO_REFERENCE_RERENDERS;
+  const nameOf = (i) => batch[i]?.name || `element ${i + 1}`;
+  const missing = [];
+  for (let i = 0; i < batch.length; i++) if (!references[i]) missing.push(i);
+  const out = { rerendered: 0, recovered: [], stillMissing: [], cappedOut: [] };
+  if (missing.length === 0) return out;
+
+  for (const i of missing) {
+    if (out.rerendered >= cap) {
+      out.cappedOut.push(nameOf(i));
+      continue;
+    }
+    out.rerendered++;
+    log.warn(`⚠️ [REF-SHEET] "${nameOf(i)}" came out of the sheet with no reference — re-rendering it solo`);
+    genLog?.warn('vb_sheet_solo_rerender', 'No cell on the sheet held this element — re-rendering it on its own', nameOf(i));
+    try {
+      const cells = await renderSolo([batch[i]]);
+      const cell = Array.isArray(cells) ? cells[0] : null;
+      if (!cell) throw new Error('solo re-render returned no cell');
+      references[i] = cell;
+      out.recovered.push(nameOf(i));
+      log.info(`✓ [REF-SHEET] Solo re-render recovered a reference for "${nameOf(i)}"`);
+      genLog?.info('vb_sheet_solo_rerender_ok', 'Solo re-render produced a reference', nameOf(i));
+    } catch (err) {
+      out.stillMissing.push(nameOf(i));
+      log.error(`❌ [REF-SHEET] Solo re-render failed for "${nameOf(i)}" (${err.message}) — it ships with NO reference image`);
+      genLog?.warn('vb_sheet_no_reference', `Solo re-render failed (${err.message}) — no reference image for this element`, nameOf(i));
+    }
+  }
+
+  if (out.cappedOut.length > 0) {
+    log.error(`❌ [REF-SHEET] Solo re-render cap (${cap}) reached — no reference image for: ${out.cappedOut.join(', ')}`);
+    genLog?.warn('vb_sheet_solo_rerender_capped', `Solo re-render cap of ${cap} reached — these elements ship with no reference: ${out.cappedOut.join(', ')}`);
+  }
+  return out;
+}
+
+/**
+ * How many panels each MAPPED crop really contains.
+ *
+ * Only crops an element was assigned to are measured (one detection per
+ * assigned cell, no model call). A crop whose own pixels show a grid is a
+ * merge of several drawn cells. Detection failure counts as one panel — the
+ * check may never invent a drop.
+ *
+ * @param {string[]} crops base64 crops, cell-indexed
+ * @param {Array<number|null>} map element index -> cell index
+ * @returns {Promise<number[]>} panels per cell index
+ */
+async function countPanelsPerCell(crops, map) {
+  const counts = new Array(crops.length).fill(1);
+  const assigned = [...new Set(map.filter(i => i !== null && i !== undefined))];
+  await Promise.all(assigned.map(async (idx) => {
+    try {
+      const sub = await detectSheetGrid(Buffer.from(crops[idx], 'base64'));
+      counts[idx] = sub.count;
+    } catch {
+      counts[idx] = 1;
+    }
+  }));
+  return counts;
 }
 
 /**
@@ -86,6 +303,30 @@ async function identifySheetCells(buffer, cells, elements) {
  *                for the identification call; without them a mismatch can only
  *                fall back to row-major order.
  */
+/**
+ * Cell-indexed crops -> element-indexed references, through the requested
+ * layout's cell map.
+ *
+ * The first usable crop for an element wins, so a repeated element takes its
+ * primary cell (top-left) and falls back to the duplicate only when that crop
+ * is missing. Length is always the element count: a repeat never adds an entry
+ * (`isStateBatch` tests `references.every(Boolean)` over exactly the batch).
+ *
+ * @param {Array<string|null>} crops row-major, cell-indexed
+ * @param {{map:number[]}} layout from referenceSheetLayout
+ * @param {number} count elements requested
+ * @returns {Array<string|null>} element-indexed, length `count`
+ */
+function referencesFromCells(crops, layout, count) {
+  const refs = new Array(count).fill(null);
+  for (let cell = 0; cell < layout.map.length; cell++) {
+    const el = layout.map[cell];
+    if (el >= count || refs[el]) continue;
+    refs[el] = crops[cell] || null;
+  }
+  return refs;
+}
+
 async function splitGridIntoReferences(gridImage, count, elements = null) {
   // Convert input to BOTH a Buffer (for sharp) and a base64 string
   // (for the Python call) so we don't pay the conversion twice.
@@ -99,24 +340,46 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
     base64 = buffer.toString('base64');
   }
 
+  // The shape the PROMPT asked for — which is not the element count when a
+  // partial row repeats element 0 (count 3 asks for four cells).
+  const layout = referenceSheetLayout(count);
+
   // ── Measure the real grid before trusting the requested count ──────────
   let grid = null;
   try {
     grid = await detectSheetGrid(buffer);
-    log.info(`[REF-SHEET] Grid detected from pixels: ${grid.cols}x${grid.rows} = ${grid.count} cell(s) (requested ${count}) — separators h=[${grid.separators.horizontal.join(',')}] v=[${grid.separators.vertical.join(',')}]`);
+    log.info(`[REF-SHEET] Grid detected from pixels: ${grid.cols}x${grid.rows} = ${grid.count} cell(s) (requested ${layout.cols}x${layout.rows} = ${layout.cells} for ${count} element(s)) — separators h=[${grid.separators.horizontal.join(',')}] v=[${grid.separators.vertical.join(',')}]`);
   } catch (err) {
     log.warn(`[REF-SHEET] Grid detection failed (${err.message}) — falling back to the requested-count split`);
   }
 
-  if (grid && grid.count !== count) {
-    log.warn(`⚠️ [REF-SHEET] Sheet layout mismatch: asked for ${count} cell(s), the model drew ${grid.count} (${grid.cols}x${grid.rows}). Cell order cannot be assumed — running one identification call.`);
+  if (grid && grid.count !== layout.cells) {
+    log.warn(`⚠️ [REF-SHEET] Sheet layout mismatch: asked for ${layout.cells} cell(s), the model drew ${grid.count} (${grid.cols}x${grid.rows}). Cell order cannot be assumed — running one identification call.`);
     const genLog = require('./generationLogger').getCurrentLogger();
-    genLog?.warn('vb_sheet_layout_mismatch', `Reference sheet drew ${grid.count} cells (${grid.cols}x${grid.rows}) for ${count} requested element(s)`);
+    genLog?.warn('vb_sheet_layout_mismatch', `Reference sheet drew ${grid.count} cells (${grid.cols}x${grid.rows}) for ${layout.cells} requested cell(s) / ${count} element(s)`);
+
+    if (grid.count < count) {
+      log.warn(`⚠️ [REF-SHEET] Fewer cells than elements — at least one detected cell must hold more than one element; every crop is checked for merged panels`);
+    }
 
     if (Array.isArray(elements) && elements.length === count) {
       try {
-        const { map, missing, unused } = await identifySheetCells(buffer, grid.cells, elements);
+        const identified = await identifySheetCellsWithRetry(buffer, grid.cells, elements, genLog);
         const crops = await cropCells(buffer, grid.cells);
+        // A detected "cell" that itself splits into panels is a merge of
+        // several drawn cells — cropping it hands one element a picture of
+        // several. Drop those assignments; no reference beats a wrong one.
+        const panelCounts = await countPanelsPerCell(crops, identified.map);
+        const { map: safeMap, dropped } = rejectMultiPanelAssignments(identified.map, panelCounts);
+        for (const d of dropped) {
+          log.error(`❌ [REF-SHEET] Cell ${cellLabel(d.cell)} holds ${d.panels} panels — "${elements[d.element]?.name || d.element + 1}" gets NO reference rather than a crop of several elements`);
+          genLog?.warn('vb_sheet_cell_multi_element', `Cell shows ${d.panels} panels, not one element — no reference stored`, elements[d.element]?.name || `element ${d.element + 1}`);
+        }
+        const map = safeMap;
+        const droppedElements = new Set(dropped.map(d => d.element));
+        const missing = [];
+        for (let i = 0; i < count; i++) if (map[i] === null && !droppedElements.has(i)) missing.push(i);
+        const unused = identified.unused;
         for (const i of missing) {
           log.error(`❌ [REF-SHEET] Element "${elements[i]?.name || i + 1}" has no cell on the sheet — no reference image for it`);
           genLog?.warn('vb_sheet_element_missing', `No cell on the reference sheet shows this element`, elements[i]?.name || `element ${i + 1}`);
@@ -127,8 +390,10 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
         log.info(`[REF-SHEET] Cell mapping: ${elements.map((e, i) => `${e.name} → ${map[i] === null ? 'NONE' : cellLabel(map[i])}`).join(', ')}`);
         return map.map(idx => (idx === null ? null : crops[idx]));
       } catch (err) {
-        log.error(`❌ [REF-SHEET] Cell identification failed (${err.message}) — no reference images for this batch`);
-        genLog?.warn('vb_sheet_identification_failed', `Cell identification failed: ${err.message}`);
+        // Twice unusable. The batch has no map, but no element is abandoned
+        // here: every null is picked up by fillMissingReferencesSolo below.
+        log.error(`❌ [REF-SHEET] Cell identification failed twice (${err.message}) — this batch falls back to solo re-renders`);
+        genLog?.warn('vb_sheet_identification_failed', `Cell identification failed twice: ${err.message}`);
         return new Array(count).fill(null);
       }
     }
@@ -136,10 +401,10 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
     return new Array(count).fill(null);
   }
 
-  if (grid && grid.count === count) {
+  if (grid && grid.count === layout.cells) {
     // Fast path: the model drew exactly what was asked for, so row-major
     // order is the prompt's order. Cut on the detected boundaries.
-    return cropCells(buffer, grid.cells);
+    return referencesFromCells(await cropCells(buffer, grid.cells), layout, count);
   }
 
   // Try Python service first — variance-based separator detection that
@@ -151,18 +416,20 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         image: `data:image/png;base64,${base64}`,
-        count,
+        count: layout.cells,
+        cols: layout.cols,
+        rows: layout.rows,
       }),
       signal: AbortSignal.timeout(10000),
     });
 
     if (response.ok) {
       const result = await response.json();
-      if (result.success && Array.isArray(result.cells) && result.cells.length === count) {
+      if (result.success && Array.isArray(result.cells) && result.cells.length === layout.cells) {
         log.info(`[REF-SHEET] Python split: ${result.layout.cols}x${result.layout.rows}, separators v=[${result.separators.vertical.join(',')}] h=[${result.separators.horizontal.join(',')}]`);
-        return result.cells;
+        return referencesFromCells(result.cells, layout, count);
       }
-      log.warn(`[REF-SHEET] Python split returned ${result.cells?.length ?? 'no'} cells (expected ${count}) — falling back to sharp`);
+      log.warn(`[REF-SHEET] Python split returned ${result.cells?.length ?? 'no'} cells (expected ${layout.cells}) — falling back to sharp`);
     } else {
       log.debug(`[REF-SHEET] Python service unavailable (${response.status}) — using sharp fallback`);
     }
@@ -179,16 +446,16 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
     throw new Error('Could not get grid image dimensions');
   }
 
-  // Calculate grid layout — match prompt logic: 2x2 only for exactly 4, otherwise single column
-  const cols = count === 4 ? 2 : 1;
-  const rows = count === 4 ? 2 : count;
+  // Grid layout — the SAME requested shape the prompt asked for (one helper,
+  // so the crop geometry can never disagree with what was requested).
+  const { cols, rows } = layout;
   const cellWidth = Math.floor(width / cols);
   const cellHeight = Math.floor(height / rows);
 
   log.debug(`[REF-SHEET] Sharp fallback: ${width}x${height} → ${cols}x${rows} cells (${cellWidth}x${cellHeight} each)`);
 
-  const references = [];
-  for (let i = 0; i < count; i++) {
+  const crops = [];
+  for (let i = 0; i < layout.cells; i++) {
     const col = i % cols;
     const row = Math.floor(i / cols);
 
@@ -203,15 +470,15 @@ async function splitGridIntoReferences(gridImage, count, elements = null) {
         .png()
         .toBuffer();
 
-      references.push(cropped.toString('base64'));
-      log.debug(`[REF-SHEET] Sharp extracted cell ${i + 1}/${count} (col=${col}, row=${row})`);
+      crops.push(cropped.toString('base64'));
+      log.debug(`[REF-SHEET] Sharp extracted cell ${i + 1}/${layout.cells} (col=${col}, row=${row})`);
     } catch (err) {
       log.error(`[REF-SHEET] Sharp failed to extract cell ${i}: ${err.message}`);
-      references.push(null);
+      crops.push(null);
     }
   }
 
-  return references;
+  return referencesFromCells(crops, layout, count);
 }
 
 /**
@@ -244,19 +511,119 @@ function characterAgeCue(el) {
 }
 
 /**
+ * The kind sentence: what the object IS, as plain prose in front of its
+ * description. The cell line used to be the description alone — the name and
+ * type were dropped on purpose after a labelled line ("Name (artifact) - …")
+ * got the name painted onto the object. Description-only then failed the other
+ * way on job_1789078732136_622wecmhj: "an oval, slightly convex scale…" with no
+ * noun in sight rendered as a ceramic dish, twice. So the noun goes back in,
+ * but as a sentence (owner, 2026-09-11) — never a heading, a bold line or a
+ * quoted title, which is what invites lettering.
+ *
+ * Characters keep their own line: `build` already opens with the noun and the
+ * age cue follows. A state cell uses `displayName` (the parent's name); its
+ * identification-only name carries the state suffix.
+ *
+ * @param {Object} el
+ * @returns {string} '' or a sentence ending in ': ' ready to prefix the description
+ */
+function elementKindSentence(el) {
+  if (!el || el.type === 'character') return '';
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const clean = (v) => String(v || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.\s]+$/, '').trim();
+  // ONE authored English label per element (vbLabel.labelOf) — the same string
+  // the page prompt's REQUIRED OBJECTS lead and the detector use.
+  const name = clean(el.displayName || elementDisplayLabel(el));
+  // The bible's free-text type ("single reptile scale") arrives as `kind`
+  // (getElementsNeedingReferenceImages stamps the pool onto `type`); a bare
+  // entry may still carry it on `type`, and a pool label is never a kind.
+  const rawType = clean(el.kind || el.type);
+  const type = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : '';
+  if (!name && !type) return '';
+  // "the small dragon scale" / "the Windchopf sign" / "Julian's ball" /
+  // "Nordwind" — a possessive or a one-word proper name is already definite.
+  const definite = /['\u2019]s\b/.test(name) || (/^[A-Z\u00C0-\u00DE]/.test(name) && !/\s/.test(name));
+  const nameClause = name ? (definite ? name : `the ${name}`) : '';
+  const typeClause = type && type.toLowerCase() !== name.toLowerCase() ? `${article(type)} ${type}` : '';
+  const what = [nameClause, typeClause].filter(Boolean).join(', ');
+  return `This is ${what}: `;
+}
+
+// The pool labels getElementsNeedingReferenceImages stamps as `type` when an
+// entry has no free-text type of its own.
+const POOL_LABELS = new Set(['artifact', 'vehicle', 'animal', 'location', 'clothing']);
+const article = (noun) => (/^[aeiou]/i.test(String(noun || '')) ? 'an' : 'a');
+
+/**
+ * The lettering sentence for an element whose bible entry carries `text` —
+ * words that must be READABLE in the picture (a sign, a plaque, a banner). The
+ * words are quoted inside a sentence; the cell renders solo on the
+ * typography-aware tier (MODEL_DEFAULTS.vbTextCellModel).
+ *
+ * @param {Object} el
+ * @returns {string} '' or a leading-space sentence
+ */
+function elementTextSentence(el) {
+  const text = String((el && el.text) || '').trim();
+  if (!text) return '';
+  return ` It carries the words "${text}" in clear, legible lettering, spelled exactly like that.`;
+}
+
+/**
+ * One cell's prose: kind sentence + description (+ lettering sentence).
+ * @param {Object} el
+ * @returns {string}
+ */
+function elementCellText(el) {
+  const desc = String(el.extractedDescription || el.description || '').trim();
+  const textSentence = elementTextSentence(el);
+  // The description rarely ends in a full stop; the text sentence needs one.
+  const stop = textSentence && desc && !/[.!?]$/.test(desc) ? '.' : '';
+  return `${elementKindSentence(el)}${desc}${stop}${textSentence}`;
+}
+
+// Words, never digits: a literal "2x2" in the prompt used to get painted onto
+// the rendered sheet as a label.
+const numWord = (n) => ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][n] || String(n);
+
+/**
+ * The plain-English name of one cell in a cols x rows grid, row-major —
+ * "Top-left", "Top-centre", "Bottom-right", "Left", "Right". The names are
+ * what tie a LAYOUT line to a place on the sheet, and the same row-major order
+ * is what the crop geometry uses.
+ *
+ * @param {number} i cell index, row-major
+ * @param {number} cols
+ * @param {number} rows
+ * @returns {string}
+ */
+function cellPositionName(i, cols, rows) {
+  const rowWords = rows === 1 ? [''] : rows === 2 ? ['Top', 'Bottom'] : ['Top', 'Middle', 'Bottom'];
+  const colWords = cols === 1 ? [''] : cols === 2 ? ['left', 'right'] : ['left', 'centre', 'right'];
+  const row = rowWords[Math.floor(i / cols)];
+  const col = colWords[i % cols];
+  // More rows or columns than there are words for (only the >6 fallback).
+  if (row === undefined || col === undefined) return `Cell ${numWord(i + 1)}`;
+  if (row && col) return `${row}-${col}`;
+  if (row) return row;
+  if (col) return col.charAt(0).toUpperCase() + col.slice(1);
+  return `Cell ${numWord(i + 1)}`;
+}
+
+/**
  * Build reference sheet prompt for a batch of elements
  *
  * @param {Array} elements - Elements to include (from getElementsNeedingReferenceImages)
  * @param {string} styleDescription - Art style description
  * @returns {string} Complete prompt for reference sheet generation
  */
-function buildReferenceSheetPrompt(elements, styleDescription, visualBible = null) {
+function buildReferenceSheetPrompt(elements, styleDescription, visualBible = null, gateReason = null) {
   const count = elements.length;
-  // Only use 2x2 for exactly 4 elements. Everything else uses a single column
-  // to avoid partial rows (e.g. 3 elements in a 2x2 leaves an empty cell that
-  // confuses image models and grid splitters).
-  const cols = count === 4 ? 2 : 1;
-  const rows = count === 4 ? 2 : count;
+  // The requested shape and the crop geometry come from ONE helper — see
+  // referenceSheetLayout for the table and why a partial row repeats element 0
+  // rather than being left blank.
+  const layout = referenceSheetLayout(count);
+  const { cols, rows } = layout;
 
   // Build grid layout description.
   // We deliberately omit el.name from the per-cell line. The model treats
@@ -267,10 +634,10 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   // Pure visual prose — no labels, no IDs — keeps the cell intent clear to
   // the model without giving it strings to render. Splitter still works on
   // the grid borders.
-  const positions2x2 = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
-  const gridLayoutLines = elements.map((el, i) => {
-    const pos = cols === 2 ? (positions2x2[i] || `Cell ${i + 1}`) : `Row ${i + 1}`;
-    const desc = (el.extractedDescription || el.description) + characterAgeCue(el);
+  const gridLayoutLines = layout.map.map((elIdx, cellIdx) => {
+    const el = elements[elIdx];
+    const pos = cellPositionName(cellIdx, cols, rows);
+    const desc = elementCellText(el) + characterAgeCue(el);
     // A reference image carries POSE, not just appearance: reference-conditioned
     // models reproduce a referenced object's exact appearance AND pose whatever
     // the instruction says (OminiControl arXiv:2411.15098; leakage/shortcut in
@@ -290,21 +657,31 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     // and also put the orientation into the page prompt.
     // A solo call has no position to name — a bare "Row 1:" prefix is a stringy
     // label on an image with nothing to index.
-    return count === 1 ? desc : `${pos}: ${desc}`;
+    if (count === 1) return desc;
+    // A spare cell repeats an element already named above. Say so, naming the
+    // cell it repeats — which is NOT always the top-left (count 2 mirrors, so
+    // the bottom-right repeats the top-right). A cell the model cannot place is
+    // a cell it invents something for.
+    const firstCell = layout.map.indexOf(elIdx);
+    if (cellIdx > firstCell) {
+      return `${pos}: the same element as ${cellPositionName(firstCell, cols, rows)}, drawn a second time, identical in every detail: ${desc}`;
+    }
+    return `${pos}: ${desc}`;
   });
 
   // Describe the grid in natural language. Passing literal digit-strings like
   // "2x2" used to bake "2x2" onto the rendered image (the model treated it as
   // a label). Use words for the count and an explicit row/column phrase so the
   // model never sees a stringy template token to copy.
-  const numWord = (n) => ['', 'one', 'two', 'three', 'four', 'five', 'six'][n] || String(n);
   const gridShapePhrase = count === 1
     ? 'single full-frame illustration with no grid and no dividing lines'
-    : (cols === 2 && rows === 2)
-      ? 'square grid with two rows and two columns (four cells total)'
-      : (cols === 1)
-        ? `single vertical column with ${numWord(rows)} cell${rows === 1 ? '' : 's'} stacked top-to-bottom`
-        : `${numWord(rows)}-row by ${numWord(cols)}-column grid`;
+    : (cols === 2 && rows === 1)
+      // No count asks for this shape since 2026-09-14; kept so a future table
+      // entry that does still gets a phrase rather than the generic fallback.
+      ? 'single horizontal row of two cells side by side'
+      : (cols === 2 && rows === 2)
+        ? 'square grid with two rows and two columns (four cells total)'
+        : `grid with ${numWord(rows)} rows and ${numWord(cols)} columns (${numWord(cols * rows)} cells total)`;
 
   // A ONE-element call must not ask for gridlines. The template is written for
   // a sheet — "cells separated by thick black gridlines", three times over —
@@ -337,15 +714,37 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
     ? '\n- Each cell shows only its own element, never anything described for another cell, and no lettering or readable words anywhere'
     : '';
 
+  // A solo cell whose entry carries `text` is the one place lettering is
+  // wanted; every other sheet keeps the blanket ban.
+  const textCell = count === 1 && String(elements[0]?.text || '').trim();
+  const textRule = textCell
+    ? '- The only lettering anywhere in the image is the quoted words, spelled exactly as given — no other letters, labels, captions or numbers'
+    : '- Every cell is purely visual — only illustrations, only drawings. Zero text, zero labels, zero letters, zero captions, zero numbers, zero grid coordinates anywhere in the image.';
+
+  // A re-render after a failed gate is told WHAT failed. Without it the second
+  // render reproduces the first verdict word for word (staging
+  // job_1789147573901_m3uam0nxi: two entries failed twice with an identical
+  // reason). The text is the judge's own sentence at runtime — quoted, never
+  // interpreted here. Carries its own leading newline so the empty case leaves
+  // no gap.
+  const reason = String(gateReason || '').trim();
+  const retryNote = reason
+    ? `
+
+**PREVIOUS ATTEMPT REJECTED:** ${reason}
+Fix exactly that; everything else stays as described above.`
+    : '';
+
   const prompt = fillTemplate(PROMPT_TEMPLATES.referenceSheet, {
     STYLE_DESCRIPTION: styleDescription,
     GRID_SHAPE_PHRASE: gridShapePhrase,
     GRID_LAYOUT: gridLayoutLines.join('\n'),
+    TEXT_RULE: textRule,
     BATCH_GUARD: batchGuard,
     GRID_SEPARATION: gridSeparation,
     CELL_LAYOUT_REQ: cellLayoutReq,
     CLOSING: closing,
-  });
+  }) + retryNote;
 
   // VB descriptions cross-reference each other by id ("shimmer matching
   // ART001"), and those ids land in the cell line verbatim. An unsanitized id
@@ -365,6 +764,47 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
   return sanitised;
 }
 
+/**
+ * The one question the character-cell gate asks. Pure, so it can be tested.
+ *
+ * (1) skin colour and (2) art style are the original gate (owner, 2026-08-31).
+ * (3) apparent age joined when a secondary character carried a numeric age.
+ * (4) sex joined 2026-09-10 (owner): the bible opens every secondary
+ * character's `build` with the sex ("a woman, wiry and angular"), the sheet
+ * renderer read that one word against a wall of other cues and drew a man,
+ * and nothing downstream could catch it — every later identity check compares
+ * the page to THIS cell, so a wrong cell is agreed with on every page. The
+ * `build` field is quoted verbatim; the model does the comparing. No prose is
+ * parsed in code.
+ *
+ * (1) became a single rule against the quoted `description` (2026-09-11,
+ * owner): the description IS the specification, so the cell is judged against
+ * it and nothing else — a description stating fair skin already catches a
+ * green-tinted figure, and a character that is not human is no longer failed
+ * for being the material its description states. With no description there is
+ * no specification, so (1) says so and checks nothing; the numbering of the
+ * later checks stays fixed either way.
+ *
+ * @param {string} styleDescription - the book's declared art style
+ * @param {number|string|null} age - the character's stated age, if any
+ * @param {string|null} build - the bible's `build` field, which opens with the sex
+ * @param {string|null} description - the bible's `description` field, quoted verbatim
+ * @returns {string}
+ */
+function cellGatePrompt(styleDescription = '', age = null, build = null, description = null) {
+  const ageClause = age ? ` (3) Apparent age: does the figure look about ${age}? A visibly older or younger rendering fails.` : '';
+  const buildText = String(build || '').trim();
+  const sexClause = buildText
+    ? ` (${age ? 4 : 3}) Sex: the character is described as "${buildText}". Does the figure read as the sex that description states? A figure that reads as the other sex fails, whatever else is right.`
+    : '';
+  const descText = String(description || '').trim();
+  const descClause = descText ? ` The character is described as: "${descText}".` : '';
+  const colourClause = descText
+    ? `(1) Colouring: do the figure's colouring and material match what the description states?`
+    : `(1) Colouring: no description was given, so nothing is checked here.`;
+  return `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}".${descClause} Judge strictly: ${colourClause} (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause}${sexClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
+}
+
 // ── Character-cell render gate ──────────────────────────────────────────────
 // VB reference cells are generated with the quality evaluator deliberately
 // skipped (avatar path in images.js), yet each CHARACTER cell then feeds every
@@ -374,22 +814,37 @@ function buildReferenceSheetPrompt(elements, styleDescription, visualBible = nul
 // cheapest vision-capable TEXT_MODELS entry, one re-render on NO, then accept
 // whatever came back. No scores, no thresholds, no loops; fail-open on any API
 // error — the gate may never block a story.
-async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null) {
+async function checkCharacterCellRender(cellBase64, styleDescription = '', age = null, build = null, description = null) {
+  // The style anchor is load-bearing: without it flash-lite judged the known-bad
+  // green-skinned comic cell "natural" (validated 2026-08-31 against the stored
+  // job_1788123310558 cell — NO with the anchor, YES without).
+  const parsed = await askCellGate([cellBase64], cellGatePrompt(styleDescription, age, build, description));
+  return { natural: parsed.natural !== false, reason: String(parsed.reason || '') };
+}
+
+/**
+ * The one call every cell gate makes: N cell images + one question to the
+ * cheapest vision-capable TEXT_MODELS entry, JSON back. Throws on any API
+ * error; callers fail open.
+ *
+ * @param {string[]} cellsBase64
+ * @param {string} prompt
+ * @returns {Promise<Object>} the parsed JSON reply
+ */
+async function askCellGate(cellsBase64, prompt) {
+  prompt = guardPromptString(prompt, 'askCellGate');
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   const { TEXT_MODELS } = require('../config/models');
   const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
-  // The style anchor is load-bearing: without it flash-lite judged the known-bad
-  // green-skinned comic cell "natural" (validated 2026-08-31 against the stored
-  // job_1788123310558 cell — NO with the anchor, YES without).
-  const ageClause = age ? ` (3) Apparent age: does the figure look about ${age}? A visibly older or younger rendering fails.` : '';
-  const prompt = `You are checking one cell cut from a character reference sheet for an illustrated children's book. The book's declared art style: "${styleDescription}". Judge strictly: (1) Is the figure's skin a plausible human skin color — not green-, gray- or blue-tinted? (2) Is the cell actually rendered in the declared art style, not a different one (for example flat comic-book or graphic-novel shading when the declared style is painterly watercolor)?${ageClause} If any check fails, natural is false. Reply as JSON: {"natural": true or false, "reason": "one short sentence"}`;
   const body = {
     contents: [{ parts: [
-      { inlineData: { mimeType: 'image/png', data: cellBase64 } },
+      // Stored VB cells are JPEG (R2), fresh cuts are PNG; Gemini returns 400
+      // on a mismatched mimeType, so sniff the magic bytes.
+      ...cellsBase64.map(data => ({ inlineData: { mimeType: data.startsWith('/9j/') ? 'image/jpeg' : 'image/png', data } })),
       { text: prompt },
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 256, responseMimeType: 'application/json' },
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
   };
   const resp = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,
@@ -405,12 +860,101 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
   const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
   // flash-lite occasionally emits two JSON objects back-to-back despite
   // responseMimeType — strict parse first, then the first {…} span.
-  let parsed;
-  try { parsed = JSON.parse(raw); } catch {
+  try { return JSON.parse(raw); } catch {
     const m = raw.match(/\{[\s\S]*?\}/);
-    parsed = JSON.parse(m ? m[0] : raw);
+    return JSON.parse(m ? m[0] : raw);
   }
-  return { natural: parsed.natural !== false, reason: String(parsed.reason || '') };
+}
+
+// ── Element-cell render gate ────────────────────────────────────────────────
+// Same shape as the character gate, for every non-character cell (owner,
+// 2026-09-11, after the dish): one question, one re-render on NO, accept
+// afterwards, fail-open. The classification lives in the question; code only
+// decides the one re-render.
+
+/**
+ * The element-cell question. Pure, so it can be tested.
+ * @param {Object} el - the cell element
+ * @param {string} styleDescription
+ * @returns {string}
+ */
+function elementCellGatePrompt(el, styleDescription = '') {
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const rawType = String(el?.kind || el?.type || '').trim();
+  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : (String(el?.displayName || '').trim() || elementDisplayLabel(el));
+  const desc = String(el?.description || '').trim();
+  const text = String(el?.text || '').trim();
+  const textClause = text ? ` (4) Lettering: the words "${text}" are readable and spelled exactly so; any other lettering fails.` : '';
+  return `You are checking one cell cut from a reference sheet for an illustrated children's book. The cell is meant to show ${article(kind)} ${kind}, described as: "${desc}". The book's declared art style: "${styleDescription}". Judge strictly: (1) Kind: does the depicted thing read as ${article(kind)} ${kind} — not a different kind of object that merely shares its shape, colour or size? (2) Match: do its material, colour and main parts follow the description? (3) Style: is it rendered in the declared art style?${textClause} If any check fails, ok is false. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+}
+
+/**
+ * The state-consistency question for an object rendered in several states.
+ * Pure, so it can be tested.
+ * @param {Object} parent - the bible entry (name/type/description)
+ * @param {Array<Object>} cells - the state cells in image order (stateName, delta)
+ * @returns {string}
+ */
+function stateCellsGatePrompt(parent, cells) {
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const { stateLabelOf } = require('./vbLabel');
+  const rawType = String(parent?.kind || parent?.type || '').trim();
+  const kind = rawType && !POOL_LABELS.has(rawType.toLowerCase()) ? rawType : (String(parent?.build || '').trim() || elementDisplayLabel(parent));
+  const desc = String(parent?.description || '').trim();
+  const list = cells.map((c, i) => `${i + 1}. ${c.stateName || stateLabelOf(parent, c)}: ${c.delta || ''}`.trim()).join(' ');
+  return `You are checking ${cells.length} cells cut from a reference sheet for an illustrated children's book. They are meant to show ONE object, ${article(kind)} ${kind}, described as: "${desc}", in ${cells.length} states, in this order: ${list} Judge strictly: is it the same object in every cell — same shape, build, material and colour — differing only in the named state? Two different objects, or a change that is not the one named, fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence"}`;
+}
+
+async function checkElementCellRender(cellBase64, el, styleDescription = '') {
+  const parsed = await askCellGate([cellBase64], elementCellGatePrompt(el, styleDescription));
+  return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
+}
+
+async function checkStateCellsConsistency(cellsBase64, parent, cells) {
+  const parsed = await askCellGate(cellsBase64, stateCellsGatePrompt(parent, cells));
+  return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
+}
+
+/**
+ * Both questions for a batch of state cells.
+ *
+ * A state batch used to be asked ONLY whether its cells agree with each other,
+ * so an entry with `states[]` was never asked whether it depicts the object its
+ * description describes. Measured on staging job_1789147573901_m3uam0nxi:
+ * ART001 "Levin's Velolampe" — described as a compact rectangular bicycle lamp
+ * with a handlebar bracket — rendered as a broadcast/CCTV camera body in both
+ * state cells, and the stored verdict was a PASS reading "State cells pass: The
+ * object is consistent in shape, color, and material, with the only difference
+ * being the state of the lamp being off or lit." Accurate about consistency,
+ * blind to the object being wrong; all five pages holding that reference
+ * reproduced the camera. Stateful entries are by definition the props the story
+ * changes, i.e. the most plot-critical objects in the book.
+ *
+ * So both questions are asked. IDENTITY is per-object, not per-cell: it is
+ * asked once, of the FIRST cell (the bible lists the unaltered look first) with
+ * the parent's base description, because asking it of every state multiplies
+ * cost for no information. A check that ERRORS stays unchecked (fail-open,
+ * unchanged); a check that answers NO fails the batch.
+ *
+ * @param {Array<string>} cellsBase64 - state cells in image order
+ * @param {Object} parent - the bible entry (name/kind/description/text)
+ * @param {Array<Object>} cells - the state cells (stateName, delta)
+ * @param {string} styleDescription
+ * @param {Object} [deps] - test seam: {checkIdentity, checkConsistency}
+ * @returns {Promise<{ok:boolean, reason:string, identity:Object|null, consistency:Object|null}>}
+ */
+async function checkStateBatch(cellsBase64, parent, cells, styleDescription = '', deps = {}) {
+  const askIdentity = deps.checkIdentity || checkElementCellRender;
+  const askConsistency = deps.checkConsistency || checkStateCellsConsistency;
+  const settle = (p) => p.then(v => v, () => null);
+  const [identity, consistency] = await Promise.all([
+    settle(Promise.resolve().then(() => askIdentity(cellsBase64[0], parent, styleDescription))),
+    settle(Promise.resolve().then(() => askConsistency(cellsBase64, parent, cells))),
+  ]);
+  const failed = [];
+  if (identity && !identity.ok) failed.push(`object identity: ${identity.reason}`);
+  if (consistency && !consistency.ok) failed.push(`state consistency: ${consistency.reason}`);
+  return { ok: failed.length === 0, reason: failed.join(' | '), identity, consistency };
 }
 
 /**
@@ -465,13 +1009,42 @@ async function checkCharacterCellRender(cellBase64, styleDescription = '', age =
  */
 function expandElementStateCells(el) {
   const { objectStates } = require('./visualBible');
+  const { stateLabelOf } = require('./vbLabel');
+  const { baseVbId, elementDisplayLabel } = require('./vbIdGuard');
   const states = objectStates(el);
   if (states.length === 0) return [el];
+  // A state row with no dotted id mints a cell with `id: undefined`: the grid
+  // renders, and every write-back and page lookup keyed on that id then finds
+  // nothing, so the paid sheet is discarded in silence. That shipped
+  // (job_1788763045123_z8so79ngb — the live parse path never normalised
+  // states). Ids come from `normaliseObjectStates` at parse time; backfill
+  // them here for a bible stored before that fix, and say so loudly.
+  const parent = baseVbId(el.id);
+  const missing = states.filter(st => !st.id);
+  if (missing.length > 0 && parent) {
+    log.error(`[REF-SHEET] "${el.name}" (${parent}) has ${missing.length} state(s) with no id — `
+      + 'backfilling dotted ids so the rendered cells can be written back');
+    states.forEach((st, i) => { if (!st.id) st.id = `${parent}.${i + 1}`; });
+  }
   const baseDesc = String(el.extractedDescription || el.description || '').trim().replace(/[.;\s]+$/, '');
+  // A state batch bypasses maxPerBatch by construction (all states of one
+  // object render in one call), and the AD prompt asks for at most four states
+  // — but nothing enforces that, so an over-authored entry silently produces a
+  // 5- or 6-cell sheet. Since 2026-09-14 that lays out as a 3x2 rather than a
+  // 1x5 column, so it is handled, not catastrophic; it is still worth seeing.
+  // NOT clamped: dropping an authored state would silently lose data the story
+  // then cites on a page.
+  if (states.length > 4) {
+    log.warn(`⚠️ [REF-SHEET] "${el.name}" authors ${states.length} states — more than the four the sheet asks for; all of them render, on a wider grid`);
+    require('./generationLogger').getCurrentLogger()?.warn(
+      'vb_sheet_state_overflow',
+      `Object authors ${states.length} states (more than four) — every state still renders, on a wider grid`,
+      el.name,
+    );
+  }
   // The STATES ARE THE PICTURES. No separate base cell: the unaltered look is
   // itself one of the states (the first), so minting a base cell would render
-  // the default twice and push a 4-state object to 5 cells — and 5 cells lay
-  // out as a 1x5 column of narrow, low-detail references instead of a 2x2.
+  // the default twice and push a 4-state object to 5 cells.
   return [
     ...states.map(s => ({
       ...el,
@@ -480,6 +1053,13 @@ function expandElementStateCells(el) {
       // by name when the model draws a different grid than asked for, and
       // every cell of one object would otherwise carry the same name.
       name: `${el.name} — ${s.name}`,
+      // The image-facing strings: ONE authored English label per element
+      // (vbLabel), the state cell carrying "label, state".
+      label: stateLabelOf(el, s),
+      displayName: elementDisplayLabel(el),
+      baseDescription: baseDesc,
+      stateName: s.name,
+      delta: s.delta,
       description: `${baseDesc}, ${s.delta}`,
       extractedDescription: null,
       states: [],
@@ -516,6 +1096,10 @@ function assertStateCellsCoLocated(batches) {
   }
 }
 
+// `needsReference` comes from `getElementsNeedingReferenceImages`, which walks the
+// VB collection arrays. A generic entry never entered one (it lives in
+// `visualBible.genericObjects[]` with no id), so it can never reach a paid render
+// here — which is the whole point of the generic gate (owner, 2026-09-15).
 function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4) {
   const { vbDeclaredLetteringNames } = require('./promptBuilders');
   const letteringNames = vbDeclaredLetteringNames(visualBible);
@@ -535,7 +1119,9 @@ function buildReferenceSheetBatches(needsReference, visualBible, maxPerBatch = 4
     // grid, base plus every state, so the states cannot disagree. It also
     // keeps the object to one element in every downstream budget, because
     // every cell resolves to the same parent id.
-    if (cells.length > 1 || (name && letteringNames.has(name))) { solo.push(cells); continue; }
+    // An entry with `text` (readable words) renders solo too: its lettering
+    // must land on itself only, and it goes to the typography-aware tier.
+    if (cells.length > 1 || (name && letteringNames.has(name)) || String(el.text || '').trim()) { solo.push(cells); continue; }
     (el.type === 'character' ? batchableChars : batchableOther).push(el);
   }
 
@@ -669,6 +1255,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   let generated = 0;
   let failed = 0;
   const processedElements = [];
+  // Every gate verdict of this run (also written onto the bible entries).
+  const cellGates = [];
 
   // Batch elements into grids — balanced, with declared-lettering elements
   // quarantined into solo calls (see buildReferenceSheetBatches).
@@ -705,10 +1293,18 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // behaviour for one-shot reference grids) — only the aspect changes.
       const isCharacterBatch = batch[0]?.type === 'character';
       const batchAspectOverride = isCharacterBatch ? null : elementAspect;
+      // A solo cell whose entry carries `text` renders on the typography-aware
+      // tier; every other batch keeps the caller's model.
+      const textCell = batch.length === 1 && String(batch[0].text || '').trim();
+      const batchModel = textCell ? require('../config/models').MODEL_DEFAULTS.vbTextCellModel : imageModelOverride;
+      if (textCell) log.info(`[REF-SHEET] ✍️ "${batch[0].name}" carries readable text "${textCell}" — rendering on ${batchModel}`);
       const result = await callGeminiAPIForImage(
-        prompt, [], null, 'avatar', null, imageModelOverride, null, '',
+        prompt, [], null, 'avatar', null, batchModel, null, '',
         null, [], 0, null, null, null, null, batchAspectOverride
       );
+      // Booked before the empty-image check: a render that came back without an
+      // image was still paid for.
+      recordReferenceSheetUsage(result);
 
       if (!result || !result.imageData) {
         throw new Error('Image generation did not return an image');
@@ -730,42 +1326,128 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // Split grid into individual references
       const references = await splitGridIntoReferences(gridImageData, batch.length, batch);
 
-      // Gate CHARACTER cells only (not artifacts/locations/animals) — see
-      // checkCharacterCellRender above. One check, one re-render on NO, one
-      // re-check for the log, then accept whatever came back.
+      // Cell gates — one question, one re-render on NO, one re-check for the
+      // record, then accept whatever came back (fail-open on any API error).
+      //   character cell  → checkCharacterCellRender (skin/style/age/sex)
+      //   other single    → checkElementCellRender (kind/match/style[/text])
+      //   state batch     → checkStateCellsConsistency on the whole batch
       const genLog = require('./generationLogger').getCurrentLogger();
-      for (let i = 0; i < batch.length; i++) {
+      const { recordElementCellGate } = require('./visualBible');
+      const rerenderSolo = async (cells, gateReason = null) => {
+        const rePrompt = buildReferenceSheetPrompt(cells, styleDescription, visualBible, gateReason);
+        const reResult = await callGeminiAPIForImage(rePrompt, [], null, 'avatar', null, batchModel, null, '', null, [], 0, null, null, null, null, batchAspectOverride);
+        // Its own bucket: a gate/solo re-render is a SECOND paid render of the
+        // same cells, and folding it into the batch label hides how often the
+        // cell gates and the missing-reference salvage pay for a redo.
+        recordReferenceSheetUsage(reResult, `${REFERENCE_SHEET_USAGE_LABEL}_rerender`);
+        if (!reResult?.imageData) throw new Error('re-render returned no image');
+        const reCells = await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), cells.length, cells);
+        if (reCells.length !== cells.length || reCells.some(c => !c)) throw new Error('re-rendered cell extraction failed');
+        return reCells;
+      };
+
+      // NEVER ship an element with no reference. A null here means the split
+      // could not give this element a cell (identification failed, or its cell
+      // held several panels and was rejected). Without a reference the image
+      // model re-invents the element on every page: the central prop of staging
+      // job_1789348171785_9oxos7dwv drew as a mottled stone, a glossy red egg,
+      // a speckled egg, and twice over on one page. Bounded — see
+      // MAX_SOLO_REFERENCE_RERENDERS.
+      await fillMissingReferencesSolo(references, batch, rerenderSolo, { genLog });
+
+      const record = (element, verdict) => {
+        cellGates.push({ id: element.id, name: element.name, ...verdict });
+        recordElementCellGate(visualBible, element.id, verdict);
+      };
+      const isStateBatch = batch.length > 1 && batch.every(c => c.stateName) && references.every(Boolean);
+
+      if (isStateBatch) {
+        // Every cell is one object; the question is asked of the set.
+        const parent = { ...batch[0], name: batch[0].displayName, description: batch[0].baseDescription };
+        // BOTH questions: is this the described object at all (identity, asked
+        // once of the first/unaltered cell), and do the states agree with each
+        // other. See checkStateBatch.
+        const verdict = await checkStateBatch(references, parent, batch, styleDescription);
+        // Each question keeps its own gate record, so a pass on one and a fail
+        // on the other is never stored as a pass.
+        const recordBoth = (rerendered, recheck) => {
+          const pairs = [['element_cell', 'identity'], ['state_cells', 'consistency']];
+          for (const [gate, key] of pairs) {
+            const v = verdict[key];
+            if (!v) continue; // errored → unchecked, as before
+            const re = recheck ? recheck[key] : null;
+            record(batch[0], {
+              gate, ok: v.ok, reason: v.reason, rerendered,
+              ...(rerendered ? { recheckOk: re ? re.ok : null, recheckReason: re?.reason || null } : {}),
+            });
+          }
+        };
+        if (!verdict.identity && !verdict.consistency) {
+          log.warn(`⚠️ [REF-SHEET] State-cell gates errored for "${parent.name}" — accepting cells unchecked`);
+        } else if (verdict.ok) {
+          genLog?.info('vb_state_cells_gate', `State cells pass: ${verdict.reason || [verdict.identity?.reason, verdict.consistency?.reason].filter(Boolean).join(' | ')}`, parent.name);
+          recordBoth(false, null);
+        } else {
+          log.warn(`⚠️ [REF-SHEET] State cells for "${parent.name}" failed gate: ${verdict.reason} — re-rendering once`);
+          genLog?.warn('vb_state_cells_rerender', `VB state cells failed gate: ${verdict.reason}`, parent.name);
+          let recheck = null;
+          try {
+            // The re-render carries the failing reason — identity or
+            // consistency, whichever answered NO.
+            const reCells = await rerenderSolo(batch, verdict.reason);
+            for (let i = 0; i < batch.length; i++) references[i] = reCells[i];
+            recheck = await checkStateBatch(references, parent, batch, styleDescription);
+            if (!recheck.ok) {
+              // Fail-open, unchanged (owner, 2026-09-11): a cell that fails
+              // twice still ships.
+              log.warn(`⚠️ [REF-SHEET] Re-rendered state cells for "${parent.name}" still fail gate (${recheck.reason}) — accepting anyway`);
+              genLog?.warn('vb_state_cells_still_bad', `Re-rendered state cells still fail gate (${recheck.reason}) — accepted anyway`, parent.name);
+            } else {
+              log.info(`✓ [REF-SHEET] Re-rendered state cells for "${parent.name}" pass gate`);
+            }
+          } catch (err) {
+            log.warn(`⚠️ [REF-SHEET] Re-render failed for "${parent.name}" (${err.message}) — keeping original cells`);
+          }
+          recordBoth(true, recheck);
+        }
+      }
+
+      for (let i = 0; i < batch.length && !isStateBatch; i++) {
         const element = batch[i];
-        if (element.type !== 'character' || !references[i]) continue;
+        if (!references[i]) continue;
+        const isChar = element.type === 'character';
+        const ask = (cell) => isChar
+          ? checkCharacterCellRender(cell, styleDescription, element.age || null, element.build || null, element.extractedDescription || element.description || null).then(v => ({ ok: v.natural, reason: v.reason }))
+          : checkElementCellRender(cell, element, styleDescription);
+        const gateName = isChar ? 'character_cell' : 'element_cell';
         let verdict;
         try {
-          verdict = await checkCharacterCellRender(references[i], styleDescription, element.age || null);
+          verdict = await ask(references[i]);
         } catch (err) {
           log.warn(`⚠️ [REF-SHEET] Cell render gate errored for "${element.name}" (${err.message}) — accepting cell unchecked`);
           continue;
         }
-        if (verdict.natural) continue;
-        log.warn(`⚠️ [REF-SHEET] Character cell "${element.name}" failed render gate: ${verdict.reason} — re-rendering once`);
-        genLog?.warn('vb_character_cell_rerender', `VB reference cell failed render gate: ${verdict.reason}`, element.name);
+        if (verdict.ok) {
+          genLog?.info(`vb_${gateName}_gate`, `Cell passes gate: ${verdict.reason}`, element.name);
+          record(element, { gate: gateName, ok: true, reason: verdict.reason, rerendered: false });
+          continue;
+        }
+        log.warn(`⚠️ [REF-SHEET] ${isChar ? 'Character' : 'Element'} cell "${element.name}" failed render gate: ${verdict.reason} — re-rendering once`);
+        genLog?.warn(`vb_${gateName}_rerender`, `VB reference cell failed render gate: ${verdict.reason}`, element.name);
+        let recheck = null;
         try {
-          const rePrompt = buildReferenceSheetPrompt([element], styleDescription, visualBible);
-          const reResult = await callGeminiAPIForImage(rePrompt, [], null, 'avatar', null, imageModelOverride, null, '');
-          if (!reResult?.imageData) throw new Error('re-render returned no image');
-          const reCell = (await splitGridIntoReferences(r2Lib.stripDataUriPrefix(reResult.imageData), 1, [element]))[0];
-          if (!reCell) throw new Error('re-rendered cell extraction failed');
-          references[i] = reCell;
-          try {
-            const recheck = await checkCharacterCellRender(reCell, styleDescription, element.age || null);
-            if (!recheck.natural) {
-              log.warn(`⚠️ [REF-SHEET] Re-rendered cell for "${element.name}" still fails gate (${recheck.reason}) — accepting it anyway`);
-              genLog?.warn('vb_character_cell_still_bad', `Re-rendered cell still fails render gate (${recheck.reason}) — accepted anyway`, element.name);
-            } else {
-              log.info(`✓ [REF-SHEET] Re-rendered cell for "${element.name}" passes render gate`);
-            }
-          } catch { /* re-check is informational only — accept */ }
+          references[i] = (await rerenderSolo([element], verdict.reason))[0];
+          try { recheck = await ask(references[i]); } catch { /* re-check is informational only — accept */ }
+          if (recheck && !recheck.ok) {
+            log.warn(`⚠️ [REF-SHEET] Re-rendered cell for "${element.name}" still fails gate (${recheck.reason}) — accepting it anyway`);
+            genLog?.warn(`vb_${gateName}_still_bad`, `Re-rendered cell still fails render gate (${recheck.reason}) — accepted anyway`, element.name);
+          } else if (recheck) {
+            log.info(`✓ [REF-SHEET] Re-rendered cell for "${element.name}" passes render gate`);
+          }
         } catch (err) {
           log.warn(`⚠️ [REF-SHEET] Re-render failed for "${element.name}" (${err.message}) — keeping original cell`);
         }
+        record(element, { gate: gateName, ok: false, reason: verdict.reason, rerendered: true, recheckOk: recheck ? recheck.ok : null, recheckReason: recheck?.reason || null });
       }
 
       // Update Visual Bible with extracted references. When storyId is set,
@@ -827,6 +1509,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     generated,
     failed,
     elements: processedElements,
+    cellGates,
     sourceGrids,  // Source grid images per batch — caller persists for debugging
   };
 }
@@ -913,19 +1596,31 @@ async function buildPageCompositeRefs(visualBible, pageNumber, landmarkPhotos = 
   // painted. The empty-scene grid keeps its own cap of 9
   // (buildEmptySceneVbGrid) — it is a different grid, sent to a call with no
   // character slots competing for space.
-  // The cap is the owner's brief-side budget (2026-09-06): the Art Director is
-  // told at most three, the brief check reports an overflow and the pipeline
-  // truncates what survives — so the selection here bounds the SAME number,
-  // with the same priority order. A looser cap here would let an element the
-  // budget dropped back in through `appearsInPages`.
-  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, VB_ELEMENT_BUDGET, sceneObjectIds, sceneMetadata);
+  // NO LONGER the brief-side budget (owner, 2026-09-11: remove every code-side
+  // enforcement of the element budget). The budget is now a prompt rule for the
+  // Art Director and a fault in the scene review — nothing in code withdraws an
+  // element any more. What remains here is the PHYSICAL bound and nothing else:
+  // the grid shares one Grok reference slot, cell size scales as 1/n, and below
+  // VB_CELL_FLOOR_PX a face is a smear that the model replaces with a prior.
+  // That bound is Grok's own VB_SLOT_MAX_ELEMENTS (4), the same net the cover,
+  // repair and iterate paths run under.
+  let elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, VB_SLOT_MAX_ELEMENTS, sceneObjectIds, sceneMetadata);
   // Landmarks never ride in the grid — a real photograph composited among
   // style-rendered cells corrupts a stylised render (owner, 2026-08-18). A
   // landmark reaches the image only as its own reference photo, and when a
   // plate is set it is already painted into the plate.
   let finalLandmarkPhotos = landmarkPhotos || [];
   if (hasBackground) {
-    elementReferences = elementReferences.filter(e => e.type !== 'vehicle' && e.type !== 'location');
+    // A plate IS sent, so everything plate-borne drops: vehicles and locations
+    // by type (the pre-2026-09-15 rule, and the `scaleClass === null` fallback
+    // for every stored bible), plus any element the bible classed at vehicle,
+    // building or landscape scale — a building-scale ARTIFACT belongs to the
+    // plate for exactly the same reason a ship does (owner, 2026-09-15).
+    // Gated on the SAME brief the plate is gated on (2026-09-15): an element the
+    // AD brief does not name never reaches the plate, so dropping its cell would
+    // leave it with no reference anywhere.
+    const { isPlateBorneElement } = require('./visualBible');
+    elementReferences = elementReferences.filter(e => !isPlateBorneElement(e, sceneObjectIds));
     finalLandmarkPhotos = [];
     log.debug(`🔲 [${logTag}] Page ${pageNumber}: sceneBackground set — dropping vehicles/locations/landmarks from composite refs`);
   } else if (hasOtherRefs || (landmarkPhotos || []).length > 0) {
@@ -1143,13 +1838,29 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = [], op
 
 module.exports = {
   checkCharacterCellRender,
+  cellGatePrompt,
+  elementKindSentence,
+  elementCellText,
+  elementCellGatePrompt,
+  stateCellsGatePrompt,
+  checkElementCellRender,
+  checkStateCellsConsistency,
+  checkStateBatch,
   splitGridIntoReferences,
+  referenceSheetLayout,
+  referencesFromCells,
+  cellPositionName,
+  identifySheetCellsWithRetry,
+  fillMissingReferencesSolo,
+  MAX_SOLO_REFERENCE_RERENDERS,
   buildReferenceSheetPrompt,
   characterAgeCue,
   buildReferenceSheetBatches,
   expandElementStateCells,
   assertStateCellsCoLocated,
   generateReferenceSheet,
+  recordReferenceSheetUsage,
+  REFERENCE_SHEET_USAGE_LABEL,
   buildEmptySceneVbGrid,
   buildPageCompositeRefs,
   buildVisualBibleGrid,

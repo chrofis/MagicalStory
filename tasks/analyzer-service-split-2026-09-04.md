@@ -72,7 +72,14 @@ service holds the libraries and can sleep between stories.
 - [ ] 9. Enable sleeping on the analyzer service ONLY (never the web service).
       Confirm `/warmup` wakes it early enough that the first real call does not
       time out into the Gemini fallback.
-- [ ] 10. Production rollout — needs its own owner approval.
+- [x] 10. Production rollout — **DONE 2026-09-06.** Production runs the split: both the
+      web service and the analyzer service were deployed from commit `a79c8bee`, and the
+      production analyzer has been healthy since (~6.6 days uptime measured 2026-09-13).
+      Consequence: production now carries the same analyzer-restart exposure as staging —
+      every `master` deploy restarts the analyzer, and any call site still using a raw
+      `fetch()` instead of `analyzerFetch()` (the trial photo upload, `server/routes/photos.js`)
+      fails for a real user during that window instead of retrying → `tasks/BACKLOG.md`
+      (Refactor + tech debt, "trial photo upload does not ride out an analyzer restart").
 
 ## What actually shipped, and why it differs from the plan
 

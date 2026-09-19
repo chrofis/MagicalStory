@@ -6,7 +6,8 @@ import {
   storyTypes,
   lifeChallenges,
   getStoryTypesByGroup,
-  getLifeChallengesByGroup,
+  getTrialLifeChallenges,
+  parseChildAge,
 } from '@/constants/storyTypes';
 import type { Language } from '@/types/story';
 
@@ -20,6 +21,8 @@ interface Props {
   previewAvatar?: string | null;
   characterName?: string;
   characterGender?: string;
+  /** Declared child age, free text from the character step ('' when skipped). */
+  characterAge?: string;
 }
 
 type TrialCategory = 'adventure' | 'life-challenge';
@@ -83,13 +86,37 @@ const strings: Record<string, {
     avatarReady: (name, gender) => `${name} est prêt${gender === 'female' ? 'e' : ''} pour sa première aventure !`,
     avatarLoading: (name) => `${name} se prépare pour l'histoire. Tu peux déjà choisir un sujet.`,
   },
+  it: {
+    title: 'Scegli il tuo tema',
+    subtitle: 'Che tipo di avventura vuoi creare?',
+    pickCategory: 'Scegli un tipo di storia',
+    pickTheme: 'Scegli un tema',
+    pickTopic: 'Scegli un argomento',
+    pickStyle: 'Che tipo di storia?',
+    back: 'Indietro',
+    next: 'Avanti',
+    change: 'Cambia',
+    avatarReady: (name, gender) => `${name} è pront${gender === 'female' ? 'a' : 'o'} per la sua prima avventura!`,
+    avatarLoading: (name) => `${name} si sta preparando per la storia. Puoi già scegliere un argomento qui sotto.`,
+  },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender }: Props) {
-  const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as Language;
+export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender, characterAge }: Props) {
+  // Match on the BASE language so regional codes ('de-ch', 'fr-ch', 'it-ch') resolve too.
+  const langBase = (storyInput.language || '').toLowerCase().split('-')[0];
+  const lang = (langBase === 'de' ? 'de' : langBase === 'fr' ? 'fr' : langBase === 'it' ? 'it' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
+
+  // Owner directive: the trial shows only age-appropriate challenges — hidden
+  // means absent, no dimming, no "best for" label. A blank age filters nothing.
+  // A deep-linked topic stays pinned (see getTrialLifeChallenges).
+  const childAge = parseChildAge(characterAge);
+  const trialChallenges = useMemo(
+    () => getTrialLifeChallenges(childAge, storyInput.storyTopic),
+    [childAge, storyInput.storyTopic]
+  );
 
   const avatarBanner = characterName ? (
     <div className="flex flex-col items-center text-center mb-8">
@@ -309,7 +336,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-          {getLifeChallengesByGroup('popular').map((challenge) => (
+          {trialChallenges.map((challenge) => (
             <button
               key={challenge.id}
               onClick={() => handleTopicSelect(challenge.id)}

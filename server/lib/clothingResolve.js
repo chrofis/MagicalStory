@@ -4,6 +4,8 @@
 // Cross-bucket calls go through lazy require('./storyHelpers') to avoid circular imports.
 
 const { log } = require('../utils/logger');
+const { lookupByName } = require('./castResolver');
+const { resolveCharacterReqs } = require('./clothingCategories');
 const { getPrimaryPhoto, getStandardAvatar, getFaceThumb, getBodyThumb } = require('./characterPhotos');
 
 let imagesModule = null;
@@ -423,7 +425,7 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
       //      fell back to the raw user photo (modern clothes leak into the
       //      costumed scene). Accepting the bare-string shape here closes that.
       let resolvedClothing = defaultClothing;
-      const charReqs = require('./clothingCategories').resolveCharacterReqs(clothingRequirements, char.name);
+      const charReqs = resolveCharacterReqs(clothingRequirements, char.name);
       if (typeof charReqs === 'string' && charReqs.length > 0) {
         resolvedClothing = charReqs;
         log.debug(`[AVATAR LOOKUP] ${char.name}: per-scene clothing (flat-map) = ${resolvedClothing}`);
@@ -699,6 +701,28 @@ function getCharacterPhotoDetails(characters, defaultClothing = null, artStyle =
     .filter(info => info.hasPhoto);
 }
 
+/**
+ * Whole-cast reference photos for an evaluation (every character in the story,
+ * standard clothing, styled for the art style).
+ *
+ * The eval judge's identity check AND its clothing contract both read this
+ * list, so it must be built by the same resolver the generator uses — a
+ * hand-rolled `c.photoUrl || c.avatars?.styled` filter matched nothing after
+ * the character-storage normalisation and left every batch eval with zero
+ * references and no contract.
+ *
+ * @param {Array} characters - Story characters (stored shape: photos[], avatars)
+ * @param {string} artStyle - Art style, for the styled-avatar lookup
+ * @param {Object} clothingRequirements - Per-story clothing requirements from the outline
+ * @returns {Array} getCharacterPhotoDetails entries with styled avatars applied
+ */
+function buildWholeCastReferencePhotos(characters, artStyle = null, clothingRequirements = null) {
+  const photos = getCharacterPhotoDetails(characters, 'standard', artStyle, clothingRequirements);
+  // Lazy: styledAvatars → images → clothingResolve is a require cycle at load time.
+  const { applyStyledAvatars } = require('./styledAvatars');
+  return applyStyledAvatars(photos, artStyle);
+}
+
 // ============================================================================
 // Character visual profile — single source of truth
 // ----------------------------------------------------------------------------
@@ -751,13 +775,11 @@ function buildSceneClothingRequirements(sceneCharacters, perCharClothing, clothi
   const perChar = perCharClothing || {};
   for (const char of (sceneCharacters || [])) {
     if (!char?.name) continue;
-    const charNameTrimmed = char.name.trim().toLowerCase();
-    let charClothing = Object.entries(perChar).find(
-      ([name]) => name.trim().toLowerCase() === charNameTrimmed
-    )?.[1];
+    // RESOLVE: one name-keyed-map reader. No cast index is available here
+    // (the caller passes only the page's cast), so exact + canonical key.
+    let charClothing = (lookupByName(perChar, char.name, null) || {}).value;
     if (!charClothing) {
-      const globalReqs = clothingRequirements?.[char.name]
-        || Object.entries(clothingRequirements || {}).find(([n]) => n.trim().toLowerCase() === charNameTrimmed)?.[1];
+      const globalReqs = resolveCharacterReqs(clothingRequirements, char.name);
       if (globalReqs?.costumed?.used) {
         // Not a guess: a fully-costumed story has exactly one outfit, so the
         // page not restating it carries no ambiguity.
@@ -858,7 +880,6 @@ function resolveClothingForPage(char, clothingLabel, clothingRequirements = null
  */
 function buildUsedClothingText(char, clothingRequirements) {
   if (!char?.name || !clothingRequirements) return null;
-  const { resolveCharacterReqs } = require('./clothingCategories');
   const reqs = resolveCharacterReqs(clothingRequirements, char.name);
   if (!reqs) return null;
 
@@ -890,10 +911,7 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
 
     // If clothingRequirements provided, only show categories actually used in this story
     if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
-      const charReqs = clothingRequirements[char.name] ||
-                       clothingRequirements[charNameLower] ||
-                       Object.entries(clothingRequirements)
-                         .find(([k]) => k.toLowerCase() === charNameLower)?.[1];
+      const charReqs = resolveCharacterReqs(clothingRequirements, char.name);  // RESOLVE
 
       if (charReqs) {
         const usedCategories = Object.entries(charReqs)
@@ -993,6 +1011,7 @@ module.exports = {
   parseCharacterClothing,
   prefetchAvatarBytesForCharacters,
   getCharacterPhotoDetails,
+  buildWholeCastReferencePhotos,
   buildSceneClothingRequirements,
   resolveClothingForPage,
   buildUsedClothingText,

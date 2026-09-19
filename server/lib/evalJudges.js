@@ -12,7 +12,8 @@
 // to whoever answered.
 const { log } = require('../utils/logger');
 const { withRetry } = require('./textModels');
-const { TEXT_MODELS } = require('../config/models');
+const { TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
+const { assertPromptFilled } = require('../services/prompts');
 
 // EVAL_JUDGES=gemini            (default — single judge, no jury)
 //            =gemini,grok
@@ -26,11 +27,12 @@ function getEvalJudges() {
 }
 
 // Judge key → model registry key (server/config/models.js TEXT_MODELS).
-const JUDGE_MODEL = { grok: 'grok-4-fast', qwen: 'qwen-vl' };
+const JUDGE_MODEL = { grok: GROK_VISION_FALLBACK, qwen: 'qwen-vl' };
 
 // OpenRouter vision call — mirrors callGrokVisionAPI (Gemini parts → OpenAI
 // image_url content), returns the raw text or null on any failure.
 async function callOpenRouterVisionAPI(modelId, geminiParts) {
+  assertPromptFilled(geminiParts, 'evalJudges.callOpenRouterVisionAPI');
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) { log.warn('[EVAL JUDGE] OPENROUTER_API_KEY unset — skipping Qwen judge'); return null; }
   const content = [];
@@ -46,7 +48,7 @@ async function callOpenRouterVisionAPI(modelId, geminiParts) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: modelId, max_tokens: 8192, temperature: 0, messages: [{ role: 'user', content }],
+      model: modelId, temperature: 0, messages: [{ role: 'user', content }],  // no max_tokens (owner rule: no output caps)
       provider: fastOrder ? { order: fastOrder, allow_fallbacks: true } : { sort: 'throughput' },
     }),
     signal: AbortSignal.timeout(120000),

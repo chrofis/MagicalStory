@@ -13,13 +13,14 @@ const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { logActivity, dbQuery, withTransaction, saveAvatarToR2, saveAvatarThumbToR2, uploadCharacterPhotosToR2, offloadCharacterImages } = require('../services/database');
-const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { PROMPT_TEMPLATES, fillTemplate, assertPromptFilled } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS, MODEL_DEFAULTS, resolveGrokImageModel } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
 const { editWithGrok } = require('../lib/grok');
 const { scoreAvatarLikeness, failsArcFaceGate, warmArcFace, ARCFACE_MIN } = require('../lib/faceIdentity');
 const { buildHairDescription, getAgeCategory, clampApparentAge } = require('../lib/storyHelpers');
+const { resolveDeclaredAvatarOverrides } = require('../lib/avatarOverrides');
 const { getFacePhoto } = require('../lib/characterPhotos');
 const { getImageIdentifier, getImageSizeKB } = require('../utils/imageMetadata');
 const { stripDataUriPrefix } = require('../lib/r2');
@@ -339,31 +340,26 @@ async function _extractTraitsWithGeminiOnce(imageData, languageInstruction = '')
     const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
       imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
+    const traitParts = [
+      {
+        text: fillTemplate(
+          PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`,
+          { LANGUAGE_INSTRUCTION: languageInstruction }
+        )
+      },
+      { inlineData: { mimeType: mimeType, data: base64Data } },
+    ];
+    assertPromptFilled(traitParts, '_extractTraitsWithGeminiOnce');
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                text: fillTemplate(
-                  PROMPT_TEMPLATES.characterAnalysis || `Analyze this image of a person for a children's book illustration system. Return JSON with traits (age, gender, height, build, face, hair). Be specific about colors.`,
-                  { LANGUAGE_INSTRUCTION: languageInstruction }
-                )
-              },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data,
-                },
-              },
-            ],
-          }],
+          contents: [{ parts: traitParts }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 4096,
             responseMimeType: 'application/json'
           }
         }),
@@ -508,7 +504,7 @@ function consensusTraits(photoTraits, avatarTraitsArray) {
  * Runs both Gemini LLM evaluation AND LPIPS perceptual comparison
  * Returns { score, details, physicalTraits, clothing, lpips } or null on error
  */
-async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey, requestedClothing = null) {
+async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey, requestedClothing = null, declaredOverrides = null, declaredAgeText = null) {
   try {
     // Both inputs may arrive as data: URIs, raw base64, or HTTPS R2 URLs (the
     // common case post-R2 migration). bytesFromAnyImage normalizes all three
@@ -544,7 +540,22 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     // TASK 3 CLOTHING MATCH and its own TASK 5 (clothing extraction).
     const evalPrompt = fillTemplate(
       PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Rate similarity 1-10. Output: FINAL SCORE: [number]',
-      { REQUESTED_CLOTHING: requestedClothing ? `"${requestedClothing}"` : '(not provided)' }
+      {
+        REQUESTED_CLOTHING: requestedClothing ? `"${requestedClothing}"` : '(not provided)',
+        // Declared trait/clothing corrections travel with the judge so a
+        // DELIBERATE difference from the photo is not scored as a defect while
+        // an UNDECLARED one still is. Without this the glasses axis caps at 3
+        // on a user-added pair, faceMatch.score (MIN of the features) sinks
+        // below MIN_BASE_AVATAR_SCORE, and the retry regenerates the same
+        // correction into the same rejection. resolveDeclaredAvatarOverrides is
+        // the single producer of the list the GENERATOR was given.
+        DECLARED_OVERRIDES: declaredOverrides || '(none — the user declared no corrections; judge everything against IMAGE 1)',
+        // DRAW AND JUDGE AGAINST THE DECLARED AGE (owner, 2026-09-15). The
+        // generator builds the body for this age, so TASK 2 scores age against
+        // it and stops comparing body proportions to the photo. Same producer
+        // as the generator's own age line — resolveDeclaredAvatarOverrides.
+        DECLARED_AGE: declaredAgeText || '(not declared — score the apparent age against IMAGE 1)',
+      }
     );
 
     const requestBody = {
@@ -557,7 +568,6 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       }],
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 4000,
         responseMimeType: 'application/json'
       },
       safetySettings: [
@@ -567,6 +577,8 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
         { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
       ]
     };
+
+    assertPromptFilled(requestBody.contents[0].parts, 'evaluateAvatarFaceMatch');
 
     // Gemini evaluation extracts clothing, physical traits, and face score.
     const geminiPromise = fetch(
@@ -711,6 +723,8 @@ async function callGeminiAvatarApi(opts) {
     ],
   };
 
+  assertPromptFilled([...requestBody.systemInstruction.parts, ...requestBody.contents[0].parts], 'callGeminiAvatarApi');
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${geminiApiKey}`,
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) }
@@ -805,7 +819,6 @@ Set pass=true if:
       }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 2000,
         responseMimeType: 'application/json'
       },
       safetySettings: [
@@ -815,6 +828,8 @@ Set pass=true if:
         { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
       ]
     };
+
+    assertPromptFilled(requestBody.contents[0].parts, 'evaluateCostumeApplication');
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
@@ -1047,9 +1062,19 @@ async function generateDynamicAvatar(character, category, config) {
     // Build the prompt
     const promptPart = splitPromptFromCatalogue(PROMPT_TEMPLATES.avatarMainPrompt).task.trim();
     const clothingPrompt = getDynamicClothingPrompt(category, config, isFemale);
-    const avatarPrompt = fillTemplate(promptPart, {
+    let avatarPrompt = fillTemplate(promptPart, {
       'CLOTHING_STYLE': clothingPrompt
     });
+    // DECLARED AGE (owner, 2026-09-15). Story-time avatars go through the same
+    // resolver as the two account paths, so the body is built for the age the
+    // user entered and the judge below scores against that same declaration.
+    const dynamicAge = resolveDeclaredAvatarOverrides({ declaredAge: character?.age });
+    if (dynamicAge.ageLine) {
+      avatarPrompt += `
+
+PHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):
+${dynamicAge.ageLine}`;
+    }
 
     // Prepare image data - keep 768px for quality, only convert format
     const photoSizeKB = Math.round(facePhoto.length / 1024);
@@ -1091,7 +1116,7 @@ async function generateDynamicAvatar(character, category, config) {
     // Evaluate face match to get clothing description (optional)
     let clothingDescription = null;
     if (ENABLE_AVATAR_EVALUATION) {
-      const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey);
+      const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey, null, null, dynamicAge.ageFact);
       if (faceMatchResult?.clothing) {
         clothingDescription = faceMatchResult.clothing;
         log.debug(`👕 [DYNAMIC AVATAR] ${logCategory} clothing: ${clothingDescription}`);
@@ -1683,49 +1708,35 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     const mimeType = finalPhoto.match(/^data:(image\/\w+);base64,/) ?
       finalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    // Build user clothing section
+    // Declared trait/clothing corrections. ONE resolver feeds the generator
+    // prompt AND the judge (see server/lib/avatarOverrides.js) — when only the
+    // generator knew about them, every correction was graded against the photo
+    // that by definition does not show it, and the avatar was rejected forever.
+    const overrides = resolveDeclaredAvatarOverrides({
+      physicalTraits,
+      clothing,
+      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      declaredAge: age,
+    });
+    const declaredOverridesFor = (category) => resolveDeclaredAvatarOverrides({
+      physicalTraits,
+      clothing,
+      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      category,
+      declaredAge: age,
+    }).text;
+    // The judge's rendering of the SAME declared age the generator's trait
+    // block carries (overrides.ageLine) — one resolver, two wordings.
+    const declaredAgeText = overrides.ageFact;
+
     let userClothingSection = '';
-    if (clothing) {
-      const clothingParts = [];
-      if (clothing.fullBody) {
-        clothingParts.push(`Full outfit: ${clothing.fullBody}`);
-      } else {
-        if (clothing.upperBody) clothingParts.push(`Top: ${clothing.upperBody}`);
-        if (clothing.lowerBody) clothingParts.push(`Bottom: ${clothing.lowerBody}`);
-      }
-      if (clothing.shoes) clothingParts.push(`Shoes: ${clothing.shoes}`);
-      if (clothing.accessories) clothingParts.push(`Accessories: ${clothing.accessories}`);
-      if (clothingParts.length > 0) {
-        userClothingSection = `\n\nUSER-SPECIFIED CLOTHING (MUST USE - override default clothing style):\n${clothingParts.join('\n')}\nIMPORTANT: Use the user-specified clothing above instead of the default clothing style.`;
-      }
+    if (overrides.clothingParts.length > 0) {
+      userClothingSection = `\n\nUSER-SPECIFIED CLOTHING (MUST USE - override default clothing style):\n${overrides.clothingParts.join('\n')}\nIMPORTANT: Use the user-specified clothing above instead of the default clothing style.`;
     }
 
-    // Build user traits section
     let userTraitsSection = '';
-    if (physicalTraits && Object.keys(physicalTraits).length > 0) {
-      const traitLines = [];
-      if (physicalTraits.hairColor) traitLines.push(`- Hair color: ${physicalTraits.hairColor}`);
-      if (physicalTraits.eyeColor) traitLines.push(`- Eye color: ${physicalTraits.eyeColor}`);
-      // Hair shape/length from detailedHairAnalysis (single source of truth).
-      const hairDesc = buildHairDescription(physicalTraits);
-      if (hairDesc) traitLines.push(`- Hair: ${hairDesc}`);
-      if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
-      if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
-      if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
-      if (physicalTraits.facialHair) {
-        if (physicalTraits.facialHair.toLowerCase() === 'clean-shaven') {
-          traitLines.push(`- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
-        } else if (physicalTraits.facialHair.toLowerCase() !== 'none') {
-          traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
-        }
-      }
-      if (physicalTraits.glasses && String(physicalTraits.glasses).trim().toLowerCase() !== 'none') {
-        traitLines.push(`- Glasses: ${physicalTraits.glasses} — ALWAYS visible on the face`);
-      }
-      if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
-      if (traitLines.length > 0) {
-        userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):\n${traitLines.join('\n')}`;
-      }
+    if (overrides.traitLines.length > 0) {
+      userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):\n${overrides.traitLines.join('\n')}`;
     }
 
     job.progress = 20;
@@ -1832,6 +1843,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
           ]
         };
+
+        assertPromptFilled(requestBody.contents[0].parts, 'processAvatarJobInBackground');
 
         // Log prompt for debugging IMAGE_OTHER issue
         log.info(`[AVATAR JOB ${jobId}] 🔍 Prompt for ${category} (${avatarPrompt.length} chars)`);
@@ -2070,7 +2083,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         // at 7/10, which ArcFace scores worst-of-102.
         const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
           const [faceMatchResult, arcface] = await Promise.all([
-            evaluateAvatarFaceMatch(faceRef, imageData, geminiApiKey),
+            evaluateAvatarFaceMatch(faceRef, imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText),
             scoreAvatarLikeness(faceRef, imageData),
           ]);
           return { category, faceMatchResult, arcface };
@@ -2255,7 +2268,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             }
 
             // Re-evaluate (use facePhoto for face match — see comment above)
-            const retryEval = await evaluateAvatarFaceMatch(faceRef, retryGen.imageData, geminiApiKey);
+            const retryEval = await evaluateAvatarFaceMatch(faceRef, retryGen.imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
             const retryScore = retryEval?.score ?? 0;
             log.debug(`🔄 [AVATAR JOB ${jobId}] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 
@@ -2844,61 +2857,44 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     const base64Data = stripDataUriPrefix(resizedPhoto);
     const mimeType = 'image/jpeg'; // Always JPEG after resize
 
-    // Build user clothing section if provided
-    let userClothingSection = '';
-    if (clothing) {
-      const clothingParts = [];
-      if (clothing.fullBody) {
-        clothingParts.push(`Full outfit: ${clothing.fullBody}`);
-      } else {
-        if (clothing.upperBody) clothingParts.push(`Top: ${clothing.upperBody}`);
-        if (clothing.lowerBody) clothingParts.push(`Bottom: ${clothing.lowerBody}`);
-      }
-      if (clothing.shoes) clothingParts.push(`Shoes: ${clothing.shoes}`);
-      if (clothing.accessories) clothingParts.push(`Accessories: ${clothing.accessories}`);
+    // Declared trait/clothing corrections - same resolver as the job path and
+    // as the judge, so the generator and the evaluator can never hold
+    // different specs (server/lib/avatarOverrides.js).
+    const overrides = resolveDeclaredAvatarOverrides({
+      physicalTraits,
+      clothing,
+      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      declaredAge: age,
+    });
+    const declaredOverridesFor = (category) => resolveDeclaredAvatarOverrides({
+      physicalTraits,
+      clothing,
+      hairDescription: physicalTraits ? buildHairDescription(physicalTraits) : null,
+      category,
+      declaredAge: age,
+    }).text;
+    // The judge's rendering of the SAME declared age the generator's trait
+    // block carries (overrides.ageLine) — one resolver, two wordings.
+    const declaredAgeText = overrides.ageFact;
 
-      if (clothingParts.length > 0) {
-        userClothingSection = `\n\nUSER-SPECIFIED CLOTHING (MUST USE - override default clothing style):\n${clothingParts.join('\n')}\nIMPORTANT: Use the user-specified clothing above instead of the default clothing style.`;
-        log.debug(`👕 [CLOTHING AVATARS] Using user-specified clothing: ${clothingParts.join(', ')}`);
-      }
+    let userClothingSection = '';
+    if (overrides.clothingParts.length > 0) {
+      userClothingSection = `\n\nUSER-SPECIFIED CLOTHING (MUST USE - override default clothing style):\n${overrides.clothingParts.join('\n')}\nIMPORTANT: Use the user-specified clothing above instead of the default clothing style.`;
+      log.debug(`[CLOTHING AVATARS] Using user-specified clothing: ${overrides.clothingParts.join(', ')}`);
     }
 
-    // Build user physical traits section if provided (user-edited traits that must be applied)
     let userTraitsSection = '';
-    if (physicalTraits && Object.keys(physicalTraits).length > 0) {
-      const traitLines = [];
-      if (physicalTraits.hairColor) traitLines.push(`- Hair color: ${physicalTraits.hairColor}`);
-      if (physicalTraits.eyeColor) traitLines.push(`- Eye color: ${physicalTraits.eyeColor}`);
-      // Hair shape/length from detailedHairAnalysis (single source of truth).
-      const hairDesc = buildHairDescription(physicalTraits);
-      if (hairDesc) traitLines.push(`- Hair: ${hairDesc}`);
-      if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
-      if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
-      if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
-      if (physicalTraits.facialHair) {
-        if (physicalTraits.facialHair.toLowerCase() === 'clean-shaven') {
-          traitLines.push(`- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
-        } else if (physicalTraits.facialHair.toLowerCase() !== 'none') {
-          traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
-        }
-      }
-      if (physicalTraits.glasses && String(physicalTraits.glasses).trim().toLowerCase() !== 'none') {
-        traitLines.push(`- Glasses: ${physicalTraits.glasses} — ALWAYS visible on the face`);
-      }
-      if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
-
-      if (traitLines.length > 0) {
-        userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):
+    if (overrides.traitLines.length > 0) {
+      userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):
 The user has specified the following traits that MUST be applied to the output:
-${traitLines.join('\n')}
+${overrides.traitLines.join('\n')}
 
 These corrections OVERRIDE what is visible in the reference photo.
 - If hair color is specified, the output MUST show that exact hair color
 - If eye color is specified, the output MUST show that exact eye color
 - If skin tone is specified, the output MUST show that exact skin tone
 - Apply these traits while preserving the person's facial identity from the reference.`;
-        log.info(`🎨 [CLOTHING AVATARS] Using user-specified physical traits: ${traitLines.join(', ')}`);
-      }
+      log.info(`[CLOTHING AVATARS] Using user-specified physical traits: ${overrides.traitLines.join(', ')}`);
     }
 
     // Check if using ACE++ model (face-consistent avatar generation)
@@ -3297,7 +3293,7 @@ These corrections OVERRIDE what is visible in the reference photo.
       // the async/job path above).
       const faceRefSync = faceRefPhoto || referencePhoto;
       const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
-        const faceMatchResult = await evaluateAvatarFaceMatch(faceRefSync, imageData, geminiApiKey);
+        const faceMatchResult = await evaluateAvatarFaceMatch(faceRefSync, imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
         return { category, faceMatchResult };
       });
 
@@ -3433,7 +3429,7 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
 
           // Re-evaluate (use face crop for face match — see F2 comment above)
-          const retryEval = await evaluateAvatarFaceMatch(faceRefSync, retryResult.imageData, geminiApiKey);
+          const retryEval = await evaluateAvatarFaceMatch(faceRefSync, retryResult.imageData, geminiApiKey, null, declaredOverridesFor(category), declaredAgeText);
           const retryScore = retryEval?.score ?? 0;
           log.debug(`🔄 [CLOTHING AVATARS] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
 

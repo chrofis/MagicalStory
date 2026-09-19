@@ -27,11 +27,12 @@ const {
   runInCacheScope,
   clearStyledAvatarCache,
   getStyledAvatarCacheStats,
+  invalidateStyledAvatarForCategory,
   exportStyledAvatarsForPersistence,
   getStyledAvatarGenerationLog,
   clearStyledAvatarGenerationLog
 } = require('./server/lib/styledAvatars');
-const { reconcileCoverClothingWithRequirements } = require('./server/lib/clothingCategories');
+const { reconcileCoverClothingWithRequirements, reconcilePageClothingWithRequirements } = require('./server/lib/clothingCategories');
 const {
   getCostumedAvatarGenerationLog,
   clearCostumedAvatarGenerationLog
@@ -64,6 +65,7 @@ const {
 } = require('./server/lib/landmarkPhotos');
 const {
   getCharactersInScene,
+  unionPageCast,
   getCharacterPhotoDetails,
   buildCharacterReferenceList,
   buildReferenceCardColours,
@@ -71,13 +73,13 @@ const {
   extractPageClothing,
   buildSceneExpansionPrompt,
   buildImagePrompt,
-  buildUnifiedStoryPrompt,
   buildOutlineReviewPrompt,
   buildTrialStoryPrompt,
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForScene,
   ensureLandmarkPhotoBytes,
   extractSceneMetadata,
+  describeDegradedSceneMetadata,
   findCastMissingFromMetadata,
   getHistoricalLocations,
   convertClothingToCurrentFormat,
@@ -88,10 +90,38 @@ const {
 const { UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { checkSceneConsistency, formatSceneConsistencySummary } = require('./server/lib/sceneConsistencyCheck');
 const { generateStoryViaBeats, resolvePipelineMode } = require('./server/lib/beatsPipeline');
-const { createJobHeartbeat } = require('./server/lib/jobHeartbeat');
+const { createJobHeartbeat, startJobHeartbeat } = require('./server/lib/jobHeartbeat');
 const { GenerationLogger, setCurrentLogger, clearCurrentLogger } = require('./server/lib/generationLogger');
 const { stripDataUriPrefix } = require('./server/lib/r2');
 const { COVER_PAGE_NUMBERS } = require('./server/lib/coverKeys');
+const { applyCoverEvalMirror } = require('./server/lib/coverEvalMirror');
+
+/**
+ * The season the TRIAL's avatar sheet is drawn for; null on every other path.
+ *
+ * Trial-only by measurement, not by caution. A full story's outline writes a
+ * real `clothingRequirements[...].description` — the canonical outfit
+ * (docs/SETTLED.md:71) — and already dresses its cast for the season it is
+ * given (0 summer-outfit cold-season stories across 34 stored ones). The trial
+ * has no outline: its contract is `standard: { used: true, signature: 'none' }`,
+ * which every resolver discards, so NO clothing text reaches any prompt and the
+ * styled 2×4 sheet is the only thing that decides what the child wears. That
+ * sheet was drawn from the creation-time photo with no season input at all, so a
+ * child photographed in a t-shirt wore a t-shirt through an autumn book
+ * (staging job_1789296188291_thezv15y1).
+ *
+ * `inputData.season` is stamped in `_processStoryJobImpl` (resolveSeason from
+ * the job's own created_at) before the pipeline is entered.
+ */
+function trialSeasonOutfit(inputData = {}) {
+  if (!inputData?.trialMode) return null;
+  try {
+    return require('./server/lib/season').seasonOutfitGuidance(inputData);
+  } catch (e) {
+    log.warn(`🍁 [TRIAL] seasonOutfitGuidance failed: ${e.message} — sheet drawn without a season`);
+    return null;
+  }
+}
 
 /**
  * Which covers a job renders. `inputData.coverTypes` is the explicit list
@@ -255,7 +285,7 @@ async function savePartialStoryFromCheckpoints(jobId, failureReason = 'Unknown f
     let coverImages = {};
     let pageClothingData = null;
     const lang = inputData?.language || 'en';
-    const pageWord = lang.startsWith('de') ? 'Seite' : lang.startsWith('fr') ? 'Page' : 'Page';
+    const pageWord = lang.startsWith('de') ? 'Seite' : lang.startsWith('it') ? 'Pagina' : lang.startsWith('fr') ? 'Page' : 'Page';
 
     for (const cp of checkpoints) {
       const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;
@@ -379,6 +409,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
+  // Hoisted to function scope (2026-09-13): the eval/repair short-circuit reads
+  // it in the images block, and the analytics block — far below, outside that
+  // scope — must report "not measured" rather than a measured zero when it is
+  // on. One declaration, both readers. See docs/decisions.md
+  // "Unevaluated runs report not-measured, never a clean score".
+  const skipQualityEval = inputData.skipQualityEval === true;
+
   // The stories row exists from the FIRST moment (owner, 2026-08-15).
   // story_images.story_id references stories.id, so anything written during
   // generation — cover repairs, debug artifacts, per-page versions — needs the
@@ -386,12 +423,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // minutes after the cover repairs that wanted it. The row is empty; the
   // content arrives via upsertStory at the end. An unfinished story is kept out
   // of the library by joining story_jobs status, not by a flag on the row.
-  try {
-    await require('./server/services/database').ensureStoryRow(jobId, userId, {
-      adminDraft: inputData?.adminDraft === true,
-    });
-  } catch (err) {
-    log.warn(`⚠️ [UNIFIED] Could not pre-create the story row for ${jobId}: ${err.message}`);
+  //
+  // This row is also the ANCHOR for every R2 object the job writes: they all
+  // land under `stories/{jobId}/`, and that prefix is only reachable — for
+  // serving, for erasure, for the orphan audit — through this row. Swallowing
+  // a failure here used to mean a whole story's worth of objects written with
+  // nothing pointing at them, unreachable forever. So: one retry, then fail
+  // the job. Failing here costs nothing (no model call has happened yet) and
+  // the run could not have been saved anyway — story_images has a foreign key
+  // to this row.
+  {
+    const { ensureStoryRow } = require('./server/services/database');
+    try {
+      await ensureStoryRow(jobId, userId, { adminDraft: inputData?.adminDraft === true });
+    } catch (err) {
+      log.warn(`⚠️ [UNIFIED] Could not pre-create the story row for ${jobId}: ${err.message} — retrying once`);
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        await ensureStoryRow(jobId, userId, { adminDraft: inputData?.adminDraft === true });
+      } catch (err2) {
+        throw new Error(
+          `Cannot create the story row for ${jobId} (${err2.message}). Refusing to generate: ` +
+          `every image would be written to R2 with no database row referencing it.`);
+      }
+    }
   }
 
   // Debug: Log inputData values at start of unified processing
@@ -475,7 +530,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
+    // Read the CONFIGURED quality model, never a hardcoded id: this line named
+    // 'gemini-2.0-flash' while the judge actually running was
+    // MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and 6.25x the
+    // output price), so any quality-eval call that reached this fallback was
+    // priced at a sixth of its cost. Mirrors apiCost.js's
+    // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
+    // (This comment used to add "a model Google shut down". It is not shut
+    // down — delisted from GET /v1beta/models but still answering, verified
+    // 2026-09-18. The hardcoding was the bug; the id's liveness never was.)
+    gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
 
@@ -610,10 +674,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const beatsMode = pipelineMode === 'beats';
     if (beatsMode) log.info(`🪜 [PIPELINE] pipelineMode=beats — unified writer + outline review are skipped`);
 
+    // The single-call writer is the TRIAL writer and nothing else. The
+    // pre-beats unified writer (buildUnifiedStoryPrompt + story-unified*.txt)
+    // was deleted 2026-09-15 — see docs/decisions.md. resolvePipelineMode
+    // guarantees a non-trial job is always 'beats', so this stays null there.
     const unifiedPrompt = inputData.trialMode
       ? buildTrialStoryPrompt(inputData, sceneCount)
-      : buildUnifiedStoryPrompt(inputData, sceneCount);
-    log.debug(`📖 [UNIFIED] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages${inputData.trialMode ? ' (trial mode)' : ''}`);
+      : null;
+    if (unifiedPrompt) log.debug(`📖 [TRIAL] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages`);
 
     // Art style for avatar generation
     const artStyle = inputData.artStyle || 'pixar';
@@ -685,20 +753,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // TRIAL MODE: Start avatar styling immediately using pre-defined costumes
     // This runs in parallel with story generation (no need to wait for outline clothing)
     if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
-      const { getTrialCostume } = require('./server/config/trialCostumes');
+      const { getTrialCostumeForStory } = require('./server/config/trialCostumes');
       const mainChar = (inputData.characters || [])[0];
-      // For life-challenge: storyTheme has the adventure type (pirate), storyTopic has the challenge (cleaning-up)
-      // For adventure: storyTheme has the theme, storyTopic may be empty
-      // For historical: storyTopic has the event ID
-      const lookupCategory = inputData.storyCategory === 'historical' ? 'historical' : 'adventure';
-      const lookupTopic = inputData.storyCategory === 'historical'
-        ? (inputData.storyTopic || '')
-        : (inputData.storyTheme || inputData.storyTopic || '');
-      const costume = getTrialCostume(
-        lookupTopic,
-        lookupCategory,
-        mainChar?.gender || ''
-      );
+      // Category/theme/topic -> costume mapping lives in trialCostumes.js, so the
+      // avatar prewarm, this job and the idea generator cannot disagree about
+      // whether this story has a costume at all.
+      const costume = getTrialCostumeForStory({
+        storyCategory: inputData.storyCategory,
+        storyTheme: inputData.storyTheme,
+        storyTopic: inputData.storyTopic,
+        gender: mainChar?.gender || ''
+      });
 
       // Build clothing requirements from config (not from outline)
       const trialClothingRequirements = {};
@@ -791,7 +856,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // bodies/heads/identity/style eval. Measured on job_1786818831439:
           // 4 Gemini evals plus a body-row retry the trial cannot act on
           // anyway (no repair stage).
-          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true });
+          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: true, seasonOutfit: trialSeasonOutfit(inputData) });
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
@@ -930,7 +995,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // straight through to streamingClothingRequirements[charName] and
           // leak that per-page value into every future page.
           const pageClothingReqs = { ...streamingClothingRequirements };
+          // Same contract check the post-parse pages get — this path runs
+          // BEFORE the full parse, so it cannot inherit that reconciliation.
+          const streamingContract = inputData.trialMode
+            ? inputData._trialClothingRequirements
+            : streamingClothingRequirements;
+          const reconciledPageClothing = reconcilePageClothingWithRequirements(
+            page.characterClothing,
+            streamingContract,
+            { pageNumber: page.pageNumber, logger: log, label: 'PAGE CLOTHING/STREAM' }
+          ).clothing;
           if (page.characterClothing) {
+            page.characterClothing = reconciledPageClothing;
             for (const [charName, clothingCat] of Object.entries(page.characterClothing)) {
               pageClothingReqs[charName] = {
                 ...(pageClothingReqs[charName] || {}),
@@ -1009,7 +1085,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // 24 parallel scene expansions can each take 30-60s; without heartbeating,
           // the row would only get updated when the first one finishes.
           const expansionHeartbeat = createJobHeartbeat(jobId, dbPool);
-          expansionResult = await callTextModelStreaming(expansionPrompt, 10000, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { usageLabel: 'scene_expansion' });
+          expansionResult = await callTextModelStreaming(expansionPrompt, null, () => expansionHeartbeat(), modelOverrides.sceneDescriptionModel, { usageLabel: 'scene_expansion' });
           // Usage recorded by the callTextModelStreaming chokepoint (usageLabel above).
           finalSceneDescription = expansionResult.text;
 
@@ -1121,7 +1197,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // pre-override: only if Claude emits no clothing at all do we
           // default the main character to 'costumed' so the page has
           // something to render.
-          const perCharClothing = page.characterClothing || {};
+          const perCharClothing = reconcilePageClothingWithRequirements(
+            page.characterClothing || {},
+            inputData._trialClothingRequirements,
+            { pageNumber: page.pageNumber, logger: log, label: 'PAGE CLOTHING/TRIAL' }
+          ).clothing;
+          page.characterClothing = perCharClothing;
           if (inputData._trialCostumeType && Object.keys(perCharClothing).length === 0) {
             const mainCharIds = inputData.mainCharacters || [];
             for (const char of (inputData.characters || [])) {
@@ -1132,9 +1213,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           }
 
-          // Determine which characters appear in this scene
-          const sceneCharacters = getCharactersInScene(
+          // Determine which characters appear in this scene. Same union rule as
+          // the full-mode page cast (see unionPageCast): the hint's own
+          // `characters[]` is commissioned cast even when the prose never names
+          // them. Per-page clothing keys are deliberately NOT read — they are
+          // populated for the whole cast on pages that commission nobody.
+          const sceneCharacters = unionPageCast(
             (page.sceneHint || '') + '\n' + (page.text || ''),
+            page.characters || [],
             inputData.characters
           );
 
@@ -1296,7 +1382,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             imageData: genResult.imageData,
             modelId: genResult.modelId,
             usage: genResult.usage,
-            prompt: imagePrompt,
+            // Post-shrink sent text + sent scene block, like the unified page
+            // path — the trial page record had the same pre-shrink bug.
+            prompt: genResult.prompt || imagePrompt,
+            compressedScene: genResult.compressedScene || null,
             characterPhotos: pagePhotos,
             grokRefImages: genResult.grokRefImages || null,
             sceneDescription,
@@ -1557,8 +1646,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const defaultClothingCategory = 'standard';
 
         // Cap characters at 5 — more than 5 almost always produces bad results
-        // Main characters appear on ALL covers, non-main are split across initial/back
-        const MAX_COVER_CHARACTERS = 5;
+        // Main characters appear on ALL covers, non-main are split across initial/back.
+        // ONE constant with the iterate path and with the cover JUDGE
+        // (server/lib/coverCastRoster.js).
+        const { MAX_COVER_CHARACTERS } = require('./server/lib/coverCastRoster');
         let charactersForCover;
         if (coverCharacters.length > 0) {
           // Scene description contained character names - use exactly those
@@ -1618,13 +1709,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const hintElementIds = collectCoverHintElementIds(hint);
         const { photos: clothingDedupedPhotos, excludeElementIds } =
           applyCoverWornHeldDedupe(coverPhotos, hint, streamingVisualBible);
-        const visualBibleText = streamingVisualBible
-          ? buildFullVisualBiblePrompt(streamingVisualBible, {
-              skipMainCharacters: true,
-              allowedElementIds: hintElementIds,
-              excludeElementIds,
-            })
-          : '';
+        // visualBibleText is built AFTER the scene description below — the
+        // KEY STORY ELEMENTS gate has to see which entities the assembled
+        // description actually names (cover NAME invariant).
         // Same block as every other cover path and as pages: garment bound to
         // its wearer, plus the legend saying which framed card is whom.
         let characterRefList = buildCharacterReferenceList(clothingDedupedPhotos, inputData.characters, { includeClothing: true })
@@ -1651,8 +1738,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // with wide-eyed discovery"), losing the explicit holds: ART005 spec.
         const initialCoverModel = modelOverrides.coverImageModel || MODEL_DEFAULTS.coverImage || MODEL_DEFAULTS.image;
         const initialCoverBackend = IMAGE_MODELS[initialCoverModel]?.backend || null;
-        const { buildCoverSceneFromHint } = require('./server/lib/coverIterate');
+        const { buildCoverSceneFromHint, reconcileCoverSceneEntities } = require('./server/lib/coverIterate');
         sceneDescription = buildCoverSceneFromHint(hint, streamingVisualBible, charactersForCover, { language: inputData.language || 'en' });
+        // COVER NAME INVARIANT — buildCoverSceneFromHint pastes the outline's
+        // per-character `position` free text verbatim, so any entity NAME the
+        // writer put there arrives here. Either it is fully sent (definition
+        // in KEY STORY ELEMENTS + reference image in the VB grid, which
+        // buildCoverReferences re-derives with the same matcher) or its name
+        // is stripped. job_1788903616404_iqvhj4l8m front cover: the dog "Nia"
+        // reached the model undefined and was painted as a phantom child.
+        const coverNameFix = reconcileCoverSceneEntities({
+          sceneDescription,
+          visualBible: streamingVisualBible,
+          elementIds: hintElementIds,
+          label: `${coverType} FIRST-GEN`,
+        });
+        sceneDescription = coverNameFix.sceneDescription;
+        const visualBibleText = streamingVisualBible
+          ? buildFullVisualBiblePrompt(streamingVisualBible, {
+              skipMainCharacters: true,
+              allowedElementIds: coverNameFix.elementIds,
+              excludeElementIds,
+            })
+          : '';
         const coverExpandedMetadata = null; // No metadata block — structured hint IS the metadata.
 
         const coverLabel = coverType === 'frontCover' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
@@ -1836,6 +1944,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Exact sent text when the provider reports it (post-truncation /
           // post-sanitize), falling back to the built prompt — same as pages.
           prompt: coverResult.prompt || coverPrompt,
+          // Post-shrink scene block when this cover's prompt went over the
+          // model's cap — same field the page path stamps. Null when it fit.
+          compressedScene: coverResult.compressedScene || null,
           referencePhotos: coverPhotos,
           landmarkPhotos: coverLandmarkPhotos,
           emptySceneImage: coverSceneBackground || null,
@@ -1864,6 +1975,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     //    of waiting for the whole pipeline.
     // Idempotent: the `!streamingAvatarStylingPromise` guard means a second
     // caller is a no-op, and the awaits downstream (line ~4870) are unchanged.
+    // The used-category derivation for a set of characters, in one place: the
+    // early kickoff and the post-correction re-render must ask for the SAME
+    // buckets or the second one renders a different avatar than it replaces.
+    const avatarRequirementsFor = (chars, requirements) => (chars || []).flatMap(char => {
+      const charNameTrimmed = char.name?.trim();
+      const charNameLower = charNameTrimmed?.toLowerCase();
+      const charReqs = requirements?.[char.name] ||
+                       requirements?.[charNameTrimmed] ||
+                       requirements?.[charNameLower] ||
+                       (requirements && Object.entries(requirements)
+                         .find(([k]) => k.trim().toLowerCase() === charNameLower)?.[1]);
+      let usedCategories = charReqs
+        ? Object.entries(charReqs)
+            .filter(([cat, config]) => config?.used)
+            .map(([cat, config]) => cat === 'costumed' && config?.costume
+              ? `costumed:${config.costume.toLowerCase()}`
+              : cat)
+        : ['standard'];
+      if (usedCategories.length === 0) usedCategories = ['standard'];
+      return usedCategories.map(cat => ({
+        pageNumber: 'pre-cover',
+        clothingCategory: cat,
+        characterNames: [char.name],
+      }));
+    });
+
     const onClothingRequirementsReady = (requirements) => {
         streamingClothingRequirements = requirements;
         // Bug #13 fix: Log completeness check for clothing requirements
@@ -1884,34 +2021,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.debug(`🎨 [STREAM] Starting early avatar styling (${reqCharCount} characters, ${artStyle} style)...`);
           streamingAvatarStylingPromise = (async () => {
             try {
-              const basicRequirements = (inputData.characters || []).flatMap(char => {
-                const charNameTrimmed = char.name?.trim();
-                const charNameLower = charNameTrimmed?.toLowerCase();
-                const charReqs = requirements?.[char.name] ||
-                                 requirements?.[charNameTrimmed] ||
-                                 requirements?.[charNameLower] ||
-                                 (requirements && Object.entries(requirements)
-                                   .find(([k]) => k.trim().toLowerCase() === charNameLower)?.[1]);
+              const basicRequirements = avatarRequirementsFor(inputData.characters || [], requirements);
 
-                let usedCategories = charReqs
-                  ? Object.entries(charReqs)
-                      .filter(([cat, config]) => config?.used)
-                      .map(([cat, config]) => cat === 'costumed' && config?.costume
-                        ? `costumed:${config.costume.toLowerCase()}`
-                        : cat)
-                  : ['standard'];
-
-                if (usedCategories.length === 0) {
-                  usedCategories = ['standard'];
-                }
-
-                return usedCategories.map(cat => ({
-                  pageNumber: 'pre-cover',
-                  clothingCategory: cat,
-                  characterNames: [char.name]
-                }));
-              });
-              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
+              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
               earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
             } catch (error) {
@@ -1919,6 +2031,41 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
           })();
         }
+    };
+
+    // THE AVATAR IS RENDERED BEFORE THE WARDROBE CORRECTION EXISTS.
+    // The kickoff above fires at the story-bible stage; the wardrobe-vs-Visual-
+    // Bible correction can only run once the bible exists, several stages later
+    // (beatsPipeline). The early kickoff is deliberate — avatars are the long
+    // pole in front of every image — so the fix is not to delay it but to
+    // re-render exactly the characters whose outfit text actually changed.
+    // Corrections are rare (a genuine contract/bible contradiction), so this is
+    // one avatar render per corrected character and nothing when nothing moved.
+    const onWardrobeCorrectedReady = (characterNames, requirements) => {
+      if (inputData.trialMode || skipImages) return;
+      const names = (characterNames || []).filter(Boolean);
+      if (names.length === 0) return;
+      const affected = (inputData.characters || []).filter(c =>
+        names.some(n => String(n).trim().toLowerCase() === String(c.name || '').trim().toLowerCase()));
+      if (affected.length === 0) return;
+      const reqs = avatarRequirementsFor(affected, requirements);
+      // Chained onto the in-flight styling promise, and put BACK into it, so the
+      // downstream awaits wait for the corrected avatar rather than racing it.
+      const prior = streamingAvatarStylingPromise || Promise.resolve();
+      streamingAvatarStylingPromise = (async () => {
+        try { await prior; } catch { /* the kickoff owns its own failure */ }
+        try {
+          for (const r of reqs) {
+            invalidateStyledAvatarForCategory(r.characterNames[0], r.clothingCategory,
+              affected.find(c => c.name === r.characterNames[0]) || null);
+          }
+          log.info(`🧥 [STREAM] Wardrobe corrected for ${names.join(', ')} — re-rendering ${reqs.length} styled avatar(s) against the Visual Bible`);
+          await prepareStyledAvatars(affected, artStyle, reqs, requirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: false, seasonOutfit: trialSeasonOutfit(inputData) });
+          earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
+        } catch (error) {
+          log.warn(`⚠️ [STREAM] Post-correction avatar re-render failed: ${error.message} — the avatar keeps the pre-correction outfit`);
+        }
+      })();
     };
 
     // Progressive parser with callbacks for streaming updates AND parallel task initiation
@@ -2019,36 +2166,53 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // shipping a photographic page in a watercolour book. Measured on
           // prod job_1787647410717_5dvfqu8jg p1 and staging
           // job_1787696601288_bfgznq960: both 'pending_lazy', both zero plates.
-          // No scene view exists here (the plate is built from the VB
-          // background, before any brief), so the resolver picks an exterior —
-          // which is what a background plate wants.
           // Photo resolution is async, and this callback is deliberately sync
           // (making it async would leave an un-awaited promise on the stream
           // handler). So resolve ONCE PER LOCATION into a promise here and await
-          // it inside the plate task that already runs async below.
-          const { resolveLandmarkPhotoForLocation, buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
-          const landmarkPromiseByPage = {};
-          for (const loc of (vb.locations || [])) {
-            if (!loc.isRealLandmark || !loc.pages?.length) continue;
-            const p = resolveLandmarkPhotoForLocation(vb, loc, { sceneView: null })
-              .catch(err => {
-                log.warn(`⚠️ [TRIAL] Landmark photo resolve failed for "${loc.name}": ${err.message}`);
-                return null;
-              });
-            for (const pn of loc.pages) {
-              if (!landmarkPromiseByPage[pn]) landmarkPromiseByPage[pn] = p;
-            }
-          }
+          // it inside the plate task that already runs async below — the scene
+          // view and the rest of that reasoning now live in the helper's doc.
+          // The per-location resolution lives in trialPlateLandmarkPromisesByPage
+          // — and it AWAITS landmarkDescriptionsPromise first. Without that the
+          // resolver's sync policy half decided on a location whose
+          // photoVariants had not been loaded yet (the descriptions query was
+          // only started one line above, at 2047), so every variant-backed Swiss
+          // landmark resolved to null: the plate rendered with no photo and,
+          // since 286086573 derives both from the same variable, with neither
+          // the REFERENCE line nor the fidelity block. Measured on staging
+          // job_1789337873076_qf2at21ui p6 (Kirche Rohrdorf, 3 variants): the
+          // page row carried the photo, the plate prompt carried neither block.
+          // The page path (line ~887) and the cover path (line ~1706) have
+          // always awaited it before resolving landmark photos; this was the
+          // one sibling that did not.
+          const { buildLandmarkFidelityBlock, trialPlateLandmarkPromisesByPage } = require('./server/lib/storyHelpers');
+          const landmarkPromiseByPage = trialPlateLandmarkPromisesByPage(vb, {
+            descriptionsPromise: landmarkDescriptionsPromise,
+          });
 
-          for (const bg of vb.backgrounds) {
-            if (!bg.description || !bg.pages?.length) continue;
-            // Pick the first landmark whose `pages` array overlaps this bg's
+          // ONE plate per distinct vantage, fanned out to that vantage's pages —
+          // the same economy full mode has had since Phase 5a-pre-vantage. Trial
+          // used to render one plate PER PAGE (6 calls / $0.12 on a 6-page trial,
+          // 17-23% of the whole trial cost) while measuring only 1-3 distinct
+          // vantages across 12 measured trials. The grouping is the real grouper
+          // (groupPagesByVantage) fed a synthesized page shape — see
+          // groupTrialPlatePagesByVantage. Pages with no LOC come back as their
+          // own single-page group, so nobody loses a plate.
+          const { groupTrialPlatePagesByVantage } = require('./server/lib/sceneMetadata');
+          const plateGroups = groupTrialPlatePagesByVantage(vb);
+          log.info(`🎬 [TRIAL] ${plateGroups.length} plate(s) for ${plateGroups.reduce((n, g) => n + g.pages.length, 0)} page(s): ${plateGroups.map(g => `${g.vantageId || 'unassigned'}→p${g.pages.join(',')}`).join('; ')}`);
+          for (const plateGroup of plateGroups) {
+            const bg = { description: plateGroup.description, pages: plateGroup.pages };
+            // Representative page — the one whose landmark, log line and prompt
+            // page-number the shared plate inherits. Same choice the full-mode
+            // vantage path makes (`group.pageNumbers[0]`).
+            const pageNum = plateGroup.pages[0];
+            // Pick the first landmark whose `pages` array overlaps this group's
             // pages — typically there's only one. Plumbing the photo into the
             // empty-scene render is the only way to anchor the building's
             // shape; the scene description alone doesn't carry visual identity.
             const bgLandmarkPromise = bg.pages.map(pn => landmarkPromiseByPage[pn]).find(Boolean)
               || Promise.resolve(null);
-            for (const pageNum of bg.pages) {
+            {
               const platePromise = bgLimit(async () => {
                 try {
                   const bgLandmark = await bgLandmarkPromise;
@@ -2058,11 +2222,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   // photo by NAME so Grok knows which building it's looking at
                   // and preserves its silhouette; '' when no landmark.
                   const landmarkFidelityBlock = buildLandmarkFidelityBlock(bgLandmark);
-                  log.info(`🎬 [TRIAL] Empty scene page ${pageNum}: ${bgLandmark ? `landmark "${bgLandmark.name}" variant ${bgLandmark.variantNumber ?? '?'} attached` : 'no landmark photo'}`);
+                  log.info(`🎬 [TRIAL] Empty scene ${plateGroup.vantageId || 'unassigned'} (pages ${bg.pages.join(',')}, rep p${pageNum}): ${bgLandmark ? `landmark "${bgLandmark.name}" variant ${bgLandmark.variantNumber ?? '?'} attached` : 'no landmark photo'}`);
                   const emptyPrompt = buildEmptyScenePrompt({
                     style: artStyleDesc,
                     description: bg.description,
                     landmarkFidelity: landmarkFidelityBlock,
+                    // Tells the model what the attached reference IS
+                    // (prompts.js REFERENCE line). Same expression the full /
+                    // vantage path uses — 'landmark' when a photo is attached,
+                    // otherwise null. No VB element grid is built on the trial
+                    // plate call, so the 'element' arm of that expression has
+                    // no counterpart here. Without this the trial plate got the
+                    // landmark photo as pixels but no line saying the place in
+                    // the scene IS that photo.
+                    referenceKind: emptySceneLandmarkPhotos.length > 0 ? 'landmark' : null,
                     visualBible: streamingVisualBible,
                     pageNumber: pageNum,
                   });
@@ -2080,21 +2253,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                   });
                   if (result?.imageData) {
-                    sceneBackgrounds[pageNum] = { imageData: result.imageData, prompt: emptyPrompt };
-                    log.info(`🎬 [TRIAL] Empty scene for page ${pageNum} generated (${Math.round(result.imageData.length / 1024)}KB)`);
+                    // grokRefImages = what packReferences actually packed into
+                    // the plate call (the landmark photo, here). Same field
+                    // name every other image call in the pipeline stores its
+                    // packed refs under; carried onto the page row below as
+                    // emptySceneGrokRefImages so the plate call leaves a trace.
+                    // Fan out the same canvas to every page in the group — same
+                    // shape (and same per-page trace fields) the full-mode
+                    // vantage fan-out writes. vantageId is null for a page that
+                    // resolved to no LOC, exactly as the vantage path leaves it.
+                    for (const pn of bg.pages) {
+                      sceneBackgrounds[pn] = {
+                        imageData: result.imageData,
+                        prompt: emptyPrompt,
+                        grokRefImages: result.grokRefImages || null,
+                        vantageId: plateGroup.vantageId || null,
+                      };
+                    }
+                    log.info(`🎬 [TRIAL] Empty scene for pages ${bg.pages.join(',')} generated from 1 plate (${Math.round(result.imageData.length / 1024)}KB)`);
                     if (result.usage) {
                       const isGrok = result.modelId?.startsWith('grok-imagine');
                       addUsage(isGrok ? 'grok' : 'gemini_image', result.usage, 'trial_empty_scene', result.modelId);
                     }
                   }
                 } catch (err) {
-                  log.warn(`⚠️ [TRIAL] Empty scene for page ${pageNum} failed: ${err.message}`);
+                  log.warn(`⚠️ [TRIAL] Empty scene for pages ${bg.pages.join(',')} failed: ${err.message}`);
                 }
               });
               // Registered BEFORE any page streams, so the page render can await
               // its own plate instead of racing it. Never rejects (the task
               // swallows its own errors), so an await here cannot break a page.
-              trialEmptyScenePromises.set(pageNum, platePromise);
+              // Every page in the group awaits the SAME promise — the one render
+              // that fills all their slots.
+              for (const pn of bg.pages) trialEmptyScenePromises.set(pn, platePromise);
               bgPromises.push(platePromise);
             }
           }
@@ -2130,7 +2321,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
 
             // Build scene description from the cover hint JSON
-            const sceneDescription = '```json\n' + JSON.stringify(coverScene, null, 2) + '\n```';
+            // `let`: the cover NAME invariant may strip an unsendable entity
+            // name from this blob (token-mode strip — JSON-safe).
+            let sceneDescription = '```json\n' + JSON.stringify(coverScene, null, 2) + '\n```';
 
             // Determine which characters appear in the cover scene
             let coverCharacters = [];
@@ -2191,9 +2384,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const trialCoverIds = (coverScene.objects || [])
               .map(obj => typeof obj === 'string' ? obj.match(/((?:ART|ANI|VEH|CHR|LOC)\d+)/i)?.[1]?.toUpperCase() : (obj?.id ? String(obj.id).toUpperCase() : null))
               .filter(Boolean);
+            // COVER NAME INVARIANT — same helper as the full-account cover
+            // paths: an entity named in the trial cover's description is
+            // fully sent or its name is stripped.
+            const { reconcileCoverSceneEntities: reconcileTrialCoverEntities } = require('./server/lib/coverIterate');
+            const trialNameFix = reconcileTrialCoverEntities({
+              sceneDescription,
+              visualBible: streamingVisualBible,
+              elementIds: trialCoverIds.length > 0 ? trialCoverIds : null,
+              label: 'TRIAL FRONT COVER',
+              stripMode: 'token', // the trial cover description is a JSON blob
+            });
+            sceneDescription = trialNameFix.sceneDescription;
             const visualBibleText = buildFullVisualBiblePrompt(streamingVisualBible, {
               skipMainCharacters: true,
-              allowedElementIds: trialCoverIds.length > 0 ? trialCoverIds : null,
+              allowedElementIds: trialNameFix.elementIds,
             });
 
             // Textless when covers are typeset app-side — same rule the
@@ -2306,7 +2511,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               type: 'frontCover',
               imageData: result.imageData,
               description: sceneDescription,
-              prompt: coverPrompt,
+              // Sent text, not the build — same fix as the streaming cover.
+              prompt: result.prompt || coverPrompt,
+              // Post-shrink scene block when this cover's prompt went over the
+              // model's cap — same field the page path stamps. Null when it fit.
+              compressedScene: result.compressedScene || null,
               modelId: result.modelId,
               referencePhotos: coverPhotos,
               landmarkPhotos: coverLandmarkPhotos,
@@ -2444,6 +2653,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // so kick them off there instead of after the whole pipeline. Same
         // trigger the unified stream uses; the awaits downstream are unchanged.
         onClothingRequirements: onClothingRequirementsReady,
+        onWardrobeCorrected: onWardrobeCorrectedReady,
         // Per-stage progress (2-7%): without it the bar sits at 1% for the
         // whole ~10-minute text phase; heartbeat never moves the percent.
         onStage: async (pct, msg, hint = null) => {
@@ -2522,7 +2732,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (beatsMode) {
       await runBeatsWriterWithLandmarkGuideline();
     } else {
-      const unifiedResult = await callTextModelStreaming(unifiedPrompt, 64000, (chunk, fullText) => {
+      // Trial only (resolvePipelineMode returns 'unified' for trialMode alone).
+      if (!unifiedPrompt) throw new Error('No writer prompt: a non-trial job reached the single-call branch');
+      const unifiedResult = await callTextModelStreaming(unifiedPrompt, null, (chunk, fullText) => {
         progressiveParser.processChunk(chunk, fullText);
         unifiedHeartbeat();  // throttled — fires at most every 30s
       }, modelOverrides.outlineModel, { usageLabel: 'unified_story' });
@@ -2617,10 +2829,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         let reviewModelId = null;
         for (let attempt = 1; attempt <= 2 && !reviewText; attempt++) {
           try {
-            const reviewResult = await callTextModelStreaming(reviewPrompt, 32000, () => {
+            const reviewResult = await callTextModelStreaming(reviewPrompt, null, () => {
               unifiedHeartbeat(); // keep story_jobs.updated_at fresh during the review
             }, reviewModel, { usageLabel: 'outline_review' });
             const t = reviewResult.text || '';
+            // A review cut at the ceiling carries a partial FIXES REQUIRED list
+            // and no closing section — a failed attempt, never a shorter review
+            // (textReplyGuard.js). The retry loop runs once more, then the
+            // draft ships unpatched, exactly as on a shape failure.
+            if (reviewResult.truncation?.suspected) {
+              log.warn(`⚠️ [OUTLINE-REVIEW] attempt ${attempt}: reviewer reply ${require('./server/lib/textModels').describeTruncation(reviewResult.truncation)} — ${attempt < 2 ? 'retrying' : 'giving up'}`);
+              continue;
+            }
             // Minimal shape gate: without these markers the concatenation would
             // confuse the parsers — treat as a failed attempt.
             if (/---\s*ANALYSIS\s*---/i.test(t) && /FIXES\s+REQUIRED/i.test(t)) {
@@ -2701,7 +2921,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const clothingRequirements = inputData.trialMode
       ? inputData._trialClothingRequirements
       : (parser.extractClothingRequirements() || streamingClothingRequirements);
-    const visualBible = parser.extractVisualBible() || streamingVisualBible || {};
+    // Beats mode: the pipeline's own bible object, which its post-checks
+    // (assignment trim, invented-peer age clamp) mutated and which the Art
+    // Director used. A re-parse of the transcript is the FALLBACK only — until
+    // 2026-09-11 it was the primary, and re-parsed the untrimmed JSON (the
+    // transcript is now kept in step too; see beatsPipeline
+    // syncVisualBibleSection and docs/decisions.md 2026-09-11 "trim not persisted").
+    const visualBible = (beatsMode && beatsResult.visualBible) || parser.extractVisualBible() || streamingVisualBible || {};
+    // The assignment-trim assertion that used to stand here is gone with the
+    // trim itself (2026-09-11): page assignment is no longer guessed at bible
+    // time, it is rebuilt from the FINAL scene briefs inside the beats pipeline
+    // (`applyBriefUsage`), which is also what the element budget is measured
+    // against downstream. Both `trimVbAssignments` and its `vbTrimLostPages`
+    // tripwire were deleted the same day, once nothing called either.
     // Sonnet sometimes emits two secondaryCharacters entries that share the
     // same CHR id (the same person referenced by relation AND by attribute).
     // Resolve via Haiku before any downstream consumer sees the collision —
@@ -2758,6 +2990,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Beats mode assembled its own pages (text + beat scene line); the parser
     // has no ---STORY PAGES--- draft/patch structure to merge in that path.
     const storyPages = beatsMode ? beatsResult.pages : parser.extractPages();
+
+    // Page-side sibling of the cover reconciliation above: a page may not ask
+    // for an outfit the story's clothing contract says does not exist. Left
+    // alone, the request resolves to no clothing description at all and the
+    // garment reaches the render as a prop (see the helper's comment).
+    for (const page of (storyPages || [])) {
+      if (!page?.characterClothing || Object.keys(page.characterClothing).length === 0) continue;
+      const { clothing } = reconcilePageClothingWithRequirements(
+        page.characterClothing,
+        clothingRequirements,
+        { pageNumber: page.pageNumber, logger: log }
+      );
+      page.characterClothing = clothing;
+    }
 
     // Deterministic scene metadata ↔ scene design consistency check on the
     // FINAL pages (draft + reviewer patches merged). Mechanical string/set
@@ -3037,7 +3283,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characterNames: [char.name]
             }));
           });
-          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
+          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
           log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
@@ -3117,7 +3363,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         ? `coverage top-up (${getStyledAvatarCacheStats().size} already cached)`
         : 'early styling did not run';
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled-avatar reqs for ${artStyle} (${mode})`);
-      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode });
+      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.storyAvatarModel || null, { skipQualityEval: !!inputData.trialMode, seasonOutfit: trialSeasonOutfit(inputData) });
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
@@ -3267,6 +3513,59 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       };
     });
 
+    // WARDROBE-STATE AVATAR VARIANTS (owner ruling 2026-09-19).
+    //
+    // This is the earliest point the flip data exists. The avatar kickoff fires
+    // at the story-bible stage, long before any scene brief, so `wornItems[]` —
+    // the per-page declaration of which garment comes OFF — is simply not
+    // available there; and `onWardrobeCorrected` only fires when the wardrobe
+    // check actually rewrote a clause, which most stories never do. So the
+    // derivation rides neither hook: it runs here, once, on the all-pages Art
+    // Director output, and chains onto the in-flight styling promise so the
+    // base sheets it redresses are finished first.
+    //
+    // Covers are deliberately NOT included: compositeCastBuilder resolves a
+    // cover cast by the page's plain clothing category, so a cover always takes
+    // the worn (base) sheet. A cover is the book's cover, not a page with a
+    // per-page garment state. See docs/decisions.md.
+    // Trials are out of scope — a trial has no Art Director brief to declare a
+    // flip in, and `inputData.trialMode` skips avatar styling here anyway.
+    if (!inputData.trialMode && !skipImages) {
+      const { deriveWardrobeVariantRequirements } = require('./server/lib/wardrobeVariants');
+      const vbForVariants = visualBible || streamingVisualBible;
+      let variantRows = [];
+      try {
+        const scenesForVariants = expandedScenes.map(scene => ({
+          pageNumber: scene.pageNumber,
+          sceneMetadata: extractSceneMetadata(scene.sceneDescription),
+        }));
+        variantRows = deriveWardrobeVariantRequirements({
+          visualBible: vbForVariants,
+          scenes: scenesForVariants,
+          clothingRequirements: streamingClothingRequirements,
+          characters: inputData.characters || [],
+        }).requirements;
+      } catch (err) {
+        log.warn(`👕 [WARDROBE-VARIANT] derivation failed: ${err.message} — every page keeps the worn sheet + the "leave it off" line`);
+      }
+      if (variantRows.length > 0) {
+        const prior = streamingAvatarStylingPromise || Promise.resolve();
+        streamingAvatarStylingPromise = (async () => {
+          try { await prior; } catch { /* the kickoff owns its own failure */ }
+          try {
+            const { prepareWardrobeVariantAvatars } = require('./server/lib/styledAvatars');
+            await prepareWardrobeVariantAvatars(inputData.characters || [], artStyle, variantRows, {
+              addUsage,
+              skipQualityEval: false,
+              backendOverride: modelOverrides.storyAvatarModel || null,
+            });
+          } catch (error) {
+            log.warn(`👕 [WARDROBE-VARIANT] variant rendering failed: ${error.message} — every page keeps the worn sheet + the "leave it off" line`);
+          }
+        })();
+      }
+    }
+
     // Batch-translate scene summaries to story language (separate from scene expansion)
     // One cheap Haiku call with all summaries — ~1-2s, ~$0.001
     if (lang !== 'en') {
@@ -3280,7 +3579,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const langInstruction = getLanguageInstruction(lang);
           const translationPrompt = `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${langInstruction}\n\n${summaries}`;
           const { callTextModelStreaming } = require('./server/lib/textModels');
-          const transResult = await callTextModelStreaming(translationPrompt, 2000, null, 'claude-haiku-4-5-20251001', { usageLabel: 'scene_translation' });
+          const transResult = await callTextModelStreaming(translationPrompt, null, null, 'claude-haiku-4-5-20251001', { usageLabel: 'scene_translation' });
           if (transResult?.text) {
             const translations = transResult.text.trim().split('\n').filter(l => l.trim());
             let tIdx = 0;
@@ -3432,6 +3731,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageData: result.imageData,
               description: result.description,
               prompt: result.prompt,
+              // THE COVER RECORD IS THE SINGLE GATE ON WHAT REACHES
+              // stories.data. `prompt` above is the pre-shrink build; this is
+              // the scene block the model was actually handed when that build
+              // went over the cap. Absent from this whitelist, the field died
+              // here even once the generator returned it — measured on staging
+              // job_1789584708605_rts4wqupm: absent on all three cover roots
+              // and null on all three v0 versions, which resolve from the root.
+              compressedScene: result.compressedScene || null,
               qualityScore: result.qualityScore,
               qualityReasoning: result.qualityReasoning,
               wasRegenerated: result.wasRegenerated,
@@ -3523,17 +3830,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // ── TEXT REFINEMENT, IN PARALLEL WITH IMAGES ──────────────────────────
     // Scenes are locked at this point, so image generation and prose polishing
     // are independent: the refiner receives the scene outlines READ-ONLY and may
-    // only rewrite page prose, never events. Running it here costs no wall-clock
-    // — images take ~25 min on a 10-page story, refinement ~2-4 min — whereas a
-    // pass after images would add its full duration to the total.
+    // only rewrite page prose, never events. Running it here hides most of its
+    // wall-clock behind the phases that follow, whereas a pass started after
+    // them would add its full duration to the total.
+    // WHAT THE NUMBERS ACTUALLY ARE (corrected 2026-09-14). An older version of
+    // this comment — and the commit that moved the join, 2beda5425 — claimed
+    // "images take ~25 min". They do not: PURE page generation is ~55s (Grok,
+    // 18 pages, parallel). The ~25 minutes is the REPAIR phase, which starts
+    // after the join. The refine chain measures 400-600s and up to ~880s, so it
+    // is NOT hidden behind pure generation; the join waits for it.
     // Never blocks and never throws: a failed refinement leaves the original
     // text in place (startBackgroundRefine swallows and logs).
     // TRIAL SKIPS REFINEMENT (owner 2026-08-15). The "costs no wall-clock"
     // premise above holds only when images take minutes: a trial renders all 5
-    // pages in ~15s (Grok, no eval, no repair), so a ~184s polish pass can
-    // never finish behind them. Measured on both staging trials: refinement hit
-    // the 90s join cap every time and the refined text was DISCARDED — 90s of a
-    // ~230s run, plus two rounds of tokens, for nothing.
+    // pages in ~15s (Grok, no eval, no repair) and has no repair phase behind
+    // which the chain could run, so a minutes-long polish pass would be added
+    // wholesale to a ~230s run. Measured on both staging trials when it was
+    // still enabled: refinement hit the join cap every time and the refined
+    // text was DISCARDED — the wait, plus two rounds of tokens, for nothing.
+    // The cap is gone now, which makes the trial exclusion MORE important, not
+    // less: without it the trial would wait out the whole chain.
     const refineEnabled = process.env.TEXT_REFINE !== 'false' && !inputData.trialMode;
     let textRefinePromise = null;
     // Per-page before/after, filled at the join so dev mode can show WHAT the
@@ -3541,6 +3857,280 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let textRefineReport = null;
     // Latest snapshot the refiner published (audit, then after each round).
     let textRefinePartial = null;
+
+    // ── TEXT-REFINE JOIN — RUNS ONCE, BEFORE ANYTHING READS THE PAGE TEXT ──
+    // Idempotent: the first call joins the refiner and rewrites the page text
+    // in `expandedScenes`, in `fullStoryText`, and in every page-object list
+    // passed as `targets`; every later call is a no-op.
+    //
+    // ORDERING (owner, 2026-09-13). This used to run AFTER the repair
+    // pipeline, which meant the mid-loop book audit inside that pipeline read
+    // PRE-REFINE prose and routed IMG faults from it — image repairs driven by
+    // a comparison against wording the book would not contain. Measured on 12
+    // staging stories: the refiner rewrote 172 of 178 pages (97%), and 42% of
+    // the shipped words on one book were absent from the text the audit read.
+    // It is not only wording: the refiner merges dialogue, drops beats and
+    // changes the depicted action, which is exactly what an IMG fault judges.
+    let textRefineJoined = false;
+    const joinTextRefinement = async (targets = []) => {
+      if (textRefineJoined) return;
+      textRefineJoined = true;
+      // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
+      // Started back at pagesStart. Resolves to null on any failure — the
+      // original text simply stays.
+      //
+      // UNBOUNDED, AND THAT IS THE POINT (owner, 2026-09-14). This await was
+      // bounded from 2026-08-10 on the premise that "images take ~25 min, so
+      // anything still running here is anomalous". The premise was wrong, and
+      // the commit that moved this join (2beda5425) repeated it: PURE page
+      // generation is ~55s (Grok, 18 pages, parallel) — the ~25 minutes is the
+      // REPAIR phase, which now runs AFTER this point. The refiner's headroom
+      // went from ~1460s to ~99s and the race started losing every time: 3 of 3
+      // staging stories after that commit, two of them with ZERO refine rounds.
+      // Measured chains run 400-600s, with 743/770/841/878s inside one month.
+      // Nothing cancels the chain when the race is lost, so the deadline never
+      // saved a franc — it discarded ~$1.01 of paid work and the whole text
+      // audit with it. The join therefore WAITS: the chain is never truncated,
+      // and the book audit downstream reads the FINAL text.
+      // It cannot wait forever — every model call in the chain is bounded by
+      // textModels' streaming ceiling (>=1500s) and its 120s inactivity abort,
+      // each audit by its own 900s hostage guard, and every step catches its
+      // own failure. Slowness is reported, never acted on: see the warning
+      // below. (docs/decisions.md, 2026-09-14.)
+      if (textRefinePromise) {
+        // HISTORY OF THE CAP THAT IS NOW GONE — kept so it is not re-derived.
+        // 300s, not 90s (owner 2026-08-17). The cap existed so a slow refiner could not
+        // add its full duration to a story, but 90s was shorter than the refiner's
+        // own runtime: deepseek needs ~2-4 min for two rounds, so a fast image phase
+        // meant the pass was DISCARDED after being paid for (staging
+        // job_1786998860057_o6deqtv5s: $0.16 and 23k output tokens thrown away).
+        // Worst case now adds up to 5 min on a run whose images finished early.
+        // SCALED (2026-08-24). A flat 300s was measured on a stage that had no
+        // blind audit in front of it — that landed 2026-08-23 and roughly doubled
+        // the stage, so the budget no longer matched the work. It is also
+        // reading-level sensitive: a `standard` book's audit emitted 2.3x the
+        // output tokens of a `1st-grade` one (18.4k vs 7.9k on two runs the same
+        // evening), and its single round outweighed a whole 1st-grade round. The
+        // long-text levels got double the base, plus a per-page allowance beyond
+        // ten pages. Salvage below is what makes overrunning cheap; this only
+        // decides how long a user waits for the last round.
+        // UNSPLIT (2026-09-14). The reading-level halves are gone — every book
+        // gets the long base; the per-page allowance stays.
+        // NO DEADLINE (owner, 2026-09-14). The budget above is now only the
+        // point at which a still-running chain is worth a log line; the join
+        // waits for the chain either way. See awaitTextRefineJoin.
+        const {
+          computeTextRefineJoinWarnMs, awaitTextRefineJoin, isTotalTextAuditLoss,
+        } = require('./server/lib/textRefine');
+        const JOIN_WARN_MS = computeTextRefineJoinWarnMs(
+          expandedScenes?.length || 0,
+          process.env.TEXT_REFINE_JOIN_WARN_MS,
+        );
+        const { usable, source, waitedMs, slow } = await awaitTextRefineJoin(
+          textRefinePromise,
+          () => textRefinePartial,
+          {
+            warnAfterMs: JOIN_WARN_MS,
+            onSlow: (ms) => {
+              const secs = (ms / 1000).toFixed(0);
+              log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed — waiting for it, the book audit downstream must read the final text`);
+              genLog.warn('text_refine_join_slow', `Text refinement is still running ${secs}s after images completed — the pipeline waits for it rather than truncating the chain, because every stage below (the book audit first) must read the text that ships. The chain's own per-call ceilings bound this wait.`);
+            },
+          }
+        );
+        if (slow) {
+          genLog.info('text_refine_join_slow_done', `Text refinement finished after a ${(waitedMs / 1000).toFixed(1)}s join wait (${source})`);
+        }
+        if (source === 'partial' || source === 'original' || source === 'failed') {
+          // The chain FAILED — it was never cut short. Salvage whatever it
+          // published, and rank the loss the way the gate's loss deserves.
+          if (!isTotalTextAuditLoss(usable)) {
+            log.warn(`⚠️ [TEXT-REFINE] the chain did not deliver a complete result — shipping ${usable.rounds.length} completed round(s)`);
+            genLog.warn('text_refine_join_partial', `Text refinement failed before it finished — kept ${usable.rounds.length} completed round(s), rewrote page(s) ${usable.changed.join(', ')}; the unfinished step's share of the text audit did not apply, so those pages went unchecked for the faults it exists to catch, text/picture alignment among them`);
+          } else {
+            // TOTAL loss — ERROR, not warn (owner, 2026-09-14). Nothing landed:
+            // the whole text-quality gate is gone, which is a bigger loss than
+            // one styled avatar (avatar_guarantee_fallback, logged at error).
+            // The old wording — "original text kept" — read like a benign
+            // fallback and named nothing that was lost.
+            log.error(`❌ [TEXT-REFINE] the chain failed with no round finished — the ENTIRE text audit is discarded, the unchecked text ships`);
+            genLog.error('text_refine_join_failed', `Text refinement failed and no round landed — the text audit did not apply: nothing checked these pages for the faults its two auditors exist to catch, text/picture alignment among them; the unrefined text ships as written`);
+          }
+        }
+        if (usable?.changed?.length) {
+          // Capture the pre-refine prose BEFORE the overwrite below — it is the
+          // only moment both versions exist. Without it the refiner's work is
+          // invisible: the story ships the rewritten text with no record of what
+          // changed, and 10 of 14 pages were rewritten on the first real run.
+          textRefineReport = {
+            rounds: usable.rounds.length,
+            // Per-step trace (owner, 2026-08-27): the count alone made "what did
+            // this step change" unanswerable twice. `kind` says which step —
+            // 'repair' or 'lector'. Analyses capped — text only.
+            roundTrace: usable.rounds.map(r => ({
+              round: r.round,
+              kind: r.kind || null,
+              ok: r.ok,
+              modelKey: r.modelKey || null,
+              modelId: r.modelId || null,
+              elapsedMs: r.elapsedMs || 0,
+              cost: r.cost ?? null,
+              changedPages: r.changedPages || [],
+              // How much each round landed, in that round's own unit: findings
+              // the code-side applier placed for the lector and the diff (see
+              // applyLectorFindings), pages rewritten for the whole-page passes
+              // (repair / repetition_fix / length_fix), which have no
+              // per-finding applier. `droppedCount` stays applier-only.
+              appliedCount: r.appliedCount ?? null,
+              droppedCount: r.droppedCount ?? null,
+              // THE PASS'S OWN REPORT vs THE DIFF (2026-09-17). A whole-page
+              // pass claims a rewrite by returning a page block; these say which
+              // of those blocks came back identical, and which pages it rewrote
+              // that no finding named. The per-finding appliers answer the same
+              // question with `unparsedCount`: finding-shaped lines the parser
+              // could not read, which used to be skipped in silence.
+              returnedIdentical: r.returnedIdentical || [],
+              changedUnasked: r.changedUnasked || [],
+              unparsedCount: r.unparsedCount ?? null,
+              unparsedLines: r.unparsedLines || [],
+              // WHY each non-applied finding was not applied. The count alone
+              // cannot answer "what happened to that finding" — which is the
+              // whole question the ledger below exists for, asked of the
+              // per-finding appliers (quote-absent / overlap / no-such-page).
+              droppedFindings: r.droppedFindings || [],
+              // The whole-page passes' per-finding outcomes (textRefine.js,
+              // resolveFindingOutcomes). Present only on repair / repetition_fix
+              // / length_fix, which are the rounds handed FAULT lines.
+              findingOutcomes: (r.findingOutcomes || []).map(f => ({
+                pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+                text: f.text, outcome: f.outcome, reason: f.reason || null,
+              })),
+              error: r.error || null,
+              analysis: (r.analysis || '').slice(0, 15000),
+            })),
+            changedPages: usable.changed,
+            // Cross-page repetition check after the repair pass (2026-09-10):
+            // { pairs, correctivePassRan, resolved, ... } — see textRefine.js.
+            repetition: usable.repetition || null,
+            // THE TWO AUDITS (owner ruling 2026-09-03) — one entry each, raw
+            // output included so a fault can be traced to the auditor that found
+            // it, plus the merged list the single repair pass actually answered.
+            audits: (usable.audits || []).map(a => ({
+              source: a.source,
+              ok: !!a.ok,
+              modelKey: a.modelKey || null,
+              modelId: a.modelId || null,
+              faults: a.faults ?? 0,
+              byCategory: a.byCategory || {},
+              elapsedMs: a.elapsedMs || 0,
+              cost: a.cost ?? null,
+              error: a.error || null,
+              raw: (a.raw || '').slice(0, 40000),
+            })),
+            mergedFindings: (usable.mergedFindings || []).map(f => ({
+              pageNumber: f.pageNumber,
+              category: f.category,
+              text: f.text,
+              sources: f.sources,
+            })),
+            mergeStats: usable.mergeStats || null,
+            // THE LEDGER — one entry per merged finding, each with the outcome
+            // the repair pass gave it and, where that is not `page-rewritten`,
+            // the reason. Without it the report could say 20 findings went in
+            // and 17 pages came out, and nothing at all about which finding
+            // reached which page (staging job_1789584708605_rts4wqupm).
+            findingLedger: (usable.findingLedger || []).map(f => ({
+              pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+              text: f.text, outcome: f.outcome, reason: f.reason || null,
+            })),
+            // The word counter's re-measurement after the whole-page passes
+            // (textRefine.js): before/after violation counts, every page's final
+            // word count, and whether the corrective pass ran. It is the one
+            // finding class whose closure is MEASURED rather than assumed, and
+            // it was computed on every run since 2026-09-11 and stored on none.
+            wordBudget: usable.wordBudget || null,
+            // The lector's raw output, its parsed findings, and what the
+            // code-side applier did with each (see applyLectorFindings).
+            proofread: usable.proofread || '',
+            lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+            lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+            // A dropped finding keeps its REASON: quote-absent is the
+            // hallucination guard firing, overlap is two findings on one span.
+            lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
+            durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
+            model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
+            // Same three fields beatsReviewReport and sceneReviewReport carry, so
+            // renderDiffPanel shows all three panels alike (owner 2026-09-06).
+            // They were already IN the round entries — this only projects them.
+            // `prompt` is the repair round's prompt (the lector round has its own
+            // template and no rewrite prompt); `briefsIn` is the page text as
+            // sent in; `analysis` concatenates EVERY round's analysis, labelled,
+            // because a run has a repair round and a lector round and storing
+            // only the last would read as the whole stage's reasoning.
+            prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
+            briefsIn: (usable.original || []).map(p => ({ pageNumber: p.pageNumber, brief: p.text || '' })),
+            analysis: usable.rounds
+              .filter(r => (r.analysis || '').trim())
+              .map(r => `--- Round ${r.round} (${r.kind || 'repair'}${r.modelId ? `, ${r.modelId}` : ''}) ---\n${r.analysis.trim()}`)
+              .join('\n\n'),
+            pages: usable.pages
+              .filter(p => usable.changed.includes(p.pageNumber))
+              .map(p => ({
+                pageNumber: p.pageNumber,
+                before: expandedScenes.find(sc => sc.pageNumber === p.pageNumber)?.text || '',
+                after: p.text,
+              })),
+          };
+          // BOTH arrays: allImages[].text is a COPY taken when the page was
+          // prepared, so updating only the scene would leave the saved story on
+          // the pre-refinement prose.
+          const byPage = new Map(usable.pages.map(p => [p.pageNumber, p.text]));
+          for (const scene of expandedScenes) {
+            const t = byPage.get(scene.pageNumber);
+            if (t) scene.text = t;
+          }
+          // Every page-object list the caller handed us: rawImages before the
+          // repair pipeline, allImages on the late fallback call. Each is a COPY
+          // of the page text taken when the page was prepared.
+          for (const list of targets) {
+            for (const img of list || []) {
+              const t = byPage.get(img.pageNumber);
+              if (t) img.text = t;
+            }
+          }
+          // THIRD store: data.story / data.storyText are assembled from the
+          // pre-refine pages and persisted as-is, and the Lab's edit mode reads
+          // THEM — so without this rebuild the editor showed the original text
+          // while the book showed the refined one (caught by the owner on p18 of
+          // the first arc-pipeline run: "Das reicht." vs the refined ending).
+          fullStoryText = storyPages.map(page =>
+            `--- Page ${page.pageNumber} ---\n${byPage.get(page.pageNumber) || page.text}`
+          ).join('\n\n');
+          const totalMs = usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
+          // A salvaged snapshot already logged text_refine_join_partial, which
+          // says what was kept AND what was abandoned. Emitting "complete" here
+          // too would read as a clean finish and hide the abandoned round.
+          if (!usable.partial) {
+            genLog.info(
+              'text_refine_complete',
+              `Text refined in ${usable.rounds.length} round(s), ${(totalMs / 1000).toFixed(1)}s — rewrote page(s) ${usable.changed.join(', ')}`,
+              null,
+              { rounds: usable.rounds.length, changedPages: usable.changed, durationMs: totalMs }
+            );
+          }
+        } else if (usable && !usable.partial) {
+          // "Nothing to rewrite" and "a round failed" are different outcomes — a
+          // failed round means the ORIGINAL text ships unreviewed, which must be
+          // visible in the log, not filed as a clean convergence.
+          const failedRound = (usable.rounds || []).find(r => !r.ok);
+          if (failedRound) {
+            genLog.warn('text_refine_failed', `Text refinement round ${failedRound.round} failed (${failedRound.error}) — original text kept`);
+          } else {
+            genLog.info('text_refine_complete', 'Text refinement found nothing to rewrite');
+          }
+        }
+      }
+    };
     // The other two review stages' before/after (beats mode only). Same shape,
     // captured inside generateStoryViaBeats at each rewrite; null on the
     // unified path, which has no beats or scene review.
@@ -3550,7 +4140,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const arcReviewReport = beatsResult?.arcReviewReport || null;
     // The challenges from this account's earlier books that the arc planner was
     // told to avoid. Stored so a repeat can be audited against what was excluded.
-    const arcVarietyExclusions = beatsResult?.arcVarietyExclusions || null;
+    const challengeDrawIds = beatsResult?.challengeDrawIds || null;
     const challengeDraw = beatsResult?.challengeDraw || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
@@ -3584,9 +4174,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // No `rounds`: the chain is fixed at two parallel audits → one repair
           // → one lector (owner ruling 2026-09-03). There is no loop to bound.
           usageLabel: 'text_refine',
-          // Latest completed state, so the bounded join below can salvage the
-          // audit and any finished round instead of discarding paid work when
-          // the round still in flight runs past the deadline.
+          // Latest completed state, so the join below can salvage the audit and
+          // any finished round if the chain FAILS partway. (It is no longer a
+          // deadline fallback — the join has no deadline.)
           onProgress: (snap) => { textRefinePartial = snap; },
         });
       }
@@ -3600,6 +4190,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Compact record of each mid-loop book audit (one per repair round that had
     // a further round to feed). See the repair loop's MID-LOOP BOOK AUDIT block.
     let pipelineBookAuditRounds = null;
+    let pipelineRepairRounds = null;
+    // Dimensions that went UNJUDGED (2026-09-14) — rolled up from the picked
+    // version of every page. See server/lib/notEvaluated.js.
+    let pipelineNotEvaluated = null;
+    // Pages that ship below the repair threshold or still carrying a CRITICAL
+    // (D7): the run must say so somewhere a reader will find it.
+    let pipelineShippedDefective = null;
+    let pipelineSurvivingCriticals = null;
 
     {
       // =======================================================================
@@ -3656,7 +4254,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.warn(`[SIDE-MIRROR] Page ${pageNum}: mirror step failed, continuing without flip — ${err.message}`);
         }
 
-        const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
+        // UNION, never replacement (see unionPageCast). The brief prose and the
+        // outline hint each drop cast the other keeps: a hint with an empty
+        // `characters[]` scans down to whatever names happen to sit in its JSON
+        // (garment owners), and prose that describes a figure without naming it
+        // scans down to the named subset. This is the roster every presence
+        // check downstream is measured against.
+        //
+        // The hint side is `characters[]` ONLY. Per-page `characterClothing` is
+        // NOT a cast signal, and reading its keys was measured to be wrong: on
+        // job_1789207854566_l43qgl34w p3 and p11 the outline commissioned no
+        // people at all and still emitted a clothing entry for all five, which
+        // put a cast of five onto two empty pages.
+        const sceneCharacters = unionPageCast(
+          scene.sceneDescription,
+          scene.characters || [],
+          inputData.characters
+        );
         // Characters section takes priority over scene metadata JSON (may have stale costume data)
         const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
         const perCharClothing = {
@@ -3721,6 +4335,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
           await sav.applyStoryCellRefs(pagePhotos, storyAvatars, metaChars, {
             closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+            // Wardrobe state: a page that takes a garment OFF gets the cell
+            // cropped from the `--off:` sheet when one exists, so the attached
+            // reference agrees with the brief instead of contradicting it.
+            wornResolved: sav.wornResolvedForPage(streamingVisualBible, sceneMetadata, metaChars, pageNum),
           });
         }
         // over-the-shoulder: drop refs ONLY for background-depth characters.
@@ -3787,11 +4405,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // 6 cells is 4 elements' worth of unreadable.
         // Cap = the owner's brief-side VB element budget (2026-09-06): three, the
         // same number the Art Director is given and the pipeline truncates to.
-        const { VB_ELEMENT_BUDGET } = require('./server/lib/vbElementBudget');
+        // The PHYSICAL grid bound, not the element budget (owner, 2026-09-11:
+        // no code-side enforcement of the budget — it is a prompt rule for the
+        // Art Director and a scene-review fault, nothing more). One Grok slot,
+        // cell size 1/n, a face below VB_CELL_FLOOR_PX gets replaced by a prior.
+        const { VB_SLOT_MAX_ELEMENTS } = require('./server/lib/grok');
         // sceneMetadata rides along for the removable-worn-item dedupe: an item
         // the page declares WORN is already on the avatar reference, so its
         // standalone plate is dropped from the grid (server/lib/wornItems.js).
-        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_ELEMENT_BUDGET, sceneMetadata?.objects || null, sceneMetadata);
+        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, VB_SLOT_MAX_ELEMENTS, sceneMetadata?.objects || null, sceneMetadata);
         // NOTE: the plate-aware filter does NOT live here. `sceneBackgrounds` is
         // populated by Phase 5a-pre / 5a-pre-vantage, both of which run AFTER
         // this pageData map (they iterate the pageDataArray it produces), so at
@@ -3849,14 +4471,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
         const imageModelConfig = IMAGE_MODELS[pageImageModel];
         const isGrokImage = imageModelConfig?.backend === 'grok';
-        const imagePrompt = buildImagePrompt(
+        // ORDERING BUG, fixed 2026-09-15. `vbRefElementIds` decides whether the
+        // prompt says "the attached reference images include a rough image of
+        // <X>" (promptBuilders REQUIRED OBJECTS). It used to be computed HERE,
+        // from the UNFILTERED selection, while Phase 5a-pre-grid drops cells
+        // afterwards — so a page could be told to match a reference it was
+        // never given. The prompt is now built through this closure and rebuilt
+        // in 5a-pre-grid from the cells actually sent, which is what the trial
+        // path (`trialVbGrid.rawElements`) and the iterate path (images.js)
+        // already do.
+        const makeImagePrompt = (vbRefElementIds) => buildImagePrompt(
           scene.sceneDescription, inputData, sceneCharacters, visualBible, pageNum, pagePhotos, {
             skipVisualBible: isGrokImage,
             // Elements whose reference render rides with this call: grid cells,
             // or (for a plate-filtered vehicle in 5a-pre-grid) the plate itself.
-            vbRefElementIds: elementReferences.map(r => r.id).filter(Boolean),
+            vbRefElementIds,
           }
         );
+        const imagePrompt = makeImagePrompt(elementReferences.map(r => r.id).filter(Boolean));
         // Extract emptyScenePrompt from outline hint (Sonnet-generated, high quality)
         // Falls back to scene expansion's emptyScenePrompt via sceneMetadata
         let outlineEmptyScenePrompt = null;
@@ -3873,6 +4505,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           index,
           scene,
           prompt: imagePrompt,
+          // Rebuilt in Phase 5a-pre-grid from the cells actually sent.
+          makeImagePrompt,
           characterPhotos: pagePhotos,
           landmarkPhotos: pageLandmarkPhotos,
           // Landmarks this page cited but renders without (photo unavailable) —
@@ -3939,7 +4573,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // regardless of the flag and the canvases were attached to ref0 anyway
       // (per packReferences), partly defeating singlePassScene.
       if (modelOverrides.generateEmptyScenes !== false && !runSinglePassScene && visualBible?.locations?.length > 0) {
-        const { groupPagesByVantage, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
+        const { groupPagesByVantage, resolvePagePlate, enforceSpreadTextPosition, buildTextZoneInstruction, buildEraGuard } = require('./server/lib/storyHelpers');
         const groups = groupPagesByVantage(pageDataArray, visualBible);
         const allRealGroups = Array.from(groups.entries()).filter(([key]) => key !== '__unassigned__');
         // A vantage whose pages ALL have zero cast needs no canvas — nobody
@@ -3947,14 +4581,38 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // 2026-09-02). A mixed group still renders its canvas: the cast>0
         // pages need it, and the cast-0 page in the group simply rides along
         // on the shared plate.
+        // A vantage whose pages ALREADY have a plate needs no canvas either:
+        // the fan-out at the bottom of this block skips a pre-populated slot
+        // (`if (sceneBackgrounds[pn]) continue;`), so rendering the canvas —
+        // and running the QC vision call on it — produced an image that was
+        // thrown away. Trial mode is the one populator today (it renders one
+        // plate PER PAGE during outline streaming), and on a 6-page trial this
+        // cost one whole extra plate generation + one QC vision call whose
+        // result reached nothing. The condition is deliberately about the SLOTS
+        // rather than `trialMode`: it is the same fact the discard at the
+        // fan-out already tests, and the per-page path below (Phase 5a-pre)
+        // already skips on exactly this ("Skip if already generated"). A group
+        // where only SOME pages are pre-filled still renders — the unfilled
+        // pages genuinely need the canvas. A non-trial run reaches this block
+        // with `sceneBackgrounds` empty (it is declared empty and written only
+        // here and in 5a-pre, both of which run after), so `every()` is false
+        // for every group and nothing changes.
+        const prefilledGroups = allRealGroups.filter(([, group]) =>
+          group.pageNumbers.every(pn => sceneBackgrounds[pn]));
+        if (prefilledGroups.length > 0) {
+          log.info(`🏛️ [VANTAGE] Skipping ${prefilledGroups.length} canvas(es) — every page already has a plate: ${prefilledGroups.map(([vid, g]) => `${vid} (p${g.pageNumbers.join(',')})`).join('; ')}`);
+        }
         const realGroups = allRealGroups.filter(([, group]) =>
-          group.pageNumbers.some(pn => !platelessByRoute(pn)));
-        const castlessGroups = allRealGroups.length - realGroups.length;
-        if (castlessGroups > 0) {
-          const skipped = allRealGroups
-            .filter(([, group]) => group.pageNumbers.every(pn => platelessByRoute(pn)))
-            .map(([vid, group]) => `${vid} (p${group.pageNumbers.join(',')})`);
-          log.info(`🏛️ [VANTAGE] Skipping ${castlessGroups} canvas(es) — every page on them has cast=0: ${skipped.join('; ')}`);
+          group.pageNumbers.some(pn => !platelessByRoute(pn))
+          && !group.pageNumbers.every(pn => sceneBackgrounds[pn]));
+        // Counted independently of the pre-filled skip above — a group can be
+        // both castless and pre-filled, and subtracting both from the total
+        // would under- (or negatively) report.
+        const castlessSkipped = allRealGroups
+          .filter(([, group]) => group.pageNumbers.every(pn => platelessByRoute(pn)))
+          .map(([vid, group]) => `${vid} (p${group.pageNumbers.join(',')})`);
+        if (castlessSkipped.length > 0) {
+          log.info(`🏛️ [VANTAGE] Skipping ${castlessSkipped.length} canvas(es) — every page on them has cast=0: ${castlessSkipped.join('; ')}`);
         }
         // One canvas per VB vantage, reused across every page that uses it.
         // Sonnet assigns a distinct vantage (LOC###.N) whenever the same
@@ -3981,16 +4639,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // (text overlay zone differs per page via spread rule). The per-page
             // image render handles those.
             const eraGuard = buildEraGuard(repPageData.sceneMetadata?.era || null);
-            // HYBRID PLATE (owner-approved 2026-08-29): the Art Director's
-            // per-page emptyScenePrompt decides framing and foreground — it
-            // knows where the action has to sit — and the vantage/LOC prose is
-            // setting context underneath it. Before this the vantage path
+            // HYBRID PLATE (owner-approved 2026-08-29): Art Director prose
+            // decides framing and foreground, and the vantage/LOC prose is
+            // setting context underneath it. Before that the vantage path
             // DISCARDED the AD prose entirely and built the plate from Visual
             // Bible prose alone; 25 of 30 audited plates were prompt-wrong.
-            // Where several pages share a plate, the FIRST page's AD prose is
-            // the framing (same page whose model/aspect/landmarks we inherit).
-            const adEmptyPrompt = (repPageData.emptyScenePrompt
-              || repPageData.sceneMetadata?.emptyScenePrompt || '').trim();
+            //
+            // The FRAMING paragraph is the VANTAGE's own plate since 2026-09-17
+            // (owner: "we either reuse a plate or create a new one — the AD
+            // decides"). The Art Director writes it once per vantage, so the
+            // plate this canvas renders is the plate its author wrote for these
+            // pages, not the first page's leftover. A stored story authored
+            // per-page plates instead: resolvePagePlate falls back to the
+            // representative page's, which is exactly today's behaviour and the
+            // same page whose model / aspect / landmarks we inherit.
+            const repPlate = resolvePagePlate({
+              pageNumber: repPageNum,
+              sceneMetadata: repPageData.sceneMetadata,
+              visualBible,
+              outlinePlate: repPageData.emptyScenePrompt,
+              vantage: v,
+            });
+            const adEmptyPrompt = repPlate.text;
+            if (repPlate.source === 'missing') {
+              // Never substituted by another vantage's plate or another page's:
+              // the canvas below is built from Visual Bible prose alone, which
+              // is the prompt-wrong case the hybrid plate exists to prevent.
+              log.error(`❌ [VANTAGE] ${vantageId} (${v.locationName} – ${v.name}) has NO plate: the bible authored no \`emptyScenePrompt\` for this vantage and page ${repPageNum} carries none either. Pages ${group.pageNumbers.join(',')} render on a canvas built from bible prose only.`);
+              genLog.warn('vantage_plate_missing', `Vantage ${vantageId} has no emptyScenePrompt — pages ${group.pageNumbers.join(',')} render on bible prose alone`, null, {
+                vantageId, pages: group.pageNumbers, locationName: v.locationName, vantageName: v.name,
+              });
+            } else {
+              log.info(`🏛️ [VANTAGE] ${vantageId}: plate prose from ${repPlate.source}${repPlate.source === 'page' ? ` (page ${repPageNum})` : ''}`);
+            }
             // Shot follows the same precedence: the AD's page shot wins over
             // the vantage's generic one.
             const vantageShot = (repPageData.sceneMetadata?.fullData?.shot || v.shot || '').trim();
@@ -4011,6 +4692,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             const characterSpace = `Render this as an empty location backdrop. Foreground, midground and background bands all show the scene's natural ground/floor/water surface continuing unbroken — characters will be composited into them later. No figures, no animals.`;
             // Pull landmark photos for the LOC if real — used as a strict
             // visual reference for the Wikimedia-photo case.
+            // NOT resolveLandmarkPhotoForLocation: this is the per-vantage plate
+            // path and the photo is the LOC's own legacy referencePhotoData, not a
+            // variant slot. It therefore carries no `photoType`, and
+            // buildLandmarkFidelityBlock falls to its close/exterior wording —
+            // correct for a single legacy landmark photo, and the reason a wide
+            // curated view must not be routed here.
             const landmarkPhotos = (v.location?.isRealLandmark && v.location?.referencePhotoData)
               ? [{ name: v.location.name, photoData: v.location.referencePhotoData, attribution: v.location.photoAttribution, source: v.location.photoSource }]
               : (repPageData.landmarkPhotos || []);
@@ -4043,6 +4730,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 pageNumber: repPageData.pageNumber,
                 aboardId: repAboardId,
                 sceneObjects: repSceneObjects,
+                // The SAME prose validateEmptyScene grades this plate's geometry
+                // against, reduced to the geometry facts (no cast, no action).
+                mainScenePrompt: repPageData.scene?.sceneDescription || null,
+                castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
               });
               const result = await generateImageOnly(emptyPrompt, [], {
                 aspectRatio: layoutAspect,
@@ -4077,6 +4768,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // plate's page group.
               let plateImage = result.imageData;
               let platePrompt = emptyPrompt;
+              let plateRefs = result.grokRefImages || null;
               let plateQcRecord = null;
               try {
                 const { validateEmptyScene } = require('./server/lib/images');
@@ -4124,6 +4816,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     pageNumber: repPageData.pageNumber,
                     aboardId: repAboardId,
                     sceneObjects: repSceneObjects,
+                    mainScenePrompt: repPageData.scene?.sceneDescription || null,
+                    castNames: (repPageData.sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -4149,6 +4843,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       plateQcRecord = { v1ImageData: plateImage, v1Issues: qc.issues, visionFeedback: qc.visionFeedback || null, retryPrompt };
                       plateImage = retryResult.imageData;
                       platePrompt = retryPrompt;
+                      plateRefs = retryResult.grokRefImages || null;
                       genLog.info('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry ${retryQc.pass ? 'passed QC' : `still has ${retryQc.issues.length} issue(s) — fewer than v1's ${qc.issues.length}, keeping retry`}`);
                     } else {
                       genLog.warn('vantage_plate_qc_retry', `Vantage plate ${vantageId} retry did not improve (${retryQc.issues.join(', ')}) — keeping the first plate`);
@@ -4170,6 +4865,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 sceneBackgrounds[pn] = {
                   imageData: plateImage,
                   prompt: platePrompt,
+                  // Refs packed into the plate call that produced plateImage
+                  // (the retry's, when the retry won). Same field name every
+                  // other image call stores its packed refs under.
+                  grokRefImages: plateRefs,
                   textAreaMask: null,
                   emptySceneVbGrid: emptySceneVbGridDataUrl,
                   vantageId,
@@ -4215,8 +4914,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             }
             const sceneMetadata = pageData.sceneMetadata;
             const settingDesc = sceneMetadata?.setting?.description || sceneMetadata?.imageSummary || '';
-            // emptyScenePrompt lives on pageData (from scene expansion), not on sceneMetadata
-            const expandedEmptyPrompt = pageData.emptyScenePrompt || sceneMetadata?.emptyScenePrompt || '';
+            // The page's plate: the outline hint's, then the cited vantage's
+            // (the Art Director writes one per vantage since 2026-09-17), then
+            // the brief's own — which is where every stored story keeps it.
+            // Pages that reach THIS loop are the ones the vantage pass did not
+            // cover, so a page with no LOC at all legitimately resolves
+            // 'missing' and falls through to the setting fields below.
+            const { resolvePagePlate } = require('./server/lib/storyHelpers');
+            const pagePlate = resolvePagePlate({
+              pageNumber: pageData.pageNumber,
+              sceneMetadata,
+              visualBible,
+              outlinePlate: pageData.emptyScenePrompt,
+            });
+            const expandedEmptyPrompt = pagePlate.text;
             if (!settingDesc && !expandedEmptyPrompt) return null;
 
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', pageData.pageImageBackend) || '';
@@ -4276,7 +4987,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // give it FOOTING. "Natural surface" was the old wording — on a river
               // panorama the natural surface at a background band is open water, the
               // plate complied, and the composited figure floated on it.
-              characterSpace = `${parts.join(' and ').replace(/^./, c => c.toUpperCase())} will be composited into this scene later. Each of those bands must give its figures FOOTING — a standable surface at that depth (ground, path, bank, floor, deck, walkway, jetty — whatever structure the setting offers) rendered continuing through unbroken. Open water, air, or a drop may fill a figure band only when the scene's figures are in the water or airborne. Lighting and surface texture must continue across the bands. They hold no props, signage, vehicles, or extra structures, but they ARE part of the scene — never blank, white, or unfinished patches, never abrupt building cutoffs.`;
+              characterSpace = `${parts.join(' and ').replace(/^./, c => c.toUpperCase())} will be composited into this scene later. Each of those bands must give its figures FOOTING — a standable surface at that depth (ground, path, bank, floor, deck, walkway, jetty, the floor of a shaft or pit a figure stands inside — whatever structure the setting offers) rendered continuing through unbroken. Open water, air, or a drop may fill a figure band only when the scene's figures are in the water or airborne. Lighting and surface texture must continue across the bands. They hold no props, signage, vehicles, or extra structures, but they ARE part of the scene — never blank, white, or unfinished patches, never abrupt building cutoffs.`;
 
               // If any depth band needs both-sides placement, spell it out so Grok doesn't
               // wall the frame with buildings on left and right.
@@ -4366,6 +5077,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               pageNumber: pageData.pageNumber,
               aboardId: pageAboardId,
               sceneObjects: pageSceneObjects,
+              // The SAME prose validateEmptyScene grades this plate's geometry
+              // against, reduced to the geometry facts (no cast, no action).
+              mainScenePrompt: pageData.scene?.sceneDescription || null,
+              castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
             });
 
             try {
@@ -4448,6 +5163,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     pageNumber: pageData.pageNumber,
                     aboardId: pageAboardId,
                     sceneObjects: pageSceneObjects,
+                    mainScenePrompt: pageData.scene?.sceneDescription || null,
+                    castNames: (sceneMetadata?.fullData?.characters || []).map(c => c?.name).filter(Boolean),
                   });
                   const retryResult = await generateImageOnly(retryPrompt, [], {
                     aspectRatio: layoutAspect,
@@ -4464,17 +5181,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     if (retryQc.pass) {
                       log.info(`✅ [EMPTY SCENE] P${pageData.pageNumber} retry passed QC`);
                       // Return both versions so they can be compared in dev mode
-                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
+                      return { pageNumber: pageData.pageNumber, imageData: retryResult.imageData, prompt: retryPrompt, grokRefImages: retryResult.grokRefImages || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
                     }
                     log.warn(`⚠️ [EMPTY SCENE] P${pageData.pageNumber} retry also failed pixel QC — picking best of v1/v2`);
                     // Pick whichever version has fewer issues
                     const bestImage = retryQc.issues.length < qc.issues.length ? retryResult.imageData : result.imageData;
-                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
+                    return { pageNumber: pageData.pageNumber, imageData: bestImage, prompt: retryPrompt, grokRefImages: (retryQc.issues.length < qc.issues.length ? retryResult.grokRefImages : result.grokRefImages) || null, v1ImageData: result.imageData, v1Issues: qc.issues, visionFeedback: qc.visionFeedback, retryPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
                   }
                 }
               }
 
-              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
+              return { pageNumber: pageData.pageNumber, imageData: result?.imageData || null, prompt: emptyPrompt, grokRefImages: result?.grokRefImages || null, textAreaMask, emptySceneVbGrid: emptySceneVbGridDataUrl };
             } catch (err) {
               // Loud, and in the STORED log (2026-08-29). A page whose plate
               // failed still renders — the page path handles a null
@@ -4508,6 +5225,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sceneBackgrounds[bg.pageNumber] = {
               imageData: bg.imageData,
               prompt: bg.prompt,
+              // Refs packed into the plate call — same field name every other
+              // image call stores its packed refs under.
+              grokRefImages: bg.grokRefImages || null,
               textAreaMask: bg.textAreaMask || null,
               emptySceneVbGrid: bg.emptySceneVbGrid || null,
               // Store QC data for dev mode comparison (v1 failed, v2 retry)
@@ -4572,8 +5292,28 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // sent this is already covered by the location/vehicle drop below —
           // it matters on the plateless cast-0 pages this phase now feeds.
           const aboardId = pageData.sceneMetadata?.aboard || null;
+          // LARGE ELEMENTS BELONG TO THE PLATE (owner, 2026-09-15). Same
+          // question as buildPageCompositeRefs asks: vehicles and locations by
+          // TYPE (the pre-2026-09-15 rule and the `scaleClass === null`
+          // fallback for stored bibles), plus anything the bible classed at
+          // vehicle, building or landscape scale — a building-scale ARTIFACT
+          // belongs to the plate for the same reason a ship does.
+          //
+          // CONDITIONAL ON hasPlate, deliberately. A large element on a
+          // plateless page KEEPS its cell rather than travelling on nothing:
+          // page 1 of job_1788295892348_l028ggiq7a was a cast-0 ship exterior
+          // that attached zero references while a finished plate of the ship
+          // existed and was discarded.
+          //
+          // CONDITIONAL ON THE ELEMENT ACTUALLY REACHING THE PLATE too: the
+          // plate admits a vehicle or a large element only when the AD brief's
+          // objects[] names it, so the same brief gates the drop. Without this
+          // the two gates disagree and the element is rendered with no
+          // reference and no STRUCTURES line at all.
+          const pageSceneObjectsForDrop = pageData.sceneMetadata?.objects || null;
+          const { isPlateBorneElement } = require('./server/lib/visualBible');
           const kept = (hasPlate
-            ? refs.filter(e => e.type !== 'location' && e.type !== 'vehicle')
+            ? refs.filter(e => !isPlateBorneElement(e, pageSceneObjectsForDrop))
             : refs
           ).filter(e => !aboardId || e.id !== aboardId);
           if (kept.length < refs.length) {
@@ -4588,6 +5328,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageData.visualBibleGrid = kept.length > 0
             ? await buildVisualBibleGrid(kept, [])
             : null;
+          // Recompute the reference claim from the cells actually sent — the
+          // prompt must never promise an image the call does not carry.
+          if (typeof pageData.makeImagePrompt === 'function') {
+            pageData.prompt = pageData.makeImagePrompt(kept.map(e => e.id).filter(Boolean));
+          }
           log.info(`🔲 [VB-GRID] Page ${pageData.pageNumber}: ${kept.length}/${refs.length} cell(s) — ${hasPlate ? `plate sent, dropped location/vehicle` : `no plate sent, location/vehicle kept`}${aboardId ? ` (aboard ${aboardId} withheld)` : ''}`);
         }
         if (filteredPages > 0) {
@@ -4613,12 +5358,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const genStartTime = Date.now();
       const genLimit = pLimit(50);
 
-      // Liveness heartbeat. progress/updated_at only move as a page STARTS, and
-      // all pages start at once — so updated_at freezes for the whole first
-      // pass and the status endpoint's 10-minute heartbeat check (jobs.js)
-      // declares a perfectly healthy job dead. Observed: a 14-page run killed at
-      // 28% while the analyzer was burning 5,776 CPU-seconds of real work.
-      // Touching updated_at on a timer says "alive" without faking progress.
       // Progress tracked on COMPLETION, not on start. Every page starts at once,
       // so the old per-start update drove the bar straight to its ceiling (28%)
       // and then sat there for the entire pass — looking hung to the user and to
@@ -4633,14 +5372,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         ).catch(err => log.debug(`[PROGRESS] job ${jobId}: ${err.message}`));
       };
 
-      const heartbeat = setInterval(() => {
-        dbPool.query('UPDATE story_jobs SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND status = $2', [jobId, 'processing'])
-          .catch(err => log.debug(`[HEARTBEAT] job ${jobId}: ${err.message}`));
-      }, 60_000);
-      heartbeat.unref?.();
-
+      // NO phase-local liveness interval here any more: the whole-job heartbeat
+      // armed in processStoryJob covers this phase and every phase after it.
       let rawImages;
-      try {
       rawImages = await Promise.all(
         pageDataArray.map(pageData => genLimit(async () => {
           await checkCancellation();
@@ -4662,7 +5396,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 visualBibleGrid: pageData.visualBibleGrid,
                 grokRefImages: streamResult.grokRefImages,
                 emptySceneImage: null,
-                emptyScenePrompt: null,
+                // The trial plate was the ONLY image call in the pipeline that
+                // left no trace: this branch hardcoded null, so every trial
+                // page shipped with emptyScenePrompt null even though the
+                // plate had been rendered from a real prompt during outline
+                // streaming. Read it back off the slot the trial loop filled.
+                emptyScenePrompt: sceneBackgrounds[pageData.pageNumber]?.prompt || null,
+                emptySceneGrokRefImages: sceneBackgrounds[pageData.pageNumber]?.grokRefImages || null,
+                vantageId: sceneBackgrounds[pageData.pageNumber]?.vantageId || null,
                 sceneDescription: pageData.scene.sceneDescription,
                 text: pageData.scene.text,
                 sceneCharacters: pageData.sceneCharacters,
@@ -4758,7 +5499,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 // Only the trigger is used here — the composite replaced
                 // runScaleRepair on this path (decisions.md 2026-08-15).
                 const { needsScaleRepair } = require('./server/lib/scaleRepair');
-                if (needsScaleRepair(pageData.sceneMetadata)) {
+                if (!require('./server/config/runtime').runtime('sceneCompositeEnabled')) {
+                  compositeOutcome = { status: 'disabled', reason: 'runtime.sceneCompositeEnabled is false' };
+                  // Count only figures the composite can cast: the scene
+                  // reviewer now promotes Visual Bible secondaries into
+                  // characters[] (scene-review rules 5/5a), and the composite
+                  // renders photo-backed characters only.
+                } else if (needsScaleRepair(pageData.sceneMetadata, inputData.characters || [])) {
                   compositeOutcome = { status: 'triggered' };
                   // Resolve avatar refs only for the background characters.
                   const helpers = require('./server/lib/storyHelpers');
@@ -4876,11 +5623,33 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   const fdMeta = pageData.sceneMetadata?.fullData || pageData.sceneMetadata || {};
                   const compRes = await generateSceneComposite({
                     compositeStrategy: 'uniform',
+                    // Per-figure pose render: the silhouette's pose (seated,
+                    // kneeling, leaning) becomes the cut-out's pose. Without
+                    // it a standing sheet cell is pasted into a seated
+                    // silhouette (measured, Lab exp 1087). +$0.02 per figure.
+                    phantomPoseRender: true,
+                    // In-place figures (owner, 2026-09-10/11): each figure is
+                    // rendered INTO the plate where its silhouette is and cut
+                    // out with DINO+SAM. Measured on the two-level page 4 of
+                    // job_1788983823620_csjcyp1q9: paste+phantom lost the pose
+                    // 2/2 (exp 1106); in-place held pose and level on its last
+                    // two runs (exp 1146, 1148). phantomPoseRender is unused
+                    // on this path and stays for the paste fallback.
+                    figureMethod: 'inPlace',
                     cast: compositeCast, frontCast, backCast,
+                    // The brief and the plate prompt, from where this closure
+                    // actually holds them: pageData.scene.sceneDescription and
+                    // sceneBackgrounds / sceneMetadata.emptyScenePrompt.
+                    // fdMeta.description, pageData.sceneDescription and
+                    // pageData.emptyScenePrompt do not exist at this point, so
+                    // every trigger since 2026-08-25 aborted with
+                    // "cleanBackgroundPrompt or scene.description required"
+                    // before the first paid call (44 of 49 staging outcomes;
+                    // the composite never produced a production page).
                     scene: {
-                      description: String(fdMeta.description || pageData.sceneDescription || ''),
+                      description: String(fdMeta.description || pageData.scene?.sceneDescription || pageData.sceneDescription || '').split('---METADATA---')[0].trim(),
                       artStyle: inputData.artStyle || 'watercolor',
-                      pageBrief: String(fdMeta.pageBrief || pageData.sceneDescription || ''),
+                      pageBrief: String(fdMeta.pageBrief || pageData.scene?.sceneDescription || pageData.sceneDescription || '').split('---METADATA---')[0].trim(),
                       interactions: fdMeta.interactions || [],
                       // Per-character expression + attention target, the two
                       // things a pasted avatar cut-out cannot supply (it is
@@ -4890,12 +5659,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                       // model re-arrange the scene it was asked to preserve.
                       ...buildBlendMetadata(fdMeta, pageData, inputData.clothingRequirements || inputData.outline?.clothingRequirements || null),
                     },
-                    cleanBackgroundPrompt: String(pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
+                    cleanBackgroundPrompt: String(sceneBackgrounds[pageData.pageNumber]?.prompt || pageData.sceneMetadata?.emptyScenePrompt || pageData.emptyScenePrompt || fdMeta.emptyScenePrompt || ''),
                     aspectRatio: inputData?.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
                     // Labelled portrait grid as Image 2 — the blend prompt calls it
                     // the authoritative face/clothing reference, and this path was
                     // passing nothing, leaving identity to the pasted pixels alone.
                     visualBibleGridImage: pageData.visualBibleGrid || null,
+                    // For the blend prompt: ids in the brief's interactions become names, never leak.
+                    visualBible,
                     // Creatures declared on this page. The paste step only
                     // places cast cut-outs, so a Visual Bible animal has no
                     // way into the page unless the plate paints it — measured
@@ -4910,7 +5681,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     ? { imageData: compRes.imageData, modelId: 'scene-composite', prompt: compRes.debug?.populatedPlatePrompt || null, grokRefImages: null, debug: compRes.debug || null }
                     : null;
                   compositeOutcome = scaleRepairResult
-                    ? { status: 'composited', detector: compRes.debug?.detector || null, placed: (compRes.debug?.placements || []).length }
+                    ? { status: 'composited', detector: compRes.debug?.detector || null, placed: compRes.placed ?? (compRes.debug?.placements || []).length }
                     : { status: 'no-image', reason: 'the composite returned no image' };
                   compositeDebug = compRes?.debug || null;
                 }
@@ -4970,13 +5741,35 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               compositeDebug,
               thinkingText: genResult.thinkingText || null,
               usage: genResult.usage,
-              prompt: pageData.prompt,
+              // The prompt the model ACTUALLY received, not the pre-shrink
+              // build. generateImageOnly stamps the post-shrink string on
+              // `genResult.prompt`; storing `pageData.prompt` threw it away, so
+              // the dev panel and the batch eval's ORIGINAL_PROMPT fallback
+              // read text the model never saw — staging
+              // job_1789348171785_9oxos7dwv p7 stored 8,002 chars against
+              // grok-imagine-image-2.0's 7,900 cap. Falls back to the build
+              // for providers that report no sent text.
+              prompt: genResult.prompt || pageData.prompt,
+              // Set ONLY when the built prompt went over the image model's
+              // character cap and shrinkPromptForModel changed the scene prose
+              // (compressed, deduped or cut): the description the model
+              // actually received. The batch
+              // eval judges the render against it instead of the pre-shrink
+              // `scene.sceneDescription`, which can name clauses the compressor
+              // removed (sceneMetadata.resolveEvalSceneDescription). Undefined
+              // on every under-cap page, so nothing extra is stored there.
+              compressedScene: genResult.compressedScene || null,
               characterPhotos: pageData.characterPhotos,
               landmarkPhotos: pageData.landmarkPhotos,
               visualBibleGrid: pageData.visualBibleGrid,
               grokRefImages: genResult.grokRefImages || null,
               emptySceneImage: emptySceneData?.imageData || null,
               emptyScenePrompt: emptySceneData?.prompt || null,
+              emptySceneGrokRefImages: emptySceneData?.grokRefImages || null,
+              // Which vantage group this page's plate came from. Persisted so
+              // plate-group membership is directly auditable instead of being
+              // reconstructable only by comparing image hashes across pages.
+              vantageId: emptySceneData?.vantageId || null,
               textAreaMask: emptySceneData?.textAreaMask || null,
               emptySceneVbGrid: emptySceneData?.emptySceneVbGrid || null,
               emptySceneQc: emptySceneData?.v1Issues ? {
@@ -5011,10 +5804,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }).finally(bumpProgress))
       );
-      } finally {
-        // Stop the liveness heartbeat whether generation succeeded or threw.
-        clearInterval(heartbeat);
-      }
 
       // ── A PAGE WITH NO IMAGE IS A LOUD FAILURE (2026-08-29) ──────────────
       // The per-page catch above returns `imageData: null` and the story went
@@ -5055,6 +5844,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             raw.usage = retryResult.usage;
             raw.thinkingText = retryResult.thinkingText || null;
             raw.grokRefImages = retryResult.grokRefImages || null;
+            // The retry is the render that survives, so its sent prompt and
+            // scene block are the ones that describe the stored image.
+            raw.prompt = retryResult.prompt || raw.prompt;
+            raw.compressedScene = retryResult.compressedScene || null;
             raw.error = null;
             if (retryResult.usage) {
               const m = retryResult.modelId || '';
@@ -5083,6 +5876,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       timing.pagesEnd = Date.now();
       genLog.info('generation_complete', `Generated ${successCount}/${rawImages.length} page images in ${genDuration}s (pure generation)`);
       genLog.setStage('repair');
+
+      // JOIN THE TEXT REFINER HERE — before covers, before the repair
+      // pipeline, before the book audit inside it. Pure generation is done, so
+      // this is the same "after images completed" moment the join always had;
+      // what changes is that every stage downstream now reads the FINAL text.
+      await joinTextRefinement([rawImages]);
 
       // Await covers before repair pipeline so covers go through the same quality checks
       if (coverAwaitPromise) {
@@ -5121,17 +5920,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // one cover even while the flag says app-side: the model painted the
             // title, so the evaluator must VERIFY it — spelling is the whole risk
             // baked mode takes on. The other covers keep app-side typography.
-            const textMode = (coverData.titleBaked === true || !MODEL_DEFAULTS.appSideCoverType) ? 'painted' : 'appOverlay';
-            let expectedText = null;
-            if (textMode === 'painted') {
-              if (coverKey === 'frontCover') {
-                expectedText = title || inputData.title || inputData.storyTitle || null;
-              } else if (coverKey === 'initialPage') {
-                expectedText = coverData.dedication || inputData.dedication || null;
-              } else if (coverKey === 'backCover') {
-                expectedText = 'magicalstory.ch';
-              }
-            }
+            // ONE resolver, shared with the cover ITERATE path (2026-09-13) so
+            // a regenerated / Lab cover is judged under the same text contract
+            // as a freshly generated one.
+            const { textMode, expectedText } = require('./server/lib/coverTypography').resolveCoverTextContract(coverKey, {
+              titleBaked: coverData.titleBaked === true,
+              title: title || inputData.title || inputData.storyTitle || null,
+              dedication: coverData.dedication || inputData.dedication || null,
+            });
             // Synthetic sceneMetadata from the outline's structured cover hint,
             // so the shared Phase 5b-pre detection and eval enrich see expected
             // character positions + objects exactly like pages do.
@@ -5167,7 +5963,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               expectedText,
               textMode,
               imageData: coverData.imageData,
+              // WHICH MODEL PAINTED IT. The page path has carried
+              // `modelId: activeModelId` since it was written; this push never
+              // did, so every cover entered the repair pipeline model-less and
+              // its v0 version record stamped `modelId: img.modelId` = undefined
+              // — a cover could not answer "Grok or Gemini" after the fact.
+              modelId: coverData.modelId || null,
               prompt: coverData.prompt,
+              // The sent prose of the ORIGINAL cover render. The repair
+              // pipeline's version builder resolves a version's own
+              // `compressedScene` and falls back to the page's — so without
+              // this the original cover version (v0) resolves to null even
+              // when the render was shrunk, and every judge scores it against
+              // the pre-shrink build.
+              compressedScene: coverData.compressedScene || null,
               characterPhotos: coverData.referencePhotos || [],
               // Carry the original render's references onto the pipeline img so
               // the persisted V1 (original) version records what was actually
@@ -5178,6 +5987,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               referencePhotos: coverData.referencePhotos || [],
               grokRefImages: coverData.grokRefImages || null,
               sceneCharacters: coverSceneCharacters,
+              // THE JUDGE GETS THE GENERATOR'S TRIM (owner, 2026-09-15: "Cover
+              // the author is correct max 5"). The cover was rendered from a
+              // roster capped at MAX_COVER_CHARACTERS; every other story
+              // character is excluded, and the EXPECTED CAST must not rebuild
+              // them from the cover prose. One resolver with the iterate path.
+              excludedCastNames: require('./server/lib/coverCastRoster')
+                .resolveCoverCastRoster(coverSceneCharacters, inputData.characters || []).excluded,
               scene: { outlineExtract: coverData.description },
               evaluationType: 'cover', // Use cover evaluation (includes text checks)
             });
@@ -5189,7 +6005,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       // Phases 5b-5g: Unified repair pipeline
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
-      const skipQualityEval = inputData.skipQualityEval === true;
 
       // ── Text-space gate + repair: count calm pixels INSIDE the polygon the
       // renderer will draw text into. If calmFound < calmNeeded for the page's
@@ -5331,10 +6146,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // and the UI showed empty for every trial page even though the
           // JSON description had the IDs all along.
           sceneMetadata: img.sceneMetadata || null,
+          // KNOWN-DEGRADED BRIEF (2026-09-15). The page's metadata came out of
+          // the prose-only recovery path, so this page went to the image model
+          // with no cast, no clothing contract, no props and no text placement.
+          // This whitelist is the single gate on what reaches stories.data —
+          // without this line the state exists only inside sceneMetadata and in
+          // a log line. null = normally parsed brief. Recording only: it changes
+          // no score, no severity and no repair route.
+          degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
+          // Post-shrink scene block, when the prompt was over the model cap
+          // (see the page-record comment above). Persisted so a repair rerun
+          // from the stored story evaluates against the sent description too.
+          compressedScene: img.compressedScene || null,
           sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
           sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
           thinkingText: img.thinkingText || null,
@@ -5343,7 +6170,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBibleGrid: img.visualBibleGrid || null,
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
-          emptyScenePrompt: img.emptyScenePrompt || null,
+          emptyScenePrompt: img.emptyScenePrompt || sceneBackgrounds[img.pageNumber]?.prompt || null,
+          // Refs packed into the empty-scene plate call, and the vantage
+          // group the plate belongs to. Both are whitelisted here or they
+          // never reach stories.data. Base64 in emptySceneGrokRefImages is
+          // offloaded to R2 by extractInlineImagesToR2 (explicit walker).
+          emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
+          vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
           emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
             v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
             v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
@@ -5468,16 +6301,45 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             expectedCharacters.push(...buildSecondaryExpectedForPage(
               visualBible, img.pageNumber, expectedCharacters.map(c => c.name)
             ));
+            // ONE ROSTER (2026-09-13). The entries above keep their identity
+            // prose — the detector needs it and the eval roster does not carry
+            // it — but MEMBERSHIP is decided in one place, by
+            // buildExpectedCastBlock, for every builder in the pipeline. Before
+            // this the detector and the evaluator answered "who is on this page"
+            // separately and disagreed (job_1789207854566_l43qgl34w p7: detector
+            // Sarah/Saira/Facundo/Fiona, evaluator Sarah/Facundo/Frau Amrein).
+            const { resolveExpectedCastNames, reconcileDetectorCast } = require('./server/lib/evalPipeline');
+            const authoritativeCast = resolveExpectedCastNames({
+              sceneCharacters: img.sceneCharacters || null,
+              sceneHint: img.sceneHint || null,
+              originalPrompt: img.sceneDescription || '',
+              visualBible,
+              evaluationType: img.evaluationType || 'scene',
+              pageLabel: `PAGE ${img.pageNumber} `,
+              sceneMetadata,
+              pageNumber: img.pageNumber,
+              extraNames: img.scene?.outlineCharacters || [],
+              // The photo-backed cast, so the resolver's index knows the main
+              // characters — without it every main name came back unresolved.
+              storyData: { characters: inputData.characters || [], visualBible },
+            });
+            const reconciled = reconcileDetectorCast(expectedCharacters, authoritativeCast,
+              { visualBible, pageLabel: `PAGE ${img.pageNumber} `,
+                storyData: { characters: inputData.characters || [], visualBible } });
             const expectedObjects = Array.isArray(sceneMetadata.objects)
               ? sceneMetadata.objects.filter(o => typeof o === 'string')
               : [];
             img.sharedBboxDetection = await detectAllBoundingBoxes(img.imageData, {
-              expectedCharacters,
+              expectedCharacters: reconciled.entries,
               expectedObjects,
               sceneContext: img.sceneDescription || null,
               pageContext: `PAGE ${img.pageNumber}`,
               artStyle,
             });
+            // The authoritative names ride ALONGSIDE expectedCharacters, never
+            // instead of it: the arithmetic reads this, the SoM prompt reads
+            // the described entries.
+            if (img.sharedBboxDetection) img.sharedBboxDetection.expectedCastNames = reconciled.names;
             const figCount = img.sharedBboxDetection?.figures?.length || 0;
             const idCount = img.sharedBboxDetection?.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
             log.debug(`🔍 [BBOX-SHARED] P${img.pageNumber}: ${figCount} figures, ${idCount} identified`);
@@ -5508,6 +6370,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBible,
           artStyle: inputData.artStyle,
           language: inputData.language,
+          // Season, or the iterate path re-derives it from the RENDER date.
+          // resolveSeason() falls back to `inputData.createdAt || new Date()`,
+          // and neither field reached this object — so every iterate-round page
+          // rebuilt its prompt with whatever season the server was living in.
+          // Measured 2026-09-08 on two stories stored `season: 'summer'`: all
+          // four `iterate-round-*` versions carried **SEASON: Autumn** (it was
+          // September) while every first-pass version carried Summer, which is
+          // the autumn almond tree on the pirate p13 climax. createdAt rides
+          // along so a repair months later still resolves the drawn season —
+          // the behaviour season.js already documents and could not deliver.
+          season: inputData.season,
+          createdAt: inputData.createdAt,
           clothingRequirements: clothingRequirements,
           pageClothing: pageClothingData,
           // Preserve per-scene layout fields (imageAspect, textInImage) so any
@@ -5527,6 +6401,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // died while the covers, which use iterateCover, survived).
             sceneCharacters: r.sceneCharacters || null,
             perCharClothing: r.perCharClothing || null,
+            // THE PAGE'S OWN BRIEF METADATA. Absent from this whitelist,
+            // `iteratePageCore` read `savedScene.sceneMetadata` as `{}` on
+            // every pipeline iterate -- so `wornItems` was never carried
+            // forward (81ad55a54's carryForwardWornItems had nothing to carry
+            // FROM), the declared-set allowance had no original id set, and the
+            // citation-drop warning compared against nothing. Measured on
+            // staging job_1789584708605_rts4wqupm: all six iterate rewrites
+            // stored `wornItems: []`, and p16's REQUIRED OBJECTS block shipped
+            // empty because the jacket it had taken OFF was resolved back to
+            // "worn" and omitted as already-referenced.
+            sceneMetadata: r.sceneMetadata || null,
             imageAspect: inputData?.layout?.imageAspect,
             textInImage: inputData?.layout?.textInImage,
             // The page's locked text-overlay position. Used by iteratePageCore
@@ -5544,7 +6429,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dedication: inputData.dedication || '',
         };
 
-        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds } = await runUnifiedRepairPipeline(rawImages, {
+        const { results: pipelineResult, charFixDetails, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, survivingCriticals, notEvaluated: pipelineNotEvaluatedRollup } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
           usageTracker: (provider, usage, funcName, modelId) => {
@@ -5577,7 +6462,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // clamped so a request can never ask for MORE than configured.
           maxRegenAttempts: enableFullRepair ? repairPasses : 0,
           evalConcurrency: 500,
-          qualityModelOverride: modelOverrides.qualityModel,
+          // Only a dev-mode USER override reaches the eval as an override. The
+          // resolved default (modelOverrides.qualityModel = MODEL_DEFAULTS.qualityEval)
+          // used to be passed here, and runVisualInventory lets an override beat
+          // `inventoryModel` — so the staging Qwen inventory never ran on a
+          // story job (every stored stage-1 call carried 2.5 Flash's 1990-token
+          // signature; bugs.json inventory-model-shadowed-by-default-override).
+          qualityModelOverride: inputData.modelOverrides?.qualityModel || null,
           useIteratePage: true  // Use iterate (re-expansion) for better redo quality
         });
 
@@ -5587,6 +6478,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pipelineCharFixDetails = charFixDetails;
         pipelineStyleConsistency = styleConsistency || null;
         pipelineBookAuditRounds = (bookAuditRounds && bookAuditRounds.length) ? bookAuditRounds : null;
+        pipelineRepairRounds = (repairRounds && repairRounds.length) ? repairRounds : null;
+        pipelineShippedDefective = (shippedDefective && shippedDefective.length) ? shippedDefective : null;
+        pipelineSurvivingCriticals = survivingCriticals || null;
+        pipelineNotEvaluated = pipelineNotEvaluatedRollup || null;
 
         // Map pipeline results to allImages format. Index rawImages by
         // pageNumber so per-page intermediates that the pipeline drops
@@ -5603,10 +6498,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // sceneMetadata from the saved row even though every generation
           // step computed it from the scene description.
           sceneMetadata: img.sceneMetadata || null,
+          // KNOWN-DEGRADED BRIEF (2026-09-15). The page's metadata came out of
+          // the prose-only recovery path, so this page went to the image model
+          // with no cast, no clothing contract, no props and no text placement.
+          // This whitelist is the single gate on what reaches stories.data —
+          // without this line the state exists only inside sceneMetadata and in
+          // a log line. null = normally parsed brief. Recording only: it changes
+          // no score, no severity and no repair route.
+          degradedScene: describeDegradedSceneMetadata(img.sceneMetadata),
           outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
           imageData: img.imageData,
           generatedAt: new Date().toISOString(),
           prompt: img.prompt,
+          // Post-shrink scene block, when the prompt was over the model cap
+          // (see the page-record comment above). Persisted so a repair rerun
+          // from the stored story evaluates against the sent description too.
+          compressedScene: img.compressedScene || null,
           sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
           sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
           qualityScore: img.qualityScore,
@@ -5619,6 +6526,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // budget ran out. This whitelist is the single gate on what reaches
           // stories.data — without this line the marker exists only in logs.
           unrepairedCritical: img.unrepairedCritical || null,
+          // Per-page record of which dimensions were never judged on the
+          // shipped version (null = no evaluation ran at all).
+          notEvaluated: img.notEvaluated || null,
           qualityReasoning: img.qualityReasoning,
           thinkingText: img.thinkingText || null,
           wasRegenerated: img.wasRegenerated,
@@ -5629,7 +6539,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
           grokRefImages: img.grokRefImages || null,
           emptySceneImage: img.emptySceneImage || null,
-          emptyScenePrompt: img.emptyScenePrompt || null,
+          emptyScenePrompt: img.emptyScenePrompt || sceneBackgrounds[img.pageNumber]?.prompt || null,
+          // Refs packed into the empty-scene plate call, and the vantage
+          // group the plate belongs to. Both are whitelisted here or they
+          // never reach stories.data. Base64 in emptySceneGrokRefImages is
+          // offloaded to R2 by extractInlineImagesToR2 (explicit walker).
+          emptySceneGrokRefImages: img.emptySceneGrokRefImages || sceneBackgrounds[img.pageNumber]?.grokRefImages || null,
+          vantageId: img.vantageId || sceneBackgrounds[img.pageNumber]?.vantageId || null,
           emptySceneQc: img.emptySceneQc || (sceneBackgrounds[img.pageNumber]?.v1Issues ? {
             v1ImageData: sceneBackgrounds[img.pageNumber]?.v1ImageData || null,
             v1Issues: sceneBackgrounds[img.pageNumber]?.v1Issues || null,
@@ -5704,28 +6620,48 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           if (img.pageNumber < 0) {
             const coverKey = COVER_TYPE_MAP[String(img.pageNumber)];
             if (coverKey && coverImages[coverKey]) {
-              // Update cover with pipeline eval results
-              coverImages[coverKey].qualityScore = img.qualityScore;
-              // Covers get the same canonical mirror as scenes (see the
-              // sceneImages mapping above). This whitelist dropped finalScore,
-              // so every stored cover root had finalScore undefined and
-              // database.js fell back to qualityScore — covers and pages
-              // ended up carrying different fields for "the score".
-              coverImages[coverKey].finalScore = img.finalScore ?? null;
-              coverImages[coverKey].qualityReasoning = img.qualityReasoning;
-              coverImages[coverKey].fixTargets = img.fixTargets;
-              coverImages[coverKey].fixableIssues = img.fixableIssues;
-              coverImages[coverKey].semanticResult = img.semanticResult;
-              coverImages[coverKey].semanticScore = img.semanticScore;
-              coverImages[coverKey].issuesSummary = img.issuesSummary;
-              coverImages[coverKey].bboxDetection = img.bboxDetection;
-              coverImages[coverKey].bboxOverlayImage = img.bboxOverlayImage;
+              // Update cover with pipeline eval results.
+              //
+              // ONE mirror, shared and guarded (2026-09-14). This used to be a
+              // hand-listed assignment block, and it went stale exactly the way
+              // the finalScore line below it records: it dropped
+              // `threeStageResult`, `qualityRawOutput`, `evalTemplateHash`,
+              // `identityAgreement`, `unrepairedCritical` and `notEvaluated`.
+              // Measured on staging: 61 stored cover roots carried a
+              // threeStageResult 0 times, while 78 of 78 of the same covers'
+              // VERSION records carried one — the compliance judge had been
+              // running on covers since 2026-06-28 and only the root lost its
+              // verdict. `img` here is the repair pipeline's page mapping, the
+              // same record a scene page is stored from, so the mirror is a
+              // field-for-field copy. See server/lib/coverEvalMirror.js.
+              applyCoverEvalMirror(coverImages[coverKey], img);
               // Copy imageVersions if pipeline produced new ones (regen, character fix, or first time)
               if (img.wasRegenerated || img.wasCharacterFixed || !coverImages[coverKey].imageVersions?.length ||
                   (img.imageVersions?.length > (coverImages[coverKey].imageVersions?.length || 0))) {
                 coverImages[coverKey].imageVersions = img.imageVersions;
               }
               if (img.imageData) coverImages[coverKey].imageData = img.imageData;
+              // The scene contract of the version that SHIPPED, not of the one
+              // this cover started as. A page gets this for free (its stored
+              // record IS the pipeline mapping); a cover is copied back field
+              // by field, so a repaired cover kept the original render's sent
+              // prose while shipping a rewrite's pixels. `?? null` and never a
+              // skip-if-absent, for the same reason the eval mirror gives:
+              // a stale value is worse than none. Not in COVER_EVAL_MIRROR_FIELDS
+              // because this is the scene contract, not an eval verdict — the
+              // mirror's own docstring reserves those for the caller.
+              coverImages[coverKey].compressedScene = img.compressedScene ?? null;
+              // …AND ITS PROMPT, FOR THE SAME REASON (2026-09-19). The line
+              // above moved `compressedScene` onto the shipped version while
+              // `prompt` was left describing the FIRST render, so one cover
+              // record narrated two different renders — measured on staging
+              // job_1789759147125_p08djwhbl initialPage, where the root prompt
+              // was the original's and the root compressedScene the iterate's.
+              // Both now name the version that shipped (repairPipeline resolves
+              // it via resolveVersionPrompt, which keeps the original-lineage
+              // fallback: this field is a model input on the re-run path, so it
+              // is never null while the cover rendered at all).
+              coverImages[coverKey].prompt = img.prompt ?? coverImages[coverKey].prompt ?? null;
               if (img.wasRegenerated) coverImages[coverKey].wasRegenerated = true;
               log.info(`📸 [UNIFIED] ${coverKey} pipeline result: score ${img.qualityScore}, ${img.wasRegenerated ? 'regenerated' : 'original'}`);
             }
@@ -5744,191 +6680,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const imgSuccess = allImages.filter(p => p.imageData).length;
     const repairSecs = ((timing.repairEnd - timing.pagesEnd) / 1000).toFixed(1);
     log.debug(`📖 [UNIFIED] Generated ${imgSuccess}/${allImages.length} page images`);
-    log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, repair phase: ${repairSecs}s`);
-    genLog.info('images_complete', `${imgSuccess}/${allImages.length} pages: generation ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, repair phase (detection/evals/entity/rounds/covers) ${repairSecs}s`);
+    // The phase label must say what the phase ACTUALLY did. With
+    // skipQualityEval on there is no detection, no eval, no entity check and no
+    // repair round — only the text-space pass and persistence run — so naming
+    // those stages made a trial look like it had been graded.
+    const repairPhaseLabel = skipQualityEval
+      ? 'post-generation phase (text-space + persistence only, NO evals/repair)'
+      : 'repair phase (detection/evals/entity/rounds/covers)';
+    log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, ${repairPhaseLabel} ${repairSecs}s`);
+    genLog.info('images_complete', `${imgSuccess}/${allImages.length} pages: generation ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s, ${repairPhaseLabel} ${repairSecs}s`);
 
-    // ── JOIN THE PARALLEL TEXT REFINEMENT ─────────────────────────────────
-    // Started back at pagesStart; on a normal run it finished long ago and this
-    // await returns immediately. Resolves to null on any failure — the original
-    // text simply stays.
-    //
-    // BOUNDED (2026-08-10). This await used to be open-ended, resting on
-    // "on a normal run it finished long ago" — an assumption, not a guarantee.
-    // The stage already fails safe (null → original text kept) but had no guard
-    // against being SLOW: a stalled provider or a retrying round would hold the
-    // whole story here, after every image is finished, with a user waiting.
-    // Measured normal cost is ~184s against a ~25-min image phase, so anything
-    // still running at this point is anomalous. Refinement is a polish pass —
-    // shipping the unrefined text is always better than not shipping.
-    if (textRefinePromise) {
-      // 300s, not 90s (owner 2026-08-17). The cap exists so a slow refiner cannot
-      // add its full duration to a story, but 90s was shorter than the refiner's
-      // own runtime: deepseek needs ~2-4 min for two rounds, so a fast image phase
-      // meant the pass was DISCARDED after being paid for (staging
-      // job_1786998860057_o6deqtv5s: $0.16 and 23k output tokens thrown away).
-      // Worst case now adds up to 5 min on a run whose images finished early.
-      // SCALED (2026-08-24). A flat 300s was measured on a stage that had no
-      // blind audit in front of it — that landed 2026-08-23 and roughly doubled
-      // the stage, so the budget no longer matched the work. It is also
-      // reading-level sensitive: a `standard` book's audit emitted 2.3x the
-      // output tokens of a `1st-grade` one (18.4k vs 7.9k on two runs the same
-      // evening), and its single round outweighed a whole 1st-grade round. The
-      // long-text levels get double the base, plus a per-page allowance beyond
-      // ten pages. Salvage below is what makes overrunning cheap; this only
-      // decides how long a user waits for the last round.
-      const LONG_TEXT_LEVELS = new Set(['standard', 'advanced']);
-      const JOIN_TIMEOUT_MS = Number(process.env.TEXT_REFINE_JOIN_TIMEOUT_MS)
-        || ((LONG_TEXT_LEVELS.has(inputData?.languageLevel) ? 600000 : 300000)
-          + Math.max(0, (allImages?.length || 0) - 10) * 10000);
-      const TIMED_OUT = Symbol('text-refine-join-timeout');
-      let joinTimer = null;
-      const refined = await Promise.race([
-        textRefinePromise,
-        // NOT unref'd on purpose: an unref'd timer does not keep the loop
-        // alive, so if this ever ran somewhere the loop could drain, the race
-        // would never settle. `clearTimeout` in the finally below is what stops
-        // it leaking, and that runs on both branches.
-        new Promise((resolve) => { joinTimer = setTimeout(() => resolve(TIMED_OUT), JOIN_TIMEOUT_MS); }),
-      ]).finally(() => { if (joinTimer) clearTimeout(joinTimer); });
-      // SALVAGE: on timeout, fall back to the last state the refiner published
-      // rather than throwing the whole stage away. Everything below reads
-      // `usable`, so a partial snapshot ships exactly like a complete run.
-      const usable = (refined === TIMED_OUT) ? textRefinePartial : refined;
-      if (refined === TIMED_OUT) {
-        const secs = (JOIN_TIMEOUT_MS / 1000).toFixed(0);
-        if (usable?.changed?.length) {
-          log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed — shipping ${usable.rounds.length} completed round(s), abandoning the one in flight`);
-          genLog.warn('text_refine_join_partial', `Text refinement did not finish within ${secs}s of images completing — kept ${usable.rounds.length} completed round(s), rewrote page(s) ${usable.changed.join(', ')}`);
-        } else {
-          log.warn(`⚠️ [TEXT-REFINE] still running ${secs}s after images completed and no round had finished — shipping the ORIGINAL text`);
-          genLog.warn('text_refine_join_timeout', `Text refinement did not finish within ${secs}s of images completing — original text kept`);
-        }
-      }
-      if (usable?.changed?.length) {
-        // Capture the pre-refine prose BEFORE the overwrite below — it is the
-        // only moment both versions exist. Without it the refiner's work is
-        // invisible: the story ships the rewritten text with no record of what
-        // changed, and 10 of 14 pages were rewritten on the first real run.
-        textRefineReport = {
-          rounds: usable.rounds.length,
-          // Per-step trace (owner, 2026-08-27): the count alone made "what did
-          // this step change" unanswerable twice. `kind` says which step —
-          // 'repair' or 'lector'. Analyses capped — text only.
-          roundTrace: usable.rounds.map(r => ({
-            round: r.round,
-            kind: r.kind || null,
-            ok: r.ok,
-            modelKey: r.modelKey || null,
-            modelId: r.modelId || null,
-            elapsedMs: r.elapsedMs || 0,
-            cost: r.cost ?? null,
-            changedPages: r.changedPages || [],
-            // Lector only: how many of its findings the code-side applier
-            // landed, and how many it dropped (see applyLectorFindings).
-            appliedCount: r.appliedCount ?? null,
-            droppedCount: r.droppedCount ?? null,
-            error: r.error || null,
-            analysis: (r.analysis || '').slice(0, 15000),
-          })),
-          changedPages: usable.changed,
-          // THE TWO AUDITS (owner ruling 2026-09-03) — one entry each, raw
-          // output included so a fault can be traced to the auditor that found
-          // it, plus the merged list the single repair pass actually answered.
-          audits: (usable.audits || []).map(a => ({
-            source: a.source,
-            ok: !!a.ok,
-            modelKey: a.modelKey || null,
-            modelId: a.modelId || null,
-            faults: a.faults ?? 0,
-            byCategory: a.byCategory || {},
-            elapsedMs: a.elapsedMs || 0,
-            cost: a.cost ?? null,
-            error: a.error || null,
-            raw: (a.raw || '').slice(0, 40000),
-          })),
-          mergedFindings: (usable.mergedFindings || []).map(f => ({
-            pageNumber: f.pageNumber,
-            category: f.category,
-            text: f.text,
-            sources: f.sources,
-          })),
-          mergeStats: usable.mergeStats || null,
-          // The lector's raw output, its parsed findings, and what the
-          // code-side applier did with each (see applyLectorFindings).
-          proofread: usable.proofread || '',
-          lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-          lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-          // A dropped finding keeps its REASON: quote-absent is the
-          // hallucination guard firing, overlap is two findings on one span.
-          lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
-          durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
-          model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
-          // Same three fields beatsReviewReport and sceneReviewReport carry, so
-          // renderDiffPanel shows all three panels alike (owner 2026-09-06).
-          // They were already IN the round entries — this only projects them.
-          // `prompt` is the repair round's prompt (the lector round has its own
-          // template and no rewrite prompt); `briefsIn` is the page text as
-          // sent in; `analysis` concatenates EVERY round's analysis, labelled,
-          // because a run has a repair round and a lector round and storing
-          // only the last would read as the whole stage's reasoning.
-          prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
-          briefsIn: (usable.original || []).map(p => ({ pageNumber: p.pageNumber, brief: p.text || '' })),
-          analysis: usable.rounds
-            .filter(r => (r.analysis || '').trim())
-            .map(r => `--- Round ${r.round} (${r.kind || 'repair'}${r.modelId ? `, ${r.modelId}` : ''}) ---\n${r.analysis.trim()}`)
-            .join('\n\n'),
-          pages: usable.pages
-            .filter(p => usable.changed.includes(p.pageNumber))
-            .map(p => ({
-              pageNumber: p.pageNumber,
-              before: expandedScenes.find(sc => sc.pageNumber === p.pageNumber)?.text || '',
-              after: p.text,
-            })),
-        };
-        // BOTH arrays: allImages[].text is a COPY taken when the page was
-        // prepared, so updating only the scene would leave the saved story on
-        // the pre-refinement prose.
-        const byPage = new Map(usable.pages.map(p => [p.pageNumber, p.text]));
-        for (const scene of expandedScenes) {
-          const t = byPage.get(scene.pageNumber);
-          if (t) scene.text = t;
-        }
-        for (const img of allImages) {
-          const t = byPage.get(img.pageNumber);
-          if (t) img.text = t;
-        }
-        // THIRD store: data.story / data.storyText are assembled from the
-        // pre-refine pages and persisted as-is, and the Lab's edit mode reads
-        // THEM — so without this rebuild the editor showed the original text
-        // while the book showed the refined one (caught by the owner on p18 of
-        // the first arc-pipeline run: "Das reicht." vs the refined ending).
-        fullStoryText = storyPages.map(page =>
-          `--- Page ${page.pageNumber} ---\n${byPage.get(page.pageNumber) || page.text}`
-        ).join('\n\n');
-        const totalMs = usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0);
-        // A salvaged snapshot already logged text_refine_join_partial, which
-        // says what was kept AND what was abandoned. Emitting "complete" here
-        // too would read as a clean finish and hide the abandoned round.
-        if (!usable.partial) {
-          genLog.info(
-            'text_refine_complete',
-            `Text refined in ${usable.rounds.length} round(s), ${(totalMs / 1000).toFixed(1)}s — rewrote page(s) ${usable.changed.join(', ')}`,
-            null,
-            { rounds: usable.rounds.length, changedPages: usable.changed, durationMs: totalMs }
-          );
-        }
-      } else if (usable && !usable.partial) {
-        // "Nothing to rewrite" and "a round failed" are different outcomes — a
-        // failed round means the ORIGINAL text ships unreviewed, which must be
-        // visible in the log, not filed as a clean convergence.
-        const failedRound = (usable.rounds || []).find(r => !r.ok);
-        if (failedRound) {
-          genLog.warn('text_refine_failed', `Text refinement round ${failedRound.round} failed (${failedRound.error}) — original text kept`);
-        } else {
-          genLog.info('text_refine_complete', 'Text refinement found nothing to rewrite');
-        }
-      }
-    }
+    // The refiner was joined before the repair pipeline (see
+    // joinTextRefinement). This call covers the paths that skipped Phase 5a and
+    // is a no-op on every normal run.
+    await joinTextRefinement([allImages]);
 
     // Wait for cover images if still running (they ran parallel with page images)
     if (coverAwaitPromise) {
@@ -6152,6 +6917,62 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       finalChecksReport.bookAuditRounds = pipelineBookAuditRounds;
     }
 
+    // Per-round, per-method repair effectiveness (owner, 2026-09-13): which
+    // method improved pages, which regressed them, which failed outright.
+    if (pipelineRepairRounds) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.repairRounds = pipelineRepairRounds;
+    }
+
+    // KNOWN-BROKEN PAGES (D7). Attached whenever the repair budget ran out with
+    // a page still below threshold or still carrying a CRITICAL, so the stored
+    // story carries the list instead of it living only in a log line.
+    if (pipelineShippedDefective) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.shippedDefective = pipelineShippedDefective;
+    }
+
+    // CRITICALS THAT SURVIVED REPAIR, AND WHAT WAS TRIED ON THEM (2026-09-14).
+    // The owner kept the existing routing (every critical goes to iterate) and
+    // asked for the evidence instead: which methods a still-broken page
+    // consumed, and whether it shipped above or below the threshold. Report
+    // only — it changes no route, no severity and no score.
+    if (pipelineSurvivingCriticals) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.survivingCriticals = pipelineSurvivingCriticals;
+    }
+
+    // UNJUDGED DIMENSIONS (2026-09-14). A check that could not run must say so
+    // in its result, not only in a log line — three checks shipped blind for
+    // months because "ran clean" and "could not run" looked identical. This is
+    // where an analyst reading stories.data finds which dimensions were never
+    // judged, on which pages. Recording only: it changes no score and no
+    // repair routing (owner decision the same day — scoring left as-is).
+    if (pipelineNotEvaluated) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.notEvaluated = pipelineNotEvaluated;
+    }
+
+    // PAGES THAT SHIPPED ON PROSE ALONE (2026-09-15). Same contract as
+    // notEvaluated above: a page whose brief was stripped before it was sent
+    // must say so in the stored run, not only in a log line. An analyst reading
+    // finalChecksReport now sees "page N shipped on prose alone" next to that
+    // page's findings, which is what makes the scoring question answerable on
+    // evidence. Recording only — no score, severity or route changes.
+    const degradedScenePages = (allImages || [])
+      .filter(img => img && img.degradedScene)
+      .map(img => ({
+        pageNumber: img.pageNumber,
+        emptyInputs: img.degradedScene.emptyInputs || []
+      }));
+    if (degradedScenePages.length > 0) {
+      finalChecksReport = finalChecksReport || {};
+      finalChecksReport.degradedScenes = degradedScenePages;
+      for (const p of degradedScenePages) {
+        log.warn(`⚠️  [DEGRADED SCENE] page ${p.pageNumber} shipped on prose alone — no ${p.emptyInputs.join(', ')}. Every judge scored it against a stripped brief.`);
+      }
+    }
+
     // Deterministic scene metadata ↔ scene design consistency findings (see
     // check right after the final parse). Attached even when empty so the dev
     // panel can show "checked, clean" vs "not run".
@@ -6230,22 +7051,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     clearCurrentLogger();
     log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries (including API usage)`);
 
-    // Compute quality aggregates for analytics
-    const qualityScores = allImages
-      .map(img => img.qualityScore)
-      .filter(s => s != null && !isNaN(s));
-    const avgQualityScore = qualityScores.length > 0
-      ? Math.round(qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length)
-      : null;
-    const minQualityScore = qualityScores.length > 0 ? Math.min(...qualityScores) : null;
-    const maxQualityScore = qualityScores.length > 0 ? Math.max(...qualityScores) : null;
-    const firstAttemptPassRate = allImages.length > 0
-      ? Math.round(allImages.filter(img => !img.totalAttempts || img.totalAttempts <= 1).length / allImages.length * 100)
-      : null;
-    const totalRetries = allImages.reduce((sum, img) => sum + Math.max(0, (img.totalAttempts || 1) - 1), 0);
-    const pagesWithIssues = qualityScores.filter(s => s < 70).length;
-    const contentBlocked = allImages.reduce((sum, img) =>
-      sum + (img.retryHistory?.filter(r => r.blocked)?.length || 0), 0);
+    // Quality aggregates — one implementation, in server/lib/storyMetrics.js,
+    // so the "not measured vs measured zero" rule is pinned by unit tests and
+    // cannot drift between this writer and the metrics collector that reads it.
+    const { computeQualityAnalytics, getBuildInfo } = require('./server/lib/storyMetrics');
+    const {
+      qualityEvaluated, qualityEvalSkipReason, attemptsMeasured, attemptSource,
+      avgQualityScore, minQualityScore, maxQualityScore,
+      firstAttemptPassRate, totalRetries, pagesWithIssues, contentBlocked,
+    } = computeQualityAnalytics(allImages, { skipQualityEval });
 
     // A page or cover that reaches persistence with no image bytes is a
     // SHIPPED DEFECT — the story must say so instead of looking complete
@@ -6362,7 +7176,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       generationLog: genLog.getEntries(), // Generation log for dev mode
       textRefineReport, // per-page before/after from the parallel refine pass
       arcReviewReport,   // drafted arc + arc-review analysis (beats mode)
-      arcVarietyExclusions, // challenges from this account's earlier books, excluded at arc plan (beats mode)
+      // The catalogue ids this book was OFFERED. The next book on this
+      // account excludes them at draw time (loadUsedChallengeIds) — which is
+      // the whole of the cross-story variety rule: no prompt names a previous
+      // story, so nothing can leak one book's cast into another's.
+      challengeDrawIds,
       challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
@@ -6379,7 +7197,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // done): detection, evals, entity checks, repair rounds, cover checks.
         repairDurationMs: timing.repairEnd ? timing.repairEnd - timing.pagesEnd : null,
         coversDurationMs: timing.coversEnd ? timing.coversEnd - (timing.coversStart || timing.storyGenEnd) : null,
-        // Quality
+        // Quality.
+        // `qualityEvaluated: false` marks every score/count below as NOT
+        // MEASURED (all null) — the run skipped the eval + repair pipeline.
+        // `true` means the numbers are real, including a truthful 0 / 100.
+        qualityEvaluated,
+        qualityEvalSkipReason: qualityEvaluated ? null : 'skipQualityEval',
+        // `attemptsMeasured: false` marks firstAttemptPassRate/totalRetries as
+        // NOT MEASURED — no page carried an attempt counter. They were
+        // previously derived from `totalAttempts`, which no generation path
+        // writes, so an evaluated run with 14 real retries reported 100 / 0
+        // (staging job_1789348171785_9oxos7dwv). Counter source now:
+        // retryHistory. `attemptSource` names it.
+        attemptsMeasured,
+        attemptSource,
         avgQualityScore,
         minQualityScore,
         maxQualityScore,
@@ -6392,8 +7223,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         sceneCount: allImages.length,
         coverCount: Object.keys(coverImages || {}).filter(k => coverImages[k]?.imageData || coverImages[k]?.hasImage).length,
         // Pipeline config
+        // Which code produced this story. Same env var /api/health reports
+        // (RAILWAY_GIT_COMMIT_SHA); null on a local run, never a throw. Without
+        // it, "did that fix hold?" means reconstructing the deploy history from
+        // timestamps — guesswork when a push lands minutes before a job starts.
+        build: getBuildInfo(),
         pipelineConfig: {
           enableFullRepair,
+          // The pipeline this run actually took (beats | unified).
+          pipelineMode,
+          // Recorded alongside it because repair is unreachable when eval is
+          // skipped: without this the row could not be read back correctly.
+          skipQualityEval,
         },
         // Models used
         models: (() => {
@@ -6988,9 +7829,19 @@ async function processStoryJob(jobId) {
     // Begin/end are fire-and-forget; this finally runs on completion, failure
     // and cancellation alike, so a story can never leak a session.
     require('./server/lib/analyzerClient').sessionBegin(`story:${jobId}`);
+    // WHOLE-JOB liveness heartbeat — armed here, the ONE entry point every
+    // caller uses (jobs, trial, admin rerun, auth), so every phase of every
+    // pipeline (unified, beats, trial) is inside it. Phase-local intervals
+    // were the old shape and they left a blind window after every phase that
+    // grew a new one; see server/lib/jobHeartbeat.js and docs/decisions.md
+    // "Job liveness heartbeat spans the whole job". Cleared in the same
+    // outermost finally as the analyzer session, so completion, failure,
+    // cancellation and early return all disarm it exactly once.
+    const jobHeartbeat = startJobHeartbeat(jobId, dbPool);
     try {
       return await _processStoryJobImpl(jobId);
     } finally {
+      jobHeartbeat.stop();
       require('./server/lib/analyzerClient').sessionEnd(`story:${jobId}`);
       // Free the per-scope avatar log buckets. The buckets were captured into
       // saved story data already; the dev panel reads from the DB, not from
@@ -7073,7 +7924,16 @@ async function _processStoryJobImpl(jobId) {
   // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
+    // Read the CONFIGURED quality model, never a hardcoded id: this line named
+    // 'gemini-2.0-flash' while the judge actually running was
+    // MODEL_DEFAULTS.qualityEval (gemini-2.5-flash, 3x the input and 6.25x the
+    // output price), so any quality-eval call that reached this fallback was
+    // priced at a sixth of its cost. Mirrors apiCost.js's
+    // PROVIDER_FALLBACK_MODEL, which already resolves it this way.
+    // (This comment used to add "a model Google shut down". It is not shut
+    // down — delisted from GET /v1beta/models but still answering, verified
+    // 2026-09-18. The hardcoding was the bug; the id's liveness never was.)
+    gemini_quality: MODEL_PRICING[MODEL_DEFAULTS.qualityEval] || MODEL_PRICING['gemini-2.5-flash'],
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
 
@@ -7309,7 +8169,11 @@ async function _processStoryJobImpl(jobId) {
     if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
       const { resolveAvailableLandmarks } = require('./server/lib/landmarkPhotos');
       const landmarks = await resolveAvailableLandmarks(inputData.userLocation, {
-        limit: 30, discoverOnMiss: false, language: inputData.language, shuffle: true,
+        // 20, the same number the ideas route offers (owner, 2026-09-19). The
+        // pipeline asked for 30 and the arc prompt then carried 15.5k chars of
+        // landmark listing — 41% of everything the arc creator read, most of it
+        // guild houses and archives no children's story reaches for.
+        limit: 20, discoverOnMiss: false, language: inputData.language, shuffle: true,
         // A landmark the family names in their idea is pinned first (after the
         // shuffle), so the writer's top-3 opens on it.
         premiseText: [inputData.storyDetails, inputData.title].filter(Boolean).join('\n'),
@@ -7333,7 +8197,13 @@ async function _processStoryJobImpl(jobId) {
     // non-admins here — before any reader (this function OR the pipeline's
     // resolveLayout) can pick them up — so a normal user can't pick expensive
     // models or silently degrade their own paid story.
-    if (!isAdmin) {
+    // `serverAuthoredInput` (set only by a server route that builds the whole
+    // commission itself, and forced to false on the user-facing create-story
+    // path after the req.body spread) means there is no client-supplied field
+    // here to strip. Without this exemption the trial route's deliberate
+    // `enableFullRepair: false` was deleted — trial users are not admins — and
+    // every trial ran and recorded the default ON (2026-09-13).
+    if (!isAdmin && inputData.serverAuthoredInput !== true) {
       delete inputData.modelOverrides;
       delete inputData.skipImages;
       delete inputData.skipCovers;

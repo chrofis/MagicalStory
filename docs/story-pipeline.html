@@ -62,7 +62,7 @@ A push to <code>master</code> auto-deploys to Railway, kills the Node process, a
 
 <h2 id="unified">3. Unified Claude pass</h2>
 
-<p>One <code>messages.create</code> call returns the entire story payload — outline, visual bible (characters + objects + locations), per-page text, and per-scene hints (shot, framing, primary characters, optional location reference). Prompt: <code>prompts/story-unified.txt</code> (trial variant: <code>prompts/story-trial.txt</code>).</p>
+<p>One <code>messages.create</code> call returns the entire story payload — outline, visual bible (characters + objects + locations), per-page text, and per-scene hints (shot, framing, primary characters, optional location reference). Prompt: <code>prompts/story-trial.txt</code> on the trial path. The full path no longer makes this single call — it runs the beats chain (<code>story-beats.txt</code> → <code>story-bible-from-beats.txt</code> → <code>scene-expansion-all.txt</code> → <code>story-text-from-beats.txt</code>); <code>story-unified.txt</code> was deleted 2026-09-15.</p>
 
 <p>Why one call: keeping outline + text + scene hints in the same context guarantees consistency. A page's text references the same hat the outline introduced; a scene hint about "the marketplace at dusk" aligns with the outline's Act II setup.</p>
 

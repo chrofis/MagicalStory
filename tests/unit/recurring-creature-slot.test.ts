@@ -52,10 +52,16 @@ describe('recurring creature — definition', () => {
 });
 
 describe('recurring creature — element reference selection', () => {
-  it('survives the cap-4 element budget on a cast-heavy page and is flagged', () => {
+  it('survives the element budget on a cast-heavy page and is flagged', () => {
+    const { VB_ELEMENT_BUDGET } = require('../../server/lib/vbElementBudget');
     const v = makeVb();
-    const refs = vb.getElementReferenceImagesForPage(v, 16, 4);
-    expect(refs).toHaveLength(4);
+    const refs = vb.getElementReferenceImagesForPage(v, 16, VB_ELEMENT_BUDGET);
+    // Budget-many elements plus the page's location cell LAST (locations are
+    // not elements — owner, 2026-09-08); together never above Grok's slot cap.
+    const elements = refs.filter((r: any) => r.type !== 'location');
+    expect(elements).toHaveLength(VB_ELEMENT_BUDGET);
+    expect(refs).toHaveLength(VB_ELEMENT_BUDGET + 1);
+    expect(refs[refs.length - 1].type).toBe('location');
     expect(refs[0].id).toBe('ANI001');
     expect(refs[0].recurring).toBe(true);
     // cap is not raised to make room

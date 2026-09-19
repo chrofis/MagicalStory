@@ -63,9 +63,10 @@ async function detectPremiseNamedWorld(inputData) {
 
   try {
     const { callTextModel } = require('./textModels');
-    // Generous cap on purpose: the utility model (Gemini) counts its thinking
-    // tokens against maxOutputTokens — a one-word budget returns empty text.
-    const res = await callTextModel(prompt, 2000, MODEL_DEFAULTS.utility, {
+    // null = the model's own ceiling (owner rule: no output caps). The utility
+    // model (Gemini) counts its thinking tokens against the ceiling — a
+    // one-word budget returned empty text.
+    const res = await callTextModel(prompt, null, MODEL_DEFAULTS.utility, {
       usageLabel: 'premise_world_classify', temperature: 0,
     });
     const answer = String(res?.text || '').trim().toUpperCase();

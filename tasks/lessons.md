@@ -686,3 +686,232 @@ session had made further up the same file (655b25f9b). An empty index is not eno
 FILE is shared; check `git diff <file>` shows only your hunks, or stage your hunk alone with
 `git diff -U3 -- <file>` → keep your hunk → `git apply --cached`. Hot files tonight:
 promptBuilders.js, decisions.md, BACKLOG.md, prompts/story-*.txt.
+
+## 2026-09-06 — Get the authoritative artifact before theorising about a third-party UI
+A customer-facing "Google hasn't verified this app" screen took three wrong diagnoses before
+the right one, and every wrong turn came from reasoning about state I could not see. Theory 1
+(sensitive scopes on the customer project leak project-wide) died when the console's Data
+Access tables came back empty. Theory 2 (the owner was looking at the admin project's tab)
+died the moment the actual consent URL arrived carrying `client_id=…cl8hv6p5…` — the customer
+login client. The screen text alone never carried a client_id or a scope list, so re-pasting it
+could not discriminate between causes; the URL settled it in one message. Rule: when the
+evidence lives in a third-party console or a browser flow, ask for the ONE artifact that
+identifies the actor (a URL with its query string, a request id, a config table's contents) and
+stop reasoning until it arrives — and when a datum is asked for twice and not supplied, give the
+full remaining fix list rather than asking a third time. Also worth remembering: repo greps do
+prove things here — `grep` over both auth paths showed `scope: 'openid email profile'` and
+nothing else, which is what ruled out a rogue scope and pointed at undeclared-scope state.
+
+## 2026-09-07 — A price in a code comment is not a price
+
+**What happened:** I told the owner Gemini 3.7 Flash was cost-neutral against 2.5 Flash, taking "$0.38/$1.88 per 1M" from a comment in `server/config/models.js`. The owner doubted it. The vendor pages say $0.75/$3.75 (Flex, Google list through 2026) and $1.50/$7.50 (standard route, list from 2027): 1.8-3.5x per call, not neutral.
+**Rule:** any cost comparison put in front of the owner is computed from a vendor page fetched that day (ai.google.dev pricing, openrouter.ai model page, x.ai pricing), with the source named in the table. Repo comments, memory and model-card summaries are leads, never the number. Include the date-bound price when the vendor announces a change.
+
+## 2026-09-08 — "All 4 fixed" after viewing 2
+
+Reported four page re-renders as fixed having looked at two of them. The owner
+opened the other two: one was improved-but-wrong (a scale drawn as a dish of
+scales), one was not fixed at all (the trapped woman could reach the rim; a model
+pose where the beat needed distress). Same failure class as
+`feedback_view_actual_pixels_not_metadata` and
+`feedback_evaluate_every_picture_after_run`, one level up: an agent's summary of
+an image is not the image either.
+
+Rule: a claim that N things are fixed requires N looks — mine, not the agent's.
+Report per item ("2 fixed, 1 improved, 1 not") before any group verdict. A
+group verdict issued on a sample is a guess wearing a conclusion's clothes.
+
+Second lesson from the same page: the trapped figure was drawn reaching the rim
+because the BEAT said "gripping its rim". A beat that puts an exit within a
+trapped character's reach has contradicted its own story; downstream stages
+drew it faithfully. When an image is "wrong", read the beat before blaming the
+Art Director or the renderer — the earliest stage that states the contradiction
+owns it.
+
+## 2026-09-08 — "No fallback logged" is not "the model ran"
+Claimed the first staging story ran under the Qwen inventory because no fallback warning appeared. It never ran: the pipeline passed the default quality model as an override, which beat the inventory key. The absence of a failure log says nothing about which model answered. Rule: before claiming model X ran, read a stored per-call signature (token count, modelId, response shape) on the actual rows — and compare it to a Lab run of X where the model is known.
+
+## 2026-09-08 — A rule drafted from one failure comes out as that failure's jargon
+
+Sent the owner a beats rule for the "stick levers water into the trough" page
+written in the vocabulary of that page: tool, target, receiver, strike, release.
+He rejected it: not generic, and unreadable English. The generic rule already
+existed ("one moment — no before-and-after"); the gap was only that the action
+count let cause + effect pass as one. The fix was one plain line: a deed is one
+action, its effect another, where the effect goes a third; extra ones move to
+the next page.
+
+Rule: before sending any prompt rule, rewrite it with zero words from the
+motivating page, then read it against two unrelated pages (a door pushed open
+onto a room; a chip pressed to a scale while someone refuses). If it only
+makes sense for the page that broke, it is not a rule yet. Short sentences,
+no em-dash chains.
+
+## A prompt check that detects reliably is not a prompt check that repairs (2026-09-09)
+
+Adding a check to a critique prompt proves the model can SEE a fault. It proves nothing about
+whether the model can FIX it. Fourteen paid attempts went into forcing a planner to split a page
+it correctly identified as holding two actions; every attempt it answered by destroying the page
+instead. Before promoting a new check to must-fix, ask what the model does when it is told to
+repair that fault, and what the worst repair looks like next to the original fault. If the worst
+repair is silent and the fault is visible, leave the check advisory.
+
+## A heredoc ends the && chain (2026-09-09)
+
+A `cat >> file <<EOF` inside an `a && b && c` chain terminates the chain at the heredoc: every
+command on the lines after the closing EOF runs UNCONDITIONALLY. That is how a commit and a push
+to staging ran after step one of the chain had already failed — the tree happened to be green,
+verified afterwards, but the gate did not run before the push. Rule: a heredoc is always the
+ONLY command in its Bash call. Write the file first, on its own; run the guarded chain second,
+with `-m` flags and no heredocs in it.
+
+## 2026-09-09 — a `python - <<'EOF'` heredoc still eats backslashes
+A `\n` written inside a quoted heredoc arrived at Python as a real newline, so
+every `assert old in s` against a JS template literal containing `\n` failed
+silently-looking ("no match") while the file was obviously right. Build such
+needles with `B = chr(92)` and concatenate — never rely on `\n` surviving the
+heredoc. Two wasted edit attempts before this was spotted.
+
+## A pipe masks a failed push; a wait loop needs a bound (2026-09-10)
+
+In a guarded && chain, `git push ... | grep | tail` reports TAIL's exit code, so a push the pre-push gate
+refused read as success and the chain went on to "wait for the deploy" of a commit that never left the
+machine - an unbounded `until curl ...` loop that ran until the OS killed it for memory. Two rules:
+(1) never pipe a command whose exit code guards the chain - run it bare, or `set -o pipefail`;
+(2) every wait loop gets a deadline (`for i in $(seq 1 60)` ...) and fails loudly when it expires.
+The gate itself was right (check-no-undef found three real ReferenceErrors).
+
+## Never pipe the test runner in a guarded chain (2026-09-10, same day as the push lesson)
+
+Recorded this morning for git push, repeated this afternoon for vitest: `npx vitest run | grep -E "Tests |FAIL"`
+exits with GREP's status, so two failing tests read as success and the chain committed and pushed them
+(34b7d7a8). Rule: `npx vitest run --reporter=dot > "$LOG" 2>&1; RC=$?; tail -3 "$LOG"; test $RC -eq 0 && ...`
+- the exit code comes from the runner, never from a filter. Applies to every command whose result
+gates the next step: run it bare or capture to a file, then filter the file.
+
+## 2026-09-11 — a stage that fails open is invisible until you count it
+The production composite aborted on every trigger for 17 days ("cleanBackgroundPrompt or scene.description required") and nobody saw it: the pipeline caught the throw, kept the direct render, and every "composite verdict" in that period was a Lab verdict. A rerun meant to validate a composite change validated nothing.
+Rules: (1) before claiming a stage ran, read the stored outcome field for the pages it should have touched (here `compositeOutcome`), not the log of the change; (2) when wiring a call from a closure, confirm each field exists ON THAT OBJECT at that point (`pageData.scene.sceneDescription`, not `pageData.sceneDescription`); (3) a fail-open stage needs an abort count in the run summary.
+
+## 2026-09-13 — "no reference in the database" is not proof an object is dead
+Three R2 orphan classifiers in one session, three different false-positive classes, all from the same
+inference: absence of a reference means deletable. (1) An `orders` row owns a PDF but never stores its
+URL — structurally invisible to a URL scan; 22 paid-order PDFs were queued for deletion. (2)
+`dbHousekeeping.js:148` writes `{table}/{userId}/{rowId}/migrated/…`, so segment 2 is a USER id — a live
+user with 27 stories and 77 orders landed on the delete list. (3) Numeric ids are simultaneously user ids,
+character ids and JSONB values, so the substring VERIFIER was wrong too.
+Rules: (1) when a destructive action rests on "X is absent", find a positive test instead — here, group by
+owner prefix and delete only if ZERO members are in the referenced set, which never interprets an id;
+(2) an unrecognised shape is protected, never defaulted to deletable; (3) verify a classifier by sampling
+and proving the negative through a DIFFERENT code path — that is what caught it; (4) price the thing before
+proposing deletion: the whole 20 GB bucket cost $0.16/month, so storage was never a reason to delete
+anything, and the owner's actual concern was deletion COMPLETENESS.
+
+## 2026-09-14 — Compare a brief to the plan that SHIPPED, never to `briefsIn`
+**What happened:** I diagnosed "the Art Director drifts one page behind its plan lines" on job_1789304198359_y3n0euk3z, wrote it up, scanned 20 stories and reported 6 more. The owner said "the beats is allowed to shift a page or delete one and create a new one." Against the FINAL plan (`data.outline`, post `beats_replan`) every brief matched its own page. I had compared against `beatsReviewReport.briefsIn`, which `beatsPipeline.js:1254` stores as `plan.pages` — the division BEFORE the re-plan round.
+**Rule:** The beats layer may re-divide the book after the plan check. Any page-to-plan comparison — cast, moment, elements, a Lab replay, a scan — must read the division that actually shipped (the page plan inside `data.outline`, or whatever `resolveStoryBeats` is fixed to return), never `briefsIn`. Before claiming a pipeline stage disobeyed its input, prove the input you hold is the one it was given. This is the same lesson as "verify what RAN, not what was asked", one hop earlier.
+**Cost:** a false finding in decisions/backlog (withdrawn), a void 6-of-20 scan, ~half a day. The pre-existing backlog item "four Lab stages measure a story division that never shipped" now has its first measured victim.
+
+## 2026-09-14 — A defect in the output is not evidence of a missing input
+**What happened:** prod `job_1789227389389_z18dmvnt6` p8 narrates «queues d'argent» while the
+contract gives a deep yellow and a red tail, and all 7 surfaces drew the contract. I diagnosed a
+plumbing gap and offered options built on it; when the owner asked "is this only for the clothing,
+what about all the visual bible elements", I went further and proposed injecting a whole
+`{VISUAL_CONTRACT}` block into the writer. The owner's reply — "this is not hard to do or catch,
+something must be wrong somewhere" — is what sent me to the stored prompt. `stories.data.storyTextPrompts`
+(59,347 chars) already carried the per-page `ILLUSTRATION (already locked)` block with **both tail
+colours verbatim**, and `buildTextRefinePrompt` already passes the full `sceneBrief` as
+`{SCENE_OUTLINES}`. The real gap was a RULE gap: the prompts said "don't narrate wardrobe" and
+"never contradict" (read as being about events) and said nothing about the case that occurred — a
+transformation is an event, so naming the tails was legitimate and no rule anchored the colour.
+**Three more of the same shape in the same session:** the narrative audits "never fire" (the arc
+review had already filed `[MAJOR] Maman lets two small children go under the lake`, and
+`roundsConfigured: 1` meant nothing could act on it); "p3 text says photograph, image shows a model
+ship" (filed backwards — the brief says "a photographic display of a sailing barque", the text was
+faithful and the IMAGE deviated); "p2 should have routed to char-fix and didn't" (it routed in all
+three rounds and the method failed: `original 16 → 10 → -35 → -30`).
+**Rule:** before proposing that a stage lacks an input, open the artefact the run stored and grep it.
+`stories.data` holds `storyTextPrompts`, `sceneDescriptions`, every `*ReviewReport`, `textRefineReport`
+(with `roundTrace` / `lectorApplied` / `proofread`), `finalChecksReport`, and per page `imageVersions`
+with `source`/`finalScore`, `retryHistory`, `unrepairedCritical`, `bestSource`. If the input is there
+and the rule is there, the bug is in the rule's SCOPE, a severity ceiling, or the method — never the
+wiring. Plumbing that duplicates existing plumbing is worse than no fix: it ships, it looks like
+progress, and the real defect stays.
+**Cost:** two wrong option-sets put to the owner, one near-miss on building a redundant prompt block,
+and three findings filed with the wrong owner. Caught only because the owner pushed back twice.
+
+## 2026-09-14 — Before a paid run: the LIVE commit must equal origin/staging HEAD, not just be "ok" and idle
+**What happened:** I launched an 18-page dragon rerun (job_1789337754344_c6h7vz7mu, ~CHF 2) after checking `/api/health` (commit c83e8344, status ok) and `/api/health/busy` (idle). Four commits had been pushed by another session at 00:10-00:13; Railway's build landed at 00:16 and restarted the container 27 seconds into my job — "Server restarted during generation". The push gate was not violated (the push preceded my launch); the deploy was simply in flight and I did not look.
+**Rule:** Before launching anything paid on an environment, `git fetch` and require `live commit == origin/<branch> HEAD`. If they differ, a deploy is pending — wait for it to land (poll `/api/health` until the SHA matches), then launch. `busy:false` and `status:ok` say nothing about a build that has not finished yet.
+**Cost:** one full story's arc stage, one of the three runs the goal allowed.
+
+## 2026-09-15 — Pixels first, numbers second: read the story and look at every image before reporting on a run
+**What happened:** the first report on staging story `job_1789420511893_zly5rcdej` was written from
+metadata — mean `finalScore` 43 against 62-69 on the three predecessors, nine `extra_character`
+CRITICALs — and it said the book had come out badly. The owner had to say *"read the story yourself
+and look at the images"*. The text is good and pages 1-7 are strong; the nine CRITICALs were **false**,
+fired on correctly-drawn harbour crowds because `crowdExpected` was never emitted on the beats path.
+Opening the images inverted the diagnosis: p10 scores 35 on a clean page, p8 scores 68 with a
+football-sized chestnut in the foreground, and an empty climax (p12, 33) outscores a fine page
+(p2, -5) by 38 points.
+**Rule:** before reporting on any run, read the text and look at **every** image. Scores are a
+hypothesis about quality, not a measurement of it — a single missing guard input can invert the whole
+ranking. Report what the pictures show first, then use the numbers to explain it. (Third recurrence
+of the same lesson: [[feedback_evaluate_every_picture_after_run]],
+[[feedback_view_actual_pixels_not_metadata]].)
+**Cost:** one wrong verdict on a good book, delivered to the owner.
+
+## 2026-09-15 — A guard is only as good as its input: verify the field is POPULATED, not just consumed
+**What happened:** the crowd guard was wired end to end and correct at every hop —
+`sceneMetadata.js:883/921/1082` reads `metadata.crowdExpected === true`, `evalPipeline.js:1087`
+carries it into the cast roster, `evalPipeline.js:1452` declines the finding. It had never once been
+handed a `true`, because the field was declared only in `prompts/scene-expansion.txt` — the per-page
+FALLBACK template — and the live beats path expands with `prompts/scene-expansion-all.txt`, which
+never asks for it. An omitted key reads as `false`, silently, forever.
+**Rule:** when verifying a guard, trace the field back to its PRODUCER and check the stored data — is
+this field ever `true` in a real run? Reading the consuming code proves only that the guard would work
+if it were fed. One query against `stories.data` would have found `crowdExpected: false` on 16 of 16
+pages. Same shape as [[feedback_absent_counter_is_not_a_clean_score]] and
+[[feedback_guards_check_adjacent_property]].
+
+## 2026-09-15 — Sibling paths: when you find a new pair, add the SET, don't just fix both sides
+**What happened:** 27 of 173 verified fixes from one 60-hour window were PARTIAL — each had reached
+one path and not its sibling (per-page vs all-pages AD template, trial vs unified writer, lector vs
+diff pass, streaming vs non-streaming provider entry, Gemini vs Grok fallback, prod repair vs
+regeneration vs entityConsistency, Lab vs prod, cover vs page). The `fixing-sibling-paths` skill had
+described the class since 2026-08-09 and prevented none of them.
+**Rule:** the registry (`scripts/admin/sibling-registry.json`), pre-push **gate 9** and
+`tests/unit/sibling-parity.test.ts` now enforce it. When you discover a new sibling pair, the fix is
+to **add the set to the registry**, not merely to patch both sides — patching both sides fixes today
+and lets tomorrow's third path diverge. If gate 9 blocks you and the divergence is correct, vouch for
+it in the commit message with `Siblings-Checked: <reason>` — that is a statement on the record that
+you read each sibling, not a way past the gate.
+
+## 2026-09-15 — A variety requirement with no placement rule will land on the climax
+**What happened:** `NO_PEOPLELESS_PAGE` requires one people-free page per book — a good rule, it buys
+visual variety. Nothing constrained WHICH page, and `NO_COMMISSIONED_ON_PAGE` skips zero-cast pages by
+construction, so the planner spent the quota on the emotional climax: three children shouting after a
+departing ship, drawn as an empty quay with a coil of rope.
+**Rule:** a quota that says a book must contain N of something needs a companion rule about where it
+may NOT go. Whenever you add or review a plan counter of the form "at least one page must be X", ask
+what the worst page to spend it on would be, and write that constraint in the same change. The quota
+and its placement rule are one rule in two halves.
+
+## 2026-09-16 — Workflow fan-out burned the weekly budget
+- Launched 3 audit workflows (~hundreds of agents) alongside 5 code agents; owner: "you used the weekly budget in 10 min".
+- Rule: count agents (items × stages × verifiers) BEFORE any Workflow call and say the number; >15 agents needs an explicit yes. One careful reader per question, not five lenses. Audits never run parallel to the code agents that are the deliverable.
+- On "stop": TaskStop all, save half-applied agent edits to a scratchpad patch, revert those files, report what survived (commits + journals are safe).
+
+## 2026-09-18 — An absence is not a fault: name what was PROMISED, and by which artefact
+**What happened:** the owner corrected the same mistake three times in one day. First, on the eval
+prompts: *"Not all characters mentioned in text must appear in the image. Add that rule everywhere! A
+text can be 3 actions the image must focus on one. You keep getting this wrong."* Then, on 13 pages
+reported as absence faults: 8 of them were misclassified — one character was plainly in the frame, and
+one was never even named by the text that was supposed to have promised him. Then, on a report of
+peopleless pages: *"Pages without cast are ok. Stop repeating that as a fault."* A character the text
+names and the frame omits, a cast the Art Director trims to one instant, a page with no characters at
+all — each is normal, designed output, and each was filed as a defect on the same day.
+**Rule:** before calling an absence a fault, name what was **promised** and **by which artefact** — a
+beat the story gives a figure, a contact the brief states, a plan line that stages them — and then look
+at the pixels. A text naming something is not a promise; the brief and the plan are. "X is missing" is
+an observation, never a finding.

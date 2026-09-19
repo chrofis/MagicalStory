@@ -11,8 +11,13 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { textZoneRulesActive } = require('../config/runtime');
-const { commissionedChildBand, buildChildAgeBandNote } = require('./inventedAgeBand');
-const { buildVisualBiblePrompt, englishEntityRef, englishLocationRef, significantEntityTokens, clauseRef, objectStates, objectStateFor } = require('./visualBible');
+const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = require('./inventedAgeBand');
+// significantEntityTokens is NOT imported here any more: its only consumer in
+// this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
+// exported from visualBible.js for coverIterate.js, which still uses it.
+const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
+const { SHOT_ENUM, SHOT_DEFINITIONS } = require('./shotVocabulary');
+const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -20,11 +25,43 @@ const { frameColorForName } = require('./characterFrames');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
-const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata } = require('./sceneMetadata');
+const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
-const { seasonLabel, buildSeasonNote } = require('./season');
-const { highActionPagesPhrase } = require('./planCounters');
+const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
+const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
+
+/**
+ * The SEASON a page-brief prompt states — and the ONE place the three Art
+ * Director / iterate builders below ask for it.
+ *
+ * Why it is a function and not `seasonLabel(story || {})` written out three
+ * times. season.js:63-66 states the rule the resolver is FOR: "Explicit value
+ * wins; otherwise it is derived from the story's own date (job `created_at`),
+ * never from 'now' at render time — a repair run months later must resolve the
+ * same season the pages were drawn in." A page brief is always written for a
+ * story that exists, so a builder here reaching `new Date()` means its caller
+ * dropped the story — and the result is a book whose foliage is this month's
+ * instead of the story's, silently. That is exactly what the Test Lab's
+ * per-page Art Director did: a stored SUMMER story replayed in September was
+ * told "the season is Autumn on every page of this book".
+ *
+ * It cannot throw — a season is never worth killing a paid run over (gates are
+ * guidelines) — so it says so instead, at error level, naming the builder. The
+ * empty `|| {}` that used to swallow this is gone from all three sites.
+ *
+ * `story` is the job's `inputData` (or the stored story blob, the same shape).
+ */
+function pageSeasonLabel(story, builderName) {
+  const resolvable = !!story && typeof story === 'object'
+    && (String(story.season || '').trim() || story.createdAt);
+  if (!resolvable) {
+    log.error(`🍁 [SEASON] ${builderName}: no story season and no story date — the season is being taken from TODAY,`
+      + ' which season.js forbids (a replay months later must resolve the season the pages were drawn in).'
+      + ' The caller must pass the story.');
+  }
+  return seasonLabel(story || {});
+}
 
 /**
  * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
@@ -392,9 +429,14 @@ function buildCharacterDescriptionsForBbox(storyData, expectedPositions) {
  * @param {string} pageLabel - e.g. "PAGE 4 " for logs
  * @returns {{[name: string]: { richDescription: string }}}
  */
-function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames = [], pageLabel = '') {
+function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames = [], pageLabel = '', opts = {}) {
   const out = {};
   const vb = visualBible || {};
+  // `includeAnimals` (2026-09-10): the EXPECTED CAST roster the quality
+  // evaluator reads counts every figure the page was written for, animals
+  // included — a dog written for the page is one roster entry, a fifth child
+  // painted for it is not. The detector exclusion below stays the default.
+  const { includeAnimals = false } = opts || {};
   // ANIMALS ARE NOT EXPECTED CHARACTERS (owner, 2026-08-19). DINO detects
   // `person`; a dog or a dragon can never satisfy it, so every animal in the
   // expected list is a guaranteed "missing person": it fires the undercount,
@@ -405,10 +447,17 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
   // case this function exists for) keep flowing.
   const lists = [
     { list: vb.secondaryCharacters, kind: 'secondary character' },
+    ...(includeAnimals ? [{ list: vb.animals, kind: 'animal' }] : []),
   ];
   // A malformed Visual Bible (object instead of array, missing entirely) must
   // not throw — the page still renders, it just has no secondary to add.
   if (!lists.some(l => Array.isArray(l.list) && l.list.length > 0)) return out;
+  // Required lazily: this module is loaded from prompt paths that must not
+  // acquire a load-order dependency on the resolver.
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  // The photo-backed cast is represented by `knownNames` (the exclusion set),
+  // so the index covers the Visual Bible pools only.
+  const idx = buildCastIndex(null, visualBible);
   const known = new Set((knownNames || []).map(n => String(n).toLowerCase()));
   const seen = new Set();
   for (const raw of (sceneNames || [])) {
@@ -417,42 +466,20 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     const key = name.toLowerCase();
     if (known.has(key) || seen.has(key)) continue;
     seen.add(key);
-    let matched = null;
-    for (const { list, kind } of lists) {
-      if (!Array.isArray(list)) continue;
-      const entry = list.find(e => (e?.name && e.name.toLowerCase() === key)
-        || (e?.id && e.id.toLowerCase() === key));
-      if (entry) { matched = { entry, kind }; break; }
-    }
-    // A TITLE IS NOT A DIFFERENT PERSON (owner, 2026-08-25). The Visual Bible
-    // names secondaries in full ("Kapitänin Rossa", "König Ludwig"); the scene
-    // metadata refers to them the way the prose does ("Rossa"). Exact match
-    // alone therefore resolved neither, and the detector was never told that
-    // figure exists — so it borrowed a user character's name for her instead.
-    // Measured on p15 of job_1787514666616_yw9qsv1vf: "Sarah" landed on Rossa
-    // and a face repair whited out the wrong person's head.
-    //
-    // Word-boundary containment either way, and ONLY when exactly one entry
-    // matches: two candidates mean the reference is genuinely ambiguous, and
-    // guessing between them is how the wrong description gets attached.
+    // RESOLVE (brief/plan token → entity). On p15 of job_1787514666616_yw9qsv1vf
+    // an unresolved scene reference let the detector borrow a user character's
+    // name for a Visual Bible secondary — "Sarah" landed on Rossa and a face
+    // repair whited out the wrong person's head. castResolver is now the one
+    // ladder (VB id → exact canonical name → unique whole-word subset either
+    // direction); it warns on its own for unresolved and ambiguous refs.
+    const resolved = resolveEntity(name, idx, { log, pageLabel });
+    // The animal pool is indexed but only in scope when `includeAnimals` asked
+    // for it (see the roster note above).
+    const matched = (resolved && (includeAnimals || resolved.kind !== 'animal'))
+      ? { entry: resolved.entry, kind: resolved.kind === 'animal' ? 'animal' : 'secondary character' }
+      : null;
     if (!matched) {
-      const asWord = (haystack, needle) =>
-        new RegExp(`(^|\\s)${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`, 'i').test(haystack);
-      for (const { list, kind } of lists) {
-        if (!Array.isArray(list)) continue;
-        const candidates = list.filter(e => e?.name
-          && (asWord(e.name, name) || asWord(name, e.name)));
-        if (candidates.length === 1) { matched = { entry: candidates[0], kind }; break; }
-        if (candidates.length > 1) {
-          log.warn(`⚠️ [BBOX-BUILD] ${pageLabel}Scene reference "${name}" matches ${candidates.length} Visual Bible entries (${candidates.map(c => c.name).join(', ')}) — too ambiguous to resolve`);
-        }
-      }
-      if (matched) {
-        log.debug(`[BBOX-BUILD] ${pageLabel}Resolved scene reference "${name}" to Visual Bible entry "${matched.entry.name}"`);
-      }
-    }
-    if (!matched) {
-      log.warn(`⚠️ [BBOX-BUILD] ${pageLabel}Scene references "${name}" but no Visual Bible entry resolves it — the detector will report it as missing`);
+      log.debug(`[BBOX-BUILD] ${pageLabel}Scene references "${name}" but no Visual Bible entry resolves it — the detector will report it as missing`);
       continue;
     }
     const e = matched.entry;
@@ -463,7 +490,8 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     if (e.age) parts.push(`Age: ${e.age}`);
     if (e.build) parts.push(`Build: ${e.build}`);
     if (e.species) parts.push(`Species: ${e.species}`);
-    if (e.size) parts.push(`Size: ${e.size}`);
+    const eScale = elementScaleNote(e);
+    if (eScale) parts.push(`Size: ${eScale}`);
     if (e.coloring) parts.push(`Coloring: ${e.coloring}`);
     if (e.features) parts.push(`Features: ${e.features}`);
     if (e.hair) parts.push(`Hair: ${e.hair}`);
@@ -475,7 +503,7 @@ function buildSecondaryCharacterDescriptions(visualBible, sceneNames, knownNames
     const rich = baseDesc ? `${label} (${matched.kind}). ${baseDesc}` : `${label} (${matched.kind})`;
     // Key by the metadata name (may be a VB id placeholder like "CHR001")
     // so buildExpectedCharactersForBbox finds it via the same key.
-    out[name] = { richDescription: rich };
+    out[name] = { richDescription: rich, entryName: e.name || label, entryId: e.id || null };
   }
   return out;
 }
@@ -585,8 +613,31 @@ function buildCastIdentityDescription(char, clothingText = '') {
   const look = char.ageCategory || char.age || '';
   const gender = char.gender === 'female' ? 'girl/woman' : char.gender === 'male' ? 'boy/man' : '';
   if (look || gender) parts.push([look, gender].filter(Boolean).join(' '));
-  const phys = char.physical || {};
-  if (phys.hair) parts.push(`hair: ${phys.hair}`);
+  const phys = getPhysicalFromChar(char);
+  // Hair comes from buildHairDescription — the SAME composer
+  // extractCharacterVisualProfile uses, and through it the Test Lab's
+  // buildCharacterPhysicalDescription. Reading `phys.hair` directly was dead
+  // code: the stored profile holds hairColor + detailedHairAnalysis and has no
+  // `hair` key at all. Measured 2026-09-18 over 379 staging profiles from 45
+  // days — 379 carry hairColor, 365 carry detailedHairAnalysis, 16 carry a
+  // `hair` key, all 16 a bare colour from stories dated 2026-08-09, none created
+  // since. So EVERY production identity line reached the Set-of-Mark call as
+  // age-band + build + face geometry + wardrobe with no hair, while the Lab's
+  // builder emitted the full hair prose — which is why Lab and production
+  // identity numbers were never comparable, the real damage here.
+  // The legacy key still works and does not need its own precedence rule:
+  // buildHairDescription returns `physical.hair` verbatim when there is no
+  // detailedHairAnalysis and no userHairOverride, and otherwise leads with
+  // hairColor. All 16 legacy values equal their own hairColor exactly (zero
+  // disagreements), so the rich path never contradicts one — it only adds
+  // length and texture.
+  // Output is short by construction: hex codes, salonLevel and uninformative
+  // styling/parting words are dropped, leaving colour + texture + length
+  // (+ bangs/parting when they discriminate) — median 43 chars, p90 61, max 72
+  // over those 365 profiles. No truncation here: a second, shorter composition
+  // is exactly the hand-maintained copy that drifts.
+  const hair = buildHairDescription(phys, char.physicalTraitsSource);
+  if (hair) parts.push(`hair: ${hair}`);
   if (phys.build) parts.push(`build: ${phys.build}`);
   if (phys.face) parts.push(phys.face);
   if (Array.isArray(char.traits) && char.traits.length) parts.push(char.traits.filter(t => typeof t === 'string').join(', '));
@@ -635,12 +686,13 @@ function buildSecondaryExpectedForPage(visualBible, pageNumber, knownNames = [])
 }
 
 function buildSecondaryExpectedCharacters(visualBible, sceneMetadata, knownNames = [], opts = {}) {
-  const { pageLabel = '', extraNames = [] } = opts;
+  const { pageLabel = '', extraNames = [], includeAnimals = false } = opts;
   const resolved = buildSecondaryCharacterDescriptions(
     visualBible,
     collectSceneCharacterNames(sceneMetadata, extraNames),
     knownNames,
-    pageLabel
+    pageLabel,
+    { includeAnimals }
   );
   return Object.entries(resolved).map(([name, d]) => ({ name, description: d.richDescription }));
 }
@@ -732,8 +784,17 @@ function buildEraGuard(era) {
  * Only meaningful when the caller ALSO attaches the landmark photo to the
  * generation call (the FRAMING section references "the reference photo").
  *
- * @param {{name?: string}|string|null} landmark - landmark object (any shape
- *        carrying `name`) or a bare name string. Null-safe.
+ * Two shapes of reference exist and they need different instructions. A close
+ * or exterior photo of one building HAS a silhouette to preserve. A `distant`
+ * or `view-from` photo shows a whole village or town — there is no single
+ * silhouette in it, and "never a tiny speck against a wide cityscape" has no
+ * coherent answer for a panorama. `photoType` (the indexer's own
+ * classification of the served slot, threaded through
+ * resolveLandmarkPhotoForLocation) picks the branch; anything else, including
+ * an unclassified photo, keeps the original block byte-for-byte.
+ *
+ * @param {{name?: string, photoType?: string}|string|null} landmark - landmark
+ *        object (any shape carrying `name`) or a bare name string. Null-safe.
  * @returns {string} the fidelity block, or '' when no named landmark.
  */
 function buildLandmarkFidelityBlock(landmark) {
@@ -741,6 +802,21 @@ function buildLandmarkFidelityBlock(landmark) {
     ? landmark.trim()
     : String(landmark?.name || '').trim();
   if (!name) return '';
+  const photoType = typeof landmark === 'string' ? null : (landmark?.photoType || null);
+  if (photoType === 'distant' || photoType === 'view-from') {
+    // ⚠️ DRAFT WORDING — NOT OWNER-APPROVED (2026-09-14). The plumbing above is
+    // the shipped part; this text is awaiting sign-off and must not reach
+    // master before it has it.
+    return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo is a WIDE VIEW: it shows this real place as a whole, not one building close up. The scene is set in this place.
+
+**IDENTITY (from the photo):** Take the character of the place — the shapes and pitch of its roofs, the materials and colours of walls and roofs, how densely the buildings stand, and the landscape around them: hills, water, trees, skyline. Someone who knows the place must recognise it from those, not from one façade. Do not pull a single structure out of the photo and make it the subject unless the scene description asks for it.
+
+**MEDIUM (never from the photo):** The photo supplies geometry and nothing else. Every surface is painted in the ART STYLE, with the same brushwork, edges, texture and palette as the rest of the page — no photographic detail, no lens depth of field, no camera grain.
+
+**CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the place into them. The scene may stand in a street or a yard of this place instead of looking at all of it from afar; the photo still governs what the buildings there are made of and look like.
+
+**EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space — never mounted on or overlapping the buildings.`;
+  }
   return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
 
 **IDENTITY (from the photo):** Preserve the silhouette, architectural details, distinctive features and overall proportions exactly as in the photo. Someone who has seen the real building must immediately recognise it.
@@ -907,7 +983,13 @@ function parseTeachingGuideFile(filePath) {
     }
 
     const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n');
+    // Split on either line ending. The `$` anchor in the topic-header regex
+    // below does not match before a trailing \r, so a CRLF copy of a guide
+    // file parses to ZERO topics — silently, with every guide coming back
+    // null. (Git stores these files LF, so Linux deploys are unaffected; a
+    // Windows working tree checks adventure-guides.txt out as CRLF and loses
+    // all 15 adventure guides locally.)
+    const lines = content.split(/\r?\n/);
 
     let currentId = null;
     let currentContent = [];
@@ -923,8 +1005,13 @@ function parseTeachingGuideFile(filePath) {
         currentId = match[1];
         currentContent = [];
       } else if (currentId) {
-        // Skip comment lines at start of file
-        if (!line.startsWith('#') || currentContent.length > 0) {
+        // '#' opens a comment line in this format — the file header, and the
+        // section banners that separate topic groups. They are never guide
+        // content, wherever they appear. Skipping them only while the current
+        // topic was still empty let a banner that FOLLOWS a topic's content
+        // land at the end of that topic's guidance, and it shipped into the
+        // story prompt (20 of 169 topics across four guide files).
+        if (!line.startsWith('#')) {
           currentContent.push(line);
         }
       }
@@ -942,6 +1029,16 @@ function parseTeachingGuideFile(filePath) {
 }
 
 // Load teaching guides at startup
+// OBJECT ID STABILITY (2026-09-16). One text, injected into both iterate
+// templates through {OBJECT_ID_STABILITY}. An evaluator complaint about an
+// object's colour was read by the rewriter as "wrong entity" and answered by
+// citing a different Visual Bible id — the creature the object becomes later in
+// the story — which staged that transformation pages early. This states that a
+// state complaint is answered with a state variant of the SAME id. It is
+// additive to rule 3a (a dropped plan-line figure may be brought back);
+// re-adding an id is allowed, replacing one is not.
+const OBJECT_ID_STABILITY_RULE = "**Object ids are not substituted.** `objects[]` entries may be added, removed or reordered; an id is never swapped for a different id standing for the same thing. A complaint about an object's colour, glow, temperature, size or condition is a STATE complaint — cite the same id with the state variant that matches (`ART001.1` → `ART001.2`), never a different id. An object that transforms later in the story and the creature it becomes are separate ids: cite the one whose Visual Bible pages include this page.";
+
 const PROMPTS_DIR = path.join(__dirname, '../../prompts');
 const EDUCATIONAL_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'educational-guides.txt'));
 const LIFE_CHALLENGE_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'life-challenge-guides.txt'));
@@ -962,7 +1059,19 @@ const SWISS_SAGEN_GUIDES = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'swiss-
  * chosen idea sentence, so the topic and the theme reached the writer with
  * whatever weight that one sentence gave them.
  */
-function buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide) {
+function buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide, inputData = null) {
+  if (inputData && SIMPLE_BANDS.has(resolveAgeBand(inputData))) {
+    return `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
+
+**GUIDELINES for Life Skills Stories at this age:**
+- The topic is what happens around the main character — what they see, hold, hear and do while it happens
+- No tips, no strategies, no moral, no closing line about what it means
+${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} setting — the topic happens inside it` : '- This is a realistic story set in everyday life situations'}
+
+${teachingGuide ? `**WHAT THE SITUATION IS for "<user_input>${storyTopic}</user_input>"** — background for you, never things to tell the child:
+${teachingGuide}` : ''}`;
+  }
+
   return `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Life Skills Stories:**
@@ -994,8 +1103,42 @@ function getTeachingGuide(category, topicId) {
     return HISTORICAL_GUIDES.get(normalizedId) || null;
   } else if (category === 'swiss-sagen') {
     return SWISS_SAGEN_GUIDES.get(normalizedId) || null;
+  } else if (category === 'swiss-stories') {
+    return buildSwissStoryGuide(normalizedId);
   }
   return null;
+}
+
+/**
+ * Swiss local stories keep their guide in docs/story-ideas/<city>.md (parsed by
+ * swissStories.js), not in a prompts/*-guides.txt file — so getTeachingGuide had
+ * no branch for them and every beats stage that reads STORY_GUIDE_SECTION got
+ * nothing at all. Same source and the same localized-field handling the unified
+ * writer path uses for its swiss-stories CATEGORY_GUIDELINES branch.
+ * @param {string} topicId - `<cityId>-<ideaNumber>`, e.g. `aarau-1`
+ * @returns {string|null} guide body, or null when the city has no research
+ */
+function buildSwissStoryGuide(topicId) {
+  const cityId = String(topicId).replace(/-[0-9]+$/, '');
+  const cityData = getSwissStoryResearch(cityId);
+  if (!cityData) return null;
+  const cityMeta = getSwissCityById(cityId);
+  const cityName = cityMeta?.name?.en || cityMeta?.name || cityId;
+  const ideaNum = parseInt(String(topicId).split('-').pop(), 10);
+  const idea = Number.isFinite(ideaNum) ? (cityData.ideas || [])[ideaNum - 1] : null;
+  // Ideas arrive either localized ({en,de,fr}) or as plain strings.
+  const pick = (v) => (v && typeof v === 'object' ? v.en : v) || '';
+  const ideaTitle = pick(idea?.title);
+  const ideaDesc = pick(idea?.description);
+  const lines = [
+    `A Swiss local story set in ${cityName}, a real Swiss city.`,
+    ideaTitle ? `Story idea: "${ideaTitle}"` : '',
+    ideaDesc ? `Concept: ${ideaDesc}` : '',
+    '',
+    'Verified research on the city — the story takes its landmarks, traditions and geography from it:',
+    cityData.research || '',
+  ];
+  return lines.filter(Boolean).join('\n').trim() || null;
 }
 
 // Historical Locations Databank
@@ -1502,9 +1645,9 @@ const LANGUAGE_LEVELS = {
   '1st-grade': {
     description: 'Simple words and very short sentences for early readers',
     wordsPerPageMin: 25,
-    wordsPerPageMax: 50,
-    sentencesPerPage: '2-4',
-    pacing: 'Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don\'t aim for a uniform word count.',
+    wordsPerPageMax: 70,
+    sentencesPerPage: '3-6',
+    pacing: 'Small amount of variation is fine — some pages can sit at the low end (a quiet beat), others near the top. Don\'t aim for a uniform word count. The extra room buys more sentences, never longer ones: keep sentences short, one idea each.',
   },
   'standard': {
     description: 'Age-appropriate vocabulary for elementary school children',
@@ -2050,8 +2193,14 @@ function buildCoverPrompt(coverType, {
 }
 
 // The painted-title instruction of a baked cover.
+// The margin clause is trim insurance: pdf.js adds a 3mm bleed per side for
+// Gelato and the printer cuts it away (~2% of an 864px-wide cover raster).
+// Two staging trials painted ink to x=863 and x=861 of 864 and lost their
+// final letter on the physical book (job_1788763045123_z8so79ngb,
+// job_1788802404497_i1mm4yn6h) — the margin is stated as a FRACTION because
+// the raster size varies by book format.
 function bakedTitleLine(title) {
-  return `Paint "${title}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area.`;
+  return `Paint "${title}" in the upper third of the canvas as three-dimensional letters that sit as physical objects in the scene, catching its lighting and shadows. Hand-crafted lettering in the story's own materials, never a standard computer font. It is the only text in the image, painted on the illustration itself, never in a band, strip or caption area. Every letter, accent and descender stays at least 8% of the canvas width clear of the left and right edges. A long title breaks onto more lines rather than reaching that margin.`;
 }
 
 function buildReferenceCardColours(chars, referencePhotos) {
@@ -2075,8 +2224,8 @@ function buildCharacterReferenceList(photos, characters = null, { includeClothin
   if (!photos || photos.length === 0) return '';
 
   // Each character is already named with their physical description in the
-  // SCENE prose (per story-unified.txt: "Name each character explicitly on
-  // first mention, THEN weave the physical description in"), and each
+  // SCENE prose (per prompts/scene-expansion-all.txt rule 10: "Weave each
+  // character's physical description on first mention"), and each
   // attached image carries a `[Name]:` label in the parts array. Repeating
   // the description here was triple-binding the same info — drop it.
   // Just list the names so the model knows which images to expect.
@@ -2154,24 +2303,8 @@ function buildBasePrompt(inputData, textPageCount = null) {
 
   // Build relationship descriptions
   let relationshipDescriptions = '';
-  if (inputData.relationships) {
-    const relationships = inputData.relationships;
-    const relationshipTexts = inputData.relationshipTexts || {};
-    const characters = inputData.characters || [];
-
-    const relationshipLines = Object.entries(relationships)
-      .filter(([key, type]) => type && type !== 'Not Known to')
-      .map(([key, type]) => {
-        const [char1Id, char2Id] = key.split('-').map(Number);
-        const char1 = characters.find(c => c.id === char1Id);
-        const char2 = characters.find(c => c.id === char2Id);
-        if (!char1 || !char2) return null;
-        const customText = relationshipTexts[key] || '';
-        const baseRelationship = `${char1.name} is ${type} ${char2.name}`;
-        return customText ? `${baseRelationship}. ${customText}` : baseRelationship;
-      })
-      .filter(Boolean);
-
+  {
+    const relationshipLines = buildRelationshipLines(inputData);
     if (relationshipLines.length > 0) {
       relationshipDescriptions = `\n- **Relationships**:\n${relationshipLines.map(r => `  - ${r}`).join('\n')}`;
     }
@@ -2192,6 +2325,37 @@ function buildBasePrompt(inputData, textPageCount = null) {
 - **Story Type**: ${inputData.storyType || 'adventure'}
 - **Story Details**: <user_input>${inputData.storyDetails || 'None'}</user_input>
 - **Characters**: ${JSON.stringify(characterSummary, null, 2)}${relationshipDescriptions}`;
+}
+
+/**
+ * The story's MAIN (or, with `main=false`, the remaining PRIMARY) character
+ * names as a comma list, or 'None'.
+ *
+ * One helper because two prompts now need the same split: the wardrobe stage
+ * prints it in its TARGET block, and the Art Director uses it to bound the
+ * cover casts it writes.
+ */
+function namedByMain(inputData = {}, main = true) {
+  const mainIds = inputData.mainCharacters || [];
+  return (inputData.characters || [])
+    .filter(c => (mainIds.includes(c.id) ? main : !main))
+    .map(c => c.name)
+    .filter(Boolean)
+    .join(', ') || 'None';
+}
+
+/**
+ * ONE state line for a recurring-elements dump, WITH the state's page range
+ * (2026-09-17). The bible declares each state's `pages` and a page cites the
+ * state whose range covers it; the brief REWRITER was shown the states' names
+ * and deltas and no ranges at all, so the only way it could pick the right
+ * dotted handle was to copy the one the previous brief used — and a rewrite
+ * that re-derives its citations had nothing to derive from. An entry with no
+ * declared range renders exactly as before.
+ */
+function stateLineForIterate(st) {
+  const pages = Array.isArray(st && st.pages) && st.pages.length > 0 ? ` (pages ${st.pages.join(', ')})` : '';
+  return `[${st.id}] ${st.name}: ${st.delta}${pages}`;
 }
 
 /**
@@ -2222,6 +2386,14 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         if (!isRelevant(sc)) continue;
         const description = sc.extractedDescription || sc.description;
         recurringElements += `* **${sc.name}** [${sc.id}] (secondary character): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(sc);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
+          }
+        }
       }
     }
     if (visualBible.locations && visualBible.locations.length > 0) {
@@ -2242,6 +2414,14 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         if (!isRelevant(animal)) continue;
         const description = animal.extractedDescription || animal.description;
         recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(animal);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
+          }
+        }
       }
     }
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
@@ -2255,7 +2435,7 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
         // state; each line is only what changed.
         const states = objectStates(artifact);
         if (states.length > 0) {
-          recurringElements += `  States: ${states.map(st => `[${st.id}] ${st.name}: ${st.delta}`).join(', ')}\n`;
+          recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
         }
       }
     }
@@ -2282,14 +2462,19 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
  * one call. Repetition and visual arc were already reviewed set-wide; now they
  * are authored set-wide too.
  *
- * Output shape is `## Page N` + prose + METADATA per page — exactly what the
- * scene review returns — so parseRefinedText(raw, expected, 'SCENES') reads it
- * with no new parser.
+ * It also AUTHORS the Visual Bible and the cover scene hints (2026-09-11),
+ * emitted BEFORE page 1 so every page's `objects[]` can only cite an id the
+ * response already declared. One author owns both what is in each picture and
+ * what each thing looks like, so the two cannot contradict each other.
+ *
+ * Output shape is `---VISUAL BIBLE---` + `---COVER SCENE HINTS---`, then
+ * `## Page N` + prose + METADATA per page. beatsPipeline's
+ * extractBibleSections(raw, AD_BIBLE_MARKERS) takes the two leading sections and
+ * parseRefinedText(raw, expected, 'SCENES') reads the pages with no new parser.
  *
  * @param {Object} inputData
  * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
  * @param {Object} [options]
- * @param {Object} [options.visualBible]
  * @param {string} [options.availableAvatars]
  * @param {number} [options.maxCharactersPerScene]
  * @returns {string|null} null when the template is unavailable
@@ -2343,14 +2528,69 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     CHARACTER_DESCRIPTIONS: characterDescriptions,
     CHARACTER_COUNT: characters.length,
     HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
-    // The whole bible, unfiltered: each page draws on a different slice and a
-    // per-page objects[] filter has nothing to key on in a single call.
-    RECURRING_ELEMENTS: buildRecurringElementsText(options.visualBible || null),
     AVAILABLE_AVATARS: options.availableAvatars || buildAvailableAvatarsForPrompt(characters),
+    // The Art Director AUTHORS the Visual Bible now (2026-09-11), so the three
+    // inputs the bible rules need travel here instead of to the bible stage.
+    CHARACTER_NAMES: characters.map(c => c.name).filter(Boolean).join(', ') || 'None',
+    MAIN_CHARACTER_NAMES: namedByMain(inputData, true),
+    PRIMARY_CHARACTER_NAMES: namedByMain(inputData, false),
+    // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
+    // them shows, and the per-page `landmarkView` is picked from the same list.
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { jsonFields: true }),
+    CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
+    CREATURE_TONE: buildCreatureToneSection(inputData),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
-    // The owner's cap of three packable Visual Bible elements per page, from
+    // The owner's cap of packable Visual Bible elements per page (four since
+    // 2026-09-11), from
     // the same constant the mechanical check and the code-side truncation use.
     VB_ELEMENT_BUDGET,
+    // Season governs foliage, ground cover and daylight colour, and it must be
+    // the SAME on every page. The per-page builder has passed it since the
+    // placeholder existed; the batch builder — the beats path, which is the
+    // production pipeline — did not, so the Art Director wrote every book
+    // season-blind. `inputData` is the job's inputData; pageSeasonLabel says so
+    // out loud if it is not resolvable from the story itself.
+    SEASON: pageSeasonLabel(inputData, 'scene-expansion-all'),
+    // ONE counting rule for both Art Director templates — see COUNTING_RULE.
+    COUNTING_RULE,
+    // ONE cast contract and ONE multi-picture prop contract, shared with the
+    // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
+    PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+    MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+    // FOUR brief-authoring contracts, one constant each, shared by both Art
+    // Director templates and both iterate templates — a page brief is written at
+    // four sites and a rule that reaches one of them is absent on the other
+    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE /
+    // REACHABLE_CONTACT_RULE.
+    CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
+    STAGED_PROP: STAGED_PROP_RULE,
+    CONTACT_VERB: CONTACT_VERB_RULE,
+    REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
+    // that author a page brief — see ONE_INSTANT_RULE and the block around it.
+    // Registered as sibling set art-director-vs-iterate.
+    ONE_INSTANT: ONE_INSTANT_RULE,
+    GAZE_TARGET: GAZE_TARGET_RULE,
+    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
+    GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
+    // PERMISSION: the page text may name more than the frame stages.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    // ONE scale vocabulary for every Visual-Bible authoring site (the
+    // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
+    SCALE_CLASS_SPEC,
+    // ONE entry-page contract for the same two bible-authoring sites — see
+    // ELEMENT_ENTRY_PAGE_RULE.
+    ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
+    // ONE shot vocabulary for every stage that writes or reads a `shot` — the
+    // beats planner produces it, planCounters counts it, and the image prompt
+    // defines it. See server/lib/shotVocabulary.js.
+    SHOT_ENUM,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -2577,15 +2817,60 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     LANGUAGE_NOTE: getLanguageNote(language),
     CORRECTION_NOTES: '',
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
-    // The owner's cap of three packable Visual Bible elements per page, from
+    // The same creature-tone block the all-pages builder injects. Missing here
+    // entirely until 2026-09-11, so a story that fell back to per-page expansion
+    // got no tone rule at all. `options.story` is the job's inputData, the same
+    // source SEASON reads; without it the page's own cast still carries the age
+    // the level is keyed on, and an unreadable age emits nothing either way.
+    CREATURE_TONE: buildCreatureToneSection(options.story || { characters }),
+    // The owner's cap of packable Visual Bible elements per page (four since
+    // 2026-09-11), from
     // the same constant the mechanical check and the code-side truncation use.
     VB_ELEMENT_BUDGET,
     // Season governs foliage, ground cover and daylight colour, and it must be
     // the SAME on every page. The Art Director is the only writer of the scene
     // prose and of `emptyScenePrompt` (the background plate), so this is the
     // one place a season can reach the pixels. `options.story` is the job's
-    // inputData where a caller has it; the resolver falls back to the date.
-    SEASON: seasonLabel(options.story || {})
+    // inputData; a caller that omits it is named in the log, not silently
+    // given today's season — see pageSeasonLabel.
+    SEASON: pageSeasonLabel(options.story, `scene-expansion P${pageNumber}`),
+    // ONE counting rule for both Art Director templates — see COUNTING_RULE.
+    COUNTING_RULE,
+    // ONE cast contract and ONE multi-picture prop contract, shared with the
+    // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
+    PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+    MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+    // FOUR brief-authoring contracts, one constant each, shared by both Art
+    // Director templates and both iterate templates — a page brief is written at
+    // four sites and a rule that reaches one of them is absent on the other
+    // three. See CONCEALED_OBJECT_RULE / STAGED_PROP_RULE / CONTACT_VERB_RULE /
+    // REACHABLE_CONTACT_RULE.
+    CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
+    STAGED_PROP: STAGED_PROP_RULE,
+    CONTACT_VERB: CONTACT_VERB_RULE,
+    REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
+    // that author a page brief — see ONE_INSTANT_RULE and the block around it.
+    // Registered as sibling set art-director-vs-iterate.
+    ONE_INSTANT: ONE_INSTANT_RULE,
+    GAZE_TARGET: GAZE_TARGET_RULE,
+    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
+    GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. The brief author's half is the
+    // PERMISSION: the page text may name more than the frame stages.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    // ONE scale vocabulary for every Visual-Bible authoring site (the
+    // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
+    SCALE_CLASS_SPEC,
+    // ONE shot vocabulary for every stage that writes or reads a `shot` — the
+    // beats planner produces it, planCounters counts it, and the image prompt
+    // defines it. See server/lib/shotVocabulary.js.
+    SHOT_ENUM,
   });
   // Text-zone rule family, same gate as the all-pages builder. A cover call
   // (pageNumber <= 0) never gets it; a page call follows the story's layout,
@@ -2615,7 +2900,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
  * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
 function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null, options = {}) {
-  const { freeIterate = false, textInImage = false, extraRule = null } = options;
+  const { freeIterate = false, textInImage = false, extraRule = null, stagedFigures = '' } = options;
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -2634,8 +2919,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   const perPageCategoryFor = (name) => {
     if (!characterClothing) return null;
     if (typeof characterClothing === 'string') return characterClothing;
-    const key = Object.keys(characterClothing).find(k => k.trim().toLowerCase() === String(name).trim().toLowerCase());
-    return key ? characterClothing[key] : null;
+    // RESOLVE: one name-keyed-map reader (castResolver.lookupByName).
+    const hit = require('./castResolver').lookupByName(characterClothing, name, null);
+    return hit ? hit.value : null;
   };
   const characterDetails = characters.map((c, idx) => {
     // Track Visual Bible matches for logging
@@ -2666,6 +2952,14 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const sc of visualBible.secondaryCharacters) {
         const description = sc.extractedDescription || sc.description;
         recurringElements += `* **${sc.name}** [${sc.id}] (secondary character): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(sc);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
+          }
+        }
       }
     }
     // Add ALL locations - with photo variants for real landmarks
@@ -2686,6 +2980,14 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const animal of visualBible.animals) {
         const description = animal.extractedDescription || animal.description;
         recurringElements += `* **${animal.name}** [${animal.id}] (animal): ${description}\n`;
+        // STATES, listed the way an object's are below: the Art Director needs
+        // the dotted handle to cite the look this page shows.
+        {
+          const states = objectStates(animal);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
+          }
+        }
       }
     }
     // Add ALL artifacts
@@ -2693,6 +2995,12 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       for (const artifact of visualBible.artifacts) {
         const description = artifact.extractedDescription || artifact.description;
         recurringElements += `* **${artifact.name}** [${artifact.id}] (object): ${description}\n`;
+        {
+          const states = objectStates(artifact);
+          if (states.length > 0) {
+            recurringElements += `  States: ${states.map(stateLineForIterate).join(', ')}\n`;
+          }
+        }
       }
     }
     // Add ALL clothing/costumes
@@ -2727,7 +3035,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   let previousScenesText = '';
   let sceneContextText = '';
 
-  if (rawOutlineContext) {
+  // A `planLine`-only context (the iterate path — see iterateBeat.js) carries no
+  // raw outline BLOCKS, so it must not take this branch: doing so would drop the
+  // reconstructed PREVIOUS_SCENES an iterate prompt has always carried. It is
+  // read further down, where it fills SCENE_SUMMARY.
+  if (rawOutlineContext && (rawOutlineContext.previousPages || rawOutlineContext.currentPage)) {
     // SIMPLE: Use raw outline blocks directly
     if (rawOutlineContext.previousPages) {
       previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
@@ -2804,6 +3116,17 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     if (rawOutlineContext?.currentPage) {
       // Raw outline block already contains TEXT, SCENE HINT, Characters, Setting, Time, Weather
       sceneSummary = rawOutlineContext.currentPage + '\n\n';
+    } else if (rawOutlineContext?.planLine) {
+      // THE BEAT (iterate path, 2026-09-14). Before this, both beat-shaped slots
+      // were filled from the previous brief's own one-line summary, so a rewrite
+      // had no narrative anchor outside the artefact it was rewriting — while
+      // rule 1 claimed the outline was authoritative. The plan line goes in the
+      // authoritative slot; DRAFT_SCENE_DESCRIPTION below keeps the previous
+      // brief as the starting point, which is a different job.
+      sceneSummary = `Page plan line (the page's narrative beat — authoritative for what happens on this page and who is staged in it):\n${rawOutlineContext.planLine}\n\n`;
+      if (shortSceneDesc) {
+        sceneSummary += `Previous brief summary (what was drawn last time): ${shortSceneDesc}\n\n`;
+      }
     } else if (shortSceneDesc) {
       sceneSummary = `Scene Summary: ${shortSceneDesc}\n\n`;
     }
@@ -2852,7 +3175,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // metadata key as an English phrase. That prose is the contract the quality
     // evaluator judges against, so the judge then scores a correct render as
     // off-spec ("clothing is non-standard"). Observed on staging
-    // job_1786147254924_8nuyywjii p7/p10. Same rule as story-unified.txt:127.
+    // job_1786147254924_8nuyywjii p7/p10. Same rule as the clothing contract in
+    // prompts/scene-expansion-all.txt / prompts/story-bible-from-beats.txt.
     let expectedClothingText = '';
     const clothingReqsForPrompt = options.clothingRequirements || null;
     const describeOutfit = (name, category) => {
@@ -2933,6 +3257,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
+      // Named visual-bible figures staged on this page (animals, secondaries).
+      // The locked-cast list is roster characters only; without this block those
+      // figures reach the rewriter as anonymous entries in the bulk recurring
+      // dump and come back described by species instead of by name.
+      STAGED_FIGURES: stagedFigures || '',
       RECURRING_ELEMENTS: recurringElements,
       AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
       EXPECTED_CLOTHING: expectedClothingText,
@@ -2941,9 +3270,75 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language),
       CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
-      MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3
+      MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3,
+      OBJECT_ID_STABILITY: OBJECT_ID_STABILITY_RULE,
+      // The same four brief-authoring contracts the Art Director templates
+      // carry. An iterate rewrites the WHOLE brief, so a rule the first pass was
+      // given and the rewrite was not is a rule one repair round undoes.
+      CONCEALED_OBJECT: CONCEALED_OBJECT_RULE,
+        STAGED_PROP: STAGED_PROP_RULE,
+      CONTACT_VERB: CONTACT_VERB_RULE,
+      REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
+    // that author a page brief — see ONE_INSTANT_RULE and the block around it.
+    // Registered as sibling set art-director-vs-iterate.
+    ONE_INSTANT: ONE_INSTANT_RULE,
+    GAZE_TARGET: GAZE_TARGET_RULE,
+    LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
+    EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
+    GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ON_OTHER: WORN_ON_OTHER_RULE,
+    NEVER_NAME_ABSENT: ABSENT_THING_RULE,
+    SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. An iterate rewrites the WHOLE
+    // brief, so the permission to stage one moment has to travel with it.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+      // The rewrite restates every character's appearance from CHARACTER
+      // DETAILS, which is where a declared colour drifts — see
+      // DECLARED_TRAIT_VERBATIM_RULE. One constant, both iterate templates,
+      // filled from this one call site.
+      DECLARED_TRAIT_VERBATIM: DECLARED_TRAIT_VERBATIM_RULE,
+      // THE SAME PAGE CONTRACTS THE FIRST ART DIRECTOR IS GIVEN (2026-09-17).
+      // Each of these already existed as ONE constant filled into the Art
+      // Director templates and into nothing else, so a rewrite dropped the rule
+      // the page was written under. Measured across 11 stored iterate rounds on
+      // two staging runs: see the ONE_INSTANT_RULE block.
+      PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+      MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+      COUNTING_RULE,
+      VB_ELEMENT_BUDGET,
+      SHOT_ENUM,
+      CREATURE_TONE: buildCreatureToneSection(options.story || { characters }),
+      // A rewrite authors a whole new setting paragraph and `emptyScenePrompt`,
+      // so a season it is never told is a season it can contradict. Callers
+      // that omit `story` are named in the log — see pageSeasonLabel.
+      SEASON: pageSeasonLabel(options.story, `scene-iteration P${pageNumber}`),
+      HEIGHT_ORDER: buildRelativeHeightDescription(characters) || '',
+      // THREE INPUTS THE REWRITER NEVER HAD. It was handed a SCORE and a list
+      // of findings and asked to diagnose root causes with neither the
+      // evaluator's own reasoning nor the regions it named, and it re-declared
+      // the page's worn state having never been told what that state was.
+      EVALUATOR_REASONING: options.evaluatorReasoning
+        ? `
+**Evaluator reasoning on the previous render (why it scored what it scored):**
+${options.evaluatorReasoning}
+`
+        : '',
+      FIX_TARGETS: options.fixTargets
+        ? `
+**Regions the evaluator marked (the picture, not the brief — each names where it looked):**
+${options.fixTargets}
+`
+        : '',
+      WORN_STATE: options.wornState
+        ? `
+**Worn state this page already declared (carry it, or state the change and emit the row):**
+${options.wornState}
+`
+        : '',
     });
-    // Same gate as buildUnifiedStoryPrompt: text-overlay-only rules
+    // Text-overlay-only rules gate:
     // (calmZoneCheck, calm-zone pose rule, textPosition in the JSON example,
     // emptyScenePrompt corner instruction) are wrapped in
     // <!-- TEXT_OVERLAY_BEGIN --> ... <!-- TEXT_OVERLAY_END --> markers in
@@ -2990,6 +3385,70 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 }
 
 /**
+ * The Visual Bible secondaries that appear in ONE page's cast and have no
+ * reference image of their own.
+ *
+ * Membership is read structurally, never guessed from prose: the scene brief's
+ * own character records (id first, then exact name) say who is on the page,
+ * and the entry's `appearsInPages` / `pages` array is the fallback for a brief
+ * that carries no cast list. A name that matches a commissioned character or a
+ * reference card is dropped — that character already has a photo, a frame
+ * colour and an outfit, and a second textual description of them is the
+ * duplicate the 2026-06-09 removal was right about.
+ *
+ * @param {Object|null} visualBible
+ * @param {Object|null} metadata      parsed scene metadata for this page
+ * @param {Array|null} sceneCharacters commissioned cast on this page
+ * @param {Array|null} referencePhotos reference cards travelling with the call
+ * @param {number|null} pageNumber
+ * @returns {Array<Object>} bible entries, in cast order
+ */
+function collectSecondaryCastForPage(visualBible, metadata, sceneCharacters, referencePhotos, pageNumber) {
+  const pool = Array.isArray(visualBible?.secondaryCharacters) ? visualBible.secondaryCharacters : [];
+  if (pool.length === 0) return [];
+
+  const norm = (v) => String(v == null ? '' : v).trim().toLowerCase();
+  const covered = new Set([
+    ...(Array.isArray(sceneCharacters) ? sceneCharacters : []).map(c => norm(c?.name)),
+    ...(Array.isArray(referencePhotos) ? referencePhotos : []).map(p => norm(p?.name)),
+  ].filter(Boolean));
+
+  // Two shapes reach here: `fullData.characters` keeps the brief's own
+  // records (id + name), while the flattened `metadata.characters` is a plain
+  // name list. Prefer the records — an id survives a renamed entry.
+  const rich = metadata?.fullData?.characters;
+  const castRecords = (Array.isArray(rich) && rich.length > 0)
+    ? rich
+    : (Array.isArray(metadata?.characters) ? metadata.characters : []);
+  const out = [];
+  const seen = new Set();
+  const take = (entry) => {
+    if (!entry || seen.has(entry)) return;
+    if (!entry.description || covered.has(norm(entry.name))) return;
+    seen.add(entry);
+    out.push(entry);
+  };
+
+  if (castRecords.length > 0) {
+    for (const rec of castRecords) {
+      const id = typeof rec === 'string' ? '' : norm(rec?.id);
+      const name = typeof rec === 'string' ? norm(rec) : norm(rec?.name);
+      if (!id && !name) continue;
+      take(pool.find(e => (id && norm(e?.id) === id) || (name && norm(e?.name) === name)));
+    }
+    return out;
+  }
+
+  if (pageNumber != null) {
+    for (const entry of pool) {
+      const pages = entry?.appearsInPages || entry?.pages;
+      if (Array.isArray(pages) && pages.includes(pageNumber)) take(entry);
+    }
+  }
+  return out;
+}
+
+/**
  * Build image generation prompt
  */
 // ============================================================================
@@ -2998,67 +3457,29 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 // 2026-07-31). A garment the scene holds/drops must not ALSO be described as
 // worn ("tied around his neck" + "held overhead in his hands" is unpaintable —
 // the model draws the item twice).
+//
+// REMOVED 2026-09-18: NON_WORN_STRONG_RE / NON_WORN_WEAK_RE /
+// BODY_ANCHORED_DRAPE_RE / textDeclaresNonWornPlacement /
+// sceneDeclaresNonWornState — the PROSE half of that guard. It INFERRED the
+// off-body state by sieving the brief's prose and interactions[] for verbs
+// that sounded off-body. Measured over 247 stored stories (staging + prod):
+// it fired on 68.5% / 56.9% of every element a brief cites, 96% of those on an
+// entry that can never be worn (an animal, a vehicle, a plain prop), 14 fires
+// directly contradicting an explicit `wornItems: state:"worn"` row the Art
+// Director wrote — precision against declared `off` rows 0.73% / 0.18%. Its
+// one surviving effect was a ≤6-word lead label (REQUIRED OBJECTS has been
+// name-only since 2026-09-02), and that label came out identical in all 1,905
+// fires: zero shipped damage. The same function was already deleted from its
+// other consumer on 2026-08-08 (5f174cba5, filterWornClothingAgainstScene).
+//
+// The state is now DECLARED, never inferred, exactly as server/lib/wornItems.js
+// says: the Art Director writes a `wornItems` row (GARMENT_REMOVED_RULE is
+// filled into all four brief templates), `placedElsewhere` below reads only
+// that row's `state: "off"`, and clothingCheck's `removal_unstated` reports a
+// page that omits the row. The cover sibling reached the same shape from the
+// other side on 2026-09-15: its verdict rides declared slot identity, never a
+// verb regex. docs/decisions.md 2026-09-18.
 // ============================================================================
-
-// Placement wording that means an item is NOT worn on the body: held/carried/
-// waved, lying/dropped on a surface, or explicitly removed.
-const NON_WORN_STRONG_RE = /\b(?:held|holds?|holding|clutch(?:es|ed|ing)?|grip(?:s|ped|ping)?|carr(?:y|ies|ied|ying)|wav(?:es|ed|ing)|swing(?:s|ing)?|brandish(?:es|ed|ing)?|overhead|in\s+(?:his|her|their|both|one)\s+hands?|l(?:ies|ying)|lays?|laid|crumpled|dropp(?:ed|ing)|drops?|on\s+the\s+(?:ground|floor|grass|sand|bench|chair|bed|rock|table)|tak(?:es|en|ing)\s+off|took\s+off|pull(?:s|ed|ing)\s+off|remov(?:es|ed|ing)|without\s+(?:the|his|her|their))\b/i;
-// draped / hangs / slung are off-body ONLY when not anchored to a body part
-// ("cape draped over his shoulders" is worn; "cape draped over the chair" is not).
-const NON_WORN_WEAK_RE = /\b(?:drap(?:es|ed|ing)|hangs?|hanging|hung|slung)\b/i;
-const BODY_ANCHORED_DRAPE_RE = /\b(?:drap(?:es|ed|ing)|hangs?|hanging|hung|slung)\b[^.;]{0,50}\b(?:shoulders?|neck|waist|head|back|hips?|arms?|torso|chest|body)\b/i;
-
-function textDeclaresNonWornPlacement(text) {
-  const t = String(text || '');
-  if (!t) return false;
-  if (NON_WORN_STRONG_RE.test(t)) return true;
-  return NON_WORN_WEAK_RE.test(t) && !BODY_ANCHORED_DRAPE_RE.test(t);
-}
-
-/**
- * Does the scene place this VB entry somewhere other than ON a body?
- * Checks the structured interactions[] first (VB id match or token overlap),
- * then the prose sentences (token overlap + non-worn placement wording).
- * Overlap rule = the cover dedupe's: ≥2 shared significant tokens, or ≥1
- * token from the entry NAME (names are short and specific).
- *
- * Cross-language caveat: token matching cannot bridge a story-language entry
- * ("Roter Umhang") against English prose ("red cape") — that gap is closed at
- * the ROOT by the story-unified VB language rule (English name + description
- * for artifacts/locations/vehicles/clothing).
- */
-function sceneDeclaresNonWornState(entry, proseText, interactions) {
-  const nameTokens = significantEntityTokens(entry?.name);
-  const allTokens = new Set([
-    ...nameTokens,
-    ...significantEntityTokens(entry?.extractedDescription || entry?.description),
-  ]);
-  if (allTokens.size === 0) return false;
-  const entryId = String(entry?.id || '').toUpperCase();
-  const overlaps = (text) => {
-    const tokens = significantEntityTokens(text);
-    let overlap = 0;
-    let nameHit = false;
-    for (const t of tokens) {
-      if (allTokens.has(t)) overlap++;
-      if (nameTokens.has(t)) nameHit = true;
-    }
-    return overlap >= 2 || nameHit;
-  };
-  for (const i of (Array.isArray(interactions) ? interactions : [])) {
-    if (!i || typeof i !== 'object') continue;
-    const combined = `${i.object || ''} ${i.where || ''}`;
-    const idHit = entryId && combined.toUpperCase().includes(entryId);
-    if (!idHit && !overlaps(combined)) continue;
-    if (textDeclaresNonWornPlacement(combined)) return true;
-  }
-  const sentences = String(proseText || '').split(/(?<=[.!?])\s+|\n+/);
-  for (const s of sentences) {
-    if (!overlaps(s)) continue;
-    if (textDeclaresNonWornPlacement(s)) return true;
-  }
-  return false;
-}
 
 // Attachment clauses ("tied at the neck", "fastened around her waist") inside
 // an object description contradict a scene that holds/drops the item. The
@@ -3097,8 +3518,10 @@ function stripWornStateFromDescription(description) {
  * writes "she is without the bandana, it lies in the chest". See
  * docs/decisions.md, 2026-08-08.
  *
- * sceneDeclaresNonWornState / stripWornStateFromDescription survive — the
- * REQUIRED OBJECTS path still uses them to describe an object's own state.
+ * stripWornStateFromDescription survives — the REQUIRED OBJECTS path still
+ * uses it to describe an object's own state, but only on the DECLARED
+ * `wornItems: state:"off"` branch. sceneDeclaresNonWornState, the prose half,
+ * followed this one out on 2026-09-18 (see the tombstone above it).
  */
 
 /**
@@ -3141,6 +3564,81 @@ function trimStateClause(delta, ctx = null) {
     : 'unidentified state';
   log.warn(`⚠️ [IMAGE PROMPT] State clause for ${who} cut from ${words.length} to ${STATE_CLAUSE_MAX_WORDS} words — the tail is dropped and may hold what tells this state from another. Authored delta: "${words.join(' ')}"`);
   return words.slice(0, STATE_CLAUSE_MAX_WORDS).join(' ');
+}
+
+/**
+ * A Visual Bible OBJECT entity id (everything but CHR — the human cast).
+ * Accepts the three citation shapes a brief writes: "ANI001", "Funkli
+ * [ANI001]", { id: 'ANI001' }. Dotted facet handles ("ART001.2") keep their
+ * suffix; the caller bases them where it needs to.
+ */
+const VB_OBJECT_ID_RE = /^(?:ANI|ART|CLO|LOC|VEH)\d{1,4}(?:\.\d{1,3})?$/i;
+function vbObjectIdOf(citation) {
+  if (citation === null || citation === undefined) return null;
+  if (typeof citation === 'object') return vbObjectIdOf(citation.id);
+  const raw = String(citation).trim();
+  const bracketed = raw.match(/\[([A-Za-z]{3}\d{1,4}(?:\.\d{1,3})?)\]/);
+  const candidate = bracketed ? bracketed[1] : raw;
+  return VB_OBJECT_ID_RE.test(candidate) ? candidate.toUpperCase() : null;
+}
+
+/**
+ * THE PAGE'S VISUAL BIBLE OBJECT CITATIONS — the UNION of `objects[]` and the
+ * VB-object ids filed in `characters[]` (2026-09-14, story B
+ * job_1789343124794_z2c779f7i p17).
+ *
+ * An entity's citation is a citation wherever the brief filed it. A repair
+ * rewrite that reclassifies an animal from `objects[]` to `characters[]` used
+ * to empty the REQUIRED OBJECTS block of it — losing its `size` rider and its
+ * reference-cell claim silently. Only VB-id-shaped, non-CHR entries are taken
+ * from `characters[]`: a human cast member is a name (or a CHR id) and is not
+ * a VB object entity, so their existing path is untouched.
+ *
+ * Returns citation strings/records in `objects[]` order first, deduped.
+ */
+function collectVbObjectCitations(metadata) {
+  const out = [];
+  const seen = new Set();
+  const take = (citation, idOnly) => {
+    if (citation === null || citation === undefined || citation === '') return;
+    const id = vbObjectIdOf(citation);
+    if (idOnly && !id) return; // a human cast member — not a VB object entity
+    const key = id
+      || (typeof citation === 'string'
+        ? citation.trim().toLowerCase()
+        : String(citation?.id || citation?.name || '').toLowerCase());
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    // From characters[] push the bare ID: the downstream matcher takes strings.
+    out.push(idOnly ? id : citation);
+  };
+  for (const o of (Array.isArray(metadata?.objects) ? metadata.objects : [])) take(o, false);
+  for (const c of (Array.isArray(metadata?.characters) ? metadata.characters : [])) take(c, true);
+  for (const c of (Array.isArray(metadata?.fullData?.characters) ? metadata.fullData.characters : [])) take(c, true);
+  return out;
+}
+
+/** VB object ids the BEFORE metadata cited and the AFTER metadata does not. */
+function droppedVbCitations(beforeMeta, afterMeta) {
+  const idsOf = (m) => new Set(
+    collectVbObjectCitations(m).map(vbObjectIdOf).filter(Boolean).map(id => id.split('.')[0])
+  );
+  const after = idsOf(afterMeta);
+  return [...idsOf(beforeMeta)].filter(id => !after.has(id));
+}
+
+/**
+ * A repair rewrite that drops a VB id the ORIGINAL brief cited must SAY SO.
+ * LOG-ONLY: a gate is a guideline — the rewrite stands, the round is not
+ * failed. Story B p17 shipped with its two dragons uncited and nothing said.
+ */
+function warnDroppedVbCitations(pageNumber, beforeMeta, afterMeta, options = {}) {
+  const dropped = droppedVbCitations(beforeMeta, afterMeta);
+  if (dropped.length === 0) return dropped;
+  const warn = typeof options.warn === 'function' ? options.warn : ((m) => log.warn(m));
+  const what = options.what || 'repair rewrite';
+  warn(`⚠️ [VB-CITATION] Page ${pageNumber}: the ${what} dropped Visual Bible id(s) the original brief cited: ${dropped.join(', ')} — each loses its REQUIRED OBJECTS line and its reference-cell claim on this render. Log-only; the rewrite stands.`);
+  return dropped;
 }
 
 function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, visualBible = null, pageNumber = null, referencePhotos = null, options = {}) {
@@ -3215,7 +3713,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
 
   // Forward the scene hint's `background` field explicitly. It carries the
   // atmosphere AND any story-essential unnamed figures (antagonists, guards —
-  // see story-unified.txt BACKGROUND rule). The prose is supposed to weave it
+  // the scene hint's `background` field, emitted today only by
+  // prompts/story-trial.txt; on the full path the Art Director writes such
+  // figures into the SETTING prose instead). The prose is supposed to weave it
   // in but can drop the figures, and the evaluator scores against the hint —
   // generator and evaluator must receive the same contract.
   const sceneBackground = metadata?.background || metadata?.fullData?.background || null;
@@ -3241,32 +3741,72 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // the Art Director declared in `wornItems[]`: worn, or off with the place it
   // now lies. Read structurally — nothing here infers a state from prose.
   const {
-    resolveWornItemsForPage, wornStateById, stripOffItemsFromOutfit, buildWornStateBlock,
+    resolveWornItemsForPage, wornStateById, resolveOutfitForPage, buildWornStateBlock,
+    referenceCarriesItem,
   } = require('./wornItems');
   const wornResolved = (visualBible && metadata)
-    ? resolveWornItemsForPage(visualBible, metadata.characters || [], metadata)
+    ? resolveWornItemsForPage(visualBible, metadata.characters || [], metadata, { pageNumber })
     : [];
   const wornById = wornStateById(wornResolved);
   // The owner's outfit text must not still list an item this page takes off.
   // The item is identified by its `wornAs` SLOT, and exactly that one clause is
   // dropped — this is not the rejected 2026-08-08 filterWornClothingAgainstScene,
   // which sieved every clause of every outfit against prose.
+  // ONE RESOLVED OUTFIT PER PAGE (owner ruling 2026-09-15). `off` or handed
+  // over → the owner's outfit text loses the clause; `worn` in a slot the
+  // contract fills with a different garment → the contract's clause yields to
+  // the declared item. wornItems.resolveOutfitForPage is the single resolver,
+  // and the eval side reaches the identical string through
+  // resolveGeneratedOutfit — the compliance judge and the semantic judge can no
+  // longer be handed two different answers about the same head.
   let effectiveReferencePhotos = referencePhotos;
-  if (wornResolved.some(w => w.state === 'off') && Array.isArray(referencePhotos)) {
+  if (wornResolved.length > 0 && Array.isArray(referencePhotos)) {
     effectiveReferencePhotos = referencePhotos.map((photo) => {
       if (!photo || !photo.clothingDescription) return photo;
-      const { text, removals } = stripOffItemsFromOutfit(photo.clothingDescription, wornResolved, photo.name);
+      const { text, removals, swaps } = resolveOutfitForPage(photo.clothingDescription, wornResolved, photo.name);
       for (const r of removals) {
         log.info(`[WORN] Page ${pageNumber}: ${photo.name}'s ${r.slot} (${r.id}) is OFF this page — outfit text ${r.removed ? 'phrase removed' : `left intact (${r.reason})`}`);
+      }
+      for (const s of swaps) {
+        log.info(`[WORN] Page ${pageNumber}: ${photo.name}'s ${s.slot} (${s.id}) is WORN this page and the contract named another garment — contract clause ${s.applied ? 'replaced by the declared item' : `left intact (${s.reason})`}`);
       }
       return text === photo.clothingDescription ? photo : { ...photo, clothingDescription: text };
     });
   }
 
+  // CAST THE BIBLE INVENTED. A Visual Bible secondary has no uploaded photo,
+  // no reference card and no clothingRequirements entry — the ONLY channel by
+  // which its look can reach the image model is this prompt. The beats scene
+  // brief is structured JSON whose character records carry position, action,
+  // expression and depth and have no field for appearance, so an invented
+  // adult arrived with a bare name: prod job_1788698812047_q5b1vuds7 p2 read
+  // "- Mama:, right, bending down toward Amian, …" with an AGE & PROPORTIONS
+  // block naming only the commissioned child. The model invented her from
+  // nothing on every page, at whatever age it liked.
+  //
+  // This is NOT a reinstatement of the SECONDARY CHARACTERS block removed
+  // 2026-06-09: that one was a THIRD copy of a description the prose format
+  // (prompts/scene-expansion-all.txt rule 10: name each character, then weave
+  // the physical description in) already embedded inline. The JSON brief has no such
+  // sentence to trust. Emitted only for entries in THIS page's cast that have
+  // no reference photo of their own, so a commissioned character is never
+  // doubled, and the entry's own single `description` string is used verbatim
+  // — no clause is inferred, filtered or assembled here (the no-backstop
+  // ruling below governs the characters the prose DOES dress).
+  //
+  // Scoped to the STRUCTURED brief. A prose brief really does weave the
+  // description into the sentence — job_1787689073034_1v6ew0y1kae p11 spells
+  // out the park keeper's hat, shirt, trousers and boots inline — so emitting
+  // there would be the duplicate 2026-06-09 removed. Only the JSON brief,
+  // which has no appearance field at all, gets the block.
+  const secondaryCast = isProseFormat ? [] : collectSecondaryCastForPage(
+    visualBible, metadata, sceneCharacters, referencePhotos, pageNumber
+  );
+
   // Build character reference list (Option B: explicit labeling in prompt)
   let characterReferenceList = '';
-  if (sceneCharacters && sceneCharacters.length > 0) {
-    log.debug(`[IMAGE PROMPT] Scene characters: ${sceneCharacters.map(c => c.name).join(', ')}`);
+  if ((sceneCharacters && sceneCharacters.length > 0) || secondaryCast.length > 0) {
+    log.debug(`[IMAGE PROMPT] Scene characters: ${(sceneCharacters || []).map(c => c.name).join(', ')}`);
 
     // Per-character clothing reaches the image model through the scene prose
     // (SCENE_DESCRIPTION), written from each character's "Wearing:" input. That
@@ -3329,8 +3869,13 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // one merged line ("- Emma, Noah: kindergarten-age …") instead of a
     // verbatim copy per child (~230 chars saved per duplicate on prompts
     // that fight an 8k model cap).
+    // Invented cast rides the SAME block: `secondaryAgeCues` turns a bible
+    // entry whose age is readable as a number ("a boy of about ten") into the
+    // {name, age} shape this loop already consumes. An entry whose age is
+    // prose only ("a woman in her early thirties") yields no cue here — its
+    // age still reaches the model through the appearance line below.
     const ageCueGroups = new Map(); // markers text -> [names]
-    for (const c of sceneCharacters) {
+    for (const c of [...(sceneCharacters || []), ...secondaryAgeCues(secondaryCast)]) {
       const ageMarkers = extractCharacterVisualProfile(c).ageMarkers;
       if (!ageMarkers) continue;
       if (!ageCueGroups.has(ageMarkers)) ageCueGroups.set(ageMarkers, []);
@@ -3369,15 +3914,62 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     log.info(`[WORN] Page ${pageNumber}: ${wornResolved.map(w => `${w.id}=${w.state}${w.defaulted ? '(defaulted)' : ''}`).join(', ')}`);
   }
 
+  // The appearance line for the invented cast collected above. One line per
+  // character, the bible's own `description` verbatim — the only description
+  // of them that exists anywhere in the pipeline.
+  if (secondaryCast.length > 0) {
+    const lines = secondaryCast.map(e => `- ${e.name}: ${String(e.description).trim()}`);
+    characterReferenceList += `\nCAST WITHOUT A REFERENCE IMAGE (draw each from this description, identically on every page):\n${lines.join('\n')}\n`;
+    log.info(`[IMAGE PROMPT] Page ${pageNumber}: described ${secondaryCast.length} bible-invented cast member(s): ${secondaryCast.map(e => e.name).join(', ')}`);
+  }
+
   // (Removed 2026-06-09) SECONDARY CHARACTERS IN THIS SCENE block — was
   // injecting a third copy of each secondary character's appearance onto
-  // pages where the SCENE prose already embeds it inline. story-unified.txt
-  // explicitly instructs Sonnet to "Name each character explicitly on first
-  // mention, THEN weave the physical description in" (prompts/story-
-  // unified.txt:125). Trust the prose. If a future bug shows Sonnet
+  // pages where the SCENE prose already embeds it inline. The Art Director
+  // prompt explicitly instructs "Weave each character's physical description
+  // on first mention" (prompts/scene-expansion-all.txt rule 10; the rule lived
+  // in story-unified.txt when this was removed). Trust the prose. If a future bug shows Sonnet
   // skipping the inline embed for secondaries, fix it at the Sonnet output
   // level — don't re-add a duplicate emitter here. Page 12 of the Miller
   // showcase wasted ~1050 chars triple-counting Sofia before this removal.
+
+  // RESULT AT THE CONTACT, RECEIVER CLEAR. An interactions[] row may name a
+  // `receiver`: the second object the action's result later arrives at (a
+  // basin under a spout). Measured over six renders of one such instant
+  // (decisions.md 2026-09-08): every prompt that let the receiver carry the
+  // effect ("water jetting into the interior") or sit "nearby" drew the water
+  // out of the TOOL into the receiver; the one prompt that put the tip INTO
+  // the target and the receiver "several steps in front, well clear" drew it
+  // out of the target. Prose rules to that effect did not bind; this is the
+  // structured version — a fixed sentence the model cannot rewrite, and the
+  // receiver's state clause dropped for this page (the strip site is in the
+  // artifact loop below).
+  const receiverRows = (Array.isArray(metadata?.interactions) ? metadata.interactions : [])
+    .filter(r => r && typeof r.receiver === 'string' && r.receiver.trim() && r.object);
+  const receiverPlacement = buildReceiverPlacement(receiverRows);
+  if (receiverPlacement) {
+    cleanSceneDescription += `\n\n${receiverPlacement}`;
+    log.info(`[RECEIVER] Page ${pageNumber}: placement sentence emitted — "${receiverPlacement}"`);
+  }
+
+  // UNION OF objects[] AND characters[] (2026-09-14, story B p17). A Visual
+  // Bible entity citation is a citation wherever the brief filed it. The
+  // `iterate-round-1` repair on job_1789343124794_z2c779f7i p17 — commissioned
+  // for a hammer artefact, a facing error and stray leaves, with no scale
+  // issue anywhere in its commission — re-authored the page metadata and moved
+  // ANI001 ("Funkli") and ANI002 ("Mother Dragon") out of `objects[]` and into
+  // `characters[]`. This block walked `metadata.objects` only, so the shipped
+  // render lost both size riders ("about the size of a small house") AND the
+  // ANI reference cell claim, leaving only the prose adjective "a massive
+  // emerald green creature". Nothing logged it.
+  //
+  // The citation list is now the union. Reclassifying an entity between the
+  // two lists can no longer empty this block or drop its reference cell.
+  // Only VB-id-shaped, non-CHR citations are taken from `characters[]` — a
+  // human cast member is a NAME (or a CHR id) and keeps its existing path
+  // untouched. Nothing about WHAT is emitted changes: the line stays name-only
+  // (2026-09-02) and `size` still rides for animals (2026-09-11).
+  const vbObjectCitations = collectVbObjectCitations(metadata);
 
   // Build required objects section from metadata.objects by looking up in Visual Bible
   // This ensures objects listed in scene metadata are included with their full descriptions
@@ -3387,7 +3979,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // and outputs them in JSON metadata. We use ONLY those elements instead of the entire bible.
   let requiredObjectsSection = '';
   let hasRequiredObjects = false;
-  if (metadata && metadata.objects && metadata.objects.length > 0 && visualBible) {
+  if (vbObjectCitations.length > 0 && visualBible) {
     const requiredObjects = [];
 
     // Helper function to match by name OR ID
@@ -3436,9 +4028,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     // character's full description. The prose already carries them inline.
     // CHR ids that slip into metadata.objects are now filtered below and
     // silently skipped — the prose is the canonical source.
-    for (const objName of metadata.objects) {
+    // Dedupe by RESOLVED entity id: an id filed in both lists (or cited
+    // once by id and once by name) is one entity and gets one line.
+    const citedEntryIds = new Set();
+    const pushRequired = (rec) => {
+      const key = String(rec.id || rec.name || '').toUpperCase();
+      if (key && citedEntryIds.has(key)) return;
+      if (key) citedEntryIds.add(key);
+      requiredObjects.push(rec);
+    };
+    for (const objName of vbObjectCitations) {
       // Skip any character id in the objects list — the prose carries the
-      // character's description (story-unified.txt instructs the model to
+      // character's description (the Art Director prompt instructs the model to
       // both name antagonists in the prose AND list their CHR id here; the
       // id is presence metadata for the pipeline, not a prompt input).
       // Re-injecting the VB description would duplicate the prose.
@@ -3456,10 +4057,70 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // id, or a match on the name, resolves to no state and the object's
         // unaltered look stands.
         const handle = typeof objName === 'string' ? objName : (objName && objName.id);
-        requiredObjects.push({
-          name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact,
-          state: objectStateFor(artifact, handle),
-        });
+        // ONE resolver (visualBible.resolveObjectState) picks the state from
+        // the cited handle, the bible's page table and the page's declared
+        // contact — the same call the reference cell is picked with. THE
+        // INSTANT OUTRANKS THE STATE: a state whose `held` flag disagrees with
+        // the brief's interactions[] is a neighbouring page's look (staging
+        // job_1788816451791_25b31uqlp p11: "no hands touching it" on the page
+        // whose instant pressed two halves together — the render obeyed the
+        // state twice). Its delta is dropped from this line, loudly; the
+        // object itself stays listed.
+        const resolved = resolveObjectState(artifact, handle, pageNumber, metadata, { visualBible });
+        let state = resolved.state;
+        // ONE OBJECT, ONE POSITION PER PAGE PROMPT. This block's own header
+        // promises each element "appears exactly as the scene description
+        // places it", so where the brief places the object the state's
+        // placement half is not asserted against it (the delta's appearance
+        // half always stays — that is what the state is FOR).
+        let stateDelta = state ? resolved.promptDelta : '';
+        // ONE reference format for this object's state, shared by the three
+        // clause-drop warnings below. Each of them was a hand-maintained copy
+        // that read `state.id` directly, and a bible stored before the dotted
+        // handles existed has none: staging job_1788727233899_1dpnym94p carries
+        // states with a `name` and no `id`, so the line that says what was
+        // deleted said `undefined`.
+        const stateRef = (st) => ((st && st.id)
+          ? `${st.id} ("${st.name}")`
+          : `${artifact.id} state "${(st && st.name) || '?'}"`);
+        if (state && resolved.placementDropped.length > 0) {
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}", so the state's placement clause(s) are dropped from REQUIRED OBJECTS: "${resolved.placementDropped.join(', ')}". Kept: "${stateDelta}"`);
+        }
+        // A SPLIT MAY SHORTEN A DELTA, NEVER REPLACE IT. Every segment read as
+        // placement, so the cut would have left the line with no state clause
+        // at all — undecidable from here (see visualBible.resolveObjectState),
+        // and the delta stands. Two positions reach the model on this page:
+        // the brief's, and whatever this delta asserts. Loud, because nothing
+        // downstream can see it happened.
+        if (state && resolved.placementOnly) {
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — the scene places ${artifact.id} at "${resolved.scenePlacement}" and the state's whole delta reads as placement: "${state.delta}". The delta STANDS (a cut here would leave no state clause at all, and the split cannot tell a placement-only delta from a look it misread) — the page prompt carries two positions for this object. The delta should state the object's own look and nothing else.`);
+        }
+        if (resolved.contradicted) {
+          // A DELETION NOBODY CAN SEE THE REASON FOR IS A DELETION NOBODY CAN
+          // CALL WRONG (2026-09-17). The appearance axis decides on WORDS the
+          // prose and a sibling state happen to share, and both false positives
+          // that opened this fix were found by accident off a hand diff. The
+          // words are now in the line, with the element that lost its clause.
+          const why = resolved.contradictedBy === 'appearance'
+            ? `the page's instant asserts ${artifact.id} ("${artifact.name}")'s ${stateRef(resolved.rival)} instead ("${resolved.rival.delta}"), `
+              + `on the word(s) ${(resolved.evidenceTokens || []).map(t => `"${t}"`).join(', ') || '(none recorded)'} — "${resolved.evidence}"`
+            : `the brief's interactions ${resolved.held ? 'put hands on it' : 'declare no hands on it'} but the state says the object is ${state.held ? 'in hand' : 'untouched'}`;
+          log.warn(`⚠️ [VB-STATE] Page ${pageNumber}: ${stateRef(state)} — ${why} — state clause dropped, the page's instant wins. Delta was: "${state.delta}"`);
+          state = null;
+          stateDelta = '';
+        }
+        // The RECEIVER of another row's result never carries a state clause
+        // on the acting page: the bible writes the effect onto it ("water
+        // jetting into the interior"), and that clause is what pulls the
+        // result to the receiver instead of the contact. Same drop mechanism
+        // as the `held` contradiction above; the object itself stays listed.
+        const receiverRow = state ? receiverRows.find(r => matchesEntry(artifact, r.receiver)) : null;
+        if (receiverRow) {
+          log.warn(`⚠️ [RECEIVER] Page ${pageNumber}: ${stateRef(state)} is the receiver of ${receiverRow.character}'s action on ${receiverRow.object} — state clause dropped, the result belongs at the contact. Delta was: "${state.delta}"`);
+          state = null;
+          stateDelta = '';
+        }
+        pushRequired({ name: artifact.name, id: artifact.id, type: 'object', description, entry: artifact, state, stateDelta });
         continue;
       }
 
@@ -3467,7 +4128,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const animal = (visualBible.animals || []).find(a => matchesEntry(a, objName));
       if (animal) {
         const description = animal.extractedDescription || animal.description;
-        requiredObjects.push({ name: animal.name, id: animal.id, type: 'animal', description, entry: animal });
+        pushRequired({ name: animal.name, id: animal.id, type: 'animal', description, entry: animal });
         continue;
       }
 
@@ -3475,7 +4136,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const location = (visualBible.locations || []).find(l => matchesEntry(l, objName));
       if (location) {
         const description = location.extractedDescription || location.description;
-        requiredObjects.push({ name: location.name, id: location.id, type: 'location', description, entry: location });
+        pushRequired({ name: location.name, id: location.id, type: 'location', description, entry: location });
         continue;
       }
 
@@ -3483,7 +4144,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const vehicle = (visualBible.vehicles || []).find(v => matchesEntry(v, objName));
       if (vehicle) {
         const description = vehicle.extractedDescription || vehicle.description;
-        requiredObjects.push({ name: vehicle.name, id: vehicle.id, type: 'vehicle', description, entry: vehicle });
+        pushRequired({ name: vehicle.name, id: vehicle.id, type: 'vehicle', description, entry: vehicle });
         continue;
       }
 
@@ -3491,7 +4152,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       const clothing = (visualBible.clothing || []).find(c => matchesEntry(c, objName));
       if (clothing) {
         const description = clothing.extractedDescription || clothing.description;
-        requiredObjects.push({ name: clothing.name, id: clothing.id, type: 'clothing', description, wornBy: clothing.wornBy || null, entry: clothing });
+        pushRequired({ name: clothing.name, id: clothing.id, type: 'clothing', description, wornBy: clothing.wornBy || null, entry: clothing });
       }
     }
 
@@ -3509,7 +4170,6 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // wastes ~200 chars per page with no model benefit.
       const promptObjects = requiredObjects.filter(o => o.type !== 'location');
       requiredObjectsSection = `\n${header}\n`;
-      const GENERIC_NOUN_BY_TYPE = { object: 'object', vehicle: 'vehicle', clothing: 'outfit' };
       // VB ids whose reference render travels with this generation call
       // (grid cell or, for a plate-covered vehicle, the background plate).
       // Callers that know the attachment set pass it; without it no image
@@ -3520,12 +4180,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       );
       const gridRefNames = [];
       for (const obj of promptObjects) {
-        // A worn removable item is not a prop on this page — it is on the
-        // character, and the avatar reference already carries it. Listing it
-        // here as an object is half of what made p3 of
-        // job_1788641639919_mpjwlzkf1 render a second, free-standing hat.
+        // A worn removable item is omitted here ONLY when an attached reference
+        // demonstrably shows it on its wearer — a `wornAs`-linked item on its
+        // own owner (referenceCarriesItem). That is the case p3 of
+        // job_1788641639919_mpjwlzkf1 needs: listing it as an object as well
+        // rendered a second, free-standing hat.
+        // Otherwise — a handover, or an Art-Director row against a bare bible
+        // element that is in nobody's wardrobe contract — nothing in the call
+        // shows it worn, and this line is the only place it is said. It is then
+        // listed WORN ON the character, never as a loose prop, so the entry
+        // cannot become that free-standing duplicate.
         const wornState = wornById.get(String(obj.id || '').toUpperCase());
-        if (wornState && wornState.state === 'worn') {
+        if (wornState && wornState.state === 'worn' && referenceCarriesItem(wornState)) {
           log.info(`[WORN] Page ${pageNumber}: ${obj.id} omitted from REQUIRED OBJECTS — ${wornState.owner} is wearing it`);
           continue;
         }
@@ -3535,8 +4201,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // (held, draped over furniture, lying on the ground), the emitted
         // description must not contradict it — attachment clauses like "tied
         // at the neck" and the clothing "(worn by X)" suffix are dropped.
-        const placedElsewhere = (wornState && wornState.state === 'off')
-          || sceneDeclaresNonWornState(obj.entry, cleanSceneDescription, metadata?.interactions);
+        // DECLARED, never inferred: the Art Director's own `wornItems` row is
+        // the only signal. The prose matcher that used to sit in this
+        // disjunct was deleted 2026-09-18 — see the tombstone above.
+        const placedElsewhere = !!(wornState && wornState.state === 'off');
         const description = placedElsewhere ? stripWornStateFromDescription(obj.description) : obj.description;
         const wornSuffix = (obj.type === 'clothing' && obj.wornBy && !placedElsewhere)
           ? ` (worn by ${obj.wornBy})`
@@ -3544,49 +4212,34 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         if (placedElsewhere) {
           log.info(`🧥 [IMAGE PROMPT] Page ${pageNumber}: required ${obj.type} ${obj.id || ''} emitted state-aware (scene places it off-body)`);
         }
-        // English-only entity refs: the VB NAME follows the story language, so
-        // artifacts/vehicles/clothing lead with an English description-derived
-        // ref. Animals keep their proper name (identity anchor). The ref is
-        // built from the STATE-AWARE description so a stripped attachment
-        // clause can't sneak back in via the lead.
-        const refEntry = placedElsewhere ? { description } : obj.entry;
-        // The lead is a checklist NAME — one clean short noun phrase, trimmed
-        // clause-aware so it never stops on a modifier or a half-stated
-        // measurement. Both rules now live in ONE place: visualBible's
-        // `clauseRef`, which englishEntityRef itself also runs (the label's
-        // copy was the only trimmer until then, so every other consumer of
-        // the ref got the untrimmed chop).
-        const shortRef = (r) => clauseRef(r, { maxWords: 6, hardCap: 10 });
-
+        // ONE authored English label per element, minted with the bible and
+        // read here through `labelOf` — the same string the detector, the cell
+        // gates and the judges use. Nine competing naming rules once produced
+        // `**tool** (object)` twice in one page's checklist
+        // (job_1789301291267_ueh8h145m); the label is now authored once instead.
+        // Animals keep their proper name (identity anchor). The entry is passed
+        // state-aware so a stripped attachment clause cannot return via a
+        // description-derived backfill.
+        const refEntry = placedElsewhere ? { ...obj.entry, description } : obj.entry;
 
         // A two-sided prop is TWO bible entries whose orientation lives in the
         // NAME's parenthetical ("… (turned away)", "… (face to camera)").
         // decisions.md 2026-08-26 made that orientation reach the prompt via
         // the copied description; with the description gone it rides the lead
         // instead, so the pair mechanism keeps its text channel.
-        const qualifier = (obj.name && obj.name.match(/\(([^)]+)\)\s*$/)) ? ` (${obj.name.match(/\(([^)]+)\)\s*$/)[1]})` : '';
-        // An ENGLISH story's VB names are English BY CONSTRUCTION —
-        // story-unified.txt mandates English `name` + `description` for
-        // artifacts/vehicles/clothing — so for those stories the NAME is the
-        // better label: it is the term the Art Director's own prose uses, and
-        // it is whole, where any description chop is a guess at where the noun
-        // phrase ends. Non-English stories keep the description-derived ref:
-        // the settled English-only direction (decisions.md 2026-07-31) exists
-        // because a story-language token degrades compliance and gets painted
-        // onto the prop as lettering, and the code-side ref is the backstop
-        // for exactly those stories. Same story-language gate the cover hint's
-        // free-text `Mood:` field uses.
-        const storyIsEnglish = /^en(?:[-_]|$)/.test(language);
-        // The orientation parenthetical rides `qualifier` below — strip it
-        // here so it is not emitted twice.
-        const nameLabel = String(obj.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
-        const nameIsUsable = storyIsEnglish && nameLabel
-          && !/^(?:ART|VEH|CLO|LOC|CHR|ANI)\d+$/i.test(nameLabel);
+        // ONLY an orientation qualifier rides the lead. The bible's clothing
+        // naming convention puts the WEARER in that same trailing parenthetical
+        // ("<garment> (<CharacterName>)"), and this regex took it too — so a
+        // character's name reached the image-facing label of a garment, which is
+        // exactly the leak 32c825a61 closed. Decided structurally against
+        // `wornBy`, never by reading the text.
+        const parenthetical = obj.name ? (obj.name.match(/\(([^)]+)\)\s*$/) || [])[1] : null;
+        const isWearerParenthetical = !!parenthetical && !!obj.wornBy
+          && parenthetical.trim().toLowerCase() === String(obj.wornBy).trim().toLowerCase();
+        const qualifier = (parenthetical && !isWearerParenthetical) ? ` (${parenthetical})` : '';
         const refName = (obj.type === 'animal' && obj.name)
           ? obj.name
-          : (nameIsUsable
-            ? nameLabel
-            : shortRef(englishEntityRef(refEntry, GENERIC_NOUN_BY_TYPE[obj.type] || 'object', { language })));
+          : elementLeadLabel(refEntry, { language, type: obj.type });
         const lead = (obj.type === 'animal' && obj.name)
           ? `**${obj.name}** (animal)`
           : `**${refName}${qualifier}** (${obj.type})`;
@@ -3606,11 +4259,36 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const offWhere = (wornState && wornState.state === 'off' && wornState.location)
           ? ` — ${wornState.location}`
           : '';
-        // The bible's `size` is the one look-field that rides along: it is the
-        // scale anchor against the figure, which nothing else in the prompt
+        // A kept WORN item says whose head/body it is on, in the same clause.
+        // The omission rule above exists to stop a listed object becoming a
+        // second, free-standing copy of a hat somebody is already wearing; an
+        // item that survives it must therefore never read as a loose prop.
+        // Pinned wording — the tests assert this string.
+        const wornOn = (wornState && wornState.state === 'worn')
+          ? ` — worn on ${wornState.wearer || wornState.owner}, not a separate free-standing copy`
+          : '';
+        // The element's SCALE rides along: the one look-field that does, because
+        // it is the anchor against the figure that nothing else in the prompt
         // states for a held or carried prop (a shoebox-sized chest rendered
         // torso-sized on every page of staging trial job_1788712851192).
-        const sizeNote = (obj.type !== 'animal' && obj.entry?.size) ? ` — ${String(obj.entry.size).trim()}` : '';
+        //
+        // It is the `scaleClass` band's ONE canonical phrase (owner,
+        // 2026-09-15) — `elementScaleNote` renders the token, never prints it,
+        // and falls back to a pre-enum bible's stored free-text `size`.
+        //
+        // ANIMALS CARRY IT TOO (owner, 2026-09-11). They were excluded when
+        // this rider was introduced (793049e40) because that change was scoped
+        // to held props — not because a creature's size was judged harmful.
+        // A creature is the element whose scale drifts most and the one nothing
+        // else anchors: on job_1789147573901_m3uam0nxi the bible wrote
+        // ANI002 `size` = "body length approximately four metres … large enough
+        // for four small children and a dog to sit across the back", and the
+        // same dragon rendered knee-high on two pages, a bodiless wing on a
+        // third and house-sized on a fourth. The pages that restated the size
+        // in their prose were the ones that came closest; the pages that did
+        // not (p8, p18) had nothing to go on, because this line dropped it.
+        const scaleNote = elementScaleNote(obj.entry);
+        const sizeNote = scaleNote ? ` — ${scaleNote}` : '';
         // OBJECT STATE - the fourth rider on this line, beside `size`, the
         // clothing `(worn by X)` suffix and a two-sided prop's orientation
         // parenthetical. It says WHICH variant of the object this page shows;
@@ -3624,8 +4302,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // grounding label and the entity-consistency key - one object would
         // read as several across the book, which is the defect this whole
         // model exists to remove.
-        const stateNote = obj.state ? ` — ${trimStateClause(obj.state.delta, obj.state)}` : '';
-        requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${offWhere}\n`;
+        // `stateDelta` is the state's delta minus any placement half the page's
+        // own brief already states (visualBible.splitStatePlacement), and the
+        // delta WHOLE wherever that cut would leave nothing — a split may
+        // shorten a delta, never replace it. It is empty only where an axis
+        // above dropped the state outright (contradiction, receiver), and then
+        // `obj.state` is null too, so no dangling dash reaches the line.
+        const stateNote = (obj.state && obj.stateDelta) ? ` — ${trimStateClause(obj.stateDelta, obj.state)}` : '';
+        requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${wornOn}${offWhere}\n`;
       }
       if (gridRefNames.length > 0) {
         // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry
@@ -3634,8 +4318,31 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           ? `The attached reference images include a rough image of ${gridRefNames[0]} — match its look at the size and placement the scene description gives it.\n`
           : `The attached reference images include rough images of: ${gridRefNames.join('; ')} — match each one's look at the size and placement the scene description gives it.\n`;
       }
-      if (promptObjects.length === 0) {
-        // All entries were locations — nothing left to list.
+      // MARKINGS DO NOT MULTIPLY WITH THE OBJECT. Plain line (no "* **"
+      // prefix) so parseVisualBibleObjects never reads it as an object.
+      // A state that divides an object multiplies the noun ("two halves"), and
+      // an attribute of that noun replicates per instance: prod trial
+      // job_1789292742265_mgxmrkfpd declared ONE artifact bearing ONE device
+      // and a split state, and two pages rendered the device complete on each
+      // half. It sits here rather than in the template head so it rides the
+      // protected tail through shrinkPromptForModel, and costs prompt budget
+      // only on pages that actually state an object.
+      requiredObjectsSection += `A state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.
+`;
+      // A HEADER WITH NOTHING UNDER IT IS NOT A CHECKLIST (2026-09-17). The
+      // old test was `promptObjects.length === 0` — "every entry was a
+      // location" — and it missed the other way an entry disappears: the
+      // worn-item omission inside the loop above. On staging
+      // job_1789584708605_rts4wqupm p16 the page cited LOC002 and ART004.2 (a
+      // jacket the page carries as a bundle); the lost `wornItems` resolved the
+      // jacket back to "worn", the omission rule dropped its line, and the
+      // render was sent a REQUIRED OBJECTS heading followed by nothing but the
+      // markings rule. The condition is now what the block promises: at least
+      // one listed element.
+      // `hasRequiredObjects` deliberately stays true: the brief DID cite
+      // elements, so the whole-bible fallback below must not fire and dump
+      // every entry into the prompt.
+      if (!/^\* /m.test(requiredObjectsSection)) {
         requiredObjectsSection = '';
       }
 
@@ -3681,7 +4388,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   const metaCharacters = Array.isArray(metadata?.fullData?.characters) && metadata.fullData.characters.length > 0
     ? metadata.fullData.characters
     : (Array.isArray(metadata?.characters) ? metadata.characters : []);
-  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible);
+  const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible, { language: inputData?.language });
   const eraGuard = buildEraGuard(metadata?.era);
   const sceneIntentLine = metadata?.sceneIntent
     ? `**THIS IMAGE DEPICTS:** ${String(metadata.sceneIntent).trim()}`
@@ -3726,7 +4433,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // Season note, same shape as ERA_GUARD: a book-wide condition the
       // renderer must honour even when an attached landmark reference photo
       // was shot in a different season (decisions.md 2026-08-16).
-      SEASON_NOTE: buildSeasonNote(inputData || {})
+      SEASON_NOTE: buildSeasonNote(inputData || {}),
+      // See the declarations: one constant per rule, mirrored by the judge rule
+      // it answers (D-24, D-16b). The template places both at the very end, in
+      // the protected tail.
+      NO_CHARACTER_MARKING: NO_CHARACTER_MARKING_RULE,
+      HANDS_HOLD_ONLY_NAMED: HANDS_HOLD_ONLY_NAMED_RULE,
+      // The shot rule lived in the droppable **Composition:** head block — first
+      // in CUT_DROP_ORDER — so every over-cap page lost the only statement of
+      // what its declared shot means. It sits at the END of the template now,
+      // inside the tail shrinkPromptForModel never cuts, and comes from the same
+      // constant the Art Director enum does (server/lib/shotVocabulary.js).
+      SHOT_DEFINITIONS
     })));
   }
 
@@ -3827,6 +4545,44 @@ function vbDeclaredLetteringNames(visualBible) {
  * @returns {string} Sanitised prompt with VB IDs resolved or orphan lines
  *                   dropped.
  */
+/**
+ * The ONE image-facing name for a Visual Bible element.
+ *
+ * An AUTHORED `label` wins — one English label per element, minted with the
+ * bible and read by the REQUIRED OBJECTS lead, the detector's grounding label,
+ * the reference-sheet cell gates and the judges, so all of them say the same
+ * word. Nine competing naming rules once printed `**tool** (object)` twice in
+ * one page's checklist (job_1789301291267_ueh8h145m).
+ *
+ * With NO label — every bible stored before labels existed — the derivation
+ * below is the pre-label one, byte-for-byte: the bold lead is the
+ * GroundingDINO grounding key AND the entity-consistency key, so a shorter (or
+ * merely different) string on a stored story silently re-keys its objects.
+ *
+ * @param {Object} entry - the VB entry
+ * @param {Object} [opts]
+ * @param {string} [opts.language] - story language ('de', 'en-gb', …)
+ * @param {string} [opts.type] - pool type: 'object' | 'vehicle' | 'clothing'
+ * @returns {string}
+ */
+const LEAD_GENERIC_NOUN_BY_TYPE = { object: 'object', vehicle: 'vehicle', clothing: 'outfit' };
+function elementLeadLabel(entry, opts = {}) {
+  if (!entry || typeof entry !== 'object') return 'object';
+  if (String(entry.label || '').trim()) return labelOf(entry);
+  const language = opts.language || 'en';
+  // An ENGLISH story's VB names are English by construction
+  // (prompts/scene-expansion-all.txt:140),
+  // so the NAME is the label; a non-English story routes through the
+  // English-only description ref (decisions.md 2026-07-31).
+  const storyIsEnglish = /^en(?:[-_]|$)/.test(language);
+  const nameLabel = String(entry.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const nameIsUsable = storyIsEnglish && nameLabel
+    && !/^(?:ART|VEH|CLO|LOC|CHR|ANI)\d+$/i.test(nameLabel);
+  if (nameIsUsable) return nameLabel;
+  const generic = LEAD_GENERIC_NOUN_BY_TYPE[opts.type] || 'object';
+  return clauseRef(englishEntityRef(entry, generic, { language }), { maxWords: 6, hardCap: 10 });
+}
+
 function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   if (!prompt || typeof prompt !== 'string') return prompt;
   if (!visualBible || typeof visualBible !== 'object') return prompt;
@@ -3835,11 +4591,13 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   // are English-only: characters and animals resolve to their given names
   // (identity anchors), but artifact/location/vehicle/clothing NAMES follow
   // the story language ("Roter Umhang" must not reach the English prompt), so
-  // those resolve to an English description-derived ref instead. Locations
-  // keep their name WITH the English visual fields inlined (real-landmark
-  // names are real-world identifiers the model knows).
-  const NAME_POOLS = ['mainCharacters', 'secondaryCharacters', 'animals'];
+  // those resolve to the element's authored English `label` (vbLabel.labelOf)
+  // — the same string the REQUIRED OBJECTS lead and the detector use. Real
+  // landmarks keep their name (a real-world identifier the model knows); an
+  // invented place keeps its English visual fields inlined behind the label.
+  // properName never reaches an image model (SETTLED).
   const REF_POOLS = { artifacts: 'object', vehicles: 'vehicle', clothing: 'outfit' };
+  const NAME_POOLS = ['mainCharacters', 'secondaryCharacters', 'animals'];
   const idToName = new Map();
   for (const pool of NAME_POOLS) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
@@ -3850,19 +4608,30 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
   for (const [pool, genericNoun] of Object.entries(REF_POOLS)) {
     for (const entry of (Array.isArray(visualBible[pool]) ? visualBible[pool] : [])) {
       if (!entry?.id) continue;
-      idToName.set(String(entry.id).toUpperCase(), englishEntityRef(entry, genericNoun));
+      // Authored label wins; with none, the pre-label ref, unchanged — this
+      // string is substituted INTO the Art Director's prose, so a shorter
+      // derivation deletes detail a stored story was written around.
+      const ref = String(entry.label || '').trim() ? labelOf(entry) : englishEntityRef(entry, genericNoun);
+      idToName.set(String(entry.id).toUpperCase(), ref);
     }
   }
   for (const entry of (Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
     if (!entry?.id) continue;
+    // An invented place: the label leads, the English visual fields stay
+    // inlined behind it exactly as englishLocationRef built them.
+    const visuals = [entry.features, entry.colors, entry.signatureElement]
+      .map(v => String(v || '').trim()).filter(Boolean).join('; ');
+    const labelled = String(entry.label || '').trim();
     const ref = entry.isRealLandmark
       ? (entry.name || englishLocationRef(entry))
-      : (englishLocationRef(entry) || englishEntityRef(entry, 'place'));
+      : (labelled
+        ? (visuals ? `${labelOf(entry)} (${visuals})` : labelOf(entry))
+        : (englishLocationRef(entry) || englishEntityRef(entry, 'place')));
     if (!ref) continue;
     idToName.set(String(entry.id).toUpperCase(), ref);
     // VANTAGE HANDLES. A location shown from more than one viewpoint carries
     // `vantages[]`, and the Art Director cites one as the dotted form
-    // `LOC005.1` (prompts/story-unified.txt "vantages"). The old id pattern
+    // `LOC005.1` (prompts/scene-expansion-all.txt "vantages"). The old id pattern
     // matched only the `LOC005` half and left a dangling ".1" glued to the
     // substituted text -- "The chestnut path to the Holzbruecke.1" -- which an
     // image model letters onto the page exactly as readily as the raw id did.
@@ -3916,6 +4685,33 @@ function sanitizeVbIdsInPrompt(prompt, visualBible, pageNumber = null) {
 }
 
 /**
+ * The fixed "result at the contact, receiver clear" sentence for every
+ * interactions[] row carrying a `receiver`. Deterministic string assembly from
+ * the row's own fields — `object` is the tool, `target` (or, failing that, the
+ * row's `where` text) is what it acts on, `receiver` is what later takes the
+ * result. VB ids are left in place; the final sanitiser resolves them to the
+ * same English refs the rest of the prompt uses. No prose is classified here.
+ *
+ * @param {Array} rows - interactions rows with a non-empty `receiver`
+ * @returns {string} '' when no row qualifies
+ */
+function buildReceiverPlacement(rows) {
+  const lines = [];
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    const tool = String(r?.object || '').trim();
+    const receiver = String(r?.receiver || '').trim();
+    if (!tool || !receiver) continue;
+    const target = String(r?.target || '').trim();
+    const where = String(r?.where || '').trim();
+    const contact = target
+      ? `where ${tool} meets ${target}`
+      : (where ? `at the point where ${tool} makes contact (${where})` : `at the point where ${tool} makes contact`);
+    lines.push(`The result of this action appears only ${contact}; ${receiver} stands well clear of ${tool}, several steps away, never under or beside its tip.`);
+  }
+  return lines.join('\n');
+}
+
+/**
  * Build a terse "EXACT POSES" imperative block from scene interactions[].
  * Appended at the END of the image prompt. Image models (Grok Aurora) weight
  * the tail of the prompt heavily — declared interactions buried mid-paragraph
@@ -3962,8 +4758,49 @@ function resolveVbActorName(name, visualBible) {
   return raw;
 }
 
-function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null) {
+/**
+ * The element an interaction's `object` handle names, as {type, entry}.
+ *
+ * Handles only — `ART001`, `ART001.2`, `ANI004`, `VEH002`. A free-text object
+ * ("the dirt", "the stone wall") resolves to nothing on purpose: the pools
+ * below are the ones the REQUIRED OBJECTS block scale-notes, and a name match
+ * would reach entries that block never lists.
+ */
+const VB_ELEMENT_POOLS = [['artifacts', 'object'], ['animals', 'animal'], ['vehicles', 'vehicle']];
+function resolveVbElement(handle, visualBible) {
+  const m = VB_HANDLE.exec(String(handle || '').trim());
+  if (!m || !visualBible) return null;
+  const wanted = (m[1] + m[2]).toUpperCase();
+  for (const [key, type] of VB_ELEMENT_POOLS) {
+    const entries = visualBible[key];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (String((entry && entry.id) || '').trim().toUpperCase() === wanted) return { id: wanted, type, entry };
+    }
+  }
+  return null;
+}
+
+/**
+ * The eyes, as a phrase. `looksAt` is the one field that means gaze (AD rule
+ * 8j); a Visual Bible id in it becomes the element's name, never a raw id.
+ */
+function looksAtPhrase(target, visualBible = null) {
+  const t = String(target || '').trim();
+  if (!t) return '';
+  const k = t.toLowerCase();
+  if (k === 'camera' || k === 'the viewer' || k === 'viewer') return 'eyes on the viewer';
+  if (k === 'away') return 'eyes turned away from everyone in the frame';
+  const { scrubVbIds } = require('./vbIdGuard');
+  return `eyes on ${scrubVbIds(t, visualBible)}`;
+}
+
+function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = null, options = {}) {
   const interactionList = Array.isArray(interactions) ? interactions : [];
+  const language = options.language || 'en';
+  // An element that was scale-noted on this block already — the rider is stated
+  // ONCE per element, on the first pose line that names it.
+  const scaledElements = new Set();
   // Even with zero declared interactions, we may still emit fill lines for
   // uncovered fg/mg characters — so don't early-return on an empty list.
   const lines = [];
@@ -4025,10 +4862,37 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
         }
       }
     }
+    // SIZE RIDES THE POSE LINE (2026-09-17). The REQUIRED OBJECTS block states
+    // the same scale, and on the pages where nothing takes hold of the element
+    // the render ignored it: staging job_1789584708605_rts4wqupm drew one
+    // head-sized element at beach-ball size on p5, p6 and p14 — the three pages
+    // whose pose line put no hand, arm or ear on it — while p4, p7, p11, p12,
+    // p13 and p15, which did, drew it correctly. The `where` clause is the
+    // field the render obeys: p9 and p11 built a byte-identical REQUIRED
+    // OBJECTS line and differed only there (649908242), and the A/B that
+    // produced this rider (Lab #1281 vs #1284, #1286 vs #1288) shrank the
+    // element on both failing pages and left an already-correct page alone.
+    // Same pools, same label and same phrase as that block, so one element has
+    // one scale and one name across the whole prompt. The label carries the
+    // phrase as an apposition, never as a predicate: three of the thirteen band
+    // phrases are verb-led ("fills an open hand"), so "the X is …" is not a
+    // form every band survives.
+    const element = resolveVbElement(object, visualBible);
+    const scaleNote = element ? elementScaleNote(element.entry) : null;
+    const scaleRider = scaleNote
+      ? ` — the ${elementLeadLabel(element.entry, { language, type: element.type })}: ${scaleNote}`
+      : '';
     for (const target of targets) {
       // A visual-bible actor reaches the model by name, not by handle.
       const label = resolveVbActorName(target, visualBible);
-      lines.push(`- ${label}: ${finalWhere}`);
+      // Stated once per element per block — a multi-character row splits into
+      // one line per figure, and three figures do not need three copies.
+      let lineWhere = finalWhere;
+      if (scaleRider && !scaledElements.has(element.id)) {
+        scaledElements.add(element.id);
+        lineWhere += scaleRider;
+      }
+      lines.push(`- ${label}: ${lineWhere}`);
       coveredNames.add(label.toLowerCase());
       coveredNames.add(target.toLowerCase());   // so the fill below skips it either way
     }
@@ -4058,12 +4922,13 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
     if (!c || typeof c !== 'object') continue;
     const name = (c.name || '').trim();
     const expr = typeof c.expression === 'string' ? c.expression.trim() : '';
-    if (!name || !expr) continue;
+    const gaze = looksAtPhrase(c.looksAt, visualBible);
+    if (!name || (!expr && !gaze)) continue;
     if (String(c.depth || '').toLowerCase() === 'background') continue;
-    exprLines.push(`- ${name}: ${expr}`);
+    exprLines.push(`- ${name}: ${[expr, gaze].filter(Boolean).join('; ')}`);
   }
   const exprBlock = exprLines.length > 0
-    ? `EXPRESSIONS (each face shows exactly this — no default smiles):\n${exprLines.join('\n')}`
+    ? `EXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n${exprLines.join('\n')}`
     : '';
 
   if (lines.length === 0 && !exprBlock) return '';
@@ -4075,35 +4940,16 @@ function buildExactPosesBlock(interactions, sceneCharacters = [], visualBible = 
 // UNIFIED STORY GENERATION
 // ============================================================================
 
-// Injected into {ANALYSIS_INSTRUCTIONS} when the split outline review is ON
-// (MODEL_DEFAULTS.splitOutlineReview): the writer skips its self-critique and a
-// separate reviewer model (see buildOutlineReviewPrompt) emits the ANALYSIS +
-// FIXES REQUIRED + patches instead. The stub keeps the writer's output shape
-// byte-compatible with the parsers: the ---ANALYSIS--- marker still appears
-// (draft extraction ends there) and the bare ---STORY PAGES--- marker still
-// closes the output (cover-hint extraction ends there), but no FIXES REQUIRED
-// phrase and no patch blocks are emitted — those come from the reviewer, whose
-// output is appended after this one.
-const SPLIT_REVIEW_ANALYSIS_STUB = `The critique of this draft is performed by a SEPARATE external reviewer AFTER this response — not by you. In this section, write exactly one line and nothing else:
-
-Reviewed externally.
-
-Then continue directly with the ---TITLE--- section. Hard rules for this response:
-- Do NOT write any analysis and do NOT emit a "FIXES REQUIRED" list — never write that phrase anywhere in your output.
-- Do NOT emit any \`--- Page N ---\` patch blocks anywhere. Your draft is final as written; the external reviewer emits all patches.
-- At the very end, still output the bare \`---STORY PAGES---\` marker on its own line, followed by NOTHING. Any patch-related instructions in the ---STORY PAGES--- section or the FINAL CHECKLIST do not apply to this response.`;
-
 /**
  * Build the external outline-review prompt (split outline review, Call 2).
  *
- * The reviewer receives the writer's FULL output verbatim plus the SAME
- * analysis instructions the single-call mode would have used (variant-matched
- * body, one shared source file), and emits ---ANALYSIS--- + FIXES REQUIRED +
+ * The reviewer receives the writer's FULL output verbatim plus the shared
+ * analysis instruction body (prompts/outline-analysis-imagefirst.txt), and emits ---ANALYSIS--- + FIXES REQUIRED +
  * ---STORY PAGES--- patch blocks in the exact single-call format — so the
  * concatenation (writer output + reviewer output) parses through the unchanged
  * UnifiedStoryParser / ProgressiveUnifiedParser.
  *
- * @param {Object} inputData - Same story parameters given to buildUnifiedStoryPrompt
+ * @param {Object} inputData - Story parameters (same shape the writer stages receive)
  * @param {string} writerOutput - Call 1's complete response text
  * @param {Array}  [sceneConsistencyIssues] - deterministic validator findings
  *   ([{page, issues:[{type, detail}]}]) surfaced to the reviewer as REVIEW HINTS
@@ -4189,11 +5035,7 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
   const aspect = (opts.aspect === 'text' || opts.aspect === 'scene') ? opts.aspect : 'both';
   const priorReviews = Array.isArray(opts.priorReviews) ? opts.priorReviews.filter(Boolean) : [];
 
-  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
-  const useImageFirst = variant !== 'textFirst';
-  const analysisBody = sliceAnalysisAspect((useImageFirst
-    ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
-    : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '', aspect);
+  const analysisBody = sliceAnalysisAspect(PROMPT_TEMPLATES.outlineAnalysisImageFirst || '', aspect);
   if (!analysisBody) {
     log.error('[PROMPT] outline analysis instruction template missing — reviewer prompt will lack the check list');
   }
@@ -4310,11 +5152,8 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // `aspect: 'text'` uses. Reused rather than restated so the refiner and the
   // reviewer can never judge text by different standards; the tail is dropped
   // because that block dictates fix-line output and this stage returns pages.
-  const variant0 = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
   const analysisBody = sliceAnalysisAspect(
-    (variant0 !== 'textFirst'
-      ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
-      : PROMPT_TEMPLATES.outlineAnalysisTextFirst) || '',
+    PROMPT_TEMPLATES.outlineAnalysisImageFirst || '',
     'text',
     { includeTail: false }
   );
@@ -4328,7 +5167,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // avoid changing what it cannot see. Falls back to the intent for stored
   // stories that predate the brief being carried.
   const sceneOutlines = pages
-    .map(p => `## Page ${p.pageNumber}\n${p.sceneBrief || p.sceneIntent || '(no scene outline recorded)'}`)
+    .map(p => `## Page ${p.pageNumber}\n${resolveTextStagePictureSpec(p) || '(no scene outline recorded)'}`)
     .join('\n\n');
   // The locked plan lines, page by page — which picture each page carries
   // (beats pipeline only; extractRefinablePages leaves `planLine` empty on a
@@ -4368,27 +5207,13 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     ].filter(Boolean).join('\n');
   }).join('\n\n') || '(no character details available)';
 
-  // Story brief = what the book was ASKED to be. This mirrors the field set the
-  // writer prompt receives, because a refiner working from less context than the
-  // writer had will drift away from the commission — storyDetails in particular
-  // is the user's own idea in their own words and is the strongest anchor here.
-  // Absent fields are omitted rather than sent as "undefined".
-  const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
-    ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
-    : null;
-  const brief = [
-    inputData.title ? `Title: ${inputData.title}` : null,
-    inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
-    inputData.storyTypeName || inputData.storyType ? `Type: ${inputData.storyTypeName || inputData.storyType}` : null,
-    inputData.storyTheme ? `Theme: ${inputData.storyTheme}` : null,
-    inputData.storyTopic ? `Topic: ${inputData.storyTopic}` : null,
-    `Season: ${seasonLabel(inputData)}`,
-    buildSettingLine(inputData),
-    rel ? `Relationships:\n${rel}` : null,
-    // The commission itself, last so it reads as the payload — wrapped the same
-    // way the writer wraps it, since it is untrusted user text.
-    inputData.storyDetails ? `\nStory idea (the user's own words):\n${wrapUserInput(inputData.storyDetails)}` : null,
-  ].filter(Boolean).join('\n') || '(no additional brief recorded)';
+  // NO COMMISSION HERE. text-refine.txt carries no {STORY_BRIEF} placeholder,
+  // and must not gain one: the refiner judges the finished text against the ARC,
+  // which is the master. The pre-arc commission was deliberately withheld from
+  // the generator at this stage, so putting it in front of this judge would be
+  // spec drift — it would "fix" the text toward a brief the writer never saw.
+  // A brief was computed and passed here until 2026-09-13; the template silently
+  // dropped it, and the argument is deleted rather than wired up.
 
   // Reuse the canonical DO-NOT-WRITE list from the writer template so the ban
   // categories can never drift between writing and refining.
@@ -4412,7 +5237,6 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PAGE_COUNT: pages.length,
     CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
-    STORY_BRIEF: brief,
     CHARACTER_DETAILS: characterDetails,
     // The whole story — every fact it states belongs on some page. Read-only:
     // never a licence to add events the story does not carry.
@@ -4432,7 +5256,7 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
  * Tolerates the model echoing the ---STORY TEXT--- marker or omitting it.
  * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
  */
-function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
+function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT', trailingMarkers = []) {
   const full = String(raw || '');
   // Built from markerName, not hardcoded: callers pass 'SCENES' for the scene
   // review. A literal /---\s*STORY TEXT\s*---/ here silently failed to match
@@ -4464,8 +5288,28 @@ function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT') {
   while ((m = re.exec(body)) !== null) {
     marks.push({ page: parseInt(m[1], 10), headStart: m.index, bodyStart: re.lastIndex });
   }
+  // A NAMED block after the pages ends the last one. Without this the last
+  // page's text ran to the end of the reply, so a trailing block was appended to
+  // it and shipped inside the book — the same failure the headStart comment
+  // above describes for a page heading. The text writer's ---TITLE--- moved
+  // after the pages (2026-09-11) so the title is picked from the finished story
+  // rather than guessed before it exists.
+  //
+  // Opt-in per caller, never a blanket "any ---MARKER--- ends a page": scene
+  // briefs carry ---METADATA--- INSIDE each page, so a general rule would cut
+  // the last brief's metadata off.
+  const terminators = (Array.isArray(trailingMarkers) ? trailingMarkers : [trailingMarkers])
+    .filter(Boolean)
+    .map(n => String(n).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+'));
+  const endRe = terminators.length
+    ? new RegExp('^[ \\t]*---\\s*(?:' + terminators.join('|') + ')\\s*---', 'im')
+    : null;
   for (let i = 0; i < marks.length; i++) {
-    const end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    let end = i + 1 < marks.length ? marks[i + 1].headStart : body.length;
+    if (endRe && i + 1 === marks.length) {
+      const tail = body.slice(marks[i].bodyStart).match(endRe);
+      if (tail) end = marks[i].bodyStart + tail.index;
+    }
     const text = body.slice(marks[i].bodyStart, end).trim();
     if (text) pages.push({ pageNumber: marks[i].page, text });
   }
@@ -4526,7 +5370,18 @@ function hasAnyTraits(char) {
 }
 
 /**
- * Which age band the story is written for — the plot SHAPE a child of that age
+ * The age of the character the band rules are written for — the focus main.
+ * ONE reader of `focus.age`, so the shape band, the pacing band and the band
+ * file's own age line can never disagree about whose age they mean.
+ * @returns {number|null} null when no usable age is recorded
+ */
+function focusAge(inputData = {}) {
+  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
+  return Number.isFinite(age) && age >= 0 ? age : null;
+}
+
+/**
+ * Which age band the story is written for — the plot SHAPE a reader of that age
  * can follow (owner, 2026-09-04; supersedes the two-way toddler/standard split
  * of 2026-08-25, see docs/decisions.md).
  *
@@ -4535,7 +5390,22 @@ function hasAnyTraits(char) {
  *   3   tries       one problem, try-fail-fail-succeed
  *   4   fear-choice something scary resolved by the hero's own choice
  *   5   journey     mini hero's journey with a real low point
- *   6+  standard    the full pipeline behaviour, unchanged
+ *   6+  journey     the same hero's-journey shape, at full size
+ *
+ * THERE IS NO 'standard' SHAPE BAND (owner, 2026-09-14). The 2026-09-04 table
+ * above stopped at index 5, so every age from 6 up fell through to a band name
+ * `AGE_BAND_TEMPLATE_KEYS` has no entry for — and `buildAgeModeSection`
+ * returned ''. Most of the product's readers therefore received NO plot-shape
+ * rules at all. That was a consequence of the array's length, never a stated
+ * intent; measured on job_1789420083330_5si0z6ze1, an age-8 story where the
+ * father handed the child a key that removed the only obstacle, with no low
+ * point and an approving close — four things prompts/age-band-journey.txt
+ * already forbids. Ages 6 and up now read that file, with the age-specific
+ * framing scaled to the reader (see buildAgeModeSection).
+ *
+ * NO UPPER CAP (owner, 2026-09-14): "what would a mother or grandmother get
+ * that try it out, should also work for them". A 38- or 68-year-old main gets
+ * the journey shape, not silence.
  *
  * Owner rule (2026-08-25, retained): the OLDEST main character decides, and
  * secondary characters never do. Two mains aged 5 and 1 get a 5-year-old's
@@ -4543,14 +5413,38 @@ function hasAnyTraits(char) {
  * Because pickMainCharacters already sorts mains oldest-first, the focus
  * character IS the oldest main.
  *
- * An unreadable or absent age falls back to 'standard' — the existing
- * behaviour, and the safe direction to be wrong in.
+ * An unreadable or absent age resolves to 'journey' as well. Silence is no
+ * longer the safe direction to be wrong in: it is what shipped the failure
+ * above. The journey rules are generic story craft — a real low point, the
+ * hero's own idea, never carried through their own story — so an unknown age
+ * gets the shape that is wrong for nobody except a toddler, and a toddler book
+ * is never commissioned without an age.
  */
 const AGE_BANDS = ['routine', 'routine', 'quest', 'tries', 'fear-choice', 'journey'];
 
 function resolveAgeBand(inputData = {}) {
-  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
-  if (!Number.isFinite(age) || age < 0) return 'standard';
+  const age = focusAge(inputData);
+  if (age === null) return 'journey';
+  return AGE_BANDS[age] || 'journey';
+}
+
+/**
+ * The PACING band — how much a reader of this age carries per page and per
+ * book. A SECOND axis, deliberately not the shape band: the hero's-journey
+ * SHAPE is right for a 6-year-old and for a 16-year-old, but the 5-year-old's
+ * event budget, invented-figure allowance and one-action-per-page shape are
+ * not. From 6 up this returns 'standard', which is not a shape band and has no
+ * template file — it is the key under which the maturity tables
+ * (EVENT_BUDGETS_STANDARD, INVENTED_FIGURE_BASE_STANDARD, ACTION_SHAPE_STANDARD)
+ * hand over to the reading level.
+ *
+ * Before 2026-09-14 the two axes were one function, which is why routing ages
+ * 6+ to the journey SHAPE had to split them: without the split a 12-year-old's
+ * advanced book would have inherited a five-year-old's budgets.
+ */
+function resolvePacingBand(inputData = {}) {
+  const age = focusAge(inputData);
+  if (age === null) return 'standard';
   return AGE_BANDS[age] || 'standard';
 }
 
@@ -4570,14 +5464,303 @@ const AGE_BAND_TEMPLATE_KEYS = {
 };
 
 /**
- * The plot-shape rules for the resolved band (prompts/age-band-*.txt), or '' at
- * age 6 and up. Scope is deliberately narrow — WHAT the story is about and what
+ * ONE band file carries every reader's slice of it so they cannot drift apart.
+ * Spans in prompts/age-band-*.txt are tagged by what the rule IS, never by who
+ * drops it — the earlier [[book]]/[[plot]] names asked the author "does the
+ * writer need this", which is not the question that decides a reader, and three
+ * premise-defining rules in a row were filed under [[plot]] and never reached
+ * the make-believe idea arm (fdc85a290, 862432a85, 2026-09-16).
+ *
+ *   [[premise]]    what the book is OF: subject, who resolves it, that it
+ *                  resolves, what kind of story is forbidden, whether magic is
+ *                  allowed, where it opens and closes. A 40-word premise can
+ *                  honour every one of these and is wrong without them.
+ *   [[craft]]      book craft a premise cannot express: per-page feeling, ending
+ *                  register, food safety, the low point as a written page.
+ *   [[mechanics]]  page-count arithmetic: enumerated beats in order, one place
+ *                  per page, a new thing on every page.
+ *   [[example]]    worked-example menus. Dropped for a different reason: at
+ *                  premise size a menu is read as the answer (Lab 1273, 8/10).
+ *
+ * Three premise spans are NAMED slots ([[premise:subject]], [[premise:agency]],
+ * [[premise:resolution]]) and declared per band in BAND_PREMISE_SLOTS, so a band
+ * that legitimately owes no rule in a slot says so positively rather than silently.
+ *
+ * Views COMPOSE by allow-list rather than subtracting drops: a new role reaches
+ * a narrow view only when someone adds it here.
+ */
+const BAND_ROLES = new Set(['premise', 'craft', 'mechanics', 'example']);
+
+const BAND_VIEW_KEEPS = {
+  writer: ['premise', 'craft', 'mechanics', 'example'],
+  premise: ['premise', 'mechanics'],
+  // Renamed from `tone` 2026-09-16: the name itself taught three authors that
+  // subject rules do not belong in it, which is how **Topic.** stayed excluded.
+  'premise-open': ['premise'],
+};
+
+/**
+ * What each band must declare. 'none' stays available as a POSITIVE declaration
+ * for a band that legitimately owes no rule in a slot, so an absence never looks
+ * like a missing tag. Every band currently declares all three.
+ *
+ * `routine` declared agency: 'none' until 2026-09-19. Its agency rule is not the
+ * other bands' — it asks for no working-out, only that the doing on the page is
+ * the child's and not the grown-up's.
+ */
+const BAND_PREMISE_SLOTS = {
+  routine: { subject: 'required', agency: 'required', resolution: 'required' },
+  quest: { subject: 'required', agency: 'required', resolution: 'required' },
+  tries: { subject: 'required', agency: 'required', resolution: 'required' },
+  'fear-choice': { subject: 'required', agency: 'required', resolution: 'required' },
+  journey: { subject: 'required', agency: 'required', resolution: 'required' },
+};
+
+const BAND_TAG_RE = /\[\[(\/)?([a-z-]+)(?::([a-z-]+))?\]\]/g;
+
+/**
+ * Parse a band file into its tagged spans, refusing anything ambiguous: an
+ * unknown role, a nested or unclosed span, or — the one that mattered — prose
+ * sitting outside every span. Untagged used to mean "every reader", silently,
+ * which made forgetting to tag the most consequential act in the file and the
+ * only one with no syntax.
+ */
+function parseBandSpans(text) {
+  const spans = [];
+  let open = null;
+  let cursor = 0;
+  let m;
+  BAND_TAG_RE.lastIndex = 0;
+  while ((m = BAND_TAG_RE.exec(text))) {
+    const [raw, closing, role, slot] = m;
+    if (!BAND_ROLES.has(role)) throw new Error(`Unknown age-band tag "${raw}"`);
+    const between = text.slice(cursor, m.index);
+    if (!open && between.trim()) {
+      throw new Error(`Untagged age-band prose: "${between.trim().slice(0, 60)}"`);
+    }
+    if (closing) {
+      if (!open) throw new Error(`Stray closing age-band tag "${raw}"`);
+      if (open.role !== role || open.slot !== (slot || null)) {
+        throw new Error(`Mismatched age-band tag "${raw}" closing "[[${open.role}${open.slot ? ':' + open.slot : ''}]]"`);
+      }
+      spans.push({ role, slot: slot || null, start: open.start, end: m.index + raw.length, inner: text.slice(open.innerStart, m.index) });
+      open = null;
+    } else {
+      if (open) throw new Error(`Nested age-band tag "${raw}" inside "[[${open.role}]]"`);
+      open = { role, slot: slot || null, start: m.index, innerStart: m.index + raw.length };
+    }
+    cursor = m.index + raw.length;
+  }
+  if (open) throw new Error(`Unclosed age-band tag "[[${open.role}]]"`);
+  if (text.slice(cursor).trim()) {
+    throw new Error(`Untagged age-band prose: "${text.slice(cursor).trim().slice(0, 60)}"`);
+  }
+  return spans;
+}
+
+function applyBandView(text, view = 'writer') {
+  if (!text) return '';
+  const keeps = BAND_VIEW_KEEPS[view];
+  if (!keeps) throw new Error(`Unknown age-band view "${view}"`);
+  const src = String(text);
+  const spans = parseBandSpans(src);
+  const keep = new Set(keeps);
+  const dropped = spans.filter(s => !keep.has(s.role));
+  // The writer reads the file whole: strip the tags and change nothing else, so
+  // no view can quietly cost the writer a rule.
+  if (!dropped.length) return src.replace(BAND_TAG_RE, '');
+  let out = src;
+  for (const s of dropped.slice().reverse()) out = out.slice(0, s.start) + out.slice(s.end);
+  return out
+    .replace(BAND_TAG_RE, '')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+const NUMBER_WORDS = [
+  'zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine',
+  'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen',
+  'seventeen', 'eighteen', 'nineteen',
+];
+const ageWord = age => NUMBER_WORDS[age] || String(age);
+
+/**
+ * The age-specific FRAMING of a band file, filled in JS so one template serves
+ * the whole range the band covers.
+ *
+ * Only `age-band-journey.txt` carries these tokens, because only it covers more
+ * than one year: the four bands below it are single-year files whose wording is
+ * already exact. From 2026-09-14 journey runs from 5 with no upper cap (owner:
+ * "what would a mother or grandmother get that try it out, should also work for
+ * them"), so its three age-specific phrasings are computed rather than written:
+ *
+ *   BAND_TITLE   MINI at 5-6, plain from 7, and "adult reader" from 18
+ *   READER_LINE  "the child this book is for" up to 12, "the reader" for a
+ *                teenager, and an adult reading their own book from 18
+ *   SHAPE_SCALE  ", in small" at 5-6 — the owner's wording, right for that
+ *                reader — and ", at full size" above it
+ *
+ * The RULES themselves are untouched and identical at every age: the low point,
+ * the hero's own idea, the ban on a grown-up arriving to fix it. Only how the
+ * reader is addressed scales.
+ *
+ * A missing age (the band still resolves — see resolveAgeBand) gets the
+ * full-size framing with no age claimed, never an empty "(age )".
+ *
+ * Filled HERE rather than left to the caller's fillTemplate: the band text is
+ * interpolated into ~8 different parent templates, and a token that reached
+ * fillTemplate unfilled would be stripped to nothing with only a log warning.
+ */
+function fillBandTokens(text, inputData = {}) {
+  if (!text || !text.includes('{')) return text;
+  const age = focusAge(inputData);
+  const mini = age !== null && age <= 6;
+  const title = age === null
+    ? "HERO'S JOURNEY"
+    : `${mini ? "MINI HERO'S JOURNEY" : "HERO'S JOURNEY"} (${age >= 18 ? 'adult reader, ' : ''}age ${age})`;
+  let readerLine;
+  if (age === null) {
+    readerLine = 'No age is recorded for the main character. Write for a reader who can follow a whole story from end to end.';
+  } else if (age <= 12) {
+    readerLine = `The child this book is for is ${ageWord(age)}. Write for that child.`;
+  } else if (age <= 17) {
+    readerLine = `The reader this book is for is ${ageWord(age)}. Write for that reader — a young adult, not a small child.`;
+  } else {
+    readerLine = `The reader this book is for is an adult of ${age}. Write a book an adult reads for themselves: the shape below is the same one, told at adult weight — never a children's book about a grown-up.`;
+  }
+  return text
+    .replace(/\{BAND_TITLE\}/g, title)
+    .replace(/\{READER_LINE\}/g, readerLine)
+    .replace(/\{SHAPE_SCALE\}/g, mini ? ', in small' : ', at full size');
+}
+
+/**
+ * The plot-shape rules for the resolved band (prompts/age-band-*.txt). Scope is
+ * deliberately narrow — WHAT the story is about and what
  * happens in it. Text length belongs to the reading level and is not touched
  * here (owner, 2026-08-25: tasks/toddler-mode-2026-08-25.md §0, still standing).
+ * `bandView` slices the band for a reader that is not the writer.
  */
-function buildAgeModeSection(inputData = {}) {
+/**
+ * The second age axis. The band files govern plot SHAPE; nothing governed the
+ * PROPS or the SUBJECT. Measured 2026-09-15 over 56 rated trial ideas: ages 8
+ * and 12 rated 2.75 and 3.00-3.25, every card resolving through a plush toy, a
+ * craft project or a talking object, and routing 6+ to the journey SHAPE did not
+ * move it.
+ *
+ * ONE constant rather than a line in each of the five band files — it is the same
+ * rule at every age, and five hand-kept copies drift. It carries no per-age
+ * examples: the same day measured that an illustrative list in a rule position
+ * is answered with one of its items. The band header states the age; this points
+ * at it, so it holds at 1, at 12 and at an adult reader.
+ */
+const AGE_OWNS_PROPS_RULE = "**The age owns the props and the subject.** What the main character wants, what stands in the way, and the objects the story turns on belong to the world of someone that age — what they handle themselves, where they go on their own, what counts as a loss to them. Never a want, a comfort or a plaything the reader has outgrown, and never stakes beyond what someone that age would be given.";
+
+function buildAgeModeSection(inputData = {}, { bandView = 'writer' } = {}) {
   const key = AGE_BAND_TEMPLATE_KEYS[resolveAgeBand(inputData)];
-  return key ? (PROMPT_TEMPLATES[key] || '') : '';
+  const band = key
+    ? fillBandTokens(applyBandView(PROMPT_TEMPLATES[key] || '', bandView), inputData)
+    : '';
+  const window = buildTopicWindowSection(inputData);
+  return [band, AGE_OWNS_PROPS_RULE, window].filter(Boolean).join('\n\n');
+}
+
+/**
+ * Life-skill topics that only land inside a developmental window, inclusive.
+ * Read from shared/topic-age-windows.json — the ONE table both this writer
+ * nudge and the client picker (client/src/constants/storyTypes.ts) consume,
+ * so neither side can drift from the other. A topic with no entry is any-age.
+ */
+const TOPIC_AGE_WINDOWS = require('../../shared/topic-age-windows.json');
+
+/**
+ * One line when the chosen topic sits outside its window for this child. It
+ * never refuses and never blocks — the book is written, from the angle the
+ * topic actually reaches a child of this age.
+ */
+function buildTopicWindowSection(inputData = {}) {
+  const topic = String(inputData.storyTopic || '').trim().toLowerCase();
+  const w = TOPIC_AGE_WINDOWS[topic];
+  if (!w) return '';
+  const age = parseInt(pickMainCharacters(inputData).focus?.age, 10);
+  if (!Number.isFinite(age) || age < 0) return '';
+  if (age >= w[0] && age <= w[1]) return '';
+  return `**Topic timing.** This topic usually belongs to ages ${w[0]}-${w[1]} and the main character is ${age}. Write it the way it reaches a child of ${age} — watching someone else do it, remembering it, or being close to it — not as something they are being taught.`;
+}
+
+/**
+ * How non-human and invented cast MAY LOOK for the focus child's age. Scope is
+ * appearance only — face, expression, teeth and claws, posture, and how size is
+ * stated relative to a child. It never touches plot difficulty, stakes, the low
+ * point or what happens: a 5-year-old still gets the `journey` plot shape with
+ * a real low point, drawn with a friendly-looking creature. The blanket "focus
+ * is under six, so keep it simple" soften was removed on purpose (see
+ * buildStoryShapeSection) because it flattened `fear-choice` and `journey`;
+ * this block is the narrow replacement that does not.
+ *
+ * Size is a RECOMMENDATION, not a cap: each level leans toward a default scale and
+ * yields to what the story needs of the creature (ridden, carrying, blocking).
+ * Owner boundaries (2026-09-09): 0-4 really cute, 5-6 not menacing, 7+ formidable
+ * where the story means it to be — a ceiling that is lifted, never a floor: a
+ * gentle creature stays gentle at every level.
+ * Keyed on the AGE, not the band name — the shape band is `journey` at every
+ * age from 6 up and the pacing band `standard`, so neither separates 6 from 7. Same age source as
+ * `resolveAgeBand` (`pickMainCharacters(inputData).focus?.age`).
+ * An unparseable or missing age emits NOTHING — it must not harden creatures in
+ * a story whose reader age we cannot read.
+ *
+ * Evidence: job_1788903616404_iqvhj4l8m, ANI002 (a creature sized in city-bus
+ * lengths, children tiny beside it, backward-swept horns) and CHR002 (heavy
+ * brow ridges, deep-set eyes, jutting chin, hunched) beside a 5-year-old.
+ */
+const CREATURE_TONE_LEVELS = {
+  cute: "Animals, creatures and non-human characters are drawn cute: rounded forms throughout, soft faces, large round friendly eyes, a calm or smiling mouth with no teeth showing, no displayed claws, an open upright posture, warm colours. A horned, spined or crested one carries a single pair at most, short and blunt-tipped — never a crown of horns around the head or rows of spikes down it. A non-human character reads as a playmate. For size, lean toward a creature near the child's own size — a scale a child could stand beside or hug — and go bigger only where the story needs it: a being that is ridden, carries characters or fills a doorway is that size. A being may be large — state its size in metres or against a familiar room, never as a multiple of a child and never with the child dwarfed beside it, and never frame it leaning or towering over a child.",
+  'not-menacing': "Animals, creatures and non-human characters carry an open friendly face and clearly kind eyes: a level brow rather than a heavy or overhanging one, open rather than deep-set eyes, a neutral or gentle mouth that shows no teeth, open or smiling included. Claws may exist but are not raised or displayed. A horned, spined or crested one carries a single pair at most, kept short and smooth-tipped — never a crown of horns around the head or rows of spikes down it. For size, a creature may be clearly bigger than a child; prefer one that still fits in frame beside them and reads as approachable over an overwhelming one, unless the story needs otherwise — a being that is ridden, carries characters or blocks a way is that size. A being may be large — state its size in metres, not as a multiple of a child, and frame it at the child's eye level rather than looming over them.",
+  formidable: "A creature the story gives a powerful, wild or formidable nature is drawn as one: claws and teeth visible rather than hidden, real physical weight and presence, weathered or rugged hide, scale, fur or feather where they suit it. No rounded, toy-like or plush softening of such a creature. It may loom, and its size may be stated against a child. A creature the story means as gentle — a pet, a domestic animal, a comic one — stays gentle and friendly-looking; the story's own nature for each creature decides which of the two it gets. Size may be whatever the story wants; a genuinely huge creature is welcome.",
+};
+
+/**
+ * The band comes from the YOUNGEST main character, not the focus one
+ * (owner, 2026-09-13).
+ *
+ * `pickMainCharacters().focus` is `mains[0]` after a DESCENDING age sort — the
+ * OLDEST main. On prod job_1789227389389_z18dmvnt6 the mains were Liz 5 and
+ * Ayan 8, so focus was Ayan and the whole book was briefed `formidable`
+ * ("claws and teeth visible rather than hidden … it may loom") — in a book
+ * whose other lead is five. Its p10 crayfish was drawn gripping a wet,
+ * dead-looking mouse, which is that instruction working as written. Liz alone
+ * would have got `not-menacing` ("no teeth shown, claws not raised").
+ *
+ * The gentler band is the safe direction for a mixed-age cast: an eight-year-old
+ * is not harmed by a non-menacing creature, a five-year-old is harmed by a
+ * formidable one. Same reasoning as the reading level, which already clamps to
+ * `youngestMainAge` at buildChildCriticPrompt's age helper.
+ *
+ * Fallback is NaN, not youngestMainAge's default 5: a cast with no readable age
+ * must still yield no tone section at all, exactly as before.
+ */
+function creatureToneLevel(inputData = {}) {
+  const age = youngestMainAge(inputData, NaN);
+  if (!Number.isFinite(age) || age < 0) return null;
+  if (age <= 4) return 'cute';
+  if (age <= 6) return 'not-menacing';
+  return 'formidable';
+}
+
+// The tone shapes the bible ENTRY, and an entry's description never reaches a
+// page: the REQUIRED OBJECTS block is name-only by the 2026-09-02 ruling, so an
+// animal arrives at the image model as a name (plus its size, since 2026-09-11)
+// and nothing else. The page's own prose is therefore the only place a
+// creature's face is decided per page — on job_1789147573901_m3uam0nxi p11 the
+// whole of it was "At the base of the block, Nia digs vigorously at the dirt
+// with her paws", and a vigorously digging dog was drawn snarling, teeth bared,
+// in a book whose tone level says teeth are "not bared, raised or displayed".
+const CREATURE_TONE_PAGE_RULE = ' Where a creature is in frame, the page\'s own prose states its face and expression in these terms — a creature\'s entry does not travel to the page, so a face left unwritten is drawn from the action alone, and effort reads as teeth.';
+
+function buildCreatureToneSection(inputData = {}) {
+  const level = CREATURE_TONE_LEVELS[creatureToneLevel(inputData)];
+  return level ? `${level}${CREATURE_TONE_PAGE_RULE}` : '';
 }
 
 /**
@@ -4588,7 +5771,11 @@ function buildAgeModeSection(inputData = {}) {
  * site, being a safety rule rather than a plot-shape one.
  */
 function challengeCatalogueBands(inputData = {}) {
-  const band = resolveAgeBand(inputData);
+  // PACING, not shape: obstacle difficulty follows what the reader can carry.
+  // Keyed on the shape band this would hand a 12-year-old the age-5 columns
+  // ['3','6'] from 2026-09-14 onward, instead of the ['6','9'] the age ladder
+  // below gives them.
+  const band = resolvePacingBand(inputData);
   if (SIMPLE_BANDS.has(band)) return [];
   if (band === 'fear-choice') return ['3'];
   if (band === 'journey') return ['3', '6'];
@@ -4622,6 +5809,16 @@ function challengeCatalogueBands(inputData = {}) {
 // no thread/split rule, no secondary-moment quota, no entrance choreography.
 // The full block stays for the beats stage (and its reviewers/judges), where
 // page allocation belongs.
+// Nothing downstream checks that a described solution actually causes the
+// outcome: the trial path runs no review at all, and the beats reviewers grade
+// the skill, not the physics. So the rule rides in the shape section, which
+// every writer path now receives (2026-09-14).
+const CAUSAL_COHERENCE_RULE =
+  'Cause: what the main character does is what makes the outcome happen, and the step from the one to the other is visible. '
+  + 'An object brought into the solution does real mechanical work — it holds, lifts, reaches, blocks or carries. '
+  + 'Never a prop that is set down and plays no part in what follows, and never an action, a plan, a warning or a promise no later page acts on. '
+  + 'No consequence falls while an easier option stands open: every barrier the story leans on has its way around closed on some page.';
+
 function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
   const pages = parseInt(pageCount, 10) || (inputData.sceneImages || []).length || 10;
   const chars = inputData.characters || [];
@@ -4658,7 +5855,12 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
         ? 'Their traits are the page plan: give each one a page of its own, in the form a child this age can do it.'
         : 'No traits are recorded for them, so the pages come from what every small child is: hungry, sleepy, curious, delighted, grumpy.',
       alongside,
-      `Page budget: ${pages} pages, ${pages} distinct events. Never spend two pages on the same want, and never a page that only wants what the last page wanted.`,
+      // Deliberately not phrased as "events": the event budget in # BUDGETS
+      // prices PLOT events (at most 1 for this band), while these are
+      // page-moments. Calling both "events" put two contradicting numbers in
+      // the same prompt (measured 2026-09-07, age-1 arc render).
+      `Page budget: ${pages} pages, a different moment on each. Never spend two pages on the same want, and never a page that only wants what the last page wanted.`,
+      CAUSAL_COHERENCE_RULE,
     ].filter(Boolean).join('\n');
   }
 
@@ -4676,21 +5878,28 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       `Search pattern: look in ${searchPages} places, one per page, each a new place with a new thing to see there. The same call or question is repeated word for word at every one of them.`,
       'Feelings: friendly throughout — no danger, no villain, nobody unkind. The last page is happy.',
       alongside,
+      CAUSAL_COHERENCE_RULE,
       'Ending: the thing is found, then home, a meal or sleep.',
     ].filter(Boolean).join('\n');
   }
 
   if (band === 'tries') {
-    const tryPages = Math.max(3, pages - 2);
+    // The span is named as PAGES, never as a bare number next to "the three
+    // tries" — "Opening 1, the three tries 4, ending 1" reads as a count of
+    // tries, and a book shipped four attempts against it (2026-09-14).
+    const triesSpan = pages >= 4
+      ? `page 1 opens, pages 2-${pages - 1} carry the three tries, page ${pages} ends`
+      : 'page 1 opens, the pages between carry all three tries, the last page ends';
     return [
       shapeHeader,
       '',
-      `Pages: ${pages}. Opening 1, the three tries ${tryPages}, ending 1.`,
+      `Pages: ${pages} — ${triesSpan}.`,
       topic
         ? `Subject: the ${topic} is what this book is about. It is in full view from the first page, stays present throughout, and looks friendly and fun.`
         : '',
       `Main character: ${mainName} — the problem is theirs and the solving is theirs.`,
-      'Challenges: one, met three times — two tries fail, the third succeeds by the main character\'s own doing. Never luck, never a grown-up doing it for them.',
+      'Challenges: one, met three times — each try a different kind of attempt, the first two fail, the third succeeds because the main character notices something about the problem the earlier tries missed. Never luck, never a grown-up doing it for them.',
+      CAUSAL_COHERENCE_RULE,
       'Feelings: named plainly, one per turn of the story — sad, then helped, then happy.',
       alongside,
       'Ending: the problem is solved and somebody is glad.',
@@ -4757,6 +5966,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       `Build the story on ${challengeBudget} challenges.`,
       alongside,
       difficulty,
+      CAUSAL_COHERENCE_RULE,
     ].join('\n');
   }
 
@@ -4795,6 +6005,7 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
         ? ' Where the pages allow, give each later joiner an entrance picture of their own — a page of at most two characters where their trait shows; fold it into their moment or a challenge page rather than adding pages.'
         : ''),
     difficulty,
+    CAUSAL_COHERENCE_RULE,
   ].filter(Boolean).join('\n');
 }
 
@@ -4816,11 +6027,94 @@ function buildSettingLine(inputData) {
     : `Setting/location: ${place}`;
 }
 
+// ONE renderer for relationships, shared by every prompt path (beats brief,
+// unified writer, legacy base prompt). It was not always one: the beats brief
+// rendered `relationshipTexts` alone, keyed by the raw id pair, so production's
+// arc author saw "1-2: They share a room." — no names, no relationship type,
+// and stale pairs whose ids no longer resolve leaked through as raw keys
+// (docs/decisions.md, 2026-09-13).
+//
+// `relationships` carries the TYPE per ordered id pair; `relationshipTexts`
+// carries the user's free note for that pair. Entries are ordered and may be
+// reciprocal ('1-2' and '2-1' both present) — both directions are rendered,
+// because "Leo is Brother of Mia" and "Mia is Sister of Leo" are different
+// facts. A pair whose ids do not resolve to a character is dropped entirely:
+// never emit a raw id key. A note with no type ("orphan") is still the user's
+// own words about a real pair, so it is rendered with names and no type rather
+// than discarded — deduped by unordered pair so a reciprocal note appears once.
+//
+// TWO CELL VALUES ARE NOT RELATIONSHIPS (owner 2026-09-19): the auto-filled
+// default says the user has not answered and contributes NO line; the deliberate
+// strangers choice says they are strangers, which is a fact about the cast and
+// does reach the writer — as one reciprocal sentence per pair, never as the
+// ungrammatical "X is <sentinel> Y". Both are recognised in every UI language
+// through server/lib/relationships.js, over shared/relationship-sentinels.json.
+// The guard used to compare the English literal only, so for de/fr/it every
+// unanswered cell reached the arc author as an assertion of strangerhood.
+function buildRelationshipLines(inputData) {
+  const relationships = inputData.relationships || {};
+  const relationshipTexts = inputData.relationshipTexts || {};
+  const characters = inputData.characters || [];
+  const byId = new Map(characters.map(c => [Number(c.id), c]));
+  const resolve = (key) => {
+    const parts = String(key).split('-');
+    if (parts.length !== 2) return null;
+    const a = byId.get(Number(parts[0]));
+    const b = byId.get(Number(parts[1]));
+    return (a && b && a !== b) ? [a, b] : null;
+  };
+  const unorderedKey = (pair) => [Number(pair[0].id), Number(pair[1].id)].sort((x, y) => x - y).join('-');
+
+  const lines = [];
+  // Strangers is symmetric, so a reciprocal pair must not say it twice — but the
+  // note may be stored on either side, so the first sentence keeps the slot and
+  // adopts a note the other direction brings.
+  const strangersAt = new Map();   // unordered pair -> { index, base, hasNote }
+  for (const [key, type] of Object.entries(relationships)) {
+    if (isNotSetRelationship(type)) continue;
+    const pair = resolve(key);
+    if (!pair) continue;
+    const text = String(relationshipTexts[key] || '').trim();
+    if (isStrangersRelationship(type)) {
+      const unordered = unorderedKey(pair);
+      const seen = strangersAt.get(unordered);
+      if (seen) {
+        if (text && !seen.hasNote) {
+          lines[seen.index] = `${seen.base}. ${text}`;
+          seen.hasNote = true;
+        }
+        continue;
+      }
+      const base = `${pair[0].name} and ${pair[1].name} do not know each other`;
+      strangersAt.set(unordered, { index: lines.length, base, hasNote: Boolean(text) });
+      lines.push(text ? `${base}. ${text}` : base);
+      continue;
+    }
+    const base = `${pair[0].name} is ${type} ${pair[1].name}`;
+    lines.push(text ? `${base}. ${text}` : base);
+  }
+
+  const seenOrphan = new Set();
+  for (const [key, rawText] of Object.entries(relationshipTexts)) {
+    if (!isNotSetRelationship(relationships[key])) continue;   // already rendered above
+    const text = String(rawText || '').trim();
+    if (!text) continue;
+    const pair = resolve(key);
+    if (!pair) continue;
+    const reverseKey = `${pair[1].id}-${pair[0].id}`;
+    if (!isNotSetRelationship(relationships[reverseKey])) continue; // the note belongs to that line
+    const unordered = unorderedKey(pair);
+    if (seenOrphan.has(unordered)) continue;
+    seenOrphan.add(unordered);
+    lines.push(`${pair[0].name} and ${pair[1].name}: ${text}`);
+  }
+  return lines;
+}
+
 /** The commission's factual body (title, type, setting, the user's own idea) — no framing. */
 function buildStoryBriefBody(inputData) {
-  const rel = inputData.relationshipTexts && Object.keys(inputData.relationshipTexts).length
-    ? Object.entries(inputData.relationshipTexts).map(([k, v]) => `  ${k}: ${v}`).join('\n')
-    : null;
+  const relLines = buildRelationshipLines(inputData);
+  const rel = relLines.length ? relLines.map(r => `  - ${r}`).join('\n') : null;
   return [
     inputData.title ? `Title: ${inputData.title}` : null,
     inputData.storyCategory ? `Category: ${inputData.storyCategory}` : null,
@@ -4834,9 +6128,30 @@ function buildStoryBriefBody(inputData) {
   ].filter(Boolean).join('\n') || '(no additional brief recorded)';
 }
 
+/**
+ * WHICH SOURCE WINS (owner, 2026-09-19). Injected as {CHARACTER_SOURCE_RULE}
+ * into arc-create and arc-retell — ONE constant, never two hand-kept headings.
+ *
+ * The two blocks contradicted each other on staging job_1789759147125_p08djwhbl
+ * and nothing in 37k chars said which to believe. The commission's premise:
+ * "Zwei fremde Buben — Max und Kiaan", "die vier Buben kennen sich nicht", and a
+ * relationship matrix of twelve "Nicht bekannt mit". Levin's saved character
+ * details, under a heading that called them the source of truth: "Max und Kiaan
+ * sind seine guten Freunde". Strangers-meeting was the story's whole engine, and
+ * which state the arc opened in was a coin flip.
+ *
+ * The split is by KIND, not by precedence in general: a saved profile knows who
+ * a child IS and cannot know what happens in a book not yet written.
+ */
+const CHARACTER_SOURCE_RULE = [
+  'These details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.',
+  "The commission decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the premise — a friendship where the premise stages a first meeting — the premise stands, and the detail is simply not true yet in this book.",
+].join('\n');
+
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
   const brief = buildStoryBriefBody(inputData);
+  const characterSourceRule = CHARACTER_SOURCE_RULE;
 
   const mainIds = inputData.mainCharacters || [];
   const characterDetails = (inputData.characters || []).map(char => {
@@ -4869,8 +6184,19 @@ function buildStoryContextFields(inputData) {
     : (inputData.storyTopic || inputData.storyTheme);
   let guideSection = '';
   try {
+    // The accuracy mandate rode on the unified writer's CATEGORY_GUIDELINES,
+    // which the beats chain never inherited — the guide arrived as unmarked
+    // background reading, with nothing declaring the facts in it binding.
+    const factMandate = (inputData.storyCategory === 'historical' || inputData.storyCategory === 'swiss-stories')
+      ? '\nThis names real events, places and people. Every fact, date, name and sequence in the story comes from this guide. Invent none.'
+      : '';
     const guide = getTeachingGuide(inputData.storyCategory, guideKey);
-    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})\n\n${String(guide).slice(0, 4000)}`;
+    // WHOLE GUIDE, as the unified writer's CATEGORY_GUIDELINES has always
+    // injected it. A 4000-char cut removed the last 175 characters of the
+    // Swiss guide mid-sentence — and a fact mandate ("every fact, date, name
+    // and sequence comes from this guide") over a guide that stops mid-sentence
+    // is the one shape that cannot be obeyed.
+    if (guide) guideSection = `# TOPIC GUIDE (facts and context for ${guideKey})${factMandate}\n\n${String(guide)}`;
   } catch (err) {
     log.warn(`[PROMPT] topic guide unavailable for ${inputData.storyCategory}/${guideKey}: ${err.message}`);
   }
@@ -4900,6 +6226,7 @@ function buildStoryContextFields(inputData) {
       brief,
     ].join('\n'),
     STORY_GUIDE_SECTION: guideSection,
+    CHARACTER_SOURCE_RULE: characterSourceRule,
     CHARACTER_DETAILS: characterDetails,
     MAX_CHARACTERS_PER_SCENE: IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3,
   };
@@ -4912,10 +6239,31 @@ function buildStoryContextFields(inputData) {
 // ~5x so the planner selects what fits instead of forcing every entry. Same
 // filtering as the idea generator's sample (age bands, peril, default-zone
 // category caps).
+//
+// VARIETY IS A SELECTION RULE, NOT A PROMPT INSTRUCTION (owner, 2026-09-19).
+// The draw excludes the catalogue ids this reader's earlier books were offered,
+// so the new story simply never sees them. Nothing about a previous story is
+// ever written into a prompt — see loadUsedChallengeIds in beatsPipeline.js and
+// the block this replaced, which told the arc creator "this reader's earlier
+// books used these challenges" and listed prose lifted from those books' arcs.
 let challengeCatalogueCache = null;
-function buildChallengeIdeasSection(inputData, count = 15) {
+
+/**
+ * Draw a random, age-filtered, category-spread sample of the challenge
+ * catalogue.
+ *
+ * @param {Object} inputData
+ * @param {Object} opts
+ *   count       how many to draw (default 15)
+ *   excludeIds  catalogue ids this reader has already been offered. Applied as
+ *               a filter; if honouring it in full would leave too small a pool
+ *               to draw from, the exclusions are dropped (a thin draw is worse
+ *               for the story than a repeat is).
+ * @returns {{section: string, ids: number[]}}
+ */
+function drawChallengeIdeas(inputData, { count = 15, excludeIds = [] } = {}) {
   const bands = challengeCatalogueBands(inputData);
-  if (!bands.length) return '';
+  if (!bands.length) return { section: '', ids: [] };
   try {
     if (challengeCatalogueCache === null) {
       challengeCatalogueCache = require('fs').readFileSync(
@@ -4923,16 +6271,26 @@ function buildChallengeIdeasSection(inputData, count = 15) {
     }
     const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
     const youngest = ages.length ? Math.min(...ages) : 8;
-    const entries = challengeCatalogueCache.split('\n')
+    const eligible = challengeCatalogueCache.split('\n')
       .filter(l => l && !l.startsWith('#'))
       .map(l => l.split('|'))
       .filter(f => f.length >= 6)
       .filter(f => bands.some(b => f[4].startsWith(b)))
       .filter(f => youngest > 5 || f[5].trim() !== '1');
+    // Keep the draw well oversupplied relative to what it must produce: below
+    // this the category spread collapses and the "random sample" becomes the
+    // remainder of the catalogue, which is not a sample at all.
+    const MIN_POOL = count * 3;
+    const excluded = new Set((excludeIds || []).map(Number).filter(Number.isFinite));
+    const kept = excluded.size ? eligible.filter(f => !excluded.has(parseInt(f[0], 10))) : eligible;
+    const entries = kept.length >= MIN_POOL ? kept : eligible;
+    if (excluded.size && entries !== kept) {
+      log.info(`[PROMPT] challenge variety: ${excluded.size} prior id(s) would leave ${kept.length} of ${eligible.length} eligible (< ${MIN_POOL}) — drawing from the full band instead`);
+    }
     const byCat = new Map();
     for (const f of entries) {
       if (!byCat.has(f[1])) byCat.set(f[1], []);
-      byCat.get(f[1]).push(`- ${f[2]} (tests: ${f[3]})`);
+      byCat.get(f[1]).push({ id: parseInt(f[0], 10), line: `- ${f[2]} (tests: ${f[3]})` });
     }
     const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
     const picked = [];
@@ -4946,25 +6304,33 @@ function buildChallengeIdeasSection(inputData, count = 15) {
         const pool = byCat.get(c);
         if (!pool.length) continue;
         const i = Math.floor(Math.random() * pool.length);
-        picked.push({ cat: c, line: pool.splice(i, 1)[0] });
+        picked.push({ cat: c, ...pool.splice(i, 1)[0] });
       }
       round++;
     }
-    if (!picked.length) return '';
+    if (!picked.length) return { section: '', ids: [] };
     // Structural budget scales with the book (owner, 2026-08-30): a short book
     // cannot pay off three challenges, a long one starves on two.
     const pages = parseInt(inputData?.pages, 10) || 10;
     const challengeBudget = pages <= 10 ? 'one or two' : pages <= 17 ? 'about three' : 'three or four';
-    return [
-      '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
-      `Build the story's challenges from ${challengeBudget} of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.`,
-      '',
-      ...picked.map(x => x.line),
-    ].join('\n');
+    return {
+      section: [
+        '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
+        `Build the story's challenges from ${challengeBudget} of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.`,
+        '',
+        ...picked.map(x => x.line),
+      ].join('\n'),
+      ids: picked.map(x => x.id),
+    };
   } catch (err) {
     log.warn(`[PROMPT] challenge catalogue unavailable: ${err.message}`);
-    return '';
+    return { section: '', ids: [] };
   }
+}
+
+/** The section alone, for callers that do not record the draw. */
+function buildChallengeIdeasSection(inputData, count = 15) {
+  return drawChallengeIdeas(inputData, { count }).section;
 }
 
 /**
@@ -4988,6 +6354,31 @@ function buildChallengeIdeasSection(inputData, count = 15) {
  * the two things a book is remembered for. Story job_1788614817116_vxnu60yjg
  * lost its reunion because the Q4 finding against page 17 arrived as one
  * unranked line among twelve, beside counter findings pulling the other way.
+ *
+ * Q9 (deed and effect on one page) was tried here 2026-09-09 and is NOT in
+ * the set. As an "also noted" line the fault was named and ignored twice on
+ * the same page: the planner answered it by demoting the effect into the
+ * after-segment, then by deleting it outright — never by spending a page.
+ * Forcing the WHOLE of Q5 was measured and rejected the same
+ * day: Q5 also covers presence-only and after-state instants, so ranking it
+ * must-fix put 12-16 pages under must-fix, churned every page of the division,
+ * and cost the book its Q4 wanted pictures and its Q8 ending — the exact loss
+ * this set exists to prevent. Q9 names only the deed-and-effect page, and
+ * was measured as must-fix and reverted the same day: on one 18-page story
+ * the planner answered a named climax page by deleting it, by demoting it
+ * into the after-segment, and by overwriting it with a verbatim copy of its
+ * neighbour - three configurations, three ways of losing the page where the
+ * quest object was put back. The check detects the fault reliably; this
+ * planner does not repair it, and a mild visible fault is not worth a silent
+ * severe one. Q9 stays a visible finding, not a mandate.
+ *
+ * Q10 (two named characters at two heights) joined 2026-09-10, advisory like
+ * Q9: measured across six staging stories, the two-height pages that failed were
+ * the ones where both figures mattered (q10, and one page that collapsed 5/5
+ * across every renderer path), and the ones that passed put one figure up high
+ * with the rest a mass or tiny — which is what the rule now says to do. Kept
+ * advisory for the same reason as Q9: the planner detects reliably and a forced
+ * repair has destroyed pages before.
  */
 const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
 
@@ -4995,9 +6386,17 @@ const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
  * Counter codes that outrank the rest: a commissioned character the division
  * left out. Everything else a counter measures — shot distribution, repetition,
  * consecutive-page sameness — is a preference next to these.
+ *
+ * `PEOPLELESS_ON_INTERACTION_PAGE` joined 2026-09-15 (owner). It has the same
+ * shape as the rest of this set — the cast is missing from a page that needed
+ * it — and the page it names is the one that can least afford it: the drama
+ * between people. On job_1789420511893_zly5rcdej that page was the emotional
+ * climax, and it shipped empty. Interaction pages get faces; the re-plan
+ * resolves this finding, it does not merely note it.
  */
 const REPLAN_MUST_FIX_CODES = new Set([
   'NO_FOCAL_PAGE', 'UNDER_COVERED_CHARACTER', 'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE',
+  'PEOPLELESS_ON_INTERACTION_PAGE',
 ]);
 
 /**
@@ -5013,17 +6412,90 @@ function replanRank(finding) {
   return 'also';
 }
 
-function buildReplanSection(pagePlan, findingLines) {
+/**
+ * The pages a finding names. Counters carry `pages` structurally; a model
+ * finding is a line whose format is fixed by prompts/plan-check.txt ("names the
+ * page"), so the page NUMBER is read off it — never its prose meaning, which is
+ * what this codebase forbids. Used to merge a re-plan that returns only the
+ * named pages back over the division that stands.
+ */
+function findingPages(finding) {
+  if (!finding || typeof finding === 'string') {
+    const out = new Set();
+    for (const m of String(finding || '').matchAll(/pages?\s+([\d\s,and]+)/gi)) {
+      for (const n of m[1].match(/\d+/g) || []) out.add(Number(n));
+    }
+    return [...out];
+  }
+  if (Array.isArray(finding.pages) && finding.pages.length) return finding.pages.map(Number).filter(Number.isFinite);
+  return findingPages(String(finding.line || ''));
+}
+
+/**
+ * THE RE-DIVIDE BLOCK — declare, review, apply (owner design, 2026-09-18).
+ *
+ * What it replaced, and why. The block used to carry three structural rules in
+ * consecutive sentences and two of them contradicted outright:
+ *
+ *   "Every page number you return is already in the plan above."
+ *   "…or on its own page when it earns a picture of its own… Keep the page
+ *    count by merging two pages…, or by dropping the weakest."
+ *
+ * A planner obeying the second has to violate the first — a new page has no
+ * number available — so the cut-one-add-one the block described was
+ * structurally impossible, and the half that did work ("dropping the weakest")
+ * was an unreviewed deletion of an entire page with nothing recording which
+ * page went or why. The third rule, "dropping a character is not a fix either",
+ * was one-directional: `NO_COMMISSIONED_ON_PAGE` is answered by adding,
+ * `CAST_OVER_CEILING` by writing a justification into the line, plan-check Q3
+ * likewise — so an over-crowded page could only ever get more crowded, and a
+ * division the first round got wrong could never be corrected in the second.
+ * The owner's verdict: "we can not say delete only or add only; we must give a
+ * fair review and allow both fix types."
+ *
+ * What it says now, in three parts:
+ *   DECLARE  every structural change, with the finding it answers and why,
+ *            under `---CHANGES---`. An undeclared change is undone.
+ *   REVIEW   a removal is judged against declared evidence — the page's
+ *            obstacle-holder, the cast ceiling, the figure's span, the page
+ *            count (`reviewPlanChanges`, server/lib/planCounters.js).
+ *   APPLY    code restores the pages a rule refuses and nothing else; the
+ *            finding that named the page survives to the recheck.
+ *
+ * The page-number rule is now stated once and is consistent with the split: the
+ * book keeps its page count, no number is added or retired, and a moment that
+ * earns its own picture takes an existing number whose material merges into a
+ * neighbour — both halves declared, both pages returned.
+ *
+ * @param {string} pagePlan the division that stands
+ * @param {Array|string} findingLines structured findings (or legacy strings)
+ * @param {Object} [opts]
+ * @param {number} [opts.pageCount] the book's page count; derived from the plan
+ *   when absent so the two can never disagree
+ */
+function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
   const items = (Array.isArray(findingLines) ? findingLines : String(findingLines || '').split('\n'))
     .map(f => (f && typeof f === 'object' ? { ...f, line: String(f.line || '').trim() } : { line: String(f || '').trim() }))
     .filter(f => f.line);
   if (items.length === 0) return '';
   const must = items.filter(f => replanRank(f) === 'must').map(f => f.line);
   const also = items.filter(f => replanRank(f) !== 'must').map(f => f.line);
+  // Derived from the plan when the caller gives no count, and never smaller
+  // than the highest page number the plan shows: a span that contradicts the
+  // division printed underneath it is worse than no span at all.
+  const planned = parsePagePlan(pagePlan);
+  const count = Number(pageCount) > 0
+    ? Number(pageCount)
+    : Math.max(planned.size, ...[0, ...planned.keys()]);
+  const span = count > 0 ? `its ${count} pages, numbered 1 to ${count}` : 'its pages and their numbers';
   return [
     '# RE-DIVIDE',
     '',
-    'You divided this story once. Your plan and the findings against it follow. Re-divide the named pages; everything else stands — a page no finding names comes back exactly as it was. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins. Output the full plan again.',
+    'You divided this story once. Your plan and the findings against it follow. Return a line for every page you change, in the same format, and for no other page — a page you leave out stands exactly as it is. Where a must-fix finding and a noted one pull opposite ways, the must-fix wins.',
+    `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
+    'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
+    'Two figures stay wherever they are: the character whose action a page\'s instant works against, and a character the division would leave with fewer than two pages in the book.',
+    'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
     '## YOUR PAGE PLAN',
     String(pagePlan || '').trim() || '(none)',
@@ -5031,6 +6503,256 @@ function buildReplanSection(pagePlan, findingLines) {
     ...(must.length ? ['## MUST FIX', must.join('\n'), ''] : []),
     ...(also.length ? ['## ALSO NOTED', also.join('\n')] : []),
   ].join('\n').trimEnd();
+}
+
+/** A change line's declared finding tag: PLAN[CODE] or CHECK[n]. Null when it carries neither. */
+function parseFindingTag(text) {
+  const t = String(text || '');
+  const plan = t.match(/PLAN\s*\[\s*([A-Za-z0-9_]+)\s*\]/);
+  if (plan) return { code: plan[1].toUpperCase() };
+  const chk = t.match(/CHECK\s*\[\s*(\d+)\s*\]/i);
+  if (chk) return { check: Number(chk[1]) };
+  return null;
+}
+
+/**
+ * THE CLOSED SET OF DECLARABLE CHANGES — one table, read twice.
+ *
+ * `syntax` is what the planner is shown; `re`/`build` is what
+ * `parsePlanChanges` reads. Generating the prompt sentence from the same list
+ * the parser matches on is what stops a verb from being renamed on one side and
+ * left standing on the other — a hand-kept copy on each side is how a declared
+ * field quietly stops being parsed.
+ *
+ * TWO VERBS FOR TWO MEANINGS (2026-09-18, Lab 1326 and 1327). `new material`
+ * used to be the only way to say either "this page now also stages X" or "this
+ * page took the number a merge freed", and the balance rule refuses the second
+ * when no `material from page N` matches it. Both planner models reached for the
+ * word in its common sense — a widened shot, a figure frozen behind the push —
+ * and both were refused. `action in` is the common case and carries no
+ * page-count obligation; `material to page <M>` is the freed half of a merge and
+ * names the page that took its material, so the balance rule can pair the two
+ * halves by number. A model reaching for "this page now stages X" cannot land on
+ * the merge verb by accident: the merge verb demands a page number it has none of.
+ *
+ * Match order is the order shown; no verb here is a prefix of another.
+ */
+const PLAN_CHANGE_VOCABULARY = [
+  {
+    kind: 'cast_in',
+    bareName: true,
+    syntax: 'cast in <name>',
+    re: /^cast\s+in\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'cast_out',
+    bareName: true,
+    syntax: 'cast out <name>',
+    re: /^cast\s+out\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'action_in',
+    syntax: 'action in <the action this page now stages>',
+    re: /^action\s+in\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'action_out',
+    syntax: 'action out <the action this page no longer stages>',
+    re: /^action\s+out\b[:\s]*(.+)$/i,
+    build: m => ({ subject: m[1].trim() }),
+  },
+  {
+    kind: 'action_to',
+    syntax: 'action to page <M> <the action>',
+    re: /^action\s+to\s+page\s+(\d+)\b[:\s]*(.*)$/i,
+    build: m => ({ toPage: Number(m[1]), subject: m[2].trim() }),
+  },
+  {
+    kind: 'material_from',
+    syntax: 'material from page <M>',
+    re: /^material\s+from\s+page\s+(\d+)\b[:\s]*(.*)$/i,
+    build: m => ({ fromPage: Number(m[1]), subject: m[2].trim() }),
+  },
+  {
+    kind: 'material_to',
+    syntax: 'material to page <M> <what this page stages instead>',
+    re: /^material\s+to\s+page\s+(\d+)\b[:\s]*(.*)$/i,
+    build: m => ({ toPage: Number(m[1]), subject: m[2].trim() }),
+  },
+];
+
+/**
+ * The change block's grammar, exactly as the planner is given it.
+ *
+ * The vocabulary sentence is generated from `PLAN_CHANGE_VOCABULARY`, so the
+ * set the prompt offers is the set the parser reads.
+ *
+ * ONE LINE, ONE CHANGE is stated as a contract because it was broken on the
+ * first live attempt by both planner models: 7 of 10 change lines on Lab 1326
+ * and 1 of 5 on 1327 packed several changes behind semicolons, and on one page
+ * that made the review read a `cast in` as a `cast out` and refuse a correct
+ * fix. The parser now splits such a line rather than mis-reading it; the
+ * contract is here so the violation is a violation and not the house style.
+ *
+ * The count comes LAST and is a re-count of the lines above it: a total is
+ * always self-certifiable, and asking for it first invites an assertion.
+ */
+const REPLAN_CHANGES_FORMAT = [
+  '',
+  '---CHANGES---',
+  'Page <N>: <the change> — <the finding it answers> — <why, one clause>',
+  'Changes: <how many lines stand above this one>',
+  '',
+  `One line, one change: a page you changed in two ways gets two lines, each repeating its page number, and no line holds two changes. The change is one of: ${PLAN_CHANGE_VOCABULARY.map(v => v.syntax).join('; ')}. A cast line gives the name alone, with nothing after it. A merge is two lines: the page that takes the material declares material from page <M>, and page <M> declares material to page <N> with what it stages instead. The finding it answers is its tag, PLAN[CODE] or CHECK[n]. The last line counts the lines above it.`,
+].join('\n');
+
+// The plan line's own column separator, so a change line is split the same way
+// a plan line is (planCounters.SEGMENT_SPLIT).
+const CHANGE_FIELD_SPLIT = /\s+[—–]\s+|\s+--\s+/;
+
+// Several changes behind semicolons on one line. Splitting here is what keeps a
+// packed line from being MIS-read: without it only the first verb matches and
+// everything after it is swallowed into the first change's subject.
+const CHANGE_CLAUSE_SPLIT = /\s*;\s*/;
+
+// A cast line's subject is the character and nothing else, so the bare name is
+// the leading run of capitalised words and the first word that does not start
+// with a capital begins the prose. Measured (Lab 1326 p16): the subject
+// `<name> lying still in <other name>'s hands` resolved BOTH names against the
+// cast list, so a second figure was recorded as removed and a correct fix was
+// refused. A subject that starts lower-case (an article, a lower-case name) is
+// kept whole — no worse than before the split existed.
+const BARE_NAME_RUN = /^(\p{Lu}[^\s]*(?:\s+\p{Lu}[^\s]*)*)(\s+\S[\s\S]*)?$/u;
+
+function splitBareName(subject) {
+  const s = String(subject || '').trim();
+  const m = s.match(BARE_NAME_RUN);
+  if (!m) return { name: s, trailing: '' };
+  return { name: m[1].trim(), trailing: String(m[2] || '').trim() };
+}
+
+/**
+ * A re-plan's `---CHANGES---` block — the structural edits it DECLARES.
+ *
+ * Every field is declared and read positionally; nothing here interprets a
+ * sentence. A line whose change does not match the declared vocabulary is kept
+ * with `kind: 'other'` rather than dropped — a change the parser cannot read is
+ * a change nobody reviewed, and the caller must be able to see it.
+ *
+ * `present: false` means the response carried no block at all — a planner that
+ * ignored the format, or a stored round from before declarations existed. The
+ * caller then treats every structural change as undeclared, which is exactly
+ * the behaviour the re-plan merge had before 2026-09-18.
+ *
+ * FORGIVING, NEVER SILENT. The contract is one change per line; the parser
+ * still splits a packed line into its clauses and reads each one, so a
+ * violation can never be MIS-read — it is read correctly and recorded in
+ * `violations`. `counted` counts CHANGES, not lines, because a total that
+ * counts lines certifies nothing about a block that packs them: 1326 declared
+ * "Changes: 10" over 18 actual changes.
+ *
+ * @returns {{present:boolean, changes:Array, declaredCount:(number|null),
+ *            counted:number, lines:number, violations:Array}}
+ */
+function parsePlanChanges(raw) {
+  const full = String(raw || '');
+  const m = full.match(/---\s*CHANGES\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i);
+  if (!m) return { present: false, changes: [], declaredCount: null, counted: 0, lines: 0, violations: [] };
+  const changes = [];
+  const violations = [];
+  let declaredCount = null;
+  let lines = 0;
+  for (const rawLine of m[1].split('\n')) {
+    const line = rawLine.trim().replace(/\*\*/g, '').trim();
+    if (!line) continue;
+    const total = line.match(/^changes?\s*:\s*(\d+)\s*$/i);
+    if (total) { declaredCount = Number(total[1]); continue; }
+    const p = line.match(/^(?:\d+[.)]\s*)?(?:Page|Seite|Pagina)\s*(\d+)\s*[:.)-]\s*(.+)$/i);
+    if (!p) continue;
+    lines++;
+    const pageNumber = Number(p[1]);
+    const fields = String(p[2]).split(CHANGE_FIELD_SPLIT).map(s => s.trim()).filter(Boolean);
+    const answersText = fields[1] || '';
+    const answers = parseFindingTag(answersText);
+    const reason = fields.slice(2).join(' — ');
+    const clauses = String(fields[0] || '').split(CHANGE_CLAUSE_SPLIT).map(s => s.trim()).filter(Boolean);
+    if (clauses.length > 1) {
+      violations.push({
+        pageNumber,
+        rule: 'packed',
+        detail: `one line declares ${clauses.length} changes; the contract is one change per line`,
+        line,
+      });
+    }
+    for (const clause of (clauses.length ? clauses : [''])) {
+      let parsed = { kind: 'other', subject: clause };
+      for (const v of PLAN_CHANGE_VOCABULARY) {
+        const hit = clause.match(v.re);
+        if (!hit) continue;
+        parsed = { kind: v.kind, ...v.build(hit) };
+        if (v.bareName) {
+          const { name, trailing } = splitBareName(parsed.subject);
+          if (trailing) {
+            violations.push({
+              pageNumber,
+              rule: 'cast_prose',
+              detail: `"${clause}" describes the character; a cast line gives the name alone`,
+              line,
+            });
+          }
+          parsed.subject = name;
+        }
+        break;
+      }
+      // A move or a merge that points at its own number declares nothing —
+      // "Page 4: action to page 4 …" was written on the first live run.
+      const selfTarget = (parsed.kind === 'action_to' || parsed.kind === 'material_to')
+        ? parsed.toPage
+        : (parsed.kind === 'material_from' ? parsed.fromPage : null);
+      if (selfTarget != null && Number(selfTarget) === pageNumber) {
+        violations.push({
+          pageNumber,
+          rule: 'self_page',
+          detail: `"${clause}" points at its own page number, so it declares no move`,
+          line,
+        });
+      }
+      changes.push({ pageNumber, ...parsed, answers, answersText, reason, clause, line });
+    }
+  }
+  return { present: true, changes, declaredCount, counted: changes.length, lines, violations };
+}
+
+/**
+ * The plan check's OBSTACLES block — per page, the character whose action that
+ * page's instant works against, as DATA.
+ *
+ * Question 11 has asked this since 2026-09-18 and answered it only as a finding
+ * ("the plan line does not name them"), so the mapping itself — the evidence a
+ * removal is judged against — never left the model's prose. Reading it back out
+ * of a finding sentence is exactly the prose pattern-matching this codebase
+ * forbids, so the check declares it in the same shape as the ROSTER.
+ *
+ * "OBSTACLES 16: Tobias" → {16: ['Tobias']}. Pages with no obstacle emit no
+ * line and are absent from the map.
+ *
+ * @returns {Map<number, string[]>}
+ */
+function parsePlanCheckObstacles(raw) {
+  const out = new Map();
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().replace(/\*\*/g, '').match(/^OBSTACLES?\s+(\d+)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    const names = String(m[2] || '')
+      .split(',')
+      .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/(?:'s|’s|s'|s’)$/i, '').trim())
+      .filter(n => n && !/^none$/i.test(n));
+    if (names.length) out.set(parseInt(m[1], 10), names);
+  }
+  return out;
 }
 
 function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '' } = {}) {
@@ -5047,16 +6769,25 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     'fear-choice': 'preschool age (about four)',
     journey: 'kindergarten age (about five)',
   };
-  const readerLine = READER_LINES[resolveAgeBand(inputData)]
+  // PACING band: the fallback line is what every reader from 6 up wants, and
+  // the shape band would send a 12-year-old "kindergarten age (about five)".
+  const readerLine = READER_LINES[resolvePacingBand(inputData)]
     || `elementary-school age (about ${readerAge(inputData)} years old)`;
   return fillTemplate(template, {
     LANGUAGE: ctx.LANGUAGE,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     MAX_CHARACTERS_PER_SCENE: ctx.MAX_CHARACTERS_PER_SCENE,
     PAGE_COUNT: pageCount,
-    // Mechanical budget, computed in code and injected — never prose (owner,
-    // 2026-09-05: 2-3 pages per story may stage a high-action instant).
-    HIGH_ACTION_PAGES: highActionPagesPhrase(pageCount),
+    // The output scope follows the mode. A first plan (no replan section)
+    // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
+    // — the merge in beatsPipeline restores every other page from the division
+    // that stands, and a change the CHANGES block declares is what carries a
+    // page the findings did not name into that scope.
+    OUTPUT_SCOPE: String(replan || '').trim()
+      ? 'One line for each page you change under RE-DIVIDE, and for no other page, then the changes block.'
+      : `One line per page, through page ${pageCount}.`,
+    // Only a re-plan declares changes; a first division has nothing to declare.
+    CHANGES_FORMAT: String(replan || '').trim() ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
     ARC_HINTS: String(arcHints || '').trim()
@@ -5149,29 +6880,626 @@ function arcLengthRange(pageCount) {
 
 /**
  * Concrete budgets for the arc prompts ({ARC_BUDGETS} in arc-create and
- * arc-retell). Event budget scales with reading level: pages/3 at 1st-grade
- * (one obstacle chain), pages/2 at standard, pages/1.5 at advanced, floor 3.
- * Invented-named-figure allowance from commissioned cast size + page count:
- * round(pages/8) - floor(cast/2), clamped 0..3 (owner anchors, 2026-09-05:
- * 1 character/20 pages → 3; 5 characters/10 pages → 0).
+ * arc-retell).
+ *
+ * EVENT budget (2026-09-07, supersedes the 2026-09-05 reading-level-only
+ * arithmetic): plot complexity is keyed on the AGE BAND, and only gently on
+ * page count. Two independent knobs — the band says how hard the story is
+ * allowed to be, page count and reading level say how long it is. Extra pages
+ * buy INSTANCES (another place searched, another try), not proportionally more
+ * plot. Owner anchors: a simple 3-year-old story carries 1 event at 5 pages and
+ * 3-4 at 20. The slope steepens with age. Emitted as a RANGE so the arc may use
+ * fewer. Floor 1 — the old `Math.max(3, ...)` forced three events into a
+ * five-page toddler book. At 6+ no band applies, so the reading level stands in
+ * as the maturity proxy.
+ *
+ * Invented-named-figure allowance: a per-band ceiling minus half the commissioned
+ * cast, floored at 2 — a story structurally needs an antagonist and a helper, so
+ * a large cast may reduce the allowance but never below two. The ceiling rises
+ * with the band (and with the reading level at 6+); page count does not enter
+ * the calculation at all.
+ *
+ * ACTION budget (2026-09-07): an event may hold any number of actions, but
+ * words are spent per ACTION, so the event budget alone does not bound page
+ * length. Per page by reading level: 1-2 at 1st-grade, 2-4 at standard, 5-8 at
+ * advanced; total = pages x per-page. Evidence:
+ * job_1788727233899_1dpnym94p (18 pages, 1st-grade) sat AT its 6-event budget
+ * yet carried 66 action clauses (3.0/page) and overran the 25-50 word band on
+ * 13 of 18 pages.
  */
+// Event divisors per band: [lo, hi] pages-per-event. A flat number means the
+// band carries that many events whatever the page count.
+const EVENT_BUDGETS = {
+  routine: { flat: 1 },
+  quest: { flat: 1 },
+  tries: { lo: 7, hi: 5 },
+  'fear-choice': { lo: 6, hi: 4 },
+  journey: { lo: 5, hi: 4 },
+};
+// At 6+ no PACING band applies — the reading level is the maturity proxy.
+// (The SHAPE band is `journey` at every age from 6 up; these are the other axis.)
+const EVENT_BUDGETS_STANDARD = {
+  '1st-grade': { lo: 4, hi: 3 },
+  standard: { lo: 3, hi: 2 },
+  advanced: { lo: 2, hi: 1.5 },
+};
+// Invented named figures the band tolerates before the cast deduction. Floor 2
+// — an antagonist and a helper are structural, not optional — so a large cast
+// may reduce the allowance but never below two.
+const INVENTED_FIGURE_BASE = {
+  routine: 2,
+  quest: 2,
+  tries: 2,
+  'fear-choice': 2,
+  journey: 3,
+};
+// At 6+ no PACING band applies; the ceiling rises with the reading level, not length.
+const INVENTED_FIGURE_BASE_STANDARD = {
+  '1st-grade': 3,
+  standard: 6,
+  advanced: 9,
+};
+
+// Per-page action shape at 6+ where no PACING band applies. Every band, and the
+// 1st-grade level here, gets the young shape (one action, at most two).
+// advanced dropped 5-8 -> 3-4 on measured evidence: an advanced arc wrote
+// 2.17 actions/page unprompted, less than half its old band.
+const ACTION_SHAPE_STANDARD = {
+  standard: 'two to three',
+  advanced: 'three to four',
+};
+
+// Who the 1st-grade book is read aloud to. Derived from the band, not
+// hardcoded: the line said "3-5 year old" for every 1st-grade book, including
+// the age-1 and age-2 bands (measured 2026-09-07).
+const READER_AGE_BY_BAND = {
+  routine: 'a 1-2 year old',
+  quest: 'a 2-3 year old',
+  tries: 'a 3-5 year old',
+  'fear-choice': 'a 3-5 year old',
+  journey: 'a 3-5 year old',
+  standard: 'a 3-5 year old',
+};
+
+/**
+ * The invented-named-figure allowance for a commission: the band (or reading
+ * level at 6+) sets the base, a large cast reduces it, and the floor of 2 holds
+ * — an antagonist and a helper are structural (owner, 2026-09-07). ONE source of
+ * truth: the budget section, the arc panel and the code re-count all read this.
+ */
+function arcInventedAllowance(inputData) {
+  const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
+  // PACING band — the tables below hand over to the reading level at 'standard'.
+  const band = resolvePacingBand(inputData);
+  const cast = (inputData?.characters || []).length || 1;
+  const base = INVENTED_FIGURE_BASE[band]
+    ?? INVENTED_FIGURE_BASE_STANDARD[lvl]
+    ?? INVENTED_FIGURE_BASE_STANDARD.standard;
+  return Math.max(2, base - Math.floor(cast / 2));
+}
+
 function buildArcBudgetSection(inputData, pageCount) {
   const pages = Math.max(4, parseInt(pageCount, 10) || 10);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
-  const divisor = lvl === '1st-grade' ? 3 : lvl === 'advanced' ? 1.5 : 2;
-  const events = Math.max(3, Math.round(pages / divisor));
-  const cast = (inputData?.characters || []).length || 1;
-  const allowance = Math.max(0, Math.min(3, Math.round(pages / 8) - Math.floor(cast / 2)));
+  // PACING band throughout this builder: every table it reads (EVENT_BUDGETS,
+  // ACTION_SHAPE_STANDARD, READER_AGE_BY_BAND, and arcInventedAllowance inside
+  // it) prices what the reader can carry, not the shape of the plot.
+  const band = resolvePacingBand(inputData);
+  const rule = EVENT_BUDGETS[band]
+    || EVENT_BUDGETS_STANDARD[lvl]
+    || EVENT_BUDGETS_STANDARD.standard;
+  let lo;
+  let hi;
+  if (rule.flat) {
+    lo = rule.flat;
+    hi = rule.flat;
+  } else {
+    lo = Math.max(1, Math.round(pages / rule.lo));
+    hi = Math.max(1, Math.round(pages / rule.hi));
+  }
+  hi = Math.max(lo, hi);
+  const events = lo === hi ? `${lo} event${lo === 1 ? '' : 's'}` : `${lo}-${hi} events`;
+  const allowance = arcInventedAllowance(inputData);
   const chain = lvl === '1st-grade' ? ', one obstacle chain' : '';
+  // Per-page SHAPE, never a book total: a total is an arithmetic claim the
+  // model re-granulates until it passes (two models self-certified compliance
+  // while overrunning it). A shape has nothing to count.
+  // `band` here is the PACING band, so 'standard' still means "6 and up".
+  const olderShape = band === 'standard' ? (ACTION_SHAPE_STANDARD[lvl] || null) : null;
+  const actionsLine = olderShape
+    ? `- A page carries ${olderShape} actions, and one of them is the main one — the picture renders that one. An action is one thing a character does that changes something: a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action.`
+    : '- A page carries ONE main action — at most two. An action is one thing a character does that changes something: a step taken, an object taken or given, a question asked and answered, a decision acted on. Steps inside one event each count as an action. A page where several things happen at once is too much for this reader.';
   return [
     '# BUDGETS',
-    `- This book carries at most ${events} events${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
-    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line in the arc stating why the story cannot work without them.`,
+    `- This book carries at most ${events}${chain}. An event is a happening a child would retell on its own — a meeting, a loss, a discovery, a confrontation; steps within one happening count as one event.`,
+    ...(SIMPLE_BANDS.has(band) ? ['- Pages beyond what the events need are more of the same kind of thing — another place looked in, another try, another animal seen — never another happening.'] : []),
+    // Telling was FREE against both limits above: a speech is one happening and
+    // changes nothing, so backstory the arc had to deliver was cheapest as one
+    // character explaining it, and the budget pushed it there. Measured on
+    // job_1789147573901_m3uam0nxi, whose arc packed the theft, the thieves,
+    // where the thing now is, when a second piece broke and why the owner is
+    // stuck into ONE event — one page, one speech. The clause routes the
+    // surplus rather than banning it: a bare ban makes the model drop facts,
+    // which is how a length rule once deleted a story's causality (2026-09-07).
+    '- One telling carries one thing the reader did not already know. Further facts arrive where they are needed — at the page that turns on them — or are found and shown rather than said.',
+    actionsLine,
+    ...(lvl === '1st-grade' ? [`- This book is read aloud to ${READER_AGE_BY_BAND[band] || READER_AGE_BY_BAND.standard} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
+    `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
+    '- A figure counts when the story gives it a name and the commission did not: persons, animals and creatures alike, including one who appears on a single page, one who never speaks, and any adult who frames a scene — a parent, grandparent, teacher, shopkeeper or neighbour who sets a rule, waits, permits or welcomes. Standing in the background does not take a figure off the list.',
+    '- Not counted: anyone the commission named, including any animal or companion it supplied; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; a figure given no name and referred to only by what it is.',
+    '- A figure the story needs and cannot drop stays on the list; taking its name away is not a way off it.',
+  ].join('\n');
+}
+
+/**
+ * The risk-FRAMING rule, one string for every stage that writes story prose.
+ *
+ * Distinct from the peril rule beside it, which is a ceiling on threat
+ * MAGNITUDE (nothing that could lead to death). This one governs how a risk the
+ * story is allowed to keep is TOLD: a child may do a risky thing, and an adult
+ * may permit it — what must not happen is the story treating it as simply fine,
+ * with nobody wary, no risk named and an approving close.
+ *
+ * Deliberately narrow. It is not "children may not do dangerous things": that
+ * would collide with the rule two lines above it — the children resolve it
+ * themselves, adults may comfort, permit or watch — and flatten the stakes the
+ * 2026-08-19 round RAISED. See docs/decisions.md 2026-09-14.
+ *
+ * One constant, four consumers: {TELLING_RULES} (arc-create / arc-retell) and
+ * the {RISK_FRAMING} placeholder in story-trial.txt — the template the shared
+ * block never reaches (story-unified.txt and story-unified-imagefirst.txt were
+ * the other two consumers until they were deleted 2026-09-15). Byte-identical everywhere by construction, not by discipline.
+ */
+// Generator-side counterparts of two judge rules, kept as ONE constant each so
+// the instruction the illustrator receives and the rule the judge deducts on
+// cannot drift apart. Registry set `page-image-generator-vs-critics`
+// (scripts/admin/sibling-registry.json) pins the pairing; the anchors in that
+// set fail if either side loses its half.
+//
+// A judge may only deduct for a rule the generator was given. Both of these were
+// found by the 2026-09-15 generator-vs-critic audit penalising pages for
+// something nothing on the generator side ever asked for:
+//   - image-evaluation.txt D-24 `character_marking` is CATASTROPHIC/CRITICAL,
+//     and the template forbade LETTERING only — never a non-text mark.
+//   - image-evaluation.txt D-16b `action_interaction` is MAJOR when a hand holds
+//     something the scene never named while a named object is absent, and
+//     nothing told the renderer what a hand may hold.
+// Both live at the very END of the built prompt, i.e. inside the tail that
+// shrinkPromptForModel never hands to a compressor (images.js) — a rule in the
+// head can be compressed away.
+const NO_CHARACTER_MARKING_RULE = "**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.";
+
+// The free-hand clause used to read "rests, gestures, or touches what the
+// scene describes", which licensed exactly the failure it was meant to stop:
+// on staging job_1789584708605_rts4wqupm p4 the brief's one contact was an
+// EAR against an object and both hands were declared idle, and the render put
+// a hand on the object instead. A contact the brief gives to another part of
+// the body is not an invitation to the hands.
+const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.";
+
+/**
+ * COUNTING — one string for both Art Director templates (owner, 2026-09-15:
+ * "For the count increase limit to three. Judge also just gets more than three
+ * no exact nr."). Exact counts up to three may reach the image model; above
+ * three both the brief and the judge hold the non-numeric form, so no judge
+ * ever checks an exact number the generator was not allowed to receive.
+ * Pinned in tests/unit/built-prompt-values.test.ts against the real builders.
+ */
+const COUNTING_RULE = 'Counting rule: an exact number for a group of like things may be stated only up to three, and then it is drawn exactly. Above three the group is staged as more than three, a cluster, a row, a few or several — never an exact number, in the prose, `sceneIntent` or `emptyScenePrompt`. A group that recurs across pages holds the same size impression, role and placement.';
+
+/**
+ * ONE cast-from-the-plan-line contract for the Art Director (both templates,
+ * rule 3) and the scene review (check 5a). Staging job_1789506283204_3kxqshifx
+ * p3: the plan line named two characters, the all-pages Art Director gave a
+ * tracked animal that page in its Visual Bible entry and then staged it there
+ * through objects[] and the prose -- rule 3 spoke of "characters", the animal
+ * reached it as an element, and the review's 5a reported none. The contract
+ * closes both channels. The VB-authoring consequence (which pages such an
+ * entry may claim) lives generator-side in the pages-is-earned rule.
+ */
+const PLAN_LINE_CAST_RULE = "A tracked animal — one with a Visual Bible entry — counts as a character for this rule: it is in a page's frame only when that page's plan line names it, whichever way it enters — `characters[]`, `objects[]` or the prose — and its entry's `pages` never claims a page whose plan line leaves it out.";
+
+/**
+ * ONE contract for an object that shows a different picture on different
+ * pages, for the Art Director (both templates, the two-sided-prop rule) and the
+ * scene review (check 9f). Same job, p5: the plan line said the object was
+ * open to one picture, the arc had a second one for a later page, and the
+ * one-face-state convention left the Art Director a single face state whose
+ * delta was the later picture -- cited on p5, overriding the plan line. The
+ * review's 9f checked page ranges only.
+ */
+const MULTI_PICTURE_PROP_RULE = "An object that shows a different picture on different pages — a book, an album, a board, a screen — has one face-to-camera state per distinct picture the plan lines call for. Each such state's `delta` restates what its page's plan line says the object shows, its `pages` is that page alone, and a page cites only the state whose `delta` is the picture its own plan line names.";
+
+/**
+ * ONE concealment contract for every stage that writes a page brief -- both Art
+ * Director templates and both iterate templates.
+ *
+ * Staging job_1789584708605_rts4wqupm carries the controlled pair. p9 and p11
+ * declare the SAME object, cite it the same way, and build an identical
+ * REQUIRED OBJECTS line for it ("match its look ... at the placement the scene
+ * description gives it"). p9's interaction `where` reads "carries the heavy
+ * bulge in the front of his jacket" and the render hides the object under a
+ * bulging jacket; p11's reads "holds the egg tightly against his chest" and the
+ * render holds it in the open, so the beat that depends on somebody SPOTTING it
+ * has nothing left to spot. p7 lost it the same way and additionally placed the
+ * object inside the covering and against its outside in one sentence.
+ *
+ * So the channel exists and works: the structured `where` is what reaches the
+ * protected tail as an EXACT POSES line, and concealment written into the prose
+ * alone is advisory. Nothing else in the schema can say "hidden" -- `wornItems`
+ * has `state: "off"` plus a `location`, but only for an entry with a `wornAs`
+ * link, i.e. a garment. This rule is the representation for everything else.
+ */
+const CONCEALED_OBJECT_RULE = "An object the page puts out of sight \u2014 inside a coat, under a cloth, in a closed bag, behind a back \u2014 is staged as what a viewer would actually see: the shape it makes under the covering. Its id still goes in `objects[]`, and the `where` of every interaction with it names the covering (carries the bulge under his coat), never the object's own surface. Do not describe its colour, markings or glow on that page, and never place it inside the covering and against the outside of the covering in one sentence. A page whose moment is somebody NOTICING it still shows only that shape.";
+
+/**
+ * ONE contract for a prop the page's own TEXT puts against a character.
+ *
+ * This does NOT reopen "the page text is not a checklist for the image"
+ * (docs/SETTLED.md, owner 2026-09-13): that verdict governs the per-page
+ * EVALUATOR, which judges image-vs-brief, and the cast and the choice of moment
+ * stay the plan line's. This is the brief-authoring side, where the page text is
+ * already a declared input. Same run: p1's text hands the protagonist the warm
+ * bag whose loss the book later turns on and the brief cited a location and
+ * nothing else, so that page built no REQUIRED OBJECTS block at all
+ * (finalChecksReport.notEvaluated, reason `no_required_objects`); p5's text has
+ * a ball roll into a character's shoe and neither the plan line, the bible nor
+ * the brief ever named it. A prop that touches somebody is the one physical
+ * fact the text settles that the plan line routinely leaves out.
+ */
+const STAGED_PROP_RULE = "A prop the page's own text puts against a character \u2014 handed to them, pressed into their hands, rolling into them, taken out, put on \u2014 is in the picture: cite its id in `objects[]` when the Visual Bible has an entry for it, name it in the prose when it does not. Who is in the frame and which instant it is stay the plan line's; this is the one physical fact the page text settles.";
+
+/**
+ * ONE contract for how an interaction's `where` is phrased.
+ *
+ * `where` is the text of the EXACT POSES line in the protected tail of the image
+ * prompt, so its grammar is the instruction the model acts on. Same run, p4: the
+ * page turns on a character laying an EAR against an object, the brief declared
+ * exactly that contact and the tail carried it verbatim as "right ear pressed
+ * flat against the ... shell" -- a noun phrase among a block of verb-led lines
+ * -- and three renders across two repair rounds all drew a generic hand reach
+ * instead. Every `where` on that run that the render obeyed opens with a verb.
+ *
+ * Second half of the same page, measured 2026-09-17 over 18 Lab renders of p4
+ * (experiments #1299-#1312, all offline overrides of the stored brief). The verb
+ * fix landed and the hands did not. The repair round that rewrote the brief
+ * reasoned in its own `draftValidation` that an ear press "requires hands free
+ * or grounded", and answered that by declaring TWO more interactions for the
+ * same character -- one hand on the ground for balance, one bracing on a nearby
+ * root -- which buildExactPosesBlock re-anchors as two more pose lines in the
+ * protected tail. Every render of a brief carrying hand rows, or carrying no
+ * statement of where the hands are, put a hand on the object: 6 of 6 (the three
+ * shipped versions and three Lab arms). Briefs with ONE interaction row and
+ * prose putting both hands off the object: 7 of 12 clean. Not deterministic --
+ * a byte-identical repeat of a clean arm came back with a hand on the object --
+ * but it is the only lever that moved that rate off zero.
+ *
+ * The framing half of the same measurement is deliberately NOT here: a close-up
+ * brief was what produced head-to-object contact (9 of 10 against 0 of 8), and
+ * the planner cannot prefer one on this page class without reversing the
+ * 2026-08-12 "a beat needing kneeling/floor contact is medium" decision. Owner
+ * decision, logged in docs/decisions.md and tasks/BACKLOG.md.
+ */
+const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the character performs, never with the body part: `presses his ear to the door`, not `ear pressed to the door`. A contact made with something other than the hands states in that verb which part of the body makes it. That character is then given no second interaction row for a hand — no brace, no balance, no steadying touch — and the prose says where both hands are and that they are off the object.";
+
+/**
+ * ONE contract for an object the page gives more than one toucher.
+ *
+ * Staging job_1789584708605_rts4wqupm p6: the brief put the object down inside
+ * a recess at the foot of a tree and in the same breath had four characters
+ * stack hands on it (one with both palms on it, three reaching over him). An
+ * object recessed that way cannot take four pairs of hands, so the render drew
+ * one of each — a correctly sized one still in the recess and a second,
+ * oversized one out in the open, enlarged until eight hands fit it.
+ *
+ * Lab #1302 re-rendered the page from a brief that moved the object out to the
+ * mouth of the recess, clear of the surrounding structure: exactly ONE object,
+ * no second instance, and the recess not drawn at all. What did NOT change is
+ * scale — the object came back at the same head-ratio — so this rule is
+ * about reachability, never size; the "do not enlarge it for the hands" lever
+ * was A/B tested separately (Lab 1281/1282) and failed.
+ *
+ * The same override also RANKED the contacts (one presses, the rest touch
+ * beside him) and the render inverted the ranking, so nothing here ranks
+ * anyone, and the template's field-shape section keeps the one-pair-of-hands
+ * convention it already carried.
+ *
+ * The second sentence is the other half of that page's brief: only ONE of the
+ * four touchers had a `where` naming the object at all — the other three
+ * "stack their hands over" the first one's hold — so the brief asked the
+ * object to take one pair of hands while the prose put four on it. Row
+ * CARDINALITY is deliberately not legislated here: the Art Director fuses
+ * several names into one `character` slot whatever the template says (measured
+ * again under this rule, Lab #1303), and buildExactPosesBlock already splits
+ * such a row into one pose line per figure, so the protected tail states each
+ * toucher's contact either way.
+ *
+ * THE BRANCH (2026-09-18). The first version of this rule was unconditional and
+ * bought its zero duplicate objects at the cost of the plot. Staging
+ * job_1789681157795_wkt20ckod p12: the page text is an object wedged in a gap in
+ * a wall and the whole beat is three characters failing to shift it. The brief
+ * obeyed the rule, staged it out on open ground, and the render put it on the
+ * ground in front of the wall — semantic eval setting/MAJOR, the book audit
+ * raised it to CRITICAL, the page scored 0.
+ *
+ * Owner's principle, verbatim: "You can not take a stone that is blocking the
+ * entrance into the middle of the open space. So the pushing can be rendered!
+ * That is only an option if the location carries no story meaning. Holding an
+ * egg can be anywhere. Pushing a blocking object must be where it blocks."
+ *
+ * So the restaging is CONDITIONAL and the condition is a question the Art
+ * Director answers, not a word list code matches: would moving the object change
+ * what the page is about? Where it would, the object holds its position and the
+ * COMPOSITION absorbs the reach problem instead — fewer simultaneous touchers,
+ * an angle showing obstacle and hands together, the touchers ranged along the
+ * reachable side. That is the same lever that stopped the duplication (an object
+ * asked to take more hands than its space allows), applied to the figures rather
+ * than to the object.
+ *
+ * WHERE THE POSITION HAS TO TRAVEL. p12's stored brief did not lose the
+ * placement in its prose — that paragraph says "wedged tightly between the
+ * stones", and the emptyScenePrompt says "a dark rectangular gap where a stone
+ * is wedged". What it lost was the one channel the model obeys: all three
+ * `where` values read "presses both hands flat against the ... stone" and the
+ * protected tail carried three EXACT POSES lines with no gap and no wall in
+ * them. Same shape as the p7/p11 concealment defect — a page-critical physical
+ * fact that reaches only the prose is advisory. So the load-bearing branch puts
+ * the position INTO the `where`, beside the contact, not merely into the
+ * paragraph.
+ */
+const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask first whether moving it would change what the page is about. If it would not — a thing held, carried, passed or examined — stage it where every one of them can reach it: out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or sunk below something a named toucher would have to reach through, and the prose puts it in that same open spot. If it would — an object whose position is the point, blocking, wedged, stuck fast, buried, sealed in or out of reach — it stays exactly where the plan line and the page text put it, still held by whatever holds it there, and the composition gives way instead: fewer characters in contact at once, the rest in frame straining, bracing or watching; an angle that shows the object's position and the hands in one view; the touchers ranged along the side they can actually reach. On such a page every toucher's `where` names the object together with what holds it in place — that is naming the object, not pose detail. Either way each toucher's `where` names the object itself, never another character's hands or hold.";
+
+/**
+ * ONE contract for the page a Visual Bible element ENTERS the story on, for
+ * every site that authors a bible.
+ *
+ * The pages-is-earned rule says "being physically present is not earning", and
+ * it is right for the pages that merely carry a thing along. It is wrong for the
+ * page that introduces it: on staging job_1789584708605_rts4wqupm the bag the
+ * story's whole warmth chain hangs on was given to the protagonist on p1 and its
+ * entry claimed pages 7, 10 and 13. The reader meets it for the first time on a
+ * page that does not draw it.
+ */
+const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page the story first brings it in \u2014 handed over, found, taken out, put on \u2014 even when that page's plan line is about something else. That is the page the reader learns what it looks like on.";
+
+/**
+ * ONE contract for how a DECLARED trait reaches the prose, for both iterate
+ * templates — the stage that rewrites a whole brief from the CHARACTER DETAILS
+ * block it is given.
+ *
+ * The rewriter is told to "weave each named character's appearance on first
+ * mention from CHARACTER DETAILS ... as flowing language, not a labeled list",
+ * and weaving is where the colour words go. Measured on staging
+ * job_1789584708605_rts4wqupm p16: the prompt that was SENT states `Eyes:
+ * green. Hair: light blonde, wavy, short, tousled`, and the round-1 rewrite came
+ * back with the entry's own three shape words and a different colour on each
+ * trait — hair and eyes both. A second character on the same page had one shade
+ * shifted. The page shipped that brief. This is NOT the locked-cast gap
+ * (649908242): every drifted character was in the locked cast with its entry in
+ * hand. Same class on the previous run's p7 and p16.
+ *
+ * The Art Director templates carry the same weaving instruction and the same
+ * corpus shows no drift from them — they copy the entry's words — so the rule
+ * is declared where it is measured. It is a constant rather than two hand-kept
+ * sentences: the pair is a registered sibling set (scene-iteration-templates)
+ * filled by ONE call site.
+ */
+const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair colour and cut, eye colour, skin tone, a distinctive feature — reaches the prose in that entry's own words. The sentence around it is yours to write; the trait words are not. Reordering them is fine (`Hair: <colour>, wavy, short` may be written as `short wavy <colour> hair`); a neighbouring shade, a shade the entry leaves unstated, or a trait written from memory is a different character.";
+
+/**
+ * SEVEN PAGE-BRIEF CONTRACTS THE REWRITER WAS NEVER GIVEN (2026-09-17).
+ *
+ * A page brief is authored at FOUR sites: the two Art Director templates that
+ * write it the first time (scene-expansion.txt, scene-expansion-all.txt) and the
+ * two iterate templates that REWRITE it when the render proves it unbuildable
+ * (scene-iteration.txt, scene-iteration-free.txt). The rewrite's output replaces
+ * the brief wholesale and becomes the page's contract with the image model, so a
+ * rule only the first author holds is a rule one repair round deletes.
+ *
+ * Measured on the 11 iterate rounds stored across staging
+ * job_1789584708605_rts4wqupm (p4, p6, p9, p10, p13, p16) and
+ * job_1789506283204_3kxqshifx (p2, p7, p10, p13, p16): every one of the 11
+ * rewrites came back with `looksAt` on 0 of its characters where the brief it
+ * replaced carried it on all of them, and with no `wornItems` row at all. On
+ * job_1789584708605_rts4wqupm p16 the brief being replaced declared the jacket
+ * OFF and held as a bundle; the rewrite declared nothing, and the built image
+ * prompt flipped from "Levin is NOT wearing this" to "Levin IS wearing this".
+ *
+ * Each of these seven was a sentence standing byte-identical in BOTH Art Director
+ * templates and in neither iterate template. They are constants rather than four
+ * hand-kept copies because that is exactly how these drift: the set is
+ * registered as `art-director-vs-iterate` in sibling-registry.json, and
+ * tests/unit/ad-iterate-parity.test.ts asserts each one reaches all four BUILT
+ * prompts byte-identically.
+ */
+const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
+
+const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
+
+const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, `camera`, or `away`. It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+
+/**
+ * ONE contract for the `expression` field, at every site that writes a brief.
+ *
+ * `characters[].expression` (with `looksAt`) is the ONLY thing that builds the
+ * EXPRESSIONS AND EYES block in the protected tail of the image prompt — no
+ * field, no block. Measured on staging job_1789584708605_rts4wqupm p4,
+ * 2026-09-17, 19 Lab renders (#1299-#1313): every one of the 8 arms whose
+ * character object carried no `expression` came back with a mild smile aimed at
+ * the camera, on a page whose beat is a child listening to a sound. The 5 arms
+ * that carried one were obeyed 5/5.
+ *
+ * The field was contracted at only two of the four brief-authoring sites:
+ * scene-expansion-all.txt ("required for every character") and
+ * scene-iteration.txt ("for foreground/midground characters add `expression`").
+ * scene-expansion.txt and scene-iteration-free.txt named it in their JSON
+ * examples and nowhere in their rules -- and a rewrite that drops it deletes the
+ * block for the rest of that page's life. Those two templates keep their format
+ * sentences; this constant is the contract all four now share.
+ *
+ * NOT here, deliberately: any particular eye state. "eyes closed, listening" was
+ * obeyed 4/4 and the owner rejected the result -- a child with his eyes shut
+ * reads as ASLEEP, not as listening. The shipped brief's own wording ("eyes wide
+ * open, neutral mouth, focused", gaze on a surface beside him) is what reads as
+ * listening, re-measured in arm FO. What is contracted is that the face is
+ * stated at all.
+ */
+const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `expression`, and a rewrite carries it through. A page whose beat is a character sensing something — listening, feeling, watching, smelling — states that in the eyes and mouth as much as in the pose.";
+
+const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both state the character is WITHOUT it and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once.";
+
+const WORN_ON_OTHER_RULE = "When the page has a character other than the item's owner wearing it, the row is `state: \"worn\"` plus `wearer` naming that character — not `off`. The prose puts the item on the wearer and on nobody else; the owner's description does not mention it.";
+
+const ABSENT_THING_RULE = "\"no glow\", \"bare rail\", \"no other figures in the room\", \"does not wave\" each paint the named thing into the picture. Leave it unwritten and describe what does occupy that space instead (\"the rail runs smooth grey iron\", \"the far wall is plain plaster\"). This covers props, people and the medium alike — you are not shown the art style, and a ban on glow, colour, text, reflections or weather can contradict the style the picture is drawn in.";
+
+const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single moment the image depicts. Sentence 1: who does what to whom, where. Sentence 2: what characters hold or reach for, and the page's one gaze target — never a second target, and never a character facing one person while gazing at another. Sentence 3: setting, lighting, and the mood as it shows — in faces, posture, light or weather, never as a mood word. Name every character physically present. List the main and primary characters among them in `characters[]`; secondary characters stay in the prose and carry their CHR id in `objects[]`. One moment only — not cause plus effect.";
+
+/**
+ * THE PAGE TEXT IS NOT A CHECKLIST FOR THE PICTURE (owner, 2026-09-18).
+ *
+ * Owner's words: "Not all characters mentioned in text must appear in the image.
+ * Add that rule everywhere! A text can be 3 actions the image must focus on one.
+ * You keep getting this wrong."
+ *
+ * Already settled — `docs/SETTLED.md`, "The page TEXT is not a checklist for the
+ * image — semantic eval judges image-vs-BRIEF, by design" (2026-09-13), and
+ * "the Art Director trims cast by design". This constant implements that
+ * verdict; it reverses nothing. `prompts/story-beats.txt` states the generator
+ * half of the same fact ("one action per page").
+ *
+ * TWO HALVES, and the second is the reason this is one string rather than a
+ * one-line prohibition. Per page, an omission is the Art Director working: the
+ * brief picks the instant and trims the cast to it. Across the book it is not:
+ * a character the story gives a moment of their own whose moment no plan line
+ * ever stages is a real defect — measured on staging
+ * job_1789681157795_wkt20ckod, where an invented antagonist fell out of the
+ * plan over three consecutive pages and three of the book's six CRITICAL faults
+ * followed. A rule carrying only the first half would have excused it. The
+ * second half therefore opens by carving itself out of the first ("Where the
+ * whole book is in view, one absence IS a fault"), so a judge cannot read the
+ * first and wave the second away, and it names the artefact that is at fault —
+ * the PLAN — so a per-page judge never charges it to a picture.
+ *
+ * ONE constant, nine templates. Hand-kept copies of a shared rule drifted four
+ * times in one week in this repo (`docs/decisions.md`, "fix the mirror class,
+ * not the instance"), and this rule already had three partial copies living on
+ * their own: image-semantic.txt's CHARACTER AUTHORITY paragraph (characters
+ * only, no actions), image-prompt-compliance.txt's STORY_TEXT DECLARES NOTHING
+ * block (characters and dialogue, no actions) and book-audit.txt's MAJOR weight
+ * clause. The set is registered as `text-not-a-checklist` in
+ * sibling-registry.json and pinned to the BUILT prompts in
+ * tests/unit/text-not-a-checklist-reach.test.ts — a placeholder nobody declares
+ * is stripped by fillTemplate silently.
+ */
+const TEXT_NOT_A_CHECKLIST_RULE = "A page's text may name several characters and several actions; its picture stages one moment — the one its brief names. A character or an action the text names and the frame does not show is not a fault: not at any severity, and not as support for another finding. Where the whole book is in view, one absence is a fault: a character the story gives a moment of their own — an obstacle they raise, a turn they cause — that no page's plan line stages. Charge that one to the plan, never to a picture.";
+
+const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
+
+/**
+ * The page-opening variety rule, one string for every stage that writes page
+ * prose. Four templates carried the same sentence as prose (beats text writer,
+ * both unified variants, trial); one constant, filled into the
+ * {PAGE_OPENING_VARIETY} placeholder each declares. The constant is the bare
+ * sentence: the bullet templates write `- {PAGE_OPENING_VARIETY}` and the
+ * beats template, whose rules are plain sentences, writes it bare with its
+ * full stop — the built prompts are byte-identical to the prose they replaced.
+ */
+const PAGE_OPENING_VARIETY_RULE = "Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way";
+
+/**
+ * The Art Director composition rules for a writer that authors its own scene
+ * hints without an Art Director stage: trial and both unified variants. The
+ * six bullets were reworded for a scene hint from scene-expansion(-all).txt
+ * rules 5, 5c, 11f, the close-up rule and the immersion/footing rules
+ * (2026-09-13) and lived only in story-trial.txt as prose; the unified
+ * templates carried their own two-bullet subset. One constant, filled into
+ * the {AD_COMPOSITION} placeholder. The beats path does not receive it — its
+ * text writer stages nothing, the Art Director does.
+ */
+const AD_COMPOSITION_RULE = [
+  '- One moment, one focal point. One main action draws the eye, drawn at its peak of motion — mid-leap, mid-swing, mid-throw — not the static pose that follows.',
+  '- One instant, no history. Never ask the picture to show how many times something happened, what just finished or what comes next — no "again", no "already", no object both mid-motion and in its ended state.',
+  '- One level per frame. Two named figures on different levels — one on a deck, floor, bank, wall or roof, the other on the water, ground or stair below — cannot be drawn facing each other at equal size: the renderer flattens every figure onto one plane. Stage the page from one level; the figure on the other level is `depth: background`, small, and on a surface visibly above or below the edge.',
+  "- No partial immersion. A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage them at the water's edge or as swimming.",
+  '- Footing. Every standing character has something standable at their declared position and depth — a bank, path, floor, deck or walkway — never open water or air. A moment that puts a figure where nothing standable exists moves the figure or the camera.',
+  '- A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping or feet-on-ground contact, and nothing placed behind the character. A moment that needs below-waist action is a `medium` shot.',
+].join('\n');
+
+/**
+ * # RULES OF THE TELLING for the arc prompts ({TELLING_RULES} in arc-create and
+ * arc-retell). Interpolated rather than baked into the templates because four
+ * of its lines demanded exactly what the simple bands forbid: escalation, a
+ * low point near the end, an unyielding blocker and a rival thread, against
+ * age-band files that say "no danger, no villain, nobody unkind, nothing lost
+ * for good" (measured 2026-09-07 across seven arc runs). The simple bands get
+ * the repetition shape instead — a simple book still has a shape.
+ *
+ * `landmarks` adds the create-only landmark line; that is the sole difference
+ * between the two templates' blocks.
+ */
+// The landmark rule is NOT here. It used to be — a bullet saying landmarks join
+// "at most on the opening page before the adventure leaves home, or not at all"
+// — while the REAL LANDMARKS header of the same prompt said "build at least two
+// of them in, woven into the story's action (two to four is the target)". Both
+// unconditional, ~5k chars apart, so the creator obeyed whichever it read last
+// and no later stage could tell which. Owner ruling 2026-09-19: the header's
+// version is the rule, and it is stated ONCE, where the landmarks are listed.
+function buildTellingRulesSection(inputData = {}) {
+  const band = resolveAgeBand(inputData);
+  const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
+  const simple = SIMPLE_BANDS.has(band);
+  // The therapeutic payload of a life-skill book: the one CATEGORY_GUIDELINES
+  // clause ("include practical tips or coping strategies woven into the
+  // narrative") that no other beats stage carries. Restored to the arc rules
+  // 2026-09-14 (docs/decisions.md). Gated OFF for the simple bands, whose own
+  // life-skill guidelines say "no tips, no strategies, no moral" — a scoped
+  // clause beats an overridden one, and this file exists because four telling
+  // rules once demanded what those bands forbid.
+  const lifeSkillStrategy = String(inputData?.storyCategory || '') === 'life-challenge' && !simple;
+  // A second thread is legitimate only at the standard band on the older
+  // reading levels, where the STORY SHAPE explicitly allows one. Four of seven
+  // measured arcs split the cast, including a band whose own budget says
+  // "one thread".
+  const noSplit = band !== 'standard' || lvl === '1st-grade';
+  return [
+    '# RULES OF THE TELLING',
+    '- Factual register: plain declarative sentences stating what happens and why. No imagery, no metaphors, no inner monologue, no emotional narration, no decorative adjectives.',
+    '- Every sentence follows from the one before — therefore, or but. Never "and then".',
+    '- Name what the main figures feel at each turn, as plain fact — a feeling stated is part of the story.',
+    '- Each character\'s nature causes a problem or solves one.',
+    '- The main character wants something from the start, and their situation is different at the end. One character carries a visible change: early they refuse, fail or need help at something; late they do it themselves. Early on, a character says aloud what must happen and why.',
+    simple
+      ? '- The shape is repetition, not escalation: the same want, the same call, the same kind of try, page after page, until the last one works. Nothing gets worse, nothing is lost for good, and the goal never looks lost.'
+      : '- Each challenge is met at a cost, each harder because the last was not clean; near the end the goal looks lost before it is won. No obstacle is removed in the moment that introduces it; passing one costs something named — time, a possession, a plan, help asked for.',
+    '- The children resolve it themselves. No adult, rescuer, lucky arrival or accident removes an obstacle; adults may comfort, permit or watch.',
+    ...(lifeSkillStrategy ? ['- One thing the main character does to handle the topic works, and a child listening could do the same thing: it happens on the page, in what they do, never explained, recommended or named as a lesson.'] : []),
+    '- Challenges belong to the story, never dealt out one per character in turn; what the youngest does stays within a very young child\'s reach — noticing, holding, fetching, naming, offering, refusing.',
+    '- Serve character coverage by giving several characters deeds inside the same event — never by opening a new event per character.',
+    simple
+      ? '- Nothing stands in the way on purpose. What holds the main character up is a thing or a circumstance — out of reach, missing, not working yet — never anyone unwilling, and whoever they meet is friendly.'
+      : '- Whoever or whatever stands in the way wants something of their own, presses on the story to the end and stands in the scene at the turning point; they do not yield on request.',
+    '- Reasons are grounded, not announced: a sign, an inscription or a rule stated once to license a turn is not a reason — it comes from who someone is, what a place is for, or what someone needs.',
+    '- A figure who can speak never records what it could say: backstory a present character knows is spoken aloud, never carved, written, scratched or drawn for the cast to read.',
+    '- An obstacle exists for its own reasons: never shaped around a thing a character carries, and never a barrier whose only solution a character already holds. Obstacles come from the story\'s own world — weather, distance, a rival, a broken or missing or guarded thing, a character\'s own flaw; no puzzle door, riddle, trick lock or test set by no one, unless the commission establishes it.',
+    ...(simple ? [] : ['- A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.']),
+    '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
+    RISK_FRAMING_RULE,
+    '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
+    '- The ending is the page the child remembers: one emotion or one image that stays — never bookkeeping, never a stated moral. Settle debts and props before the final page; the last page belongs to the feeling.',
+    '- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.',
+    '- Use the fewest characters the story needs: invent no figure an existing character could be, and merge two roles into one where the plot allows. The group stays together unless it has a reason to separate and a reason to meet again.',
+    ...(noSplit ? ['- The cast stays together on one path — never two groups going separate ways; where the commission itself splits them, keep them together and justify it in one line.'] : []),
+    '- Characters enter in ones or twos — never more than three at once — and each gets one line of their own on first appearance, doing or saying something only they would.',
+    '- Each named character speaks with a distinctive voice — word choice and rhythm a child could tell apart with eyes closed.',
+    '- An animal or creature that travels with the children is named by them where they decide to help it, and goes by that name after.',
+    '- Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.',
+    '- When the deadline is a time of day, the story starts at an hour the book\'s length can cross to reach it.',
+    '- The commission\'s central figure acts in every third of the story — chooses, moves, speaks, changes something; never reduced to cargo another figure carries.',
   ].join('\n');
 }
 
 /** CREATE: the creator writes two arcs with self-critiques and commits to one. */
-function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, priorChallenges = '' } = {}) {
+function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
   if (!template) {
     log.error('[PROMPT] arcCreate template not loaded — arc machine unavailable');
@@ -5184,8 +7512,8 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
     AGE_MODE: buildAgeModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
+    TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
-    PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
@@ -5202,6 +7530,10 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     STORY_BRIEF: ctx.STORY_BRIEF,
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     COMMITTED_ARC: String(committedBlock || '').trim(),
+    // The panel is the only INDEPENDENT reader of the arc; until 2026-09-09 it
+    // was never told the allowance, so nobody but the author (grading itself in
+    // the same call) could audit the invented cast.
+    INVENTED_ALLOWANCE: arcInventedAllowance(inputData),
   });
 }
 
@@ -5218,6 +7550,7 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
     AGE_MODE: buildAgeModeSection(inputData),
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
+    TELLING_RULES: buildTellingRulesSection(inputData),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
@@ -5259,6 +7592,83 @@ function parseArcHints(raw) {
 }
 
 /**
+ * Read the "Invented figures:" block the arc critique emits (2026-09-09). The
+ * block is UNNUMBERED by contract — `critiqueMaxSeverity` reads numbered lines
+ * only, and a numbered list here would mint phantom MAJOR faults — and it sits
+ * in the head, beside the other contract lines, so it never leaks into the arc
+ * text. Same block-read shape as "Challenges taken:". Optional: an absent block
+ * yields an empty reading and the caller degrades to the pre-2026-09-09
+ * behaviour; nothing here throws.
+ */
+const INVENTED_BLOCK_STOP = /^\s*(?:\*\*|#+\s*)?(?:Premise figures|Invented figures|Fixing|Keeping|Challenges taken|Used|FINAL ARC|CRITIQUE|ARC\s*\d)\s*:?/mi;
+
+/**
+ * The arc's PREMISE FIGURES — named figures the commission's own premise
+ * supplies that its character list does not (a sibling, a friend, a pet).
+ *
+ * They are commissioned, not invented: the budget rule has always said so
+ * ("Not counted: anyone the commission named, including any animal or
+ * companion it supplied"), but nothing carried their NAMES out of the arc, so
+ * the plan counters — which only ever saw `inputData.characters` — charged them
+ * against the invented allowance. Measured on job_1789147573901_m3uam0nxi: the
+ * premise reads "<child> and his dog <name>", and the dog was counted invented.
+ */
+function parsePremiseFigures(raw) {
+  return parseFigureList(raw, 'Premise figures');
+}
+
+function parseInventedFigures(raw) {
+  return parseFigureList(raw, 'Invented figures');
+}
+
+/**
+ * The explicit "there are none" answers a figure list may carry, tested on the
+ * name with any trailing parenthetical qualifier removed.
+ */
+const NEGATIVE_FIGURE_ANSWERS = new Set(['none', 'no one', 'noone', 'nobody', 'n/a', 'na', 'keine', 'aucun']);
+
+function isNegativeFigureAnswer(name) {
+  const bare = String(name || '').replace(/\s*\([^)]*\)\s*$/, '').replace(/[.,;:]+$/, '').trim().toLowerCase();
+  return bare === '' || NEGATIVE_FIGURE_ANSWERS.has(bare);
+}
+
+function parseFigureList(raw, heading) {
+  const src = String(raw || '');
+  const h = heading.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const idx = src.search(new RegExp(`^\\s*(?:\\*\\*)?${h}\\s*:`, 'mi'));
+  if (idx < 0) return { present: false, names: [], allowed: null, written: null };
+  const tail = src.slice(idx).replace(new RegExp(`^\\s*(?:\\*\\*)?${h}\\s*:\\**[^\\n]*\\n?`, 'i'), '');
+  const stop = tail.search(INVENTED_BLOCK_STOP);
+  const block = stop >= 0 ? tail.slice(0, stop) : tail;
+  const names = [];
+  for (const line of block.split('\n')) {
+    const t = line.replace(/\*\*/g, '').trim();
+    if (!t) continue;
+    if (/^Allowed\s*:/i.test(t)) break;
+    const m = t.match(/^[-–—*•]\s*(.+)$/);
+    if (!m) break;
+    const name = m[1].split(/\s+[—–]\s+|\s+-\s+/)[0].replace(/[.,;:]+$/, '').trim();
+    // A NEGATIVE ANSWER IS AN EMPTY LIST, NOT A NAME (2026-09-17). The sentinel
+    // test was anchored, so the arc's own phrasing walked straight past it:
+    // staging job_1789584708605_rts4wqupm wrote `- none (the creature in the
+    // egg is unnamed in the commission)` under "Premise figures:", and that
+    // whole clause became a commissioned CHARACTER. It then earned two of the
+    // five plan-counter findings against itself (`NO_FOCAL_PAGE`,
+    // `UNDER_COVERED_CHARACTER`) and bought a re-plan of three pages.
+    // The qualifier a model appends is a parenthetical, so it is removed
+    // structurally before the sentinel is tested — never by matching prose.
+    if (name && !isNegativeFigureAnswer(name)) names.push(name);
+  }
+  const am = block.match(/Allowed\s*:\s*(\d+)[^\d]{0,12}Written\s*:\s*(\d+)/i);
+  return {
+    present: true,
+    names,
+    allowed: am ? parseInt(am[1], 10) : null,
+    written: am ? parseInt(am[2], 10) : null,
+  };
+}
+
+/**
  * Parse the arc-create output: "ARC 1:" + CRITIQUE, "ARC 2:" + CRITIQUE, then
  * a "Stronger: Arc N — why" commitment line. Throws on a missing commitment or
  * boundary — the caller re-creates once, then gives up.
@@ -5286,6 +7696,8 @@ function parseArcCreate(raw) {
       .replace(/^\s*(?:\*\*|#+\s*)?ARC\s*\d\s*:?\**\s*/i, '')
       .trim(),
     critique: critIdx >= 0 ? chosen.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim() : '',
+    invented: parseInventedFigures(chosen),
+    premiseFigures: parsePremiseFigures(chosen),
   };
 }
 
@@ -5334,7 +7746,7 @@ function parseArcRetell(raw) {
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique, fixing, keeping };
+  return { finalArc, used, critique, fixing, keeping, invented: parseInventedFigures(head), premiseFigures: parsePremiseFigures(head) };
 }
 
 /**
@@ -5390,6 +7802,48 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counter
  * still has its numbered lines picked up, because a lost finding is the one
  * failure that silently skips the re-plan.
  */
+/**
+ * The plan check's ROSTER block — who each page holds, as DATA.
+ *
+ * The cast used to be re-derived from the plan prose in code, by asking whether
+ * the token before a capitalised name was an article or a place preposition
+ * (`isThingMarked`, deleted 2026-09-11). That test had been patched once per
+ * story that broke it and still read a bike lamp, two bikes, a bridge and a
+ * river as cast members on job_1789147573901_m3uam0nxi. The model already reads
+ * these same pages in this same call; it answers the language question and the
+ * counters do arithmetic on the answer.
+ *
+ * "ROSTER 4: people = A, B; things = the lamp" → {4: {people:[A,B], things:[…]}}
+ * A page the model omits is absent from the map, and the caller decides what an
+ * incomplete roster means — never a silent empty cast.
+ *
+ * THIRD FIELD, `covers` (2026-09-18): the names a who column reaches without
+ * naming them — a count of the cast, a word for the group, a description
+ * standing in for one figure. `people` still means only what the column NAMES,
+ * so the cast the counters resolve is unchanged; `covers` is per-page presence
+ * and nothing else. It is OPTIONAL in the parse: a roster line without it reads
+ * exactly as it did before, and a `things` value carrying its own semicolon
+ * still lands whole in `things`.
+ *
+ * @returns {Map<number, {people: string[], things: string[], covers: string[]}>}
+ */
+function parsePlanCheckRoster(raw) {
+  const out = new Map();
+  const names = (s) => String(s || '')
+    .split(',')
+    // A possessive is the same figure: a roster that answers "Ondine's" for a
+    // page that also says "Ondine" used to enter the cast twice and inflate
+    // every per-page count (measured replaying job_1789304198359_y3n0euk3z).
+    .map(n => n.trim().replace(/^(?:the|a|an)\s+/i, '').replace(/(?:'s|’s|s'|s’)$/i, '').trim())
+    .filter(n => n && !/^none$/i.test(n));
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().match(/^ROSTER\s+(\d+)\s*:\s*people\s*=\s*([^;]*)(?:;\s*things\s*=\s*(.*?))?(?:;\s*covers\s*=\s*(.*))?$/i);
+    if (!m) continue;
+    out.set(parseInt(m[1], 10), { people: names(m[2]), things: names(m[3]), covers: names(m[4]) });
+  }
+  return out;
+}
+
 function parsePlanCheck(raw) {
   const text = String(raw || '').trim();
   if (!text || /^none\.?$/i.test(text)) return [];
@@ -5461,10 +7915,15 @@ function readerAge(inputData) {
   return Math.min(8, youngestMainAge(inputData, 8));
 }
 
+// AGE 0 IS AN AGE (2026-09-15). `n > 0` here dropped it, so an age-0-only cast
+// read as "no readable age" and fell to the caller's fallback: the creature-tone
+// band went from `cute` to no section at all when age 0 became a live band
+// (6416cc326). `focusAge` — the sibling reader of the same field — has always
+// accepted `>= 0`.
 function youngestMainAge(inputData, fallback = 5) {
   const mainIds = inputData?.mainCharacters || [];
   const chars = (inputData?.characters || []).filter(c => c && (!mainIds.length || mainIds.includes(c.id)));
-  const ages = chars.map(c => parseInt(c.age, 10)).filter(n => Number.isFinite(n) && n > 0);
+  const ages = chars.map(c => parseInt(c.age, 10)).filter(n => Number.isFinite(n) && n >= 0);
   return ages.length ? Math.min(...ages) : fallback;
 }
 
@@ -5574,11 +8033,16 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '') {
     const m = String(brief || '').match(/THIS IMAGE DEPICTS:\*{0,2}\s*([\s\S]*?)(?=\n\s*\n\s*(?:\*\*|#|[A-Z][A-Z ]{3,}:)|$)/);
     return (m ? m[1] : '').trim();
   };
-  // sceneIntent first: the DEPICTS header only ever exists in image prompts,
-  // never in briefs, so depictsOf alone left every page "(no picture
-  // description)" and the MISMATCH question could not fire.
+  // THE WHOLE BRIEF, via the shared resolver (sceneMetadata.js) — the same spec
+  // the writer wrote this text from and the same one the repair pass acts on.
+  // It used to be `p.sceneIntent`, which in beats mode is a blind 600-char head
+  // cut of the brief (extractRefinablePages' fallback, the only path a beats
+  // page ever takes), so the auditor filed MISMATCH faults against events it
+  // could not see and the repairer deleted prose the picture does contain.
+  // depictsOf stays the last resort: the DEPICTS header exists only in image
+  // prompts, never in briefs.
   const body = pages.map(p =>
-    `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${String(p.sceneIntent || '').trim() || depictsOf(p.sceneBrief) || '(no picture description)'}`
+    `--- Page ${p.pageNumber} ---\nTEXT:\n${String(p.text || '').trim()}\n\nTHE PICTURE SHOWS:\n${resolveTextStagePictureSpec(p) || depictsOf(p.sceneBrief) || '(no picture description)'}`
   ).join('\n\n');
   // The story and its division (2026-09-02). The LOADBEARING question asked
   // what "the story and the beat" treat as load-bearing while the audit was
@@ -5589,10 +8053,24 @@ function buildTextAuditPrompt(inputData, pages = [], arc = '') {
     .filter(p => String(p.planLine || '').trim())
     .map(p => `## Page ${p.pageNumber}\n${String(p.planLine).trim()}`)
     .join('\n\n');
+  // NO COMMISSION HERE. story-text-audit.txt carries no {STORY_BRIEF}
+  // placeholder, and must not gain one: the auditor judges the finished text
+  // against the ARC and the plan, which are the master. The pre-arc commission
+  // was deliberately withheld from the generator at this stage, so showing it to
+  // this judge would be spec drift. It was computed and passed here until
+  // 2026-09-13; the template silently dropped it, so the argument is deleted.
+  // Owner ruling 2026-09-15: PULL is scoped to the bands whose books are built
+  // as one arc. SIMPLE_BANDS are built from self-contained moments, so a page
+  // that leaves nothing open is the spec, and the question fired on correct
+  // work for every page of those books. The band is resolved here rather than
+  // guessed by the judge.
+  const simpleBand = SIMPLE_BANDS.has(resolveAgeBand(inputData));
   return fillTemplate(template, {
-    STORY_BRIEF: buildStoryContextFields(inputData).STORY_BRIEF,
     STORY_ARC: String(arc || '').trim() || '(no story was recorded — audit the pages alone)',
     PLAN_LINES: planLines || '(no page plan was recorded)',
+    PULL_QUESTION: simpleBand
+      ? 'skip this question — this book is built from self-contained moments, so a page that leaves nothing open is correct.'
+      : 'does anything remain open at the end of the page that the next page answers? The last page is exempt.',
     PAGES: body,
   });
 }
@@ -5774,6 +8252,80 @@ function parseBeats(raw, expectedPages = []) {
 }
 
 /**
+ * The stated objects of a Visual Bible — the entries carrying `states[]` — as
+ * the {VISUAL_BIBLE} block of scene-review.txt.
+ *
+ * Only stated entries are rendered: they are the subject of the review's state
+ * check, and a whole bible would swamp a prompt that already carries every
+ * brief. Empty string when the story has none, so fillTemplate drops the
+ * placeholder and the prompt is unchanged (same convention as
+ * {CLOTHING_FINDINGS} / {BRIEF_FINDINGS}).
+ *
+ * Judge-facing text, so the label comes from `elementDisplayLabel` — the same
+ * resolver every other judge-facing block reads (docs/SETTLED.md: one authored
+ * label per element).
+ */
+const SCENE_REVIEW_VB_COLLECTIONS = ['secondaryCharacters', 'animals', 'artifacts', 'vehicles', 'locations', 'clothing'];
+function buildSceneReviewBibleBlock(visualBible) {
+  if (!visualBible || typeof visualBible !== 'object') return '';
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const lines = [];
+  for (const key of SCENE_REVIEW_VB_COLLECTIONS) {
+    const entries = Array.isArray(visualBible[key]) ? visualBible[key] : [];
+    for (const e of entries) {
+      if (!e || !e.id || !Array.isArray(e.states) || e.states.length === 0) continue;
+      const label = elementDisplayLabel(e) || e.name || String(e.id);
+      lines.push(`- ${String(e.id).trim().toUpperCase()} (${key}) "${label}": ${String(e.description || e.name || '').trim()}`);
+      for (const st of e.states) {
+        if (!st) continue;
+        lines.push(`  - ${st.id || '?'} "${st.name || '?'}" — ${st.delta || '?'} — pages ${JSON.stringify(Array.isArray(st.pages) ? st.pages.map(Number) : [])}`);
+      }
+    }
+  }
+  // VANTAGE PLATES. The Art Director writes one backdrop plate per location
+  // vantage (owner ruling 2026-09-17) and the page briefs no longer carry one,
+  // so rule 10a's subject reaches the reviewer here or not at all. A location
+  // with no `vantages[]` is one viewpoint and carries its plate on the entry.
+  const plateLines = [];
+  for (const loc of (Array.isArray(visualBible.locations) ? visualBible.locations : [])) {
+    if (!loc || !loc.id) continue;
+    const id = String(loc.id).trim().toUpperCase();
+    const label = elementDisplayLabel(loc) || loc.name || id;
+    const vantages = Array.isArray(loc.vantages) && loc.vantages.length > 0
+      ? loc.vantages
+      : [{ id: `${id}.1`, name: loc.name || '', shot: '', pages: loc.pages, emptyScenePrompt: loc.emptyScenePrompt }];
+    for (const v of vantages) {
+      if (!v) continue;
+      const plate = String(v.emptyScenePrompt || '').trim();
+      if (!plate) continue;
+      const pages = Array.isArray(v.pages) ? v.pages.map(Number) : (Array.isArray(loc.pages) ? loc.pages.map(Number) : []);
+      plateLines.push(`- ${String(v.id || `${id}.1`).trim().toUpperCase()} (${label}${v.shot ? `, ${v.shot}` : ''}) — pages ${JSON.stringify(pages)}: ${plate}`);
+    }
+  }
+
+  const blocks = [];
+  if (lines.length > 0) {
+    blocks.push([
+      '# VISUAL BIBLE — STATED OBJECTS',
+      '',
+      'One physical thing per entry, then the looks it wears and the pages each look covers.',
+      '',
+      ...lines,
+    ].join('\n'));
+  }
+  if (plateLines.length > 0) {
+    blocks.push([
+      '# VANTAGE PLATES',
+      '',
+      'One backdrop plate per vantage, and the pages drawn on it.',
+      '',
+      ...plateLines,
+    ].join('\n'));
+  }
+  return blocks.join('\n\n');
+}
+
+/**
  * ONE review over ALL scene briefs. Repetition between pages, visual arc and
  * continuity are invisible to a per-scene reviewer, so the whole set goes in a
  * single call.
@@ -5788,11 +8340,15 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
   // Per-page plan lines so check 5 (character on the page but absent from the
   // brief) has the division to compare against — without them the check was
   // dead (ALL_SCENES + STORY_BRIEF never carried it). One line per page,
-  // truncated; "(no plan data)" tells the reviewer to skip the comparison
-  // instead of hallucinating one (non-beats callers pass none).
+  // verbatim; "(no plan data)" tells the reviewer to skip the comparison
+  // instead of hallucinating one (non-beats callers pass none). Verbatim
+  // since 2026-09-08: the line is the authority a rewrite may not contradict
+  // (task preamble in scene-review.txt), and a line cut at 300 chars lost
+  // its "what is true after" segment on the longer pages. Round 2 passes
+  // only the pages under review, so the block shows exactly those lines.
   const planLines = (Array.isArray(options.beats) ? options.beats : [])
     .filter(b => b && b.pageNumber != null && String(b.planLine || '').trim())
-    .map(b => `Page ${b.pageNumber}: ${String(b.planLine).replace(/\s+/g, ' ').trim().slice(0, 300)}`);
+    .map(b => `Page ${b.pageNumber}: ${String(b.planLine).replace(/\s+/g, ' ').trim()}`);
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: scenes.length,
@@ -5808,6 +8364,21 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // Stated as contradictions, not orders: the reviewer wrote both halves and
     // may legitimately decline one.
     BRIEF_FINDINGS: options.briefFindings || '',
+    // The stated objects of the Visual Bible, for check 9f: the review is the
+    // one stage holding both the plan lines and the bible, so it is the one
+    // stage that can correct a state's page range. Empty for a story with no
+    // stated object, same convention as the two blocks above.
+    VISUAL_BIBLE: buildSceneReviewBibleBlock(options.visualBible),
+    // ONE cast contract and ONE multi-picture prop contract, shared with the
+    // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
+    PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
+    MULTI_PICTURE_PROP: MULTI_PICTURE_PROP_RULE,
+    // ONE rule for every template that authors or judges a page against its
+    // text — see TEXT_NOT_A_CHECKLIST_RULE. This reviewer is the only stage
+    // holding the whole book's plan lines at once, so the second half — a
+    // character whose own moment no plan line stages — is nameable here and
+    // nowhere else upstream of the finished book.
+    TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
   });
 }
 
@@ -5839,8 +8410,11 @@ function buildDoNotWriteSection() {
  * pictures. Beat prose used to stand between the two and was measured as the
  * lossiest stage in the chain (Lab #973, 2026-09-02 — see docs/decisions.md).
  * Emits the same ---ANALYSIS--- / ---STORY TEXT--- shape the refiner emits, so
- * parseRefinedText() reads it with no new parser. A ---TITLE--- block precedes
- * both: in a beats run no other call produces a title.
+ * parseRefinedText() reads it with no new parser. A ---TITLE--- block FOLLOWS
+ * both (2026-09-11): in a beats run no other call produces a title, and the
+ * pick is judged against the pages as written rather than guessed ahead of
+ * them. The caller passes 'TITLE' as a trailing marker so the last page's text
+ * ends there.
  */
 /**
  * @param {Object} inputData
@@ -5875,6 +8449,15 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     ARC_HINTS: String(arcHints || '').trim()
       ? `# HINTS — apply these in the text where the beats have not\n\n${String(arcHints).trim()}`
       : '',
+    // NO COMMISSION HERE. The template carries no {STORY_BRIEF}: by this stage
+    // the arc IS the story, and it has already ruled on the idea's mechanics —
+    // which obstacles survive, which are dropped as unsuited to the cast's age.
+    // Showing the writer the raw idea again re-opens those rulings, and it took
+    // them: job_1789147573901_m3uam0nxi's arc collapsed the idea's three-way
+    // group split ("four boys aged three to five never separate on a mountain")
+    // and dropped its coded gate; the text stage, handed the idea a second time,
+    // restored both. Subject, world and cast reach the writer through the arc,
+    // the plan lines and CHARACTER_DETAILS.
     ...buildStoryContextFields(inputData),
     // Text stage: the full reading-level block, PACING rhythm included.
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
@@ -5885,6 +8468,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
     // (2026-08-27) — the reader age is the "can a child say it" yardstick.
     AGE: readerAge(inputData),
     DO_NOT_WRITE_SECTION: buildDoNotWriteSection(inputData),
+    PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
   });
 }
 
@@ -5929,20 +8513,22 @@ function buildTitleRule(inputData) {
 }
 
 /**
- * Visual contract written FROM the locked beats (beats-first pipeline, step 3).
- * The unified writer emitted clothing requirements, the Visual Bible and the
- * cover scene hints as part of one call; no beats stage produced them, so a
- * beats run shipped with an empty VB, null clothing and no cover hints.
+ * WARDROBE contract written FROM the locked beats (beats-first pipeline, step 3).
  *
- * It runs BEFORE scene expansion, not after: the Visual Bible feeds
- * buildSceneExpansionPrompt's {RECURRING_ELEMENTS}, so a brief written without
- * it has no location, artifact, animal or secondary-character continuity to
- * weave in. The clothing requirements also gate the styled-avatar kickoff.
+ * It used to write the Visual Bible and the cover scene hints too. Both moved
+ * to the ALL-PAGES Art Director call on 2026-09-11: a bible written here had to
+ * GUESS which page used which element from plan-line prose, and the guess
+ * emptied a story's central prop (job_1789147573901_m3uam0nxi). The Art
+ * Director knows what is in each picture because it writes the pictures.
  *
- * The three sections use the same markers/format the unified writer used, and
- * beatsPipeline splices them into the transcript that becomes
- * `unifiedResponse` — so UnifiedStoryParser.extractClothingRequirements() /
- * extractVisualBible() / extractCoverHints() work unchanged.
+ * What stays here is exactly what the styled avatars need — they are the long
+ * pole in front of every image and start the moment this call returns, so the
+ * clothing must not wait for the Art Director. Clothing depends on the cast and
+ * the setting, both already fixed by the plan.
+ *
+ * The section uses the same marker/format the unified writer used, and
+ * beatsPipeline splices it into the transcript that becomes `unifiedResponse` —
+ * so UnifiedStoryParser.extractClothingRequirements() works unchanged.
  *
  * @param {Object} inputData
  * @param {Array<{pageNumber:number, beat:string, scene:string}>} beats
@@ -5954,9 +8540,7 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
     log.error('[PROMPT] storyBibleFromBeats template not loaded — beats visual contract unavailable');
     return null;
   }
-  const mainIds = inputData.mainCharacters || [];
   const chars = inputData.characters || [];
-  const named = (predicate) => chars.filter(predicate).map(c => c.name).join(', ') || 'None';
 
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
@@ -5967,369 +8551,19 @@ function buildStoryBibleFromBeatsPrompt(inputData, beats = []) {
     // (job_1786737619634: 3D-render drift on every page that used them).
     ART_STYLE: resolveArtStyle(inputData.artStyle) || inputData.artStyle || 'not specified',
     STYLE_WARDROBE: buildStyleWardrobeBlock(inputData.artStyle),
-    MAIN_CHARACTER_NAMES: named(c => mainIds.includes(c.id)),
-    PRIMARY_CHARACTER_NAMES: named(c => !mainIds.includes(c.id)),
+    MAIN_CHARACTER_NAMES: namedByMain(inputData, true),
+    PRIMARY_CHARACTER_NAMES: namedByMain(inputData, false),
     CHARACTER_PHYSICAL_BLOCK: chars
       .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
       .join('\n\n') || '(no character appearance available)',
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
-    // The band an invented child who is a PEER of the commissioned children
-    // must state its age inside. Computed in code from the commission — the
-    // bible had no tie to it at all, so a rival cast as the peer of a
-    // 6-year-old came out at ten and rendered 11-12 beside her
-    // (job_1788641639919_mpjwlzkf1, CHR001, p5). Empty for an all-adult
-    // commission: there is no band to state.
-    CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
+    // The `costumed:`-not-`standard` rule also rode on the unified writer's
+    // CATEGORY_GUIDELINES. This is the one beats stage that decides the
+    // clothing variant, so the rule lands here rather than in the arc chain.
+    ERA_CLOTHING_RULE: (inputData.storyCategory === 'historical' || inputData.storyCategory === 'swiss-stories')
+      ? '\n- The story is set in a real period. Every character uses the `costumed` variant, named for that period (`medieval`, `1920s`, …). `standard` is not an option here.'
+      : '',
     PLAN_LINES: planBlocks(beats),
   });
-}
-
-/**
- * Build unified story generation prompt
- * Generates complete story with character arcs, plot structure, visual bible, and all pages
- * @param {Object} inputData - Story parameters
- * @param {number} sceneCount - Number of story pages to generate
- * @returns {string} Filled prompt template
- */
-function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
-  const pageCount = sceneCount || inputData.pages || 15;
-  const readingLevel = getReadingLevel(inputData.languageLevel);
-  const mainCharacterIds = inputData.mainCharacters || [];
-  const language = inputData.language || 'en';
-
-  // Extract character info with strengths/flaws for character arcs
-  const characterSummary = (inputData.characters || []).map(char => {
-    const traits = getTraits(char);
-    return {
-      name: char.name,
-      isMainCharacter: mainCharacterIds.includes(char.id),
-      gender: char.gender,
-      age: char.age,
-      personality: char.personality,
-      strengths: traits.strengths,
-      flaws: traits.flaws,
-      challenges: traits.challenges,
-      specialDetails: traits.specialDetails
-    };
-  });
-
-  // Extract character names for Visual Bible exclusion
-  const characterNames = characterSummary.map(c => c.name).join(', ');
-
-  // Separate main and primary character names for prompt
-  const mainCharacterNames = characterSummary
-    .filter(c => c.isMainCharacter)
-    .map(c => c.name)
-    .join(', ') || 'None';
-  const primaryCharacterNames = characterSummary
-    .filter(c => !c.isMainCharacter)
-    .map(c => c.name)
-    .join(', ') || 'None';
-
-  // Build relationship descriptions
-  let relationshipDescriptions = '';
-  if (inputData.relationships) {
-    const relationships = inputData.relationships;
-    const relationshipTexts = inputData.relationshipTexts || {};
-    const characters = inputData.characters || [];
-
-    const relationshipLines = Object.entries(relationships)
-      .filter(([key, type]) => type && type !== 'Not Known to')
-      .map(([key, type]) => {
-        const [char1Id, char2Id] = key.split('-').map(Number);
-        const char1 = characters.find(c => c.id === char1Id);
-        const char2 = characters.find(c => c.id === char2Id);
-        if (!char1 || !char2) return null;
-        const customText = relationshipTexts[key] || '';
-        const baseRelationship = `${char1.name} is ${type} ${char2.name}`;
-        return customText ? `${baseRelationship}. ${customText}` : baseRelationship;
-      })
-      .filter(Boolean);
-
-    if (relationshipLines.length > 0) {
-      relationshipDescriptions = `\n**Relationships:**\n${relationshipLines.map(r => `- ${r}`).join('\n')}`;
-    }
-  }
-
-  // Determine story category and build category-specific guidelines
-  const storyCategory = inputData.storyCategory || 'adventure';
-  const storyTopic = inputData.storyTopic || '';
-  const storyTheme = inputData.storyTheme || inputData.storyType || 'adventure';
-
-  // Get teaching guide from external file if available
-  const teachingGuide = getTeachingGuide(storyCategory, storyTopic);
-
-  let categoryGuidelines = '';
-  if (storyCategory === 'life-challenge') {
-    categoryGuidelines = buildLifeSkillGuidelines(storyTopic, storyTheme, teachingGuide);
-  } else if (storyCategory === 'educational') {
-    categoryGuidelines = `This is an EDUCATIONAL story teaching about "<user_input>${storyTopic}</user_input>".
-
-**IMPORTANT GUIDELINES for Educational Stories:**
-- Weave the educational content naturally into an engaging narrative
-- Include accurate, age-appropriate information about the topic
-- Use repetition and reinforcement to help children learn
-- Make the learning fun and memorable through story elements
-- Include moments where characters discover or apply what they're learning
-${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}
-
-${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "<user_input>${storyTopic}</user_input>":**
-${teachingGuide}` : `- The story should teach children about: <user_input>${storyTopic}</user_input>`}`;
-  } else if (storyCategory === 'historical') {
-    // Get historical event context from txt guide
-    const historicalGuide = getTeachingGuide('historical', storyTopic);
-    const historicalEvent = getEventById(storyTopic);
-    // Get pre-fetched location photos (unified prompt)
-    const historicalLocations = getHistoricalLocations(storyTopic);
-    const historicalObjects = getHistoricalObjects(storyTopic);
-    if (historicalGuide) {
-      const eventName = historicalEvent?.name || storyTopic;
-      const eventYear = historicalEvent?.year || '';
-
-      // Build location references section if locations are available
-      let locationsSection = '';
-      if (historicalLocations?.length > 0) {
-        locationsSection = `
-
-**PRE-POPULATED LOCATIONS (canonical reference images for these landmarks — USE AS-IS):**
-${historicalLocations.map(loc => `- [dbKey: ${loc.dbKey}] ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
-RULES for these locations:
-1. Use the EXACT name shown above when referring to a location in scene descriptions, the Visual Bible, and cover hints. Do not translate, abbreviate, or invent variants.
-2. **Set the \`dbKey\` field on every Visual Bible location entry** to the slug shown in brackets above (e.g. \`"dbKey": "marktplatz-altdorf"\`). This is the authoritative lookup key for attaching the reference photo — the linker uses it before falling back to name matching. Locations with no matching pre-populated entry get \`"dbKey": null\`.
-3. When you write the Visual Bible entry for one of these locations, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT rewrite it, do NOT add new visual details, do NOT invent your own version — the reference photo was painted to match this exact description.
-4. Prefer these locations over inventing new ones. If a story scene needs one of these settings, reuse the canonical entry instead of creating a parallel location with a different name.
-5. **Per-scene composition must match the description.** When a page's primary location is one of these entries, copy the description verbatim into that page's \`landmarkContext\` metadata field, AND keep the page's character \`depth\` / \`position\` / prose composition consistent with what the description spells out. If the description says the child is "in the right background, against the tree", that page's matching character is \`depth: background\`, on the right — do not place them at midground or center. Re-read the description before composing each scene that uses it.`;
-        log.debug(`[UNIFIED] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
-      }
-
-      // Build objects (Visual Bible) section if period objects are available
-      let objectsSection = '';
-      if (historicalObjects?.length > 0) {
-        objectsSection = `
-
-**PRE-POPULATED OBJECTS (canonical reference images for these period objects — USE AS-IS):**
-${historicalObjects.map(o => `- ${o.name} (${o.type}): ${o.description || 'Historical object'}`).join('\n')}
-RULES for these objects:
-1. Use the EXACT name shown above whenever you mention one of these objects (scene descriptions, the Visual Bible artifacts list, cover hints). The name is the lookup key for the reference photo.
-2. When you write the Visual Bible entry for one of these objects, COPY THE DESCRIPTION ABOVE VERBATIM into the description field. Do NOT invent alternative shapes, parts, or details — the reference photo was painted to match this exact description and any divergence will produce a different-looking object on the page.
-3. Do not create a parallel artifact entry with a different name for the same physical object.`;
-        log.debug(`[UNIFIED] Including ${historicalObjects.length} pre-fetched object photos for ${storyTopic}`);
-      }
-
-      categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
-
-**CRITICAL: HISTORICAL ACCURACY REQUIRED**
-This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
-
-${historicalGuide}${locationsSection}${objectsSection}
-
-**GUIDELINES:**
-- The main character(s) should witness or participate in this historical event
-- Include historically accurate details about the time period
-- Characters MUST use \`costumed:\` clothing for period-appropriate attire (e.g., costumed:1920s, costumed:medieval). Do NOT use \`standard\` — modern clothes in a historical setting looks wrong.
-- Use the suggested story angles or create a similar child-appropriate perspective
-- Make the history come alive through the eyes of a child character
-- Balance historical education with an engaging adventure narrative
-- The story should help children understand what life was like during this event`;
-    } else {
-      // Fallback if event not found
-      categoryGuidelines = `This is a HISTORICAL story about "<user_input>${storyTopic}</user_input>".
-
-**IMPORTANT GUIDELINES for Historical Stories:**
-- Create a story set during this historical event or period
-- Include historically accurate details about the time
-- Characters should wear period-appropriate clothing
-- Make history accessible and engaging for children
-- Balance education with entertainment`;
-    }
-  } else if (storyCategory === 'swiss-stories') {
-    const cityId = storyTopic.replace(/-\d+$/, '');
-    const cityData = getSwissStoryResearch(cityId);
-    const cityMeta = getSwissCityById(cityId);
-
-    if (cityData) {
-      const ideaNum = parseInt(storyTopic.split('-').pop());
-      const idea = cityData.ideas[ideaNum - 1];
-      // Support both localized {en,de,fr} and plain string formats
-      const ideaTitle = (idea?.title && typeof idea.title === 'object' ? idea.title.en : idea?.title) || storyTopic;
-      const ideaDesc = idea?.description && typeof idea.description === 'object' ? idea.description.en : idea?.description;
-      const cityName = cityMeta?.name?.en || cityId;
-
-      categoryGuidelines = `This is a SWISS LOCAL STORY set in ${cityName}, a real Swiss city.
-
-**STORY IDEA:** "${ideaTitle}"
-${ideaDesc ? `**CONCEPT:** ${ideaDesc}` : ''}
-
-**HISTORICAL & CULTURAL CONTEXT (verified research — use for accuracy):**
-${cityData.research}
-
-**GUIDELINES:**
-- Set the story in this specific Swiss city with real local landmarks
-- Use historically accurate details from the research above
-- Include local cultural elements, traditions, and geography
-- Characters should interact with real places described in the context
-- Make the local history and culture come alive for children
-- The story should feel authentic to this specific Swiss place`;
-    } else {
-      categoryGuidelines = `This is a SWISS LOCAL STORY. Create an engaging story set in a Swiss city with local landmarks and cultural elements.`;
-    }
-  } else if (storyCategory === 'custom') {
-    const customText = inputData.customThemeText || '';
-    categoryGuidelines = `This is a CUSTOM story. The user provided their own story concept:
-
-<user_input>${customText}</user_input>
-
-**IMPORTANT GUIDELINES for Custom Stories:**
-- Follow the user's concept closely - this is their creative vision
-- Build the story around the description provided above
-- Maintain age-appropriate content while honoring the user's idea
-- Create engaging characters and plot points that serve the user's concept`;
-  } else {
-    // Adventure category - get theme-specific guide
-    const adventureGuide = getTeachingGuide('adventure', storyTheme);
-
-    categoryGuidelines = `This is an ADVENTURE story with a "${storyTheme || 'adventure'}" theme.
-
-**IMPORTANT GUIDELINES for Adventure Stories:**
-- Create an exciting, engaging adventure appropriate for the age group
-- Include elements typical of the ${storyTheme || 'adventure'} theme
-- Balance action and excitement with character development
-- Include challenges that the characters must overcome
-- Historical and fantasy themes SHOULD use costumed clothing for authenticity
-- Signature theme props keep their full theme form even in a modern real-world setting: a pirate story's ship is a real pirate ship, a knight story's castle a real castle — never a scaled-down everyday stand-in
-
-${adventureGuide ? `**THEME-SPECIFIC GUIDANCE for "${storyTheme}":**
-${adventureGuide}` : ''}`;
-  }
-
-  // Build characters JSON with relationships
-  const charactersJson = JSON.stringify(characterSummary, null, 2) + relationshipDescriptions;
-
-  // Build the canonical per-character physical block. Sonnet is told to weave
-  // physical description into each scene's prose, so it needs the actual traits.
-  // Without this block it hallucinates — e.g. giving a character a beard when
-  // facialHair is 'clean-shaven', or dropping glasses entirely.
-  // Include the character's stored clothing description. Sonnet uses this as
-  // the STARTING POINT for clothingRequirements[char][category].description —
-  // it can keep it as-is, add an accessory, or change a garment for the story,
-  // but the avatar generator no longer concatenates a separate "signature"
-  // line that could conflict (Noah: green hoodie + signature "blue hoodie" =
-  // two contradictory tops in the same prompt). One field, one full outfit.
-  const characterPhysicalBlock = (inputData.characters || [])
-    .map(char => buildCharacterPromptBlock(char, { format: 'bullets', includeClothing: true }))
-    .join('\n\n');
-
-  // Build available landmarks section if landmarks were pre-discovered
-  const availableLandmarksSection = buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote);
-  if (inputData.availableLandmarks?.length > 0) {
-    log.debug(`[PROMPT] Including ${inputData.availableLandmarks.length} pre-discovered landmarks in unified prompt`);
-  }
-
-  // Use template if available
-  // Look up maxCharactersPerScene from image model config
-  const imageModelKey = inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage;
-  const imageModelConfig = IMAGE_MODELS[imageModelKey];
-  const maxCharsPerScene = imageModelConfig?.maxCharactersPerScene || 3;
-
-  // Prompt-variant seam (roadmap §4 image-first). DEFAULT = the image-first
-  // template (owner 2026-07-31: arc → scenes → text is the production order).
-  // storyPromptVariant === 'textFirst' opts back into the legacy text-then-scene
-  // template (kept for the harness A/B via rerun-text inputOverrides; also set
-  // STORY_PROMPT_VARIANT=textFirst to flip the fleet without a deploy).
-  const variant = inputData.storyPromptVariant || process.env.STORY_PROMPT_VARIANT || 'imageFirst';
-  const useImageFirst = variant !== 'textFirst';
-  if (useImageFirst && !PROMPT_TEMPLATES.storyUnifiedImageFirst) {
-    log.warn('[PROMPT] image-first template not loaded — falling back to storyUnified (text-first)');
-  }
-  const unifiedTemplate = (useImageFirst && PROMPT_TEMPLATES.storyUnifiedImageFirst)
-    ? PROMPT_TEMPLATES.storyUnifiedImageFirst
-    : PROMPT_TEMPLATES.storyUnified;
-
-  if (unifiedTemplate) {
-    // ── ANALYSIS placeholder (split outline review seam) ──
-    // Both templates carry {ANALYSIS_INSTRUCTIONS} in their ---ANALYSIS---
-    // section. Single-call mode injects the full self-critique instructions
-    // (variant-matched body, one source shared with the external reviewer);
-    // split mode injects a stub telling the writer the review happens
-    // externally — no FIXES REQUIRED, no patch blocks, bare ---STORY PAGES---
-    // marker so every parser boundary stays where it is today.
-    // Per-job override first (the rerun-text harness A/B seam:
-    // inputOverrides: { splitOutlineReview: false }), then the global default.
-    const splitReview = inputData.splitOutlineReview !== undefined
-      ? !!inputData.splitOutlineReview
-      : !!MODEL_DEFAULTS.splitOutlineReview;
-    const analysisBody = useImageFirst
-      ? PROMPT_TEMPLATES.outlineAnalysisImageFirst
-      : PROMPT_TEMPLATES.outlineAnalysisTextFirst;
-    let analysisBlock;
-    if (splitReview) {
-      analysisBlock = SPLIT_REVIEW_ANALYSIS_STUB;
-    } else if (analysisBody) {
-      analysisBlock = analysisBody;
-    } else {
-      // Analysis body failed to load — ship the stub rather than an empty
-      // critique section (the model would otherwise invent its own format).
-      log.error('[PROMPT] outline analysis instruction template missing — falling back to reviewed-externally stub');
-      analysisBlock = SPLIT_REVIEW_ANALYSIS_STUB;
-    }
-    // Inject BEFORE fillTemplate so placeholders inside the analysis body
-    // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled below.
-    const templateWithAnalysis = unifiedTemplate.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBlock);
-
-    let prompt = fillTemplate(templateWithAnalysis, {
-      LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
-      PAGES: pageCount,
-      LANGUAGE: getLanguageNameEnglish(language),
-      LANGUAGE_NOTE: getLanguageNote(language),
-      READING_LEVEL: readingLevel,
-      STORY_CATEGORY: storyCategory,
-      STORY_TYPE: storyCategory === 'custom' ? 'custom' : storyTheme,
-      STORY_TOPIC: wrapUserInput(storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None')),
-      STORY_DETAILS: wrapUserInput(inputData.storyDetails || 'None'),
-      CHARACTERS: charactersJson,
-      CHARACTER_PHYSICAL_BLOCK: characterPhysicalBlock,
-      CHARACTER_NAMES: characterNames,
-      MAIN_CHARACTER_NAMES: mainCharacterNames,
-      PRIMARY_CHARACTER_NAMES: primaryCharacterNames,
-      CATEGORY_GUIDELINES: categoryGuidelines,
-      AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
-      MAX_CHARACTERS_PER_SCENE: maxCharsPerScene,
-      // Reader age for the title pick the writer makes in its ---TITLE---
-      // section (2026-08-27, replaced the separate title-judge call).
-      AGE: readerAge(inputData),
-      // The list body under this template's own '## DO-NOT-WRITE LIST' heading.
-      // One copy, in prompts/do-not-write-list.txt.
-      DO_NOT_WRITE_LIST: String(PROMPT_TEMPLATES.doNotWriteList || '').trim()
-    });
-    // Hard gate for all text-overlay-only instructions. Layouts that render
-    // text BELOW the image (square-below, advanced reading level) don't
-    // need textPosition / textZoneDescription / forbidden-side / calm-zone
-    // rules — keeping them in the prompt makes Sonnet emit the fields and
-    // bake the calm-corner constraints into scene prose, polluting non-
-    // overlay stories. story-unified.txt wraps every overlay-only block
-    // in <!-- TEXT_OVERLAY_BEGIN --> … <!-- TEXT_OVERLAY_END -->. With
-    // overlay ON we strip just the markers; with overlay OFF we strip
-    // the markers AND their contents.
-    const textInImage = inputData.layout?.textInImage === true;
-    if (textInImage) {
-      prompt = prompt.replace(/<!-- TEXT_OVERLAY_(BEGIN|END) -->\n?/g, '');
-    } else {
-      prompt = prompt.replace(/<!-- TEXT_OVERLAY_BEGIN -->[\s\S]*?<!-- TEXT_OVERLAY_END -->\n?/g, '');
-    }
-    log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars (textInImage=${textInImage}, variant=${useImageFirst ? 'imageFirst' : 'default'})`);
-    return prompt;
-  }
-
-  // Fallback to hardcoded prompt
-  log.warn('[PROMPT] storyUnified template not loaded, using fallback');
-  return `Create a complete children's story with ${pageCount} pages.
-Language: ${getLanguageNameEnglish(language)}
-Reading Level: ${readingLevel}
-Characters: ${charactersJson}
-Story Type: ${storyTheme}
-Story Details: <user_input>${inputData.storyDetails || 'None'}</user_input>
-
-Output: Title, clothing requirements, character arcs, plot structure, visual bible, cover scenes, and all ${pageCount} pages with text and scene hints.`;
 }
 
 /**
@@ -6376,13 +8610,37 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
 
   if (PROMPT_TEMPLATES.storyTrial) {
     // Look up costume from config
-    const { getTrialCostume } = require('../config/trialCostumes');
+    // Same resolver as the story job and the avatar prewarm. This used to read
+    // `storyTopic || storyTheme`, which on a life-challenge trial looks the
+    // challenge id up in the costume table and finds nothing — so the story
+    // prompt would state "no costume" for a story whose clothingRequirements
+    // and avatar sheets carry the theme's costume.
+    const { getTrialCostumeForStory } = require('../config/trialCostumes');
     const mainChar = (inputData.characters || [])[0];
-    const topic = inputData.storyTopic || inputData.storyTheme || '';
     const category = inputData.storyCategory || 'adventure';
-    const gender = mainChar?.gender || '';
+    const costume = getTrialCostumeForStory({
+      storyCategory: inputData.storyCategory,
+      storyTheme: inputData.storyTheme,
+      storyTopic: inputData.storyTopic,
+      gender: mainChar?.gender || ''
+    });
 
-    const costume = getTrialCostume(topic, category, gender);
+    // Every costume instruction in the template is conditional on a costume
+    // actually existing. The template used to state them unconditionally — the
+    // `[standard | costumed]` enum, "wears it in every scene except the very
+    // first", and a cover fixed at `costumed` — while only this AVATAR_SELECTION
+    // block was gated. A story whose theme has no configured costume therefore
+    // got told to dress its cast in one it does not have: the writer complied,
+    // invented the garment, and (there being no clothingRequirements section in
+    // this template to declare it in) registered it as a Visual Bible artifact,
+    // which reaches the page as a PROP painted onto the standard outfit rather
+    // than worn (prod job_1788698812047_q5b1vuds7).
+    const clothingEnum = costume ? '[standard | costumed]' : 'standard';
+    const clothingRule = costume
+      ? '- `characters.clothing`: a character with a `costumed` variant wears it in every scene except the very first, which is set before the adventure starts. Never `standard` on every page.'
+      : '- `characters.clothing`: always `standard` — this story has no costume variant. Nobody puts on or wears a costume; a costume named in the story idea stays something in the scene, never a garment on a character.';
+    const coverClothingNote = costume ? ' Characters in costumed clothing.' : '';
+    const coverClothing = costume ? 'costumed' : 'standard';
 
     // Build avatar selection section (only if costume available)
     let avatarSelection = '';
@@ -6443,7 +8701,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
 
     // Same life-skill block the full story prompt carries; empty for adventure.
     const categoryGuidelines = category === 'life-challenge' && inputData.storyTopic
-      ? buildLifeSkillGuidelines(inputData.storyTopic, inputData.storyTheme, getTeachingGuide('life-challenge', inputData.storyTopic))
+      ? buildLifeSkillGuidelines(inputData.storyTopic, inputData.storyTheme, getTeachingGuide('life-challenge', inputData.storyTopic), inputData)
       : '';
 
     return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
@@ -6454,10 +8712,37 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
       CATEGORY_GUIDELINES: categoryGuidelines,
+      // Lean (arc) variant: who carries the story, the challenge budget, the
+      // band's explicit arithmetic and the causal rule — no page budget,
+      // thread rule or entrance quota, which would fight the scene-count
+      // instructions this template already carries.
+      STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
       AGE_MODE: buildAgeModeSection(inputData),
+      // Same string the arc prompts get inside {TELLING_RULES}. The trial runs
+      // no review stage of any kind, so the writer prompt is the only place a
+      // framing rule can reach a trial story.
+      RISK_FRAMING: RISK_FRAMING_RULE,
+      PAGE_OPENING_VARIETY: PAGE_OPENING_VARIETY_RULE,
+      // Trial has no Art Director either: the scene-hint composition rules
+      // reach a trial page only through the writer prompt.
+      AD_COMPOSITION: AD_COMPOSITION_RULE,
+      // Same resolver the full pipeline's Art Director uses. Trial has no Art
+      // Director, so without this the creature tone never reaches a trial page.
+      CREATURE_TONE: buildCreatureToneSection(inputData),
       AVATAR_SELECTION: avatarSelection,
+      CLOTHING_ENUM: clothingEnum,
+      CLOTHING_RULE: clothingRule,
+      COVER_CLOTHING_NOTE: coverClothingNote,
+      COVER_CLOTHING: coverClothing,
       LANDMARKS: landmarksInstruction,
+      // Same resolver the trial's images use, so prose and pictures agree.
+      SEASON: buildSeasonInstruction(inputData),
       MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
+      // ONE scale vocabulary for every Visual-Bible authoring site — the trial
+      // writer authors its own bible, so it declares the same placeholder.
+      SCALE_CLASS_SPEC,
+      // ...and the same entry-page contract, for the same reason.
+      ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
     });
   }
 
@@ -6505,37 +8790,92 @@ function buildVbLocationLines(loc) {
 // `retryNote` (optional): one generic sentence injected when a previous writer
 // attempt fell short of the landmark guideline — see the landmark check in
 // storyJobPipeline.js. Never story-specific.
-function buildAvailableLandmarksSection(landmarks, retryNote = '') {
+// ONE to TWO sentences of Wikipedia extract, never the whole article (owner,
+// 2026-09-19). The stored extract is a full lead paragraph and every one of the
+// ~20 offered landmarks carried it verbatim: the Zurich James Joyce Foundation
+// alone spent 958 chars explaining its archival significance to a prompt whose
+// job is to plan a story for a five-year-old. The prompt needs what the place
+// IS; the rest is the article's, not the story's.
+const LANDMARK_DESCRIPTION_MAX = 260;
+function shortLandmarkDescription(extract) {
+  const text = String(extract || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (text.length <= LANDMARK_DESCRIPTION_MAX) return text;
+  // Cut on a sentence end inside the budget, so the entry never ends mid-clause.
+  // A full stop after an initial or an abbreviation is not a sentence end, so
+  // require a following space and a capital or end-of-window.
+  const window = text.slice(0, LANDMARK_DESCRIPTION_MAX + 1);
+  const ends = [...window.matchAll(/[.!?](?=\s+[A-ZÄÖÜ]|\s*$)/g)].map(m => m.index + 1);
+  const cut = ends.length ? ends[ends.length - 1] : -1;
+  if (cut > 0) return window.slice(0, cut).trim();
+  return window.slice(0, LANDMARK_DESCRIPTION_MAX).replace(/\s+\S*$/, '').trim() + '…';
+}
+
+/**
+ * @param {Object} opts
+ *   jsonFields  emit the `isRealLandmark` / `landmarkQuery` output contract and
+ *               its JSON example. ONLY the Art Director emits those fields, and
+ *               only it should be told about them. The arc creator writes
+ *               numbered prose sentences and was carrying ~900 chars of JSON
+ *               schema for a format it must never produce — including a worked
+ *               example object with a "description" key, in a prompt that ends
+ *               "Last line, exactly: Stronger: Arc <N>".
+ */
+function buildAvailableLandmarksSection(landmarks, retryNote = '', { jsonFields = false } = {}) {
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
 
-  // Format with Wikipedia descriptions (what the landmark IS, not what photos look like)
-  // "- Kurpark (Baden) [Park]: A historic spa park in the town center..."
+  // Two lines per landmark. DESCRIPTION is the Wikipedia extract — what the
+  // landmark IS, for the story. PHOTOS is what we can actually show of it: one
+  // clause per reference photo, its kind and a short description. The writer
+  // used to get only the first, and authored viewpoints no photo shows —
+  // "distant aerial view" of a station whose only exterior is a street-level
+  // façade — so the page rendered the landmark from words. The photos ARE the
+  // landmark as far as the pictures are concerned, and the bible may only
+  // name a viewpoint one of them shows.
+  const photoLine = (l) => {
+    const variants = Array.isArray(l.photoVariants) ? l.photoVariants : [];
+    const clauses = variants
+      // A variant with no stored description said "(medium) reference photo" —
+      // a clause that tells the model nothing about what the photo shows, which
+      // is the only reason this line exists. Drop it instead.
+      .map(v => ({ kind: v.kind || v.vantage || 'exterior', d: String(v.description || '').replace(/^\[[^\]]*\]\s*/, '').trim() }))
+      .filter(v => v.d)
+      .map(v => `(${v.kind}) ${v.d}`)
+      .map(c => c.length > 110 ? c.slice(0, 107).replace(/\s+\S*$/, '') + '…' : c);
+    return clauses.length ? `\n  PHOTOS: ${clauses.join('; ')}` : '';
+  };
   const landmarkList = landmarks
     .map(l => {
       let entry = `- ${l.name}`;
       if (l.type) entry += ` [${l.type}]`;
-      // Use Wikipedia extract for outline (describes what landmark IS)
-      // NOT photo description (describes what a photo looks like)
-      const description = l.wikipediaExtract || l.wikipedia_extract;
+      const description = shortLandmarkDescription(l.wikipediaExtract || l.wikipedia_extract);
       if (description) entry += `\n  DESCRIPTION: ${description}`;
+      entry += photoLine(l);
       return entry;
     })
     .join('\n');
 
   const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
+  const hasPhotos = landmarks.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
 
-  return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
+  // THE ONE STATEMENT OF THE LANDMARK RULE (owner, 2026-09-19). The telling
+  // rules used to carry a second, contradictory one ("at most on the opening
+  // page ... or not at all"); it is deleted. If a landmark rule needs changing,
+  // it changes here and nowhere else.
+  return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none${jsonFields ? ' — no entry with isRealLandmark or landmarkQuery' : ''}, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
 ${retryNote ? `\n${retryNote}\n` : ''}
 ${landmarkList}
 
 When you use a landmark from the list (even if you rename it in your story):
-- Set "isRealLandmark": true
+${jsonFields ? `- Set "isRealLandmark": true
 - Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
-${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
+` : ''}${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
 - The DESCRIPTION is reference for you, not wording for the page. Never carry an abbreviation, acronym or technical term from it into the story — name the thing the way a child would say it` : ''}
+${hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none` : ''}
 
+${jsonFields ? `
 EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 {
   "name": "The Enchanted Castle",
@@ -6545,7 +8885,7 @@ EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 }
 
 Your "name" can be creative, but "landmarkQuery" MUST match the original name exactly (without the [type] suffix)!
-`;
+` : ''}`;
 }
 
 // ============================================================================
@@ -6578,7 +8918,123 @@ function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious 
 // ============================================================================
 
 
+/**
+ * Costume instructions for the trial idea generator.
+ *
+ * A trial's clothing comes from the static costume table, not the writer, so a
+ * theme with no entry never gets a costumed avatar sheet and a premise that has
+ * a character put a costume ON cannot be rendered as worn (prod
+ * job_1788698812047_q5b1vuds7). With a costume the three pieces are the
+ * historical wording, unchanged.
+ *
+ * @param {{costumeType: string, description: string}|null} costume
+ * @returns {{costumeRule: string, themeShows: string, fantasyOpening: string}}
+ */
+function buildTrialIdeaCostumeInstructions(costume) {
+  if (costume) {
+    return {
+      costumeRule: '',
+      themeShows: 'A costume or theme shows in what they wear and how they play',
+      fantasyOpening: 'dressing up, or starting to play'
+    };
+  }
+  return {
+    costumeRule: ' No character puts on, changes into or wears a costume, disguise or special outfit; a costume may appear as an object in the scene — on display, on a rack, carried — never on a character.',
+    themeShows: 'The theme shows in what they play with and where they play',
+    fantasyOpening: 'starting to play'
+  };
+}
+
+/**
+ * Two draws of a trial idea differ by construction, not by being asked to.
+ * One axis pair is injected per arm and rotated; the lists are coprime in
+ * length, so the pairing turns over rather than repeating every cycle. Lab 1273
+ * measured the unrotated prompt collapsing to one premise 10 times out of 10.
+ */
+const IDEA_WANT_AXES = [
+  'something the main character wants to give away, not to get',
+  'something that has to be put back where it belongs',
+  'somewhere the main character wants to reach',
+  'something that has to be finished before a moment passes',
+  'someone the main character wants to bring along',
+  'something the main character wants to make',
+  'something that has to be carried safely to the end',
+];
+const IDEA_COMPANION_AXES = [
+  'an animal',
+  'one other child',
+  'a grown-up who stays out of the solving',
+  'a favourite object treated as a friend',
+];
+let ideaAxisCursor = 0;
+
+function nextIdeaVarietyAxis() {
+  const i = ideaAxisCursor++;
+  const want = IDEA_WANT_AXES[i % IDEA_WANT_AXES.length];
+  const companion = IDEA_COMPANION_AXES[i % IDEA_COMPANION_AXES.length];
+  return { want, companion, text: `This idea's want: ${want}. Whoever comes along: ${companion}.` };
+}
+
+/**
+ * The two trial idea prompts, built once for every caller (the /try route and
+ * the Lab's variety stage, which has to measure what production sends).
+ *
+ * The arms differ in KIND (owner, 2026-08-25): own town at real landmarks vs a
+ * make-believe world entered from home. They fire in parallel, so neither can
+ * refer to the other — both arms get every PREMISE rule of the band, and only
+ * the own-town arm also gets its MECHANICS (the page arithmetic that helps a
+ * concrete local premise), which is what makes it a different story rather than
+ * the same story relocated.
+ */
+function buildTrialIdeaPrompts({
+  template,
+  characters = [],
+  charDesc = '',
+  categoryContext = '',
+  landmarksText = '',
+  townName = '',
+  storyTheme = '',
+  trialTitle = '',
+  langInstruction = '',
+  seasonInstruction = '',
+  ideaCostume = null,
+} = {}) {
+  const tpl = template || PROMPT_TEMPLATES.trialIdea;
+  if (!tpl || !String(tpl).trim()) throw new Error('trial-idea template unavailable');
+  const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
+  const title = String(trialTitle || '').trim();
+  const axes = { local: nextIdeaVarietyAxis(), fantasy: nextIdeaVarietyAxis() };
+
+  const base = (bandView, axis) => fillTemplate(tpl, {
+    SEASON: seasonInstruction,
+    CHARACTER: charDesc,
+    CATEGORY_CONTEXT: categoryContext,
+    TITLE: title,
+    TITLE_LINE: title ? `Story title: ${title}` : '',
+    TITLE_RULE: title ? 'The idea must fit the title above and never repeats it. ' : '',
+    VARIETY_AXIS: axis.text,
+    LANDMARKS: '',
+    LANG_INSTRUCTION: langInstruction,
+    AGE_MODE: buildAgeModeSection({ characters }, { bandView }),
+    COSTUME_RULE: costumeRule,
+  });
+
+  const townClause = townName ? `in ${townName}` : `in the child's own town`;
+  const noInventedPlaces = landmarksText
+    ? '\nName no place beyond the landmarks listed above - no other river, lake, mountain, street, square or building. Any further setting must be generic ("the market", "the woods").'
+    : '';
+  const localIdea = `\n${landmarksText}\nSet this idea ${townClause}, at the real local places named above.${noInventedPlaces} ${themeShows} — the play is the story, never a trip somewhere else.`;
+  const fantasyIdea = `\nSet this idea in a make-believe ${storyTheme && storyTheme !== 'realistic' ? storyTheme + ' ' : ''}world. It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
+
+  return {
+    local: base('premise', axes.local) + localIdea,
+    fantasy: base('premise-open', axes.fantasy) + fantasyIdea,
+    axes,
+  };
+}
+
 module.exports = {
+  OBJECT_ID_STABILITY_RULE,
   wrapUserInput,
   getPhysicalFromChar,
   stripAgeWords,
@@ -6645,39 +9101,80 @@ module.exports = {
   buildSceneExpansionAllPrompt,
   buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
-  NON_WORN_STRONG_RE,
-  NON_WORN_WEAK_RE,
-  BODY_ANCHORED_DRAPE_RE,
-  textDeclaresNonWornPlacement,
-  sceneDeclaresNonWornState,
+  pageSeasonLabel,
   WORN_ATTACHMENT_CLAUSE_RE,
   stripWornStateFromDescription,
   buildImagePrompt,
+  looksAtPhrase,
   sanitizeVbIdsInPrompt,
+  collectVbObjectCitations,
+  vbObjectIdOf,
+  droppedVbCitations,
+  warnDroppedVbCitations,
+  elementLeadLabel,
   vbDeclaredLetteringNames,
   buildExactPosesBlock,
-  SPLIT_REVIEW_ANALYSIS_STUB,
+  buildReceiverPlacement,
   sliceAnalysisAspect,
   stripReviewAspectMarkers,
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,
   parseRefinedText,
   buildStoryContextFields,
+  buildRelationshipLines,
   buildBeatsPrompt,
   buildChallengeIdeasSection,
+  drawChallengeIdeas,
   buildArcCreatePrompt,
   buildArcPanelPrompt,
   buildArcRetellPrompt,
   buildArcHintsPrompt,
   buildArcBudgetSection,
+  buildTellingRulesSection,
+  RISK_FRAMING_RULE,
+  COUNTING_RULE,
+  PLAN_LINE_CAST_RULE,
+  MULTI_PICTURE_PROP_RULE,
+  CONCEALED_OBJECT_RULE,
+  STAGED_PROP_RULE,
+  CONTACT_VERB_RULE,
+  REACHABLE_CONTACT_RULE,
+  DECLARED_TRAIT_VERBATIM_RULE,
+  ONE_INSTANT_RULE,
+  GAZE_TARGET_RULE,
+  LOOKS_AT_FIELD_RULE,
+  EXPRESSION_FIELD_RULE,
+  GARMENT_REMOVED_RULE,
+  WORN_ON_OTHER_RULE,
+  ABSENT_THING_RULE,
+  SCENE_INTENT_FIELD_RULE,
+  // ONE rule for the nine templates that author or judge a page against its
+  // text — see TEXT_NOT_A_CHECKLIST_RULE. Exported so the four fill sites that
+  // live outside this file (prompts.js, evalPipeline.js, sceneValidator.js,
+  // bookAudit.js) read the same string, never a copy of it.
+  TEXT_NOT_A_CHECKLIST_RULE,
+  ELEMENT_ENTRY_PAGE_RULE,
+  NO_CHARACTER_MARKING_RULE,
+  HANDS_HOLD_ONLY_NAMED_RULE,
+  PAGE_OPENING_VARIETY_RULE,
+  AD_COMPOSITION_RULE,
   parseArcHints,
   parseArcCreate,
   parseArcRetell,
+  parseInventedFigures,
+  parsePremiseFigures,
+  arcInventedAllowance,
   critiqueMaxSeverity,
   buildPlanCheckPrompt,
   parsePlanCheck,
+  parsePlanCheckRoster,
+  parsePlanCheckObstacles,
   buildReplanSection,
+  parsePlanChanges,
+  REPLAN_CHANGES_FORMAT,
+  PLAN_CHANGE_VOCABULARY,
   replanRank,
+  findingPages,
   buildArcReviewPrompt,
   buildArcAuditPrompt,
   buildChildCriticPrompt,
@@ -6691,7 +9188,13 @@ module.exports = {
   buildStoryShapeSection,
   pickMainCharacters,
   resolveAgeBand,
+  resolvePacingBand,
+  focusAge,
   buildAgeModeSection,
+  buildLifeSkillGuidelines,
+  buildTopicWindowSection,
+  TOPIC_AGE_WINDOWS,
+  buildCreatureToneSection,
   challengeCatalogueBands,
   parseArcReview,
   buildClothingReviewPrompt,
@@ -6702,12 +9205,20 @@ module.exports = {
   planBlocks,
   planInstant,
   buildSceneReviewPrompt,
+  buildSceneReviewBibleBlock,
   buildDoNotWriteSection,
   buildStoryTextFromBeatsPrompt,
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
-  buildUnifiedStoryPrompt,
   buildTrialStoryPrompt,
   buildAvailableLandmarksSection,
+  buildTrialIdeaCostumeInstructions,
+  buildTrialIdeaPrompts,
+  AGE_OWNS_PROPS_RULE,
+  nextIdeaVarietyAxis,
+  applyBandView,
+  BAND_VIEW_KEEPS,
+  BAND_PREMISE_SLOTS,
+  parseBandSpans,
   buildPreviousScenesContext
 };

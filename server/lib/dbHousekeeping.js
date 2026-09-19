@@ -150,6 +150,7 @@ async function offloadInlineImages(pool, log, { tables = TABLES, limit = null } 
       if (!tasks.length) continue;
 
       let failed = 0;
+      const uploaded = [];
       const PARALLEL = 12;
       let next = 0;
       await Promise.all(new Array(Math.min(PARALLEL, tasks.length)).fill(null).map(async () => {
@@ -160,12 +161,28 @@ async function offloadInlineImages(pool, log, { tables = TABLES, limit = null } 
             const url = await r2.uploadImage(tasks[i].input, tasks[i].key);
             if (!url) throw new Error('no URL');
             tasks[i].apply(url);
+            uploaded.push(tasks[i].key);
           } catch { failed++; }
         }
       }));
 
       if (failed) {
+        // The row keeps its inline bytes, so the uploads that DID succeed are
+        // referenced by nothing. Record them for reclamation instead of leaving
+        // them in the bucket unreachable. Safe because the row still holds the
+        // inline bytes: a later pass re-uploads the same deterministic keys.
+        // That is also why the pending retry runs BEFORE this offload in
+        // runDailyHousekeeping — reversing the order would delete an object the
+        // same run had just re-uploaded and referenced.
         log.warn(`[db-housekeeping] ${table}/${row.id}: ${failed}/${tasks.length} uploads failed — row left unchanged`);
+        try {
+          const r2Pending = require('./r2Pending');
+          for (const key of uploaded) {
+            await r2Pending.recordPending('object', key, `partial JSONB offload of ${table}/${row.id}`);
+          }
+        } catch (err) {
+          log.warn(`[db-housekeeping] could not record ${uploaded.length} unreferenced upload(s): ${err.message}`);
+        }
         result.skipped++;
         continue;
       }
@@ -372,6 +389,21 @@ async function runDailyHousekeeping({ pool, log }) {
   const before = await databaseSize(pool);
   log.info(`[db-housekeeping] daily start — database ${before.pretty}`);
 
+  // Retry every R2 prune that failed after its owning row was already gone.
+  // Without this the keys in r2_pending_deletions would just be a nicer record
+  // of an orphan; with it they are recoverable (server/lib/r2Pending.js).
+  // Runs BEFORE the offload on purpose — see the note in offloadInlineImages.
+  let pendingR2 = { tried: 0, settled: 0, stillFailing: 0 };
+  try {
+    pendingR2 = await require('./r2Pending').retryPending();
+    if (pendingR2.stillFailing > 0) {
+      log.warn(`[db-housekeeping] ${pendingR2.stillFailing} R2 deletion(s) still failing after retry — ` +
+               `see r2_pending_deletions (deleted_at IS NULL)`);
+    }
+  } catch (err) {
+    log.warn(`[db-housekeeping] pending R2 deletion retry failed: ${err.message}`);
+  }
+
   const offload = await offloadInlineImages(pool, log);
   if (offload.rows > 0 || offload.skipped > 0) {
     // Not routine noise. Rows only get here because a write path stored image
@@ -387,7 +419,7 @@ async function runDailyHousekeeping({ pool, log }) {
 
   const report = await bloatReport(pool);
   logBloatReport(report, log);
-  return { offload, report };
+  return { offload, report, pendingR2 };
 }
 
 /**

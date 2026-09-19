@@ -8,6 +8,11 @@ import { storyService } from '@/services';
 
 const sectionTranslations = {
   en: {
+    // Hero trust row (ads landing: only claims the site already makes elsewhere)
+    trustPayment: 'Secure payment with Stripe',
+    trustSwiss: 'Printed and shipped in Switzerland',
+    trustImprint: 'Imprint',
+    trustPrivacy: 'Privacy Policy',
     // Section 1: Characters
     step1: 'Step 1',
     createCharacters: 'Create Your Characters',
@@ -69,6 +74,11 @@ const sectionTranslations = {
     discoverScienceDesc: 'The research behind personalized stories and child development.',
   },
   de: {
+    // Hero trust row
+    trustPayment: 'Sichere Zahlung mit Stripe',
+    trustSwiss: 'Gedruckt und versandt in der Schweiz',
+    trustImprint: 'Impressum',
+    trustPrivacy: 'Datenschutz',
     // Section 1: Characters
     step1: 'Schritt 1',
     createCharacters: 'Erstelle deine Charaktere',
@@ -130,6 +140,11 @@ const sectionTranslations = {
     discoverScienceDesc: 'Die Forschung hinter personalisierten Geschichten und Kindesentwicklung.',
   },
   fr: {
+    // Hero trust row
+    trustPayment: 'Paiement sécurisé avec Stripe',
+    trustSwiss: 'Imprimé et expédié en Suisse',
+    trustImprint: 'Mentions légales',
+    trustPrivacy: 'Confidentialité',
     // Section 1: Characters
     step1: 'Étape 1',
     createCharacters: 'Créez vos personnages',
@@ -191,6 +206,11 @@ const sectionTranslations = {
     discoverScienceDesc: 'La recherche derrière les histoires personnalisées et le développement de l\'enfant.',
   },
   it: {
+    // Hero trust row
+    trustPayment: 'Pagamento sicuro con Stripe',
+    trustSwiss: 'Stampato e spedito in Svizzera',
+    trustImprint: 'Impressum',
+    trustPrivacy: 'Privacy',
     // Section 1: Characters
     step1: 'Passo 1',
     createCharacters: 'Crea i tuoi personaggi',
@@ -434,14 +454,27 @@ export default function LandingPage() {
                 {t.startJourney}
                 <ArrowRight size={24} />
               </Button>
-              <div className="mt-4">
+              {/* min-h-[44px] on the text links: mobile tap-target size (ads
+                  landing-page experience) without changing the visible layout. */}
+              <div className="mt-2">
                 <button
                   onClick={() => setShowAuthModal(true)}
-                  className="text-indigo-500 hover:text-indigo-800 text-sm font-medium underline"
+                  className="inline-flex items-center min-h-[44px] text-indigo-500 hover:text-indigo-800 text-sm font-medium underline"
                 >
                   {t.alreadyHaveAccount || 'Already have an account? Log in'}
                 </button>
               </div>
+              {/* Trust row: claims already made elsewhere on the site (CreditsModal,
+                  step 4) + the legal pages, surfaced next to the CTA. */}
+              <p className="text-xs lg:text-sm text-stone-600 flex flex-wrap items-center gap-x-2">
+                <span>{st.trustPayment}</span>
+                <span aria-hidden="true">·</span>
+                <span>{st.trustSwiss}</span>
+                <span aria-hidden="true">·</span>
+                <Link to="/impressum" className="inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustImprint}</Link>
+                <span aria-hidden="true">·</span>
+                <Link to="/privacy" className="inline-flex items-center min-h-[44px] underline hover:text-stone-900">{st.trustPrivacy}</Link>
+              </p>
             </div>
           </div>
 
@@ -462,7 +495,7 @@ export default function LandingPage() {
                     <img src="/images/Real person.webp" alt="Your Picture" width="360" height="433" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : 'Your Picture'}
+                    {language === 'de' ? 'Dein Foto' : language === 'fr' ? 'Votre Photo' : language === 'it' ? 'La tua foto' : 'Your Picture'}
                   </p>
                 </div>
 
@@ -477,7 +510,7 @@ export default function LandingPage() {
                     <img src="/images/Avatar.webp" alt="Your Character" width="360" height="360" fetchPriority="high" decoding="async" className="w-full h-auto object-contain rounded-lg max-h-[100px] lg:max-h-[180px]" />
                   </div>
                   <p className="text-xs lg:text-base text-black font-semibold">
-                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : 'Your Character'}
+                    {language === 'de' ? 'Dein Charakter' : language === 'fr' ? 'Votre Personnage' : language === 'it' ? 'Il tuo personaggio' : 'Your Character'}
                   </p>
                 </div>
               </div>
@@ -503,7 +536,7 @@ export default function LandingPage() {
                   </video>
                 </div>
                 <p className="text-xs lg:text-base text-black font-semibold">
-                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : 'Your Story'}
+                  {language === 'de' ? 'Deine Geschichte' : language === 'fr' ? 'Votre Histoire' : language === 'it' ? 'La tua storia' : 'Your Story'}
                 </p>
               </div>
             </div>
@@ -644,7 +677,7 @@ export default function LandingPage() {
                 to="/themes"
                 className="inline-flex items-center gap-1 mt-4 text-indigo-500 hover:text-indigo-800 font-medium text-sm"
               >
-                {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : 'Browse all themes'} <ArrowRight size={16} />
+                {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : language === 'it' ? 'Esplora tutti i temi' : 'Browse all themes'} <ArrowRight size={16} />
               </Link>
             </div>
             {/* Image - Second on mobile, peeks from below */}
@@ -901,7 +934,7 @@ export default function LandingPage() {
                   {desc}
                 </p>
                 <div className="mt-3 inline-flex items-center gap-1 text-indigo-500 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                  {language === 'de' ? 'Entdecken' : language === 'fr' ? 'Découvrir' : 'Explore'}
+                  {language === 'de' ? 'Entdecken' : language === 'fr' ? 'Découvrir' : language === 'it' ? 'Esplora' : 'Explore'}
                   <ArrowRight size={14} />
                 </div>
               </Link>

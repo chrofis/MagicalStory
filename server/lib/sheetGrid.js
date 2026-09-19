@@ -295,19 +295,30 @@ async function labelCells(buffer, cells) {
  * `element` is the 1-based position in the requested list. A label of null,
  * "none" or an unknown letter means the element was not found.
  *
+ * The reply is read TOLERANTLY: the model wraps the object in a ```json fence,
+ * writes a sentence in front of it, or — the measured case — appends prose
+ * AFTER valid JSON. The old greedy `/\{[\s\S]*\}/` span swallowed that trailing
+ * prose whenever it contained a brace and JSON.parse then threw
+ * "Unexpected non-whitespace character after JSON at position 94" (staging
+ * job_1789348171785_9oxos7dwv), which cost EVERY element of that batch its
+ * reference. `extractBalancedJsonObject` (outlineParser/shared — the repo's
+ * one brace-balanced extractor, reused rather than written a third time) stops
+ * at the JSON's own closing brace, so trailing prose is simply ignored.
+ *
  * @returns {{ map: Array<number|null>, missing: number[], unused: number[] }}
  *          map[i] = cell index for element i, or null when unmatched
  */
 function parseCellIdentification(text, elementCount, cellCount) {
+  const { extractBalancedJsonObject } = require('./outlineParser/shared');
   const raw = String(text || '');
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const body = (fenced ? fenced[1] : raw).trim();
-  const objMatch = body.match(/\{[\s\S]*\}/);
-  if (!objMatch) throw new Error('identification reply contained no JSON object');
+  const objText = extractBalancedJsonObject(body);
+  if (!objText) throw new Error('identification reply contained no JSON object');
 
   let parsed;
   try {
-    parsed = JSON.parse(objMatch[0]);
+    parsed = JSON.parse(objText);
   } catch (err) {
     throw new Error('identification reply is not valid JSON: ' + err.message);
   }
@@ -333,6 +344,40 @@ function parseCellIdentification(text, elementCount, cellCount) {
   return { map, missing, unused };
 }
 
+/**
+ * Drop assignments whose cell is not a single panel.
+ *
+ * When the model draws a different grid than asked for, the detector can merge
+ * several drawn panels into one "cell" (staging job_1789147573901_m3uam0nxi:
+ * a sheet of three stacked panels plus a blank margin column was detected as
+ * 2x1, and the identification call named one of those two cells for a single
+ * element — the stored reference then showed three different objects). A crop
+ * that re-detects as more than one cell is such a merge: it cannot be trusted
+ * as one element's reference, so the element gets NO reference instead of a
+ * wrong one. A missing reference degrades; a three-object reference poisons
+ * every prompt it reaches.
+ *
+ * Pure, so the mapping is testable without an image or a model call.
+ *
+ * @param {Array<number|null>} map element index -> cell index (or null)
+ * @param {Array<number>} panelCounts per cell index, panels detected INSIDE it
+ * @returns {{ map: Array<number|null>, dropped: Array<{element:number, cell:number, panels:number}> }}
+ */
+function rejectMultiPanelAssignments(map, panelCounts) {
+  const out = map.slice();
+  const dropped = [];
+  for (let i = 0; i < out.length; i++) {
+    const cell = out[i];
+    if (cell === null || cell === undefined) continue;
+    const panels = Number(panelCounts[cell]) || 1;
+    if (panels > 1) {
+      dropped.push({ element: i, cell, panels });
+      out[i] = null;
+    }
+  }
+  return { map: out, dropped };
+}
+
 module.exports = {
   detectSheetGrid,
   detectGutterBands,
@@ -342,5 +387,6 @@ module.exports = {
   cellLabel,
   labelToIndex,
   parseCellIdentification,
+  rejectMultiPanelAssignments,
   lineStats,
 };

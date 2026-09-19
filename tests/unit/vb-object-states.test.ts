@@ -214,11 +214,25 @@ describe('REQUIRED OBJECTS — a dotted handle reaches the block', () => {
     expect(w).toContain(numbers(16));  // the full authored text, for diagnosis
   });
 
-  it('a BARE id on a stated object emits no clause (the unaltered look)', () => {
+  it('a BARE id takes the state the BIBLE declares for the page (the brief rarely repeats the handle)', () => {
+    // Supersedes "a bare id emits no clause": the Art Director writes the bare
+    // parent id on nearly every page, so leaving the delta off a bare citation
+    // meant the page's own state never reached the render
+    // (job_1788763045123_z8so79ngb p3: "flower missing", flower still drawn).
+    // promptFor renders page 7, which STATED declares as the "lit" state.
     const line = requiredObjectsBlock(promptFor(['ART001']))
       .split('\n').find(l => l.includes('hollowed carved vessel'))!;
-    expect(line).not.toMatch(/light source burns/);
+    expect(line).toMatch(/light source burns/);
     expect(line).toContain('fits in two cupped hands');
+  });
+
+  it('a bare id on a page NO state declares still emits no clause', () => {
+    const vb = bible();
+    vb.artifacts[0].appearsInPages.push(9);
+    const line = requiredObjectsBlock(
+      buildImagePrompt(scene(['ART001']), { language: 'en' }, null, vb, 9, null, {}))
+      .split('\n').find(l => l.includes('hollowed carved vessel'))!;
+    expect(line).not.toMatch(/light source burns/);
   });
 
   it('the bracket form carries the dotted suffix too — "[ART001.3]"', () => {
@@ -267,9 +281,19 @@ describe('getElementReferenceImagesForPage — dotted handles resolve', () => {
     expect(refs.find((r: any) => r.id === 'ART001').referenceImageUrl).toBe('https://r2/base.jpg');
   });
 
-  it('a bare id resolves to the DEFAULT state cell — the first state', () => {
+  it('a bare id resolves to the state the BIBLE declares for that page', () => {
+    // page 7 is declared by state 3 ("lit"). The bible's own pages[] is the
+    // deterministic channel — the brief usually cites the bare parent id.
     const refs = getElementReferenceImagesForPage(withCells(), 7, 4, ['ART001']);
     const row = refs.find((r: any) => r.id === 'ART001');
+    expect(row.referenceImageUrl).toBe('https://r2/state3.jpg');
+    expect(row.stateId).toBe('ART001.3');
+  });
+
+  it('a bare id on a page no state declares falls back to the DEFAULT (first) state cell', () => {
+    const vb = withCells();
+    vb.artifacts[0].appearsInPages.push(9);
+    const row = getElementReferenceImagesForPage(vb, 9, 4, ['ART001']).find((r: any) => r.id === 'ART001');
     expect(row.referenceImageUrl).toBe('https://r2/state1.jpg');
     expect(row.stateId).toBe('ART001.1');
   });
@@ -406,5 +430,669 @@ describe('updateElementReferenceImage — dotted writes land on the state', () =
   it('the R2 key has no second extension, and bare-id keys are unchanged', () => {
     expect(keyForVbReference('s1', 'ART001.2')).toBe('stories/s1/vb/ART001_2.jpg');
     expect(keyForVbReference('s1', 'ART001')).toBe('stories/s1/vb/ART001.jpg');
+  });
+});
+
+// ── 8. STATE CELL → PAGE RESOLUTION ───────────────────────────────────────
+// The production defect (staging job_1788763045123_z8so79ngb, d473434ed):
+// since a stated object has NO base cell, an object whose state rows carry no
+// dotted id renders its paid sheet into nothing and is referenced on NO page.
+// Three guarantees are locked down here: the live parse path mints the ids;
+// a page resolves to the cell the BIBLE declares for it (the brief writes the
+// bare parent id, so the dotted handle alone is not a channel we can rely on);
+// and an object with a sheet but no usable cell fails LOUDLY.
+describe('state cell → page resolution', () => {
+  const { UnifiedStoryParser } = require_('../../server/lib/outlineParser/unified');
+  const {
+    objectStateForPage, elementRefCell, hasElementReference, defaultObjectState,
+  } = require_('../../server/lib/visualBible');
+
+  const rendered = () => {
+    const vb = bible();
+    // What the sheet run writes back: one cell per state, no base cell.
+    delete vb.artifacts[0].referenceImageUrl;
+    for (const st of vb.artifacts[0].states) {
+      updateElementReferenceImage(vb, st.id, 'data:image/png;base64,xx', `https://r2/${st.id}.jpg`);
+    }
+    return vb;
+  };
+
+  it('the LIVE parse path mints dotted ids and empty cells for every state', () => {
+    const response = '---VISUAL BIBLE---\n```json\n' + JSON.stringify({
+      artifacts: [{
+        id: 'ART001', name: 'carved vessel', pages: [1, 2],
+        states: [{ name: 'whole', delta: 'unbroken', pages: [1] }, { name: 'cracked', delta: 'split down one wall', pages: [2] }],
+      }],
+    }) + '\n```\n';
+    const vb = new UnifiedStoryParser(response).extractVisualBible();
+    expect(vb.artifacts[0].states.map((s: any) => s.id)).toEqual(['ART001.1', 'ART001.2']);
+    expect(vb.artifacts[0].states[0]).toHaveProperty('referenceImageUrl', null);
+    // A state-less entry is untouched — no `states` key invented.
+    const plain = new UnifiedStoryParser('---VISUAL BIBLE---\n```json\n'
+      + JSON.stringify({ artifacts: [{ id: 'ART002', name: 'basket', pages: [1] }] }) + '\n```\n').extractVisualBible();
+    expect(plain.artifacts[0].states).toBeUndefined();
+  });
+
+  it('a page resolves to the state the bible declares for it, with no dotted handle in the brief', () => {
+    const vb = rendered();
+    for (const [page, name] of [[5, 'cracked'], [6, 'mended'], [7, 'lit'], [8, 'lit']] as const) {
+      const refs = getElementReferenceImagesForPage(vb, page, 4, ['ART001'], null);
+      const card = refs.find((r: any) => r.id === 'ART001');
+      expect(card, `page ${page}`).toBeTruthy();
+      expect(card.stateName, `page ${page}`).toBe(name);
+      expect(card.referenceImageUrl).toBe(`https://r2/${card.stateId}.jpg`);
+    }
+  });
+
+  it('a cited handle that disagrees with the page table loses to the table when the page gives no contact verdict', () => {
+    // Supersedes "a cited dotted handle outranks the page declaration"
+    // (2026-09-08): measured on staging job_1788816451791_25b31uqlp p12, the
+    // brief cited a state the table assigned to pages 16-17. With no
+    // interactions to arbitrate, the bible's own page table stands.
+    const vb = rendered();
+    const refs = getElementReferenceImagesForPage(vb, 5, 4, ['ART001.3'], null);
+    expect(refs.find((r: any) => r.id === 'ART001').stateName).toBe('cracked');
+  });
+
+  it('a page no state declares falls back to the DEFAULT (first) state', () => {
+    const vb = rendered();
+    vb.artifacts[0].appearsInPages.push(9);
+    const refs = getElementReferenceImagesForPage(vb, 9, 4, ['ART001'], null);
+    expect(refs.find((r: any) => r.id === 'ART001').stateName).toBe(defaultObjectState(vb.artifacts[0]).name);
+  });
+
+  it('NO-STATE case — a plain object still resolves to its own render', () => {
+    const vb = rendered();
+    const card = getElementReferenceImagesForPage(vb, 5, 4, ['ART002'], null).find((r: any) => r.id === 'ART002');
+    expect(card.referenceImageUrl).toBe('https://r2/plain.jpg');
+    expect(card.stateId).toBeNull();
+  });
+
+  it('MULTI-STATE — every state that rendered is reachable, each from its own cell', () => {
+    const vb = rendered();
+    const seen = [5, 6, 7].map(p => getElementReferenceImagesForPage(vb, p, 4, ['ART001'], null)
+      .find((r: any) => r.id === 'ART001').stateId);
+    expect(new Set(seen).size).toBe(3);
+  });
+
+  it('a stated object with only SOME cells rendered substitutes a sibling cell rather than shipping none', () => {
+    const vb = bible();
+    delete vb.artifacts[0].referenceImageUrl;
+    updateElementReferenceImage(vb, 'ART001.3', 'data:image/png;base64,xx', 'https://r2/ART001.3.jpg');
+    const card = getElementReferenceImagesForPage(vb, 5, 4, ['ART001'], null).find((r: any) => r.id === 'ART001');
+    expect(card.referenceImageUrl).toBe('https://r2/ART001.3.jpg');
+    expect(elementRefCell(vb.artifacts[0], null, 5).substituted.name).toBe('lit');
+  });
+
+  it('an object with a sheet but NO usable cell is dropped LOUDLY, never in silence', () => {
+    const vb = bible();
+    delete vb.artifacts[0].referenceImageUrl; // no base cell, no state cells either
+    expect(hasElementReference(vb.artifacts[0])).toBe(false);
+    const errors: string[] = [];
+    const listener = (level: string, line: string) => { if (level === 'error') errors.push(line); };
+    addLogListener(listener);
+    try {
+      const refs = getElementReferenceImagesForPage(vb, 5, 4, ['ART001'], null);
+      expect(refs.find((r: any) => r.id === 'ART001')).toBeUndefined();
+    } finally { removeLogListener(listener); }
+    expect(errors.join('\n')).toMatch(/ART001.*reference sheet but NO usable cell/);
+  });
+
+  it('objectStateForPage reads the bible declaration, and is null for a state-less entry', () => {
+    expect(objectStateForPage(STATED, 6).name).toBe('mended');
+    expect(objectStateForPage(STATED, 99)).toBeNull();
+    expect(objectStateForPage(PLAIN, 5)).toBeNull();
+  });
+
+  it('the page PROMPT carries the state delta the bible declares for that page', () => {
+    const vb = rendered();
+    const input = { language: 'en', artStyle: 'watercolor', characters: [{ name: 'Ada', age: 6 }], layout: { textInImage: true } };
+    const p6 = buildImagePrompt(scene(['carved vessel [ART001]']), input, null, vb, 6, null, { skipVisualBible: true });
+    expect(p6).toContain('a strip of clear tape along the split on the side wall');
+    const p5 = buildImagePrompt(scene(['carved vessel [ART001]']), input, null, vb, 5, null, { skipVisualBible: true });
+    expect(p5).toContain('a jagged vertical split down one side wall');
+  });
+
+  it('expandElementStateCells backfills a missing state id LOUDLY (bibles stored before the parser fix)', () => {
+    const legacy = JSON.parse(JSON.stringify(STATED));
+    for (const st of legacy.states) delete st.id;
+    const errors: string[] = [];
+    const listener = (level: string, line: string) => { if (level === 'error') errors.push(line); };
+    addLogListener(listener);
+    let cells: any[];
+    try { cells = expandElementStateCells(legacy); } finally { removeLogListener(listener); }
+    expect(cells.map(c => c.id)).toEqual(['ART001.1', 'ART001.2', 'ART001.3']);
+    expect(errors.join('\n')).toMatch(/state\(s\) with no id/);
+  });
+});
+
+// ── 6. THE INSTANT OUTRANKS THE STATE (2026-09-08) ──────────────────────────
+// Staging job_1788816451791_25b31uqlp p11: the bible assigned an "untouched"
+// state to the page whose plan-line instant pressed the object against another,
+// the delta ("no hands touching it") rode the REQUIRED OBJECTS line, and the
+// render obeyed the state twice. The state now carries a structured `held`
+// flag; a page whose interactions[] put hands on the object drops a state that
+// says untouched (and vice versa), and the brief's cited handle is arbitrated
+// against the bible's page table by that same flag.
+describe('resolveObjectState — the page instant outranks a contradicting state', () => {
+  const { resolveObjectState, pageHoldsObject } = require_('../../server/lib/visualBible');
+
+  const HELD_BIBLE = () => {
+    const vb = bible();
+    vb.artifacts[0].states = [
+      { id: 'ART001.1', name: 'resting', delta: 'lying flat on the shelf, nothing touching it', held: false, pages: [5, 6] },
+      { id: 'ART001.2', name: 'in hand', delta: 'gripped in one hand, tilted toward the viewer', held: true, pages: [7, 8] },
+    ];
+    return vb;
+  };
+  const meta = (interactions: any[] | null) => (interactions ? { interactions } : {});
+  const handsOn = (object: string) => [{ character: 'Ada', object, where: 'holds it', hands: true }];
+  const noHands = () => [{ character: 'Ada', object: 'her own sleeve', where: 'tugs it', hands: true }];
+  const sceneWith = (objects: string[], interactions: any[]) =>
+    `A quiet room.\n\n---METADATA---\n${JSON.stringify({ sceneIntent: 'test', characters: [{ name: 'Ada', position: 'center', depth: 'midground' }], shot: 'medium', objects, interactions, textPosition: 'bottom-left' })}`;
+  const captureWarns = <T,>(warnings: string[], fn: () => T): T => {
+    const listener = (level: string, line: string) => { if (level === 'warn') warnings.push(line); };
+    addLogListener(listener);
+    try { return fn(); } finally { removeLogListener(listener); }
+  };
+  const lineFor = (vb: any, page: number, objects: string[], interactions: any[], warnings: string[] = []) =>
+    captureWarns(warnings, () => requiredObjectsBlock(buildImagePrompt(sceneWith(objects, interactions), { language: 'en' }, null, vb, page, null, {}))
+      .split('\n').find(l => l.includes('hollowed carved vessel'))!);
+
+  it('normaliseObjectStates keeps `held` as a boolean and leaves it null when unauthored', () => {
+    const out = normaliseObjectStates([{ delta: 'a', held: true }, { delta: 'b', held: false }, { delta: 'c' }, { delta: 'd', held: 'yes' }], 'ART001');
+    expect(out.map(s => s.held)).toEqual([true, false, null, null]);
+  });
+
+  it('pageHoldsObject: hands row by id -> true, by name -> true, rows but none for it -> false, no rows -> null', () => {
+    const e = HELD_BIBLE().artifacts[0];
+    expect(pageHoldsObject(e, meta(handsOn('ART001.1')))).toBe(true);
+    expect(pageHoldsObject(e, meta(handsOn('the hollowed carved vessel with a lid')))).toBe(true);
+    expect(pageHoldsObject(e, meta(noHands()))).toBe(false);
+    expect(pageHoldsObject(e, meta(null))).toBeNull();
+    expect(pageHoldsObject(e, meta([]))).toBeNull();
+    // named in a row that does not say whether hands are on it -> no verdict
+    expect(pageHoldsObject(e, meta([{ character: 'Ada', object: 'ART001', where: 'looks at it' }]))).toBeNull();
+  });
+
+  // ── Row → entry matching. The Art Director PARAPHRASES object names, so the
+  // first matcher (substring of the entry name in the row) never fired on the
+  // page the resolver was built for. Staging job_1788816451791_25b31uqlp p13.
+  describe('entryNamedByRow — paraphrased rows resolve by token overlap, never by guess', () => {
+    const { entryNamedByRow } = require_('../../server/lib/visualBible');
+    const SCALE = { id: 'ART010', name: 'Large dragon scale', states: [
+      { id: 'ART010.1', name: 'in trough', delta: 'lying flat and still inside the dry stone trough, no hands touching it', pages: [11, 12, 13, 14], held: false },
+    ] };
+    const CHIP = { id: 'ART001', name: 'Dragon scale chip', states: [
+      // no `held` - exactly as the stored bible has it
+      { id: 'ART001.2', name: 'held', delta: 'resting in an open upturned palm, fully visible from above', pages: [6, 11] },
+    ] };
+    const TROUGH = { id: 'ART011', name: 'Stone trough' };
+    const P13_BIBLE = { mainCharacters: [], secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [], artifacts: [SCALE, CHIP, TROUGH] };
+    // The stored p13 row, verbatim.
+    const P13_ROW = { character: 'Levin', object: 'the large blue scale', where: 'reaches past the ibex to fit the chip against the scale inside the trough', action: 'reaching for the scale', hands: true, storyRelevant: true, priority: 'essential' };
+    const P13_META = { objects: ['LOC007', 'CHR002', 'ART010.1', 'ART011', 'ART001.2'], interactions: [P13_ROW] };
+
+    it('THE DEFECT: "the large blue scale" names the scale, not the chip - "large" is the scale\'s alone', () => {
+      expect(entryNamedByRow('the large blue scale', [SCALE, CHIP, TROUGH])).toBe(SCALE);
+    });
+    it('"the chip" names the chip', () => {
+      expect(entryNamedByRow('the chip', [SCALE, CHIP, TROUGH])).toBe(CHIP);
+    });
+    it('a row ambiguous between two cited entries is null, never a guess', () => {
+      expect(entryNamedByRow('the dragon scale', [SCALE, CHIP])).toBeNull();
+      expect(entryNamedByRow('the scale', [SCALE, CHIP])).toBeNull();
+    });
+    it('an id in the row wins over every token, whatever the prose says', () => {
+      expect(entryNamedByRow('the chip [ART010.1]', [SCALE, CHIP])).toBe(SCALE);
+      expect(entryNamedByRow('ART001.2', [SCALE, CHIP])).toBe(CHIP);
+    });
+    it('the old substring cases still hold: exact name, name inside a longer row, single candidate', () => {
+      const e = HELD_BIBLE().artifacts[0];
+      expect(entryNamedByRow('hollowed carved vessel with a lid', [e])).toBe(e);
+      expect(entryNamedByRow('the hollowed carved vessel with a lid', [e])).toBe(e);
+      expect(entryNamedByRow('the vessel', [e])).toBe(e);
+      expect(entryNamedByRow('her own sleeve', [e])).toBeNull();
+      expect(entryNamedByRow('', [e])).toBeNull();
+    });
+    it('pageHoldsObject on the stored p13 brief: scale held (true), chip has no row (false)', () => {
+      expect(pageHoldsObject(SCALE, P13_META, P13_BIBLE)).toBe(true);
+      expect(pageHoldsObject(CHIP, P13_META, P13_BIBLE)).toBe(false);
+      expect(pageHoldsObject(TROUGH, P13_META, P13_BIBLE)).toBe(false);
+    });
+    it('resolveObjectState on p13: ART010.1 "no hands touching it" is contradicted and the clause is dropped, loudly', () => {
+      const warnings: string[] = [];
+      const r = captureWarns(warnings, () => resolveObjectState(SCALE, 'ART010.1', 13, P13_META, { visualBible: P13_BIBLE }));
+      expect(r.state.id).toBe('ART010.1');
+      expect(r.held).toBe(true);
+      expect(r.contradicted).toBe(true);
+      const brief = `A summit.\n\n---METADATA---\n${JSON.stringify({ sceneIntent: 'test', characters: [{ name: 'Levin', position: 'left foreground', depth: 'foreground' }], shot: 'medium', ...P13_META, textPosition: 'bottom-left' })}`;
+      const block = captureWarns(warnings, () => requiredObjectsBlock(buildImagePrompt(brief, { language: 'en' }, null, P13_BIBLE, 13, null, {})));
+      expect(block).not.toMatch(/no hands touching it/);
+      // ART001.2 (the chip) has no row of its own and no `held` flag on the stored bible: its clause stays.
+      expect(block).toMatch(/open upturned palm/);
+      expect(warnings.join('\n')).toMatch(/Page 13: ART010\.1 \("in trough"\) — the brief's interactions put hands on it but the state says the object is untouched/);
+    });
+    it('a fresh bible stamping held:true on the chip state drops "open upturned palm" on p13 too - no row puts hands on the chip', () => {
+      // The existing reverse rule, reported as measured: the p13 row names the
+      // scale only, so the page declares no hands on the chip.
+      const chip = JSON.parse(JSON.stringify(CHIP));
+      chip.states[0].held = true;
+      const r = resolveObjectState(chip, 'ART001.2', 13, P13_META, { visualBible: P13_BIBLE, silent: true });
+      expect(r.held).toBe(false);
+      expect(r.contradicted).toBe(true);
+    });
+    it('without `held` on the bible (every stored story) the same page does NOT fire - the flag, not the match, is missing', () => {
+      const stored = JSON.parse(JSON.stringify(SCALE));
+      delete stored.states[0].held;
+      const r = resolveObjectState(stored, 'ART010.1', 13, P13_META, { visualBible: P13_BIBLE });
+      expect(r.held).toBe(true);
+      expect(r.contradicted).toBe(false);
+    });
+    it('the element ranking marks a paraphrased row\'s object as focal', () => {
+      const { rankPageElements } = require_('../../server/lib/vbElementBudget');
+      const vb = JSON.parse(JSON.stringify(P13_BIBLE));
+      for (const a of vb.artifacts) a.appearsInPages = [13];
+      const focal = rankPageElements(13, P13_META, vb).filter((e: any) => e.focal).map((e: any) => e.id);
+      expect(focal).toEqual(['ART010']);
+    });
+  });
+
+  it('THE DEFECT: an untouched state on a page whose brief puts hands on the object is DROPPED, loudly', () => {
+    const warnings: string[] = [];
+    const line = lineFor(HELD_BIBLE(), 5, ['ART001.1'], handsOn('ART001.1'), warnings);
+    expect(line).toContain('hollowed carved vessel');       // the object stays listed
+    expect(line).not.toMatch(/nothing touching it/);         // the contradicting delta is gone
+    expect(warnings.join('\n')).toMatch(/Page 5: ART001\.1 \("resting"\) — the brief's interactions put hands on it but the state says the object is untouched/);
+  });
+
+  it('the reverse: an in-hand state on a page that declares its contacts and has no hands on it is dropped too', () => {
+    const warnings: string[] = [];
+    const line = lineFor(HELD_BIBLE(), 7, ['ART001'], noHands(), warnings);
+    expect(line).not.toMatch(/gripped in one hand/);
+    expect(warnings.join('\n')).toMatch(/ART001\.2 \("in hand"\) — the brief's interactions declare no hands on it but the state says the object is in hand/);
+  });
+
+  it('a consistent state rides the line untouched, with no warning', () => {
+    const warnings: string[] = [];
+    const line = lineFor(HELD_BIBLE(), 7, ['ART001.2'], handsOn('ART001.2'), warnings);
+    expect(line).toMatch(/gripped in one hand/);
+    expect(warnings.filter(w => /VB-STATE/.test(w))).toEqual([]);
+  });
+
+  it('cited vs table: the page contact ARBITRATES - a cited in-hand state beats a table that says resting when hands are on it', () => {
+    // job_1788816451791_25b31uqlp p2: the brief cited the held state, the table
+    // (wrongly) declared "on the ground" for that page, the plan line held it up.
+    const r = resolveObjectState(HELD_BIBLE().artifacts[0], 'ART001.2', 5, meta(handsOn('ART001.2')));
+    expect(r.state.name).toBe('in hand');
+    expect(r.contradicted).toBe(false);
+  });
+
+  it('cited vs table: with no contact verdict the table wins and the disagreement is WARNED with both ids', () => {
+    const warnings: string[] = [];
+    const r = captureWarns(warnings, () => resolveObjectState(HELD_BIBLE().artifacts[0], 'ART001.2', 5, null));
+    expect(r.state.name).toBe('resting');
+    expect(warnings.join('\n')).toMatch(/Page 5: brief cites ART001\.2 .* but the bible assigns ART001\.1/);
+  });
+
+  it('a cited state on a page NO state declares is kept as cited, with a WARN', () => {
+    const warnings: string[] = [];
+    const r = captureWarns(warnings, () => resolveObjectState(HELD_BIBLE().artifacts[0], 'ART001.2', 9, null));
+    expect(r.state.name).toBe('in hand');
+    expect(warnings.join('\n')).toMatch(/Page 9: brief cites ART001\.2 .* none of ART001's states declares/);
+  });
+
+  it('the reference CELL follows the same resolution as the prompt clause', () => {
+    const vb = HELD_BIBLE();
+    for (const st of vb.artifacts[0].states) updateElementReferenceImage(vb, st.id, 'data:image/png;base64,xx', `https://r2/${st.id}.jpg`);
+    const card = getElementReferenceImagesForPage(vb, 5, 4, ['ART001.2'], meta(handsOn('ART001.2'))).find((r: any) => r.id === 'ART001');
+    expect(card.stateName).toBe('in hand');
+  });
+
+  it('BACKWARD COMPAT - a bible with no `held` flags never contradicts, whatever the brief declares', () => {
+    const warnings: string[] = [];
+    const line = lineFor(bible(), 5, ['ART001.1'], handsOn('ART001.1'), warnings);
+    expect(line).toMatch(/jagged vertical split/);
+    expect(warnings.filter(w => /state clause dropped/.test(w))).toEqual([]);
+  });
+});
+
+// ── 8. ONE OBJECT, ONE POSITION PER PAGE PROMPT ─────────────────────────────
+// The REQUIRED OBJECTS header promises each element "appears exactly as the
+// scene description places it". A state delta that ALSO states a placement
+// breaks that promise whenever the two disagree: staging
+// job_1789337873076_qf2at21ui pages 2-4 emitted "cupped in a small hand" on a
+// page whose own brief placed the object "wedged between roots at ground
+// level". Neither existing contradiction axis fires there — both states carried
+// `held: null`, and the brief asserted a THIRD placement that no sibling state
+// claims, so `appearanceContradiction` found no single rival.
+//
+// The contract: where the page's brief places the object, the state's PLACEMENT
+// half is not asserted a second time; its APPEARANCE half is never suppressed;
+// where the brief places nothing, the delta stands whole.
+describe('state placement vs the page`s own placement', () => {
+  const { splitStatePlacement, scenePlacesObject } = require_('../../server/lib/visualBible');
+
+  // The archetypal shape of the trial brief: `objects[]` as records carrying a
+  // per-page `position`. (The beats/full brief writes a plain id list and
+  // places nothing structurally.)
+  const jsonScene = (objects: any[]) => JSON.stringify({
+    scene: {
+      imageSummary: 'A quiet room.',
+      setting: { location: 'A room', camera: 'medium' },
+      characters: [{ name: 'Ada', position: 'center', depth: 'midground' }],
+      objects,
+      textPosition: 'bottom-left',
+    },
+  });
+  // One entry, one state, whose delta mixes a placement clause with a look.
+  const MIXED = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [],
+    artifacts: [{
+      id: 'ART001',
+      name: 'small round seed',
+      label: 'round seed',
+      type: 'natural object',
+      size: 'fits in one hand',
+      description: 'a small round seed with a pale patch on one side',
+      states: [
+        { id: 'ART001.1', name: 'on ground', delta: 'resting in the grass at the base of the tree, fully visible', pages: [1] },
+        { id: 'ART001.2', name: 'held', delta: 'cupped in a small hand, pale patch facing upward', pages: [2] },
+      ],
+      appearsInPages: [1, 2],
+    }],
+  });
+  const withWarns = <T,>(warnings: string[], fn: () => T): T => {
+    const listener = (level: string, line: string) => { if (level === 'warn') warnings.push(line); };
+    addLogListener(listener);
+    try { return fn(); } finally { removeLogListener(listener); }
+  };
+  const seedLine = (vb: any, page: number, objects: any[], warnings: string[] = []) =>
+    withWarns(warnings, () => requiredObjectsBlock(
+      buildImagePrompt(jsonScene(objects), { language: 'en' }, null, vb, page, null, {}),
+    ).split('\n').find(l => l.includes('round seed'))!);
+
+  it('splitStatePlacement separates the placement half from the look', () => {
+    expect(splitStatePlacement('cupped in a small hand, pale patch facing upward'))
+      .toEqual({ kept: 'pale patch facing upward', dropped: ['cupped in a small hand'] });
+    expect(splitStatePlacement('resting in the grass at the base of the tree, fully visible'))
+      .toEqual({ kept: 'fully visible', dropped: ['resting in the grass at the base of the tree'] });
+  });
+
+  it('APPEARANCE deltas carry no placement clause and are never split', () => {
+    for (const delta of [
+      'shell split open, brown seed visible inside',
+      'fully sealed green spiky shell, seed hidden inside',
+      'a jagged vertical split down one side wall, the cut edges parted',
+      'a small light source burns inside, light through the cut openings',
+      'filled to the brim, the lid seated',
+    ]) {
+      expect(splitStatePlacement(delta)).toEqual({ kept: delta, dropped: [] });
+    }
+  });
+
+  it('scenePlacesObject reads the brief`s own record, by id or by label', () => {
+    const entry = MIXED().artifacts[0];
+    const meta1 = { fullData: { objects: [{ id: 'ART001.2', name: 'round seed', position: 'wedged between roots' }] } };
+    expect(scenePlacesObject(entry, meta1)).toBe('wedged between roots');
+    const meta2 = { fullData: { objects: [{ name: 'round seed', position: 'on the table' }] } };
+    expect(scenePlacesObject(entry, meta2)).toBe('on the table');
+    // A plain id list places nothing; neither does a record with no position.
+    expect(scenePlacesObject(entry, { fullData: { objects: ['ART001'] } })).toBeNull();
+    expect(scenePlacesObject(entry, { fullData: { objects: [{ id: 'ART001' }] } })).toBeNull();
+    expect(scenePlacesObject(entry, null)).toBeNull();
+  });
+
+  it('the page`s placement wins: the state`s placement clause leaves the line, the look stays', () => {
+    const warnings: string[] = [];
+    const line = seedLine(MIXED(), 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots at ground level' }], warnings);
+    expect(line).toContain('pale patch facing upward');
+    expect(line).not.toMatch(/cupped in a small hand/);
+    expect(warnings.join('\n')).toMatch(/the scene places ART001 at "wedged between roots at ground level"/);
+  });
+
+  it('a brief that places nothing keeps the delta whole', () => {
+    const warnings: string[] = [];
+    const line = seedLine(MIXED(), 2, [{ id: 'ART001', name: 'round seed' }], warnings);
+    expect(line).toContain('cupped in a small hand, pale patch facing upward');
+    expect(warnings.filter(w => /the scene places/.test(w))).toEqual([]);
+  });
+
+  it('a pure APPEARANCE delta survives a brief that places the object', () => {
+    const vb = MIXED();
+    vb.artifacts[0].states[1].delta = 'shell split open, brown seed visible inside';
+    const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'held in both hands, centre frame' }]);
+    expect(line).toContain('shell split open, brown seed visible inside');
+  });
+
+  // -- A SPLIT MAY SHORTEN A DELTA, NEVER REPLACE IT (2026-09-18) -----------
+  // Replayed over every stored staging state delta — 126 stories with a Visual
+  // Bible, 165 deltas — the split leaves 110 whole, shortens 44 and EMPTIES 11.
+  // The eleven are not all placement: two of them are the object's own look and
+  // nothing else, read as placement because one comma-segment carries both
+  // halves. With nothing left on the line the verdict is unfalsifiable, so the
+  // delta stands and the warning says the page now carries two positions.
+  const emptiedByTheSplit = [
+    // job_..._erw6xc01 ART009.1 "rope snapped" — the state IS the severing.
+    'the rope hanging from the rim is severed midway, the lower half dangling free inside the cistern walls',
+    // job_..._ly5rcdej ART003.1 "unaltered" — slack vs taut is the whole state.
+    'lies slack in loose curling loops',
+  ];
+
+  it('a delta the split empties is NOT a delta the split may delete', () => {
+    for (const delta of emptiedByTheSplit) {
+      expect(splitStatePlacement(delta).kept).toBe('');   // the split claims it is all placement
+      const vb = MIXED();
+      vb.artifacts[0].states[1].delta = delta;
+      const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }]);
+      expect(line).toContain(delta.split(',')[0]);        // and the line keeps it anyway
+    }
+  });
+
+  it('a delta that genuinely IS placement stands too, and the warning says the page carries two positions', () => {
+    // job_..._18dmvnt6 ART001.3 "held by crayfish", verbatim: no look at all,
+    // only a holder — the authoring rule's own counter-example.
+    const warnings: string[] = [];
+    const vb = MIXED();
+    vb.artifacts[0].states[1].delta = 'gripped between both raised claws of the crayfish';
+    const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }], warnings);
+    expect(line).toContain('gripped between both raised claws of the crayfish');
+    const w = warnings.find(x => /VB-STATE/.test(x) && /two positions/.test(x))!;
+    expect(w).toBeDefined();
+    expect(w).toContain('wedged between roots');
+    expect(w).toContain('The delta STANDS');
+  });
+
+  it('a delta with a look half still loses its placement half — the measured shapes', () => {
+    // The ten page-citations where this actually trimmed a stored prompt, by
+    // shape: job_1789337873076_qf2at21ui (the chestnut) and
+    // job_1788725396265_p3dh87hsv (the bracelet).
+    for (const [delta, kept] of [
+      ['cupped in a small hand, cream patch facing upward', 'cream patch facing upward'],
+      ['resting in the grass at the base of the tree, fully visible', 'fully visible'],
+      ["on Mia's wrist, shells catching the sunlight", 'shells catching the sunlight'],
+      ["dripping wet but intact, held up in Lily's cupped hands", 'dripping wet but intact'],
+    ]) {
+      const vb = MIXED();
+      vb.artifacts[0].states[1].delta = delta;
+      const line = seedLine(vb, 2, [{ id: 'ART001', name: 'round seed', position: 'wedged between roots' }]);
+      expect(line).toContain(kept);
+      expect(line).not.toContain(delta);
+    }
+  });
+});
+
+
+// -- 9. ONE WORD IS A COINCIDENCE, TWO ARE A CLAIM (2026-09-17) --------------
+// `appearanceContradiction` deletes a state's whole look clause from REQUIRED
+// OBJECTS when the page's own instant speaks a SIBLING state's vocabulary. It
+// decided that on a single shared word, and a single shared word is almost
+// always the prose and the bible talking about different things.
+//
+// Replayed over the 123 stored staging stories carrying a Visual Bible (1,261
+// pages, 187 citations of a stated artifact) it fired on 10 pages; 9 of the 10
+// were coincidences and the scene reviewer declined the one it was shown
+// (job_1789584708605_rts4wqupm p5 came back in `briefUnfixed`). The shapes
+// below are those measured cases, with archetypal names.
+describe('appearanceContradiction - a shared word is not an assertion', () => {
+  const { resolveObjectState, MIN_APPEARANCE_EVIDENCE } = require_('../../server/lib/visualBible');
+
+  // The measured shape: the object's own noun ("shell") appears in its base
+  // description AND inside the cracked state's text, and the word for the
+  // cavity it lies in ("hollow") appears inside that same state's text.
+  const EGG = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [],
+    locations: [{ id: 'LOC001', name: 'tree-root square', type: 'place', description: 'a gravel square with old tree roots' }],
+    artifacts: [{
+      id: 'ART001',
+      name: 'smooth egg',
+      type: 'artifact',
+      size: 'melon-sized',
+      description: 'melon-sized oval egg with a smooth curved shell',
+      appearsInPages: [5],
+      states: [
+        { id: 'ART001.1', name: 'unaltered', delta: 'pale orange, smooth, glowing faintly from within', pages: [5] },
+        { id: 'ART001.2', name: 'cold', delta: 'pale orange, smooth, matte and dark', pages: [] },
+        { id: 'ART001.3', name: 'cracked', delta: 'pale orange shell broken in half, hollow empty interior', pages: [] },
+      ],
+    }],
+  });
+
+  const intentScene = (intent: string, objects: string[]) =>
+    `A quiet square.\n\n---METADATA---\n${JSON.stringify({
+      sceneIntent: intent,
+      characters: [{ name: 'Ada', position: 'center', depth: 'midground' }],
+      shot: 'medium',
+      objects,
+      textPosition: 'bottom-left',
+    })}`;
+
+  const grabWarns = <T,>(warnings: string[], fn: () => T): T => {
+    const listener = (level: string, line: string) => { if (level === 'warn') warnings.push(line); };
+    addLogListener(listener);
+    try { return fn(); } finally { removeLogListener(listener); }
+  };
+
+  const stateLine = (vb: any, page: number, objects: string[], intent: string, needle: string, warnings: string[] = []) =>
+    grabWarns(warnings, () => requiredObjectsBlock(
+      buildImagePrompt(intentScene(intent, objects), { language: 'en' }, null, vb, page, null, {}),
+    ).split('\n').find(l => l.includes(needle)) || '');
+
+  const eggState = (intent: string, objects = ['ART001.1', 'LOC001']) =>
+    resolveObjectState(EGG().artifacts[0], objects[0], 5, { sceneIntent: intent, objects },
+      { silent: true, visualBible: EGG() });
+
+  it('"shell" - the object\'s own noun, reused inside a state it has not reached - keeps the clause', () => {
+    // job_1789584708605_rts4wqupm: the cracked state reads "pale orange shell
+    // broken in half"; a page on the unaltered state that says "shell" is
+    // naming the object, not asserting the break.
+    const intent = 'Ada kneels by the roots. Her hands touch the egg\'s shell while she leans close.';
+    expect(eggState(intent).contradictedBy).toBeNull();
+    expect(stateLine(EGG(), 5, ['ART001.1', 'LOC001'], intent, 'egg'))
+      .toContain('pale orange, smooth, glowing faintly from within');
+  });
+
+  it('"hollow" - the cavity the object lies in, and also a word of the cracked state - keeps the clause', () => {
+    // job_1789584708605_rts4wqupm p5, verbatim shape. The scene reviewer was
+    // shown this finding and declined it; it came back in `briefUnfixed`.
+    const intent = 'Ada crouches and points toward the egg in the hollow.';
+    expect(eggState(intent).contradictedBy).toBeNull();
+    expect(stateLine(EGG(), 5, ['ART001.1', 'LOC001'], intent, 'egg'))
+      .toContain('pale orange, smooth, glowing faintly from within');
+  });
+
+  it('prose that really does assert the sibling look still drops the clause, and says which words', () => {
+    const intent = 'The egg lies broken in half on the ground, its interior empty.';
+    const r = eggState(intent);
+    expect(r.contradictedBy).toBe('appearance');
+    expect(r.rival.id).toBe('ART001.3');
+    expect(r.evidenceTokens.length).toBeGreaterThanOrEqual(MIN_APPEARANCE_EVIDENCE);
+    const warnings: string[] = [];
+    const line = stateLine(EGG(), 5, ['ART001.1', 'LOC001'], intent, 'egg', warnings);
+    expect(line).not.toContain('glowing faintly from within');   // the clause is gone
+    expect(line).toContain('egg');                                // the object stays listed
+    const w = warnings.find(x => /VB-STATE/.test(x) && /state clause dropped/.test(x))!;
+    expect(w).toBeDefined();
+    expect(w).toContain('Page 5');                     // the page
+    expect(w).toContain('ART001 ("smooth egg")');      // the element
+    expect(w).toContain('ART001.1 ("unaltered")');     // the cited state
+    expect(w).toContain('ART001.3 ("cracked")');       // the rival
+    expect(w).toMatch(/on the word\(s\) "[a-z]+", "[a-z]+"/);  // the words it decided on
+  });
+
+  it('a single word of a sibling state is never enough on its own', () => {
+    // "matte" alone, from the cold state. Two of its words WOULD decide it.
+    expect(eggState('The egg has gone matte in Ada\'s hands.').contradictedBy).toBeNull();
+    expect(eggState('The egg has gone matte and dark in Ada\'s hands.').contradictedBy).toBe('appearance');
+  });
+
+  // job_1788903616404_iqvhj4l8m p10: the prose names one word of the clipped-on
+  // state ("handlebar") and two of the set-down state ("down", "lamp") - and
+  // calls the object "dark, unlit", which is neither. Two voices, no verdict.
+  const LAMP = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [],
+    artifacts: [{
+      id: 'ART001',
+      name: 'handlebar lamp',
+      type: 'artifact',
+      size: 'palm-sized',
+      description: 'a compact front lamp, warm amber when lit, dark grey when unlit',
+      appearsInPages: [10],
+      states: [
+        { id: 'ART001.1', name: 'clipped on', delta: 'mounted on a bicycle handlebar, clip closed around the bar', pages: [1] },
+        { id: 'ART001.2', name: 'held aloft', delta: 'gripped in one hand, raised toward the viewer, clip open at the base', pages: [10] },
+        { id: 'ART001.3', name: 'set down glowing', delta: 'resting flat on bare rock, lamp face turned outward, emitting a warm amber glow', pages: [11] },
+      ],
+    }],
+  });
+
+  it('two sibling states each speaking their own word leaves the instant undecidable', () => {
+    const intent = 'Ada tightly grips her dark, unlit handlebar lamp, looking down at it as an idea forms.';
+    const r = resolveObjectState(LAMP().artifacts[0], 'ART001.2', 10,
+      { sceneIntent: intent, objects: ['ART001.2'] }, { silent: true, visualBible: LAMP() });
+    expect(r.contradictedBy).toBeNull();
+    expect(stateLine(LAMP(), 10, ['ART001.2'], intent, 'lamp')).toContain('raised toward the viewer');
+  });
+
+  // job_1789083667794_17lz946ik p9 and job_1788727233899_1dpnym94p p4: the
+  // accusing words came out of a PLACEMENT clause - "across the left-hand path"
+  // and "in the raven's nest" - and the prose meant a pair of hands and a bird.
+  const BOULDER = () => ({
+    mainCharacters: [{ id: 'CHR001', name: 'Ada' }],
+    secondaryCharacters: [], animals: [], vehicles: [], clothing: [], locations: [],
+    artifacts: [{
+      id: 'ART001',
+      name: 'path boulder',
+      type: 'artifact',
+      size: 'knee-high',
+      description: 'a rounded grey granite boulder with darker streaks',
+      appearsInPages: [9],
+      states: [
+        { id: 'ART001.1', name: 'blocking', delta: 'sitting squarely across the left-hand path, touching both side banks', pages: [8] },
+        { id: 'ART001.2', name: 'moved', delta: 'shifted to the side of the path, one edge overhanging the bank', pages: [9] },
+      ],
+    }],
+  });
+
+  it('the nouns of a placement clause never accuse', () => {
+    const intent = 'Ada leans her weight against the granite boulder, pushing hard with both hands to clear the path.';
+    const r = resolveObjectState(BOULDER().artifacts[0], 'ART001.2', 9,
+      { sceneIntent: intent, objects: ['ART001.2'] }, { silent: true, visualBible: BOULDER() });
+    expect(r.contradictedBy).toBeNull();
+  });
+
+  it('a state with no id still names its element in the drop warning', () => {
+    // A bible stored before the dotted handles existed carries `name` only.
+    const vb = EGG();
+    for (const st of vb.artifacts[0].states) delete (st as any).id;
+    const warnings: string[] = [];
+    stateLine(vb, 5, ['ART001', 'LOC001'], 'The egg lies broken in half on the ground, its interior empty.', 'egg', warnings);
+    const w = warnings.find(x => /VB-STATE/.test(x) && /state clause dropped/.test(x))!;
+    expect(w).toBeDefined();
+    expect(w).toContain('ART001 state "unaltered"');
+    expect(w).not.toMatch(/undefined/);
   });
 });

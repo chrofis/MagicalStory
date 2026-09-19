@@ -14,6 +14,18 @@
  *
  * Invoked by .githooks/pre-push with git's ref lines on stdin. Bypass a block
  * with `git push --no-verify` when you know the run is expendable.
+ *
+ * Run BY HAND (no argv from git) it is the status check CLAUDE.md points at: it
+ * probes every environment it knows and reports each one. It used to print
+ * nothing and exit 0, which reads as "all clear" — the opposite of what an
+ * unreachable or busy environment means.
+ *
+ * BOTH MODES REACH THE SAME VERDICT (2026-09-14). Whatever blocks a push also
+ * fails the status check: same probe, same renderVerdict, same `blocked` fold in
+ * evaluateTargets(), same exit code. A by-hand run over a busy environment exits
+ * 1 and says so on stdout. It previously exited 0 and warned on stderr, so
+ * `check-push-idle.js; echo EXIT=$?` reported a clean all-clear seconds before
+ * the hook refused the same push.
  */
 
 const ENVIRONMENTS = {
@@ -30,7 +42,7 @@ const ZERO_SHA = /^0+$/;
  */
 function readRefs() {
   return new Promise(resolve => {
-    if (process.stdin.isTTY) return resolve(parseRefs('')); // manual run — nothing to gate
+    if (process.stdin.isTTY) return resolve([]); // manual run — no refs to gate
     let raw = '';
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', chunk => { raw += chunk; });
@@ -50,11 +62,20 @@ function parseRefs(raw) {
 /**
  * Ask the environment whether it is busy.
  * Returns { verdict: 'idle' | 'busy' | 'unknown', reasons, detail }.
+ * Only 'idle' lets a push through; there is no fail-open verdict.
  *
  * A stopped container is genuinely idle — nothing can be running inside it — so
  * it must not block. Railway serves 502/503 from its edge for a stopped
- * deployment, and a dead host gives a connection/DNS error; both mean "down".
+ * deployment, and a host that refuses the connection has nothing listening;
+ * both are positive evidence that the deployment is down.
  * A timeout or any other 5xx is NOT proof of idleness, so those block.
+ *
+ * A DNS FAILURE IS NOT EVIDENCE (2026-09-14). ENOTFOUND / EAI_AGAIN mean the
+ * name never resolved — a flaky laptop resolver produces both, and the answer
+ * then says nothing whatsoever about what is running inside the container. They
+ * used to be classed with ECONNREFUSED as "down", so a local network hiccup
+ * printed a green "is idle" over a production generation in flight. Unknown is
+ * not idle: they block.
  */
 async function probe(base) {
   let res;
@@ -63,9 +84,9 @@ async function probe(base) {
   } catch (err) {
     // undici reports the real reason on `cause`, and for a multi-address host
     // (IPv4 + IPv6) aggregates the per-attempt errors into `cause.errors`.
-    const DOWN = ['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN'];
+    const DEPLOYMENT_DOWN = ['ECONNREFUSED'];
     const codes = [err?.cause?.code, ...(err?.cause?.errors || []).map(e => e?.code)].filter(Boolean);
-    const down = codes.find(c => DOWN.includes(c));
+    const down = codes.find(c => DEPLOYMENT_DOWN.includes(c));
     if (down) {
       return { verdict: 'idle', reasons: [], detail: `container is down (${down}) — nothing can be running` };
     }
@@ -77,11 +98,15 @@ async function probe(base) {
     return { verdict: 'idle', reasons: [], detail: `container is stopped (HTTP ${res.status}) — nothing can be running` };
   }
 
-  // The environment predates this gate (or the route was lost). Blocking would
-  // deadlock: the fix can only ship by pushing. Allow, but say it loudly —
-  // silence here would read as "verified idle".
+  // 404 BLOCKS (2026-09-15). It used to return an 'ungated' verdict that let the
+  // push through: a bootstrap allowance for an environment that predated the
+  // route (2026-08-04), where blocking would have deadlocked the fix. The route
+  // has been live on both environments since; a 404 now means the route was
+  // lost or the wrong host answered, and neither says anything about what is
+  // running inside the container. Unknown is not idle. Blocking on a lost
+  // route cannot deadlock: `--no-verify` is the escape.
   if (res.status === 404) {
-    return { verdict: 'ungated', reasons: [], detail: '/api/health/busy is not deployed there yet — nothing was verified' };
+    return { verdict: 'unknown', reasons: [], detail: 'HTTP 404 from /api/health/busy — the route is missing, nothing was verified' };
   }
 
   let body;
@@ -101,42 +126,136 @@ async function probe(base) {
   };
 }
 
-async function main() {
-  const refs = (await readRefs()).filter(r => !ZERO_SHA.test(r.localSha)); // branch deletions deploy nothing
-  const targets = [...new Set(refs.map(r => r.remoteRef))]
-    .map(ref => ENVIRONMENTS[ref])
-    .filter(Boolean);
-
-  if (targets.length === 0) return; // feature branch / tag — no deploy, no gate
-
-  let blocked = false;
-  for (const target of targets) {
-    const { verdict, reasons, detail } = await probe(target.base);
-
-    if (verdict === 'idle') {
-      console.log(`✓ ${target.name} is idle — ${detail}`);
-      continue;
-    }
-
-    if (verdict === 'ungated') {
-      console.warn(`⚠ ${target.name} NOT CHECKED — ${detail}`);
-      continue;
-    }
-
-    blocked = true;
+/**
+ * One environment's probe result as output lines + whether it blocks.
+ *
+ * `manual: true` is the by-hand status report: it says what each environment is
+ * doing without the push-gate framing (there is no push to block, and "PUSH
+ * BLOCKED" on a status check is a lie). Hook mode (`manual: false`) is the
+ * original wording, byte for byte — this gate decides every push in the repo.
+ *
+ * Each line is [stream, text] with stream one of 'log' | 'warn' | 'error'.
+ */
+function renderVerdict(target, { verdict, reasons = [], detail }, { manual = false } = {}) {
+  if (verdict === 'idle') {
+    return { blocked: false, lines: [['log', `✓ ${target.name} is idle — ${detail}`]] };
+  }
+  if (manual) {
+    // STDOUT, not stderr (2026-09-14). The ✓ lines go to stdout, so routing the
+    // bad news to stderr meant a stdout-only capture — an agent, a pipe, a log —
+    // saw nothing but green ticks for the environments that happened to be idle.
+    // One report, one stream.
+    const lines = [];
     if (verdict === 'busy') {
-      console.error(`\n✗ PUSH BLOCKED — ${target.name} is busy`);
-      for (const r of reasons) console.error(`  • ${r}`);
-      console.error('\nThis push would restart the container and kill that work.');
+      lines.push(['log', `✗ ${target.name} is BUSY — a push would kill:`]);
+      for (const r of reasons) lines.push(['log', `  • ${r}`]);
     } else {
-      console.error(`\n✗ PUSH BLOCKED — could not prove ${target.name} is idle`);
-      console.error(`  • ${detail}`);
-      console.error('\nUnknown is not idle: something may be running that a deploy would kill.');
+      lines.push(['log', `? ${target.name} — could not prove it is idle: ${detail}`]);
     }
-    console.error('Wait for it to finish, or override with: git push --no-verify\n');
+    return { blocked: true, lines };
   }
 
+  const lines = [];
+  if (verdict === 'busy') {
+    lines.push(['error', `\n✗ PUSH BLOCKED — ${target.name} is busy`]);
+    for (const r of reasons) lines.push(['error', `  • ${r}`]);
+    lines.push(['error', '\nThis push would restart the container and kill that work.']);
+  } else {
+    lines.push(['error', `\n✗ PUSH BLOCKED — could not prove ${target.name} is idle`]);
+    lines.push(['error', `  • ${detail}`]);
+    lines.push(['error', '\nUnknown is not idle: something may be running that a deploy would kill.']);
+  }
+  lines.push(['error', 'Wait for it to finish, or override with: git push --no-verify\n']);
+  return { blocked: true, lines };
+}
+
+/**
+ * Which environments this invocation reports on.
+ * Hook: only the ones the pushed refs actually deploy to (a feature branch or a
+ * tag deploys nothing, so it stays silent and ungated).
+ * Manual: all of them — the user asked for status, so give them status.
+ */
+function resolveTargets(refs, { manual = false } = {}) {
+  if (manual) return Object.values(ENVIRONMENTS);
+  return [...new Set(refs.filter(r => !ZERO_SHA.test(r.localSha)).map(r => r.remoteRef))]
+    .map(ref => ENVIRONMENTS[ref])
+    .filter(Boolean);
+}
+
+/**
+ * HOOK or MANUAL is decided by ARGV, not by stdin.
+ *
+ * git calls a pre-push hook with two arguments — the remote name and its URL —
+ * and `.githooks/pre-push` forwards them verbatim (`exec node … "$@"`). A
+ * by-hand run passes none. That is the only signal available BEFORE reading
+ * stdin, and reading stdin is exactly what must be avoided on a manual run:
+ * with no refs coming, the stream's `end` never fires and the process hangs.
+ *
+ * Two weaker signals were tried and rejected (2026-09-13):
+ *   `process.stdin.isTTY` — false for an agent shell, a CI step, a wrapper
+ *     script and `node check-push-idle.js < /dev/null`. All four then took the
+ *     hook path, resolved zero targets and exited 0 printing nothing, which is
+ *     the silence being reported on. Most by-hand runs in this project are not
+ *     interactive.
+ *   "no refs arrived on stdin" — correct in principle, but it cannot be known
+ *     without waiting for stdin to close, and racing a timer against git's refs
+ *     risks treating a REAL push as manual and letting it through ungated. The
+ *     gate exists to protect a running generation; it may never fail open.
+ *
+ * `readRefs()` keeps its own isTTY shortcut as a second belt for an interactive
+ * invocation that somehow reaches it.
+ */
+function isHookInvocation(argv = process.argv) {
+  return Array.isArray(argv) && argv.length > 2;
+}
+
+/**
+ * THE VERDICT — one resolver, both readers.
+ *
+ * The hook and the by-hand status check are the same file, but they used to fold
+ * their per-environment results into an ANSWER differently: the hook returned
+ * exit 1 when anything blocked, the manual run returned exit 0 unconditionally.
+ * Same endpoint, same probe, same rendering — opposite verdicts on the channel
+ * that scripts and agents actually read. `node scripts/admin/check-push-idle.js;
+ * echo EXIT=$?` printed EXIT=0 with a Test Lab experiment running, and the hook
+ * refused the very next push (2026-09-13, twice).
+ *
+ * So the fold lives HERE and returns `blocked` to both callers, and main() turns
+ * that one flag into the exit code with no mode in the expression. Whatever
+ * blocks a push also fails the status check.
+ *
+ * @param probeFn injectable for tests — the only seam; the decision is not.
+ */
+async function evaluateTargets(targets, { manual = false } = {}, probeFn = probe) {
+  let blocked = false;
+  const lines = [];
+  for (const target of targets) {
+    const result = await probeFn(target.base);
+    const rendered = renderVerdict(target, result, { manual });
+    if (rendered.blocked) blocked = true;
+    lines.push(...rendered.lines);
+  }
+  return { blocked, lines };
+}
+
+async function main() {
+  const hook = isHookInvocation();
+  // A manual run never reads stdin: nothing will close it, and there is
+  // nothing to gate.
+  const refs = hook ? await readRefs() : [];
+  const targets = resolveTargets(refs, { manual: !hook });
+  const manual = !hook;
+
+  if (targets.length === 0) return; // hook on a feature branch / tag — no deploy, no gate
+
+  if (manual) console.log('Checking whether each environment is idle (a deploy restarts the container)…');
+
+  const { blocked, lines } = await evaluateTargets(targets, { manual });
+  for (const [stream, text] of lines) console[stream](text);
+
   // exitCode, not process.exit(): let stdio flush before the process ends.
+  // NO `manual` TERM HERE — that is the divergence this file was fixed for.
+  // A status check that exits 0 over a busy environment is a false all-clear.
   process.exitCode = blocked ? 1 : 0;
 }
 
@@ -151,4 +270,6 @@ if (require.main === module) {
 
 // Exported for tests/manual/test-push-idle-gate.js — the verdict logic decides
 // whether every push in this repo is allowed, so it gets exercised directly.
-module.exports = { probe, parseRefs, ENVIRONMENTS };
+module.exports = {
+  probe, parseRefs, ENVIRONMENTS, renderVerdict, resolveTargets, isHookInvocation, evaluateTargets,
+};

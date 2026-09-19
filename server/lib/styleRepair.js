@@ -55,15 +55,20 @@
  * decides whether the repaint ships.
  * ============================================================================
  *
- * PRODUCTION WIRING: live since 2026-07-31 (owner directive) — the Step-5
- * style audit in runUnifiedRepairPipeline (images.js) calls
+ * PRODUCTION WIRING: wired 2026-07-31, and OFF since 2026-09-19 (owner
+ * directive — decisions.md "Production style repair is OFF"). The Step-5
+ * style audit in runUnifiedRepairPipeline (repairPipeline.js) calls
  * planStyleRepair → repairPageStyle for pages AND covers, gated by
  * MODEL_DEFAULTS.styleRepairProduction (env STYLE_REPAIR_PRODUCTION,
- * default true) with model per MODEL_DEFAULTS.styleRepairModel. The Test
- * Lab `style_repair` stage remains the Gemini-vs-Grok A/B harness.
+ * default FALSE; set it to 'true' to re-arm) with model per
+ * MODEL_DEFAULTS.styleRepairModel. The audit's DETECTION still runs — only
+ * the paid repaint below is off. The Test Lab `style_repair` stage calls
+ * this module directly and is deliberately NOT gated by the production flag:
+ * it is the Gemini-vs-Grok A/B harness and has to stay measurable.
  */
 
 const { log } = require('../utils/logger');
+const { assertPromptFilled } = require('../services/prompts');
 
 /**
  * opts.model → the production IMAGE_MODELS id whose backend is that provider.
@@ -138,6 +143,7 @@ async function geminiStyleRepaint(prompt, pageImage, { retries = 3, refImages = 
       parts.push({ inlineData: { mimeType: rmime, data: r2.stripDataUriPrefix(ref) } });
     }
   }
+  assertPromptFilled(parts, 'geminiStyleRepaint');
   const body = { contents: [{ parts }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], temperature: 0.7, imageConfig: { aspectRatio } } };
   let lastReason = 'unknown';
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -304,7 +310,7 @@ function planStyleRepair(detection, storyData, opts = {}) {
  *   null so editImageWithPrompt measures the source's own aspect.
  * @param {Function} [opts.editFn] - injectable editImageWithPrompt (tests).
  * @param {Function} [opts.styleMatchFn] - injectable checkStyleMatch (tests).
- * @returns {Promise<{imageData, model, modelId, beforeStyleMatch, afterStyleMatch, passedGate, usage}>}
+ * @returns {Promise<{imageData, model, modelId, prompt, beforeStyleMatch, afterStyleMatch, passedGate, usage}>}
  */
 async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
   const {
@@ -408,6 +414,11 @@ async function repairPageStyle(pageImage, targetStyleRef, opts = {}) {
     imageData: result.imageData,
     model,
     modelId,
+    // WHAT THIS REPAINT WAS ACTUALLY SENT. Returned so the version record can
+    // stamp its own prompt instead of inheriting the page's original render
+    // prompt; `promptOverride` means the Lab's wording is reported, not the
+    // production default it replaced.
+    prompt,
     beforeStyleMatch,
     afterStyleMatch,
     styleComparison,

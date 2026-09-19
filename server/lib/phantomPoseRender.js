@@ -142,7 +142,7 @@ CRITICAL pose rules — every detail comes from Image 2:
 - Posture (standing / sitting / kneeling / etc.) follows the silhouette.
 - Limb positions and gaze direction follow the silhouette.
 
-Output: ONE figure of the character only, on a plain pure-white background (#FFFFFF). NO environment, NO furniture, NO props from the original scene, NO shadow on the ground. The character fills most of the frame, centred. Photorealistic / illustration style consistent with Image 1.`;
+Output: ONE figure of the character only, on a plain pure-white background (#FFFFFF). NO environment, NO furniture, NO props from the original scene, NO shadow on the ground. The WHOLE figure is inside the frame, head to feet, with clear white margin above the head and below the feet; no part of the figure touches any edge of the frame. Within that margin the character is large and centred. Photorealistic / illustration style consistent with Image 1.`;
 }
 
 /**

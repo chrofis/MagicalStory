@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen, ArrowRight } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -11,6 +11,7 @@ import { trackTrialPageVisit } from '@/utils/gtagConversion';
 import { trackEvent } from '@/utils/analytics';
 import { trackTrialStep } from '@/utils/trialFunnel';
 import { useAnalyzerPresence } from '@/hooks/useAnalyzerPresence';
+import { parseChildAge } from '@/constants/storyTypes';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -216,6 +217,19 @@ export default function TrialWizard() {
   // attached to the -ch language codes.
   const storyLanguage = language === 'de' ? 'de-ch' : language === 'fr' ? 'fr-ch' : language === 'it' ? 'it-ch' : 'en';
 
+  // The deep-link provenance of THIS arrival, frozen at mount. The SEO theme
+  // pages link in as /try?category=…&topic=… with a React-Router <Link>, so
+  // document.referrer never changes and nothing else can tell such an arrival
+  // apart from a cold one. 43 of the 59 life challenges are reachable ONLY this
+  // way, so "did the visitor arrive with the topic already fixed" decides
+  // whether in-wizard topic curation buys anything at all.
+  const deepLink = useRef<{ category: string; topic: string }>(
+    (() => {
+      const params = new URLSearchParams(window.location.search);
+      return { category: params.get('category') || '', topic: params.get('topic') || '' };
+    })()
+  ).current;
+
   // Story input state — pre-fill from URL params (from theme pages)
   const [storyInput, setStoryInput] = useState<StoryInput>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -249,7 +263,16 @@ export default function TrialWizard() {
   // User location (IP-based, for landmark personalization)
   const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null; latitude?: number | null; longitude?: number | null } | null>(null);
 
-  useEffect(() => { trackTrialPageVisit(); trackEvent('trial_landing'); trackTrialStep('landing'); }, []);
+  useEffect(() => {
+    trackTrialPageVisit();
+    trackEvent('trial_landing');
+    trackTrialStep(
+      'landing',
+      deepLink.category || deepLink.topic
+        ? { deepLink: true, category: deepLink.category || undefined, topic: deepLink.topic || undefined }
+        : undefined
+    );
+  }, []);
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -338,7 +361,21 @@ export default function TrialWizard() {
     // Stamp the step being LEFT here rather than inside each step component —
     // one place, and it can't drift out of sync with the actual navigation.
     if (currentStep === 'character') trackTrialStep('character_done');
-    if (currentStep === 'topic') trackTrialStep('topic_selected');
+    if (currentStep === 'topic') {
+      // WHICH topic, not just that one was picked. This is the funnel's
+      // highest-intent signal and is what replaces the authored `liveness`
+      // weights in storyTypes.ts with measurement once enough rows exist.
+      // `age` rides along because it decides which six tiles were even offered,
+      // so a topic's pick rate is only readable against its own denominator.
+      const age = parseChildAge(characterData.age);
+      trackTrialStep('topic_selected', {
+        category: storyInput.storyCategory || undefined,
+        topic: storyInput.storyTopic || undefined,
+        theme: storyInput.storyTheme || undefined,
+        preselected: !!deepLink.topic && deepLink.topic === storyInput.storyTopic,
+        ...(age !== null ? { age } : {}),
+      });
+    }
     // Always show topic step — user should be able to change topic and select art style
     // even when coming from theme page with pre-selected category/topic
     if (nextIndex < STEPS.length) {
@@ -610,6 +647,7 @@ export default function TrialWizard() {
                 previewAvatar={previewAvatar}
                 characterName={characterData.name}
                 characterGender={characterData.gender}
+                characterAge={characterData.age}
               />
             )}
             {currentStep === 'ideas' && (

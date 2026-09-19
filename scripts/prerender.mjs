@@ -2,7 +2,7 @@
  * SSR pre-render script.
  *
  * Reads the SSR bundle and the client manifest, enumerates all SEO routes
- * (× 3 languages), renders each one to a static HTML file under
+ * (× 4 languages), renders each one to a static HTML file under
  * `dist/prerendered/{path}.{lang}.html`.
  *
  * Express serves these files directly for matching routes — meaning Googlebot
@@ -96,7 +96,7 @@ const { render, enumerateRoutes } = await import(pathToFileURL(SSR_BUNDLE).href)
 
 // ── Enumerate routes ─────────────────────────────────────────────────────────
 const routes = enumerateRoutes(enrichedCities);
-const LANGUAGES = ['de', 'en', 'fr'];
+const LANGUAGES = ['de', 'en', 'fr', 'it'];
 
 console.log(`📦 Pre-rendering ${routes.length} routes × ${LANGUAGES.length} languages = ${routes.length * LANGUAGES.length} files`);
 console.log(`   Output: ${path.relative(ROOT, OUT_DIR)}`);

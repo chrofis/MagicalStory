@@ -15,8 +15,6 @@ Each paragraph runs 2-4 sentences, a page holds at most four paragraphs, and a b
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 
-{STORY_BRIEF}
-
 # CHARACTER DETAILS (optional colour — use a trait where it fits a moment, never contradict one, never work through the list)
 
 {CHARACTER_DETAILS}
@@ -35,6 +33,8 @@ The plan lines divide the story into pages: a page tells the stretch of the stor
 
 Do not narrate staging. Zones, depths, camera angles, who stands where and what they wear are the picture's business, not the prose's.
 
+Where the story itself needs to name one of these things, name it: a transformation, a gift, a thing found or lost is an event, not staging. Naming it does not license describing it. Never copy the brief's wording, and never invent a colour, material or kind for it: use the child's plain word and keep the colour and kind the brief gives it. Where the brief colours a thing, the prose uses that colour or names none at all, never a different one.
+
 {PLAN_LINES}
 
 # YOUR TASK
@@ -47,11 +47,18 @@ Never contradict a page's illustration, and never mention pages, plans or illust
 Never use an em-dash or an en-dash. Use a comma, a full stop, a colon or parentheses.
 Every sentence is complete and finishes: no sentence broken off for effect, no bare fragments standing as sentences. Write as someone telling the story aloud, never as captions or stage directions describing a scene.
 No rhetorical set-pieces: no paired negations, no coined sayings or incantations, no one-sentence paragraphs for drama. Plain narration carries the story.
-Vary how each page begins: not always with a character's name — open some pages with time, place, speech, sound or action, and never start consecutive pages the same way.
+{PAGE_OPENING_VARIETY}.
 The story's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
 What the story establishes as load-bearing — a cause, a uniqueness, a limitation — appears in the text in its specific form, never genericized.
+A character knows only what an earlier page or picture gave them: a name said in their hearing, a place they were shown, an ability the book established. Where a page needs them to know it, an earlier page tells them.
+A character's first appearance carries the stated cause that puts them there; already being there, or arriving by chance exactly where they are needed, is not one.
+A character who refuses, gives up or discards a thing stays done with it; where a later page has them want it back or take it up again, that page says what changed.
+An object, sign, mechanism or rule earns its meaning on the page it first appears, before any later page leans on it.
+A limit the plot leans on — a thing that cannot happen, else the story collapses — is stated in the text, and no later page breaks it.
+Every reveal a page promises — a container, a secret, a question — is shown answered on a later page, and every price paid leaves a mark a later page shows.
+No phrase is repeated from a neighbouring sentence.
 The text gives each page its feeling and its suspense, and fills what the summary leaves out: feelings, dialogue, and the ordinary business between the story's turns — going somewhere and arriving, waiting, approaching people, asking, being answered, a greeting, names given and heard, a thing tried and let go. That is filler, not event, and the text invents it freely wherever the story jumps.
-What is fixed is what the story is made of: invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens.
+What is fixed is what the story is made of: invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens. A change of place, of what someone holds, or of the company they are among carries its path on the page.
 The final page gets the same care as the first sentence: land one feeling, plainly and warmly. A string of short solemn sentences is not an ending.
 Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone.
 No onomatopoeia or sound-effect words (clang-clang, whoosh, boom) and no baby-talk. The register follows the reading level, never a character's age: a story about a toddler is not written in toddler speech.
@@ -59,11 +66,11 @@ Every word must be one a child at the reading level above already uses. Name a t
 No abbreviation or acronym reaches the page, even when the story uses one: write the thing the way a child says it — the little train up the mountain, not its initials.
 Use dialogue where it fits — speech carries feeling and decision, not only what the pictures already show.
 {TITLE_RULE}
-Then name the candidate to ship, judged in this order: it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud.
+Then name the candidate to ship, judged in this order: every word of it is true of the pages you wrote — a title naming a condition, a lack or an inability is one the story shows happening on a page, never one a character only mentions; it names the adventure or the bond the story is about, not a vehicle, object or place that merely carries it; it gives away no ending; a child of {AGE} can say it out loud. Where no candidate is true of the pages, write a fourth that is and ship that one.
 
 Work in two steps.
 
-Step 1 — write the analysis: one line per page naming which stretch of the story the page tells and what changed for the main character, then name any page whose text risks repeating the page before it, name any page that opens in a place, or among people, the page before it never reached, and name any fact, cause or spoken line of the story that has not yet found its page.
+Step 1 — write the analysis: one line per page naming which stretch of the story the page tells and what changed for the main character, then name any page whose text risks repeating the page before it or carries a later page's instant, name any page that opens in a place, or among people, the page before it never reached, and name any fact, cause or spoken line of the story that has not yet found its page.
 
 Step 2 — write the pages, fixing what the analysis found. A problem the analysis names must change the page it names.
 
@@ -71,14 +78,7 @@ Step 2 — write the pages, fixing what the analysis found. A problem the analys
 
 # OUTPUT FORMAT
 
-Three blocks, in this order, nothing before or after.
-
----TITLE---
-TITLE_CANDIDATES:
-1. <a title, in the story language>
-2. <a second, taking a different angle on the story>
-3. <a third, taking a different angle again>
-TITLE_PICK: <candidate number> — <one sentence>
+Three blocks, in this order, nothing before or after. The title comes last, chosen from the pages as they stand.
 
 ---ANALYSIS---
 <one line per page>
@@ -91,3 +91,10 @@ TITLE_PICK: <candidate number> — <one sentence>
 <text for page 2>
 
 (continue through page {PAGE_COUNT})
+
+---TITLE---
+TITLE_CANDIDATES:
+1. <a title, in the story language>
+2. <a second, taking a different angle on the story>
+3. <a third, taking a different angle again>
+TITLE_PICK: <candidate number> — <one sentence>

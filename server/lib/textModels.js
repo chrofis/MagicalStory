@@ -5,11 +5,12 @@
  */
 
 const { log } = require('../utils/logger');
-const { TEXT_MODELS, MODEL_DEFAULTS } = require('../config/models');
+const { TEXT_MODELS, MODEL_DEFAULTS, GROK_VISION_FALLBACK } = require('../config/models');
 const { withAnthropic, withGemini, withGrok } = require('./aiConcurrency');
 const apiHealth = require('./apiHealth');
 const { stripDataUriPrefix } = require('./r2');
 const { recordTextUsage } = require('./usageContext');
+const { guardPromptString } = require('../services/prompts');
 
 // Map a text-model provider to its tokenUsage accounting key. Text Gemini
 // calls bill to gemini_text (image/quality Gemini are tracked on their own
@@ -120,6 +121,7 @@ function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin
  * Call Anthropic Claude API
  */
 async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callAnthropicAPI');
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -219,6 +221,9 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
 
   return {
     text: responseText,
+    // Finish reason, read by the truncation guard in callTextModel:
+    // 'max_tokens' means the reply was cut at the ceiling.
+    stop_reason: data.stop_reason || null,
     usage: {
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -238,6 +243,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
  * @returns {Promise<{text: string, usage: object}>} The complete generated text and usage
  */
 async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callAnthropicAPIStreaming');
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -406,6 +412,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
  * @returns {Promise<{text: string, usage: object, ttft: number|null}>}
  */
 async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callGeminiTextAPIStreaming');
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -462,6 +469,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
     let inputTokens = 0;
     let outputTokens = 0;
     let thinkingTokens = 0;
+    let finishReason = null;
     let firstChunkTime = null;
     resetInactivity(); // Start inactivity timer after connection established
 
@@ -506,6 +514,9 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
                 onChunk(chunk, fullText);
               }
             }
+            // Finish reason rides on the last candidate chunk ('STOP',
+            // 'MAX_TOKENS', 'SAFETY', ...) — the truncation guard reads it.
+            if (event.candidates?.[0]?.finishReason) finishReason = event.candidates[0].finishReason;
 
             // Extract usage metadata (usually in the last chunk)
             if (event.usageMetadata) {
@@ -531,6 +542,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
 
     return {
       text: fullText,
+      stop_reason: finishReason,
       usage: {
         input_tokens: inputTokens,
         output_tokens: outputTokens,
@@ -551,6 +563,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk, o
  * Includes retry logic with fallback to gemini-2.0-flash on empty responses
  */
 async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callGeminiTextAPI');
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
@@ -617,13 +630,17 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
     const blockReason = data.promptFeedback?.blockReason || 'empty response';
 
     // Try fallback to Grok (no PROHIBITED_CONTENT issues), then a second Gemini
-    // tier as last resort. NOTE: gemini-2.0-flash was RETIRED by Google (404),
-    // so the last resort is gemini-2.5-flash-lite.
+    // tier as last resort. gemini-2.5-flash-lite is the last resort because it
+    // is a different, cheaper tier — NOT, as this comment used to say, because
+    // "gemini-2.0-flash was RETIRED by Google (404)". That was inferred from the
+    // model's absence from GET /v1beta/models; a per-model read returns 200 and
+    // still advertises generateContent (2026-09-18). Leaving the false claim in
+    // place is how a non-bug gets "fixed" later.
     const LAST_RESORT_GEMINI = 'gemini-2.5-flash-lite';
     if (modelId !== LAST_RESORT_GEMINI) {
-      const grokFallbackModel = TEXT_MODELS['grok-4-fast'];
+      const grokFallbackModel = TEXT_MODELS[GROK_VISION_FALLBACK];
       if (grokFallbackModel && process.env.XAI_API_KEY) {
-        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with grok-4-fast...`);
+        log.warn(`⚠️  [GEMINI] No text response (${blockReason}), retrying with ${GROK_VISION_FALLBACK}...`);
         try {
           const grokResult = await callXaiAPI(prompt, maxTokens, grokFallbackModel.modelId, prefill ? { prefill } : {});
           return { ...grokResult, modelId: grokFallbackModel.modelId };
@@ -651,6 +668,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
   const geminiText = data.candidates[0].content.parts[0].text;
   return {
     text: prefill ? prefill + geminiText : geminiText,
+    stop_reason: data.candidates[0].finishReason || null,
     usage: {
       input_tokens: inputTokens,
       output_tokens: outputTokens,
@@ -666,6 +684,13 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId, options = {}) {
  * Never the default for German story prose until an A/B proves quality.
  */
 async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
+  // Guarded HERE as well as in the streaming implementation below. The
+  // delegation means the prompt is checked either way, but the context label is
+  // what a placeholder alarm names, and the entry point a caller used is the
+  // one worth naming. guardPromptString is idempotent, so the second pass is
+  // free. (tests/unit/sibling-parity.test.ts requires every provider entry
+  // point to carry it.)
+  prompt = guardPromptString(prompt, 'textModels.callOpenRouterAPI');
   // Delegates to the streaming implementation with no onChunk. Identical result
   // shape, and it inherits the two things this path could never have on its own:
   //   - immunity to undici's 300s headersTimeout, which killed any completion
@@ -681,6 +706,7 @@ async function callOpenRouterAPI(prompt, maxTokens, modelId, options = {}) {
  * Call xAI Grok API (OpenAI-compatible)
  */
 async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callXaiAPI');
   const apiKey = process.env.XAI_API_KEY;
 
   if (!apiKey) {
@@ -733,6 +759,8 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
 
   return {
     text: fullText,
+    // OpenAI-compatible finish_reason: 'length' = cut at max_tokens.
+    stop_reason: data.choices?.[0]?.finish_reason || null,
     usage: {
       input_tokens: inputTokens,
       output_tokens: outputTokens
@@ -744,6 +772,7 @@ async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
  * Call xAI Grok API with streaming (OpenAI-compatible SSE)
  */
 async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callXaiAPIStreaming');
   const apiKey = process.env.XAI_API_KEY;
 
   if (!apiKey) {
@@ -803,6 +832,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
       let inputTokens = 0;
       let outputTokens = 0;
       let firstChunkTime = null;
+      let finishReason = null;
       resetInactivity();
 
       try {
@@ -843,6 +873,9 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
                 }
               }
 
+              // finish_reason arrives on the last content chunk ('stop' | 'length').
+              if (event.choices?.[0]?.finish_reason) finishReason = event.choices[0].finish_reason;
+
               // Usage info (may come in the final chunk)
               if (event.usage) {
                 inputTokens = event.usage.prompt_tokens || inputTokens;
@@ -863,6 +896,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
 
       return {
         text: responseText,
+        stop_reason: finishReason,
         usage: {
           input_tokens: inputTokens,
           output_tokens: outputTokens
@@ -889,6 +923,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
  * ceiling never applies and an inactivity timer catches a genuinely dead stream.
  */
 async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  prompt = guardPromptString(prompt, 'textModels.callOpenRouterAPIStreaming');
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error('OpenRouter API key not configured (OPENROUTER_API_KEY)');
@@ -991,6 +1026,14 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       let firstChunkTime = null;
       let upstream = null;      // which provider actually served this
       let actualCost = null;    // OpenRouter's real charge, when it reports one
+      let finishReason = null;  // 'stop' | 'length' (cut at max_tokens) | null when the upstream omits it
+      // The UPSTREAM's own reason, unnormalised. OpenRouter is how DeepSeek,
+      // Qwen and OpenAI reach this codebase, and its normalised enum is
+      // formally open — so when an upstream stops for a reason OpenRouter has
+      // no mapping for, this field is the only place that reason appears.
+      // textReplyGuard reads it alongside finish_reason (a refusal in either
+      // one fails the reply).
+      let nativeFinishReason = null;
       resetInactivity();
 
       try {
@@ -1032,6 +1075,10 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
               // Which upstream served this — the single most useful field when a
               // model is inexplicably slow, and the one we were missing.
               if (event.provider && !upstream) upstream = event.provider;
+              // OpenRouter normalises upstream finish reasons to OpenAI's
+              // ('length' = max_tokens hit); native_finish_reason is the raw one.
+              if (event.choices?.[0]?.finish_reason) finishReason = event.choices[0].finish_reason;
+              if (event.choices?.[0]?.native_finish_reason) nativeFinishReason = event.choices[0].native_finish_reason;
               if (event.usage) {
                 inputTokens = event.usage.prompt_tokens || inputTokens;
                 outputTokens = event.usage.completion_tokens || outputTokens;
@@ -1060,6 +1107,8 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       const responseText = options.prefill ? options.prefill + fullText : fullText;
       return {
         text: responseText,
+        stop_reason: finishReason,
+        native_finish_reason: nativeFinishReason,
         usage: {
           input_tokens: inputTokens,
           output_tokens: outputTokens,
@@ -1083,12 +1132,34 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
 }
 
 /**
+ * Truncation guard at the chokepoint (owner order 2026-09-11, textReplyGuard.js).
+ * Every reply leaves callTextModel / callTextModelStreaming with
+ * `result.truncation`; a suspected cut is logged at ERROR with model, provider,
+ * tokens, cap, label and the first 120 chars, and counted for
+ * GET /api/health/config. Never throws — callers decide (gates are guidelines).
+ */
+function guardReply(result, model, modelName, capInForce, options) {
+  const { assessTextReply, describeTruncation, noteTruncation } = require('./textReplyGuard');
+  const truncation = assessTextReply(result, { model: result.modelId || model.modelId, provider: result.provider || model.provider, capInForce });
+  if (truncation.suspected) {
+    const label = options.usageLabel || 'text';
+    const preview = String(result.text || '').replace(/\s+/g, ' ').slice(0, 120);
+    noteTruncation(truncation, { usageLabel: label, preview });
+    log.error(`❌ [TEXT TRUNCATION] ${label}: ${modelName} (${truncation.model}) via ${truncation.provider} ${describeTruncation(truncation)} — reply starts: "${preview}"`);
+  }
+  return { ...result, truncation };
+}
+
+/**
  * Main text model caller - routes to appropriate provider
  * @param {string} prompt - The prompt to send
- * @param {number} maxTokens - Maximum tokens to generate (capped to model limit)
- * @returns {Promise<{text: string, usage: object}>}
+ * @param {number|null} maxTokens - null/0 (the default, and the rule: no output
+ *   caps) = the model's own maxOutputTokens; a number is clamped to it
+ * @returns {Promise<{text: string, usage: object, truncation: object}>}
+ *   `truncation` = assessTextReply verdict (see textReplyGuard.js); a suspected
+ *   cut is logged at ERROR and counted, never thrown.
  */
-async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, options = {}) {
+async function callTextModel(prompt, maxTokens = null, modelOverride = null, options = {}) {
   // Use override if provided, otherwise use global active model
   let model = activeTextModel;
   let modelName = TEXT_MODEL;
@@ -1146,7 +1217,7 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
   // Director, the scene reviewer) are allow-listed by label in vbIdGuard.js; an
   // unknown label warns by design.
   require('./vbIdGuard').warnIfVbIds(prompt, options.usageLabel || 'text', { kind: 'text' });
-  return { ...result, modelId: model.modelId };
+  return guardReply({ ...result, modelId: result.modelId || model.modelId }, model, modelName, effectiveMaxTokens, options);
 }
 
 /**
@@ -1156,7 +1227,7 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
  * @param {function} onChunk - Callback for each text chunk
  * @returns {Promise<{text: string, usage: object}>}
  */
-async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, modelOverride = null, options = {}) {
+async function callTextModelStreaming(prompt, maxTokens = null, onChunk = null, modelOverride = null, options = {}) {
   // Use override if provided, otherwise use global active model
   let model = activeTextModel;
   let modelName = TEXT_MODEL;
@@ -1217,13 +1288,13 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
   // Director, the scene reviewer) are allow-listed by label in vbIdGuard.js; an
   // unknown label warns by design.
   require('./vbIdGuard').warnIfVbIds(prompt, options.usageLabel || 'text', { kind: 'text' });
-  return { ...result, modelId: model.modelId };
+  return guardReply({ ...result, modelId: result.modelId || model.modelId }, model, modelName, effectiveMaxTokens, options);
 }
 
 /**
  * Backward compatibility alias for Claude API
  */
-async function callClaudeAPI(prompt, maxTokens = 4096, modelOverride = null, options = {}) {
+async function callClaudeAPI(prompt, maxTokens = null, modelOverride = null, options = {}) {
   return callTextModel(prompt, maxTokens, modelOverride, options);
 }
 
@@ -1249,5 +1320,11 @@ module.exports = {
   callXaiAPI,
   callXaiAPIStreaming,
   callOpenRouterAPI,
-  callClaudeAPI
+  callClaudeAPI,
+
+  // Truncation guard (textReplyGuard.js) — re-exported so callers reach it
+  // from the same module they call models through.
+  assessTextReply: require('./textReplyGuard').assessTextReply,
+  describeTruncation: require('./textReplyGuard').describeTruncation,
+  getTruncationStats: require('./textReplyGuard').getTruncationStats,
 };

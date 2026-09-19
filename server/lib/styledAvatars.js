@@ -21,7 +21,7 @@ const { getFacePhoto, getPrimaryPhoto, getStandardAvatar } = require('./characte
 const { normalizeClothingCategory } = require('./clothingCategories');
 const { fetchImageBytes } = require('./r2');
 const { getImageIdentifier, getImageSizeKB } = require('../utils/imageMetadata');
-const { slugifyCostume } = require('../utils/costumeKey');
+const { slugifyCostume, costumeSubKey, pickCostumed } = require('../utils/costumeKey');
 
 /**
  * Resolve an avatar's bytes for one of the standard categories. After the R2
@@ -275,7 +275,14 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
   // the key. Phase 5/6 — costumed subtype keying is gone. One costume per
   // character per story → bare 'costumed' is enough; the subtype lives on
   // clothingRequirements / visualBible.costumes.
-  const keyCategory = normalizeClothingCategory(clothingCategory);
+  // A wardrobe-state variant is its OWN sheet, so its state suffix survives the
+  // collapse — normalizing it away would make every off-variant share the base
+  // sheet's cache entry and the second one would silently serve the first.
+  const { parseOffCategory, buildOffCategory } = require('./wardrobeVariants');
+  const off = parseOffCategory(clothingCategory);
+  const keyCategory = off
+    ? buildOffCategory(normalizeClothingCategory(off.baseCategory), off.offIds)
+    : normalizeClothingCategory(clothingCategory);
   const name = String(characterName || '').trim().toLowerCase();
   return `${getCacheScope()}${name}_${keyCategory}_${artStyle}`;
 }
@@ -292,7 +299,7 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false } = {}) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null } = {}) {
   const startTime = Date.now();
 
   // CANONICAL PATH (2026-05-14): styled avatars are 2×4 reference sheets
@@ -343,6 +350,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       artStyle,
       usageTracker: addUsage,
       redress,
+      seasonOutfit,
       // The end of the chain: every caller above threads skipQualityEval, and
       // it died here — the sheet builder kept running its row reviews for
       // trials no matter what the pipeline asked for (job_1786826686448).
@@ -368,9 +376,14 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // "unscored" and the gate treats the dimension as unknown (null → passes,
     // so the sheet still ships, which is the intended fail-open).
     const evalFailed = pass1Verdict?.evalFailed || null;
+    // The caller asked for no reviews (trial): every axis is unknown, not 10.
+    const evalSkipped = pass1Verdict?.evalSkipped || null;
     const faceMatchScore = evalFailed ? null : (pass1Verdict?.sourceMatch?.sourceMatchScore ?? pass1Verdict?.sourceMatchScore ?? null);
     const clothingMatchScore = evalFailed ? null : (pass1Verdict?.outfit?.outfitScore ?? pass1Verdict?.outfitScore ?? null);
-    const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : 0;
+    // null = unscored. Never 0 (reads as a failure) and never 10 (reads as a
+    // verified pass — staging job_1788763045123_z8so79ngb stored a corrupt sheet
+    // at 10/10 on every axis with no judge call made).
+    const innerFinal = typeof result.finalScore === 'number' ? result.finalScore : null;
     // styled === false means Pass 2 was wanted but every attempt was rejected,
     // so what shipped is the realistic Pass-1 sheet in a painted story. That is
     // a real defect and must not read as success: this gate previously scored
@@ -397,6 +410,10 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       innerOutfitScore: pass1Verdict?.outfit?.outfitScore ?? null,
       innerFinalScore: innerFinal,
       combinedScore: innerFinal,
+      // False = no judge ran on this sheet. A consumer must not read its scores
+      // as a pass; they are unknown.
+      evaluated: !(evalSkipped || evalFailed),
+      evalSkipped,
       // False = the shipped sheet is the realistic Pass-1 fallback, not a
       // style-converted one. Read by the dev panel so an unstyled avatar is
       // visible as such instead of looking like a normal pass.
@@ -430,7 +447,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       }
     }
 
-    if (evalFailed) {
+    if (evalSkipped) {
+      log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — quality eval skipped (${evalSkipped}); no axis was judged`);
+    } else if (evalFailed) {
       log.warn(`⚠️ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} shipped UNSCORED — row eval failed (${evalFailed}); sheet kept but not judged`);
     } else if (passed) {
       log.info(`✅ [STYLED AVATAR] ${characterName}/${artStyle}/${clothingCategory} passed (face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10, inner=${innerFinal}/10)`);
@@ -478,7 +497,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false } = {}) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false, redress = false, seasonOutfit = null } = {}) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first. A guarantee-seeded raw reference does NOT count — the
@@ -500,7 +519,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress });
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit });
       styledAvatarCache.set(cacheKey, styledAvatar);
       guaranteeSeededKeys.delete(cacheKey); // real sheet replaces any seeded raw reference
       return styledAvatar;
@@ -525,7 +544,41 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
  * @param {Array<{pageNumber, clothingCategory, characterNames}>} pageRequirements - What's needed for each page
  * @returns {Promise<Map>} Map of cacheKey -> styledAvatar
  */
-async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
+/**
+ * Write a styled avatar onto the character object, in the shape every consumer
+ * (projectStoryCharacterAvatars, cover cell extraction) reads. Same shape as the
+ * post-generation write-back below — one source of truth for it.
+ * @param {Object} character
+ * @param {string} artStyle
+ * @param {string} clothingCategory - 'standard' | 'winter' | ... | 'costumed[:type]'
+ * @param {string} styledAvatar
+ */
+function rememberStyledAvatarOnCharacter(character, artStyle, clothingCategory, styledAvatar) {
+  if (!character || !styledAvatar) return;
+  if (!character.avatars) character.avatars = {};
+  if (!character.avatars.styledAvatars) character.avatars.styledAvatars = {};
+  if (!character.avatars.styledAvatars[artStyle]) character.avatars.styledAvatars[artStyle] = {};
+  if (clothingCategory === 'costumed' || clothingCategory.startsWith('costumed:')) {
+    // ONE key per costume (utils/costumeKey.js): the label arrives in either
+    // casing, and a raw colon part written here was missed by the slugified
+    // reads elsewhere.
+    const costumeType = costumeSubKey(clothingCategory);
+    if (!character.avatars.styledAvatars[artStyle].costumed) character.avatars.styledAvatars[artStyle].costumed = {};
+    character.avatars.styledAvatars[artStyle].costumed[costumeType] = styledAvatar;
+  } else {
+    character.avatars.styledAvatars[artStyle][clothingCategory] = styledAvatar;
+  }
+}
+
+// `seasonOutfit` ({ season, label, outfit, footwear } from season.js
+// `seasonOutfitGuidance`, or null): dresses the NON-costumed sheets for the
+// story's season. Passed only where nothing else states an outfit — the trial
+// path, whose contract is `signature: 'none'` and therefore resolves to a
+// generic default, leaving the creation-time photo as the sole source of the
+// outfit (a t-shirt in a winter book). Costumed sheets never take it: the
+// costume is the outfit. Not part of the cache key deliberately — the key is
+// already story-scoped (`getCacheScope()`), and a story has exactly one season.
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false, seasonOutfit = null } = {}) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // For realistic style, skip standard/winter/summer style conversion (photos are already realistic)
@@ -546,20 +599,35 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   // Collect costumed avatars that need on-demand generation (to run in parallel)
   const pendingCostumedGenerations = []; // { charName, char, clothingCategory, cacheKey, costumeType, costumeConfig }
 
+  // RESOLVE: ONE cast index for this build — every name below resolves through
+  // it. Raw equality (even lower-cased) misses a diacritic spelled differently
+  // and a short form, and the miss is silent: the character simply gets no
+  // styled sheet for that page's clothing.
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  const castIdx = buildCastIndex({ characters }, null);
+
   for (const requirement of pageRequirements) {
     let { clothingCategory, characterNames } = requirement;
 
     for (const charName of characterNames || []) {
-      // Case-insensitive character lookup with exact match fallback
-      const char = characters.find(c => c.name === charName) ||
-                   characters.find(c => c.name.toLowerCase() === charName.toLowerCase());
+      const resolved = resolveEntity(charName, castIdx);
+      const char = (resolved && resolved.kind === 'cast') ? resolved.entry : null;
       if (!char) continue;
 
       const cacheKey = getAvatarCacheKey(charName, clothingCategory, artStyle);
 
       // Skip if already cached (a guarantee-seeded raw reference doesn't
-      // count — the real conversion must still be retried)
-      if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) continue;
+      // count — the real conversion must still be retried). The character
+      // object must still learn about the sheet: projectStoryCharacterAvatars
+      // reads ONLY char.avatars.styledAvatars, so a cache hit that skipped the
+      // write-back left the story-avatar map empty and every page shipped the
+      // WHOLE 2×4 sheet as its reference instead of the matching pose cell
+      // (prod job_1787647410717_5dvfqu8jg p2). Only reachable via a seeded or
+      // handed-over cache; harmless when the object already has the entry.
+      if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) {
+        rememberStyledAvatarOnCharacter(char, artStyle, clothingCategory, styledAvatarCache.get(cacheKey));
+        continue;
+      }
 
       // Skip if already in our list to convert
       if (neededAvatars.has(cacheKey)) continue;
@@ -596,9 +664,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           if (matchingKey) charReqs = clothingRequirements[matchingKey];
         }
         const costumeConfig = charReqs?.costumed;
-        const colonKey = clothingCategory.startsWith('costumed:') ? clothingCategory.split(':')[1] : null;
-        const costumeType = colonKey || slugifyCostume(costumeConfig?.costume) || 'default';
-        originalAvatar = avatars?.costumed?.[costumeType];
+        // Canonical slug for every WRITE below; the READ tolerates a slot stored
+        // under the raw colon part by an older run (utils/costumeKey.js).
+        const costumeType = costumeSubKey(clothingCategory, costumeConfig?.costume);
+        originalAvatar = pickCostumed(avatars?.costumed, clothingCategory, costumeConfig?.costume);
         if (!originalAvatar) {
           if (costumeConfig?.used && costumeConfig?.description) {
             pendingCostumedGenerations.push({ charName, char, clothingCategory, cacheKey, costumeType, costumeConfig });
@@ -644,7 +713,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       // Get clothing description text (for explicit clothing in styled avatar).
       // Priority chain:
       //   1. clothingRequirements[char][category].description — Sonnet's
-      //      story-specific FULL final outfit (the new schema, story-unified.txt).
+      //      story-specific FULL final outfit (the new schema; authored today by
+      //      prompts/story-bible-from-beats.txt / prompts/scene-expansion-all.txt).
       //      Used verbatim. No concatenation.
       //   2. char.avatars.clothing[category] — the character's stored base
       //      clothing (e.g. Noah's green T-Rex hoodie). Used when no outline
@@ -727,6 +797,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
             // scene reads the body cell, and the eval — which checks the story
             // outfit — desyncs → repaint loop.
             redress: outfitChanged,
+            // Season dresses a sheet only when the outfit is NOT already
+            // dictated: a contract description (or a costume) states the
+            // garments itself, and a second, seasonal opinion would fight it.
+            seasonOutfit: (outfitChanged || isCostumedCat) ? null : seasonOutfit,
             character: char  // Pass full character object for physical traits
           });
         }
@@ -812,9 +886,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   }
 
   // Standard style conversion promises (run simultaneously with costumed)
-  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, redress, character }] of neededAvatars) {
+  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, redress, seasonOutfit: entrySeasonOutfit, character }] of neededAvatars) {
     allPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval, redress })
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval, redress, seasonOutfit: entrySeasonOutfit })
         .then(styledAvatar => ({ type: 'standard', cacheKey, characterName, clothingCategory, character, styledAvatar, success: true }))
         .catch(error => {
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}: ${error.message}`);
@@ -852,8 +926,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
             // clothingRequirements (passed earlier into pendingCostumedGenerations)
             // when bare 'costumed' arrived. Default key is 'default' so the
             // slot is never lost.
-            const costumeType = (clothingCategory.startsWith('costumed:'))
-              ? clothingCategory.split(':')[1]
+            const costumeType = clothingCategory.startsWith('costumed:')
+              ? costumeSubKey(clothingCategory)
               : (result.costumeType || 'default');
             if (!character.avatars.styledAvatars[artStyle].costumed) character.avatars.styledAvatars[artStyle].costumed = {};
             character.avatars.styledAvatars[artStyle].costumed[costumeType] = result.styledAvatar;
@@ -1207,8 +1281,98 @@ function setStyledAvatar(characterName, clothingCategory, artStyle, imageData) {
 // because their prompt spells the outfit out in words).
 const activeScopeRunners = new Map();
 
+// scopeId -> { timer, expiresAt }. A retained scope has a consumer that has not
+// entered it YET. The refcount above only protects an OVERLAP; the normal trial
+// ordering has no overlap at all: the prewarm finishes, clears (count 1, so the
+// clear runs), and the story job enters the same scope a fraction of a second
+// later to find it empty — so it pays for the identical 2x4 sheet + style
+// transfer a second time (prod job_1788698812047_q5b1vuds7: two records for
+// Amian/watercolor/standard with byte-identical prompts, 77 s and 58 s, starting
+// 220 ms apart). The DB handoff (preGeneratedStyledAvatars) does not cover this:
+// /api/trial/create-story waits at most 60 s for an in-flight prewarm, and the
+// prewarm persists the avatars AFTER it clears the cache. A retention makes the
+// scope survive the prewarm's exit until the job claims it, with a TTL so an
+// abandoned trial (no job ever arrives) still frees the bytes.
+const pendingScopeHandoffs = new Map();
+// Retained scopes hold image bytes. Bound both dimensions: how long one may live
+// and how many may live at once (oldest evicted first).
+const HANDOFF_TTL_MS = 180000;
+const MAX_PENDING_HANDOFFS = 20;
+
+/**
+ * Keep a scope's cache alive past the current runner's exit, for a consumer that
+ * has not entered the scope yet. Consumed by the next runInCacheScope on the same
+ * scopeId; otherwise the entries are freed after ttlMs.
+ * @param {string} scopeId
+ * @param {number} [ttlMs]
+ */
+function retainCacheScopeForHandoff(scopeId, ttlMs = HANDOFF_TTL_MS) {
+  if (!scopeId) return;
+  // The consumer is already inside the scope (overlapping order). The refcount
+  // guard covers that case and the last runner out clears properly - retaining
+  // on top of it would only park the entries until the TTL.
+  const others = (activeScopeRunners.get(scopeId) || 0) - (cacheContext.getStore() === scopeId ? 1 : 0);
+  if (others > 0) {
+    log.info(`[STYLED AVATARS] Not retaining scope ${scopeId} - ${others} runner(s) already inside it`);
+    return;
+  }
+  const existing = pendingScopeHandoffs.get(scopeId);
+  if (existing) {
+    clearTimeout(existing.timer);
+  } else if (pendingScopeHandoffs.size >= MAX_PENDING_HANDOFFS) {
+    // Evict the oldest retention rather than growing without bound.
+    const oldest = [...pendingScopeHandoffs.entries()]
+      .sort((a, b) => a[1].expiresAt - b[1].expiresAt)[0];
+    log.warn(`[STYLED AVATARS] ${MAX_PENDING_HANDOFFS} scopes already retained - evicting ${oldest[0]}`);
+    releasePendingScopeHandoff(oldest[0], 'evicted');
+  }
+  const timer = setTimeout(() => {
+    log.info(`[STYLED AVATARS] Handoff for scope ${scopeId} expired after ${ttlMs}ms - no consumer arrived, freeing entries`);
+    releasePendingScopeHandoff(scopeId, 'expired');
+  }, ttlMs);
+  if (typeof timer.unref === 'function') timer.unref();
+  pendingScopeHandoffs.set(scopeId, { timer, expiresAt: Date.now() + ttlMs });
+  log.info(`[STYLED AVATARS] Retaining cache scope ${scopeId} for handoff (ttl ${ttlMs}ms)`);
+}
+
+// Drop a retention and free its entries. Used by the TTL timer and by eviction -
+// never by the consumer, which wants the entries.
+function releasePendingScopeHandoff(scopeId, reason) {
+  const entry = pendingScopeHandoffs.get(scopeId);
+  if (!entry) return;
+  clearTimeout(entry.timer);
+  pendingScopeHandoffs.delete(scopeId);
+  clearScopeEntries(scopeId, reason);
+}
+
+// Delete every cache entry belonging to one scope, without having to be inside it
+// (the TTL timer runs outside any AsyncLocalStorage context).
+function clearScopeEntries(scopeId, reason = 'clear') {
+  const prefix = `${scopeId}::`;
+  let cleared = 0;
+  for (const key of [...styledAvatarCache.keys()]) {
+    if (key.startsWith(prefix)) { styledAvatarCache.delete(key); cleared++; }
+  }
+  for (const key of [...conversionInProgress.keys()]) {
+    if (key.startsWith(prefix)) conversionInProgress.delete(key);
+  }
+  for (const key of [...guaranteeSeededKeys]) {
+    if (key.startsWith(prefix)) guaranteeSeededKeys.delete(key);
+  }
+  log.debug(`[STYLED AVATARS] Cleared ${cleared} entries for scope ${scopeId} (${reason}) (${styledAvatarCache.size} remain)`);
+  return cleared;
+}
+
 async function runInCacheScope(scopeId, fn) {
   log.debug(`🔒 [STYLED AVATARS] Running in cache scope: ${scopeId}`);
+  // Entering a retained scope IS the handoff: cancel the TTL and keep the
+  // entries - this runner is the consumer they were held for.
+  const handoff = pendingScopeHandoffs.get(scopeId);
+  if (handoff) {
+    clearTimeout(handoff.timer);
+    pendingScopeHandoffs.delete(scopeId);
+    log.info(`[STYLED AVATARS] Claimed retained cache scope ${scopeId} - prewarmed avatars reused`);
+  }
   activeScopeRunners.set(scopeId, (activeScopeRunners.get(scopeId) || 0) + 1);
   try {
     return await cacheContext.run(scopeId, fn);
@@ -1232,24 +1396,17 @@ function clearStyledAvatarCache() {
     log.info(`⏭️ [STYLED AVATARS] Not clearing scope ${scopeId} — ${activeScopeRunners.get(scopeId) - 1} other runner(s) still active in it`);
     return;
   }
+  if (scopeId && pendingScopeHandoffs.has(scopeId)) {
+    // A consumer is expected but has not entered the scope yet (the normal trial
+    // order: the prewarm ends before the story job starts). Keep the entries; the
+    // consumer frees them on its own way out, and the TTL frees them if it never
+    // arrives.
+    log.info(`[STYLED AVATARS] Not clearing scope ${scopeId} - retained for a pending consumer`);
+    return;
+  }
   if (scope) {
     // Only clear entries belonging to the current scope
-    let cleared = 0;
-    for (const key of [...styledAvatarCache.keys()]) {
-      if (key.startsWith(scope)) {
-        styledAvatarCache.delete(key);
-        cleared++;
-      }
-    }
-    for (const key of [...conversionInProgress.keys()]) {
-      if (key.startsWith(scope)) {
-        conversionInProgress.delete(key);
-      }
-    }
-    for (const key of [...guaranteeSeededKeys]) {
-      if (key.startsWith(scope)) guaranteeSeededKeys.delete(key);
-    }
-    log.debug(`🗑️ [STYLED AVATARS] Cleared ${cleared} entries for scope ${scope} (${styledAvatarCache.size} remain)`);
+    clearScopeEntries(scopeId);
   } else {
     // No scope set — clear everything (backward compat)
     const size = styledAvatarCache.size;
@@ -1754,10 +1911,104 @@ function _seedStandardFromPreview(characterName, artStyle, previewAvatarDataUrl)
   styledAvatarCache.set(cacheKey, previewAvatarDataUrl);
 }
 
+/**
+ * WARDROBE-STATE VARIANT SHEETS — one extra sheet per derived requirement row.
+ *
+ * Deliberately NOT a branch inside prepareStyledAvatars. That function resolves
+ * a SOURCE avatar (photo, R2 bytes, costumed base) and runs the two-pass
+ * photo→sheet builder; a variant shares none of that. Its source is the
+ * character's already-approved styled sheet, its generator is one edit on that
+ * sheet, and its identity is fixed by construction rather than judged against a
+ * photo. Threading it through the other function would have meant a `baseCategory`
+ * fork in every one of that loop's branches.
+ *
+ * ORDERING IS THE CALLER'S JOB: the base sheets must already exist. The pipeline
+ * chains this onto the in-flight styling promise, so it always runs after them.
+ *
+ * @param {Array<Object>} characters - inputData.characters
+ * @param {string} artStyle
+ * @param {Array<Object>} variantRequirements - rows from
+ *   wardrobeVariants.deriveWardrobeVariantRequirements
+ * @returns {Promise<number>} how many variant sheets were actually stored
+ */
+async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequirements, { addUsage = null, skipQualityEval = false, backendOverride = null } = {}) {
+  const rows = Array.isArray(variantRequirements) ? variantRequirements : [];
+  if (rows.length === 0) return 0;
+
+  const { parseOffCategory } = require('./wardrobeVariants');
+  const { redressSheetVariant } = require('./character2x4Sheet');
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  const castIdx = buildCastIndex({ characters: characters || [] }, null);
+
+  const jobs = [];
+  for (const row of rows) {
+    const charName = (row.characterNames || [])[0];
+    const off = parseOffCategory(row.clothingCategory);
+    if (!charName || !off) continue;
+    const resolvedEntity = resolveEntity(charName, castIdx);
+    const char = (resolvedEntity && resolvedEntity.kind === 'cast') ? resolvedEntity.entry : null;
+    if (!char) {
+      log.warn(`👕 [WARDROBE-VARIANT] "${charName}" is not in the commissioned cast — no variant sheet`);
+      continue;
+    }
+    const cacheKey = getAvatarCacheKey(charName, row.clothingCategory, artStyle);
+    if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) {
+      rememberStyledAvatarOnCharacter(char, artStyle, row.clothingCategory, styledAvatarCache.get(cacheKey));
+      continue;
+    }
+    // THE APPROVED SHEET IS THE INPUT — never the photos (owner, 2026-09-19).
+    // No base sheet means no variant: falling back to a photo→sheet build here
+    // would produce a second, independently-drawn character.
+    const baseSheetRaw = char.avatars?.styledAvatars?.[artStyle]?.[off.baseCategory] || null;
+    const baseSheet = await photoAsDataUri(baseSheetRaw, `${charName} ${off.baseCategory} sheet`);
+    if (!baseSheet) {
+      log.warn(`👕 [WARDROBE-VARIANT] ${charName}: no approved "${off.baseCategory}" sheet to redress — no variant (the page keeps the worn sheet + the "leave it off" line)`);
+      continue;
+    }
+    const facePhoto = await photoAsDataUri(getFacePhoto(char), `${charName} face photo`);
+    jobs.push({ charName, char, row, off, cacheKey, baseSheet, facePhoto });
+  }
+
+  if (jobs.length === 0) return 0;
+  log.info(`👕 [WARDROBE-VARIANT] redressing ${jobs.length} approved sheet(s) in PARALLEL: ${jobs.map(j => `${j.charName}/${j.row.clothingCategory}`).join(', ')}`);
+
+  const results = await Promise.all(jobs.map(async (j) => {
+    try {
+      const out = await redressSheetVariant(j.baseSheet, {
+        characterName: j.charName,
+        characterAge: j.char?.age,
+        facePhoto: j.facePhoto,
+        resolvedOutfit: j.row.clothingDescription || '',
+        removedItems: j.row.removedItemNames || j.off.offIds,
+        usageTracker: addUsage,
+        skipQualityEval,
+        backendOverride,
+      });
+      return { j, out };
+    } catch (err) {
+      log.error(`👕 [WARDROBE-VARIANT] ${j.charName}/${j.row.clothingCategory} threw: ${err.message} — no variant stored`);
+      return { j, out: null };
+    }
+  }));
+
+  let stored = 0;
+  for (const { j, out } of results) {
+    if (!out?.imageData) continue;
+    const compressed = await compressImageToJPEG(out.imageData, 85, 1024);
+    styledAvatarCache.set(j.cacheKey, compressed);
+    guaranteeSeededKeys.delete(j.cacheKey);
+    rememberStyledAvatarOnCharacter(j.char, artStyle, j.row.clothingCategory, compressed);
+    stored++;
+  }
+  log.info(`👕 [WARDROBE-VARIANT] ${stored}/${jobs.length} variant sheet(s) stored`);
+  return stored;
+}
+
 module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
+  prepareWardrobeVariantAvatars,
   convertAvatarToStyle,
 
   // Apply styled avatars to photo arrays
@@ -1766,6 +2017,7 @@ module.exports = {
 
   // Cache access
   runInCacheScope,
+  retainCacheScopeForHandoff,
   getStyledAvatar,
   setStyledAvatar,
   hasStyledAvatar,

@@ -128,7 +128,10 @@ async function drawImageCovering(doc, imageBuffer, x, y, boxWidth, boxHeight, op
 function parseStoryPages(storyData) {
   const storyText = storyData.storyText || storyData.generatedStory || storyData.story || storyData.text || '';
   if (!storyText) return [];
-  const pageMatches = storyText.split(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Page)\s+\d+)/i);
+  // Italian stories label pages "Pagina" (storyJobPipeline pageWord); French uses the
+  // English word "Page", so it is already covered. "Pagina" is listed before "Page" so
+  // the longer label wins the alternation outright.
+  const pageMatches = storyText.split(/(?:---\s*(?:Pagina|Page|Seite)\s+\d+\s*---|##\s*(?:Seite|Pagina|Page)\s+\d+)/i);
   return pageMatches.slice(1).filter(p => p.trim().length > 0);
 }
 
@@ -456,8 +459,8 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
 
 /**
  * Picture-book text-area ratio per language level. The image gets the rest.
- *   1st-grade (20-35 words): 15% text → 85% image (classic picture book)
- *   standard  (120-150 words): 20% text → 80% image
+ *   1st-grade (25-70 words): 15% text → 85% image (classic picture book)
+ *   standard  (40-150 words): 20% text → 80% image
  *   advanced  (250-300 words): 35% text → 65% image (still image-dominant)
  * Sized to fit the typical word count at 12pt (14pt for 1st-grade) with
  * adaptive font sizing handling outliers down to a 10pt floor.
@@ -499,7 +502,7 @@ function computeTextBelowRatio(pages, languageLevel) {
   // Clamp UP to languageLevel's expected band so a one-page outlier doesn't
   // distort the whole book. There is no 1st-grade cap: capping the strip is the
   // wrong move exactly when it fires — a 1st-grade book whose pages overshoot
-  // their 25–50 word budget needs MORE strip, not less, and a cap only pushes
+  // their 25–70 word budget needs MORE strip, not less, and a cap only pushes
   // the adaptive font toward its 10pt floor. Measured on
   // job_1788614817116_vxnu60yjg: 73–118 words a page, i.e. the 0.28 bucket,
   // which the old `Math.min(ratio, 0.24)` shrank. (decisions.md 2026-09-05)

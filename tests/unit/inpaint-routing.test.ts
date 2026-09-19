@@ -26,7 +26,11 @@ describe('NOT_INPAINTABLE_TYPES', () => {
   it('covers the classes inpaint must never be asked to repaint', () => {
     for (const t of ['hair', 'hair_change', 'clothing', 'clothing_inconsistent',
       'clothing_detail', 'character_identity', 'face_mismatch', 'face_drift',
-      'age_shift', 'skin_tone', 'scale']) {
+      'age_shift', 'skin_tone', 'scale',
+      // extra_character (owner, 2026-09-13): an identity reconciliation, never
+      // a deletion. Inpaint was the removal route and erased a commissioned
+      // child from a cover; the finding still scores, only its route is closed.
+      'extra_character']) {
       expect(NOT_INPAINTABLE_TYPES.has(t), `${t} should be blocked`).toBe(true);
     }
   });
@@ -58,6 +62,18 @@ describe('stripCharacterNames', () => {
     // The shipped bug repeated the identifier's prefix twice.
     const occurrences = out.split('positioned between').length - 1;
     expect(occurrences).toBe(1);
+  });
+
+  it('writes the subject of a per-character fix as "this character", never its own identifier', () => {
+    const out = stripCharacterNames("Replace the object in Levin's left hand; stretch Levin's arm toward Kiaan", {
+      names,
+      vidByName: new Map([['levin', 'the preschooler in the red T-shirt']]),
+      fallbackByName,
+      ownVisualId: 'the preschooler in the red T-shirt',
+      ownName: 'Levin',
+    });
+    expect(out).toBe("Replace the object in this character's left hand; stretch this character's arm toward the preschooler");
+    expect(out).not.toContain('red T-shirt');
   });
 
   it('handles possessives and bare apostrophes', () => {

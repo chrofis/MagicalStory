@@ -232,6 +232,12 @@ const TYPE_TO_BUCKET = {
   garment_colour: 'garment_colour', garment_color: 'garment_colour',
   nudity: 'nudity', undressed: 'nudity', nude: 'nudity',
   implausible_placement: 'action_interaction', placement: 'action_interaction',
+  // face_destroyed (2026-09-12): a face rendered featureless or smeared IN THE
+  // PAGE, as opposed to cut away by our crop (cutout_artifact, which stays
+  // unmapped and zero-point). character_identity, so it repairs with the
+  // grok_face patch anchored to the reference avatar — the one route that can
+  // put features back without redrawing the page.
+  face_destroyed: 'character_identity',
   face_mismatch: 'character_identity', hair_change: 'character_identity',
   skin_tone: 'character_identity', age_shift: 'character_identity',
   clothing_inconsistent: 'clothing', color_change: 'clothing',
@@ -271,7 +277,7 @@ function bucketForType(type) {
  * @param {object} [opts]
  * @param {boolean} [opts.bySubject=false] key by (bucket, subject) instead of
  *   bucket alone. OPT-IN because the two callers need different shapes: the
- *   eval_findings stats writer groups per bucket for a plain GROUP BY, while the
+ *   eval_finding_stats writer groups per bucket for a plain GROUP BY, while the
  *   multi-judge jury must NOT collapse two characters' findings of one class into
  *   one entry — scoring bills per (class, subject), so collapsing them silently
  *   reverts every page to a single charge per class. Entries always carry

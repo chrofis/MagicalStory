@@ -34,6 +34,12 @@ const errorMessages = {
     googleSignInFailed: 'Échec de la connexion Google',
     passwordResetFailed: 'Échec de la réinitialisation du mot de passe',
   },
+  it: {
+    loginFailed: "Accesso fallito",
+    registrationFailed: "Registrazione fallita",
+    googleSignInFailed: "Accesso con Google fallito",
+    passwordResetFailed: "Reimpostazione della password fallita",
+  },
 };
 
 export function AuthModal({ isOpen, onClose, onSuccess, redirectUrl }: AuthModalProps) {

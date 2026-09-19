@@ -6,7 +6,7 @@ You are reading a children's picture book aloud for the first time, to a child w
 
 Read the pages once, in order, the way a listener hears them, and answer five questions:
 1. CONFUSION: is there a sentence you would have to read twice, or a thing, word or name a listener could not make sense of from what came before?
-2. CONTRADICTION: does a page say something an earlier page said otherwise?
+2. CONTRADICTION: does a page say something an earlier page said otherwise? A character acting against a decision an earlier page had them state or carry out counts the same, unless a page says what changed their mind.
 3. IDLE: does anyone do something that changes nothing — an action, a plan, a warning or a promise no later page acts on?
 4. TRANSITION: is anyone suddenly in another place, holding something new, or in among people who were strangers a page ago, with no page telling how? A page turn carries ordinary travel and time, so fault a move only where the jump is unexplained; joining strangers is not travel, and a page tells how they got in.
 5. PAYOFF: does the book raise something — a question, a closed container, a secret, a threat — and never show the answer?

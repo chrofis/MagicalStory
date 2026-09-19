@@ -385,10 +385,22 @@ async function deleteObject(key) {
  * @returns {Promise<number>} count of objects deleted (0 when not configured)
  */
 async function deleteByPrefix(prefix) {
-  if (!isConfigured()) return 0;
+  return (await deleteByPrefixDetailed(prefix)).deleted;
+}
+
+/**
+ * Same work as deleteByPrefix, but says whether it actually finished:
+ *   { deleted, ok, error }
+ * `ok === false` means objects may still be under the prefix — the caller is
+ * about to (or already did) delete the row that names them, so it MUST record
+ * the prefix for retry (server/lib/r2Pending.js) or they are orphaned silently.
+ * deleteByPrefix keeps returning the bare count for the callers that only log it.
+ */
+async function deleteByPrefixDetailed(prefix) {
+  if (!isConfigured()) return { deleted: 0, ok: true, error: null };
   if (typeof prefix !== 'string' || prefix.length < 12 || !prefix.endsWith('/')) {
     log.warn(`[R2] deleteByPrefix refused unsafe prefix: "${prefix}"`);
-    return 0;
+    return { deleted: 0, ok: false, error: `unsafe prefix "${prefix}"` };
   }
   const client = getClient();
   const Bucket = process.env.R2_BUCKET;
@@ -409,10 +421,10 @@ async function deleteByPrefix(prefix) {
       ContinuationToken = listed.IsTruncated ? listed.NextContinuationToken : null;
     } while (ContinuationToken);
     if (total > 0) log.info(`☁️  [R2] deleted ${total} objects under "${prefix}"`);
-    return total;
+    return { deleted: total, ok: true, error: null };
   } catch (err) {
     log.warn(`[R2] deleteByPrefix(${prefix}) failed: ${err.message}`);
-    return total;
+    return { deleted: total, ok: false, error: err.message };
   }
 }
 
@@ -422,7 +434,12 @@ async function deleteByPrefix(prefix) {
  */
 async function deleteStoryArtefacts(storyId) {
   if (!storyId || typeof storyId !== 'string' || storyId.length < 4) return 0;
-  return await deleteByPrefix(`stories/${storyId}/`);
+  return await deleteByPrefix(storyPrefix(storyId));
+}
+
+/** The one place the story artefact prefix is spelled. */
+function storyPrefix(storyId) {
+  return `stories/${storyId}/`;
 }
 
 /**
@@ -477,7 +494,9 @@ module.exports = {
   fetchImageBytes,
   bytesFromAnyImage,
   deleteByPrefix,
+  deleteByPrefixDetailed,
   deleteStoryArtefacts,
+  storyPrefix,
   objectExists,
   deleteObject,
   publicUrlForKey,

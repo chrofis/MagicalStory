@@ -17,10 +17,17 @@ const IMAGE_ASPECTS = {
 
 // Available text models
 const TEXT_MODELS = {
+  // Ceilings below were read from the vendor on 2026-09-11: OpenRouter
+  // GET /v1/models -> top_provider.max_completion_tokens; Anthropic
+  // GET /v1/models -> max_tokens; Google v1beta/models -> outputTokenLimit.
+  // 28 of 38 entries were UNDERSTATED (nothing was overstated) — since the
+  // 2026-09-11 no-caps change these numbers ARE the ceiling every call runs
+  // at AND what textReplyGuard measures against, so an understated one both
+  // truncated real replies and reported a false cap_hit.
   'claude-sonnet': {
     provider: 'anthropic',
     modelId: 'claude-sonnet-4-6',
-    maxOutputTokens: 64000,
+    maxOutputTokens: 128000,
     description: 'Claude Sonnet 4.6 - Best narrative quality'
   },
   'claude-opus': {
@@ -32,7 +39,7 @@ const TEXT_MODELS = {
   'claude-haiku': {
     provider: 'anthropic',
     modelId: 'claude-haiku-4-5-20251001',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 64000,
     description: 'Claude Haiku 4.5 - Fast and affordable'
   },
   'gemini-2.5-pro': {
@@ -53,11 +60,21 @@ const TEXT_MODELS = {
     maxOutputTokens: 65536,
     description: 'Gemini 2.5 Flash Lite - Cheapest ($0.10/$0.40 per 1M, ~6× cheaper than Flash)'
   },
+  // STILL SERVED, despite the 2026-09-11 note this replaces. That note read
+  // "NOT SERVED … the id 404s rather than caps", inferred from the model's
+  // absence from GET /v1beta/models. Absence from a LIST is not death: the
+  // per-model read `GET /v1beta/models/gemini-2.0-flash` returns 200 with
+  // supportedGenerationMethods including generateContent, and outputTokenLimit
+  // 8192 — so the ceiling below is now VERIFIED, not unverifiable. Control
+  // probes the same day: gemini-1.5-flash and gemini-2.0-flash-exp both 404
+  // with "Model is not found", so 200 here means served, not a catch-all.
+  // (Fetched 2026-09-18. The model is delisted, i.e. absent from the listing
+  // while still answering — the list is one page, 58 models, no nextPageToken.)
   'gemini-2.0-flash': {
     provider: 'google',
     modelId: 'gemini-2.0-flash',
-    maxOutputTokens: 8192,
-    description: 'Gemini 2.0 Flash - Very fast'
+    maxOutputTokens: 8192, // verified 2026-09-18 against outputTokenLimit on the per-model read
+    description: 'Gemini 2.0 Flash - Very fast (delisted by Google but still serving)'
   },
   'gemini-pro-latest': {
     provider: 'google',
@@ -65,58 +82,104 @@ const TEXT_MODELS = {
     maxOutputTokens: 65536,
     description: 'Gemini Pro Latest (2.5 Pro) - High quality'
   },
+  // ── RETIRED xAI ids. xAI has removed the whole Grok 3.x / 4.x-fast tier:
+  // GET /v1/models returns only grok-4.20-*, grok-4.3, grok-4.5, grok-4.6 and
+  // grok-build-0.1 (fetched 2026-09-18).
+  //
+  // They do NOT 404. A per-model read of each id below returns HTTP 200 with
+  // `{"id":"grok-4.3"}` — xAI keeps a deprecation redirect for the retired
+  // 3.x/4.x families. It is a curated map, not a catch-all: grok-2-vision-1212
+  // and invented ids 404 properly on the same endpoint the same day. So the
+  // cost of leaving one of these wired was never an outage, it was SILENCE —
+  // grok-4.3 answers, bills $1.25/$2.50, and the caller records a model id and
+  // a $0.20/$0.50 rate that describe a model that no longer exists.
+  //
+  // `retired` / `redirectsTo` are machine-readable on purpose: the unit test
+  // uses them to keep live code off these entries, and
+  // scripts/admin/check-model-pricing.js re-reads liveness from the vendors.
+  // They are KEPT (not deleted) so historical usage rows still price.
   'grok-3-mini': {
     provider: 'xai',
     modelId: 'grok-3-mini',
-    maxOutputTokens: 32768,
-    description: 'Grok 3 Mini - Fast and cheap ($0.30/$0.50 per 1M tokens)'
+    retired: '2026-09-18',
+    redirectsTo: 'grok-4.3',
+    maxOutputTokens: 32768, // xAI publishes NO output ceiling anywhere, so any xai entry is unverifiable in principle.
+    description: 'Grok 3 Mini - RETIRED ($0.30/$0.50 per 1M while it existed); xAI now redirects the id to grok-4.3, which bills 1.25/2.50'
   },
   'grok-3': {
     provider: 'xai',
     modelId: 'grok-3',
+    retired: '2026-09-18',
+    redirectsTo: 'grok-4.3',
     maxOutputTokens: 32768,
-    description: 'Grok 3 - Good quality ($3.00/$15.00 per 1M tokens)'
+    description: 'Grok 3 - RETIRED ($3.00/$15.00 per 1M while it existed); xAI now redirects the id to grok-4.3, which bills 1.25/2.50'
   },
   'grok-4-fast': {
     provider: 'xai',
     modelId: 'grok-4-1-fast-non-reasoning',
+    retired: '2026-09-18',
+    redirectsTo: 'grok-4.3',
     maxOutputTokens: 65536,
-    description: 'Grok 4 Fast - Very cheap, 2M context ($0.20/$0.50 per 1M tokens)'
+    description: 'Grok 4 Fast - RETIRED ($0.20/$0.50 per 1M while it existed); xAI now redirects the id to grok-4.3, which bills 1.25/2.50 — 6.25x/5x this tier'
   },
-  // Latest Grok (2026-08-12) via OpenRouter. No separate 4.x "flash" exists —
-  // grok-4-fast above is the cheap tier. Pricing from the OpenRouter catalogue.
+  // The live cheap-tier Grok, and what every id above actually resolves to at
+  // xAI today. Called DIRECTLY (api.x.ai), which is what callGrokVisionAPI
+  // does, so it is the drop-in for the Grok vision fallback — see
+  // GROK_VISION_FALLBACK below. Vision is vendor-confirmed, not assumed:
+  // GET /v1/language-models/grok-4.3 reports input_modalities ["text","image"]
+  // and a prompt_image_token_price, fetched 2026-09-18. Context 1,000,000.
+  'grok-4.3': {
+    provider: 'xai',
+    modelId: 'grok-4.3',
+    // xAI publishes no output ceiling for any model; this carries over the
+    // figure the fallback slot has used all along rather than inventing one.
+    maxOutputTokens: 65536,
+    description: 'Grok 4.3 (xAI direct) - cheapest live Grok, vision-capable ($1.25/$2.50 per 1M)'
+  },
+  // Latest Grok (2026-08-12) via OpenRouter. Pricing from the OpenRouter
+  // catalogue; xAI's own API quotes the same $2.00/$6.00 for it directly.
   'grok-4.6': {
     provider: 'openrouter',
     modelId: 'x-ai/grok-4.6',
-    maxOutputTokens: 32768,
+    maxOutputTokens: 450000,
     description: 'Grok 4.6 (xAI, latest) via OpenRouter (~$2.00/$6.00 per 1M)'
   },
   // OpenRouter-hosted models (OpenAI-compatible) for A/B testing cheap
   // alternatives on eval/consolidation. Needs OPENROUTER_API_KEY. Use via
   // model override (dev panel / MODEL_DEFAULTS), never the default for German
   // story prose until a quality A/B proves it.
+  // RETIRED. Unlike the Grok ids above, this one really has no route: OpenRouter
+  // still answers GET /models/qwen/qwen-max/endpoints with 200 but the endpoint
+  // list is EMPTY, so no upstream serves it and a call cannot be fulfilled
+  // (checked 2026-09-18; qwen/qwen3.8-max returns 1 endpoint on the same probe,
+  // which is why that one is NOT marked retired even though it too is missing
+  // from the catalogue listing). No MODEL_DEFAULTS slot points here; it is
+  // reachable only by an explicit dev-mode override. Picking its successor
+  // (qwen3-max is already registered at $0.78/$3.90) is a routing choice, so it
+  // is left to the owner rather than silently repointed.
   'qwen-max': {
     provider: 'openrouter',
     modelId: 'qwen/qwen-max',
-    maxOutputTokens: 8192,
-    description: 'Qwen-Max (Alibaba) via OpenRouter - strongest Qwen, ~$1.6/$6.4 per 1M'
+    retired: '2026-09-18',
+    maxOutputTokens: 8192, // unverifiable — no endpoint serves the id
+    description: 'Qwen-Max (Alibaba) via OpenRouter - RETIRED, zero live endpoints; no successor chosen'
   },
   'qwen-plus': {
     provider: 'openrouter',
     modelId: 'qwen/qwen-plus',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen-Plus (Alibaba) via OpenRouter - cheap reasoning, ~$0.26/$0.78 per 1M'
   },
   // Compliance-eval candidates (A/B 2026-07-18). Stronger reasoners than
   // qwen-plus for severity discipline, still far cheaper than Sonnet.
-  'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 8192, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
-  'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 8192, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
-  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 8192, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.5/$2.0)' },
-  'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 8192, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
+  'qwen3-max': { provider: 'openrouter', modelId: 'qwen/qwen3-max', maxOutputTokens: 65536, description: 'Qwen3-Max via OpenRouter (~$0.78/$3.9)' },
+  'deepseek-v32': { provider: 'openrouter', modelId: 'deepseek/deepseek-v3.2', maxOutputTokens: 65536, description: 'DeepSeek V3.2 via OpenRouter (~$0.27/$0.4)' },
+  'glm-46': { provider: 'openrouter', modelId: 'z-ai/glm-4.6', maxOutputTokens: 16384, description: 'GLM-4.6 (Zhipu) via OpenRouter (~$0.43/$1.75)' },
+  'kimi-k2': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2', maxOutputTokens: 100352, description: 'Kimi K2 (Moonshot) via OpenRouter (~$0.57/$2.3)' },
   'qwen-vl': {
     provider: 'openrouter',
     modelId: 'qwen/qwen2.5-vl-72b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 115200,
     description: 'Qwen2.5-VL 72B (vision) via OpenRouter - for image-eval A/B vs Gemini'
   },
   // Qwen3-VL (2026): strong bbox/spatial grounding, cheap. Candidate to A/B
@@ -125,29 +188,37 @@ const TEXT_MODELS = {
   'qwen3-vl': {
     provider: 'openrouter',
     modelId: 'qwen/qwen3-vl-32b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen3-VL 32B (vision) via OpenRouter - spatial/bbox leader, ~$0.10/$0.42 per 1M'
   },
   'qwen3-vl-235b': {
     provider: 'openrouter',
     modelId: 'qwen/qwen3-vl-235b-a22b-instruct',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 32768,
     description: 'Qwen3-VL 235B (vision) via OpenRouter - larger, ~$0.21/$1.90 per 1M'
   },
   'gpt-4o-mini': {
     provider: 'openrouter',
     modelId: 'openai/gpt-4o-mini',
-    maxOutputTokens: 8192,
+    maxOutputTokens: 16384,
     description: 'GPT-4o mini (vision) via OpenRouter - cheap image-eval A/B (~$0.15/$0.60 per 1M)'
   },
   // GPT-5.6 family (2026-07-09) via OpenRouter. Luna = cheap tier, Sol = strong
   // tier. Pricing from the OpenRouter catalogue. For scoring/writer A/B in the Lab.
-  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 16384, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.10/$0.60 per 1M)' },
+  'gpt-5.6-luna': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna', maxOutputTokens: 128000, description: 'GPT-5.6 Luna (OpenAI) via OpenRouter - cheap tier (~$0.20/$1.20 per 1M)' },
   // Cheap reviewer candidates (2026-08-15 beats-reviewer bake-off; see docs/decisions.md)
-  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 16384, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter (~$0.38/$1.88 per 1M)' },
-  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 16384, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.43/$0.87 per 1M)' },
-  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 16384, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.49/$1.54 per 1M)' },
-  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 16384, description: 'MiniMax M3 via OpenRouter (~$0.30/$1.20 per 1M)' },
+  // Price verified 2026-09-07 on openrouter.ai and ai.google.dev: $0.75/$3.75
+  // per 1M (Flex route, Google list through 2026), $1.50/$7.50 on the standard
+  // route and Google list from 2027. The earlier "$0.38/$1.88" here matched no
+  // vendor page and led to a wrong cost-neutral claim.
+  'gemini-3.7-flash': { provider: 'openrouter', modelId: 'google/gemini-3.7-flash', maxOutputTokens: 65536, description: 'Gemini 3.7 Flash (Google, 2026-08-13) via OpenRouter ($0.75/$3.75 per 1M; $1.50/$7.50 from 2027-01-01)' },
+  'deepseek-v4-pro-0813': { provider: 'openrouter', modelId: 'deepseek/deepseek-v4-pro-0813', maxOutputTokens: 384000, description: 'DeepSeek V4 Pro 0813 rev via OpenRouter (~$0.58/$1.73 per 1M)' },
+  'glm-5.2': { provider: 'openrouter', modelId: 'z-ai/glm-5.2', maxOutputTokens: 182476, description: 'GLM 5.2 (Z-ai) via OpenRouter (~$0.55/$1.74 per 1M)' },
+  'minimax-m3': { provider: 'openrouter', modelId: 'minimax/minimax-m3', maxOutputTokens: 512000, description: 'MiniMax M3 (text+image+video in) via OpenRouter ($0.30/$1.20 per 1M, re-read 2026-09-18)' },
+  // Vision-judge candidates for the blind inventory (Lab sets 25/27, 2026-09-07).
+  // Prices from openrouter.ai the same day.
+  'qwen3.6-plus': { provider: 'openrouter', modelId: 'qwen/qwen3.6-plus', maxOutputTokens: 65536, description: 'Qwen3.6 Plus (text+image+video in) via OpenRouter ($0.325/$1.95 per 1M)' },
+  'kimi-k2.6': { provider: 'openrouter', modelId: 'moonshotai/kimi-k2.6', maxOutputTokens: 235929, description: 'Kimi K2.6 (text+image in) via OpenRouter ($0.95/$4.00 per 1M, re-read 2026-09-18)' },
   // Neutral judge for reviewer bake-offs: third vendor, so it has no
   // self-preference stake when comparing Anthropic/xAI/DeepSeek reviewers.
   // Pinned to the explicit id, not the '-latest' alias, so scores stay comparable.
@@ -168,34 +239,57 @@ const TEXT_MODELS = {
   // confound". This is a reasoning model whose thinking tokens count against the
   // output budget, so the old caps could exhaust the budget before any visible
   // text. Untested at this new limit — no paid call has been run against it yet.
+  // NOT IN THE OPENROUTER CATALOGUE 2026-09-11. The catalogue has qwen3.8-max-0902 (131072) but NOT this bare id; per the no-inference rule they are not treated as the same model. The docs/decisions.md note about retesting qwen3.8-max at its true limit cannot run against this id. description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
   'qwen3.8-max': { provider: 'openrouter', modelId: 'qwen/qwen3.8-max', maxOutputTokens: 131072, description: 'Qwen3.8 Max (Alibaba flagship) via OpenRouter (~$2.00/$6.00 per 1M)' },
-  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 16384, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.45/$3.20 per 1M)' },
-  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.10/$0.60 per 1M)' },
-  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 16384, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier (~$5.00/$30.00 per 1M)' },
-  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 16384, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter (~$5.00/$30.00 per 1M)' },
+  'qwen3.8-27b': { provider: 'openrouter', modelId: 'qwen/qwen3.8-27b', maxOutputTokens: 131072, description: 'Qwen3.8 27B (2026-08-14) via OpenRouter (~$0.21/$2.55 per 1M)' },
+  'gpt-5.6-luna-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-luna-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Luna Pro (OpenAI) via OpenRouter (~$0.20/$1.20 per 1M)' },
+  'gpt-5.6-sol': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol', maxOutputTokens: 128000, description: 'GPT-5.6 Sol (OpenAI) via OpenRouter - strong tier ($2.00/$10.00 default route; the Azure endpoints throughput routing often picks are $5.00/$30.00, and real Lab spend implies ~2.4x the default)' },
+  'gpt-5.6-sol-pro': { provider: 'openrouter', modelId: 'openai/gpt-5.6-sol-pro', maxOutputTokens: 128000, description: 'GPT-5.6 Sol Pro (OpenAI) via OpenRouter ($2.00/$10.00 default route; up to $5.50/$33.00 on the priciest endpoint)' },
   'deepseek-v3': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-chat',
-    maxOutputTokens: 8192,
-    description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.26/$1.03 per 1M'
+    maxOutputTokens: 16000,
+    description: 'DeepSeek V3 via OpenRouter - cheapest strong reasoner, ~$0.32/$0.89 per 1M'
   },
   // DeepSeek V4 (GA 2026-07-20) via OpenRouter. 1M context, up to 384K output —
   // high maxOutputTokens so the split outline-review call (asks 32K) and even
   // the full writer draft (64K) aren't truncated. Cheap reviewer candidate vs
-  // Opus 5 ($5/$25): Flash is ~85× cheaper output, Pro ~29×.
+  // Opus 5 ($5/$25): at the CORRECTED 2026-09-18 rates Flash is ~254× cheaper
+  // on output and Pro ~7.8× — not the ~85×/~29× this comment claimed while the
+  // table under-priced Pro 3.68× and over-priced Flash 2.84×.
   'deepseek-v4-pro': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-pro',
-    maxOutputTokens: 64000,
-    description: 'DeepSeek V4 Pro via OpenRouter - top reasoning, 1M context (~$0.44/$0.87 per 1M)'
+    maxOutputTokens: 384000,
+    description: 'DeepSeek V4 Pro via OpenRouter - top reasoning, 1M context ($1.60/$3.20 per 1M, re-checked 2026-09-18)'
   },
   'deepseek-v4-flash': {
     provider: 'openrouter',
     modelId: 'deepseek/deepseek-v4-flash',
-    maxOutputTokens: 64000,
-    description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context (~$0.14/$0.28 per 1M)'
+    maxOutputTokens: 384000,
+    description: 'DeepSeek V4 Flash via OpenRouter - fast & very cheap, 1M context ($0.049/$0.099 per 1M, re-checked 2026-09-18)'
   }
 };
+
+/**
+ * The xAI model the vision FALLBACKS use when the primary judge (Gemini) errors
+ * or safety-blocks on an image.
+ *
+ * ONE constant because there were six hand-kept copies of the string
+ * 'grok-4-fast' — evalJudges, evalPipeline x3, bboxDetection x2, sceneValidator,
+ * textModels — and when xAI retired that tier in 2026 not one of them moved.
+ * Nothing caught it, for a reason worth remembering: every one of those sites
+ * guarded with `TEXT_MODELS[id]?.provider === 'xai'`, which asks whether the
+ * repo has a config entry, never whether the VENDOR still serves the model. The
+ * guard passed for nine months on an id xAI had withdrawn.
+ *
+ * A fallback also hides its own breakage by construction: it only runs once the
+ * primary has already failed, so a bad id here costs nothing on a good day and
+ * everything on a bad one. That is why liveness is now checked from outside the
+ * code (scripts/admin/check-model-pricing.js, against the vendors) instead of
+ * being assumed by a guard inside it.
+ */
+const GROK_VISION_FALLBACK = 'grok-4.3';
 
 // Which Grok image tier renders a final page / a cover in THIS environment.
 // Declared in server/config/runtime.js, where every deliberate prod/staging
@@ -222,8 +316,11 @@ const MODEL_DEFAULTS = {
   //
   // Reviewer = DeepSeek V4 Pro (was claude-opus). Test Lab compare runs on the
   // same shared draft: pro raised 58 fixes vs claude-sonnet's 15 locally and 16
-  // vs 14 on staging — more findings per pass, at roughly a tenth of the
-  // Anthropic cost ($0.02 vs $0.22 per review). It is an OpenRouter model, so
+  // vs 14 on staging — more findings per pass, and cheaper than the Anthropic
+  // reviewer. The "$0.02 vs $0.22 per review" this comment used to claim was
+  // computed at the 3.68×-too-low deepseek rate; at the corrected 2026-09-18
+  // rates the same 8.7k-in/10.8k-out review is ~$0.048, not $0.02. Still ~4-5×
+  // cheaper than Opus on the same call, not ~10×. It is an OpenRouter model, so
   // its wall-clock depends on which upstream serves it; textModels.js sorts
   // OpenRouter routing by throughput for exactly that reason. Reviewer failure
   // is already non-fatal, so a bad route degrades to the unpatched draft rather
@@ -296,6 +393,15 @@ const MODEL_DEFAULTS = {
   // holds nothing above MINOR, or once a re-telling's Fixing line addressed
   // only MINOR faults. ARC_ROUNDS for staging A/B.
   arcRounds: Math.max(1, parseInt(process.env.ARC_ROUNDS, 10) || 1),
+  // The hard ceiling on arc rounds, forced ones included (owner cap
+  // 2026-08-30 — the iteration study regressed at round 4).
+  arcRoundsMax: 3,
+  // ONE extra round when the arc's own invented-figure list overruns the
+  // allowance (2026-09-09, job_1788903616404_iqvhj4l8m). A re-telling rewrites
+  // the whole story and is the only mechanism that can remove a figure
+  // spanning several pages; the re-plan cannot. At most one forced round per
+  // story, never past arcRoundsMax. Set false to turn the forcing off.
+  arcForceRoundOnInventedOvercount: process.env.ARC_FORCE_ROUND_ON_INVENTED_OVERCOUNT !== 'false',
   // The lean flow's hint pass (owner, 2026-09-01): after the final re-telling,
   // one outside model names the top remaining issues as ISSUE → CHANGE hints.
   // The hints ride into the beats and text-writer prompts; nothing re-tells.
@@ -347,6 +453,16 @@ const MODEL_DEFAULTS = {
   // cost the step still running. The old "90s cap" note here described a
   // budget that no longer exists.
   textRefineModel: process.env.TEXT_REFINE_MODEL || 'claude-opus',
+  // Cross-page REPETITION gate after the repair pass (2026-09-10): two pages
+  // trip when they share at least this many identical 5-word shingles
+  // (lowercased, punctuation stripped). Why 4: a recurring proper noun or a
+  // stock phrase ("the ship's name", "said the main character") yields one or
+  // two shared 5-grams across a book; a copied passage yields a RUN of them
+  // — the measured case (job_1788983823620_csjcyp1q9 p12/p13, one paragraph
+  // duplicated verbatim) shared 11. Four is above the noise of repeated names
+  // and below any duplicated sentence pair of ordinary length (two adjacent
+  // ~9-word sentences copied whole share 5+).
+  textRepetitionMinShingles: 4,
   // The LECTOR: dedicated grammar proofreader of the FINAL text, after the last
   // corrective round (owner ruling 2026-09-03). A sixth question on the
   // causality audit catches a different 1-2 of 4 known defects each run
@@ -389,6 +505,17 @@ const MODEL_DEFAULTS = {
   // to sonnet via resolveSceneIterationModel(). NOTE: initial sceneDescription
   // expansion stays on Sonnet — only the repair-iterate moved.
   sceneIteration: process.env.SCENE_ITERATE_MODEL || 'qwen-plus',
+  // THE BRIEF CORRECTOR — the one call that answers a brief's mechanical
+  // findings, on BOTH paths (owner, 2026-09-17: "All 3 same as pipeline").
+  // The authored path has always answered them with sceneReviewModel and it
+  // works (15 pages changed, 5 unfixed, 3 introduced on the reference story);
+  // the rewrite path answered them with `sceneIteration` — the same model that
+  // had just failed the contract — and resolved nothing on 11 of 11 stored
+  // rounds. Correcting a brief against a fault list is the scene review's job,
+  // so it is the scene reviewer's model, not the rewriter's. The REWRITE itself
+  // stays on sceneIteration: that is a separate decision with its own evidence
+  // (the 2026-07-12 cost A/B).
+  briefCorrectionModel: process.env.BRIEF_CORRECTION_MODEL || process.env.SCENE_REVIEW_MODEL || 'deepseek-v4-pro',
 
   // Eval/consolidation model — the swappable, cost-sensitive stage (NOT story
   // prose). Changed to Qwen for the cost A/B (2026-07-12). resolveEvalModel()
@@ -414,12 +541,12 @@ const MODEL_DEFAULTS = {
   // promptBuilders. It stays on Standard in every environment: doubling it
   // would double every inpaint. The final page render reads pageRenderImage.
   //
-  // Routing repair inpaint to follow pageRenderImage was tried and REVERTED by
-  // the owner on 2026-09-06 (docs/decisions.md). Repairs stay on the cheap edit
-  // tier in every environment; only the page/cover RENDER follows the tier
-  // split. Don't re-propose the "a repair should be painted by the model that
-  // rendered the page" consistency argument — it has been heard and declined.
-  pageImage: 'grok-imagine',                 // Edit/inpaint tier ($0.02/image)
+  // The page INPAINT no longer reads this key: since 2026-09-07 inpaintPage
+  // passes pageRenderImage explicitly — the owner's reversal of the 2026-09-06
+  // pin, with evidence in docs/decisions.md 2026-09-07. Style repair and the
+  // generic edit path stay here on Standard; char repair has its own pin
+  // (charRepairModel).
+  pageImage: 'grok-imagine',                 // Edit tier ($0.02/image)
   // The tier a final page render — and every redo/repair regeneration of a
   // page — uses. Per-environment (see runtime.js): Imagine 2.0 on staging,
   // Standard everywhere else. Redos read this same key so a page cannot change
@@ -434,6 +561,10 @@ const MODEL_DEFAULTS = {
   // call sites used to pass the page's resolved model verbatim, so plates
   // silently inherited any page-tier change; they read this key instead.
   emptyScenePlateModel: 'grok-imagine',
+  // The tier a Visual Bible cell renders on when its entry carries `text` —
+  // words that must be readable (a sign, a plaque). Standard cannot spell;
+  // 2.0 is typography-aware. Solo cells only (buildReferenceSheetBatches).
+  vbTextCellModel: 'grok-imagine-2',
   avatar: 'grok-imagine',                    // Character avatars (clothing variants). Switched from
                                               // Gemini 2.5 Flash Image because Gemini's safety filter
                                               // rejects adult-face photos with IMAGE_OTHER, leaving
@@ -449,7 +580,17 @@ const MODEL_DEFAULTS = {
   // Quality evaluation models
   // Grok vision is supported via callGrokVisionAPI() — set qualityEval to a grok model to use it
   qualityEval: 'gemini-2.5-flash',          // Image quality evaluation. Lite missed small distant targets (e.g. paper-on-bench) and produced confused "X pointing at Y" reads — the resulting bad fix-targets triggered repair loops that cost more than the eval-tier upgrade.
+  // Blind inventory (eval Stage 1) judge — per-environment, see runtime.js.
+  // Was the same key as qualityEval until 2026-09-07.
+  inventoryModel: require('./runtime').runtime('inventoryModel'),
   bboxDetection: 'gemini-2.5-flash',        // Bounding box detection — kept on the same tier as qualityEval so missing-object detection lines up with the eval that uses it.
+  // Face-integrity gate on a char repair (faceIntegrityGate.js). Same tier as
+  // qualityEval: a two-image comparative yes/no, and the native Gemini path
+  // takes no `reasoning` option — gemini-3.7-flash, which the gate named as a
+  // hardcoded fallback while this key did not exist, 400s on OpenRouter without
+  // one ("reasoning is mandatory", evalPipeline.js:255) and the gate then failed
+  // open on every single call.
+  repairFaceCheck: 'gemini-2.5-flash',
 
   // Image-prompt compression — the head rewrite in shrinkPromptForModel when a
   // page prompt exceeds the backend's char budget. NOT a utility call: what it
@@ -633,25 +774,41 @@ const MODEL_DEFAULTS = {
 
 
   // ─── Style-repair production wiring (Pt 10, owner directive 2026-07-31) ──
-  // When true (default), the Step-5 style-consistency audit's outliers —
-  // pages AND covers — are repainted toward the dominant style cluster via
+  // When true, the Step-5 style-consistency audit's outliers — pages AND
+  // covers — are repainted toward the dominant style cluster via
   // server/lib/styleRepair.js (planStyleRepair → repairPageStyle), one
   // repaint attempt per outlier, gated by checkStyleMatch. The repainted
   // image is stored as a new version through the normal version plumbing.
-  // Env override: STYLE_REPAIR_PRODUCTION=false to fall back to
-  // detection-only. Model per styleRepairModel ('gemini' | 'grok').
-  // RE-ENABLED 2026-08-09 with a WORKING recipe (supersedes the 2026-08-09
-  // disable): repairPageStyle now sends a validated, character-focused,
-  // feature-preserving prompt RAW to the Gemini image edit (prompt-only, no
-  // style-reference image, temp 0.7, retry on safety no-image). Validated on
-  // p3/p10/initial page — photographic figures become watercolor while
-  // eyes/eyewear/identity are preserved (keeps glasses if present, never
-  // invents them). The engine choice in that entry (Gemini, because Grok
-  // no-opped on the pages measured then) is SUPERSEDED — see styleRepairModel
-  // below. A page the model refuses after retries keeps its original.
-  styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION
-    ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
-    : true,
+  // Model per styleRepairModel ('gemini' | 'grok').
+  //
+  // OFF BY DEFAULT since 2026-09-19 (owner directive — see decisions.md
+  // "Production style repair is OFF"). The owner's reason is cost and
+  // simplicity: style drift is no longer considered a problem worth paying
+  // to repaint now that pages render on grok-imagine-image-2.0. The call is
+  // the owner's, not the data's — the measured evidence pointed the other
+  // way (run 4, job_1789759147125_p08djwhbl: 3 cover repaints, $0.06 of a
+  // $7.24 story, gate 3-for-3, and all three covers still logged as moderate
+  // style outliers). Do not "restore" this default because that evidence
+  // looks favourable; reversing it is a SETTLED.md reversal.
+  //
+  // DETECTION IS NOT GATED BY THIS FLAG. checkStoryStyleConsistency runs
+  // above it in repairPipeline.js Step 5 and keeps writing the verdict and
+  // the outliers to finalChecksReport.styleConsistency — the book is still
+  // measured, it is just no longer repainted.
+  //
+  // Env override: STYLE_REPAIR_PRODUCTION=true re-arms the repaints without
+  // a deploy. Any other value (unset, 'false') leaves them off.
+  //
+  // History, still true if it is ever re-armed: the 2026-08-09 recipe —
+  // repairPageStyle sends a validated, character-focused, feature-preserving
+  // prompt RAW to the image edit (prompt-only, no style-reference image,
+  // temp 0.7, retry on safety no-image). Validated on p3/p10/initial page —
+  // photographic figures become watercolor while eyes/eyewear/identity are
+  // preserved (keeps glasses if present, never invents them). The engine
+  // choice in that entry (Gemini, because Grok no-opped on the pages measured
+  // then) is SUPERSEDED — see styleRepairModel below. A page the model
+  // refuses after retries keeps its original.
+  styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION === 'true',
   // GROK (owner, 2026-08-24) — reverses the 2026-08-09 (later) flip to Gemini.
   //
   // NEITHER MODEL IS RELIABLE HERE. Gemini sometimes restyles a page fine and
@@ -758,8 +915,11 @@ const MODEL_DEFAULTS = {
 const INPAINT_BACKENDS = {
   'gemini': {
     name: 'Gemini',
-    description: 'Gemini 2.5 Flash Image - High quality, more expensive (~$0.03/image)',
-    costPerImage: 0.03,
+    // $0.039/image: 1290 output tokens at $30/1M (ai.google.dev pricing, fetched
+    // 2026-09-18). Was 0.03 here while MODEL_PRICING said 0.04 for the same
+    // model — two hand-kept copies of one number, both wrong.
+    description: 'Gemini 2.5 Flash Image - High quality, more expensive ($0.039/image)',
+    costPerImage: 0.039,
     model: 'gemini-2.5-flash-image'
   },
   'runware-sdxl': {
@@ -787,8 +947,11 @@ const INPAINT_BACKENDS = {
 const IMAGE_BACKENDS = {
   'gemini': {
     name: 'Gemini',
-    description: 'Google Gemini - Best quality, higher cost (~$0.03-0.04/image)',
-    costPerImage: 0.035
+    // Same model as INPAINT_BACKENDS.gemini and MODEL_PRICING
+    // 'gemini-2.5-flash-image': $0.039 (ai.google.dev pricing, fetched
+    // 2026-09-18). Was 0.035 — a third hand-kept copy of the same number.
+    description: 'Google Gemini - Best quality, higher cost ($0.039/image)',
+    costPerImage: 0.039
   },
   'runware': {
     name: 'Runware FLUX Schnell',
@@ -813,7 +976,7 @@ const IMAGE_MODELS = {
     supportsThinking: false,
     temperature: 0.5,  // Lower temp for more consistent character reproduction
     maxPromptLength: 30000,  // Gemini supports very long prompts
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'gemini-3-pro-image-preview': {
     modelId: 'gemini-3-pro-image-preview',
@@ -827,28 +990,28 @@ const IMAGE_MODELS = {
     // 3.x, and a value left here would only read as a promise the API does not
     // keep. 2.5 still honours it and keeps its 0.5.
     maxPromptLength: 30000,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'flux-schnell': {
     modelId: 'runware:5@1',
     description: 'FLUX Schnell via Runware - Ultra fast, cheap ($0.0006/image)',
     backend: 'runware',
     maxPromptLength: 2900,  // Runware limit is 3000, leave margin
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'flux-dev': {
     modelId: 'runware:6@1',
     description: 'FLUX Dev via Runware - Better quality ($0.004/image)',
     backend: 'runware',
     maxPromptLength: 2900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'ace-plus-plus': {
     modelId: 'ace-plus-plus',
     description: 'ACE++ via Runware - Face-consistent avatar generation (~$0.005/image)',
     backend: 'runware',
     maxPromptLength: 2900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'grok-imagine': {
     modelId: 'grok-imagine-image',
@@ -860,7 +1023,7 @@ const IMAGE_MODELS = {
     // compression pass that deleted four characters' hats. 100 chars of margin
     // is enough for the assembly slack; the compressor is the expensive guard.
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   // Imagine Image 2.0 — xAI's current recommended image model, shipped to the
   // API 2026-08-07 as `grok-imagine-image-2.0` ($0.04/image). Typography-aware,
@@ -875,11 +1038,11 @@ const IMAGE_MODELS = {
     description: 'Grok Imagine Image 2.0 - typography-aware ($0.04/image), ref image support',
     backend: 'grok',
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
-    description: 'Grok Imagine Pro - Higher quality ($0.07/image), ref image support',
+    description: 'Grok Imagine Pro - Higher quality ($0.05/image at 1K, $0.07 at 2K), ref image support',
     backend: 'grok',
     // Grok's API limit is 8000 chars. The 500-char margin was costing more than
     // it protected: page 9 of job_1786484554633 built to 7534 — 34 over this
@@ -887,7 +1050,7 @@ const IMAGE_MODELS = {
     // compression pass that deleted four characters' hats. 100 chars of margin
     // is enough for the assembly slack; the compressor is the expensive guard.
     maxPromptLength: 7900,
-    maxCharactersPerScene: 5
+    maxCharactersPerScene: 6
   }
 };
 
@@ -968,11 +1131,33 @@ const EVAL_TEMPERATURE = process.env.EVAL_TEMPERATURE != null ? Number(process.e
 const REPAIR_MAX_PASSES = require('./runtime').runtime('repairMaxPasses');
 
 const REPAIR_DEFAULTS = {
-  scoreThreshold: 50,       // Pages scoring below this need redo (0-100). Lowered
-                            // from 60 (2026-08-09): measured, a page entering
-                            // repair at 50-59 was regenerated and came back
-                            // WORSE far more often than better.
+  scoreThreshold: 60,       // Pages scoring below this need redo (0-100).
+                            // 2026-09-09 (owner): back to 60, superseding ONLY the
+                            // 60 -> 50 rider inside the 2026-08-09 decisions.md entry
+                            // (iterateSalvageFloor and the four numeric gates there
+                            // are untouched). The 2026-08-09 lowering was argued from
+                            // REGENERATION outcomes, but a 50-59 page today routes to
+                            // local repair, not to a full regen. Measured over 53
+                            // recent staging stories, pages entering repair at 50-59
+                            // improved 48% of the time (+8.0 avg) -- the best
+                            // cost/benefit band left above 0. 60-69 improves only 24%
+                            // (+4.7), which is why the floor is 60 and not 70.
+                            // Blast radius: +24 pages (+3.9%).
+                            // NOTE: the MANUAL admin repair workflow does NOT move with
+                            // this -- IMAGE_QUALITY_THRESHOLD is pinned at 50 in
+                            // server/utils/config.js and server/lib/evalPipeline.js.
   issueThreshold: 5,        // Pages with this many fixable issues need redo
+  // PER-ROUND REPAIR CAP (owner, 2026-09-09). Measured over 53 staging stories:
+  // 6.4 of 14.3 pages repaired per story (45%), 19 of 53 stories repaired MORE THAN
+  // HALF their pages, and one 14-page story repaired all 14 pages in round 2 AND all
+  // 14 again in round 3. A round may therefore work on at most this SHARE of the
+  // story's pages; the rest are DEFERRED to the next round, never dropped. Rounded so
+  // a 20-page story gives 10 then 6 (the owner's worked example).
+  maxRepairShareRound1: 0.5,
+  maxRepairShareLaterRounds: 0.3,
+  minRepairPagesPerRound: 3,  // ...but a short story still repairs at least this many
+                              // (or all its bad pages, if fewer). Gates are guidelines:
+                              // the cap limits work per round, it never fails a job.
   maxPasses: REPAIR_MAX_PASSES,  // Global passes over all pages — 1 on staging, 3 on prod
   maxCharRepairPages: 20,   // Max pages to character-repair per run (hard ceiling: bounds the worst-case spend even on "Repair All" against a 32-page story)
   // Char-repair Grok tier — PINNED to Imagine 1.x ('grok-imagine-image',
@@ -1003,11 +1188,58 @@ const REPAIR_DEFAULTS = {
   inpaintMaxPasses: 1,             // Inpaint attempts per page per round
 };
 
-// Approximate pricing per 1M tokens (USD)
-// Updated Feb 2026 - check provider websites for latest pricing
-// Source: https://platform.claude.com/docs/en/about-claude/pricing
+// The date every entry below was last checked against the VENDOR's own page or
+// pricing API. Exported so a report can say how stale the table is, and so the
+// drift test has one place to read the claim from. Bump it only when you have
+// actually re-fetched the sources named in the section headers THAT DAY.
+const PRICING_VERIFIED_ON = '2026-09-18';
+
+// Pricing per 1M tokens (USD), except `perImage` entries.
+//
+// FULL RE-CHECK 2026-09-18 against sources fetched that day (backlog #27). The
+// table had been hand-maintained and had drifted badly in BOTH directions:
+// deepseek-v4-pro was 3.68x UNDER (0.435/0.87 vs the real 1.60/3.20 — a measured
+// call billed $0.0484 for 8,698 in / 10,761 out, which is 1.60/3.20 to the
+// cent), deepseek-v4-flash 2.84x OVER, qwen2.5-vl 3.2x under, and TWELVE models
+// wired up in TEXT_MODELS had no entry at all and therefore priced at $0.00 —
+// including x-ai/grok-4.6, the DEFAULT reviewer on four stages.
+//
+// HOW A PRICE GETS INTO THIS TABLE (the rule that was being broken):
+//   Never from memory, a commit message, or another comment in this repo. Fetch
+//   the vendor's page or pricing API on the day you edit the line, and name the
+//   source + date in the section header. A price you cannot cite to something
+//   fetched today does not belong here.
+//
+// WHOSE PRICE APPLIES — check how the model is ROUTED, not who built it:
+//   provider 'openrouter' in TEXT_MODELS  → OpenRouter's rate (openrouter.ai/api/v1/models)
+//   provider 'anthropic' / 'google' / 'xai' → that vendor's own page
+//   x-ai/grok-4.6 is billed by OpenRouter even though xAI made it.
+//
+// THIS TABLE IS A FALLBACK, NOT THE LEDGER. Where a provider reports what it
+// actually charged, that figure wins and these numbers are never consulted:
+//   - every OpenRouter text call (textModels.js asks for `usage: {include:true}`
+//     and stores the answer as usage.direct_cost)
+//   - every Runware call (result.cost)
+//   `storyJobPipeline.functionCost` and testlab both prefer direct_cost.
+//   The table is what prices Anthropic, Google, the OpenRouter call sites
+//   OUTSIDE textModels (evalJudges / evalPipeline / images / traitPanel /
+//   figureDetection ask for no cost), and every Grok IMAGE call — grok.js gets
+//   its "direct_cost" from `grokImageCost()`, i.e. from the perImage entries
+//   here, so those numbers are the only source of truth for Grok spend.
+//
+// REASONING MODELS: OpenRouter counts reasoning tokens inside completion_tokens
+// and bills them at the completion rate, so `thinking` = `output` for every
+// OpenRouter entry (and calculateTextCost already defaults thinking→output).
+// Billed output on a reasoning model is several times the visible answer —
+// that is normal, not a pricing error.
+//
+// LONG-CONTEXT / RESOLUTION TIERS are deliberately NOT modelled: each entry is
+// the base tier. Where a second tier exists it is named in the line's comment.
 const MODEL_PRICING = {
-  // Anthropic Claude models (Feb 2026)
+  // ── Anthropic, called directly (TEXT_MODELS provider 'anthropic').
+  // Source: https://platform.claude.com/docs/en/about-claude/pricing, fetched
+  // 2026-09-18. All ten entries below matched the page exactly — no change.
+  // `thinking` = `output`: Anthropic bills extended thinking at the output rate.
   'claude-opus-5': { input: 5.00, output: 25.00, thinking: 25.00 },
   'claude-opus': { input: 5.00, output: 25.00, thinking: 25.00 },
   'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
@@ -1019,63 +1251,170 @@ const MODEL_PRICING = {
   'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, thinking: 4.00 },
   'claude-haiku': { input: 1.00, output: 5.00, thinking: 5.00 },
 
-  // Google Gemini models (per 1M tokens) - Updated Jan 2026
-  // Source: https://ai.google.dev/gemini-api/docs/pricing
-  'gemini-2.5-pro': { input: 1.25, output: 10.00, thinking: 10.00 },
+  // ── Google Gemini, called directly (TEXT_MODELS provider 'google').
+  // Source: https://ai.google.dev/gemini-api/docs/pricing, fetched 2026-09-18.
+  // 2.5 Pro / Flash / Flash-Lite all matched the page — no change. Google's
+  // "output" column explicitly INCLUDES thinking tokens, hence thinking=output.
+  'gemini-2.5-pro': { input: 1.25, output: 10.00, thinking: 10.00 },   // >200k prompt: 2.50/15.00 (not modelled)
   'gemini-2.5-flash': { input: 0.30, output: 2.50, thinking: 2.50 },
   'gemini-2.5-flash-lite': { input: 0.10, output: 0.40, thinking: 0.40 },
+  // NOT SERVED. Absent from the pricing page AND from GET v1beta/models
+  // (both checked 2026-09-18) — the id 404s. The figures are the last known
+  // ones and are UNVERIFIABLE today; the entry stays only so an old stored
+  // usage row still prices. Never use it as a stand-in for a live model: it was
+  // storyJobPipeline's `gemini_quality` fallback price while the quality judge
+  // was actually gemini-2.5-flash, under-reporting that judge 3x in / 6.25x out.
   'gemini-2.0-flash': { input: 0.10, output: 0.40, thinking: 0.40 },
-  'gemini-pro-latest': { input: 1.25, output: 10.00, thinking: 10.00 },
+  // ALIAS, repriced 2026-09-18. Google publishes no pricing row for
+  // `gemini-pro-latest`; OpenRouter's mirror of the same alias
+  // (`~google/gemini-pro-latest`, GET /api/v1/models 2026-09-18) prices it at
+  // $2.00/$12.00 — Gemini 3.x Pro rates, not the 2.5 Pro rates ($1.25/$10.00)
+  // this entry used to carry. >200k prompt: 4.00/18.00 (not modelled).
+  'gemini-pro-latest': { input: 2.00, output: 12.00, thinking: 12.00 },
 
-  // xAI Grok models (Mar 2026)
-  // Source: https://docs.x.ai/docs/models
+  // ── xAI, called directly (TEXT_MODELS provider 'xai').
+  // Source: GET https://api.x.ai/v1/models and /v1/language-models, fetched
+  // 2026-09-18 (xAI reports prices as integers; value / 10_000 = USD per 1M).
+  //
+  // The live cheap tier. Every retired Grok id below REDIRECTS here, so this is
+  // the rate xAI actually charged for any of them.
+  'grok-4.3': { input: 1.25, output: 2.50 },
+  //
+  // RETIRED ids — the API serves only grok-4.20-*, grok-4.3, grok-4.5, grok-4.6
+  // and grok-build-0.1. Kept so historical usage rows still price; they are NOT
+  // evidence about any live model. Note what they are NOT: the three rates below
+  // are not what a call to those ids costs TODAY. xAI redirects all three to
+  // grok-4.3, so a caller reaching one of them was being charged $1.25/$2.50 and
+  // booking it at these figures — which is how a fallback can be 6.25x over
+  // budget without any error appearing anywhere. The fallback call sites moved
+  // to GROK_VISION_FALLBACK ('grok-4.3') on 2026-09-18 for exactly that reason.
   'grok-3-mini': { input: 0.30, output: 0.50 },
   'grok-3': { input: 3.00, output: 15.00 },
   'grok-4-1-fast-non-reasoning': { input: 0.20, output: 0.50 },
 
-  // OpenRouter-hosted Qwen / DeepSeek (approx list prices — verify at
-  // openrouter.ai; they vary by upstream provider and shift often).
-  'qwen/qwen-max': { input: 1.60, output: 6.40 },
-  'qwen/qwen-plus': { input: 0.26, output: 0.78 },
-  'qwen/qwen3-max': { input: 0.78, output: 3.9 },
-  'deepseek/deepseek-v3.2': { input: 0.27, output: 0.4 },
-  'z-ai/glm-4.6': { input: 0.5, output: 2.0 },
-  'moonshotai/kimi-k2': { input: 0.57, output: 2.3 },
-  'qwen/qwen2.5-vl-72b-instruct': { input: 0.25, output: 0.75 },
+  // ── OpenRouter-hosted models (TEXT_MODELS provider 'openrouter').
+  // Source: GET https://openrouter.ai/api/v1/models, fetched 2026-09-18 —
+  // `pricing.prompt` / `pricing.completion` per token, x1e6 for the per-1M
+  // figure. That is the price of the model's DEFAULT route; individual
+  // upstreams differ (deepseek-v4-pro spans $0.83-$1.91 in across 16
+  // endpoints), and textModels sorts routing by throughput, so the real charge
+  // can land either side. It is reported per call as direct_cost and always
+  // wins over these numbers.
+  //
+  // CROSS-CHECKED against what was actually billed (stories.data.tokenUsage
+  // direct_cost + tokens, prod + staging, 2026-09-18). Predicted/actual at the
+  // rates below: deepseek-v4-pro 1.001, gemini-3.1-pro 0.994, grok-4.6 0.998,
+  // qwen3-max 0.991, gemini-3.7-flash 1.000, luna-pro 0.956. Two exceptions are
+  // flagged on their own lines (qwen-plus, gpt-5.6-sol).
+  'qwen/qwen-plus': { input: 0.26, output: 0.78 },  // billing derives ~0.21/0.62 — prompt-cache hits on a fixed prefix; list price kept (conservative)
+  'qwen/qwen3-max': { input: 0.78, output: 3.90 },
+  'deepseek/deepseek-v3.2': { input: 0.269, output: 0.40 },  // was 0.27/0.40
+  'z-ai/glm-4.6': { input: 0.43, output: 1.75 },   // was 0.50/2.00
+  'z-ai/glm-5.2': { input: 0.5544, output: 1.7424 },  // ADDED — had no entry, priced $0.00
+  'moonshotai/kimi-k2': { input: 0.57, output: 2.30 },
+  'moonshotai/kimi-k2.6': { input: 0.95, output: 4.00 },  // ADDED — had no entry (TEXT_MODELS description says 0.56/3.39; the catalogue says this)
+  'qwen/qwen2.5-vl-72b-instruct': { input: 0.80, output: 1.00 },  // was 0.25/0.75 — 3.2x under on input; single endpoint (Parasail)
   'qwen/qwen3-vl-32b-instruct': { input: 0.104, output: 0.416 },
   'qwen/qwen3-vl-235b-a22b-instruct': { input: 0.21, output: 1.90 },
-  'deepseek/deepseek-chat': { input: 0.2574, output: 1.0287 },
-  'deepseek/deepseek-v4-pro': { input: 0.435, output: 0.87 },
-  'deepseek/deepseek-v4-flash': { input: 0.14, output: 0.28 },
-  // Lector + reviewer model. Prices read from OpenRouter's own model catalogue
-  // (GET /api/v1/models, 2026-09-06): pricing.prompt 0.000002 and
-  // pricing.completion / pricing.internal_reasoning 0.000012 per token → $2.00
-  // and $12.00 per 1M. `thinking` matches `output` because reasoning bills at
-  // the completion rate and OpenRouter already counts reasoning tokens inside
-  // completion_tokens. NOTE: OpenRouter's `direct_cost` remains the
-  // AUTHORITATIVE figure wherever it is returned; this entry is the fallback so
-  // the call no longer reports $0.00. Prompts over 200k tokens bill at the
-  // higher $4/$18 long-context tier, which this flat entry does not model.
+  'qwen/qwen3.6-plus': { input: 0.325, output: 1.95 },  // ADDED — had no entry
+  'qwen/qwen3.8-27b': { input: 0.214, output: 2.55 },   // ADDED — had no entry (description says 0.45/3.20)
+  // ADDED. The bare id is NOT in the OpenRouter catalogue LISTING (only
+  // qwen/qwen3.8-max-0902, at exactly these rates), so the listing alone could
+  // not price it — but it is alive and this price is measured twice over:
+  // GET /models/qwen/qwen3.8-max/endpoints returns 1 live endpoint
+  // (2026-09-18), and it HAS been billed — two Lab calls, 21,994 in / 72,280
+  // out, $0.4777 charged, which 2.00/6.00 predicts to the cent. Positive
+  // measurement, not a guess from the sibling id's name. Do NOT mark this
+  // retired on catalogue absence alone; the endpoints probe is the liveness
+  // test, the listing is not.
+  'qwen/qwen3.8-max': { input: 2.00, output: 6.00 },
+  'deepseek/deepseek-chat': { input: 0.32, output: 0.89 },  // was 0.2574/1.0287 (that is the StreamLake endpoint; the default route is DeepInfra)
+  // 3.68x UNDER before 2026-09-18 (0.435/0.87), and this is the reviewer on
+  // sceneReviewModel + clothingReviewModel + briefCorrectionModel, so every
+  // per-story figure that included it was low. Confirmed twice: OpenRouter's
+  // catalogue says 1.60/3.20, and 4.27M in / 6.38M out billed $27.18 across
+  // prod+staging, which 1.60/3.20 predicts to within 0.1%.
+  'deepseek/deepseek-v4-pro': { input: 1.60, output: 3.20, thinking: 3.20 },
+  // ADDED. Without its own entry the '-0813' suffix was stripped by
+  // calculateTextCost's normaliser and it silently borrowed deepseek-v4-pro's
+  // price, which is 2.8x/1.8x wrong for this revision.
+  'deepseek/deepseek-v4-pro-0813': { input: 0.5782, output: 1.7345, thinking: 1.7345 },
+  // 2.84x OVER before 2026-09-18 (0.14/0.28) — the only entry that was
+  // over-reporting. 16 endpoints span $0.049-$0.21 in; this is the default route.
+  'deepseek/deepseek-v4-flash': { input: 0.0493, output: 0.0986, thinking: 0.0986 },
+  // Lector + reviewer model. Re-read 2026-09-18, unchanged since 2026-09-06.
+  // `thinking` matches `output` because reasoning bills at the completion rate
+  // and OpenRouter already counts reasoning tokens inside completion_tokens.
+  // Prompts over 200k tokens bill at the higher $4/$18 long-context tier, which
+  // this flat entry does not model.
   'google/gemini-3.1-pro-preview': { input: 2.00, output: 12.00, thinking: 12.00 },
-  // Diff-pass model. Read from OpenRouter's own catalogue (GET /api/v1/models,
-  // 2026-09-06): pricing.prompt 0.0000002 and pricing.completion 0.0000012 per
-  // token → $0.20 / $1.20 per 1M. A reasoning model whose thinking bills at the
-  // completion rate, hence `thinking` = `output`. (The TEXT_MODELS description
-  // string still says ~$0.10/$0.60 — that is the stale figure, not this one.)
+  // ADDED — had no entry. Google list price is $0.75/$3.75 through 2026-12-31
+  // and $1.50/$7.50 from 2027-01-01 (ai.google.dev/gemini-api/docs/pricing,
+  // fetched 2026-09-18); OpenRouter's default route matches the current tier.
+  // Bump this line on 2027-01-01.
+  'google/gemini-3.7-flash': { input: 0.75, output: 3.75, thinking: 3.75 },
+  // Diff-pass model. Re-read 2026-09-18, unchanged. A reasoning model whose
+  // thinking bills at the completion rate, hence `thinking` = `output`. (The
+  // TEXT_MODELS description string still says ~$0.10/$0.60 — that is the stale
+  // figure, not this one; $0.10/$0.60 is one cheap OpenAI endpoint of five.)
   // Prompts over 272k tokens bill at $0.40/$1.80, which this flat entry does
-  // not model. OpenRouter's `direct_cost` stays authoritative where returned;
-  // this is the fallback so the call is not reported as $0.00.
+  // not model.
   'openai/gpt-5.6-luna-pro': { input: 0.20, output: 1.20, thinking: 1.20 },
   'openai/gpt-5.6-luna': { input: 0.20, output: 1.20, thinking: 1.20 },
+  // ADDED — had no entry. ⚠️ PUBLISHED AND BILLED DISAGREE: the catalogue's
+  // default route is $2.00/$10.00, but real Lab spend (1.34M in / 1.36M out,
+  // $39.48) implies ~2.4x that. Sol has seven endpoints from $1/$5 to $5.50/$33
+  // and throughput-sorted routing lands on the expensive end. direct_cost is
+  // recorded for these calls and overrides this entry, so the published rate is
+  // kept here rather than a route-specific one — but do not quote it as Sol's
+  // effective cost.
+  'openai/gpt-5.6-sol': { input: 2.00, output: 10.00, thinking: 10.00 },
+  'openai/gpt-5.6-sol-pro': { input: 2.00, output: 10.00, thinking: 10.00 },
+  'openai/gpt-4o-mini': { input: 0.15, output: 0.60 },  // ADDED — had no entry
+  'minimax/minimax-m3': { input: 0.30, output: 1.20 },  // ADDED — had no entry (description says 0.23/0.96)
+  // ADDED — had no entry, so the DEFAULT reviewer on outlineReviewModel,
+  // arcReviewModel, textAuditBlindModel and beatsReviewModel priced at $0.00
+  // wherever direct_cost was missing. xAI's own page and OpenRouter agree on
+  // $2.00/$6.00, and 983k in / 2.79M out billed $18.66 across prod+staging,
+  // which those rates predict to within 0.2%. ≥200k prompt: 4.00/12.00.
+  'x-ai/grok-4.6': { input: 2.00, output: 6.00, thinking: 6.00 },
+  // RETIRED — absent from the catalogue AND zero live endpoints on
+  // GET /models/qwen/qwen-max/endpoints (2026-09-18), so nothing serves it and
+  // this price has no source. Kept for historical usage rows only.
+  'qwen/qwen-max': { input: 1.60, output: 6.40 },
 
-  // Grok Imagine models (fixed cost per image)
-  'grok-imagine-image': { perImage: 0.02 },
+  // ── Grok Imagine (fixed cost per image).
+  // Source: GET https://api.x.ai/v1/models + the per-model docs pages
+  // (docs.x.ai/docs/models/grok-imagine-image*), both fetched 2026-09-18.
+  // grok.js requests resolution '1k' everywhere and never sets a quality tier,
+  // so the 1K price is the one that applies. These numbers ARE the ledger for
+  // Grok: grokImageCost() reads them and reports the result as direct_cost.
+  'grok-imagine-image': { perImage: 0.02 },      // $0.02 at 1K and 2K alike — confirmed
+  // 1K low $0.04 (this entry) / 2K low $0.06 / 1K medium $0.06 / 2K medium
+  // $0.08. NOT MODELLED: xAI also bills $0.01 per INPUT image, and the edit
+  // path sends reference sheets — so a 2.0 edit with one reference really costs
+  // $0.05, not $0.04.
   'grok-imagine-image-2.0': { perImage: 0.04 },
-  'grok-imagine-image-pro': { perImage: 0.07 },
+  // Alias of `grok-imagine-image-quality`: 1K $0.05, 2K $0.07. Was 0.07 here —
+  // that is the 2K price, and nothing in this repo requests 2K.
+  'grok-imagine-image-pro': { perImage: 0.05 },
 
-  // Image generation models (fixed cost per image, not per token)
-  'gemini-2.5-flash-image': { perImage: 0.04 },
-  'gemini-3-pro-image-preview': { perImage: 0.15 },
+  // ── Image generation models (fixed cost per image, not per token).
+  // Gemini source: https://ai.google.dev/gemini-api/docs/pricing, fetched
+  // 2026-09-18 — image output is billed per token and the page states the
+  // per-image equivalents used here.
+  // 1290 tokens at $30/1M = $0.039 (was 0.04). ⚠️ Google lists this model as
+  // deprecated with shutdown on 2026-10-02.
+  'gemini-2.5-flash-image': { perImage: 0.039 },
+  // 1120 tokens at $120/1M = $0.134 for 1K/2K (was 0.15); 4K is $0.24. Input
+  // images add $0.0011 each, not modelled.
+  'gemini-3-pro-image-preview': { perImage: 0.134 },
+  // Runware publishes no per-model list price on any fetchable page (checked
+  // runware.ai/pricing 2026-09-18: "pricing varies across thousands of
+  // parameters", range $0.0006-$0.24). These three are UNVERIFIED fallbacks and
+  // are almost never reached: runware.js takes `result.cost` from the API
+  // response, i.e. the real charge, and only falls back to these on a response
+  // that omits it.
   'runware:5@1': { perImage: 0.0006 },  // FLUX Schnell
   'runware:6@1': { perImage: 0.004 },   // FLUX Dev
   'ace-plus-plus': { perImage: 0.005 }
@@ -1156,22 +1495,29 @@ function calculateImageCost(modelId, imageCount = 1) {
     return pricing.perImage * imageCount;
   }
 
-  // Resolve display name → backend via IMAGE_MODELS (e.g. 'grok-imagine' → backend 'grok')
   const imageModelConfig = IMAGE_MODELS[modelId];
-  if (imageModelConfig?.backend && IMAGE_BACKENDS[imageModelConfig.backend]) {
-    return IMAGE_BACKENDS[imageModelConfig.backend].costPerImage * imageCount;
-  }
-  // Also check the internal modelId (e.g. 'grok-imagine' → modelId 'grok-imagine-image')
+  // The model's OWN price before its backend's generic one — ORDER FIXED
+  // 2026-09-18. A backend holds one rate for a family whose members differ:
+  // asking for 'flux-dev' (runware:6@1, $0.004) returned the runware backend's
+  // $0.0006, i.e. FLUX Schnell's price, 6.7x under; 'grok-imagine-2' and
+  // 'grok-imagine-pro' both returned the grok backend's $0.02 instead of their
+  // own $0.04 / $0.05. The backend rate is the right answer only when the model
+  // itself has no line of its own, so it belongs after this, not before it.
   if (imageModelConfig?.modelId) {
     const internalPricing = MODEL_PRICING[imageModelConfig.modelId];
     if (internalPricing?.perImage) {
       return internalPricing.perImage * imageCount;
     }
   }
+  // Resolve display name → backend via IMAGE_MODELS (e.g. 'grok-imagine' → backend 'grok')
+  if (imageModelConfig?.backend && IMAGE_BACKENDS[imageModelConfig.backend]) {
+    return IMAGE_BACKENDS[imageModelConfig.backend].costPerImage * imageCount;
+  }
 
-  // Default to Gemini pricing if unknown
+  // Default to Gemini pricing if unknown — read from the backend rather than a
+  // fourth hardcoded copy of the same number.
   console.warn(`[COST] No image pricing found for model: ${modelId}, using default`);
-  return 0.035 * imageCount;
+  return IMAGE_BACKENDS.gemini.costPerImage * imageCount;
 }
 
 /**
@@ -1215,17 +1561,38 @@ function guardModel(modelKey, label = 'model') {
 function resolveEvalModel() { return guardModel(MODEL_DEFAULTS.evalModel, 'EVAL MODEL'); }
 function resolveComplianceModel() { return guardModel(MODEL_DEFAULTS.complianceModel, 'COMPLIANCE MODEL'); }
 function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIteration, 'SCENE ITERATE MODEL'); }
+function resolveBriefCorrectionModel() { return guardModel(MODEL_DEFAULTS.briefCorrectionModel, 'BRIEF CORRECTION MODEL'); }
 function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneValidationRepair, 'SCENE VALIDATION MODEL'); }
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
 function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
 
+/**
+ * The model's own output ceiling, for the few direct provider calls that
+ * bypass textModels.js and whose API REQUIRES a max_tokens value (Anthropic).
+ * Owner rule (2026-08-29 / 2026-09-11): no output caps — the only number a call
+ * site may pass is the model's documented maximum, and it comes from here, not
+ * from a literal at the call site. Accepts a TEXT_MODELS key or a model id;
+ * throws on an unknown model rather than guessing a number.
+ */
+function maxOutputTokensFor(modelKeyOrId) {
+  const entry = TEXT_MODELS[modelKeyOrId]
+    || Object.values(TEXT_MODELS).find(m => m.modelId === modelKeyOrId);
+  if (!entry || !entry.maxOutputTokens) {
+    throw new Error(`maxOutputTokensFor: "${modelKeyOrId}" is not in TEXT_MODELS — add it with its documented maxOutputTokens`);
+  }
+  return entry.maxOutputTokens;
+}
+
 module.exports = {
   EVAL_TEMPERATURE,
   TEXT_MODELS,
+  GROK_VISION_FALLBACK,
   MODEL_DEFAULTS,
+  maxOutputTokensFor,
   resolveEvalModel,
   resolveComplianceModel,
   resolveSceneIterationModel,
+  resolveBriefCorrectionModel,
   resolveSceneValidationModel,
   resolveSceneRewriteModel,
   resolvePromptCompressModel,
@@ -1235,6 +1602,7 @@ module.exports = {
   IMAGE_BACKENDS,
   IMAGE_ASPECTS,
   MODEL_PRICING,
+  PRICING_VERIFIED_ON,
   INPAINT_BACKENDS,
   REPAIR_DEFAULTS,
   // Cost calculation utilities

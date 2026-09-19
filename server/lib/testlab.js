@@ -19,6 +19,15 @@
 
 const { log } = require('../utils/logger');
 const { samUnionBlend, maskBlurThreshold, fetchMaskWithRetry, BLEND_RULE_VERSION } = require('./samBlend');
+const { assessSceneReview, assertReviewedArtifactUsable, pickReviewedBrief } = require('./sceneReviewGuard');
+// Production's arguments for the beats writer/Art-Director calls, resolved from
+// a stored story. Every replay stage builds its inputs through these so a
+// divergent, thinner expression cannot be written a fourth time.
+const { buildReplayTextArgs, buildReplaySceneOptions, resolveReplayArc, resolveReplayArcHints } = require('./beatsReplayInputs');
+// Production's evalOptions for evaluateImageQuality, resolved from a stored
+// story. Same rule as above: every eval stage builds its options through this
+// so a thinner, silently-check-disabling expression cannot be written again.
+const { buildEvalReplayOptions } = require('./evalReplayInputs');
 
 // ─────────────────────────────────────────────────────────────────────
 // Context loading
@@ -192,6 +201,19 @@ async function loadEmptyScene(storyId, pageNumber) {
 let _lastPageLoad = null;
 function getLastPageLoad() { return _lastPageLoad; }
 
+/**
+ * Which stored version a target pins, or null for "the active one".
+ *
+ * ONE definition, because the obvious spelling is wrong: `Number(null)` is 0,
+ * so `Number.isFinite(Number(versionIndex))` turns the DEFAULT into a pin on
+ * v0. Every site that reads a pin goes through here.
+ */
+function pinnedVersionIndex(versionIndex) {
+  if (versionIndex === null || versionIndex === undefined || versionIndex === '') return null;
+  const n = Number(versionIndex);
+  return Number.isFinite(n) ? n : null;
+}
+
 async function loadActivePageImage(storyId, pageNumber, versionIndex = null, imageType = null) {
   _lastPageLoad = null;
   const { getActiveVersion, getStoryImage } = require('../services/database');
@@ -201,8 +223,7 @@ async function loadActivePageImage(storyId, pageNumber, versionIndex = null, ima
   // every unpinned Lab load silently detected on v0, which is both the
   // loadedFrom={unrecorded} symptom AND the 2026-08-19 "detected on v0
   // although activeVersion=2" mystery (bug lab-unpinned-loads-v0).
-  const pinned = (versionIndex == null || versionIndex === '') ? null
-    : (Number.isFinite(Number(versionIndex)) ? Number(versionIndex) : null);
+  const pinned = pinnedVersionIndex(versionIndex);
   // A Lab step image is written with is_test = true, and getStoryImage filters
   // those out — so an intermediate has to come through loadTestImage, which
   // does not.
@@ -432,81 +453,14 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   // is skipped and the grid image carries the references instead.
   const isGrokImage = IMAGE_MODELS[MODEL_DEFAULTS.pageImage]?.backend === 'grok';
 
-  // buildImagePrompt reads PROMPT_TEMPLATES.imageGeneration internally and is
-  // SYNCHRONOUS — swap the key only around this call (no await inside the
-  // window, so concurrent generations can never observe the override).
-  let prompt;
-  const origTemplate = PROMPT_TEMPLATES.imageGeneration;
-  if (promptOverride) PROMPT_TEMPLATES.imageGeneration = promptOverride;
-  try {
-    prompt = buildImagePrompt(
-      // sceneDescriptionOverride: test a corrected scene brief (e.g. removing a
-      // duplicated object) without regenerating the story's unified outline.
-      params.sceneDescriptionOverride || ctx.scene.sceneDescription,
-      inputData,
-      ctx.scene.sceneCharacters || null,
-      ctx.visualBible,
-      ctx.pageNumber,
-      ctx.referencePhotos,
-      { textPositionOverride: ctx.textPosition || undefined, skipVisualBible: isGrokImage }
-    );
-  } finally {
-    PROMPT_TEMPLATES.imageGeneration = origTemplate;
-  }
-
-  // avatarSheets: { characterName: tl_avatar versionIndex } — swap this page's
-  // character refs to cell crops from Test Lab avatar sheets (the production
-  // applyStoryCellRefs path), e.g. style-matrix runs with per-style avatars.
-  if (params.avatarSheets && typeof params.avatarSheets === 'object') {
-    const storyCharacterAvatars = {};
-    for (const [name, vIdx] of Object.entries(params.avatarSheets)) {
-      const sheet = await loadTestImage(ctx.storyId, 'tl_avatar', null, vIdx);
-      if (sheet?.imageData) storyCharacterAvatars[name] = { costumed: sheet.imageData };
-    }
-    const { applyStoryCellRefs } = require('./storyAvatars');
-    await applyStoryCellRefs(ctx.referencePhotos, storyCharacterAvatars, ctx.scene.sceneCharacters || []);
-  }
-
-  // refCrop: 'head' | 'upperBody' | 'costumedHead' — shrink each character
-  // reference before generation. A/B how much reference body the model needs:
-  // a full-body ref pulls the render toward full-figure present-to-camera
-  // poses even when the brief asks for a hands-only/close-up framing.
-  // 'head'/'upperBody' crop the stored (stacked) ref's top fraction — cheap,
-  // but the stack's top panel is the HATLESS face cell, so headwear is lost.
-  // 'costumedHead' rebuilds from the costumed avatar sheet: face cell
-  // (identity) + the head region of the costumed body cell (headwear), so
-  // hats and bandanas survive the crop.
-  if (params.refCrop === 'costumedHead') {
-    // Same code path as production close-up pages (cropAvatarCell headOnly).
-    const { cropAvatarCell } = require('./sceneComposite');
-    const { resolveCellPose } = require('./storyAvatars');
-    const sheets = ctx.characterAvatars || {};
-    for (const p of ctx.referencePhotos) {
-      const sheetUri = sheets[p.name]?.costumed;
-      if (!sheetUri) { log.warn(`[TESTLAB] costumedHead: no costumed sheet for ${p.name} — full ref kept`); continue; }
-      const sc = (ctx.scene.sceneCharacters || []).find(c => ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === String(p.name).toLowerCase());
-      const pf = resolveCellPose(typeof sc === 'string' ? { name: sc } : (sc || {}));
-      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace: true, stack: true, headOnly: true });
-      const out = stacked || body;
-      p.photoUrl = 'data:image/png;base64,' + out.toString('base64');
-      p.photoData = undefined;
-      p.photoType = `cell-${pf.pose}-costumedHead`;
-    }
-  } else if (params.refCrop) {
-    const fraction = params.refCrop === 'head' ? 0.35 : 0.55;
-    const sharp = require('sharp');
-    for (const p of ctx.referencePhotos) {
-      const src = p.photoUrl || p.photoData;
-      if (!src) continue;
-      const buf = Buffer.from(String(src).replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      const meta = await sharp(buf).metadata();
-      const cropped = await sharp(buf)
-        .extract({ left: 0, top: 0, width: meta.width, height: Math.round(meta.height * fraction) })
-        .jpeg({ quality: 92 }).toBuffer();
-      p.photoUrl = 'data:image/jpeg;base64,' + cropped.toString('base64');
-      p.photoData = undefined;
-    }
-  }
+  // THE PLATE AND THE GRID ARE RESOLVED BEFORE THE PROMPT (2026-09-18), because
+  // the prompt has to know which references the call actually carries. This is
+  // the same ordering production settled on 2026-09-15 (storyJobPipeline.js
+  // `makeImagePrompt` + the 5a-pre-grid rebuild) and that images.js `iterate`
+  // already had: build the grid, then build the prompt from the cells that are
+  // in it. Nothing else moved — the reference-photo knobs (avatarSheets,
+  // refCrop) still run after the prompt, exactly as before, because they change
+  // the PIXELS of a character card and nothing the prompt reads.
 
   // backgroundRef: use a specific (test) empty-scene version as the background
   // anchor — style-matrix runs chain empty_scene(style) → image(style, that bg).
@@ -547,6 +501,146 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     }
   }
 
+  // buildImagePrompt reads PROMPT_TEMPLATES.imageGeneration internally and is
+  // SYNCHRONOUS — swap the key only around this call (no await inside the
+  // window, so concurrent generations can never observe the override).
+  let prompt;
+  const origTemplate = PROMPT_TEMPLATES.imageGeneration;
+  if (promptOverride) PROMPT_TEMPLATES.imageGeneration = promptOverride;
+  try {
+    prompt = buildImagePrompt(
+      // sceneDescriptionOverride: test a corrected scene brief (e.g. removing a
+      // duplicated object) without regenerating the story's unified outline.
+      params.sceneDescriptionOverride || ctx.scene.sceneDescription,
+      inputData,
+      ctx.scene.sceneCharacters || null,
+      ctx.visualBible,
+      ctx.pageNumber,
+      ctx.referencePhotos,
+      {
+        textPositionOverride: ctx.textPosition || undefined,
+        skipVisualBible: isGrokImage,
+        // THE ELEMENTS WHOSE REFERENCE RENDER RIDES WITH THIS CALL — the cells
+        // the grid above actually holds, and nothing else. `rawElements` is set
+        // by buildVisualBibleGrid from the cells whose bytes loaded, so an
+        // element that was selected but has no usable render is correctly
+        // absent. Without this the Lab's REQUIRED OBJECTS block claimed no
+        // attached reference for any element while production's named them
+        // ("The attached reference images include a rough image of X — match
+        // its look"), so every Lab measurement of that block was made against a
+        // prompt production never sends. Empty grid → empty set, which is the
+        // honest answer, not a missing argument.
+        vbRefElementIds: (visualBibleGrid?.rawElements || []).map(e => e.id).filter(Boolean),
+      }
+    );
+  } finally {
+    PROMPT_TEMPLATES.imageGeneration = origTemplate;
+  }
+
+  // avatarSheets: { characterName: tl_avatar versionIndex } — swap this page's
+  // character refs to cell crops from Test Lab avatar sheets (the production
+  // applyStoryCellRefs path), e.g. style-matrix runs with per-style avatars.
+  if (params.avatarSheets && typeof params.avatarSheets === 'object') {
+    const storyCharacterAvatars = {};
+    for (const [name, vIdx] of Object.entries(params.avatarSheets)) {
+      const sheet = await loadTestImage(ctx.storyId, 'tl_avatar', null, vIdx);
+      if (sheet?.imageData) storyCharacterAvatars[name] = { costumed: sheet.imageData };
+    }
+    const { applyStoryCellRefs } = require('./storyAvatars');
+    await applyStoryCellRefs(ctx.referencePhotos, storyCharacterAvatars, ctx.scene.sceneCharacters || []);
+  }
+
+  // refCrop: 'head' | 'upperBody' | 'costumedHead' — shrink each character
+  // reference before generation. A/B how much reference body the model needs:
+  // a full-body ref pulls the render toward full-figure present-to-camera
+  // poses even when the brief asks for a hands-only/close-up framing.
+  // 'head'/'upperBody' crop the stored (stacked) ref's top fraction — cheap,
+  // but the stack's top panel is the HATLESS face cell, so headwear is lost.
+  // 'costumedHead' rebuilds from the costumed avatar sheet: face cell
+  // (identity) + the head region of the costumed body cell (headwear), so
+  // hats and bandanas survive the crop.
+  // WARDROBE STATE AND THE LAB (2026-09-19). The default Lab path REPLAYS the
+  // page's stored `referencePhotos`, which already carry whatever cell
+  // production cropped — the `--off:` variant included — so the Lab measures the
+  // same sheet production rendered against, by construction. The two knobs below
+  // deliberately resolve a sheet themselves and are costumed-only experiments;
+  // neither consults a `styled-` key, so neither can pick a wardrobe-state
+  // variant, and that is the intent rather than an oversight.
+  if (params.refCrop === 'costumedHead') {
+    // Same code path as production close-up pages (cropAvatarCell headOnly).
+    const { cropAvatarCell } = require('./sceneComposite');
+    const { resolveCellPose } = require('./storyAvatars');
+    const sheets = ctx.characterAvatars || {};
+    for (const p of ctx.referencePhotos) {
+      const sheetUri = sheets[p.name]?.costumed;
+      if (!sheetUri) { log.warn(`[TESTLAB] costumedHead: no costumed sheet for ${p.name} — full ref kept`); continue; }
+      const sc = (ctx.scene.sceneCharacters || []).find(c => ((typeof c === 'string' ? c : c?.name) || '').toLowerCase() === String(p.name).toLowerCase());
+      const pf = resolveCellPose(typeof sc === 'string' ? { name: sc } : (sc || {}));
+      const { body, stacked } = await cropAvatarCell(sheetUri, { pose: pf.pose, includeFace: true, stack: true, headOnly: true });
+      const out = stacked || body;
+      p.photoUrl = 'data:image/png;base64,' + out.toString('base64');
+      p.photoData = undefined;
+      p.photoType = `cell-${pf.pose}-costumedHead`;
+    }
+  } else if (params.refCrop) {
+    const fraction = params.refCrop === 'head' ? 0.35 : 0.55;
+    const sharp = require('sharp');
+    for (const p of ctx.referencePhotos) {
+      const src = p.photoUrl || p.photoData;
+      if (!src) continue;
+      const buf = Buffer.from(String(src).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const meta = await sharp(buf).metadata();
+      const cropped = await sharp(buf)
+        .extract({ left: 0, top: 0, width: meta.width, height: Math.round(meta.height * fraction) })
+        .jpeg({ quality: 92 }).toBuffer();
+      p.photoUrl = 'data:image/jpeg;base64,' + cropped.toString('base64');
+      p.photoData = undefined;
+    }
+  }
+
+  // refScale (TEST LAB ONLY — the VB cell-geometry experiment, 2026-09-19).
+  // Varies how LARGE an element is DRAWN inside its reference cell relative to
+  // the character card beside it, and nothing else: same prompt, same cells,
+  // same contents. Nothing is added to a cell — padding is the cell's own
+  // background, so the settled "no scale referent inside a cell" rule holds.
+  //   elementIds + elementFrac: white-pad those elements' reference bytes by
+  //     1/elementFrac, so `fit: contain` draws the object that much smaller.
+  //   charFrac: white-pad each character reference VERTICALLY by 1/charFrac,
+  //     so the card's figure is drawn that much smaller (and the leftover
+  //     width hands the element column more room).
+  if (params.refScale && typeof params.refScale === 'object') {
+    const sharpLib = require('sharp');
+    const padTo = async (b64, wMul, hMul) => {
+      const buf = Buffer.from(String(b64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const m = await sharpLib(buf).metadata();
+      const W = Math.round(m.width * wMul);
+      const H = Math.round(m.height * hMul);
+      const out = await sharpLib({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+        .composite([{ input: buf, left: Math.round((W - m.width) / 2), top: Math.round((H - m.height) / 2) }])
+        .jpeg({ quality: 92 }).toBuffer();
+      return 'data:image/jpeg;base64,' + out.toString('base64');
+    };
+    const ef = Number(params.refScale.elementFrac);
+    const ids = (params.refScale.elementIds || []).map(x => String(x).toUpperCase());
+    if (ef > 0 && ef < 1 && ids.length && Array.isArray(visualBibleGrid?.rawElements)) {
+      for (const el of visualBibleGrid.rawElements) {
+        if (!ids.includes(String(el.id || '').toUpperCase()) || !el.imageData) continue;
+        el.imageData = await padTo(el.imageData, 1 / ef, 1 / ef);
+        log.info(`[TESTLAB] refScale: ${el.id} drawn at ${ef} of its cell`);
+      }
+    }
+    const cf = Number(params.refScale.charFrac);
+    if (cf > 0 && cf < 1) {
+      for (const ph of ctx.referencePhotos) {
+        const src = ph.photoUrl || ph.photoData;
+        if (!src) continue;
+        ph.photoUrl = await padTo(src, 1, 1 / cf);
+        ph.photoData = undefined;
+      }
+      log.info(`[TESTLAB] refScale: character cards drawn at ${cf} of their height`);
+    }
+  }
+
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, ctx.referencePhotos, {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
@@ -564,6 +658,11 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     // default of 3 (xAI's documented edit cap is 5, re-verified 2026-09-02) —
     // e.g. give each of 4 characters their own slot instead of pairing 2-per-slot.
     maxRefSlots: params.maxRefSlots || null,
+    // vbColumnFraction: the ONE variable of the 2026-09-19 cell-geometry
+    // experiment - how wide the VB element column is, i.e. how large an
+    // element is DRAWN. Character cards are height-limited and narrower than
+    // either column width, so they render identically in both arms.
+    vbColumnFraction: params.vbColumnFraction || null,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Image generation returned no image');
@@ -572,14 +671,25 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   if (autoEval) {
     try {
       const { evaluateImageQuality } = require('./images');
+      // PRODUCTION'S OPTION SET, one resolver (buildEvalReplayOptions). This
+      // site used to pass five keys; without visualBible the judge's CLOTHING
+      // CONTRACT still named a garment the page declared `off`, and without
+      // artStyle every style-dependent rule skipped. See evalReplayInputs.js.
+      // No figure count: these are FRESH bytes and no detector runs in this
+      // stage, so the stored detection belongs to a different image. Null makes
+      // the roster decline to judge the count rather than judge it against the
+      // wrong picture.
+      const replay = buildEvalReplayOptions(ctx, {
+        detectedFigures: null,
+        // The A/B renders in params.artStyleOverride when set — the judge must
+        // be told the style it is actually looking at, not the story's.
+        artStyleKey: params.artStyleOverride || undefined,
+      });
       const evalRes = await evaluateImageQuality(
-        result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), 'scene',
+        result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), replay.evaluationType,
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        {
-          landmarkPhotos: ctx.scene.landmarkPhotos || null,
-          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-        }
+        replay.options
       );
       if (evalRes) {
         scores = {
@@ -601,7 +711,17 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     scores?.final != null ? Math.round(scores.final) : null
   );
 
-  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined };
+  // saveRefs: store the reference slots the call actually carried, so a
+  // geometry experiment can be READ off the inputs instead of assumed.
+  const steps = [];
+  if (params.saveRefs && Array.isArray(result.packedRefs)) {
+    for (let i = 0; i < result.packedRefs.length; i++) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', null, result.packedRefs[i], experimentId);
+      steps.push({ label: `reference slot ${i + 1}`, imageType: 'tl_step', versionIndex: v });
+    }
+  }
+
+  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined, ...(steps.length ? { steps } : {}) };
 }
 
 async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
@@ -625,6 +745,18 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
   // aboardOverride: test the aboard fix on a story whose stored AD metadata
   // predates the `aboard` field.
   const aboardId = params.aboardOverride ?? meta.aboard ?? null;
+  // Production attaches the VB element grid to every plate call
+  // (buildEmptySceneVbGrid); the Lab stage did not, so a plate rendered here
+  // saw only the text channel and a prompt change that fixes the image channel
+  // was invisible to the Lab. Same helper, same aboard filter.
+  // Built BEFORE the prompt: which reference family is attached decides the
+  // REFERENCE line (referenceKind below), exactly as at the production call
+  // sites (storyJobPipeline.js Phase 5a-pre-vantage and the trial plate).
+  const { buildEmptySceneVbGrid } = require('./referenceSheets');
+  const emptySceneVbGrid = await buildEmptySceneVbGrid(
+    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
+  );
+
   const prompt = buildEmptyScenePrompt({
     template: promptOverride || undefined,
     style: resolveArtStyleForEmptyScene(params.artStyleOverride || ctx.artStyle, null),
@@ -635,22 +767,24 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       : '',
     eraGuard: buildEraGuard(meta.era),
     landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null),
+    // Tells the model what the attached reference IS. Without it the Lab tested
+    // a DIFFERENT prompt than production, which passes it at every plate call
+    // site (storyJobPipeline.js vantage plate + retry, the per-page 5a-pre path,
+    // and the trial plate — every one of them passes it).
+    referenceKind: (ctx.landmarkPhotos?.length > 0) ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
     visualBible: ctx.visualBible,
     pageNumber: ctx.pageNumber ?? null,
     aboardId,
     // AD objects[] gates which vehicles enter the plate prompt + grid — same
     // gate production runs (AD is the authority on vehicle presence).
     sceneObjects: meta.objects || null,
+    // The geometry facts the plate is GRADED on (validateEmptyScene reads the
+    // same scene prose). Production passes these at every page/vantage plate
+    // call site; without them the Lab renders a plate blind to the geometry and
+    // measures a different prompt than production runs.
+    mainScenePrompt: ctx.scene.sceneDescription || null,
+    castNames: (meta.fullData?.characters || meta.characters || []).map(c => (typeof c === 'string' ? c : c?.name)).filter(Boolean),
   });
-
-  // Production attaches the VB element grid to every plate call
-  // (buildEmptySceneVbGrid); the Lab stage did not, so a plate rendered here
-  // saw only the text channel and a prompt change that fixes the image channel
-  // was invisible to the Lab. Same helper, same aboard filter.
-  const { buildEmptySceneVbGrid } = require('./referenceSheets');
-  const emptySceneVbGrid = await buildEmptySceneVbGrid(
-    ctx.visualBible, ctx.pageNumber, ctx.landmarkPhotos, aboardId, meta.objects || null
-  );
 
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, [], {
@@ -695,27 +829,37 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
   await loadPromptTemplates();
   const { evaluateImageQuality } = require('./images');
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // A pinned target evaluates THAT version (2026-09-12). Without this the stage
+  // always judged the active one, so two versions of a page — an original and
+  // the repair that replaced it — could not be scored against each other.
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const t0 = Date.now();
-  const result = await evaluateImageQuality(
-    imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
-    null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-    ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-    {
+  // PRODUCTION'S OPTION SET (buildEvalReplayOptions) + this stage's explicit
+  // A/B knobs. The baseline must equal production; the overrides are the point
+  // of the experiment. visualBible / clothingRequirements / storyData were all
+  // missing here, which is why every clothing finding this stage has ever
+  // produced was judged against the unstripped story-level outfit.
+  const replay = buildEvalReplayOptions(ctx, {
+    // The stored detection was made on the ACTIVE version's bytes. When a
+    // different version is pinned it describes a different picture, so the
+    // count is withheld rather than guessed.
+    detectedFigures: (ctx.versionIndex ?? null) === null
+      ? (ctx.scene.bboxDetection?.figures || null) : null,
+    overrides: {
       evalTemplateOverride: promptOverride || null,
-      // Lab/staging parity: the SAME resolver the production repair-round eval
-      // uses, from the same source (the story's art-style key). Never re-derive
-      // this locally - a second derivation is how the Lab silently stopped
-      // reproducing production for style-dependent rules.
-      artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null),
       // Stage-2 compliance A/B: swap the model (default qwen-plus) and/or its
       // template to test the over-strict-CRITICAL problem.
       complianceModelOverride: params.complianceModel || null,
       compliancePromptOverride: params.compliancePrompt || null,
-      // Era-aware landmark protection (2026-09-05) — Lab parity with production.
-      landmarkPhotos: ctx.scene.landmarkPhotos || null,
-      era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-    }
+    },
+  });
+  const result = await evaluateImageQuality(
+    imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
+    // Quality-judge A/B (2026-09-08): params.model swaps the P2 judge (and,
+    // because an override wins there too, the P1 inventory) for one experiment.
+    params.model || null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
+    ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+    replay.options
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Quality evaluation returned null');
@@ -731,6 +875,16 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     issuesSummary: result.issuesSummary || null,
     fixableIssues: result.fixableIssues || [],
     figures: (result.figures || []).map(f => ({ name: f.name, match: f.match, issues: f.issues })),
+    // The judge's parsed output as returned, BEFORE the fixable_issues mapper
+    // and gates. Without it a rule the judge ignores and a finding a gate
+    // dropped are indistinguishable in the Lab (2026-09-08, experiment 1057:
+    // the inventory said `complete: false`, the prompt carried the rule, and
+    // nothing arrived — no way to tell which side lost it).
+    complianceRaw: result.threeStageResult?.complianceResult || null,
+    // What RAN, not what was asked: the judge key and the per-stage token
+    // counts (a model's input-token signature is how a swap is verified).
+    modelId: params.model || require('../config/models').MODEL_DEFAULTS.qualityEval,
+    usage: { ...(result.threeStageResult?.usage || {}), quality_input_tokens: result.usage?.input_tokens ?? null, quality_output_tokens: result.usage?.output_tokens ?? null },
     storedBaseline: { qualityScore: ctx.scene.qualityScore ?? null, semanticScore: ctx.scene.semanticScore ?? null },
   };
 }
@@ -804,15 +958,25 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
 
   const repeats = Math.max(2, Math.min(5, parseInt(params.repeats, 10) || 3));
   const useConsolidator = params.consolidate !== false;
-  const versionIndex = Number.isFinite(Number(ctx.target?.versionIndex))
-    ? Number(ctx.target.versionIndex) : null;
+  const versionIndex = pinnedVersionIndex(ctx.target?.versionIndex);
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, versionIndex);
 
   // Frozen inputs, resolved ONCE and reused by every repeat — re-deriving them
   // per run would let an input drift and be mistaken for judge variance.
   const sceneDescription = evalSceneDescription(ctx);
   const referencePhotos = evalReferencePhotos(ctx);
-  const artStyle = require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null);
+  // Production's option set, frozen with everything else. Measuring the judge's
+  // variance against a THINNER input set than production's measures a different
+  // judge: a missing visualBible turns the clothing contract into the
+  // unstripped story-level outfit, and worn-item findings then flip on every
+  // repeat for a reason that has nothing to do with judge stability.
+  const replay = buildEvalReplayOptions(ctx, {
+    // Frozen with the other inputs: a count that changed between repeats would
+    // be read as judge variance. Withheld when a version is pinned (the stored
+    // detection is the active version's).
+    detectedFigures: versionIndex === null
+      ? (ctx.scene.bboxDetection?.figures || null) : null,
+  });
 
   const runs = [];
   for (let i = 1; i <= repeats; i++) {
@@ -821,14 +985,10 @@ async function runEvalVarianceStage(ctx, { experimentId, params = {} }) {
     let error = null;
     try {
       evalResult = await evaluateImageQuality(
-        imageData, sceneDescription, referencePhotos, 'scene',
+        imageData, sceneDescription, referencePhotos, replay.evaluationType,
         null, `testlab-var${experimentId}-P${ctx.pageNumber}-r${i}`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        {
-          artStyle,
-          landmarkPhotos: ctx.scene.landmarkPhotos || null,
-          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-        }
+        replay.options
       );
     } catch (err) { error = err.message; }
     const elapsedMs = Date.now() - t0;
@@ -1041,14 +1201,62 @@ async function runSemanticEvalStage(ctx, { promptOverride, experimentId }) {
   await loadPromptTemplates();
   const { evaluateSemanticFidelity } = require('./sceneValidator');
 
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // A pinned target evaluates THAT version, as quality_eval and inventory_ab
+  // already do — judging the active version instead makes an original-vs-repair
+  // comparison compare the repair with itself.
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   const storyText = ctx.scene.text || null;
   if (!storyText) throw new Error('Scene has no story text — semantic eval needs it');
+
+  // THE SIXTH ARGUMENT. Production never calls evaluateSemanticFidelity bare —
+  // evalPipeline.js hands it the art style, the CLOTHING CONTRACT and the
+  // EXPECTED CAST roster it built for all three judges. This stage passed none
+  // of them, so its judge saw no outfit contract at all (clothing findings
+  // suppressed outright) and no kind labels to keep an `(animal)` entry out of
+  // the named-character count. Same three inputs, same builders.
+  const replay = buildEvalReplayOptions(ctx, {
+    detectedFigures: ctx.scene.bboxDetection?.figures || null,
+  });
+  const { buildExpectedCastBlock, buildEvalClothingContract } = require('./evalPipeline');
+  const semanticOpts = {
+    artStyle: replay.options.artStyle,
+    clothingContract: buildEvalClothingContract({
+      sceneCharacters: ctx.scene.sceneCharacters || null,
+      referenceImages: evalReferencePhotos(ctx),
+      artStyle: replay.options.artStyle,
+      visualBible: replay.options.visualBible,
+      clothingRequirements: replay.options.clothingRequirements,
+      sceneMetadata: replay.options.sceneMetadata,
+      sceneHint: ctx.outlineHint,
+      originalPrompt: ctx.scene.sceneDescription || '',
+    }).block,
+    expectedCast: buildExpectedCastBlock({
+      sceneCharacters: ctx.scene.sceneCharacters || null,
+      sceneHint: ctx.outlineHint,
+      originalPrompt: ctx.scene.sceneDescription || '',
+      visualBible: replay.options.visualBible,
+      evaluationType: replay.evaluationType,
+      detectedFigureCount: Array.isArray(replay.options.detectedFigures)
+        ? require('./bboxDetection').countRealFigures(replay.options.detectedFigures) : null,
+      pageLabel: `testlab-exp${experimentId}-P${ctx.pageNumber} `,
+      sceneMetadata: replay.options.sceneMetadata,
+      storyData: replay.options.storyData,
+      pageNumber: replay.options.pageNumber,
+    }).block,
+    // THE LANDMARK BLOCK — the fourth input production hands this judge since
+    // 2026-09-18. Built from the replay's own landmarkPhotos + era, by the same
+    // builder evalPipeline uses, so a Lab arm judges the page production judges.
+    landmarkContext: require('./landmarkProtection').buildLandmarkContextBlock(
+      require('./landmarkProtection').computeLandmarkProtection({
+        landmarkPhotos: replay.options.landmarkPhotos,
+        era: replay.options.era,
+      })),
+  };
 
   const t0 = Date.now();
   const result = await evaluateSemanticFidelity(
     imageData, storyText, ctx.scene.sceneDescription,
-    ctx.outlineHint, promptOverride || null
+    ctx.outlineHint, promptOverride || null, semanticOpts
   );
   const elapsedMs = Date.now() - t0;
   if (!result) throw new Error('Semantic evaluation returned null');
@@ -1147,9 +1355,7 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
   // Which bytes this run actually tested — exp #7/#9 could not answer that,
   // and 'null' must be impossible: an unrecorded load is itself a finding.
   const _load = getLastPageLoad();
-  // Same null-guard as the loader: Number(null)===0 must not read as "pinned 0".
-  const _pinnedParam = (params.versionIndex == null || params.versionIndex === '') ? null
-    : (Number.isFinite(Number(params.versionIndex)) ? Number(params.versionIndex) : null);
+  const _pinnedParam = pinnedVersionIndex(params.versionIndex);
   const loadedFrom = _pinnedParam !== null
     ? { pinned: _pinnedParam }
     : (_load && _load.storyId === ctx.storyId && String(_load.pageNumber) === String(ctx.pageNumber)
@@ -1292,6 +1498,176 @@ async function runBboxStage(ctx, { experimentId, params = {} }) {
 }
 
 /**
+ * THE THIRD WITNESS, ALONE, ON A STORED CONTESTED PAGE — one VLM call, no DINO.
+ *
+ * `reconcileIdentityWithSecondWitness` (4ef21cc6c) asks a second model who is
+ * who when the evaluator and the detector disagree, and lets that answer VETO
+ * the detector's rename. The plumbing is proven byte-identical under every
+ * stubbed witness; what was never measured is whether the REAL witness ever
+ * contradicts the detector — it answers the same question, from the same badged
+ * image, under the same prompt, so it is drawn from the detector's own
+ * distribution and confirmation is the expected failure mode.
+ *
+ * This stage measures exactly that, and nothing else. It replays the vote over
+ * ONE stored version: the page image as it was, the stored
+ * `bboxDetection.figures[]` and `expectedCharacters`, and the evaluator's OWN
+ * names (un-renamed via `evaluatorReference`). The `bbox` stage cannot answer
+ * the question — it would re-run DINO + SAM + the primary Gemini identity call,
+ * so the boxes, the conflict and the witness would all move at once.
+ *
+ * Both outcomes are computed on the same inputs: `reconcileIdentity` with no
+ * witness (what ships today) and `reconcileIdentityWithSecondWitness` with the
+ * real one. `renamesWithheld` is the difference, which is the only thing the
+ * veto can ever do.
+ *
+ * COSTS one OpenRouter Qwen2.5-VL-72B call per target (the tier below the
+ * `gemini-full` that answered every stored page), plus one local composite.
+ * THE WITNESS IS NOT GUARANTEED TO BE QWEN: the SoM chain falls through on a
+ * failure, and 3 of 19 targets in experiment 1325 met `Qwen-VL HTTP 429` and
+ * were answered by `haiku-full` instead — so `witnessModel` is reported per
+ * entry rather than assumed, and a run's model mix is part of its result.
+ *
+ * params.groundTruth  'detector' | 'evaluator' — a PIXEL-JUDGED verdict for
+ *                     this version, carried as data on the target rather than
+ *                     baked into this file. Lab set 66 / experiment 1324
+ *                     downloaded and eyeballed four such pages. With it the
+ *                     entry classifies itself: a withheld rename on a
+ *                     detector-right page is a FALSE veto, on an
+ *                     evaluator-right page a TRUE one.
+ */
+async function runIdentitySecondOpinionStage(ctx, { params = {} }) {
+  const { reconcileIdentity, reconcileIdentityWithSecondWitness } = require('./identityAgreement');
+  const { secondOpinionIdentity } = require('./figureDetection');
+
+  // A PIN IS MANDATORY HERE. The vote is a property of ONE stored version — the
+  // active version of a page is routinely the one whose conflict was already
+  // resolved, so an unpinned run would measure a different page than the one
+  // named. Fail loudly rather than answer a question nobody asked.
+  const versionIndex = ctx.versionIndex != null ? ctx.versionIndex : pinnedVersionIndex(params.versionIndex);
+  if (versionIndex == null) {
+    throw new Error('identity_second_opinion requires a pinned versionIndex — the contested conflict belongs to one stored version, not to whatever won pick-best');
+  }
+  const versions = Array.isArray(ctx.scene.imageVersions) ? ctx.scene.imageVersions : [];
+  const version = versions[versionIndex];
+  if (!version) throw new Error(`No stored imageVersions[${versionIndex}] for ${ctx.storyId} p${ctx.pageNumber} (page has ${versions.length})`);
+
+  const figures = JSON.parse(JSON.stringify(version.bboxDetection?.figures || []));
+  const expectedCharacters = JSON.parse(JSON.stringify(version.bboxDetection?.expectedCharacters || []));
+  if (figures.length === 0) throw new Error(`v${versionIndex} has no bboxDetection.figures — there is nothing to re-badge`);
+  if (expectedCharacters.length === 0) throw new Error(`v${versionIndex} has no bboxDetection.expectedCharacters — the witness would have no cast to choose from`);
+
+  // WHAT THE EVALUATOR SAID, not what the page ended up storing. A stored match
+  // whose name the detector overwrote carries the detector's name in
+  // `reference` and the evaluator's in `evaluatorReference`; replaying against
+  // the rewritten names would hand the witness a page the two sides agree on.
+  const evaluatorMatches = (version.matches || []).map(m => ({ ...m, reference: (m && m.evaluatorReference) || (m && m.reference) }));
+  const evalLikeOf = () => ({
+    matches: JSON.parse(JSON.stringify(evaluatorMatches)),
+    fixableIssues: JSON.parse(JSON.stringify(version.fixableIssues || [])),
+    fixTargets: [],
+  });
+
+  // Which model answered the PRIMARY identity pass, so the witness is not that
+  // model asked twice — production reads the same field.
+  const primaryModel = version.bboxDetection?.gdinoDiag?.identity?.model || null;
+
+  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, versionIndex);
+
+  // THE COUNTERFACTUAL, ON THE SAME INPUTS. Without it the entry can say what
+  // the witness answered but not whether that answer changed anything, and the
+  // veto's only possible effect is a difference in renames.
+  const baseline = reconcileIdentity(evalLikeOf(), JSON.parse(JSON.stringify(figures)), {});
+
+  let witnessRaw = null;
+  let witnessError = null;
+  const t0 = Date.now();
+  const report = await reconcileIdentityWithSecondWitness(evalLikeOf(), figures, {
+    secondOpinion: async () => {
+      try {
+        witnessRaw = await secondOpinionIdentity(
+          imageData, figures, expectedCharacters, `PAGE ${ctx.pageNumber} v${versionIndex}: `,
+          { excludeModel: primaryModel },
+        );
+      } catch (err) {
+        witnessError = err.message;
+        throw err;
+      }
+      return witnessRaw;
+    },
+  });
+  const elapsedMs = Date.now() - t0;
+
+  const conflicts = (report?.conflicts || []).map(c => ({
+    evaluator: c.evaluator, detector: c.detector, on: c.on,
+    centreDistance: c.centreDistance, detIndex: c.detIndex,
+  }));
+  const votes = report?.secondWitness?.votes || [];
+  const vetoed = report?.secondWitness?.vetoed || 0;
+  const renamesWithheld = (baseline?.renamed || 0) - (report?.renamed || 0);
+
+  // The witness's WHOLE answer, not only the contested figures — a witness that
+  // renamed every figure on the page is a different finding from one that
+  // disagreed about two, and the votes alone cannot tell them apart.
+  const witnessByFigure = [];
+  if (witnessRaw?.nameByFigure) {
+    for (const [figIdx, name] of witnessRaw.nameByFigure) {
+      witnessByFigure.push({ figureIndex: figIdx, detector: figures[figIdx]?.name || null, witness: name });
+    }
+    witnessByFigure.sort((a, b) => a.figureIndex - b.figureIndex);
+  }
+
+  // SELF-CLASSIFYING AGAINST A PIXEL VERDICT. A veto is only good or bad
+  // relative to who was actually right, and an agreement rate on its own
+  // cannot distinguish the two.
+  const groundTruth = params.groundTruth || null;
+  let vetoClass = null;
+  if (groundTruth === 'detector') vetoClass = renamesWithheld > 0 ? 'false-veto' : 'correct-no-veto';
+  else if (groundTruth === 'evaluator') vetoClass = renamesWithheld > 0 ? 'true-veto' : 'missed-veto';
+
+  const witnessModel = report?.secondWitness?.model || witnessRaw?.model || null;
+  const pairs = conflicts.map(c => `${c.evaluator}→${c.detector}`).join(', ');
+  const said = votes.length
+    ? votes.map(v => `${v.witness || '—'} (${v.verdict})`).join(', ')
+    : (witnessError ? `call failed: ${witnessError}` : 'no answer');
+  const note = [
+    `p${ctx.pageNumber} v${versionIndex} · conflict ${pairs || '(none)'}`,
+    `witness ${witnessModel || 'none'} said ${said}`,
+    `veto ${vetoed}/${conflicts.length}`,
+    `renames ${baseline?.renamed || 0} → ${report?.renamed || 0}${renamesWithheld > 0 ? ` (WITHHELD ${renamesWithheld})` : ''}`,
+    groundTruth ? `pixel truth: ${groundTruth}-right → ${vetoClass}` : 'no pixel truth',
+  ].join(' · ');
+  // Into the captured run log, which is what the Lab card renders today.
+  log.info(`🗳️ [TESTLAB] identity_second_opinion ${ctx.storyId} ${note}`);
+  for (const w of witnessByFigure) {
+    log.info(`🗳️ [TESTLAB]   figure ${w.figureIndex}: detector=${w.detector} witness=${w.witness}`);
+  }
+
+  return {
+    elapsedMs,
+    note,
+    versionIndex,
+    primaryIdentityModel: primaryModel,
+    witnessModel,
+    witnessAnswered: !!report?.secondWitness?.answered,
+    witnessReason: report?.secondWitness?.reason || null,
+    witnessError,
+    witnessAttempts: witnessRaw?.attempts || [],
+    expectedCharacters: expectedCharacters.map(c => c.name),
+    detectorFigures: figures.map((f, i) => ({ figureIndex: i, name: f.name })),
+    evaluatorMatches: evaluatorMatches.map(m => m.reference),
+    conflicts,
+    witnessByFigure,
+    votes,
+    vetoed,
+    renamesWithheld,
+    withoutWitness: { renamed: baseline?.renamed || 0, uncorrectable: !!baseline?.uncorrectable, uncorrectableReason: baseline?.uncorrectableReason || null },
+    withWitness: { renamed: report?.renamed || 0, uncorrectable: !!report?.uncorrectable, uncorrectableReason: report?.uncorrectableReason || null },
+    groundTruth,
+    vetoClass,
+  };
+}
+
+/**
  * Character box for a page: stored detection first, else run a fresh bbox
  * detection on the image (same call the bbox stage uses). Returns
  * {bbox, faceBbox, source} or null.
@@ -1392,8 +1768,7 @@ async function runCharRepairStage(ctx, opts) {
   // target.versionIndex pins a stored version — repairing the ORIGINAL render
   // rather than whatever is active is how a repair is re-run under the same
   // conditions production saw. Null keeps the active version (previous default).
-  const pinnedVersion = Number.isFinite(Number(ctx.target?.versionIndex))
-    ? Number(ctx.target.versionIndex) : null;
+  const pinnedVersion = pinnedVersionIndex(ctx.target?.versionIndex);
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber, pinnedVersion);
   // IDENTITY-TRANSFER TEST: params.referenceCharacter sends a DIFFERENT character's
   // avatar while still targeting charName's box. If the repair returns the original
@@ -2401,7 +2776,7 @@ async function transcribeTextInImage(imageDataUri) {
           { inline_data: { mime_type: imageDataUri.match(/^data:(image\/\w+);base64,/)?.[1] || 'image/jpeg', data: r2.stripDataUriPrefix(imageDataUri) } },
           { text: 'Transcribe the large title lettering in this image character by character. Copy exactly what is drawn, including accents and umlauts, even if a letter looks malformed or misspelled — do not correct it. Return JSON: {"text": "<transcription>"}' },
         ] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       }),
       signal: AbortSignal.timeout(45_000),
     });
@@ -3098,20 +3473,42 @@ async function runBookAuditStage(target, { params = {}, promptOverride = null })
   const { loadPromptTemplates, withTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { auditStoryBook } = require('./bookAudit');
+  const { calculateTextCost } = require('../config/models');
   const { storyData } = await loadStoryDataFull(target.storyId);
   const t0 = Date.now();
+  // Same collector every other paid Lab stage uses. Without a tracker
+  // bookAudit's `if (usageTracker …)` branch never fires, so a Lab audit spent
+  // real money and recorded nothing.
+  const usage = [];
   // withTemplates, not a global assignment: the override must be visible only
   // inside this run's async tree so two concurrent experiments cannot read each
   // other's prompt.
   const audit = await withTemplates({ bookAudit: promptOverride }, () => auditStoryBook(storyData, {
     storyId: target.storyId,
     modelId: params.modelId || undefined,
+    // Gemini 3 thinking level ('low'|'medium'|'high'). Lab-only: when the param
+    // is absent nothing is sent and the model keeps its own default, so a
+    // production audit is unchanged.
+    thinkingLevel: params.thinkingLevel || undefined,
+    // OpenRouter reports billed dollars (cost_usd); Gemini native reports tokens
+    // only, so those are priced with the same table production uses.
+    usageTracker: (provider, u, fnName, mid) => usage.push({
+      provider, fn: fnName, modelId: mid,
+      cost: u?.cost_usd ?? calculateTextCost(mid || '', u || {}),
+    }),
   }));
-  if (!audit) return { ok: false, elapsedMs: Date.now() - t0, faults: 0, byRoute: { IMG: [], TEXT: [] }, logLines: [] };
+  const modelCalls = usage.length;
+  const cost = usage.reduce((a, u) => a + (u.cost || 0), 0);
+  if (!audit) return { ok: false, elapsedMs: Date.now() - t0, faults: 0, byRoute: { IMG: [], TEXT: [] }, logLines: [], modelCalls, cost };
   return {
     ok: true,
     elapsedMs: Date.now() - t0,
+    modelCalls,
+    cost,
     modelId: audit.modelId,
+    thinkingLevel: audit.thinkingLevel || null,
+    usage: audit.usage,
+    chunkUsage: audit.chunkUsage,
     faults: audit.faults,
     byRoute: audit.byRoute,
     pagesRead: audit.pagesRead,
@@ -3163,21 +3560,36 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
   const outline = String(storyData.outline || '');
   let prompt = null;
   let templateKey = null;
+  // The arc, for both branches. The text branch used to omit it from
+  // buildTextAuditPrompt's third argument, so the replay's STORY_ARC read
+  // "(no story was recorded)" while production (textRefine.js) passes the arc —
+  // the LOADBEARING question could not fire in the Lab and fault counts came
+  // out lower for reasons that had nothing to do with the prompt under test.
+  const arc = H.parseBeats(outline).arc || storyData.beatsReviewReport?.arc || '';
   if (level === 'arc') {
     templateKey = 'storyArcAudit';
-    const arc = H.parseBeats(outline).arc || storyData.beatsReviewReport?.arc || '';
     if (!arc.trim()) throw new Error('story has no stored arc to audit');
     prompt = H.buildArcAuditPrompt(storyData, arc);
   } else {
     const blind = level === 'text-blind';
     templateKey = blind ? 'storyTextAuditBlind' : 'storyTextAudit';
+    // Same fields production's extractRefinablePages carries, so the replay's
+    // THE PICTURE SHOWS is resolved from the same sources by the same resolver
+    // (sceneMetadata.resolveTextStagePictureSpec). Handing `sceneIntent` the
+    // full sceneDescription made the replay's spec LONGER than the run's — the
+    // opposite truncation — which broke comparability the other way.
     const pages = (storyData.sceneImages || [])
-      .map(p => ({ pageNumber: p.pageNumber, text: p.text, sceneIntent: p.sceneIntent || p.sceneDescription }))
+      .map(p => ({
+        pageNumber: p.pageNumber,
+        text: p.text,
+        sceneBrief: p.sceneDescription || null,
+        sceneIntent: p.sceneIntent || null,
+      }))
       .filter(p => String(p.text || '').trim());
     if (!pages.length) throw new Error('story has no page text to audit');
     prompt = blind
       ? H.buildTextAuditBlindPrompt(storyData, pages)
-      : H.buildTextAuditPrompt(storyData, pages);
+      : H.buildTextAuditPrompt(storyData, pages, arc);
   }
   if (!prompt) throw new Error(`${templateKey} template unavailable`);
 
@@ -3186,7 +3598,7 @@ async function runAuditReplayStage(target, { params = {}, promptOverride = null 
     const t = Date.now();
     try {
       const res = await withTemplates({ [templateKey]: promptOverride }, () =>
-        callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 }));
+        callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_audit_replay', temperature: 0 }));
       const raw = String(res.text || '').trim();
       return {
         model,
@@ -3266,9 +3678,16 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
       // fromBeats = the raw expansion; reviewedBrief = after the scene review
       // rewrote it. params.artifact picks the measurement: 'raw' isolates the
       // Art Director, 'reviewed' (default) measures the AD+reviewer chain.
+      // params.reviewer = '<TEXT_MODELS key>' picks ONE reviewer's rewrites out
+      // of a multi-reviewer fan-out (reviewedBriefs[modelKey]); a reviewer that
+      // is absent or failed is refused, never swapped for the primary. A failed
+      // primary review refuses 'reviewed' outright: measuring fromBeats as
+      // "reviewed" is how experiments 1109/1121/1122/1124 were misjudged.
       const useRaw = String(params.artifact || 'reviewed') === 'raw';
+      const reviewer = params.reviewer ? String(params.reviewer).trim() : null;
+      if (!useRaw && !reviewer) assertReviewedArtifactUsable(out, expId);
       pages = (out.sceneExpansions || [])
-        .map(x => ({ pageNumber: x.pageNumber, brief: useRaw ? x.fromBeats : (x.reviewedBrief || x.fromBeats) }))
+        .map(x => ({ pageNumber: x.pageNumber, brief: useRaw ? x.fromBeats : pickReviewedBrief(x, out, reviewer, expId) }))
         .filter(x => String(x.brief || '').trim());
       if (!pages.length) throw new Error(`fromExperiment ${expId}: no sceneExpansions in result`);
     }
@@ -3305,7 +3724,7 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
   const runs = await Promise.all(models.map(async (model) => {
     const t = Date.now();
     try {
-      const res = await callTextModelStreaming(prompt, 16000, null, model, { usageLabel: 'testlab_scene_hazard_count', temperature: 0 });
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_scene_hazard_count', temperature: 0 });
       const raw = String(res.text || '').trim();
       const lines = raw.split('\n').map(l => l.trim()).filter(l => /^HAZARD\[/.test(l));
       const byClass = {};
@@ -3356,190 +3775,25 @@ async function runSceneHazardCountStage(target, { params = {}, promptOverride = 
 }
 
 /**
- * Outline-review model comparison (split outline review, Call 2). Target:
- * {storyId}. Compares how DIFFERENT models perform AS THE REVIEWER.
+ * RETIRED 2026-09-13 — the outline_review stage is gone.
  *
- * One critique-free writer draft (Call 1, split mode) is generated ONCE from
- * the story's reconstructed creation input, then every model in params.models
- * runs buildOutlineReviewPrompt on that SAME draft (Call 2) — so the only
- * variable is the reviewer. Faithful to production: same split writer, same
- * deterministic REVIEW HINTS pre-check, same buildOutlineReviewPrompt. Report
- * only — nothing is written back to the story.
+ * It forced splitOutlineReview:true and measured buildUnifiedStoryPrompt +
+ * buildOutlineReviewPrompt. storyJobPipeline gates that branch behind
+ * "not beatsMode, not trialMode, splitOutlineReviewEnabled", and runtime.js sets
+ * pipelineMode:'beats' in every environment — so production never makes either
+ * call. The stage measured a configuration that cannot ship, and its beats
+ * analogues are their own stages (arc_review, text_refine, scene_review).
  *
- * params.models    : string[] of TEXT_MODELS keys to compare (default: the
- *                    configured outlineReviewModel).
- * params.writerModel : model for the shared Call-1 draft (default: MODEL_DEFAULTS.outline).
+ * Stored experiments keep rendering: the result renderer keys off
+ * result.stageKind === 'outline_review', which is untouched.
  */
-async function runOutlineReviewStage(target, { params = {} }) {
-  const { loadPromptTemplates } = require('../services/prompts');
-  await loadPromptTemplates();
-  const { buildUnifiedStoryPrompt, buildOutlineReviewPrompt } = require('./storyHelpers');
-  const { callTextModelStreaming } = require('./textModels');
-  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
-  const { UnifiedStoryParser } = require('./outlineParser');
-  const { checkSceneConsistency } = require('./sceneConsistencyCheck');
 
-  const models = Array.isArray(params.models) && params.models.length
-    ? params.models
-    : [MODEL_DEFAULTS.outlineReviewModel];
-  const bad = models.filter(m => !TEXT_MODELS[m]);
-  if (bad.length) throw new Error(`Unknown reviewer model(s): ${bad.join(', ')}. Valid: ${Object.keys(TEXT_MODELS).join(', ')}`);
-
-  // Reconstruct the creation input from the PERMANENT story record (story_jobs
-  // is pruned ~1h after completion — routes/jobs.js). stories.data carries every
-  // field the prompt builders read, copied verbatim at save time (server.js).
-  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
-  const inputData = {
-    pages: storyData.pages,
-    languageLevel: storyData.languageLevel,
-    language: storyData.language,
-    mainCharacters: storyData.mainCharacters || [],
-    characters: storyData.characters || [],
-    relationships: storyData.relationships || {},
-    relationshipTexts: storyData.relationshipTexts || {},
-    storyCategory: storyData.storyCategory,
-    storyTopic: storyData.storyTopic,
-    storyTheme: storyData.storyTheme,
-    storyType: storyData.storyType,
-    storyTypeName: storyData.storyTypeName,
-    storyDetails: storyData.storyDetails,
-    artStyle: storyData.artStyle,
-    season: storyData.season,
-    userLocation: storyData.userLocation,
-    dedication: storyData.dedication,
-    layout: storyData.layout,
-    storyPromptVariant: storyData.storyPromptVariant,
-    availableLandmarks: storyData.availableLandmarks,
-    customThemeText: storyData.customThemeText,
-    modelOverrides: storyData.modelOverrides,
-    splitOutlineReview: true, // force the critique-free Call-1 writer draft
-  };
-  if (!(inputData.characters || []).length) {
-    throw new Error(`Story ${target.storyId} has no persisted characters/input to rebuild the review.`);
-  }
-
-  // Call 1 — one shared critique-free writer draft.
-  const writerModel = params.writerModel || MODEL_DEFAULTS.outline;
-  if (!TEXT_MODELS[writerModel]) throw new Error(`Unknown writer model "${writerModel}"`);
-  const writerPrompt = buildUnifiedStoryPrompt(inputData, inputData.pages || null);
-  const wt0 = Date.now();
-  // STREAMING, like production (server.js buildUnified call) — not optional. A
-  // non-streaming request gets no response headers until the whole completion is
-  // finished, so any draft that takes over 5 minutes trips undici's default
-  // 300s headersTimeout and surfaces as "fetch failed". withRetry sees that as
-  // retryable, so it burns 3 x 5 min and ends with zero results (exp #270).
-  // Streaming delivers headers immediately, so the ceiling never applies.
-  const writer = await callTextModelStreaming(writerPrompt, 64000, null, writerModel, { usageLabel: 'testlab_review_writer' });
-  const writerElapsedMs = Date.now() - wt0;
-  const writerOutput = writer.text || '';
-  if (!writerOutput) throw new Error('Writer draft (Call 1) came back empty');
-
-  // Deterministic scene-consistency pre-check → REVIEW HINTS (same as prod).
-  let hints = [];
-  try {
-    const draftPages = new UnifiedStoryParser(writerOutput).extractPages();
-    hints = checkSceneConsistency(draftPages, writerOutput, {
-      knownCharacterNames: (inputData.characters || []).map(c => c.name),
-    });
-  } catch (e) {
-    log.warn(`[TESTLAB] outline_review hint pre-check failed (non-fatal): ${e.message}`);
-  }
-  const hintCount = hints.reduce((n, e) => n + (e.issues?.length || 0), 0);
-
-  // ── Call 2 ──────────────────────────────────────────────────────────
-  const CAP = 120000; // per-text storage cap; full reviews are large
-  const validAspect = a => (a === 'text' || a === 'scene') ? a : 'both';
-  const fixCountOf = t => (String(t).match(/^[\s\-*•]*Pages?\s+[\d,\s\-–]+?\s*:/gim) || []).length;
-
-  // Run one review call: build the aspect-scoped prompt (optionally with prior
-  // passes fed in for the repeated-review convergence test), score its fixes.
-  const runOneReview = async (modelKey, aspect, priorReviews) => {
-    if (!TEXT_MODELS[modelKey]) throw new Error(`Unknown reviewer model "${modelKey}"`);
-    const prompt = buildOutlineReviewPrompt(inputData, writerOutput, hints, { aspect, priorReviews });
-    if (!prompt) throw new Error('outline-review template unavailable');
-    const t0 = Date.now();
-    // Streaming for the same headersTimeout reason as the writer above. Anthropic
-    // / xAI / Gemini reviewers stream; OpenRouter has no streaming path and falls
-    // back to the plain call, so those stay exposed to the 5-minute ceiling.
-    const r = await callTextModelStreaming(prompt, 32000, null, modelKey, { usageLabel: 'testlab_outline_review' });
-    const elapsedMs = Date.now() - t0;
-    const usage = r.usage || {};
-    const modelId = r.modelId || TEXT_MODELS[modelKey].modelId;
-    let reviewText = r.text || '';
-    const reviewTruncated = reviewText.length > CAP;
-    if (reviewTruncated) reviewText = reviewText.slice(0, CAP) + '\n…[output truncated for storage]';
-    return {
-      modelKey, modelId, aspect, ok: true, elapsedMs,
-      usage: { input_tokens: usage.input_tokens || 0, output_tokens: usage.output_tokens || 0 },
-      cost: calculateTextCost(modelId, usage), fixCount: fixCountOf(reviewText), reviewText, reviewTruncated,
-    };
-  };
-
-  let writerDraft = writerOutput;
-  const writerTruncated = writerDraft.length > CAP;
-  if (writerTruncated) writerDraft = writerDraft.slice(0, CAP) + '\n…[draft truncated for storage]';
-
-  const mode = params.mode === 'iterate' ? 'iterate' : 'compare';
-  const base = {
-    stageKind: 'outline_review',
-    mode,
-    writerModel,
-    writerModelId: writer.modelId || TEXT_MODELS[writerModel].modelId,
-    writerElapsedMs,
-    writerChars: writerOutput.length,
-    writerTruncated,
-    writerDraft,
-    hintCount,
-  };
-
-  if (mode === 'iterate') {
-    // Repeated reviews: each round's critique feeds the next ("go deeper, only
-    // add what's new"). Per-round model(s) — same or different — test whether
-    // mixing models helps; per-round fix counts show whether it converges.
-    const roundsCfg = Array.isArray(params.rounds) && params.rounds.length ? params.rounds : [{}];
-    const priorCombined = [], priorText = [], priorScene = [];
-    const rounds = [];
-    for (let i = 0; i < roundsCfg.length; i++) {
-      const rc = roundsCfg[i] || {};
-      const startedAt = Date.now();
-      try {
-        if (rc.split) {
-          const textModel = rc.textModel || MODEL_DEFAULTS.outlineReviewModel;
-          const sceneModel = rc.sceneModel || MODEL_DEFAULTS.outlineReviewModel;
-          const [tr, sr] = await Promise.all([
-            runOneReview(textModel, 'text', priorText),
-            runOneReview(sceneModel, 'scene', priorScene),
-          ]);
-          priorText.push(tr.reviewText); priorScene.push(sr.reviewText);
-          const totalFixCount = tr.fixCount + sr.fixCount;
-          rounds.push({ round: i + 1, split: true, text: tr, scene: sr, totalFixCount, converged: totalFixCount === 0, elapsedMs: Date.now() - startedAt });
-        } else {
-          const modelKey = rc.model || MODEL_DEFAULTS.outlineReviewModel;
-          const rev = await runOneReview(modelKey, validAspect(params.aspect), priorCombined);
-          priorCombined.push(rev.reviewText);
-          rounds.push({ round: i + 1, split: false, review: rev, totalFixCount: rev.fixCount, converged: rev.fixCount === 0, elapsedMs: Date.now() - startedAt });
-        }
-      } catch (err) {
-        rounds.push({ round: i + 1, ok: false, error: err.message, elapsedMs: Date.now() - startedAt });
-        break; // later rounds depend on this one's output
-      }
-    }
-    return { ...base, rounds };
-  }
-
-  // Compare mode (default): N models each do ONE review of the same draft, same
-  // aspect, independently — which model reviews best.
-  const aspect = validAspect(params.aspect);
-  const reviewRuns = await Promise.all(models.map(m =>
-    runOneReview(m, aspect, []).catch(err => ({ modelKey: m, ok: false, elapsedMs: 0, error: err.message }))
-  ));
-  return { ...base, aspect, reviewRuns };
-}
 
 /**
  * TEXT REFINEMENT — iterative, full text in / full text out.
  *
- * Distinct from outline_review's `iterate` mode on purpose. There, every round
+ * Distinct from the retired outline_review stage's `iterate` mode on purpose.
+ * There, every round
  * re-reads the SAME writer draft with a growing stack of prior critiques
  * attached, and answers in patches — so the rounds argue with each other's
  * comments instead of building on each other's prose. Here each round receives
@@ -3580,6 +3834,130 @@ async function runOutlineReviewStage(target, { params = {} }) {
  *   to the plan, so a change to the idea GENERATOR can only be measured by
  *   planning the same cast and setting from a different idea.
  */
+/**
+ * Land reviewer rewrites on the expansions. The FIRST reviewer is primary and
+ * fills `reviewedBrief` / `reviewRewrote` (unchanged single-reviewer behaviour);
+ * every OTHER reviewer that passed the truncation guard stores its rewrite in
+ * `reviewedBriefs[modelKey]` so a multi-reviewer fan-out can be judged per
+ * reviewer (scene_hazard_count params.reviewer). A failed reviewer stores
+ * nothing — its pages must never read as reviewed. Pure; unit-tested.
+ */
+function applyReviewerPages(sceneExpansions, sceneReviews) {
+  sceneReviews.forEach((r, i) => {
+    if (!r || r.ok === false || !Array.isArray(r._pages)) return;
+    const byPage = new Map(r._pages.map(x => [x.pageNumber, x.text]));
+    for (const x of sceneExpansions) {
+      const fixed = byPage.get(x.pageNumber);
+      if (!fixed) continue;
+      if (i === 0) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
+      else { (x.reviewedBriefs = x.reviewedBriefs || {})[r.modelKey] = fixed; }
+    }
+  });
+  for (const r of sceneReviews) if (r) delete r._pages;
+}
+
+/**
+ * The all-pages scene expansion, with production's recovery.
+ *
+ * WHY THIS EXISTS - Test Lab experiment 1275 (`beats_scenes`, 16 pages): the Art
+ * Director's all-pages reply was cut mid-JSON inside page 9. The stage took every
+ * `## Page N` chunk verbatim, so it reported sixteen expansions of which seven
+ * were empty and one was half a spec - and the run still read as a success.
+ * An experiment that reports 16 and measured 9 produces conclusions nobody can
+ * trust. Production never had that hole: `beatsPipeline.js` refuses a brief that
+ * fails the scene-brief contract, retries the batch once, and re-expands whatever
+ * is still missing page by page. This is those three guards, calling the SAME
+ * contract helper (`iterateBriefGuard.partitionSceneBriefs`), not a second copy.
+ *
+ * It is dependency-injected - the batch call, the parser, the per-page fallback -
+ * because the stage around it needs a story, a DB and paid models, and the
+ * recovery decisions must be pinnable without any of those.
+ *
+ * @param {object} o
+ * @param {Array<{pageNumber:number}>} o.expected  pages the batch owes
+ * @param {function():Promise<object>} o.callBatch  one paid all-pages call
+ * @param {function(object):Array<{pageNumber:number,text:string}>} o.parsePages
+ * @param {function(object):Promise<object>} o.expandOnePage  per-page fallback
+ * @param {function(object):void} [o.onAttempt]  each reply, before parsing
+ * @param {function(object):number} [o.costOf]
+ * @param {number} [o.attempts=2]  batch attempts, production's number
+ * @returns {Promise<{byPage:Map, recovered:Array, cost:number, lastRes:object|null, attemptsMade:number}>}
+ */
+async function collectAllPagesBriefs(o) {
+  const { partitionSceneBriefs, describeSceneBrief } = require('./iterateBriefGuard');
+  const expected = o.expected || [];
+  const attempts = o.attempts || 2;
+  const costOfRes = o.costOf || (() => 0);
+  // First attempt's pages win, so a retry can only FILL gaps, never rewrite a
+  // page already parsed.
+  const byPage = new Map();
+  let lastRes = null;
+  let cost = 0;
+  let attemptsMade = 0;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    let res;
+    attemptsMade = attempt;
+    try {
+      res = await o.callBatch(attempt);
+    } catch (err) {
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages attempt ${attempt} failed (${err.message}) - falling back to per-page expansion`);
+      break;
+    }
+    lastRes = res;
+    cost += costOfRes(res) || 0;
+    if (o.onAttempt) o.onAttempt(res);
+    const { whole, cut, formatWide } = partitionSceneBriefs(o.parsePages(res) || []);
+    for (const p of (formatWide ? cut : whole)) {
+      if (!byPage.has(p.pageNumber)) byPage.set(p.pageNumber, { text: p.text, res });
+    }
+    if (formatWide) {
+      // Not one page meets the contract: the reply is in a shape the parser does
+      // not know rather than a truncated one, and re-expanding a whole book page
+      // by page would spend a paid call each to get the same shape back.
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: not one of the ${cut.length} brief(s) meets the brief contract (${describeSceneBrief(cut[0].verdict)}) - accepting them as written rather than re-expanding the whole book`);
+    } else if (cut.length > 0) {
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes attempt ${attempt}: incomplete brief(s) - ${cut.map(p => `p${p.pageNumber} (${describeSceneBrief(p.verdict)})`).join('; ')} - treating them as NOT delivered`);
+    }
+    if (byPage.size >= expected.length) break;
+    if (attempt < attempts) {
+      const missingNow = expected.filter(b => !byPage.has(b.pageNumber)).map(b => b.pageNumber);
+      log.error(`\u{1F6A8} [TESTLAB] beats_scenes: all-pages call returned ${byPage.size}/${expected.length} briefs, missing page(s) ${missingNow.join(', ')} - retrying the batch ONCE at full cap`);
+    }
+  }
+
+  // Per-page fallback for whatever the batch still owes. A page that fails here
+  // too stays a NON-result: ok:false and no brief text, so neither the scene
+  // review nor the comparison can mistake half a spec for a measurement.
+  let recovered = [];
+  const stillMissing = expected.filter(b => !byPage.has(b.pageNumber));
+  if (stillMissing.length > 0) {
+    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: ${byPage.size}/${expected.length} briefs after ${attemptsMade} batch attempt(s) - re-expanding page(s) ${stillMissing.map(b => b.pageNumber).join(', ')} per-page`);
+    recovered = await Promise.all(stillMissing.map(b => o.expandOnePage(b)));
+    for (const r of recovered) r.recoveredBy = 'per-page fallback';
+    const okAgain = recovered.filter(r => r.ok).map(r => r.pageNumber);
+    const lost = recovered.filter(r => !r.ok).map(r => r.pageNumber);
+    log.error(`\u{1F6A8} [TESTLAB] beats_scenes: per-page fallback recovered page(s) ${okAgain.length ? okAgain.join(', ') : 'none'}; still missing ${lost.length ? lost.join(', ') : 'none'}`);
+  }
+  return { byPage, recovered, cost, lastRes, attemptsMade };
+}
+
+/**
+ * "N of M pages measured" - the marker a partial beats_scenes run announces
+ * itself with. Null when every page has a brief.
+ */
+function summarizeSceneExpansions(sceneExpansions) {
+  const entries = (sceneExpansions || []).filter(Boolean);
+  const measured = entries.filter(x => x.ok).map(x => x.pageNumber);
+  const missingPages = entries.filter(x => !x.ok).map(x => x.pageNumber);
+  if (missingPages.length === 0) return null;
+  return {
+    measured: measured.length,
+    expected: entries.length,
+    missingPages,
+    message: `${measured.length} of ${entries.length} pages measured - no brief for page(s) ${missingPages.join(', ')} after the batch retry and the per-page fallback. Any conclusion from this run covers only the measured pages.`,
+  };
+}
+
 async function runBeatsScenesStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -3641,9 +4019,11 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   if (!plainStoredBeats) {
     // The planner divides a finished story (2026-08-31): feed it the stored
     // story's arc so the Lab measures the production shape.
+    // Production also passes `arcHints` alongside the arc (beatsPipeline.js:935)
+    // — the "FIX WHILE DIVIDING" block. It was missing here.
     plannerPrompt = buildBeatsPrompt(storyData, pageCount, {
-      finalArc: storyData.arcReviewReport?.finalArc || storyData.beatsReviewReport?.arc
-        || parseBeats(String(storyData.outline || '')).arc || '',
+      finalArc: resolveReplayArc(storyData, { parseBeats }),
+      arcHints: resolveReplayArcHints(storyData),
     });
     if (!plannerPrompt) throw new Error('story-beats template unavailable');
     if (promptOverride) plannerPrompt = promptOverride;
@@ -3690,7 +4070,12 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
   let sceneExpansions = null;
   let sceneReview = null;
   let sceneReviews = null;
+  let authoredBible = null;
   let timeToScenesMs = null;
+  // All-pages batch: dollars across BOTH attempts (a retry that fills no gap
+  // still costs money and must show up somewhere), and the model that answered.
+  let allPagesCost = null;
+  let allPagesModelId = null;
   if (params.expandScenes !== false) {
     const { buildSceneExpansionPrompt, buildAvailableAvatarsForPrompt } = require('./storyHelpers');
     const { callTextModelStreaming: callStream } = require('./textModels');
@@ -3704,6 +4089,47 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
       : '';
     const storedByPage = new Map((storyData.sceneImages || []).map(s => [s.pageNumber, s.sceneDescription || '']));
+
+    // ONE resolver for BOTH Art-Director call shapes in this stage — the
+    // all-pages builder below and the per-page `expandOnePage` fallback. That
+    // is why buildReplaySceneOptions exists: the all-pages sibling was routed
+    // through it and the per-page one was not, so the two measured different
+    // inputs from the same stored story (no clothing contract at all on the
+    // per-page side).
+    const replayScene = buildReplaySceneOptions(storyData, {
+      availableAvatars,
+      maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+      parseBeats,
+    });
+
+    // THE BIBLE THIS RUN AUTHORED, parsed ONCE and read by every consumer in
+    // this stage. Production adopts `adBible.visualBible` before the per-page
+    // fallback runs, "so a recovered page is expanded against the same bible
+    // the batch wrote" (beatsPipeline.js). The Lab had the parse in exactly one
+    // place — the brief pre-check — so the per-page expansion and the pre-check
+    // read different bibles, and the stored one is a different id space
+    // (Lab #1195: findings naming ART002 as an egg while the new bible's ART002
+    // was a coin). The stored bible stays the fallback for a run that authored
+    // none (`params.perPageExpansion`, where no batch call happens at all).
+    //
+    // Declared HERE, above the batch call, on purpose: `expandOnePage` runs as
+    // the batch's recovery callback, so a `let` further down would still be in
+    // its temporal dead zone when the first recovered page asks for the bible.
+    let _runVb;
+    function runVisualBible() {
+      if (_runVb !== undefined) return _runVb;
+      _runVb = storyData.visualBible || null;
+      if (authoredBible?.body) {
+        try {
+          const { UnifiedStoryParser } = require('./outlineParser/unified');
+          const parsed = new UnifiedStoryParser(authoredBible.body).extractVisualBible();
+          if (parsed) _runVb = parsed;
+        } catch (vbErr) {
+          log.warn(`[TESTLAB] beats_scenes: authored bible did not parse (${vbErr.message}) — falling back to the stored bible`);
+        }
+      }
+      return _runVb;
+    }
 
     const expStart = Date.now();
 
@@ -3724,51 +4150,104 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       const allPrompt = buildSceneExpansionAllPrompt(
         { ...storyData, characters: storyData.characters || [], pageClothing: null },
         toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
-        {
-          visualBible: storyData.visualBible || null,
-          availableAvatars,
-          maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
-          clothingRequirements: storyData.clothingRequirements || null,
-        }
+        // No visualBible: the Art Director AUTHORS it now (2026-09-11), ahead
+        // of page 1. The stage still measures the page briefs — parseAll
+        // reads the `## Page N` blocks and ignores the leading sections.
+        //
+        // finalArc comes through the shared resolver: production passes
+        // `finalArc: approvedArc` (beatsPipeline.js:1511) and this stage passed
+        // nothing, so FINAL_ARC rendered as "(no arc was recorded for this
+        // story)" on every run while production's Art Director staged each page
+        // with the whole arc in view. It is the SAME arc the stage already hands
+        // its own planner above — one expression for both, now.
+        replayScene
       );
       if (allPrompt) {
         const tAll = Date.now();
-        const res = await callStream(allPrompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
-          usageLabel: 'testlab_beats_scene_expansion_all',
-          ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+        // TRUNCATION RECOVERY - production's three guards, in the Lab.
+        const collected = await collectAllPagesBriefs({
+          expected: toExpand,
+          callBatch: () => callStream(allPrompt, null, null, params.sceneModel || MODEL_DEFAULTS.sceneDescription, {
+            usageLabel: 'testlab_beats_scene_expansion_all',
+            ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
+          }),
+          parsePages: (res) => (parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES').pages || []),
+          costOf,
+          // The bible this call AUTHORS, kept on the result. Without it the stage
+          // measures page briefs written against a bible nobody can read back,
+          // and a bible fault in a Lab run is invisible. The first attempt that
+          // carries one wins, exactly as production's `adBible` does.
+          onAttempt: (res) => {
+            if (authoredBible) return;
+            try {
+              const { extractBibleSections, AD_BIBLE_MARKERS } = require('./beatsPipeline');
+              authoredBible = extractBibleSections(res.text || '', AD_BIBLE_MARKERS) || null;
+            } catch (err) {
+              log.warn(`[TESTLAB] beats_scenes: could not extract the authored bible (${err.message})`);
+            }
+          },
+          expandOnePage,
         });
-        const parsedAll = parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES');
-        const byPage = new Map((parsedAll.pages || []).map(x => [x.pageNumber, x.text]));
-        sceneExpansions = toExpand.map(b => ({
-          pageNumber: b.pageNumber,
-          ok: byPage.has(b.pageNumber),
-          elapsedMs: Date.now() - tAll,
-          modelId: res.modelId,
-          provider: res.provider || null,
-          usage: res.usage,
-          cost: costOf(res),
-          promptChars: allPrompt.length,
-          prompt: allPrompt,
-          fromBeats: String(byPage.get(b.pageNumber) || '').slice(0, 20000),
-          storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
-          ...(byPage.has(b.pageNumber) ? {} : { error: 'page missing from the all-pages response' }),
-        }));
+        sceneExpansions = toExpand
+          .filter(b => collected.byPage.has(b.pageNumber))
+          .map(b => {
+            const hit = collected.byPage.get(b.pageNumber);
+            return {
+              pageNumber: b.pageNumber,
+              ok: true,
+              elapsedMs: Date.now() - tAll,
+              modelId: hit.res.modelId,
+              provider: hit.res.provider || null,
+              usage: hit.res.usage,
+              cost: costOf(hit.res),
+              promptChars: allPrompt.length,
+              prompt: allPrompt,
+              fromBeats: String(hit.text || '').slice(0, 20000),
+              storedProduction: (storedByPage.get(b.pageNumber) || '').slice(0, 20000),
+            };
+          })
+          .concat(collected.recovered.map(r => ({
+            ...r,
+            storedProduction: (storedByPage.get(r.pageNumber) || '').slice(0, 20000),
+          })))
+          .sort((a, b) => a.pageNumber - b.pageNumber);
+        allPagesCost = collected.cost;
+        allPagesModelId = collected.lastRes?.modelId || null;
         timeToScenesMs = Date.now() - lockStart;
       }
     }
 
-    if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(async b => {
+    // Per-page expansion. TWO callers: the historical per-page comparison
+    // (params.perPageExpansion) and the all-pages RECOVERY above — production
+    // re-expands a missing page exactly this way (beatsPipeline.js
+    // `expandOnePage`), so the Lab's fallback is the same call, not a copy of a
+    // different one. A function DECLARATION so the block above can call it.
+    async function expandOnePage(b) {
       // BEAT + PLAN line stands in for page.text. No rawOutlineContext: in a
       // beats-first run there is no outline block yet, so this measures the
       // Art Director working from the plan alone.
       const pageContent = `PLAN: ${b.planLine || ''}`;
       const prompt = buildSceneExpansionPrompt(
         b.pageNumber, pageContent, storyData.characters || [], lang,
-        storyData.visualBible || null, availableAvatars, null,
+        runVisualBible(), replayScene.availableAvatars, null,
         {
-          maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3,
+          maxCharactersPerScene: replayScene.maxCharactersPerScene,
           artStyleId: storyData.artStyle,
           imageBackend: imgModelConfig?.backend,
+          // THE TWO OPTIONS PRODUCTION PASSES AND THIS CALL DID NOT
+          // (beatsPipeline.js `expandOnePage`). Both are measurable in the
+          // built prompt, on every page:
+          //   - `clothingRequirements` — the per-page fallback attaches no
+          //     referencePhotos, so the contract is the ONLY outfit source.
+          //     Without it every character's CHARACTER DETAILS line ended at
+          //     its face and carried no `Wearing:` clause at all.
+          //   - `story` — decides the book's SEASON and whether the text-zone
+          //     rule family is asked for. With neither, `seasonLabel` fell back
+          //     to TODAY's date (a summer story replayed in September was told
+          //     "the season is Autumn on every page") and the text-zone rules
+          //     were always on, where 94 of 118 recent stories gate them off.
+          clothingRequirements: replayScene.clothingRequirements,
+          story: storyData,
         }
       );
       const t = Date.now();
@@ -3796,7 +4275,9 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       } catch (err) {
         return { pageNumber: b.pageNumber, ok: false, elapsedMs: Date.now() - t, error: err.message };
       }
-    }));
+    }
+
+    if (!sceneExpansions) sceneExpansions = await Promise.all(toExpand.map(expandOnePage));
     // ── Step 4: ONE review over ALL scene briefs ──────────────────────────
     // Repetition between pages, visual arc and continuity are invisible to a
     // per-scene reviewer — they only exist across the set — so every brief goes
@@ -3820,9 +4301,20 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       // finding changes what it rewrites: exp 821 produced four two-action pages
       // and the review prompt carried no BRIEF FAULTS block at all.
       let briefFindings = '';
+      // CHECK THE BIBLE THIS RUN AUTHORED, not the one the story shipped with
+      // (2026-09-12). The Art Director writes a fresh bible ahead of page 1, so
+      // the stored one is a different id space: on Lab #1195 the findings named
+      // "The Dragon Egg (ART002)" while the new bible's ART002 was a coin, no
+      // finding could name it by an id that meant the same thing in both
+      // bibles, and the reviewer was told to drop an element by an id that
+      // meant something else in its own bible. Declared out here so the
+      // scene-review prompt below gets the SAME bible the pre-check read —
+      // production passes it (beatsPipeline.js) and a Lab that did not would
+      // stop reproducing the review it is measuring. `runVisualBible` is the
+      // one parse, shared with the per-page expansion above.
+      const vb = runVisualBible();
       try {
         const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
-        const vb = storyData.visualBible || null;
         const secondaryList = Array.isArray(vb?.secondaryCharacters)
           ? vb.secondaryCharacters : Object.values(vb?.secondaryCharacters || {});
         const seen = new Set();
@@ -3843,44 +4335,51 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       }
       // finalBeats feeds the review's check 5 (character in beat vs brief),
       // same as the production callsite in beatsPipeline.js.
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings });
+      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings, visualBible: vb });
       if (srPrompt) {
         const reviewOnce = async (srModel) => {
           const t2 = Date.now();
           try {
-            const srRes = await callStream(srPrompt, 16000, null, srModel, { usageLabel: 'testlab_scene_review' });
+            // null = model max, exactly as production (beatsPipeline.js). The
+            // former 16000 cap silently truncated 6 of 8 reviews in the
+            // 2026-09-10 AD redo (1107-1124) — no error, briefs kept as raw.
+            const srRes = await callStream(srPrompt, null, null, srModel, { usageLabel: 'testlab_scene_review' });
             const parsed = parseRefinedText(srRes.text || '', expectedPages, 'SCENES');
+            const outTok = srRes.usage?.output_tokens ?? null;
+            const capInForce = TEXT_MODELS[srModel]?.maxOutputTokens ?? null;
+            const verdict = assessSceneReview({
+              text: srRes.text, outputTokens: outTok, stopReason: srRes.stop_reason || null,
+              capInForce, parsedPageCount: parsed.pages.length,
+            });
+            if (!verdict.ok) {
+              log.warn(`⚠️ [TESTLAB] beats_scenes scene review FAILED (story ${target.storyId}, reviewer ${srModel} → ${srRes.modelId || '?'} via ${srRes.provider || '?'}, out ${outTok ?? '?'} tok, cap ${capInForce ?? '?'}): ${verdict.error}`);
+            }
             return {
               modelKey: srModel,
               modelId: srRes.modelId,
               provider: srRes.provider || null,
+              ok: verdict.ok,
+              error: verdict.error,
               elapsedMs: Date.now() - t2,
               ttftMs: srRes.ttft ?? null,
               usage: srRes.usage,
+              stopReason: srRes.stop_reason || null,
+              capInForce,
               cost: costOf(srRes),
               promptChars: srPrompt.length,
               prompt: srPrompt,
+              // Storage clip only (dev-panel display) — not a model truncation.
               rawResponse: (srRes.text || '').slice(0, 40000),
               analysis: (parsed.analysis || '').slice(0, 40000),
-              rewrotePages: parsed.pages.map(x => x.pageNumber),
-              _pages: parsed.pages,
+              rewrotePages: verdict.ok ? parsed.pages.map(x => x.pageNumber) : [],
+              _pages: verdict.ok ? parsed.pages : [],
             };
           } catch (err) {
             return { modelKey: srModel, ok: false, elapsedMs: Date.now() - t2, error: err.message };
           }
         };
         sceneReviews = await Promise.all(srModels.map(reviewOnce));
-        // Only the FIRST reviewer's rewrites land on the briefs — with several
-        // arms their outputs conflict, and the comparison lives in sceneReviews.
-        const primary = sceneReviews[0];
-        if (primary && primary._pages) {
-          const byPage = new Map(primary._pages.map(x => [x.pageNumber, x.text]));
-          for (const x of sceneExpansions) {
-            const fixed = byPage.get(x.pageNumber);
-            if (fixed) { x.reviewedBrief = fixed; x.reviewRewrote = true; }
-          }
-        }
-        for (const r of sceneReviews) delete r._pages;
+        applyReviewerPages(sceneExpansions, sceneReviews);
         sceneReview = sceneReviews[0] || null;
       }
     }
@@ -3888,11 +4387,25 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     timeToScenesMs = timeToLockMs + (Date.now() - expStart);
   }
 
+  // "N of M pages measured", impossible to miss. The stage's own `ok` is set by
+  // the runner (a stage that returns is a stage that ran), so a partial result
+  // announces itself HERE instead - the panel renders it as a red banner above
+  // everything else. Silent partial success is the defect this closes:
+  // experiment 1275 reported 16 pages and had measured 9.
+  const sceneExpansionIncomplete = summarizeSceneExpansions(sceneExpansions);
+  if (sceneExpansionIncomplete) {
+    log.error(`\u{1F6A8} [TESTLAB] beats_scenes INCOMPLETE: ${sceneExpansionIncomplete.message}`);
+  }
+
   return {
     stageKind: 'beats_scenes',
     sceneExpansions,
+    sceneExpansionIncomplete,
+    allPagesCost,
+    allPagesModelId,
     sceneReview,
     sceneReviews,
+    authoredBible,
     timeToScenesMs,
     storyId: target.storyId,
     title: storyData.title || null,
@@ -3966,8 +4479,9 @@ async function runTextRefineStage(target, { params = {}, promptOverride = null }
     refineAudits: res.audits,
     refineMerged: res.mergedFindings,
     refineMergeStats: res.mergeStats,
-    // NOT `rounds` — outline_review's iterate mode already returns that key with
-    // a different shape, and both land in the same ExperimentResult.
+    // NOT `rounds` — the retired outline_review stage's iterate mode returns
+    // that key with a different shape in STORED rows, and both land in the same
+    // ExperimentResult.
     refineRounds: res.rounds,
     finalPages: res.pages.map((p, idx) => ({
       pageNumber: p.pageNumber,
@@ -4257,6 +4771,7 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
     // refs + its scene era, so Lab repair stages reproduce production.
     landmarkPhotos: ctx.scene.landmarkPhotos || null,
     era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+    sceneMetadata: ctx.scene.sceneMetadata || null,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.repaired || !result?.imageData) {
@@ -4300,14 +4815,36 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   const { MODEL_DEFAULTS } = require('../config/models');
   const { storyData, userId } = await loadStoryDataFull(ctx.storyId, { rehydrate: false });
 
-  const scene = ctx.scene || {};
+  // Lab-only: composite a NEW brief (e.g. a fresh Art-Director output) without a
+  // story rerun — the same knob the image stage has. The override replaces the
+  // stored brief and its metadata; everything else on the page stays as stored.
+  let scene = ctx.scene || {};
+  if (typeof params.sceneDescriptionOverride === 'string' && params.sceneDescriptionOverride.trim()) {
+    const { extractSceneMetadata } = require('./storyHelpers');
+    const meta = extractSceneMetadata(params.sceneDescriptionOverride);
+    scene = { ...scene, sceneDescription: params.sceneDescriptionOverride, sceneMetadata: meta,
+      sceneCharacters: meta?.fullData?.characters || meta?.characters || scene.sceneCharacters,
+      emptyScenePrompt: meta?.emptyScenePrompt || meta?.fullData?.emptyScenePrompt || scene.emptyScenePrompt,
+      compositeBrief: null };
+    log.info('[TESTLAB] composite: staging from sceneDescriptionOverride, not the stored brief');
+  }
   const fd = scene.sceneMetadata?.fullData || scene.sceneMetadata || {};
   const strategy = params.strategy === 'stratified' ? 'stratified' : 'uniform';
   const facing = params.facing === 'derive' ? 'derive' : 'threeQuarter';
   const wantBlend = params.blend !== false;
   // 'paste' composites cut-outs and blends; 'charRepair' hands each silhouette
   // to the production character-repair call instead.
-  const figureMethod = params.figureMethod === 'charRepair' ? 'charRepair' : 'paste';
+  // 'inPlace' renders each figure over its silhouette on the original plate,
+  // cuts it out with DINO+SAM and pastes it (no blend).
+  const figureMethod = ['charRepair', 'inPlace'].includes(params.figureMethod) ? params.figureMethod : 'paste';
+  // inPlace only: Image 2 is the whole 2x4 sheet ('sheet', production) or the
+  // one cell matching the cast entry's pose ('cell', owner's design 2026-09-11).
+  const refMode = params.refMode === 'cell' ? 'cell' : 'sheet';
+  // A secondary character staged on the page but without a bible reference
+  // image cannot be cast (nothing to render it from) and is not an animal, so
+  // production paints it nowhere. 'plate' hands it to the plate's creature
+  // block, painted from its description. Default 'omit' = production parity.
+  const unreferencedSecondaries = params.unreferencedSecondaries === 'plate' ? 'plate' : 'omit';
 
   const cast = await buildCompositeCast({
     sceneMetadata: scene.sceneMetadata,
@@ -4326,6 +4863,14 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   });
 
   if (!cast || !cast.length) throw new Error('composite cast is empty — page has no scene characters, or no story avatar sheets');
+  // Lab-only: replace a character's silhouette action text ({ "Name": "seated in the rowing boat" }).
+  // The silhouette line is built from cast[].action; this is how "in the boat" reaches the plate.
+  if (params.castActionOverrides && typeof params.castActionOverrides === 'object') {
+    for (const c of cast) {
+      const o = Object.entries(params.castActionOverrides).find(([n]) => String(n).toLowerCase() === String(c.name || '').toLowerCase());
+      if (o) { c.action = String(o[1]); log.info(`[TESTLAB] composite cast action override: ${c.name} -> "${c.action}"`); }
+    }
+  }
 
   // Facing. Scene-expansion emits no `pose` today (verified: 0 of 23 scene
   // characters on a real story), so production — the composite AND normal page
@@ -4361,7 +4906,16 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
       ctx.visualBible || null,
       ctx.pageNumber,
       ctx.referencePhotos || null,
-      { skipVisualBible: true },
+      {
+        skipVisualBible: true,
+        // EMPTY ON PURPOSE, not omitted (2026-09-18). `vbRefElementIds` names
+        // the elements whose reference render rides with the call, and this
+        // prompt is handed to the blend pass, whose only images are the pasted
+        // canvas and — where one exists — `ctx.visualBibleGrid`, which
+        // loadSceneContext never sets. Nothing element-shaped is attached, so
+        // the REQUIRED OBJECTS block must not claim a reference for anything.
+        vbRefElementIds: [],
+      },
     );
   } catch (err) {
     log.warn(`[TESTLAB] could not rebuild the page prompt (${err.message}) — blend falls back to the legacy brief`);
@@ -4382,7 +4936,12 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   // came back photorealistic. Both halves are load-bearing, and the budget
   // fits: ~4000 setting + ~1300 prompt head + ~250 per cast entry stays under
   // Grok's 8000-char limit for a five-character page.
-  const rawBg = String(scene.emptyScenePrompt || fd.emptyScenePrompt || scene.sceneDescription || '');
+  // Lab-only knob (2026-09-10): a plate description to build the silhouette
+  // plate from, instead of the page's stored emptyScenePrompt. A page that
+  // shared another page's vantage canvas stores THAT page's plate prompt,
+  // so "run the composite on the correct world" needs the correct words
+  // handed in. Production behaviour is untouched.
+  const rawBg = String(params.plateDescriptionOverride || scene.emptyScenePrompt || fd.emptyScenePrompt || scene.sceneDescription || '');
   const cleanBackgroundPrompt = rawBg.slice(0, 5000);
 
   const usage = [];
@@ -4419,15 +4978,17 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     let promptOverride = params.blendPrompt || null;
     if (params.blendMode === 'evalRepair') {
       const { evaluateImageQuality } = require('./evalPipeline');
+      // Production's option set (buildEvalReplayOptions). A replayed paste
+      // canvas has no detection for its bytes, so the figure count is withheld.
+      // This arm feeds the evaluator's findings straight into a PAID repair
+      // call, so a finding invented against an unstripped clothing contract is
+      // an order to repaint a garment the brief deliberately removed.
+      const replay = buildEvalReplayOptions(ctx, { detectedFigures: null });
       const ev = await evaluateImageQuality(
-        img.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), 'scene',
+        img.imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}-composite`,
         ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
-        {
-          artStyle: require('../services/prompts').resolveEvalArtStyle(ctx.artStyle, ctx.scene.prompt || null),
-          landmarkPhotos: ctx.scene.landmarkPhotos || null,
-          era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
-        },
+        replay.options,
       );
       if (!ev) throw new Error('evalRepair: the evaluator returned nothing');
       const RANK = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1 };
@@ -4504,10 +5065,29 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
         aborted.push({ label, imageType: 'tl_step', versionIndex: v });
       } catch (e) { log.warn(`[TESTLAB] abort step "${label}" not saved: ${e.message}`); }
     }
+    // In-place intermediates survive an all-or-nothing abort too: exp 1156
+    // placed 2/4 and left no trace of WHY the other two were refused - warn
+    // lines are not in logLines, and the renders were never saved.
+    const saveAborted = async (uri, label) => {
+      if (typeof uri !== 'string' || !uri.startsWith('data:image')) return;
+      try {
+        const v = await saveTestVersion(ctx.storyId, 'tl_step', ctx.pageNumber, uri, experimentId);
+        aborted.push({ label, imageType: 'tl_step', versionIndex: v });
+      } catch (e) { log.warn(`[TESTLAB] abort step "${label}" not saved: ${e.message}`); }
+    };
+    for (const [name, v] of Object.entries(adbg.inPlaceRefs || {})) await saveAborted(v?.ref, `· reference sent for ${name} (${v?.kind || 'unknown'})`);
+    for (const [name, v] of Object.entries(adbg.inPlaceRenders || {})) {
+      for (const a of (Array.isArray(v?.attempts) ? v.attempts : [])) {
+        const rz = a.residue ? `, unchanged ${Math.round(a.residue.unchanged * 100)}%, flat ${Math.round(a.residue.flatSaturated * 100)}%${a.residue.rejected ? ', PLACEHOLDER UNPAINTED' : ''}` : '';
+        await saveAborted(a.render, `· in-place render for ${name}, attempt ${a.attempt} (height ${a.ratio}x, IoU ${a.iou}${rz}${a.ok ? ', accepted' : ''})`);
+      }
+    }
+    for (const [name, uri] of Object.entries(adbg.cutouts || {})) await saveAborted(uri, `· cut-out used for ${name}`);
     err.partialResult = {
       ...(err.partialResult || {}),
       steps: aborted,
       aborted: true,
+      inPlaceLog: adbg.inPlaceLog || null,
       depthSpread: adbg.depthSpread ?? null,
       populatedPlatePrompt: adbg.populatedPlatePrompt || null,
       cleanBackgroundPrompt: adbg.cleanBackgroundPrompt || null,
@@ -4519,6 +5099,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     compositeStrategy: strategy,
     cast, frontCast, backCast,
     scene: compositeScene,
+    // The bible, so the blend prompt can name what a finding cites instead of leaking an id.
+    visualBible: storyData.visualBible || null,
+    // Lab-only: per-figure phantom-pose render (a seated silhouette gets a seated figure,
+    // not a standing cell). Production never passes it; the builder's default false stands.
+    phantomPoseRender: params.phantomPoseRender === true,
     cleanBackgroundPrompt,
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
     skipBlend: !wantBlend,
@@ -4527,7 +5112,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     // plate the pipeline would build, or a composite bug shows up in one and
     // not the other.
     sceneCreatures: require('./visualBible')
-      .resolveSceneCreatures(storyData.visualBible, fd.objects || [], ctx.pageNumber),
+      .resolveSceneCreatures(storyData.visualBible, fd.objects || [], ctx.pageNumber)
+      .concat(unreferencedSecondaries === 'plate'
+        ? require('./compositeCastBuilder').unreferencedSecondaryCreatures(fd, storyData.visualBible || null)
+        : []),
+    refMode,
     figureDetect: params.figureDetect === 'diff' ? 'diff' : 'dino',
     usageTracker: (provider, u, fnName, modelId) => usage.push({ provider, fn: fnName, modelId, cost: u?.cost || 0 }),
     });
@@ -4551,7 +5140,9 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     ['cleanBackground', '2 · depopulated (silhouettes removed)'],
     ['composited', figureMethod === 'charRepair'
       ? '3 · after character repair (all figures)'
-      : '3 · avatar cut-outs pasted (raw, pre-blend)'],
+      : figureMethod === 'inPlace'
+        ? '3 · figures rendered in place, cut and pasted'
+        : '3 · avatar cut-outs pasted (raw, pre-blend)'],
   ];
   const saveStep = async (uri, label) => {
     if (typeof uri !== 'string' || !uri.startsWith('data:image')) return;
@@ -4574,7 +5165,23 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   }
   // Phantom-pose renders when that path is on.
   for (const [name, v] of Object.entries(dbg.phantomPoseRenders || {})) {
+    await saveStep(v?.phantomCrop, `· phantom crop sent for ${name}`);
     await saveStep(v?.output, `· phantom-pose render for ${name}`);
+  }
+  // In-place: the reference actually sent as Image 2 (whole sheet, one cell, or a bible image).
+  for (const [name, v] of Object.entries(dbg.inPlaceRefs || {})) {
+    await saveStep(v?.ref, `· reference sent for ${name} (${v?.kind || 'unknown'})`);
+  }
+  // In-place renders (figureMethod 'inPlace'): the full plate with one figure painted.
+  for (const [name, v] of Object.entries(dbg.inPlaceRenders || {})) {
+    // Every attempt, not only the kept one: a re-render is a judgement to check.
+    const tries = Array.isArray(v?.attempts) && v.attempts.length > 1 ? v.attempts : null;
+    if (tries) {
+      for (const a of tries) await saveStep(a.render, `· in-place render for ${name}, attempt ${a.attempt} (height ${a.ratio}x, IoU ${a.iou}${a.residue ? `, unchanged ${Math.round(a.residue.unchanged * 100)}%, flat ${Math.round(a.residue.flatSaturated * 100)}%${a.residue.rejected ? ', PLACEHOLDER UNPAINTED' : ''}` : ''}${a.ok ? ', accepted' : ''})`);
+    } else {
+      const a = Array.isArray(v?.attempts) ? v.attempts[0] : null;
+      await saveStep(v?.render, `· in-place render for ${name}${a?.residue ? ` (unchanged ${Math.round(a.residue.unchanged * 100)}%, flat ${Math.round(a.residue.flatSaturated * 100)}%${a.residue.rejected ? ', PLACEHOLDER UNPAINTED' : ''})` : ''}`);
+    }
   }
 
   const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, res.imageData, experimentId);
@@ -4587,9 +5194,12 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
     strategy,
     facing,
     figureMethod,
+    refMode: figureMethod === 'inPlace' ? refMode : undefined,
+    unreferencedSecondaries,
     detector: (res.debug || {}).detector || null,
-    blended: figureMethod === 'charRepair' ? false : wantBlend,
+    blended: figureMethod === 'paste' ? wantBlend : false,
     charRepairLog: (res.debug || {}).charRepairLog || null,
+    inPlaceLog: (res.debug || {}).inPlaceLog || null,
     modelCalls: usage.length,
     cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
     cast: cast.map(c => ({
@@ -4670,10 +5280,20 @@ async function runRepairRoundStage(ctx, { experimentId, params = {} }) {
   if (params.freshEval) {
     const { evaluateImageQuality } = require('./images');
     const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+    // Production's option set (buildEvalReplayOptions). This site passed the
+    // three thinnest keys of all five, so the eval that decides the repair
+    // ROUTE ran with no bible, no wardrobe, no cast index, no art style and no
+    // landmark protection — a decision-reliability run measured a decision
+    // production never makes. The stored detection belongs to the ACTIVE image,
+    // which is what is being evaluated here.
+    const replay = buildEvalReplayOptions(ctx, {
+      detectedFigures: ctx.scene.bboxDetection?.figures || null,
+    });
     const fresh = await evaluateImageQuality(
-      imageData, ctx.scene.sceneDescription, ctx.referencePhotos, 'scene',
+      imageData, evalSceneDescription(ctx), evalReferencePhotos(ctx), replay.evaluationType,
       null, `testlab-exp${experimentId}-P${ctx.pageNumber}-decide`,
-      ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null
+      ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+      replay.options
     );
     if (!fresh) throw new Error('Fresh evaluation returned null');
     // Production stamps the consolidated plan onto the eval at scoring time;
@@ -4820,12 +5440,17 @@ async function runScaleRepairStage(ctx, { experimentId, params = {} }) {
   const { extractSceneMetadata } = require('./storyHelpers');
 
   const sceneMetadata = ctx.scene.sceneMetadata || extractSceneMetadata(ctx.scene.sceneDescription || '') || {};
-  if (!needsScaleRepair(sceneMetadata)) {
+  // THE CAST LIST, as both production sites pass it. Without it the trigger
+  // counts figures the composite cannot draw — a Visual Bible secondary the
+  // scene reviewer promoted into characters[] passes the count and then resolves
+  // to nothing — so the Lab answered a different question from production.
+  const castable = ctx.characters || [];
+  if (!needsScaleRepair(sceneMetadata, castable)) {
     throw new Error('Scene does not need scale repair (no depth=background characters in metadata)');
   }
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const t0 = Date.now();
-  const result = await runScaleRepair(imageData, sceneMetadata, { pageNumber: ctx.pageNumber });
+  const result = await runScaleRepair(imageData, sceneMetadata, { pageNumber: ctx.pageNumber, castableCharacters: castable });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('scale repair produced no image');
 
@@ -4920,7 +5545,7 @@ async function runSceneExpansionStage(ctx, { experimentId, promptOverride, param
   }
 
   const t0 = Date.now();
-  const result = await callTextModel(prompt, 10000, null, { usageLabel: 'testlab_scene_expansion' });
+  const result = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_expansion' });
   const elapsedMs = Date.now() - t0;
   return {
     elapsedMs, modelId: result.modelId || null, promptUsed: prompt,
@@ -4990,8 +5615,8 @@ async function runSceneExpansionAbStage(ctx, { experimentId, promptOverride, par
 
   const t0 = Date.now();
   const [resA, resB] = await Promise.all([
-    callTextModel(promptA, 10000, null, { usageLabel: 'testlab_scene_expansion_ab' }),
-    callTextModel(promptB, 10000, null, { usageLabel: 'testlab_scene_expansion_ab' }),
+    callTextModel(promptA, null, null, { usageLabel: 'testlab_scene_expansion_ab' }),
+    callTextModel(promptB, null, null, { usageLabel: 'testlab_scene_expansion_ab' }),
   ]);
 
   // Render each variant's scene description through the standard image stage
@@ -5075,7 +5700,7 @@ async function runSceneVariantStage(ctx, { experimentId, promptOverride, params 
   }
 
   const t0 = Date.now();
-  const res = await callTextModel(prompt, 10000, null, { usageLabel: 'testlab_scene_variant' });
+  const res = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_variant' });
   const img = await runImageStage(
     { ...ctx, scene: { ...ctx.scene, sceneDescription: res.text } },
     { experimentId, autoEval: params.autoEval !== false, params: {} }
@@ -5114,20 +5739,42 @@ async function runSceneDescriptionStage(ctx, { experimentId, promptOverride, par
     ? buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
     : '';
 
+  // THE PAGE'S PLAN LINE. Ten positional arguments left `rawOutlineContext`
+  // (the 11th) on its default, and images.js:3884 names exactly what that
+  // costs: "with a null, buildSceneDescriptionPrompt fills the authoritative
+  // SCENE_SUMMARY slot from the previous brief's own imageSummary, and the
+  // rewrite has no narrative anchor outside the artefact it is rewriting."
+  // The endpoint this stage replays passes `planLine ? { planLine } : null`
+  // (regeneration.js), through the same resolver.
+  const storedScene = (storyData.sceneDescriptions || []).find(sc => sc.pageNumber === ctx.pageNumber) || null;
+  const storedImage = (storyData.sceneImages || []).find(si => si.pageNumber === ctx.pageNumber) || null;
+  const { resolvePlanLine } = require('./iterateBeat');
+  const planLine = resolvePlanLine(storedScene, storedImage);
+  if (!planLine) {
+    log.warn(`[TESTLAB] scene_description P${ctx.pageNumber}: no stored plan line — the rewrite runs on the previous brief alone, exactly as the endpoint warns`);
+  }
+
   let prompt;
   const orig = PROMPT_TEMPLATES.sceneDescriptions;
   if (promptOverride) PROMPT_TEMPLATES.sceneDescriptions = promptOverride;
   try {
     prompt = buildSceneDescriptionPrompt(
       ctx.pageNumber, ctx.scene.text || '', storyData.characters || [], '',
-      ctx.language, ctx.visualBible, [], 'standard', '', availableAvatars
+      ctx.language, ctx.visualBible, [], 'standard', '', availableAvatars,
+      planLine ? { planLine } : null,
+      null,
+      // clothingRequirements so each character's CHARACTER DETAILS line carries
+      // its outfit TEXT. Without it the block ends at the face and every
+      // `Wearing:` clause is gone — the same omission the all-pages Art
+      // Director builder was fixed for.
+      { clothingRequirements: storyData.clothingRequirements || null }
     );
   } finally {
     PROMPT_TEMPLATES.sceneDescriptions = orig;
   }
 
   const t0 = Date.now();
-  const result = await callClaudeAPI(prompt, 10000, resolveSceneIterationModel(), {
+  const result = await callClaudeAPI(prompt, null, resolveSceneIterationModel(), {
     prefill: '{"previewMismatches":[', usageLabel: 'testlab_scene_description',
   });
   const elapsedMs = Date.now() - t0;
@@ -5889,7 +6536,7 @@ async function runRewriteBlockedStage(ctx, { experimentId, promptOverride, param
   const prompt = fillTemplate(template, { SCENE_DESCRIPTION: ctx.scene.sceneDescription || '' });
 
   const t0 = Date.now();
-  const result = await callTextModel(prompt, 1000, null, { usageLabel: 'testlab_scene_rewrite' });
+  const result = await callTextModel(prompt, null, null, { usageLabel: 'testlab_scene_rewrite' });
   return {
     elapsedMs: Date.now() - t0,
     promptUsed: prompt,
@@ -6102,8 +6749,9 @@ async function runAvatarEvalStage(target, { experimentId, promptOverride, params
     ];
   } else {
     ({ verdict: evalResult } = await _internal.evaluateAvatarSheet(sheetForDisplay, {
+      // No costumeDescription: pass 2 is a style transfer and its judge does
+      // not score the outfit (that axis lives on pass 1).
       pass: 2, facePhoto, realisticSheet: realistic, artStyle,
-      costumeDescription: costume.description || 'standard outfit',
       declaredAge: params.declaredAge ?? null, model, promptOverride,
     }));
   }
@@ -6178,7 +6826,7 @@ async function runEmptySceneAdherenceStage(ctx, { experimentId }) {
 
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 1500, thinkingConfig: { thinkingBudget: 0 } } }),
+    body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } } }),
     signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) throw new Error(`Gemini judge HTTP ${res.status}`);
@@ -6340,7 +6988,9 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY not configured');
 
-  const imageDataUri = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // A pinned target version is the case: comparing describers on a page whose
+  // active version is a repaired render answers a different question.
+  const imageDataUri = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
   if (!imageDataUri) throw new Error(`No image for page ${ctx.pageNumber}`);
   // The image ALONE — every arm here is a blind describer.
   const parts = [{
@@ -6371,6 +7021,8 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
         res = await runVisualInventory(parts, modelId, apiKey, label, {
           promptOverride: arm.template,
           raw: true,
+          // params.reasoning measures what thinking costs on a describe-only pass.
+          ...(params.reasoning ? { reasoning: params.reasoning } : {}),
         });
       } catch (e) {
         log.warn(`[INVENTORY-AB] ${label} failed: ${e.message}`);
@@ -6395,6 +7047,11 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
         ...scoreArm(arm.key, parsed, rawText),
         inputTokens: res.inputTokens || 0,
         outputTokens: res.outputTokens || 0,
+        // The model that ANSWERED, not the one the experiment asked for. The
+        // inventory falls back to gemini-2.5-flash on any OpenRouter failure,
+        // so without this an arm can silently be the fallback and the row still
+        // reads as the requested model (#1241).
+        servedByModel: res.servedByModel || modelId,
         jsonParsed: arm.json ? parsed != null : null,
         output: rawText,
       });
@@ -6459,6 +7116,7 @@ const STAGE_RUNNERS = {
   eval_variance: runEvalVarianceStage,
   semantic_eval: runSemanticEvalStage,
   bbox: runBboxStage,
+  identity_second_opinion: runIdentitySecondOpinionStage,
   char_repair: runCharRepairStage,
   entity: runEntityStage,
   text_zone: runTextZoneStage,
@@ -6564,11 +7222,64 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     .match(/---\s*BEATS\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]+---|$)/i) || [])[1] || '';
   const outlineBeats = parseBeats(beatsSection).pages;
 
+  // BRIEF CONTRADICTIONS — the fourth option production passes, and the last
+  // one this stage was missing (the bible half was closed a day earlier in
+  // e1430bb99; clothing and beats were already here). Deterministic, so a
+  // replay regenerates the same block production computed: prose against the
+  // brief's own metadata, the cast (roster + bible secondaries) and the bible,
+  // with the plan line carrying the element-coverage check. Without it
+  // {BRIEF_FINDINGS} filled empty and the replay could not reproduce a single
+  // cast_unlisted / vb_state_* / vb_page_uncited rewrite the production run
+  // made — the stage measures the reviewer, and it was measuring it on less
+  // than the reviewer is given.
+  let briefFindingsBlock = '';
+  try {
+    const { checkScenes: checkBriefs, renderFindingsBlock: renderBriefBlock } = require('./sceneBriefCheck');
+    const { textZoneRulesActive } = require('../config/runtime');
+    const planLineOf = (pageNumber) => (outlineBeats.find(b => b && b.pageNumber === pageNumber) || {}).planLine || '';
+    // Same cast list as beatsPipeline: the uploaded roster PLUS the bible's
+    // secondaries, or a figure the story invented can never trigger cast_unlisted.
+    const secondaryList = Array.isArray(storyData.visualBible?.secondaryCharacters)
+      ? storyData.visualBible.secondaryCharacters
+      : Object.values(storyData.visualBible?.secondaryCharacters || {});
+    const seenCast = new Set();
+    const castNames = [
+      ...(storyData.characters || []).map(c => c && c.name),
+      ...secondaryList.map(c => c && c.name),
+    ].filter(Boolean).filter((n) => {
+      const k = String(n).trim().toLowerCase();
+      if (!k || seenCast.has(k)) return false;
+      seenCast.add(k);
+      return true;
+    });
+    const briefRes = checkBriefs(
+      scenes.map(x => ({ pageNumber: x.pageNumber, brief: x.brief, planLine: planLineOf(x.pageNumber) })),
+      castNames,
+      storyData.visualBible,
+      { textZoneRules: textZoneRulesActive(storyData) }
+    );
+    briefFindingsBlock = renderBriefBlock(briefRes.byPage);
+  } catch (bcErr) {
+    log.warn(`⚠️ [TESTLAB] scene-review replay: brief check failed (${bcErr.message}) — the replay runs without brief findings, unlike production`);
+  }
+
   const orig = PROMPT_TEMPLATES.sceneReview;
   if (promptOverride) PROMPT_TEMPLATES.sceneReview = promptOverride;
   let prompt;
   try {
-    prompt = buildSceneReviewPrompt(storyData, scenes, { clothingFindings: findingsBlock, beats: outlineBeats });
+    // ALL FOUR options production passes (beatsPipeline.js `{ clothingFindings,
+    // briefFindings, beats, visualBible }`). The bible feeds check 9f (a stated
+    // object's state page ranges); omitted, buildSceneReviewPrompt emitted NO
+    // `# VISUAL BIBLE — STATED OBJECTS` block at all, so a replay could never
+    // see a state's page range, never emit a corrected entry, and check 9f
+    // under-reported against the production run it is meant to mirror. The
+    // brief findings are the same shape of gap, closed above.
+    prompt = buildSceneReviewPrompt(storyData, scenes, {
+      clothingFindings: findingsBlock,
+      briefFindings: briefFindingsBlock,
+      beats: outlineBeats,
+      visualBible: storyData.visualBible,
+    });
   } finally {
     PROMPT_TEMPLATES.sceneReview = orig;
   }
@@ -7114,11 +7825,25 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   const { beats, source: beatsSource } = resolveStoryBeats(storyData, { getPageText, extractSceneMetadata });
   if (beats.length === 0) throw new Error('story has no beats and no pages to rebuild them from');
 
+  // PRODUCTION ARGUMENTS (beatsPipeline.js:2327). The stage used to pass
+  // `expansions = []` and no arcHints, which is the state production warns
+  // about by name — "text is being written blind to the illustrations … the OLD
+  // sibling behaviour" (beatsPipeline.js:2321-2326). Every writer A/B run this
+  // way measured a task production never sets. `params.blindToBriefs` keeps
+  // that arm reachable, but as an explicit override, never as the baseline.
+  const textArgs = buildReplayTextArgs(storyData, beats, {
+    parseBeats,
+    overrides: {
+      expansions: (params.blindToBriefs === true || params.blindToBriefs === 'true') ? [] : undefined,
+    },
+  });
   const orig = PROMPT_TEMPLATES.storyTextFromBeats;
   if (promptOverride) PROMPT_TEMPLATES.storyTextFromBeats = promptOverride;
   let prompt;
-  try { prompt = buildStoryTextFromBeatsPrompt(storyData, beats, [], parseBeats(String(storyData.outline || '')).arc || ''); }
-  finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
+  try {
+    prompt = buildStoryTextFromBeatsPrompt(
+      storyData, textArgs.beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints });
+  } finally { PROMPT_TEMPLATES.storyTextFromBeats = orig; }
   if (!prompt) throw new Error('story-text-from-beats template unavailable');
 
   const model = params.textModel || MODEL_DEFAULTS.outline;
@@ -7141,6 +7866,12 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   return {
     storyId: target.storyId,
     beatsSource,
+    // Visible in the result so a reader can tell a production-faithful run from
+    // an override arm without re-reading the prompt.
+    briefsSeen: textArgs.expansions.length,
+    arcChars: textArgs.arc.length,
+    arcHintsChars: textArgs.arcHints.length,
+    overridden: textArgs.overridden,
     model, modelId: res.modelId,
     elapsedMs: Date.now() - t,
     cost: res.usage?.direct_cost ?? calculateTextCost(res.modelId || '', res.usage || {}),
@@ -7171,7 +7902,7 @@ async function runWriterCompareStage(target, { params = {} }) {
   await loadPromptTemplates();
   const SH = require('./storyHelpers');
   const { callTextModelStreaming } = require('./textModels');
-  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+  const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost, IMAGE_MODELS } = require('../config/models');
   const { UnifiedStoryParser } = require('./outlineParser/unified');
   const WC = require('./testlabWriterCompare');
 
@@ -7192,6 +7923,19 @@ async function runWriterCompareStage(target, { params = {} }) {
   // replays, so every arm is fed the same input.
   const { beats, source: beatsSource } = resolveStoryBeats(storyData, {
     getPageText: SH.getPageText, extractSceneMetadata: SH.extractSceneMetadata,
+  });
+
+  // The arguments production hands each of these calls, resolved once from the
+  // stored story (server/lib/beatsReplayInputs.js). Every arm below is a MODEL
+  // comparison — the inputs must be production's, or the ranking is a ranking
+  // of models at a task nobody ships.
+  const textArgs = buildReplayTextArgs(storyData, beats, { parseBeats: SH.parseBeats });
+  const sceneOptions = buildReplaySceneOptions(storyData, {
+    availableAvatars: SH.buildAvailableAvatarsForPrompt
+      ? SH.buildAvailableAvatarsForPrompt(storyData.characters || [], storyData.clothingRequirements || null)
+      : '',
+    maxCharactersPerScene: IMAGE_MODELS[storyData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageRenderImage]?.maxCharactersPerScene || 3,
+    parseBeats: SH.parseBeats,
   });
 
   const call = async (prompt, model, label) => {
@@ -7230,7 +7974,9 @@ async function runWriterCompareStage(target, { params = {} }) {
     for (const stage of stages) {
       try {
         if (stage === 'plan') {
-          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: SH.parseBeats(String(storyData.outline || '')).arc || '' }), model, 'plan');
+          // Production: buildBeatsPrompt(inputData, pageCount, { finalArc: approvedArc, arcHints })
+          // — beatsPipeline.js:935. arcHints was missing here.
+          const r = await call(SH.buildBeatsPrompt(storyData, expectedPages, { finalArc: textArgs.arc, arcHints: textArgs.arcHints }), model, 'plan');
           const parsed = SH.parsePlanResponse(r.text, []);
           arm.stages.plan = { ...WC.scorePlan(parsed.pages || [], expectedPages), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'bible') {
@@ -7238,11 +7984,18 @@ async function runWriterCompareStage(target, { params = {} }) {
           const p = new UnifiedStoryParser(r.text);
           arm.stages.bible = { ...WC.scoreBible(p.extractClothingRequirements(), p.extractVisualBible(), expectedChars), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'scenes') {
-          const r = await call(SH.buildSceneExpansionAllPrompt(storyData, beats, {}), model, 'scenes');
+          // Production: buildSceneExpansionAllPrompt(inputData, beats, { availableAvatars,
+          // maxCharactersPerScene, finalArc, clothingRequirements }) — beatsPipeline.js:1511.
+          // `{}` gave the Art Director no avatars, no cast cap, no wardrobe and
+          // FINAL_ARC = "(no arc was recorded for this story)".
+          const r = await call(SH.buildSceneExpansionAllPrompt(storyData, beats, sceneOptions), model, 'scenes');
           const briefs = String(r.text).split(/^##\s*(?:Page|Seite)\s*\d+/im).slice(1);
           arm.stages.scenes = { ...WC.scoreScenes(briefs), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         } else if (stage === 'text') {
-          const r = await call(SH.buildStoryTextFromBeatsPrompt(storyData, beats, [], SH.parseBeats(String(storyData.outline || '')).arc || ''), model, 'text');
+          // Production: buildStoryTextFromBeatsPrompt(inputData, beats, finalExpansions,
+          // approvedArc, { arcHints }) — beatsPipeline.js:2327.
+          const r = await call(SH.buildStoryTextFromBeatsPrompt(
+            storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints }), model, 'text');
           const parsed = SH.parseRefinedText(r.text);
           arm.stages.text = { ...WC.scoreText(parsed.pages || [], expectedPages, storyData.language), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         }
@@ -7327,7 +8080,7 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
   const { ARC_RUBRIC } = sc;
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
   if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
-  const context = sc.buildBriefContext({ ...storyData, pages: pageCount });
+  const context = sc.buildBriefContext({ ...storyData, pages: pageCount }, { arc: true });
 
   // A judge draw can be empty, truncated, or carry a key outside the rubric —
   // one bad draw must not read as "this round could not be scored".
@@ -7345,7 +8098,7 @@ async function runArcRoundsStage(target, { params = {}, promptOverride = null })
         const keys = ARC_RUBRIC.arc.filter(k => { const n = Number(dims[k]); return Number.isFinite(n) && n >= 1 && n <= 10; });
         if (keys.length < ARC_RUBRIC.arc.length) throw new Error(`missing dims: ${ARC_RUBRIC.arc.filter(k => !keys.includes(k)).join(',')}`);
         const score = Math.round((keys.reduce((s, k) => s + Number(dims[k]), 0) / keys.length) * 10) / 10;
-        return { score, dims, notes: String(parsed.arc.notes || ''), cost: costOf(r) };
+        return { score, dims, notes: sc.flattenNotes(parsed.arc.notes), cost: costOf(r) };
       } catch (err) {
         log.warn(`⚠️ [ARC] judge ${judge} attempt ${attempt}/3 unusable: ${err.message}`);
       }
@@ -7633,7 +8386,1003 @@ async function runArcPanelReplayStage(target, { params = {}, promptOverride = nu
   };
 }
 
+/**
+ * VB ELEMENT CELL — render one Visual Bible element's reference cell(s) the
+ * way generateReferenceSheet does (kind sentence, solo call, page aspect for
+ * non-characters, `text` → typography tier) and ask the cell gate the same
+ * question production asks. Target {storyId}; params.elementId required.
+ *
+ * Verdict only: the Lab shows what the gate said; the pipeline owns the one
+ * re-render. Built 2026-09-11 for the dish-instead-of-scale cell of
+ * job_1789078732136_622wecmhj.
+ *
+ * params.elementId   — bare id (ART001 / CHR001 / VEH002); a stated object renders every state
+ * params.gateOnly    — judge the STORED cell(s), no image call
+ * params.model       — IMAGE_MODELS key (default: text → vbTextCellModel, else pageImage)
+ * params.text        — readable words for the element (overrides the entry's `text`)
+ * params.description — description override
+ * promptOverride     — replaces the reference-sheet template
+ */
+async function runVbElementCellStage(target, { experimentId, promptOverride = null, params = {} }) {
+  const { loadPromptTemplates, withTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const refSheets = require('./referenceSheets');
+  const { resolveArtStyle } = require('./promptBuilders');
+  const { MODEL_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+  const { loadVbReferenceBytes } = require('./characterPhotos');
+  const { objectStates } = require('./visualBible');
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const vb = storyData.visualBible;
+  if (!vb) throw new Error('Story has no visualBible');
+  const elementId = String(params.elementId || '').trim().toUpperCase();
+  if (!elementId) throw new Error('params.elementId is required (e.g. ART001)');
+  const POOLS = { secondaryCharacters: 'character', artifacts: 'artifact', animals: 'animal', vehicles: 'vehicle', locations: 'location' };
+  let entry = null;
+  let type = null;
+  for (const [pool, t] of Object.entries(POOLS)) {
+    const hit = (vb[pool] || []).find(e => String(e.id || '').toUpperCase() === elementId);
+    if (hit) { entry = hit; type = t; break; }
+  }
+  if (!entry) throw new Error(`${elementId} is not in this story's visual bible`);
+  // Same shape getElementsNeedingReferenceImages hands the sheet: pool on
+  // `type`, the bible's free-text type on `kind`.
+  const el = { ...entry, kind: typeof entry.type === 'string' && entry.type.trim() ? entry.type.trim() : null, type, pageCount: (entry.appearsInPages || []).length };
+  if (params.text !== undefined) el.text = String(params.text || '').trim() || null;
+  if (params.description) el.description = String(params.description);
+  const cells = refSheets.expandElementStateCells(el);
+  const textCell = cells.length === 1 && String(cells[0].text || '').trim();
+  const modelKey = params.model || (textCell ? MODEL_DEFAULTS.vbTextCellModel : MODEL_DEFAULTS.pageImage);
+  if (!IMAGE_MODELS[modelKey]) throw new Error(`Unknown model "${modelKey}" — not an IMAGE_MODELS key`);
+  const styleDescription = resolveArtStyle(storyData.artStyle, IMAGE_MODELS[modelKey].backend) || resolveArtStyle('pixar');
+  const aspect = type === 'character' ? null : (storyData.layout?.imageAspect || MODEL_DEFAULTS.pageAspect);
+  const steps = [];
+  const addStep = async (label, dataUri) => {
+    const v = await saveTestVersion(target.storyId, 'tl_step', null, dataUri, experimentId);
+    steps.push({ label, imageType: 'tl_step', versionIndex: v });
+    return v;
+  };
+  const t0 = Date.now();
+  let prompt = null;
+  let modelId = null;
+  let cellsB64 = [];
+  if (params.gateOnly) {
+    for (const c of cells) {
+      const src = cells.length > 1 ? (objectStates(entry).find(s => s.id === c.id) || null) : entry;
+      const buf = src ? await loadVbReferenceBytes(src) : null;
+      if (!buf) throw new Error(`No stored reference for ${c.id}`);
+      // loadVbReferenceBytes contracts a base64 STRING (characterPhotos
+      // _getOrFetch); re-encoding it double-encoded the cell (exps 1171-1174).
+      cellsB64.push(typeof buf === 'string' ? buf : Buffer.from(buf).toString('base64'));
+    }
+  } else {
+    prompt = withTemplates({ referenceSheet: promptOverride }, () => refSheets.buildReferenceSheetPrompt(cells, styleDescription, vb));
+    const { callGeminiAPIForImage } = require('./images');
+    const result = await callGeminiAPIForImage(prompt, [], null, 'avatar', null, modelKey, null, '', null, [], 0, null, null, null, null, aspect);
+    if (!result?.imageData) throw new Error('render returned no image');
+    modelId = result.modelId || modelKey;
+    const gridB64 = require('./r2').stripDataUriPrefix(result.imageData);
+    if (cells.length > 1) await addStep(`rendered sheet (${cells.length} state cells) — ${modelId}`, result.imageData);
+    cellsB64 = await refSheets.splitGridIntoReferences(gridB64, cells.length, cells);
+  }
+  let firstV = null;
+  for (let i = 0; i < cells.length; i++) {
+    if (!cellsB64[i]) continue;
+    const v = await addStep(`${params.gateOnly ? 'stored' : 'rendered'} cell ${cells[i].id}${cells[i].stateName ? ` — ${cells[i].stateName}` : ''}`, `data:image/png;base64,${cellsB64[i]}`);
+    if (firstV == null) firstV = v;
+  }
+  const gates = [];
+  if (cells.length > 1 && cellsB64.every(Boolean)) {
+    const parent = { ...cells[0], name: cells[0].displayName, description: cells[0].baseDescription };
+    const question = refSheets.stateCellsGatePrompt(parent, cells);
+    const v = await refSheets.checkStateCellsConsistency(cellsB64, parent, cells);
+    gates.push({ gate: 'state_cells', cellIds: cells.map(c => c.id), ...v, question });
+  }
+  for (let i = 0; i < cells.length; i++) {
+    if (!cellsB64[i]) continue;
+    if (type === 'character') {
+      const question = refSheets.cellGatePrompt(styleDescription, cells[i].age || null, cells[i].build || null);
+      const v = await refSheets.checkCharacterCellRender(cellsB64[i], styleDescription, cells[i].age || null, cells[i].build || null);
+      gates.push({ gate: 'character_cell', cellId: cells[i].id, ok: v.natural, reason: v.reason, question });
+    } else {
+      const question = refSheets.elementCellGatePrompt(cells[i], styleDescription);
+      const v = await refSheets.checkElementCellRender(cellsB64[i], cells[i], styleDescription);
+      gates.push({ gate: 'element_cell', cellId: cells[i].id, ...v, question });
+    }
+  }
+  return {
+    imageType: 'tl_step', versionIndex: firstV, pageNumber: null, steps,
+    elementId, elementName: entry.name, elementType: type, text: el.text || null,
+    modelId: modelId || (params.gateOnly ? 'stored cell' : modelKey), aspect, styleDescription, prompt,
+    cellLine: refSheets.elementCellText(cells[0]),
+    gates,
+    allOk: gates.every(g => g.ok),
+    issuesSummary: gates.filter(g => !g.ok).map(g => `${g.gate}: ${g.reason}`).join(' | ') || null,
+    elapsedMs: Date.now() - t0,
+  };
+}
+
+// ─── Trial variety stages ───────────────────────────────────────────────────
+// Two showcase runs of ONE rotation entry came back as near-identical chestnut
+// stories. That had a harness cause (the showcase never called the idea
+// endpoint, so storyDetails was empty and buildTrialStoryPrompt fell back to the
+// literal 'A fun adventure'), fixed elsewhere. It left two variety questions
+// nobody had measured, and these are the two stages that measure them.
+
+// Words that carry no subject. Deliberately small and multilingual-ish: the
+// grouping below is an eyeballing aid, not a similarity metric.
+const IDEA_STOPWORDS = new Set([
+  'the', 'and', 'with', 'that', 'this', 'from', 'into', 'their', 'there', 'them', 'they', 'when', 'while',
+  'where', 'what', 'which', 'would', 'could', 'must', 'have', 'has', 'her', 'his', 'she', 'him', 'its',
+  'for', 'but', 'not', 'are', 'was', 'were', 'been', 'will', 'then', 'than', 'all', 'one', 'two', 'out',
+  'about', 'after', 'before', 'again', 'just', 'only', 'even', 'more', 'most', 'every', 'each', 'own',
+  'der', 'die', 'das', 'und', 'mit', 'ein', 'eine', 'einen', 'einem', 'einer', 'sich', 'ist', 'sie', 'ihr',
+  'ihre', 'ihren', 'als', 'auf', 'aus', 'den', 'dem', 'des', 'für', 'von', 'zum', 'zur', 'nicht', 'aber',
+  'les', 'des', 'une', 'dans', 'pour', 'avec', 'que', 'qui', 'son', 'sur', 'elle', 'est', 'pas', 'plus',
+]);
+
+/** Content words of an idea, lowercased and deduped — the grouping key material. */
+function ideaSubjectWords(text) {
+  return new Set(
+    String(text || '')
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !IDEA_STOPWORDS.has(w))
+  );
+}
+
+/**
+ * Compound-aware word equality. German ideas compound freely — "Herbstblätter"
+ * and "Blätter", "Laubhaufen" and "Haufen" are the same premise slot written two
+ * ways, and exact string equality scores them as different subjects. Containment
+ * (with a length floor so "sein" does not swallow half the vocabulary) catches
+ * that without a stemmer.
+ */
+function ideaWordsMatch(a, b) {
+  if (a === b) return true;
+  return a.length >= 5 && b.length >= 5 && (a.includes(b) || b.includes(a));
+}
+
+/** How many draws in `sigs` contain a word matching `word`. */
+function ideaWordDrawCount(sigs, word) {
+  return sigs.reduce((n, s) => n + (s.some(w => ideaWordsMatch(w, word)) ? 1 : 0), 0);
+}
+
+/**
+ * The PREMISE SKELETON of a set of ideas: the content words that recur across
+ * most of them, compound-deduped. This is what a human reads as "the same idea
+ * again" — an animal, an obstacle, and the resolving action, restated with
+ * different nouns each draw.
+ *
+ * Returned as a plain array, largest-recurrence first, empty when the ideas
+ * share no recurring frame.
+ */
+function ideaPremiseSkeleton(sigs, presenceRatio = 0.6, constantWords = []) {
+  if (sigs.length < 2) return [];
+  const need = Math.max(2, Math.ceil(presenceRatio * sigs.length));
+  // Words the experiment HOLDS CONSTANT — the child's name, the town, the
+  // landmark names — recur in every draw by construction and say nothing about
+  // the premise. Counting them inflates the skeleton of any arm and made a set
+  // of five genuinely different wants look like one repeated idea.
+  const vocab = [...new Set(sigs.flat())].filter(w => !constantWords.some(c => ideaWordsMatch(c, w)));
+  const scored = vocab
+    .map(w => ({ w, n: ideaWordDrawCount(sigs, w) }))
+    .filter(x => x.n >= need)
+    .sort((a, b) => b.n - a.n || b.w.length - a.w.length);
+  const skeleton = [];
+  for (const { w } of scored) if (!skeleton.some(k => ideaWordsMatch(k, w))) skeleton.push(w);
+  return skeleton;
+}
+
+/**
+ * Group ideas by PREMISE, not by raw text similarity.
+ *
+ * Why not Jaccard over the full word set (what this did until 2026-09-14, and
+ * what made it anti-correlated with the truth): two ~30-word ideas that restate
+ * one premise with a different animal and a different obstacle overlap ~0.15-0.4
+ * in raw words, so no threshold separates them from genuinely different ideas —
+ * measured on experiment 1273, where a human read all five draws of an arm as
+ * one premise and the old metric reported `distinctSubjects: 5, repeatCount: 0`.
+ * On that data the pairwise Jaccard floor was 0.18 and its ceiling 0.52; there is
+ * no line to draw.
+ *
+ * What separates instead is the RECURRING FRAME. Extract the skeleton (words
+ * present in ≥`presenceRatio` of the ideas), then ask each idea how much of that
+ * skeleton it carries. Ideas carrying ≥`coverage` of it are restatements of one
+ * premise. Leftovers are re-skeletonised, so a set with two competing premises
+ * yields two groups; when nothing recurs, every idea stands alone.
+ *
+ * LIMITS, stated plainly: this is lexical. It sees that the same frame is being
+ * reused; it cannot see that "Igel" and "Eichhörnchen" are both small woodland
+ * animals, so a set that swaps EVERY word while keeping the premise will still
+ * read as distinct. It is a convergence detector, not a semantic one — the owner
+ * still reads the ideas. Guards against the opposite failure (calling everything
+ * a repeat): the skeleton must have ≥`minSkeleton` words AND be ≥`minShare` of a
+ * typical idea, otherwise no group forms at all.
+ */
+function groupIdeasByPremise(ideas, opts = {}) {
+  const { coverage = 0.6, presenceRatio = 0.6, minSkeleton = 4, minShare = 0.3, constantWords = [] } = opts;
+  const entries = ideas.map(idea => ({ idea, sig: [...ideaSubjectWords(idea.text)] }));
+  const groups = [];
+  let pool = entries;
+
+  while (pool.length > 1) {
+    const sigs = pool.map(e => e.sig);
+    const sizes = sigs.map(s => s.length).sort((a, b) => a - b);
+    const median = sizes[Math.floor(sizes.length / 2)] || 1;
+
+    // Look for the LARGEST subset that shares a frame, not only a frame the
+    // whole pool shares: a couple of unrelated ideas mixed in otherwise dilute
+    // the skeleton below the guards and hide a real repeat. Walk the required
+    // presence down from "all of them" and take the first level that yields a
+    // group at least that large. The guards below are what keep the low levels
+    // honest — they do not loosen as the level drops.
+    let best = null;
+    for (let need = pool.length; need >= Math.max(2, Math.ceil(0.4 * pool.length)); need--) {
+      const skeleton = ideaPremiseSkeleton(sigs, need / pool.length, constantWords);
+      if (skeleton.length < minSkeleton || skeleton.length / median < minShare) continue;
+      const covered = pool.filter(e =>
+        skeleton.filter(k => e.sig.some(w => ideaWordsMatch(w, k))).length / skeleton.length >= coverage);
+      if (covered.length >= Math.max(2, need)) { best = { covered, skeleton }; break; }
+    }
+    if (!best) break;
+
+    groups.push({ members: best.covered, premiseWords: best.skeleton });
+    pool = pool.filter(e => !best.covered.includes(e));
+  }
+  for (const e of pool) groups.push({ members: [e], premiseWords: [] });
+
+  return groups
+    .map(g => ({
+      size: g.members.length,
+      members: g.members.map(m => m.idea),
+      // The recurring frame these ideas share — empty for a group of one.
+      premiseWords: g.premiseWords.slice(0, 25),
+      // TRUE intersection: words every member actually contains. The old field
+      // called this `sharedWords` while accumulating the UNION, so it listed
+      // words only one member had.
+      wordsInAllMembers: g.members.length < 2 ? [] : g.members[0].sig
+        .filter(w => g.members.every(m => m.sig.some(x => ideaWordsMatch(x, w))))
+        .slice(0, 25),
+    }))
+    .sort((a, b) => b.size - a.size);
+}
+
+/**
+ * TRIAL IDEA VARIETY — draw the SAME idea pair N times and look at the list.
+ *
+ * The trial hands the visitor two ideas that must differ in KIND: one grounded
+ * in the child's real town, one make-believe entered from home
+ * (server/routes/trial.js, POST /generate-ideas-stream). Whether that generator
+ * proposes the same premise every time has never been measured, and it is the
+ * variety question that survives the showcase-harness fix.
+ *
+ * MIRROR WARNING: the prompt assembly below duplicates the route's, because the
+ * route builds it inline inside an SSE handler and exports nothing. Every shared
+ * piece — the template, the costume instructions, the season note, the age-mode
+ * block, the landmark lookup, the two branch sentences — is taken from the
+ * production module, so only the glue is copied. The branch sentences are pinned
+ * against trial.js by tests/unit/testlab-trial-variety-stages.test.ts, so a
+ * production edit that this stage does not follow fails the suite.
+ *
+ * params.draws     — how many PAIRS to generate (default 5, max 20)
+ * params.model     — idea model (default claude-sonnet, as production)
+ * params.name / age / gender / traits — override the story's main character
+ * params.town / language / storyCategory / storyTopic / storyTheme — override the rest
+ * params.landmarks — 'false' skips the landmark lookup (ideas then name no real place)
+ * params.overlap   — premise-skeleton coverage an idea needs to join a repeat
+ *                    group (default 0.6; see groupIdeasByPremise)
+ */
+async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTrialIdeaPrompts, getTeachingGuide } = require('./promptBuilders');
+  const { buildSeasonInstruction } = require('./season');
+  const { getLanguageInstruction } = require('./languages');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+
+  const draws = Math.min(Math.max(parseInt(params.draws, 10) || 5, 1), 20);
+  const model = params.model || 'claude-sonnet';
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+  const overlap = Number.isFinite(Number(params.overlap)) ? Number(params.overlap) : 0.6;
+
+  // The inputs, held identical across every draw — that is the whole experiment.
+  const storedChar = (storyData.characters || [])[0] || {};
+  const mainChar = {
+    name: params.name || storedChar.name || 'the child',
+    age: params.age !== undefined ? params.age : storedChar.age,
+    gender: params.gender || storedChar.gender || 'male',
+    traits: params.traits ? String(params.traits).split(',').map(s => s.trim()).filter(Boolean)
+      : (Array.isArray(storedChar.traits) ? storedChar.traits : []),
+  };
+  const storyCategory = params.storyCategory || storyData.storyCategory || 'adventure';
+  const storyTopic = params.storyTopic !== undefined ? params.storyTopic : (storyData.storyTopic || '');
+  const storyTheme = params.storyTheme !== undefined ? params.storyTheme : (storyData.storyTheme || '');
+  const language = params.language || storyData.language || 'en';
+  const userLocation = params.town
+    ? { ...(storyData.userLocation || {}), city: String(params.town) }
+    : (storyData.userLocation || null);
+
+  // ── route mirror: character line ──
+  const charDesc = `${mainChar.name}${mainChar.age ? `, ${mainChar.age} years old` : ''}${mainChar.gender ? `, ${mainChar.gender}` : ''}${mainChar.traits?.length ? ` (${mainChar.traits.join(', ')})` : ''}`;
+
+  // ── route mirror: category context ──
+  let categoryContext = '';
+  if (storyCategory === 'life-challenge') {
+    const { buildThemePlaySentence } = require('../config/storyThemes');
+    const themeSentence = buildThemePlaySentence(storyTheme);
+    const guide = getTeachingGuide('life-challenge', storyTopic);
+    categoryContext = `This is a life skills story about "${storyTopic}". The idea names one outside event that forces the child to use this skill — something that happens in the world, never a feeling on its own — and what it costs them.${themeSentence ? ` ${themeSentence}` : ''}${guide ? `\nGuidance for this topic:\n${String(guide).trim()}` : ''}`;
+  } else if (storyCategory === 'historical') {
+    categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
+  } else if (storyCategory === 'swiss-stories') {
+    const { getSwissCityById } = require('./swissStories');
+    const cityId = (storyTopic || '').replace(/-\d+$/, '');
+    const cityMeta = getSwissCityById(cityId);
+    categoryContext = `This is a Swiss local story set in ${cityMeta?.name?.en || cityId}. Use real local landmarks and cultural elements from this city. Keep it age-appropriate and engaging.`;
+  } else {
+    categoryContext = `This is a ${storyTheme || 'adventure'} story${storyTopic ? ` about "${storyTopic}"` : ''}. Make it exciting and appropriate for children.`;
+  }
+
+  // ── route mirror: landmarks ──
+  let landmarksText = '';
+  const landmarkNames = [];
+  if (params.landmarks !== 'false' && params.landmarks !== false && userLocation?.city && storyCategory !== 'historical') {
+    try {
+      const { getIndexedLandmarks } = require('./landmarkPhotos');
+      const landmarks = await getIndexedLandmarks(userLocation, 3);
+      if (landmarks.length > 0) {
+        landmarkNames.push(...landmarks.map(l => l.name));
+        landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarkNames.join(', ') + '.';
+      }
+    } catch (err) {
+      log.debug(`[TESTLAB] idea-variety landmark lookup failed: ${err.message}`);
+    }
+  }
+
+  const { getTrialTitle } = require('../config/trialTitles');
+  const trialTitle = getTrialTitle(storyTopic, storyCategory, mainChar.gender, language);
+  const { getTrialCostumeForStory } = require('../config/trialCostumes');
+  const ideaCostume = getTrialCostumeForStory({ storyCategory, storyTheme, storyTopic, gender: mainChar.gender });
+  const seasonInstruction = storyCategory === 'historical' ? '' : buildSeasonInstruction({});
+
+  const townName = userLocation?.city || '';
+  // The route and this stage share ONE assembly (buildTrialIdeaPrompts) — a
+  // hand-copied mirror measures a prompt production does not send. The variety
+  // axis rotates per arm, so the prompts are rebuilt inside the draw loop.
+  const ideaArgs = {
+    template: promptOverride || null,
+    characters: [mainChar],
+    charDesc,
+    categoryContext,
+    landmarksText,
+    townName,
+    storyTheme,
+    trialTitle,
+    langInstruction: getLanguageInstruction(language),
+    seasonInstruction,
+    ideaCostume,
+  };
+  let promptLocal = '';
+  let promptFantasy = '';
+
+  const t0 = Date.now();
+  const usage = [];
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const pairs = [];
+  for (let i = 1; i <= draws; i++) {
+    // Both ideas of a pair in parallel, as the route does. One flaky response
+    // must not lose the whole run — the draw records its error and the rest
+    // still get generated (score_rejudge takes the same line).
+    const drawPrompts = buildTrialIdeaPrompts(ideaArgs);
+    if (i === 1) { promptLocal = drawPrompts.local; promptFantasy = drawPrompts.fantasy; }
+    const [localRes, fantasyRes] = await Promise.all([
+      callTextModelStreaming(drawPrompts.local, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
+      callTextModelStreaming(drawPrompts.fantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
+    ]);
+    for (const r of [localRes, fantasyRes]) if (!r.error) usage.push({ cost: costOf(r), modelId: r.modelId, usage: r.usage });
+    pairs.push({
+      draw: i,
+      axes: { local: drawPrompts.axes.local.want, fantasy: drawPrompts.axes.fantasy.want },
+      local: localRes.error ? null : String(localRes.text || '').trim(),
+      fantasy: fantasyRes.error ? null : String(fantasyRes.text || '').trim(),
+      errors: [localRes.error, fantasyRes.error].filter(Boolean),
+    });
+  }
+
+  // Held constant across every draw by the experiment's own design, so they are
+  // no evidence of a repeated premise (see ideaPremiseSkeleton).
+  const constantWords = [...ideaSubjectWords(
+    [mainChar.name, townName, landmarkNames.join(' '), trialTitle, storyTopic].filter(Boolean).join(' '))];
+
+  // Repeats are counted WITHIN an arm: the two arms are required to differ in
+  // kind, so pooling them would report the design as repetition.
+  const arms = {};
+  for (const arm of ['local', 'fantasy']) {
+    const ideas = pairs.filter(p => p[arm]).map(p => ({ draw: p.draw, text: p[arm] }));
+    const groups = groupIdeasByPremise(ideas, { coverage: overlap, constantWords });
+    const repeated = groups.filter(g => g.size > 1);
+    // Raw word frequency across the arm — the cheapest "is it always chestnuts?"
+    // read there is, and it needs no grouping decision to be trusted.
+    const freq = new Map();
+    for (const idea of ideas) for (const w of ideaSubjectWords(idea.text)) freq.set(w, (freq.get(w) || 0) + 1);
+    arms[arm] = {
+      drawsWithIdea: ideas.length,
+      distinctSubjects: groups.length,
+      repeatedGroups: repeated.length,
+      // "How many draws landed on a subject some other draw also landed on."
+      repeatCount: repeated.reduce((s, g) => s + g.size, 0),
+      groups: groups.map(g => ({ size: g.size, draws: g.members.map(m => m.draw), ideas: g.members.map(m => m.text), premiseWords: g.premiseWords, wordsInAllMembers: g.wordsInAllMembers })),
+      wordsInEveryDraw: [...freq.entries()].filter(([, n]) => n === ideas.length && ideas.length > 1).map(([w]) => w).sort(),
+      topWords: [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([w, n]) => `${w} ×${n}`),
+    };
+  }
+
+  return {
+    storyId: target.storyId,
+    model,
+    modelId: usage[0]?.modelId || null,
+    draws,
+    premiseCoverageThreshold: overlap,
+    premiseConstantWords: constantWords,
+    elapsedMs: Date.now() - t0,
+    modelCalls: usage.length,
+    cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
+    usage: usage.reduce((a, u) => ({
+      input_tokens: (a.input_tokens || 0) + (u.usage?.input_tokens || 0),
+      output_tokens: (a.output_tokens || 0) + (u.usage?.output_tokens || 0),
+    }), {}),
+    inputs: { character: charDesc, storyCategory, storyTopic, storyTheme, language, town: townName || null, landmarks: landmarkNames, title: trialTitle || null, costume: ideaCostume?.description || null },
+    promptChars: promptLocal.length,
+    prompts: { local: promptLocal, fantasy: promptFantasy },
+    pairs,
+    arms,
+    failures: pairs.flatMap(p => p.errors),
+  };
+}
+
+/**
+ * TRIAL CHALLENGE DRAW — the random catalogue draw, with and without.
+ *
+ * buildChallengeIdeasSection() draws 15 age-banded challenges from
+ * prompts/challenge-catalogue.txt and injects them as prompt text (no model
+ * call, no cost). It reaches arc-create.txt through the beats pipeline, which
+ * draws once and persists the draw as `challengeDraw`. buildTrialStoryPrompt
+ * never receives it — the trial writes its whole story in ONE call from
+ * story-trial.txt.
+ *
+ * This stage writes a trial-shaped story twice from the same inputs, once with
+ * the draw appended and once without, so the owner can read both. The injection
+ * is LAB-ONLY: it appends the section to the prompt this stage built. Nothing is
+ * wired into buildTrialStoryPrompt, so a real trial is unaffected.
+ *
+ * Two things the result states outright:
+ *  - BAND SHAPE. `challengeCatalogueBands` returns nothing for the three simple
+ *    bands (routine / quest / tries), so at age 3 production draws NO challenges
+ *    at all — the catalogue is age-banded but not band-shape-aware, and the
+ *    `tries` band wants one problem met three times, which a list of fifteen
+ *    separate trials does not describe. The stage reports the resolved band, the
+ *    band's own plot-shape text, and every drawn entry with the trait it tests,
+ *    so the fit is judged on the entries rather than on a heuristic.
+ *  - `params.forceBands` draws anyway for a simple-band story (Lab-only; it
+ *    mirrors the production filter so the entries are the real catalogue ones).
+ *
+ * params.withDraw   — 'true' / 'false' runs ONE arm; omitted runs both
+ * params.drawCount  — entries to draw (default 15, production's count)
+ * params.forceBands — comma-separated catalogue bands ('3', '6', '9') for a
+ *                     story whose band suppresses the draw
+ * params.model      — writer (default MODEL_DEFAULTS.outline, as the trial's own call)
+ * params.pages      — scene count (default 5, the trial shape)
+ * params.storyDetails — override the commission (an empty one is the bug that
+ *                     started this; the stage refuses to run blind by accident)
+ */
+function labForcedChallengeDraw(inputData, count, bands) {
+  // Lab-only mirror of buildChallengeIdeasSection's catalogue filter, for the
+  // simple bands where production deliberately draws nothing. Same file, same
+  // fields, same peril rule — only the band filter is the caller's.
+  const lines = require('fs').readFileSync(
+    require('path').join(__dirname, '../../prompts/challenge-catalogue.txt'), 'utf-8').split('\n');
+  const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
+  const youngest = ages.length ? Math.min(...ages) : 8;
+  const entries = lines
+    .filter(l => l && !l.startsWith('#'))
+    .map(l => l.split('|'))
+    .filter(f => f.length >= 6)
+    .filter(f => bands.some(b => f[4].startsWith(b)))
+    .filter(f => youngest > 5 || f[5].trim() !== '1');
+  const picked = [];
+  const pool = [...entries];
+  while (picked.length < count && pool.length) {
+    picked.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  }
+  if (!picked.length) return '';
+  return [
+    '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
+    'Build the story\'s challenges from one or two of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.',
+    '',
+    ...picked.map(f => `- ${f[2]} (tests: ${f[3]})`),
+  ].join('\n');
+}
+
+async function runTrialChallengeDrawStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildTrialStoryPrompt, buildChallengeIdeasSection, resolveAgeBand, buildAgeModeSection } = require('./promptBuilders');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const pageCount = parseInt(params.pages, 10) || 5;
+  const model = params.model || MODEL_DEFAULTS.outline;
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+
+  // Trial-shaped inputs from the stored story. storyDetails is the commission —
+  // an empty one is exactly the showcase bug, so it is stated in the result
+  // rather than silently falling through to the template's 'A fun adventure'.
+  const inputData = {
+    ...storyData,
+    trialMode: true,
+    pages: pageCount,
+    storyDetails: params.storyDetails !== undefined ? String(params.storyDetails) : (storyData.storyDetails || ''),
+  };
+  if (params.age !== undefined) {
+    inputData.characters = (storyData.characters || []).map((c, i) => (i === 0 ? { ...c, age: params.age } : c));
+  }
+
+  const band = resolveAgeBand(inputData);
+  // The band's OWN plot-shape text, through the production resolver — the rules
+  // the drawn challenges have to sit inside (for `tries`: one problem met three
+  // times). Read next to challengeDraw, it is the fit question, unheuristic.
+  const bandShapeText = buildAgeModeSection(inputData);
+
+  const drawCount = parseInt(params.drawCount, 10) || 15;
+  const forceBands = String(params.forceBands || '').split(',').map(s => s.trim()).filter(Boolean);
+  let drawSection = buildChallengeIdeasSection(inputData, drawCount);
+  let drawSource = drawSection ? 'production' : 'none (band draws no challenges)';
+  if (!drawSection && forceBands.length) {
+    drawSection = labForcedChallengeDraw(inputData, drawCount, forceBands);
+    drawSource = `lab-forced (bands ${forceBands.join(',')})`;
+  }
+  // Same extraction the beats pipeline persists as `challengeDraw`
+  // (beatsPipeline.js:780), so a Lab row and a story record are read the same way.
+  const challengeDraw = drawSection.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
+
+  const wantWith = params.withDraw === undefined || params.withDraw === true || params.withDraw === 'true';
+  const wantWithout = params.withDraw === undefined || params.withDraw === false || params.withDraw === 'false';
+  if (wantWith && !challengeDraw.length) {
+    throw new Error(`no challenges drawn: band "${band}" draws none (SIMPLE_BANDS) — pass params.forceBands=3 (or 6/9) to draw anyway, or run withDraw=false`);
+  }
+
+  const orig = PROMPT_TEMPLATES.storyTrial;
+  if (promptOverride) PROMPT_TEMPLATES.storyTrial = promptOverride;
+  let basePrompt;
+  try {
+    basePrompt = buildTrialStoryPrompt(inputData, pageCount);
+  } finally {
+    PROMPT_TEMPLATES.storyTrial = orig;
+  }
+  if (!basePrompt) throw new Error('story-trial template unavailable');
+
+  const usage = [];
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+  const runArm = async (label, prompt) => {
+    const t = Date.now();
+    const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_trial_challenge_draw' });
+    if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
+      throw new Error(`writer ${model} returned an empty response on the "${label}" arm — provider failure, not a result`);
+    }
+    usage.push({ cost: costOf(res), modelId: res.modelId, usage: res.usage });
+    const body = String(res.text || '');
+    const pagesSection = body.includes('---STORY PAGES---') ? body.split('---STORY PAGES---').slice(1).join('---STORY PAGES---') : body;
+    return {
+      arm: label,
+      modelId: res.modelId,
+      elapsedMs: Date.now() - t,
+      cost: costOf(res),
+      usage: res.usage,
+      promptChars: prompt.length,
+      prompt,
+      title: (body.match(/TITLE:\s*(.+)/) || [, ''])[1].trim() || null,
+      pages: parsePageBlocks(pagesSection).map(p => ({ pageNumber: p.pageNumber, text: p.text.split('SCENE HINT:')[0].replace(/^TEXT:\s*/i, '').trim() })),
+      rawResponse: body.slice(0, 40000),
+    };
+  };
+
+  const armsOut = [];
+  // Sequential: two writer calls of a whole story, and a failure on the second
+  // must still leave the first readable.
+  if (wantWithout) armsOut.push(await runArm('without-draw', basePrompt));
+  if (wantWith) armsOut.push(await runArm('with-draw', `${basePrompt}\n\n${drawSection}`));
+
+  return {
+    storyId: target.storyId,
+    model,
+    modelId: usage[0]?.modelId || null,
+    pages: pageCount,
+    commission: inputData.storyDetails || null,
+    commissionEmpty: !String(inputData.storyDetails || '').trim(),
+    // The band question, stated rather than inferred.
+    ageBand: band,
+    bandDrawsChallenges: drawSource === 'production',
+    drawSource,
+    bandShapeText: bandShapeText.slice(0, 4000),
+    challengeDraw,
+    challengeDrawCount: challengeDraw.length,
+    drawSection,
+    modelCalls: usage.length,
+    cost: usage.reduce((a, u) => a + (u.cost || 0), 0),
+    usage: usage.reduce((a, u) => ({
+      input_tokens: (a.input_tokens || 0) + (u.usage?.input_tokens || 0),
+      output_tokens: (a.output_tokens || 0) + (u.usage?.output_tokens || 0),
+    }), {}),
+    arms: armsOut,
+  };
+}
+
+/**
+ * BEATS RE-PLAN PLUMBING — does the planner emit the blocks the parsers read?
+ *
+ * Commits 981fcb27a + 7ed94f65c made the re-plan DECLARE its structural changes
+ * under `---CHANGES---` and the plan check answer its obstacle question as
+ * `OBSTACLES <page>: <name>` data. The merge then enforces the rule that gives
+ * the design its teeth: **a change you do not declare is undone**.
+ *
+ * Every result behind that design so far is a REPLAY over stored rows, and no
+ * stored row carries either block — neither existed before 2026-09-18. So the
+ * load-bearing question was untested: if the planner does not emit a parseable
+ * change block (wrong marker, markdown fence, renamed, omitted), then every
+ * change it made reads as undeclared, every one is restored, and the round is a
+ * silent NO-OP. On a paid run that is invisible — no error, no warning, a book
+ * that ships round one's division while the log says the plan was re-divided.
+ *
+ * This stage answers that and only that. It is a PLUMBING check, not an
+ * accuracy measurement: it asks whether the two blocks arrive in the shape
+ * `parsePlanChanges` and `parsePlanCheckObstacles` expect, not whether the
+ * re-plan's judgement was good.
+ *
+ * WHAT IT RUNS. Round one's division is the story's OWN first division, frozen
+ * (`beatsReviewReport.briefsIn`, written before any re-plan touched it), so no
+ * paid planner call is spent re-deriving a division that is already stored.
+ * Two paid text calls follow, in production's order and with production's
+ * arguments: the plan check, then the re-plan. The merge, the review and the
+ * restore are then replayed by `analyzeReplanCompliance` below.
+ *
+ * WHAT IT CANNOT SEE. A replay has no arc-machine commit, so `declaredInvented`
+ * and `inventedAllowance` are null and the premise figures are absent from
+ * `commissionedNames` — the INVENTED_* counters may therefore differ from the
+ * ones this story drew when it ran. The cast-per-page counters, which are what
+ * a re-plan's removals are judged against, are unaffected.
+ */
+
+/** The `---CHANGES---` segment exactly as the model wrote it, marker included. */
+function rawChangesBlock(text) {
+  const m = String(text || '').match(/---\s*CHANGES\s*---([\s\S]*?)(?=\n---\s*[A-Z][A-Z ]*---|$)/i);
+  return m ? m[0] : '';
+}
+
+/** Every line that LOOKS like an obstacle declaration, before any parsing. */
+function rawObstacleLines(text) {
+  return String(text || '')
+    .split('\n')
+    .map(l => l.trim().replace(/\*\*/g, '').trim())
+    .filter(l => /^OBSTACLES?\s+\d+\s*:/i.test(l));
+}
+
+/**
+ * The verdict on one re-plan response: are the two blocks there, do the
+ * production parsers read them without loss, and — the headline — would the
+ * round have been a no-op?
+ *
+ * The parsers, the reviewer and the restore are the PRODUCTION functions
+ * (`parsePlanChanges`, `parsePlanCheckObstacles`, `reviewPlanChanges`,
+ * `castLostByReplan`). The merge around them is replayed from
+ * beatsPipeline.js's re-plan round (the loop is inline there, so it cannot be
+ * called) and must be kept in step with it — the guards below are that loop's
+ * duplicate-line and page-count guards in the same order.
+ *
+ * Pure: no model, no database, no clock. Canned text in, verdict out.
+ */
+function analyzeReplanCompliance({
+  replanText = '', checkText = '', standing = [], findings = [],
+  castNames = [], aliases = {}, maxCast = 3,
+} = {}) {
+  const { parsePlanResponse, parsePlanChanges, parsePlanCheckObstacles, findingPages } = require('./promptBuilders');
+  const { reviewPlanChanges, castLostByReplan } = require('./planCounters');
+
+  const standingBy = new Map(standing.map(b => [Number(b.pageNumber), b]));
+  const parsed = parsePlanResponse(String(replanText || ''), [...standingBy.keys()]);
+  const declared = parsePlanChanges(String(replanText || ''));
+  const obstacles = parsePlanCheckObstacles(String(checkText || ''));
+
+  // ── the merge, as beatsPipeline runs it ───────────────────────────────────
+  const namedPages = new Set();
+  for (const f of findings || []) for (const n of findingPages(f)) namedPages.add(Number(n));
+  const declaredPages = new Set();
+  for (const c of declared.changes) {
+    if (Number.isFinite(c.pageNumber)) declaredPages.add(Number(c.pageNumber));
+    if (Number.isFinite(c.toPage)) declaredPages.add(Number(c.toPage));
+    if (Number.isFinite(c.fromPage)) declaredPages.add(Number(c.fromPage));
+  }
+  const scopeAll = namedPages.size === 0;
+  const inScope = n => namedPages.has(Number(n)) || declaredPages.has(Number(n));
+  let merged = [];
+  for (const pg of parsed.pages) {
+    const n = Number(pg.pageNumber);
+    merged.push(scopeAll || inScope(n) || !standingBy.has(n) ? pg : standingBy.get(n));
+  }
+  for (const [num, pg] of standingBy) if (!merged.some(k => Number(k.pageNumber) === num)) merged.push(pg);
+  merged.sort((a, b) => Number(a.pageNumber) - Number(b.pageNumber));
+  const overridden = scopeAll ? [] : parsed.pages
+    .map(pg => Number(pg.pageNumber))
+    .filter(n => !inScope(n) && standingBy.has(n));
+
+  // ── review, then apply ────────────────────────────────────────────────────
+  const restore = (nums) => {
+    const want = new Set(nums.map(Number));
+    merged = merged.map(pg => (want.has(Number(pg.pageNumber)) && standingBy.has(Number(pg.pageNumber))
+      ? standingBy.get(Number(pg.pageNumber))
+      : pg));
+  };
+  const review = reviewPlanChanges({
+    changes: declared.changes, standing, returned: merged, castNames, aliases, maxCast, obstacles,
+  });
+  restore(review.refusals.map(r => r.pageNumber));
+  const lost = castLostByReplan(standing, merged, castNames, aliases, review.declaredOut);
+  restore(lost.map(l => l.pageNumber));
+
+  // ── the round-level guards, in beatsPipeline's order ──────────────────────
+  const instants = merged.map(pg => String(pg.planLine || '').toLowerCase().replace(/\s+/g, ' ').trim());
+  const duplicate = instants.find((t, k) => t && instants.indexOf(t) !== k) || null;
+  const discardReason = duplicate
+    ? `two pages returned with an identical plan line: "${duplicate.slice(0, 120)}"`
+    : (merged.length !== standing.length
+      ? `returned ${merged.length} page(s) for a ${standing.length}-page book`
+      : null);
+
+  // ── what actually changed ─────────────────────────────────────────────────
+  const lineOf = (pg) => String((pg && pg.planLine) || '').trim();
+  const changedRaw = parsed.pages
+    .filter(pg => standingBy.has(Number(pg.pageNumber)) && lineOf(standingBy.get(Number(pg.pageNumber))) !== lineOf(pg))
+    .map(pg => Number(pg.pageNumber));
+  const changedApplied = discardReason ? [] : merged
+    .filter(pg => standingBy.has(Number(pg.pageNumber)) && lineOf(standingBy.get(Number(pg.pageNumber))) !== lineOf(pg))
+    .map(pg => Number(pg.pageNumber));
+  const restoredPages = changedRaw.filter(n => !changedApplied.includes(n));
+
+  // ── the plumbing checks ───────────────────────────────────────────────────
+  const norm = s => String(s || '').trim().replace(/\*\*/g, '').trim();
+  const isCountLine = l => /^changes?\s*:\s*\d+\s*$/i.test(l);
+  const blockRaw = rawChangesBlock(replanText);
+  const blockLines = blockRaw ? blockRaw.split('\n').slice(1).map(norm).filter(Boolean) : [];
+  const consumed = new Set(declared.changes.map(c => norm(c.line)));
+  const unparsedLines = blockLines.filter(l => !consumed.has(l) && !isCountLine(l));
+  const countMatches = declared.declaredCount != null && declared.declaredCount === declared.counted;
+  const unreadableVerbs = declared.changes.filter(c => c.kind === 'other');
+  const untagged = declared.changes.filter(c => !c.answers);
+  const reasonless = declared.changes.filter(c => !String(c.reason || '').trim());
+  const outsidePlan = parsed.pages.map(pg => Number(pg.pageNumber)).filter(n => !standingBy.has(n));
+  const obstacleLines = rawObstacleLines(checkText);
+  // A line whose names column is empty or "none" declares no obstacle, so the
+  // parser skipping it is correct — not a line it failed to read.
+  const namedObstacleLines = obstacleLines.filter(l => !/:\s*(none)?\s*$/i.test(l));
+
+  const check = (id, pass, detail, extra = {}) => ({ id, pass: !!pass, detail, ...extra });
+  const checks = [
+    check(1, declared.present,
+      declared.present
+        ? `a ---CHANGES--- block is present and carries ${declared.counted} change line(s)`
+        : 'NO ---CHANGES--- block in the response — every structural change reads as undeclared'),
+    check(2, declared.present && unparsedLines.length === 0 && countMatches,
+      `${unparsedLines.length} block line(s) the parser did not read; declared count ${declared.declaredCount == null ? '(absent)' : declared.declaredCount} vs ${declared.counted} enumerated`,
+      { unparsedLines, declaredCount: declared.declaredCount, counted: declared.counted, countMatches }),
+    check(3, declared.present && unreadableVerbs.length === 0,
+      `${unreadableVerbs.length} change line(s) outside the declared vocabulary`,
+      { unreadable: unreadableVerbs.map(c => c.line), kinds: declared.changes.map(c => c.kind) }),
+    check(4, declared.present && untagged.length === 0 && reasonless.length === 0,
+      `${untagged.length} change line(s) carry no PLAN[CODE]/CHECK[n] tag, ${reasonless.length} carry no reason`,
+      { untagged: untagged.map(c => c.line), reasonless: reasonless.map(c => c.line) }),
+    check(5, lost.length === 0,
+      `${lost.length} page(s) lost cast the round never declared`,
+      { undeclaredRemovals: lost }),
+    check(6, outsidePlan.length === 0,
+      outsidePlan.length ? `returned page number(s) not in the plan: ${outsidePlan.join(', ')}` : 'every returned page number is already in the plan',
+      { outsidePlan }),
+    check(7, obstacleLines.length > 0,
+      `${obstacleLines.length} OBSTACLES line(s) in the plan-check response`),
+    // Read, not merely present: a line naming somebody must arrive in the map.
+    // A response with no lines at all fails here as well as at check 7 — there
+    // is nothing for the parser to hand the review.
+    check(8, obstacleLines.length > 0 && obstacles.size === namedObstacleLines.length,
+      `parsePlanCheckObstacles read ${obstacles.size} page(s) from ${namedObstacleLines.length} line(s) naming somebody (${obstacleLines.length} raw)`,
+      { parsedPages: [...obstacles.keys()].sort((a, b) => a - b) }),
+    // ONE LINE, ONE CHANGE. The parser reads a packed line correctly rather
+    // than mis-reading it, so this check costs the round nothing — it is the
+    // measurement of how often the planner keeps the contract, which is what
+    // decides whether an escalation is ever worth a paid re-ask.
+    check(9, declared.present && declared.violations.length === 0,
+      `${declared.violations.length} format violation(s) across ${declared.lines} change line(s): ${
+        declared.violations.length
+          ? [...new Set(declared.violations.map(v => v.rule))].join(', ')
+          : 'one change per line, every cast subject a bare name'}`,
+      { formatViolations: declared.violations, changeLines: declared.lines }),
+  ];
+
+  return {
+    checks,
+    passed: checks.filter(c => c.pass).length,
+    failed: checks.filter(c => !c.pass).map(c => c.id),
+    // The raw blocks, line by line, so a reader sees what the model wrote
+    // rather than a verdict about it.
+    changesBlockLines: blockRaw ? blockRaw.split('\n') : [],
+    obstaclesLines: obstacleLines,
+    declaredChanges: declared.changes.map(c => ({
+      page: c.pageNumber, kind: c.kind, subject: c.subject, answers: c.answersText, reason: c.reason,
+    })),
+    // How many CHANGES the block declared, over how many lines, and every way
+    // the format was broken — the violation rate an escalation decision needs.
+    declaredCount: declared.declaredCount,
+    changesParsed: declared.counted,
+    changeLines: declared.lines,
+    formatViolations: declared.violations,
+    refusals: review.refusals,
+    reviewNotes: review.notes,
+    undeclaredRemovals: lost,
+    undeclaredRemovalCount: lost.length,
+    // THE HEADLINE. A round whose applied division equals the standing one
+    // changed nothing the book will ever see.
+    noOp: changedApplied.length === 0,
+    discardReason,
+    changedPagesReturned: changedRaw,
+    changedPagesApplied: changedApplied,
+    restoredPages,
+    restoredOnlyDifference: changedApplied.length > 0 && restoredPages.length > 0,
+    pagesTheMergeOverrode: overridden,
+    returnedPages: parsed.pages.map(pg => Number(pg.pageNumber)),
+    appliedPlan: merged.map(pg => ({ pageNumber: Number(pg.pageNumber), planLine: lineOf(pg) })),
+  };
+}
+
+/**
+ * ONE plan check + ONE re-plan against a stored story's first division, then
+ * the compliance verdict. Text only — no image spend, no story run.
+ *
+ * params.planModel  — the re-planner (default: production's outline model)
+ * params.checkModel — the plan checker (default: production's planCheckModel)
+ */
+async function runBeatsReplanStage(target, { params = {} }) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  await loadPromptTemplates();
+  const {
+    buildBeatsPrompt, buildPlanCheckPrompt, parsePlanCheck, parsePlanCheckRoster,
+    parsePlanCheckObstacles, buildReplanSection, getHistoricalLocations, getHistoricalObjects,
+  } = require('./promptBuilders');
+  const { parseBeats } = require('./storyHelpers');
+  const { runPlanCounters, collectPlaceNames } = require('./planCounters');
+  const { callTextModelStreaming } = require('./textModels');
+  const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+
+  // ROUND ONE'S DIVISION, FROZEN. `briefsIn` is written from `plan.pages` — the
+  // FIRST division, before any re-plan round touched it — so the findings this
+  // stage raises are findings against the same division the story's own check
+  // saw. `pagePlan` on the report is the SHIPPED division and is deliberately
+  // not used: re-checking the post-re-plan division would measure a different
+  // round from the one the stored findings describe.
+  const briefsIn = storyData?.beatsReviewReport?.briefsIn || [];
+  const standing = briefsIn
+    .filter(b => b && b.pageNumber != null)
+    .map(b => ({ pageNumber: Number(b.pageNumber), planLine: String(b.brief || '').replace(/^\s*PLAN:\s*/i, '').trim() }))
+    .filter(b => b.planLine)
+    .sort((a, b) => a.pageNumber - b.pageNumber);
+  if (standing.length === 0) {
+    throw new Error(`story ${target.storyId} carries no beatsReviewReport.briefsIn plan lines — nothing to re-divide`);
+  }
+  const pagePlan = standing.map(pg => `Page ${pg.pageNumber}: ${pg.planLine}`).join('\n');
+  const pageCount = standing.length;
+
+  const approvedArc = resolveReplayArc(storyData, { parseBeats });
+  const arcHints = resolveReplayArcHints(storyData);
+
+  const checkModel = params.checkModel || MODEL_DEFAULTS.planCheckModel;
+  const planModel = params.planModel || MODEL_DEFAULTS.outline;
+  for (const m of [checkModel, planModel]) if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+
+  // Production's counter inputs, as far as a stored story carries them (see the
+  // header: the arc machine's premise figures and invented allowance do not
+  // survive into the row).
+  const commissionedNames = (storyData?.characters || []).map(c => c && c.name).filter(Boolean);
+  const placeNames = collectPlaceNames(storyData, [
+    ...(storyData?.storyCategory === 'historical'
+      ? [...getHistoricalLocations(storyData.storyTopic), ...getHistoricalObjects(storyData.storyTopic)].map(e => e && e.name)
+      : []),
+  ]);
+  const maxCast = IMAGE_MODELS[storyData?.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage]?.maxCharactersPerScene || 3;
+
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+
+  // ── the plan check ────────────────────────────────────────────────────────
+  const checkPrompt = buildPlanCheckPrompt(storyData, standing, approvedArc, pagePlan, []);
+  if (!checkPrompt) throw new Error('plan-check template unavailable');
+  let t = Date.now();
+  const checkRes = await callTextModelStreaming(checkPrompt, null, null, checkModel, {
+    usageLabel: 'testlab_beats_replan_check',
+    ...(TEXT_MODELS[checkModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
+  });
+  if (!String(checkRes.text || '').trim()) throw new Error(`plan checker ${checkModel} returned an empty response — provider failure, not a result`);
+  const checkMs = Date.now() - t;
+  const modelFindings = parsePlanCheck(checkRes.text || '');
+  const roster = parsePlanCheckRoster(checkRes.text || '');
+  const obstacles = parsePlanCheckObstacles(checkRes.text || '');
+  const counters = runPlanCounters({
+    pages: standing, commissionedNames, placeNames, maxCharactersPerScene: maxCast, roster,
+  });
+  const findings = [
+    ...counters.findings.map((f, i) => ({ kind: 'counter', code: f.code, line: counters.lines[i] })),
+    ...modelFindings.map(f => ({ kind: 'check', check: f.check, line: `CHECK[${f.check}]: ${f.text}` })),
+  ];
+  if (findings.length === 0) {
+    throw new Error('the plan check raised no finding against this division — there is nothing for a re-plan to answer, so pick a story whose check fires');
+  }
+
+  // ── the re-plan ───────────────────────────────────────────────────────────
+  const replanSection = buildReplanSection(pagePlan, findings, { pageCount });
+  const replanPrompt = buildBeatsPrompt(storyData, pageCount, { finalArc: approvedArc, arcHints, replan: replanSection });
+  if (!replanPrompt) throw new Error('story-beats template unavailable');
+  t = Date.now();
+  const rpRes = await callTextModelStreaming(replanPrompt, null, null, planModel, { usageLabel: 'testlab_beats_replan' });
+  if (!String(rpRes.text || '').trim()) throw new Error(`planner ${planModel} returned an empty response — provider failure, not a result`);
+  const replanMs = Date.now() - t;
+
+  const verdict = analyzeReplanCompliance({
+    replanText: rpRes.text || '',
+    checkText: checkRes.text || '',
+    standing,
+    findings,
+    castNames: (counters.cast && counters.cast.all) || commissionedNames,
+    aliases: (counters.cast && counters.cast.aliases) || {},
+    maxCast,
+  });
+
+  const { appliedPlan, ...reportFields } = verdict;
+
+  return {
+    storyId: target.storyId,
+    pages: pageCount,
+    models: { checkModel, checkModelId: checkRes.modelId || checkModel, planModel, planModelId: rpRes.modelId || planModel },
+    elapsedMs: checkMs + replanMs,
+    cost: costOf(checkRes) + costOf(rpRes),
+    usage: {
+      input_tokens: (checkRes.usage?.input_tokens || 0) + (rpRes.usage?.input_tokens || 0),
+      output_tokens: (checkRes.usage?.output_tokens || 0) + (rpRes.usage?.output_tokens || 0),
+    },
+    note: `${verdict.passed}/${verdict.checks.length} plumbing checks pass — ${verdict.changesParsed} change(s) on ${verdict.changeLines} line(s), ${verdict.formatViolations.length} format violation(s), ${verdict.refusals.length} refusal(s) — ${verdict.noOp ? 'the round WOULD have been a no-op' : `${verdict.changedPagesApplied.length} page(s) survive to the book`}${verdict.discardReason ? ` (round discarded: ${verdict.discardReason})` : ''}`,
+    // `report` is what the Lab renders for this stage (client TestLab.tsx).
+    // The applied division travels beside it rather than inside: the rendered
+    // block stays the verdict, not a second copy of the page plan.
+    report: reportFields,
+    appliedPlan,
+    standingPlan: standing,
+    findings: findings.map(f => f.line),
+    counterStats: counters.stats,
+    cast: counters.cast,
+    rosterPages: roster ? roster.size : 0,
+    obstaclePages: [...obstacles.keys()].sort((a, b) => a - b),
+    replanSection,
+    checkPrompt,
+    replanPrompt,
+    checkRawResponse: (checkRes.text || '').slice(0, 40000),
+    replanRawResponse: (rpRes.text || '').slice(0, 40000),
+  };
+}
+
 const STORY_STAGES = {
+  trial_idea_variety: runTrialIdeaVarietyStage,
+  trial_challenge_draw: runTrialChallengeDrawStage,
+  vb_element_cell: runVbElementCellStage,
   arc_rounds: runArcRoundsStage,
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
@@ -7642,9 +9391,10 @@ const STORY_STAGES = {
   audit_replay: runAuditReplayStage,
   scene_hazard_count: runSceneHazardCountStage,
   style_repair: runStyleRepairStage,
-  outline_review: runOutlineReviewStage,
+  // outline_review retired 2026-09-13 — see the note above runTextRefineStage.
   text_refine: runTextRefineStage,
   beats_scenes: runBeatsScenesStage,
+  beats_replan: runBeatsReplanStage,
   scene_review_replay: runSceneReviewReplayStage,
   story_bible_replay: runStoryBibleReplayStage,
   story_text_replay: runStoryTextReplayStage,
@@ -7707,6 +9457,11 @@ async function runStageOnTarget(stage, target, opts) {
       // target JSON — that is what lets two versions of ONE page be two
       // separate members of the same set.
       ctx.target = target;
+      // A pinned version, resolved ONCE. Two stages read ctx.versionIndex, and
+      // nothing ever set it — so both silently judged whatever version was
+      // active. That is how the p9 face bake-off (#1209-#1216) compared the
+      // repaired render against itself while reporting one arm as the original.
+      ctx.versionIndex = pinnedVersionIndex(target.versionIndex);
       return await runner(ctx, opts);
     });
     result = captureRun.result;
@@ -7774,7 +9529,7 @@ async function checkRuleGenericity(ruleText, storyId) {
     const { callTextModel } = require('./textModels');
     const check = await callTextModel(
       `You review a rule that will be appended to an illustration-prompt template used for EVERY story. Rule:\n"${text}"\nFlag wording that is specific to one story or scene: entity names, place names, plot objects, or phrasing that only applies to a single situation. Broad archetypes (a vehicle, a guard, the main character) are fine. Reply JSON only: {"generic": true|false, "issues": ["..."]}.`,
-      500, null, { usageLabel: 'testlab_genericity' }
+      null, null, { usageLabel: 'testlab_genericity' }
     );
     const m = String(check.text || '').match(/\{[\s\S]*\}/);
     if (m) {
@@ -7788,6 +9543,16 @@ async function checkRuleGenericity(ruleText, storyId) {
 }
 
 module.exports = {
+  pinnedVersionIndex,
+  applyReviewerPages,
+  // beats_scenes truncation recovery — exported so the decisions can be pinned
+  // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
+  collectAllPagesBriefs,
+  summarizeSceneExpansions,
+  // exported for tests/unit/idea-premise-grouping.test.js
+  groupIdeasByPremise,
+  ideaPremiseSkeleton,
+  ideaSubjectWords,
   STAGES: [...Object.keys(STAGE_RUNNERS), ...Object.keys(AVATAR_STAGES), ...Object.keys(STORY_STAGES)],
   STORY_STAGES: Object.keys(STORY_STAGES),
   AVATAR_STAGE_NAMES: Object.keys(AVATAR_STAGES),
@@ -7797,6 +9562,15 @@ module.exports = {
   loadTestImage,
   resolveReplayParams,
   loadActivePageImage,
+  // The identity-vote replay, exported so its arithmetic can be pinned without
+  // a database, a story or a paid VLM call: what the witness said, whether the
+  // vote withheld a rename, and how that classifies against a pixel-judged
+  // verdict (tests/unit/testlab-identity-second-opinion.test.ts).
+  runIdentitySecondOpinionStage,
+  // The re-plan compliance verdict, exported so the plumbing checks and
+  // the no-op comparison can be pinned on canned responses — no model, no
+  // database (tests/unit/testlab-beats-replan.test.ts).
+  analyzeReplanCompliance,
   checkRuleGenericity,
   // The scorecard judge itself. Every stage runner in this file already calls
   // it; exporting it lets a measurement score an arbitrary artifact (the text

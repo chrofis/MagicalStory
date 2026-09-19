@@ -32,7 +32,10 @@ export type TrialStep =
   | 'create_clicked'
   | 'generation_started'
   | 'generation_completed'
-  | 'email_submitted';
+  /** The email LEAD — optional, the Google signup path never passes through it. */
+  | 'email_submitted'
+  /** Terminal: a real account exists, via either auth method (meta.method). */
+  | 'account_created';
 
 interface Attribution {
   utmSource?: string;
@@ -136,7 +139,11 @@ export function captureAttribution(): Attribution {
  * Record one funnel step. Safe to call repeatedly for the same step.
  *
  * @param step - one of TrialStep
- * @param meta - small, bounded context only (never image bytes)
+ * @param meta - small, bounded context only (never image bytes). The server
+ *   keeps an ALLOWLIST (TRIAL_META_SCHEMA in server/routes/trial.js) and drops
+ *   everything else silently, so a new key here needs a matching entry there or
+ *   it is simply never stored. Ids and flags only — never anything a visitor
+ *   typed, and never the child's name.
  */
 export function trackTrialStep(step: TrialStep, meta?: Record<string, unknown>): void {
   try {
@@ -153,7 +160,12 @@ export function trackTrialStep(step: TrialStep, meta?: Record<string, unknown>):
     // sendBeacon can't carry the session token, so authenticated visits (which
     // is how the server learns the user id) take the fetch path. Everything
     // before the account exists goes by beacon and survives an unload.
-    const sessionToken = localStorage.getItem('trial_session_token');
+    // After the Google link the trial session token is deleted and only
+    // `auth_token` remains — without this fallback every post-signup event went
+    // out as an unauthenticated beacon and the server resolved no user id.
+    // Falling back here rather than re-ordering the sign-in code keeps the fix
+    // independent of the order of statements in any one caller.
+    const sessionToken = localStorage.getItem('trial_session_token') || localStorage.getItem('auth_token');
     if (!sessionToken && navigator.sendBeacon) {
       navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
       return;

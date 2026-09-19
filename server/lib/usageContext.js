@@ -54,4 +54,30 @@ function recordTextUsage(provider, usage, label, modelId) {
   }
 }
 
-module.exports = { usageContext, setUsageSink, runWithUsageSink, recordTextUsage };
+/**
+ * Record an IMAGE-model call's usage into the active job's sink.
+ *
+ * Same sink, same contract — a separate name because an image render is booked
+ * under an image provider key (`gemini_image` / `grok` / `runware`), and a
+ * render booked through a function documented as text-only reads as a mistake.
+ * Use this wherever a render has no `usageTracker` closure threaded to it:
+ * the reference-sheet grids (referenceSheets.js) rendered through
+ * `callGeminiAPIForImage` with no tracker at all and so appeared under NO
+ * `byFunction` key, while every other image call in the same job was costed.
+ *
+ * @param {string} provider - tokenUsage provider key (gemini_image / grok / runware)
+ * @param {object} usage - { input_tokens, output_tokens, thinking_tokens?, direct_cost? }
+ * @param {string} label - byFunction bucket name (e.g. 'vb_reference_sheet')
+ * @param {string} modelId - resolved model id
+ */
+function recordImageUsage(provider, usage, label, modelId) {
+  const store = usageContext.getStore();
+  if (!store || typeof store.addUsage !== 'function') return;
+  try {
+    store.addUsage(provider, usage, label || 'image_uncategorized', modelId);
+  } catch {
+    // Accounting is best-effort; a sink error must not surface to the render.
+  }
+}
+
+module.exports = { usageContext, setUsageSink, runWithUsageSink, recordTextUsage, recordImageUsage };

@@ -7,8 +7,13 @@ const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;
 const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
 
 // Image quality threshold - regenerate if score below this value (0-100 scale)
-const { REPAIR_DEFAULTS } = require('../config/models');
-const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || REPAIR_DEFAULTS.scoreThreshold;
+// MANUAL admin repair workflow STOP condition -- PINNED at 50, deliberately NOT
+// REPAIR_DEFAULTS.scoreThreshold (owner, 2026-09-09). The pipeline floor moved
+// 50 -> 60 for AUTOMATIC repair rounds; deriving this from it would silently make
+// operator-driven "repair until good" grind every page up to 60 and multiply the
+// cost of a manual session. Operator behaviour is unchanged.
+const MANUAL_REPAIR_STOP_SCORE = 50;
+const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || MANUAL_REPAIR_STOP_SCORE;
 
 // Server configuration
 const PORT = process.env.PORT || 3000;

@@ -1,0 +1,23 @@
+Some elements of a Visual Bible carry a faulty label. Return corrected labels.
+
+A label is the only handle the illustration prompt has on an element. Each element needs exactly one:
+
+- English, one to four words, ending in the noun
+- unique across every element in this bible
+- names the thing, not its category ("copper lantern", not "object")
+- not the element's proper name
+- no word from the story language, no element id
+
+# FAULTS
+
+{LABEL_FINDINGS}
+
+# ELEMENTS
+
+{LABEL_ENTRIES}
+
+Return corrected labels for the listed ids only:
+
+{"labels":[{"id":"…","label":"…"}]}
+
+Return that JSON and nothing else.

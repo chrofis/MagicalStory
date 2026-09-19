@@ -44,6 +44,22 @@ const { renderCharacterInPhantomPose } = require('./phantomPoseRender');
 const { stripDataUriPrefix, bytesFromAnyImage } = require('./r2');
 const { GROK_ASPECT_PRESETS, closestGrokAspect } = require('./grokAspect');
 const { rembgRemoveBackground } = require('./rembg');
+const { scrubVbIds, warnIfVbIds } = require('./vbIdGuard');
+const { assertPromptFilled } = require('../services/prompts');
+
+/**
+ * Every blend prompt goes through here before it reaches Grok. The blend
+ * census is built from the brief's interactions, whose `object` is a raw
+ * bible id, and until 2026-09-10 nothing in this module scrubbed it - the
+ * sent prompt read "Looking at ART001.1", noise to an image model (the same
+ * leak the cover path fixed in 2026-08). With a bible the id becomes its name;
+ * without one it becomes a generic noun. warnIfVbIds keeps the alarm on.
+ */
+function scrubBlendPrompt(prompt, visualBible, tag) {
+  const out = scrubVbIds(String(prompt || ''), visualBible || null);
+  warnIfVbIds(out, `scene-composite blend prompt (${tag})`, { kind: 'image' });
+  return out;
+}
 
 const PHOTO_ANALYZER_URL = photoAnalyzerUrl();
 
@@ -120,11 +136,6 @@ const BODY_SAT_FLOOR = 0.45;
 // whole figure does not come near it. The old colour head-band could never
 // have supported it: there, every figure on a plate sat between 2.43 and 3.05.
 const MAX_SHOWN_TO_COUNT_AS_OCCLUDED = 0.75;
-// The tallest figure on the plate must be at least this many times the
-// shortest for the scene to have the depth the composite exists to fix.
-// Calibrated on three pages: 2.77 (real depth, keep), 1.73 and 1.08 (no
-// depth, abort). See the abort block in generateSceneComposite.
-const MIN_DEPTH_SPREAD = 2.0;
 
 // ─── Grok aspect preset picker ────────────────────────────────────────────
 //
@@ -492,6 +503,23 @@ async function findSilhouettesWithDino(populatedBuf, cast, opts = {}) {
       }
     }
 
+    // A head cannot be its own body. DINO's "face" box on a featureless
+    // silhouette is sometimes the whole figure, and the tint scan inside it
+    // then runs crown to hands, so the head came out equal to the box (Lab exp
+    // 1086/1089/1091: head 705 on a 705px figure - the sizer read "18% on
+    // show", scaled the figure to 3910px and pasted a giant head; the same
+    // page measured 135px in exp 1087). The one existing check only rejects a
+    // tint too SMALL for its box. Reject the other direction on geometry: a
+    // head that is most of a figure whose box has full-body proportions. A
+    // silhouette that really is only a head above a wall is near-square and
+    // keeps its measurement, which is the case the occlusion sizing exists for.
+    {
+      const figH = maxY - minY + 1, figW = Math.max(1, maxX - minX + 1);
+      if (head && head.height >= figH * 0.6 && figH / figW >= 2.0) {
+        log.warn(`[SCENE COMPOSITE]   ${s.name}: head ${head.height}px on a ${figW}×${figH} full-body silhouette (${head.source}) is not a head — measurement dropped, figure sized as painted`);
+        head = null;
+      }
+    }
     results[s.name] = {
       bbox: { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1, pixels: count },
       head,
@@ -831,14 +859,79 @@ async function cropSheetCellFixed(sheetBuf, cellIdx) {
     .toBuffer();
 }
 
+// A 2×4 character sheet is drawn on a UNIFORM grid: four columns of the same
+// width, one figure each. So a detected split whose columns are wildly uneven
+// is not an uneven sheet — it is a separator that missed its gutter and landed
+// inside a figure, and the cell either swallows a slice of the neighbour or
+// loses a slice of its own character.
+//
+// Measured on 119 stored staging sheets (all 1024×1024, nominal column 256px),
+// run through the deployed detector: 115 sit at a max column deviation of
+// 0-19.1% from nominal, then the distribution GAPS to 41.8%, 42.6%, 51.6%,
+// 56.2% — four sheets where a separator is plainly in the wrong place. The
+// worst of those four is the reference that shipped on all three covers of
+// job_1789759147125_p08djwhbl: Kiaan's columns came out [365, 164, 226, 269],
+// so his front cell was 365px of him PLUS a vertical slice of the boy in the
+// next column, and column 1 was the 164px remainder of that boy.
+//
+// 25% sits inside that gap: 1.3× above the widest deviation any good split
+// showed, 1.7× below the narrowest broken one. Rejecting is cheap — the fixed
+// width/4 grid is what every caller already falls back to when the analyzer is
+// down — so the bound leans towards rejecting a borderline split rather than
+// shipping a two-figure reference.
+const SHEET_COLUMN_WIDTH_TOLERANCE = 0.25;
+
+/**
+ * Does a detected column split look like a real grid? Pure — no image, no
+ * network — so the bound can be pinned by tests without an analyzer.
+ *
+ * @param {number[]} widths - detected column widths, left to right
+ * @param {Object} [opts]
+ * @param {number} [opts.cols=4] - how many columns the sheet is drawn on
+ * @param {number} [opts.tolerance=SHEET_COLUMN_WIDTH_TOLERANCE] - allowed
+ *   fractional deviation of any one column from the nominal width
+ * @returns {{ok: boolean, maxDeviation: number, reason?: string}}
+ */
+function judgeSheetColumnSplit(widths, opts = {}) {
+  const { cols = 4, tolerance = SHEET_COLUMN_WIDTH_TOLERANCE } = opts;
+  if (!Array.isArray(widths) || widths.length !== cols
+      || widths.some(w => !Number.isFinite(w) || w <= 0)) {
+    return {
+      ok: false,
+      maxDeviation: Infinity,
+      reason: `expected ${cols} positive column widths, got ${JSON.stringify(widths)}`,
+    };
+  }
+  // The columns tile the sheet, so their mean IS width/cols — one comparison
+  // answers both "does it deviate from its siblings" and "from the fixed grid".
+  const nominal = widths.reduce((a, b) => a + b, 0) / cols;
+  let maxDeviation = 0;
+  let worst = 0;
+  for (let i = 0; i < cols; i++) {
+    const dev = Math.abs(widths[i] - nominal) / nominal;
+    if (dev > maxDeviation) { maxDeviation = dev; worst = i; }
+  }
+  if (maxDeviation > tolerance) {
+    return {
+      ok: false,
+      maxDeviation,
+      reason: `column ${worst} is ${widths[worst]}px against a ${Math.round(nominal)}px nominal `
+        + `(${(maxDeviation * 100).toFixed(1)}% off, tolerance ${(tolerance * 100).toFixed(0)}%) `
+        + `— columns [${widths.join(', ')}]`,
+    };
+  }
+  return { ok: true, maxDeviation };
+}
+
 /**
  * Split a 2×4 sheet into 8 cells by EDGE DETECTION (Python /split-reference-sheet,
  * variance-based separator search), not fixed math. Returns an array of 8
  * PNG buffers in row-major order: cells[0..3] = top-row face cells,
  * cells[4..7] = bottom-row body cells. Cell index 1-8 maps to array index 0-7.
  *
- * On failure (Python service unreachable / errors), throws — caller falls
- * back to cropSheetCellFixed per-cell.
+ * Returns null when the detected columns fail the uniformity bound above —
+ * caller falls back to cropSheetCellFixed per-cell, same as it does when the
+ * service is unreachable (which throws).
  */
 async function splitSheetByEdgeDetection(sheetBuf) {
   const b64 = sheetBuf.toString('base64');
@@ -852,13 +945,32 @@ async function splitSheetByEdgeDetection(sheetBuf) {
   if (!data.success || !Array.isArray(data.cells)) {
     throw new Error(`split-reference-sheet bad response: ${data.error || JSON.stringify(data).slice(0,120)}`);
   }
-  return data.cells.map(b64png => b64png ? Buffer.from(b64png, 'base64') : null);
+  const cells = data.cells.map(b64png => b64png ? Buffer.from(b64png, 'base64') : null);
+
+  // Judge the CELLS that came back, not the separators the response reports:
+  // the crop is what a page actually gets, and it stays checkable if the
+  // response shape ever changes. Both rows share the column bounds, so the
+  // top row answers for all eight.
+  const COLS = 4;
+  const topRow = cells.slice(0, COLS);
+  if (topRow.length !== COLS || topRow.some(c => !c)) {
+    log.warn(`[SCENE COMPOSITE] edge-detection split returned ${topRow.filter(Boolean).length}/${COLS} top-row cells — falling back to the fixed ${COLS}-column grid`);
+    return null;
+  }
+  const widths = await Promise.all(topRow.map(async c => (await sharp(c).metadata()).width));
+  const verdict = judgeSheetColumnSplit(widths, { cols: COLS });
+  if (!verdict.ok) {
+    log.warn(`[SCENE COMPOSITE] edge-detection split REJECTED — ${verdict.reason}; falling back to the fixed ${COLS}-column grid`);
+    return null;
+  }
+  return cells;
 }
 
 /**
- * Get one cell from a sheet — uses edge detection when possible, falls back to
- * fixed math. The split result is memoised per sheetBuf so all 8 cells share a
- * single Python call.
+ * Get one cell from a sheet — uses edge detection when it produced a plausible
+ * grid, falls back to fixed math when it did not (or when the service is
+ * unreachable). The split result is memoised per sheetBuf so all 8 cells share
+ * a single Python call, and a rejected split is rejected once for all 8.
  */
 const _sheetSplitCache = new WeakMap();
 async function cropSheetCell(sheetBuf, cellIdx) {
@@ -874,6 +986,23 @@ async function cropSheetCell(sheetBuf, cellIdx) {
   const cells = _sheetSplitCache.get(sheetBuf);
   if (cells && cells[cellIdx - 1]) return cells[cellIdx - 1];
   return cropSheetCellFixed(sheetBuf, cellIdx);
+}
+
+/**
+ * Does the cut-out's figure run into the bottom edge of its image? A
+ * background-removed render whose last rows are still opaque across a real
+ * span was cropped by the renderer - the feet are outside the frame - and
+ * scaling it to a silhouette that HAS feet produces a footless figure
+ * (Lab exp 1093). Checked on the untrimmed cut-out, before trim hides it.
+ */
+async function figureTouchesBottomEdge(cutBuf, rows = 3, minFraction = 0.08) {
+  const { data, info } = await sharp(cutBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height, channels } = info;
+  let opaque = 0, total = 0;
+  for (let y = Math.max(0, height - rows); y < height; y++) {
+    for (let x = 0; x < width; x++) { total++; if (data[(y * width + x) * channels + 3] > 128) opaque++; }
+  }
+  return total > 0 && opaque / total >= minFraction;
 }
 
 /** Background-remove via the Python rembg service; white-threshold fallback. */
@@ -1182,6 +1311,483 @@ async function detectZOrderByOcclusion(populatedBuf, placements) {
  * Build the cast-line block (one line per silhouette) used by both the
  * populated-plate generate prompt and any future per-character spec.
  */
+// ─── figureMethod 'inPlace' — prompt + box-matching helpers (pure) ─────────
+/**
+ * Prompt for one in-place render: the ORIGINAL populated plate (image 1) and
+ * the character's reference sheet (image 2). The model replaces exactly one
+ * coloured placeholder; the other silhouettes stay so every figure is rendered
+ * against the same plate and cut out afterwards. Names come from the cast
+ * entry at runtime — nothing story-specific lives in the template. Owner's
+ * design, 2026-09-10.
+ */
+function buildInPlaceRenderPrompt(c, visualBible = null, { refMode = 'sheet' } = {}) {
+  const colour = c.colorName || 'coloured';
+  const name = c.name || 'the character';
+  const clauses = [];
+  if (c.action) clauses.push(String(c.action).trim());
+  if (c.looksAt) clauses.push(`looking at ${String(c.looksAt).trim()}`);
+  const poseLine = clauses.length ? ` The figure is ${clauses.join(', ')}.` : '';
+  // refMode 'cell' (owner's design 2026-09-11): Image 2 is ONE view cropped
+  // from the 2x4 sheet (or a single-image bible reference), not the grid. The
+  // view may not match the silhouette's angle, so orientation is pinned to the
+  // silhouette explicitly.
+  const image2 = refMode === 'cell'
+    ? `Image 2 is one reference picture of ${name} on a plain background, used only to know what ${name} looks like; it is not placed in the output, and the silhouette, not Image 2, decides which way the figure faces.`
+    : `Image 2 is the reference sheet of ${name}: a grid of views used only to know what ${name} looks like. None of its panels appear in the output.`;
+  const prompt = `Image 1 is an illustration with a flat ${colour} silhouette placeholder. ${image2}
+
+Replace the ${colour} silhouette with ${name} from Image 2, in exactly the silhouette's position, body orientation and pose, and exactly the silhouette's size: the figure is as tall as the silhouette, no taller.${poseLine} Identity (face, hair, skin, build, clothing) comes from Image 2. The output shows exactly one ${name}. Anything the silhouette holds is drawn as the real object in its natural colours, not in the placeholder colour.
+
+Everything else in Image 1 stays exactly as it is, including the other coloured silhouettes. Same art style as Image 1.`;
+  return scrubBlendPrompt(prompt, visualBible, `inPlace ${name}`);
+}
+
+function _iouRects(a, b) {
+  const ix0 = Math.max(a.x, b.x), iy0 = Math.max(a.y, b.y);
+  const ix1 = Math.min(a.x + a.width, b.x + b.width), iy1 = Math.min(a.y + a.height, b.y + b.height);
+  if (ix1 <= ix0 || iy1 <= iy0) return 0;
+  const inter = (ix1 - ix0) * (iy1 - iy0);
+  return inter / (a.width * a.height + b.width * b.height - inter);
+}
+
+/**
+ * Pick, among DINO person boxes on the render ([x0,y0,x1,y1] px), the one that
+ * best overlaps the silhouette's box. The silhouette box is expanded first
+ * (default 10% per side) because the model tends to draw the figure a little
+ * larger than the placeholder. Returns { box: {x,y,width,height}, iou, index }
+ * or null when nothing reaches `minIou`.
+ */
+function matchRenderedFigureBox(personBoxes, silBbox, { expand = 0.10, minIou = 0.30, canvasWidth = Infinity, canvasHeight = Infinity, clipBottom = Infinity } = {}) {
+  if (!silBbox || !Array.isArray(personBoxes) || personBoxes.length === 0) return null;
+  const dx = silBbox.width * expand, dy = silBbox.height * expand;
+  const x0 = Math.max(0, silBbox.x - dx), y0 = Math.max(0, silBbox.y - dy);
+  const target = {
+    x: x0, y: y0,
+    width: Math.min(canvasWidth, silBbox.x + silBbox.width + dx) - x0,
+    height: Math.min(canvasHeight, silBbox.y + silBbox.height + dy) - y0,
+  };
+  let best = null;
+  personBoxes.forEach((b, index) => {
+    const arr = Array.isArray(b) ? b : b?.box;
+    if (!Array.isArray(arr) || arr.length !== 4) return;
+    const [bx0, by0, bx1, by1] = arr;
+    const rect = { x: bx0, y: by0, width: bx1 - bx0, height: by1 - by0 };
+    if (rect.width <= 0 || rect.height <= 0) return;
+    // Scored on the part above clipBottom: a figure the model completed below
+    // the scenery that hides it is judged on what will be kept (exp 1146).
+    const scored = by1 > clipBottom ? { ...rect, height: Math.max(1, clipBottom - by0) } : rect;
+    const iou = _iouRects(scored, target);
+    if (!best || iou > best.iou) best = { box: rect, iou, index };
+  });
+  return best && best.iou >= minIou ? best : null;
+}
+
+/** Binary-mask dilation by `r` px (separable running max). Returns a new Uint8Array. */
+function dilateMask(mask, W, H, r) {
+  if (!(r > 0)) return mask;
+  const tmp = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    for (let x = 0; x < W; x++) {
+      let v = 0;
+      for (let k = Math.max(0, x - r); k <= Math.min(W - 1, x + r); k++) { if (mask[row + k]) { v = 1; break; } }
+      tmp[row + x] = v;
+    }
+  }
+  const out = new Uint8Array(W * H);
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) {
+      let v = 0;
+      for (let k = Math.max(0, y - r); k <= Math.min(H - 1, y + r); k++) { if (tmp[k * W + x]) { v = 1; break; } }
+      out[y * W + x] = v;
+    }
+  }
+  return out;
+}
+
+/**
+ * Pixels inside the figure's box (grown by `grow` px) where the render differs
+ * from the plate. The render is the plate with one silhouette replaced, so
+ * inside that box a changed pixel is the figure or what it holds - a chart,
+ * a lantern, a bag - which a person mask alone leaves behind (exp 1136:
+ * the chart in the figure's hands stayed on the plate). Outside the box the
+ * model's global drift is ignored.
+ */
+async function changedPixelsMask(plateBuf, renderBuf, bbox, W, H, grow, threshold = 40) {
+  const a = await sharp(plateBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const b = await sharp(renderBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const x0 = Math.max(0, Math.floor(bbox.x - grow)), x1 = Math.min(W - 1, Math.ceil(bbox.x + bbox.width + grow));
+  const y0 = Math.max(0, Math.floor(bbox.y - grow)), y1 = Math.min(H - 1, Math.ceil(bbox.y + bbox.height + grow));
+  const out = new Uint8Array(W * H);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const i = (y * W + x) * 3;
+    const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+    if (d > threshold) out[y * W + x] = 1;
+  }
+  return out;
+}
+
+/**
+ * How much of a silhouette is still a placeholder after an in-place render.
+ * Two fractions over the silhouette mask, both pure so they can be tested:
+ *   unchanged     - pixels the render left as the plate had them (Lab exp 1152:
+ *                   Grok returned the plate untouched for one figure, and DINO
+ *                   still boxed the silhouette, so the geometry gate accepted a
+ *                   raw yellow placeholder);
+ *   flatSaturated - pixels that are a flat fill of a saturated colour (same
+ *                   run: another silhouette came back merely re-tinted blue to
+ *                   teal - changed, yet no child was painted).
+ * `a` / `b` are raw RGB buffers of plate and render at W x H.
+ */
+function placeholderResidueFromRaw(a, b, mask, W, H, { diffThreshold = 40, satFloor = 0.55, flatDelta = 12, hue = null, hueTolerance = 35 } = {}) {
+  let total = 0, unchanged = 0, flatSaturated = 0;
+  // Per-pixel leftovers: untouched placeholder pixels, plus flat saturated
+  // pixels still in the placeholder's hue (exp 1154: the model painted a
+  // standing child over a seated silhouette and left the uncovered blue
+  // around the legs; the cut carried it onto the page).
+  const residueMask = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const k = y * W + x;
+    if (!mask[k]) continue;
+    total++;
+    const i = k * 3;
+    const d = Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+    if (d <= diffThreshold) { unchanged++; residueMask[k] = 1; }
+    const r = b[i], g = b[i + 1], bl = b[i + 2];
+    const mx = Math.max(r, g, bl), mn = Math.min(r, g, bl);
+    const sat = mx ? (mx - mn) / mx : 0;
+    if (sat < satFloor) continue;
+    // Flat: the 4px neighbour to the right and below are (near) the same colour.
+    const j = x + 4 < W ? i + 12 : i, l = y + 4 < H ? i + 12 * W : i;
+    const dn = Math.max(
+      Math.abs(r - b[j]), Math.abs(g - b[j + 1]), Math.abs(bl - b[j + 2]),
+      Math.abs(r - b[l]), Math.abs(g - b[l + 1]), Math.abs(bl - b[l + 2]));
+    if (dn < flatDelta) {
+      flatSaturated++;
+      if (hue != null) {
+        const dh = Math.abs(rgbToHue(r, g, bl) - hue);
+        if (Math.min(dh, 360 - dh) <= hueTolerance) residueMask[k] = 1;
+      }
+    }
+  }
+  if (!total) return { unchanged: 0, flatSaturated: 0, residueMask };
+  return { unchanged: unchanged / total, flatSaturated: flatSaturated / total, residueMask };
+}
+
+async function placeholderResidue(plateBuf, renderBuf, mask, W, H, color = null) {
+  const a = await sharp(plateBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const b = await sharp(renderBuf).resize(W, H, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  let hue = null;
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(color || ''));
+  if (m) hue = rgbToHue(parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16));
+  return placeholderResidueFromRaw(a, b, mask, W, H, { hue });
+}
+// A render is a no-op when at least this share of the silhouette is untouched,
+// and a recolour when at least this share is still a flat saturated fill.
+const RESIDUE_UNCHANGED_MAX = 0.5;
+const RESIDUE_FLAT_MAX = 0.6;
+
+/** Morphological closing: fills holes and gaps up to ~2r px (the white of a held sheet of paper that matched the plate's paper). */
+function closeMask(mask, W, H, r) {
+  if (!(r > 0)) return mask;
+  const grown = dilateMask(mask, W, H, r);
+  const inv = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) inv[i] = grown[i] ? 0 : 1;
+  const invGrown = dilateMask(inv, W, H, r);
+  const out = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) out[i] = invGrown[i] ? 0 : 1;
+  return out;
+}
+
+/** Bounding box of the set pixels of a canvas mask, or null when empty. */
+function maskBounds(mask, W, H) {
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (mask[y * W + x]) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return x1 < 0 ? null : { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+}
+
+/**
+ * The silhouette is the target geometry. When the model drew the figure at
+ * another height (exp 1138: a seated figure at 1.9x its silhouette), scale
+ * the cut-out uniformly so its height equals the silhouette's, keeping the
+ * bottom-centre where the silhouette's bottom-centre is. Canvas-sized RGBA in,
+ * canvas-sized RGBA out.
+ */
+async function fitCutToSilhouette(cutPng, cutBox, target, W, H) {
+  const s = target.height / cutBox.height;
+  const w = Math.max(1, Math.round(cutBox.width * s));
+  const h = Math.max(1, Math.round(cutBox.height * s));
+  const left = Math.round(target.x + target.width / 2 - w / 2);
+  const top = Math.round(target.y + target.height - h);
+  const piece = await sharp(cutPng).extract({ left: cutBox.x, top: cutBox.y, width: cutBox.width, height: cutBox.height })
+    .resize(w, h, { fit: 'fill' }).png().toBuffer();
+  // Clip to the canvas: sharp refuses an overlay that hangs off the edge.
+  const cl = Math.max(0, -left), ct = Math.max(0, -top);
+  const cw = Math.min(w - cl, W - Math.max(0, left)), ch = Math.min(h - ct, H - Math.max(0, top));
+  if (cw <= 0 || ch <= 0) return cutPng;
+  const clipped = (cl || ct || cw !== w || ch !== h)
+    ? await sharp(piece).extract({ left: cl, top: ct, width: cw, height: ch }).png().toBuffer()
+    : piece;
+  return sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: clipped, left: Math.max(0, left), top: Math.max(0, top) }]).png().toBuffer();
+}
+
+/** RGBA canvas-sized PNG of `renderBuf` (already W×H) with alpha = mask. */
+async function cutWithMask(renderBuf, mask, W, H) {
+  const { data } = await sharp(renderBuf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < W * H; i++) if (!mask[i]) data[i * 4 + 3] = 0;
+  return sharp(data, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
+}
+
+/**
+ * Bring a Grok render back onto the plate's canvas. Same size: untouched.
+ * Otherwise a centre cover-resize to the canvas — the same correction
+ * editWithGrok applies by default, done here so the caller can log it
+ * against the figure it affects (a drifted aspect shifts the cut-out).
+ */
+async function normaliseRenderToCanvas(renderBuf, W, H) {
+  const m = await sharp(renderBuf).metadata();
+  if (m.width === W && m.height === H) return { buf: renderBuf, note: null };
+  const drift = Math.abs((m.width / m.height) - (W / H)) / (W / H);
+  const buf = await sharp(renderBuf).resize(W, H, { fit: 'cover', position: 'centre' }).png().toBuffer();
+  return { buf, note: `${m.width}×${m.height} → ${W}×${H}${drift >= 0.01 ? ` (aspect drift ${(drift * 100).toFixed(1)}%, centre-cropped)` : ''}` };
+}
+
+/**
+ * figureMethod 'inPlace': one Grok edit per cast member on the ORIGINAL plate
+ * ("put A where the red silhouette is"), DINO+SAM cut-out of the rendered
+ * figure, all cut-outs pasted onto the depopulated plate back-to-front. No
+ * blend pass. Returns { imageData, cost, placed } and fills `debug`.
+ */
+async function renderFiguresInPlace({ cast, bboxes, silhouetteMasks, detection, populated, populatedBuf, bgBuf, aspectRatio, visualBible, usageTracker, debug, refMode = 'sheet' }) {
+  const { _gdinoDetect, _collectNmsBoxes, GDINO_PERSON_NMS_IOU, _mobilesamMaskFull } = require('./figureDetection');
+  const W = detection.canvasWidth, H = detection.canvasHeight;
+  const renders = {};
+  const cutouts = {};
+  const refs = {};
+  const inPlaceLog = [];
+  const placements = [];
+  let cost = 0;
+
+  for (const c of cast) {
+    const bbox = bboxes[c.name];
+    if (!bbox) { inPlaceLog.push({ name: c.name, skipped: 'no silhouette detected' }); continue; }
+    if (!c.sheetBuf) { inPlaceLog.push({ name: c.name, skipped: 'no reference sheet' }); continue; }
+    // Image 2: the whole 2x4 sheet ('sheet'), or ONE cell matching the cast
+    // entry's pose ('cell', owner's design 2026-09-11 — the same cell the
+    // charRepair branch sends). A bible reference is a single image either
+    // way; cropping a cell out of it returns a fragment of the figure.
+    const useCell = refMode === 'cell' && !c.singleImage;
+    const refBuf = useCell ? (await cropAvatarCell(c.sheetBuf, { pose: c.pose })).body : c.sheetBuf;
+    const basePrompt = buildInPlaceRenderPrompt(c, visualBible, { refMode: (useCell || c.singleImage) ? 'cell' : 'sheet' });
+    const sheetDataUrl = `data:image/png;base64,${refBuf.toString('base64')}`;
+    refs[c.name] = { ref: sheetDataUrl, kind: c.singleImage ? 'bible-image' : useCell ? `cell ${POSE_CELL[c.pose] || POSE_CELL.threeQuarter} (${c.pose})` : 'whole sheet' };
+    // The silhouette's bottom edge plus a small margin. Below it lies either
+    // ground (nothing to cut) or the scenery that hides the figure.
+    const bottomLimit = bbox.y + bbox.height + Math.max(4, Math.round(0.03 * bbox.height));
+    const clippedHeight = (box, limit) => Math.max(1, Math.min(box.y + box.height, limit) - box.y);
+
+    // Up to two attempts. The silhouette is the contract; the person box DINO
+    // finds on the render is measured against it (height ratio, IoU). A render
+    // that ignored the silhouette - a standing figure at 2.7x for a seated
+    // placeholder (exp 1142), 1.9x (exp 1138) - is re-rendered ONCE with the
+    // failure fed back (+$0.02). The better attempt by IoU is kept; scaling a
+    // wrong-pose figure to the silhouette is never the answer.
+    let best = null;   // { result, prompt, renderBuf, renderUri, matched, mask, norm, ratio }
+    const attempts = [];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      let prompt = basePrompt;
+      if (attempt === 2 && best) {
+        if (best.residue && best.residue.rejected) {
+          prompt = `${basePrompt}\n\nA previous attempt left the ${c.colorName || 'coloured'} silhouette as a flat coloured shape. Paint ${c.name} there as a real, fully rendered figure in the style of Image 1 - no flat ${c.colorName || 'coloured'} fill remains.`;
+        } else {
+          const how = best.ratio > 1.4 ? `${best.ratio.toFixed(1)} times too tall` : best.ratio < 0.75 ? 'too small' : 'not in the silhouette\'s place';
+          prompt = `${basePrompt}\n\nA previous attempt drew ${c.name} ${how}. Match the ${c.colorName || 'coloured'} silhouette's outline exactly: same height, same footprint, same posture${c.action ? ` (${String(c.action).trim()})` : ''}.`;
+        }
+      }
+      let result;
+      try {
+        // padInput: the plate already has the requested aspect (no-op for it);
+        // the sheet is on white, so a pad keeps every cell where a crop would
+        // slice the figure. skipOutputCrop: the render is registered against
+        // the plate below, and a crop would shift every pixel first.
+        result = await editWithGrok(prompt, [populated.imageData, sheetDataUrl], {
+          model: GROK_MODELS.STANDARD, aspectRatio, padInput: true, skipOutputCrop: true,
+        });
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: in-place render attempt ${attempt} threw — ${err.message}`);
+        if (attempt === 1) { attempts.push({ attempt, error: err.message }); continue; }
+        break;
+      }
+      if (usageTracker) usageTracker('grok', result.usage, attempt === 1 ? 'scene_composite_inplace_render' : 'scene_composite_inplace_rerender', result.modelId);
+      cost += result.usage?.cost || 0;
+
+      const rawBuf = Buffer.from(stripDataUriPrefix(result.imageData), 'base64');
+      const norm = await normaliseRenderToCanvas(rawBuf, W, H);
+      if (norm.note) log.warn(`[SCENE COMPOSITE]   ${c.name}: render resized ${norm.note}`);
+      const renderBuf = norm.buf;
+      const renderUri = `data:image/png;base64,${renderBuf.toString('base64')}`;
+
+      // Was the placeholder painted at all? DINO boxes a raw silhouette as a
+      // person just as readily (exp 1152: an untouched plate and a re-tinted
+      // silhouette both passed the geometry gate and shipped). Measured on the
+      // silhouette's own pixels before any box is trusted.
+      let residue = null;
+      try {
+        const rz = await placeholderResidue(populatedBuf, renderBuf, silhouetteMasks[c.name], W, H, c.color);
+        residue = { ...rz, rejected: rz.unchanged >= RESIDUE_UNCHANGED_MAX || rz.flatSaturated >= RESIDUE_FLAT_MAX };
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: placeholder residue check failed — ${err.message}`);
+      }
+      // Find the rendered figure: DINO person boxes, best IoU with the silhouette.
+      let matched = null, mask = null;
+      if (residue?.rejected) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: attempt ${attempt} left the placeholder unpainted (unchanged ${(residue.unchanged * 100).toFixed(0)}%, flat saturated ${(residue.flatSaturated * 100).toFixed(0)}%)`);
+      } else try {
+        const det = await _gdinoDetect(renderUri, [{ name: 'person', text: 'person' }]);
+        const persons = det?.figures?.[0] ? _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU) : [];
+        matched = matchRenderedFigureBox(persons, bbox, { canvasWidth: W, canvasHeight: H, clipBottom: bottomLimit });
+        if (matched) {
+          const b = matched.box;
+          const m = await _mobilesamMaskFull(renderUri, [Math.round(b.x), Math.round(b.y), Math.round(b.x + b.width), Math.round(b.y + b.height)], W, H);
+          if (m?.alpha) mask = m.alpha;
+        }
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE]   ${c.name}: figure detection on the render failed — ${err.message}`);
+      }
+      // Height is measured only down to the silhouette's bottom edge: that
+      // edge is the feet or the line where scenery hides the figure (a
+      // bulwark, a table). A waist-up placeholder that the model completed
+      // with legs over the hull (exp 1144) is right above that line and
+      // discarded below it - not a wrong render.
+      const ratio = matched ? clippedHeight(matched.box, bottomLimit) / bbox.height : 1;
+      const iou = matched ? matched.iou : 0;
+      const ok = !!mask && ratio >= 0.75 && ratio <= 1.4 && iou >= 0.45;
+      attempts.push({ attempt, ratio: +ratio.toFixed(2), iou: +iou.toFixed(3), ok, render: result.imageData,
+        residue: residue ? { unchanged: +residue.unchanged.toFixed(2), flatSaturated: +residue.flatSaturated.toFixed(2), rejected: residue.rejected } : null });
+      const cand = { result, prompt, renderBuf, renderUri, matched, mask, norm, ratio, residue };
+      // An unpainted placeholder never beats a painted figure, whatever its IoU.
+      if (!best || (best.residue?.rejected && !residue?.rejected) || (!!best.residue?.rejected === !!residue?.rejected && iou > (best.matched ? best.matched.iou : -1))) best = cand;
+      if (ok) break;
+      if (attempt === 1) log.warn(`[SCENE COMPOSITE]   ${c.name}: render is off the silhouette (height ${ratio.toFixed(2)}x, IoU ${iou.toFixed(2)}) — re-rendering once with the failure fed back`);
+      else log.warn(`[SCENE COMPOSITE]   ${c.name}: re-render still off (height ${ratio.toFixed(2)}x, IoU ${iou.toFixed(2)}) — keeping the better attempt`);
+    }
+    if (!best) {
+      inPlaceLog.push({ name: c.name, skipped: `render failed: ${attempts.map(a => a.error).filter(Boolean).join(' / ')}` });
+      continue;
+    }
+    if (best.residue?.rejected) {
+      // Both attempts left a flat placeholder. Nothing here can be cut out as
+      // the character; the entry is unplaced and the all-or-nothing rule
+      // keeps the direct render.
+      renders[c.name] = { prompt: best.prompt, render: best.result.imageData, attempts };
+      inPlaceLog.push({ name: c.name, skipped: `placeholder left unpainted on ${attempts.length} attempt(s)`, attempts: attempts.map(a => a.residue) });
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: placeholder left unpainted on every attempt — not placed`);
+      continue;
+    }
+    renders[c.name] = { prompt: best.prompt, render: best.result.imageData, attempts };
+    const { renderBuf, matched, norm } = best;
+    let { mask } = best;
+    let method = 'sam';
+    if (!mask) {
+      // Never ship a silhouette: cut the render with the placeholder's own
+      // outline, grown a little for the figure the model drew around it.
+      method = 'silhouette-fallback';
+      const r = Math.max(2, Math.round(0.06 * Math.max(bbox.width, bbox.height)));
+      mask = dilateMask(silhouetteMasks[c.name], W, H, r);
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: no rendered figure near the silhouette (${matched ? 'SAM returned no mask' : 'no DINO box above IoU floor'}) — cutting the silhouette region dilated by ${r}px`);
+    }
+    // The person mask is the figure; the silhouette and the changed pixels in
+    // its box add what the figure holds (exp 1136 lost a chart this way).
+    if (method === 'sam') {
+      const grow = Math.round(0.10 * Math.max(bbox.width, bbox.height));
+      const changed = await changedPixelsMask(populatedBuf, renderBuf, bbox, W, H, grow);
+      const r = Math.max(1, Math.round(0.01 * Math.max(bbox.width, bbox.height)));
+      const sil = dilateMask(silhouetteMasks[c.name], W, H, r);
+      let added = 0;
+      for (let i = 0; i < W * H; i++) if (!mask[i] && (sil[i] || changed[i])) { mask[i] = 1; added++; }
+      // Generous closing: a pixel wrongly included comes from the render, which
+      // is the plate itself away from the figure, so over-inclusion is free;
+      // a hole (white paper over the plate's white paper, exp 1140) is not.
+      mask = closeMask(dilateMask(mask, W, H, 1), W, H, Math.max(4, Math.round(0.08 * Math.max(bbox.width, bbox.height))));
+      // Never carry another figure's silhouette along.
+      for (const other of cast) {
+        if (other.name === c.name || !silhouetteMasks[other.name]) continue;
+        const om = dilateMask(silhouetteMasks[other.name], W, H, 2);
+        for (let i = 0; i < W * H; i++) if (om[i]) mask[i] = 0;
+      }
+      // Nothing below the silhouette's bottom edge: scenery in front of the
+      // figure stays in front (see bottomLimit above).
+      let clippedPx = 0;
+      for (let y = Math.max(0, Math.ceil(bottomLimit)); y < H; y++) for (let x = 0; x < W; x++) if (mask[y * W + x]) { mask[y * W + x] = 0; clippedPx++; }
+      // Leftover placeholder: the part of the silhouette the figure did not
+      // cover and the model did not repaint (exp 1154: blue and yellow around
+      // the legs of two standing children drawn over seated silhouettes). Those
+      // pixels are the plate's flat colour, never the character; the depopulated
+      // plate underneath shows through instead. Grown 2px for the antialiased rim.
+      let residuePx = 0;
+      if (best.residue?.residueMask) {
+        const rm = dilateMask(best.residue.residueMask, W, H, 2);
+        for (let i = 0; i < W * H; i++) if (mask[i] && rm[i]) { mask[i] = 0; residuePx++; }
+      }
+      log.info(`[SCENE COMPOSITE]   ${c.name}: person mask + silhouette + changed pixels in the box (+${added}px), holes closed, other silhouettes excluded${clippedPx ? `, ${clippedPx}px below the silhouette's bottom edge dropped` : ''}${residuePx ? `, ${residuePx}px of leftover placeholder colour dropped` : ''}`);
+    }
+    let cut = await cutWithMask(renderBuf, mask, W, H);
+    let fitted = null;
+    if (method === 'sam' && matched) {
+      // Like against like: the person box on the render against the person box
+      // of the silhouette (exp 1140 compared the grown mask and shrank two
+      // correct figures by 20%).
+      const ratio = clippedHeight(matched.box, bottomLimit) / bbox.height;
+      const mb = maskBounds(mask, W, H);
+      // Last resort only: both attempts were off. Within the accepted band the
+      // render is used as drawn.
+      if (mb && (ratio > 1.4 || ratio < 0.75)) {
+        const s = 1 / ratio;
+        // Scale the whole cut-out by s about the matched box's bottom-centre, then
+        // move that point onto the silhouette's bottom-centre.
+        const target = {
+          x: bbox.x + bbox.width / 2 - (mb.width * s) / 2 + ((mb.x + mb.width / 2) - (matched.box.x + matched.box.width / 2)) * s,
+          y: bbox.y + bbox.height - mb.height * s + ((mb.y + mb.height) - (matched.box.y + matched.box.height)) * s,
+          width: mb.width * s, height: mb.height * s,
+        };
+        cut = await fitCutToSilhouette(cut, mb, target, W, H);
+        fitted = { from: matched.box.height, to: bbox.height, ratio: +ratio.toFixed(2) };
+        log.info(`[SCENE COMPOSITE]   ${c.name}: drawn ${ratio.toFixed(2)}x the silhouette's height — scaled to the silhouette, bottom-centre anchored`);
+      }
+    }
+    cutouts[c.name] = `data:image/png;base64,${cut.toString('base64')}`;
+    inPlaceLog.push({
+      name: c.name, method, iou: matched ? +matched.iou.toFixed(3) : null,
+      matchedBox: matched ? { x: Math.round(matched.box.x), y: Math.round(matched.box.y), width: Math.round(matched.box.width), height: Math.round(matched.box.height) } : null,
+      resized: norm.note, fitted,
+    });
+    log.info(`[SCENE COMPOSITE]   ${c.name}: cut out via ${method}${matched ? ` (IoU ${matched.iou.toFixed(2)})` : ''}`);
+    placements.push({ input: cut, left: 0, top: 0, _footY: bbox.y + bbox.height, _name: c.name, _color: c.color, _bbox: bbox });
+  }
+
+  debug.inPlaceRenders = renders;
+  debug.inPlaceRefs = refs;
+  debug.cutouts = cutouts;
+  debug.inPlaceLog = inPlaceLog;
+  if (placements.length === 0) {
+    const err = new Error('[SCENE COMPOSITE] inPlace: no figure rendered for any cast entry');
+    err.compositeDebug = debug;
+    throw err;
+  }
+  // Back first — same occlusion read off the plate the paste path uses.
+  const z = await detectZOrderByOcclusion(populatedBuf, placements);
+  debug.zScores = z.scores;
+  debug.zDecisions = z.decisions;
+  log.info(`[SCENE COMPOSITE]   z-order (back → front): ${z.order.map(p => p._name).join(' → ')}`);
+  const composited = await sharp(bgBuf).composite(z.order.map(({ input, left, top }) => ({ input, left, top }))).png().toBuffer();
+  const imageData = `data:image/png;base64,${composited.toString('base64')}`;
+  debug.composited = imageData;
+  return { imageData, cost, placed: placements.length };
+}
+
 function buildCastLines(cast) {
   return cast.map((c) => {
     const sizeHint = c.sizeHint || 'about two-thirds the size of the largest figure';
@@ -1197,7 +1803,7 @@ function buildCastLines(cast) {
       profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || 'three-quarter view';
-    const actionClause = c.action ? `, ${c.action}` : '';
+    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, looking at ${c.looksAt}` : '');
     // Per-pose eye markers — black dot(s) inside the silhouette's head.
     // Front/three-quarter show two eyes; profile shows one; back shows none.
     const markerSpec = (() => {
@@ -1395,6 +2001,66 @@ ${lines}
 These creatures are part of the world plate and stay in it. If the SETTING DESCRIPTION above says to leave out figures or animals, that instruction does not apply to the creatures listed here — it exists to keep the human cast out, and they arrive separately. Paint no creature, animal or person that is not named above or drawn as a silhouette below.`;
 }
 
+/**
+ * The one question the plate judge asks. Pure, so it can be tested.
+ *
+ * The measured gate (tallest/shortest figure, removed 2026-09-10) asked
+ * whether the plate had DEPTH; what matters is whether each silhouette is
+ * where and how its cast line says - in the boat, at the rail, seated,
+ * standing. The cast lines are quoted verbatim; the model compares picture
+ * to words. Nothing about the plate is parsed in code.
+ *
+ * @param {string} castLines - the cast block as sent to the plate prompt
+ * @param {string} styleDescription - the book's art style (context only)
+ * @returns {string}
+ */
+function platePlacementPrompt(castLines, styleDescription = '') {
+  return `You are checking a background plate for an illustrated children's book. It shows a setting with flat-colour silhouette figures placed in it${styleDescription ? ` (art style: "${styleDescription}")` : ''}. Each silhouette was requested as follows:
+
+${String(castLines || '').trim()}
+
+Judge only placement and posture, strictly, one silhouette at a time: (1) Is the figure of that colour present exactly once? (2) Is it WHERE its line says - on the surface or inside the thing named (a deck, a boat, a bank, a wall), not beside it, not on a different level? (3) Is its posture what the line says - seated, standing, kneeling? (4) Where a line names a level relation between figures (one below or above another), does the picture show that relation? A figure standing on a deck when its line seats it in a boat on the water fails. Reply as JSON: {"ok": true or false, "reason": "one short sentence naming the failing colour, or \"all placed\""}`;
+}
+
+/**
+ * Ask flash-lite whether the populated plate placed every silhouette as its
+ * cast line says. Same shape as the character-cell gate: one question, JSON
+ * back, the caller decides on one re-roll. Throws on API failure; the caller
+ * fails open.
+ */
+async function judgePopulatedPlate(plateBase64, castLines, styleDescription = '') {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
+  const { TEXT_MODELS } = require('../config/models');
+  const cfg = TEXT_MODELS['gemini-2.5-flash-lite'];
+  const body = {
+    contents: [{ parts: [
+      { inlineData: { mimeType: 'image/jpeg', data: plateBase64 } },
+      { text: platePlacementPrompt(castLines, styleDescription) },
+    ] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+  };
+  assertPromptFilled(body.contents[0].parts, 'judgePopulatedPlate');
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${cfg.modelId}:generateContent?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) }
+  );
+  if (!resp.ok) throw new Error(`plate judge HTTP ${resp.status}`);
+  const j = await resp.json();
+  const usage = j?.usageMetadata;
+  if (usage) {
+    const { recordTextUsage } = require('./usageContext');
+    recordTextUsage('gemini_text', { input_tokens: usage.promptTokenCount || 0, output_tokens: usage.candidatesTokenCount || 0 }, 'composite_plate_judge', cfg.modelId);
+  }
+  const raw = String(j?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch {
+    // Prose around the JSON: take the outermost braces.
+    parsed = JSON.parse(raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1));
+  }
+  return { ok: parsed.ok !== false, reason: String(parsed.reason || '') };
+}
+
 function buildPopulatedPlatePrompt(scene, cast, cleanBackgroundPrompt, sceneCreatures = []) {
   const lines = buildCastLines(cast);
   const creatureBlock = buildPlateCreatureBlock(sceneCreatures);
@@ -1434,7 +2100,7 @@ SETTING DESCRIPTION:
 ${setting}
 ${sceneIntentBlock}${creatureBlock}
 
-PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures must stand on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). NEVER position a silhouette with its feet on water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
+PRIORITY 2 — Place ${cast.length} flat-colour silhouette figures naturally so the scene makes physical sense. Use the cast entries below for size, depth and per-character action. Figures rest on a SOLID surface visible in the scene (dock plank, floor, ground, rock, deck, path, stairs). When a cast entry's action puts the figure in or on something - a boat, a cart, a saddle, a chair, a wall, a ledge - the figure is placed IN or ON that thing, at that thing's position and level, and that thing is its surface: a figure seated in a rowing boat on the water sits inside the boat's hull, below the level of any deck or quay beside it, not on the deck next to the boat. NEVER position a silhouette with its feet on bare water or empty sky. Figures MAY overlap each other when the scene calls for it — partial occlusion is fine and natural.
 
 ${lines}
 
@@ -1638,13 +2304,19 @@ function buildBlendMetadata(fullData, scene = null, clothingRequirements = null)
   const characterActions = {};
   for (const it of (fd.interactions || [])) {
     if (!it?.character) continue;
-    if (it.object) attentionTargets[it.character] = String(it.object).trim();
+    // Eyes come from `looksAt` (below), never from what a character holds.
+    // A `watching` row is the one interaction kind that IS a gaze; it fills
+    // in only for briefs written before looksAt existed.
+    if (it.object && String(it.action || '').toLowerCase() === 'watching') attentionTargets[it.character] = String(it.object).trim();
     // `where` is the interaction itself ("kneels at the gap in the railing and
     // peers down through it"). It is sent as something to perform ON THE SPOT,
     // never as a placement — the prompt's own wording carries that distinction,
     // because the same sentence inside a scene-staging prompt is what moved
     // characters across the frame in every earlier attempt.
     if (it.where) characterActions[it.character] = String(it.where).trim();
+  }
+  for (const c of chars) {
+    if (c?.name && c.looksAt) attentionTargets[c.name] = String(c.looksAt).trim();
   }
   return { characterExpressions, attentionTargets, characterActions, characterClothing };
 }
@@ -1733,7 +2405,10 @@ function buildBlendEditPrompt(scene, cast = null) {
     const lines = people.map((c) => {
       const bits = [`- ${c.name} — ${_ageWord(c.age)}, ${depthWord(c)}.`];
       if (actions[c.name]) bits.push(` ${_sentence(actions[c.name])}`);
-      if (attention[c.name]) bits.push(` Looking at ${attention[c.name]}.`);
+      if (attention[c.name]) {
+        const k = String(attention[c.name]).toLowerCase();
+        bits.push(k === 'camera' ? ' Looking at the viewer.' : k === 'away' ? ' Looking away from everyone in the frame.' : ` Looking at ${attention[c.name]}.`);
+      }
       if (expressions[c.name]) bits.push(` ${_sentence(expressions[c.name])}`);
       // Size-neutral, and the occluder is deliberately NOT named: run E of Lab
       // 695-705 named it and the result was worse.
@@ -1932,7 +2607,7 @@ function buildBackCharLines(cast) {
       profile:      'profile view',
       back:         'back view, viewer sees the back of the head',
     }[c.pose] || 'three-quarter view';
-    const actionClause = c.action ? `, ${c.action}` : '';
+    const actionClause = (c.action ? `, ${c.action}` : '') + (c.looksAt ? `, looking at ${c.looksAt}` : '');
     return `- ${c.name}: ${posHint}, ${poseLabel}${actionClause}. Size: ${sizeHint}. Match the matching reference sheet for face, hair, and clothing.`;
   }).join('\n');
 }
@@ -2198,7 +2873,15 @@ async function generateSceneComposite(opts) {
     //                  Grok call production already uses for identity fixes,
     //                  once per figure, so the model paints the character into
     //                  the scene instead of us compositing pixels into it.
+    //   'inPlace'    — one Grok edit per figure on the ORIGINAL plate ("put A
+    //                  where the red silhouette is"), DINO+SAM cut-out of the
+    //                  rendered figure, pasted onto the depopulated plate. No
+    //                  blend. Lab-only, unvalidated (2026-09-10).
     figureMethod = 'paste',
+    // inPlace only: what Image 2 is — 'sheet' (the whole 2x4 grid) or 'cell'
+    // (the one cell matching the cast entry's pose; a bible reference is
+    // passed whole in both modes). Lab-only knob, 2026-09-11.
+    refMode = 'sheet',
     // 'dino' (default) or 'diff' — see the detection step. The diff is kept
     // only so a Lab run can reproduce a pre-2026-08-15 result; it is the
     // detector that mistook lawn for a character.
@@ -2252,9 +2935,13 @@ async function generateSceneComposite(opts) {
   if (sceneCreatures.length) {
     log.info(`[SCENE COMPOSITE] plate paints ${sceneCreatures.length} VB creature(s): ${sceneCreatures.map(c => c.name).join(', ')}`);
   }
-  const populated = await generateWithGrok(populatedPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
+  let populated = await generateWithGrok(populatedPrompt, { aspectRatio, model: GROK_MODELS.STANDARD });
   if (usageTracker) usageTracker('grok', populated.usage, 'scene_composite_populated_plate', populated.modelId);
   totalCost += populated.usage?.cost || 0;
+  // Plate judge (platePlacementPrompt / judgePopulatedPlate) is NOT wired: measured
+  // 2026-09-10 on five stored plates, flash-lite and flash both answered "all
+  // placed" for the two plates a human rejected (boat figure with legs on the
+  // deck; missing cast lines). Helpers stay exported for the Lab; see decisions.md.
   const populatedBuf = Buffer.from(stripDataUriPrefix(populated.imageData), 'base64');
   debug.populatedPlate = populated.imageData;
   debug.populatedPlatePrompt = populatedPrompt;
@@ -2293,9 +2980,21 @@ async function generateSceneComposite(opts) {
   // way. 'diff' is the original: subtract the clean background, then match hue.
   const detector = figureDetect === 'diff' ? 'diff' : 'dino';
   log.info(`[SCENE COMPOSITE] step 3/5 — bbox detect (${detector})`);
-  const detection = detector === 'dino'
-    ? await findSilhouettesWithDino(populatedBuf, cast)
-    : await findSilhouettesByDiff(populatedBuf, bgBuf, cast);
+  // A detector that finds nothing is a refusal like the two gates below it,
+  // and until 2026-09-10 it was the one refusal that discarded its own
+  // evidence: a plain throw carried no compositeDebug, so the populated plate
+  // the detector looked at was never persisted (Lab exp 1083). Same contract
+  // as `refuse`: attach the partial debug so the caller can save the frames.
+  let detection;
+  try {
+    detection = detector === 'dino'
+      ? await findSilhouettesWithDino(populatedBuf, cast)
+      : await findSilhouettesByDiff(populatedBuf, bgBuf, cast);
+  } catch (err) {
+    debug.abortReason = String(err.message || err);
+    err.compositeDebug = debug;
+    throw err;
+  }
   debug.detector = detector;
   const bboxes = {};
   const silhouetteMasks = {};
@@ -2330,16 +3029,12 @@ async function generateSceneComposite(opts) {
   //     40%. If detection is wrong about WHO is where, nothing after it is
   //     worth computing.
   //
-  // (b) No depth spread. The composite exists for scenes with someone near
-  //     and someone far; it is triggered by the scene metadata DECLARING that
-  //     split. The plate shows whether the split is real. Measured across
-  //     three pages (Lab 707/708/709):
-  //       p6  tallest/shortest 2.77, foot-lines spanning 40% of canvas — real
-  //       p10 1.73, 28% — five figures in one band, three standing in water
-  //       p4  1.08, 14% — five figures round one chest, declared 3 fore + 2 back
-  //     Below 2x there is no depth to correct, so compositing can only lose:
-  //     it removes Grok's own figures and pastes standing avatars into the
-  //     spaces where the plate drew people kneeling or waist-deep in a river.
+  // (b) Depth spread is MEASURED, not gated (owner, 2026-09-10). The 2.0x
+  //     refusal (calibrated on Lab 707/708/709, confirmed 2026-08-25) refused
+  //     the two plates that staged a two-level page correctly (exp 1103,
+  //     1104): a camera looking up from the lower level makes the upper
+  //     figure smaller, so the measure read the strongest depth staging as
+  //     none. debug.depthSpread is still written for the record.
   const figureBoxes = cast.map(c => detection.results[c.name]?.bbox).filter(Boolean);
   const bogus = cast.filter((c) => {
     const b = detection.results[c.name]?.bbox;
@@ -2369,11 +3064,13 @@ async function generateSceneComposite(opts) {
     const hs = figureBoxes.map(b => b.height);
     const spread = Math.max(...hs) / Math.min(...hs);
     debug.depthSpread = Number(spread.toFixed(2));
-    if (spread < MIN_DEPTH_SPREAD) {
-      throw refuse(`[SCENE COMPOSITE] no depth spread on the plate — tallest/shortest figure is ${spread.toFixed(2)}x `
-        + `(needs ${MIN_DEPTH_SPREAD}x). Every character is at the same distance, so the declared foreground/background `
-        + 'split is not real and there is nothing for the composite to correct — the page keeps its original render');
-    }
+    // No refusal on the spread (owner, 2026-09-10 - "remove the gate"). The
+    // 2.0x floor (2026-08-25) refused the two plates that finally staged a
+    // two-level page correctly (Lab exp 1103 at 1.47x, 1104 at 1.33x): a
+    // camera looking up from the lower level makes the upper figure SMALLER,
+    // so the measure that was meant to detect depth read the strongest depth
+    // staging as none. The spread stays measured and logged as evidence.
+    log.info(`[SCENE COMPOSITE] depth spread on the plate: ${spread.toFixed(2)}x (tallest/shortest figure) — recorded, not gated`);
   }
 
   // ── Stature correction ──────────────────────────────────────────────────
@@ -2499,6 +3196,35 @@ async function generateSceneComposite(opts) {
     };
   }
 
+  // ── Step 4 alternative: render each figure in place, cut it out, paste.
+  // Owner's design (2026-09-10): the model is asked, per figure and always on
+  // the ORIGINAL plate, to put the character where its coloured silhouette is;
+  // DINO+SAM lift the rendered figure and it is pasted onto the depopulated
+  // plate. No blend. Lab-only until measured.
+  if (figureMethod === 'inPlace') {
+    log.info(`[SCENE COMPOSITE] step 4/4 — in-place renders (${Object.keys(bboxes).length} figures)`);
+    const r = await renderFiguresInPlace({
+      cast, bboxes, silhouetteMasks, detection, populated, populatedBuf, bgBuf,
+      aspectRatio, visualBible: opts.visualBible, usageTracker, debug, refMode,
+    });
+    totalCost += r.cost;
+    // All or nothing. A cast member the composite could not render stays on
+    // the page as the plate left it - job_1789083667794 p18 shipped three
+    // coloured silhouettes on a quay. The page keeps its direct render.
+    if (r.placed < cast.length) {
+      const err = new Error(`in-place composite placed ${r.placed}/${cast.length} figures — the page keeps its direct render`);
+      err.compositeDebug = debug;
+      throw err;
+    }
+    log.info(`[SCENE COMPOSITE] complete (inPlace) — total cost ${totalCost.toFixed(4)}, ${r.placed}/${cast.length} characters placed`);
+    return {
+      imageData: r.imageData,
+      usage: { cost: totalCost, direct_cost: totalCost, model: 'scene-composite-inplace' },
+      debug,
+      placed: r.placed,
+    };
+  }
+
   // ── Step 4/5: composite character cutouts onto the derived clean BG
   log.info(`[SCENE COMPOSITE] step 4/5 — composite cutouts${phantomPoseRender ? ' (phantom-pose render ON)' : ''}`);
   const placements = [];
@@ -2524,28 +3250,38 @@ async function generateSceneComposite(opts) {
         // every non-target pixel (other silhouettes AND any palette-colliding
         // background) with derived clean-BG pixels — Grok then sees ONLY the
         // target's silhouette plus the surrounding scene context.
-        const ppr = await renderCharacterInPhantomPose({
-          charSheet2x4: c.sheetBuf,
-          blockingImageBuf: populatedBuf,
-          bbox,
-          charName: c.name,
-          colorName: c.colorName,
-          action: c.action,
-          aspectRatio: '9:16',
-          model: GROK_MODELS.STANDARD,
-          usageTracker,
-          cleanBgBuf: bgBuf,
-          silhouetteMask: silhouetteMasks[c.name],
-          canvasWidth: detection.canvasWidth,
-          canvasHeight: detection.canvasHeight,
-        });
-        totalCost += ppr.usage?.cost || 0;
-        phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };
-        const renderedBuf = Buffer.from(
-          stripDataUriPrefix(ppr.imageData),
-          'base64',
-        );
-        cutBuf = await removeBackground(renderedBuf);
+        // One re-render when the figure runs into the bottom edge of its
+        // render: the renderer cropped the feet, and a footless figure
+        // scaled to a silhouette that has feet is a visible fault (exp 1093).
+        let ppr = null;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          ppr = await renderCharacterInPhantomPose({
+            charSheet2x4: c.sheetBuf,
+            blockingImageBuf: populatedBuf,
+            bbox,
+            charName: c.name,
+            colorName: c.colorName,
+            action: c.action,
+            aspectRatio: '9:16',
+            model: GROK_MODELS.STANDARD,
+            usageTracker,
+            cleanBgBuf: bgBuf,
+            silhouetteMask: silhouetteMasks[c.name],
+            canvasWidth: detection.canvasWidth,
+            canvasHeight: detection.canvasHeight,
+          });
+          totalCost += ppr.usage?.cost || 0;
+          phantomPoseRenders[c.name] = { ...ppr.debug, output: ppr.imageData };
+          const renderedBuf = Buffer.from(stripDataUriPrefix(ppr.imageData), 'base64');
+          cutBuf = await removeBackground(renderedBuf);
+          const cropped = await figureTouchesBottomEdge(cutBuf);
+          if (!cropped) break;
+          if (attempt === 1) {
+            log.warn(`[PHANTOM-POSE] ${c.name}: rendered figure runs into the bottom edge (feet cropped) — re-rendering once`);
+          } else {
+            log.warn(`[PHANTOM-POSE] ${c.name}: re-render still touches the bottom edge — accepting it; the figure will be short of its feet`);
+          }
+        }
         cutBuf = await trimTransparent(cutBuf);
         usedPhantomPose = true;
       } catch (err) {
@@ -2605,6 +3341,19 @@ async function generateSceneComposite(opts) {
     }
 
     let sMeta = await sharp(scaled).metadata();
+    // sharp refuses an overlay wider than the base as well as taller; height
+    // is clipped below, width was not (a landscape phantom render that kept
+    // its background scaled to a 800px figure came out wider than the canvas
+    // and threw "must have same dimensions or smaller" outside any try -
+    // Lab exp 1089). Centre-crop to the canvas width; a figure that wide is
+    // wrong already, but a crop is a visible fault and a throw is a lost page.
+    if (sMeta.width > detection.canvasWidth) {
+      const l = Math.floor((sMeta.width - detection.canvasWidth) / 2);
+      log.warn(`[SCENE COMPOSITE]   ${c.name}: cut-out ${sMeta.width}px wide exceeds the ${detection.canvasWidth}px canvas — centre-cropped (background removal probably kept the render's backdrop)`);
+      scaled = await sharp(scaled).extract({ left: l, top: 0, width: detection.canvasWidth, height: sMeta.height }).png().toBuffer();
+      sMeta = await sharp(scaled).metadata();
+    }
+    log.info(`[SCENE COMPOSITE]   ${c.name}: cut-out ${sMeta.width}×${sMeta.height} for target h=${targetH}${usedPhantomPose ? ' (phantom pose)' : ''}`);
     const cx = bbox.x + Math.floor(bbox.width / 2);
     const bottomY = bbox.y + bbox.height;
     const canvasH = detection.canvasHeight;
@@ -2711,6 +3460,7 @@ async function generateSceneComposite(opts) {
   const blended = await blendPastedCanvas({
     compositedData, scene: { ...scene, occludedBy }, cast,
     aspectRatio, visualBibleGridImage, usageTracker, debug,
+    visualBible: opts.visualBible,
   });
   totalCost += blended.cost;
 
@@ -2737,9 +3487,9 @@ async function generateSceneComposite(opts) {
  */
 async function blendPastedCanvas({
   compositedData, scene, cast, aspectRatio, visualBibleGridImage,
-  usageTracker, promptOverride = null, debug = {},
+  usageTracker, promptOverride = null, debug = {}, visualBible = null,
 }) {
-  let blendPrompt = promptOverride || buildBlendEditPrompt(scene, cast);
+  let blendPrompt = scrubBlendPrompt(promptOverride || buildBlendEditPrompt(scene, cast), visualBible, 'uniform');
   // The page's own prompt runs to ~7.5k on a busy page, so it can pass Grok's
   // budget once the staging clause is added. Shrink with the SAME helper page
   // generation uses: it holds the REQUIRED OBJECTS + ART STYLE tail back and
@@ -2850,7 +3600,7 @@ async function generateStratifiedComposite(opts) {
   // attached so the dev panel can still show what Grok produced up to the
   // point of failure (anchor plate, depopulate output, etc.).
   try {
-    return await _stratifiedBody({ debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage });
+    return await _stratifiedBody({ visualBible: opts.visualBible, debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage });
   } catch (err) {
     err.partialDebug = debug;
     throw err;
@@ -3183,7 +3933,7 @@ function _aspectDims(aspectRatio, baseWidth = 1024) {
  * Returns the same shape generateStratifiedComposite returns so callers stay
  * agnostic about which branch ran.
  */
-async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost, visualBibleGridImage }) {
+async function _simpleCompositePath({ visualBible = null, emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost, visualBibleGridImage }) {
   const { W, H } = _aspectDims(aspectRatio, 1024);
   log.info(`[SCENE COMPOSITE/SIMPLE] start — ${frontCast.length} chars, canvas ${W}×${H}`);
 
@@ -3261,7 +4011,7 @@ async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, sc
   // default no-text behaviour. editWithGrok wants data URI strings (it does
   // r2.stripDataUriPrefix on each ref), so convert the composited buffer
   // before passing.
-  const blendPrompt = buildBlendEditPrompt(scene);
+  const blendPrompt = scrubBlendPrompt(buildBlendEditPrompt(scene), visualBible, 'simple');
   const blendRefs = [`data:image/jpeg;base64,${composited.toString('base64')}`];
   if (visualBibleGridImage) {
     const vbUri = typeof visualBibleGridImage === 'string'
@@ -3286,7 +4036,7 @@ async function _simpleCompositePath({ emptySceneData, frontCast, aspectRatio, sc
 }
 
 async function _stratifiedBody(ctx) {
-  let { debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage } = ctx;
+  let { debug, totalCost, backCast, frontCast, existingCleanBackground, cleanBackgroundPrompt, scene, aspectRatio, usageTracker, visualBibleGridImage, visualBible = null } = ctx;
 
   // ── Step 0: empty-scene canvas
   // Stratified step 1 is a Grok EDIT so we can attach identity packs as
@@ -3323,6 +4073,7 @@ async function _stratifiedBody(ctx) {
   // a visible composited intermediate in the dev panel.
   if (backCast.length === 0) {
     return _simpleCompositePath({
+      visualBible,
       emptySceneData, frontCast, aspectRatio, scene, usageTracker, debug, totalCost,
       visualBibleGridImage,
     });
@@ -3821,7 +4572,7 @@ async function _stratifiedBody(ctx) {
 
   // ── Step 4/4: blend pass (same as uniform path)
   log.info('[SCENE COMPOSITE/STRATIFIED] step 4/4 — blend pass');
-  const blendPrompt = buildBlendEditPrompt(scene);
+  const blendPrompt = scrubBlendPrompt(buildBlendEditPrompt(scene), visualBible, 'stratified');
   debug.blendPrompt = blendPrompt;
   const blendRefs = visualBibleGridImage
     ? [compositedData, visualBibleGridImage]
@@ -3860,7 +4611,11 @@ module.exports = {
     sizeFigure,
     buildAgeTargets,
     cropSheetCell,
+    judgeSheetColumnSplit,
+    SHEET_COLUMN_WIDTH_TOLERANCE,
     removeBackground,
+    platePlacementPrompt,
+    judgePopulatedPlate,
     trimTransparent,
     flipHorizontal,
     scaleToHeight,
@@ -3877,5 +4632,9 @@ module.exports = {
     buildIdentityPack,
     detectZOrderByOcclusion,
     rgbToHue,
+    buildInPlaceRenderPrompt,
+    placeholderResidueFromRaw,
+    matchRenderedFigureBox,
+    dilateMask,
   },
 };

@@ -108,7 +108,7 @@ function hasConflict(position, forbidden) {
     // Call Haiku
     let result;
     try {
-      result = await callTextModel(prompt, 1200, HAIKU_MODEL);
+      result = await callTextModel(prompt, null, HAIKU_MODEL);
     } catch (e) {
       console.log(`P${page} [${text_pos}] — Haiku call failed: ${e.message}`);
       continue;

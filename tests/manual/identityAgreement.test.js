@@ -135,13 +135,13 @@ console.log('\nreconcile — agreement changes nothing');
   eq(ev.fixableIssues[0].identityCorrected, undefined, 'and not marked as corrected');
 }
 
-console.log('\nreconcile — a conflict that is not a clean swap is flagged, never rewritten');
+console.log('\none detector figure is claimed by at most one evaluator match');
 {
-  // Two evaluator names collapse onto ONE detector name. Renaming would put the
-  // same child in two places at once, so nothing is renamed.
-  // Two neighbouring evaluator figures whose nearest detector body is the SAME
-  // one (Mara, standing between them); the detector's own Levin and Timo are
-  // across the frame.
+  // UPDATED 2026-09-18. This shape used to be the "two names collapse onto one
+  // detector name" case, and it only existed because the pairing was greedy:
+  // both neighbouring evaluator figures took Mara, who stands between them.
+  // The assignment is one-to-one now, so Mara goes to exactly one of them and
+  // the other is unpaired — its own name is across the frame, out of reach.
   const ev = {
     matches: [
       { reference: 'Levin', body_bbox: [0.15, 0.40, 0.25, 0.60] },
@@ -154,10 +154,57 @@ console.log('\nreconcile — a conflict that is not a clean swap is flagged, nev
     { name: 'Levin', bodyBox: [0.85, 0.85, 0.95, 0.95] },
     { name: 'Timo', bodyBox: [0.00, 0.90, 0.10, 1.00] },
   ]);
+  eq(r.compared, 1, 'only one match reaches Mara');
+  eq(r.conflicts.length, 1, 'and it is a conflict, since Mara is not what the evaluator called it');
+  eq((r.unpaired || []).length, 1, 'the other match is unpaired, not forced onto the same figure');
+}
+
+console.log('\nreconcile — a rename onto a name somebody still holds is refused');
+{
+  // The guarantee bc3cbe062 established: a rename must leave every name on
+  // exactly one figure. Here the detector calls the left body Mara, and a third
+  // match nobody renames away already holds "Mara" — so renaming would put her
+  // on two matches and erase Levin.
+  const ev = {
+    matches: [
+      { reference: 'Levin', body_bbox: [0.05, 0.1, 0.35, 0.9] },
+      { reference: 'Mara', body_bbox: [0.92, 0.92, 0.99, 0.99] },
+    ],
+    fixableIssues: [{ character: 'Levin', description: "Levin's jacket is red" }],
+  };
+  const r = reconcileIdentity(ev, [
+    { name: 'Mara', bodyBox: [0.1, 0.05, 0.9, 0.35] },
+    { name: 'Levin', bodyBox: [0.1, 0.55, 0.9, 0.85] },
+  ]);
   eq(r.uncorrectable, true, 'flagged as uncorrectable');
+  eq(r.uncorrectableReason, 'not-a-permutation', 'and why');
   eq(r.renamed, 0, 'nothing renamed');
   eq(ev.matches[0].reference, 'Levin', 'the evaluator name survives untouched');
+  eq(ev.fixableIssues[0].character, 'Levin', 'and so does its finding');
   ok(/not a clean swap/.test(describeIdentityAgreement(r)), 'and the log line says why');
+}
+
+console.log('\nreconcile — a face-paired conflict is measured, never applied');
+{
+  // The weak signal: an evaluator record with no body box. Head-to-head makes
+  // it comparable, but it does not get to rewrite the page — measured on three
+  // such pages where the detector turned out to be the wrong witness.
+  const ev = {
+    matches: [
+      { reference: 'Levin', face_bbox: [0.10, 0.10, 0.20, 0.20] },
+      { reference: 'Timo', face_bbox: [0.30, 0.10, 0.40, 0.20] },
+    ],
+    fixableIssues: [{ character: 'Levin', description: "Levin's jacket is red" }],
+  };
+  const r = reconcileIdentity(ev, [
+    { name: 'Timo', bodyBox: [0.10, 0.10, 0.80, 0.20], faceBox: [0.10, 0.10, 0.20, 0.20] },
+    { name: 'Levin', bodyBox: [0.10, 0.30, 0.80, 0.40], faceBox: [0.10, 0.30, 0.20, 0.40] },
+  ]);
+  eq(r.pairedOn, 'face', 'the record has no body box');
+  eq(r.conflicts.length, 2, 'the disagreement is measured');
+  eq(r.uncorrectableReason, 'face-paired', 'and named');
+  eq(r.renamed, 0, 'but nothing is rewritten');
+  eq(ev.matches[0].reference, 'Levin', 'the evaluator name survives');
 }
 
 console.log('\nreconcile — prose renaming respects word boundaries');

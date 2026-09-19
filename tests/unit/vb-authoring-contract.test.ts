@@ -97,6 +97,51 @@ describe('auditVisualBibleContract — character sex and apparent age', () => {
     expect(found).toHaveLength(0);
   });
 
+  // The authoring prompt (prompts/scene-expansion-all.txt) mandates `age` as a
+  // NUMBER of years and a `build` opening with the sex. Before 2026-09-14 the
+  // check dropped every non-string field before matching AND its age regex
+  // needed a "years"/"aged" token, so an entry obeying the prompt EXACTLY was
+  // reported as stating no apparent age — a false positive on correct output.
+  it('accepts the contract the prompt mandates: numeric age + a sex-opening build', () => {
+    const found = auditVisualBibleContract({
+      secondaryCharacters: [
+        { id: 'CHR020', name: 'Frau Brunner', age: 34, build: 'a woman, broad-shouldered', hair: 'dark, pinned up', appearsInPages: [3] },
+        { id: 'CHR021', name: 'Nico', age: 8, build: 'a boy, slightly tall for his age', hair: 'brown, cropped', appearsInPages: [5] },
+      ],
+    });
+    expect(found).toHaveLength(0);
+  });
+
+  // True-positive control: the fix must not become a disable. No age field at
+  // all and no age word anywhere in the prose is still the omission.
+  it('still reports a genuine age omission when nothing states one', () => {
+    const found = auditVisualBibleContract({
+      secondaryCharacters: [{ id: 'CHR022', name: 'Frau Brunner', build: 'a woman, broad-shouldered', hair: 'dark, pinned up' }],
+    });
+    expect(found).toHaveLength(1);
+    expect(found[0].message).toContain('no apparent age');
+    expect(found[0].message).not.toContain('no sex');
+  });
+
+  it('rejects age 0 and garbage ages — an unset or defaulted field is the omission', () => {
+    for (const age of [0, -5, 999, NaN, null, true, {}, [], '', 'unknown', 'N/A']) {
+      const found = auditVisualBibleContract({
+        secondaryCharacters: [{ id: 'CHR023', name: 'the keeper', age: age as any, build: 'a woman, sturdy' }],
+      });
+      expect(found, `age ${JSON.stringify(age)} must not satisfy the rule`).toHaveLength(1);
+      expect(found[0].message).toContain('no apparent age');
+    }
+  });
+
+  it('keeps accepting the prose age forms other templates still emit', () => {
+    for (const age of ['8 years old', 'elderly', 'a teenager', 'aged 40']) {
+      const found = auditVisualBibleContract({
+        secondaryCharacters: [{ id: 'CHR024', name: 'the keeper', age, build: 'a woman, sturdy' }],
+      });
+      expect(found, `age "${age}" should satisfy the rule`).toHaveLength(0);
+    }
+  });
+
   it('only audits secondary characters for sex and age, never props', () => {
     // A prop description mentioning neither must not be reported.
     const found = auditVisualBibleContract({
@@ -149,6 +194,36 @@ describe('auditVisualBibleContract — earned appearsInPages', () => {
     expect(found).toHaveLength(0);
   });
 
+  it('tells a LOCATION what a blanket range means for it, not the element-baking claim', () => {
+    // Locations are not elements (docs/SETTLED.md, 2026-09-08): nothing composites
+    // a location from a reference cell, so a wide range cannot bake it into a
+    // scene. The tripwire stays; the wording says what the reader should check.
+    const found = auditVisualBibleContract(
+      { locations: [{ id: 'LOC001', name: 'the workshop', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }] },
+      { pageCount: 8 }
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].category).toBe('locations');
+    expect(found[0].code).toBe('blanket-appears-in-pages');
+    expect(found[0].message).toContain('8 of 8 pages');
+    expect(found[0].message).toContain('single-setting');
+    expect(found[0].message).not.toContain('bakes the element');
+  });
+
+  it('keeps the element-baking wording for every non-location category', () => {
+    const found = auditVisualBibleContract(
+      {
+        animals: [{ id: 'ANI001', name: 'the cat', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        artifacts: [{ id: 'ART001', name: 'the lantern', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        vehicles: [{ id: 'VEH001', name: 'the cart', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+        clothing: [{ id: 'CLO001', name: 'the red cloak', appearsInPages: [1, 2, 3, 4, 5, 6, 7, 8] }],
+      },
+      { pageCount: 8 }
+    );
+    expect(found).toHaveLength(4);
+    for (const f of found) expect(f.message).toContain('bakes the element into scenes that never contain it');
+  });
+
   it('audits every category, not just vehicles', () => {
     const found = auditVisualBibleContract(
       {
@@ -197,12 +272,16 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
   });
 
+  // The Visual Bible moved OUT of storyBibleFromBeats and into the ALL-PAGES
+  // Art Director call on 2026-09-11 (owner): one author writes both what is in
+  // each picture and what each thing looks like, so a page cannot cite an
+  // element nobody declared. storyBibleFromBeats writes CLOTHING only now.
   it('requires sex and a NUMERIC age in a character entry', () => {
     // Beats states the age as a number, not prose, so the band computed from
     // the commissioned children is comparable (I11, 2026-09-06 — the other
     // three emitters keep the prose form, asserted below). The sex requirement
     // is unchanged; it moved from `age` to the opening of `build`.
-    const t = templates['storyBibleFromBeats'];
+    const t = templates['sceneExpansionAll'];
     expect(t).toBeTruthy();
     expect(t).toMatch(/`age` as a NUMBER of years/);
     expect(t).toMatch(/opens `build` with the character's sex/);
@@ -210,24 +289,91 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
   });
 
   it('requires an earned appearsInPages range', () => {
-    expect(templates['storyBibleFromBeats']).toMatch(/`pages` is earned/);
-    expect(templates['storyBibleFromBeats']).toMatch(/never a blanket 1-\{PAGE_COUNT\} range/i);
+    expect(templates['sceneExpansionAll']).toMatch(/`pages` is earned/);
+    expect(templates['sceneExpansionAll']).toMatch(/never a blanket 1-\{PAGE_COUNT\} range/i);
   });
 
   it('requires an entry for every named vehicle or vessel', () => {
-    expect(templates['storyBibleFromBeats']).toMatch(/vehicles\b/i);
-    expect(templates['storyBibleFromBeats']).toMatch(/its own `?vehicles`? entry/i);
+    expect(templates['sceneExpansionAll']).toMatch(/vehicles\b/i);
+    expect(templates['sceneExpansionAll']).toMatch(/its own `?vehicles`? entry/i);
+  });
+
+  // Regression: staging job_1789147573901_m3uam0nxi, Lab experiments 1189/1190.
+  // A parts-list description renders as whatever everyday object its bare
+  // geometry describes — a lamp entry as a camera, a scale entry as a shell.
+  // The schema asked for exactly that ("described by shape and parts"), with no
+  // recognisability requirement to hold it in place.
+  it('requires the description to read as the named thing, not as its geometry', () => {
+    const t = templates['sceneExpansionAll'];
+    expect(t).toMatch(/It must read as that thing at a glance/);
+    expect(t).toMatch(/Name the thing with the word that names it/);
+    expect(t).toMatch(/separates it from the everyday object its bare geometry would otherwise describe/);
+    expect(t).toMatch(/Geometry serves recognition; it is never the whole description/);
+  });
+
+  // Owner ruling 2026-09-11, on the cells rendered for Lab experiments
+  // 1191/1192 (staging job_1789147573901_m3uam0nxi): naming what the object
+  // attaches to is what makes it recognisable, and drew the mounting as well.
+  it('says the attachment named for recognition is never drawn', () => {
+    expect(templates['sceneExpansionAll'])
+      .toMatch(/Naming that thing identifies the object and never puts it in the picture/);
+  });
+
+  // Owner ruling 2026-09-11: two cells for the same object under different
+  // SCENE light are indistinguishable pictures. The world's light is the
+  // scene's, per page. Owner ruling 2026-09-14 (backlog #37) settled the other
+  // half: the object's OWN emission IS a state, because a state is drawn as
+  // its own reference cell and that cell is the only way a glowing look
+  // reaches the page. All three templates now carry the same split.
+  it.each([
+    ['sceneExpansionAll'],
+    ['storyTrial'],
+  ])("%s excludes the WORLD light from the state test, keeps the object own light in", (key) => {
+    expect(templates[key]).toBeTruthy();
+    expect(templates[key]).toMatch(/world lights it is not a state/i);
+    expect(templates[key]).toMatch(/own light is a state/i);
+    expect(templates[key]).not.toMatch(/A change of light is not a state/);
+    expect(templates[key]).not.toMatch(/lantern is lit/);
+    expect(templates[key]).not.toMatch(/alters it — lit,/);
+  });
+
+  it('keeps the rest of the state test intact', () => {
+    const t = templates['sceneExpansionAll'];
+    expect(t).toMatch(/Held, set down, carried, pressed against something/);
+    expect(t).toMatch(/when a face prop turns its other side to us/);
+    expect(t).toMatch(/cannot be drawn without that element and drags it into the cell/);
+    expect(t).toMatch(/a flower wilts, a bottle breaks, a canvas gets painted/);
+  });
+
+  it("sceneExpansionAll states schema: the object's own light may be a delta, the scene's light never", () => {
+    expect(templates['sceneExpansionAll']).toMatch(/the object's own light belongs here when the story turns it on or off, how the scene lights it never does/);
+  });
+
+  it('carries the recognisability requirement into the artifact schema field', () => {
+    const t = templates['sceneExpansionAll'];
+    expect(t).toMatch(/"description": "\[what it is, named with the word that names it/);
+    // The style-name ban predates this and stays (a prop once described as
+    // "<style>-style" instead of described at all).
+    expect(t).toMatch(/never by a style name/);
   });
 
   it('keeps the settled lettering gate intact', () => {
     // docs/SETTLED.md: no lettering unless the entry names the exact words.
-    expect(templates['storyBibleFromBeats']).toMatch(/No lettering unless this entry names the exact words/);
+    expect(templates['sceneExpansionAll']).toMatch(/No lettering unless this entry names the exact words/);
+  });
+
+  it('the wardrobe stage no longer authors the bible or the covers', () => {
+    const t = templates['storyBibleFromBeats'];
+    expect(t).toBeTruthy();
+    expect(t).toContain('---CLOTHING REQUIREMENTS---');
+    expect(t).not.toContain('---VISUAL BIBLE---');
+    expect(t).not.toContain('---COVER SCENE HINTS---');
   });
 
   // Every emitter of a VB character entry has to carry the sex+age rule, or a
-  // story routed down the other pipeline ships the same defect. The four
+  // story routed down the other pipeline ships the same defect. The live
   // template emitters, plus the phantom-patch prompt built in JS.
-  it.each(['storyUnified', 'storyUnifiedImageFirst', 'storyTrial'])(
+  it.each(['storyTrial'])(
     '%s states sex and apparent age in the character scaffold',
     (key) => {
       expect(templates[key], `template ${key} not loaded`).toBeTruthy();
@@ -235,11 +381,8 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     }
   );
 
-  it.each(['storyUnified', 'storyUnifiedImageFirst'])('%s carries all three authoring rules', (key) => {
-    expect(templates[key]).toMatch(/sex and apparent age in its first sentence/);
-    expect(templates[key]).toMatch(/its own `vehicles` entry/);
-    expect(templates[key]).toMatch(/`pages` is earned/);
-  });
+  // The two unified writers carried these three rules and were the subjects
+  // here until 2026-09-15, when both were deleted as unreachable.
 
   it('the phantom-patch prompt asks for sex, not a bare age category', () => {
     // server/lib/phantomCharacters.js mints CHR entries from a JS-built prompt,
@@ -250,5 +393,43 @@ describe('story-bible-from-beats.txt — authoring rules the audit backs', () =>
     );
     expect(src).toMatch(/"age":\s*"<sex and apparent age/);
     expect(src).not.toMatch(/<age category/);
+  });
+});
+
+describe('the authored `label` — one English name per element', () => {
+  const cjs = createRequire(import.meta.url);
+  const { parseVisualBible } = cjs('../../server/lib/visualBible.js');
+
+  it('survives the parse whitelist on every pool', () => {
+    const json = {
+      secondaryCharacters: [{ id: 'CHR001', label: 'village baker', name: 'Aline', pages: [1] }],
+      animals: [{ id: 'ANI001', label: 'grey farm cat', name: 'Mitzi', pages: [1] }],
+      artifacts: [{ id: 'ART001', label: 'brass hand lantern', name: 'lantern', type: 'hand tool', pages: [1], description: 'small brass lantern' }],
+      locations: [{ id: 'LOC001', label: 'hilltop meadow', name: 'Wiese', pages: [1] }],
+      vehicles: [{ id: 'VEH001', label: 'red mail cart', name: 'cart', pages: [1], colorAndDetails: 'red', signatureElement: 'brass bell' }],
+      clothing: [{ id: 'CLO001', label: 'blue wool cloak', name: 'cloak', pages: [1], wornBy: 'Aline', description: 'blue wool', howWorn: 'over the shoulders' }],
+    };
+    const outline = [
+      'Visual Bible',
+      '',
+      '```json',
+      JSON.stringify(json),
+      '```',
+      '',
+    ].join('\n');
+    const vb = parseVisualBible(outline);
+    for (const pool of ['secondaryCharacters', 'animals', 'artifacts', 'locations', 'vehicles', 'clothing']) {
+      expect(vb[pool], pool).toHaveLength(1);
+      expect(vb[pool][0].label, pool).toBe(json[pool][0].label);
+    }
+  });
+
+  it('is authored by both bible-emitting templates', async () => {
+    await cjs('../../server/services/prompts.js').loadPromptTemplates();
+    const templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
+    for (const key of ['storyTrial', 'sceneExpansionAll']) {
+      expect(templates[key], key).toBeTruthy();
+      expect(templates[key], key).toMatch(/"label":\s*"\[the one English name every prompt uses/);
+    }
   });
 });

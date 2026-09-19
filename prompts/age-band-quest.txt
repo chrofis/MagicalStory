@@ -1,35 +1,40 @@
-# REPETITION QUEST (age 2)
+[[premise]]# REPETITION QUEST (age 2)[[/premise]]
 
-The child this book is for is two. Write for that child. These rules override any instruction
-elsewhere to build a conflict, a tension or a challenge.
+[[premise]]The child this book is for is two. Write for that child. These rules override any instruction
+elsewhere to build a conflict, a tension or a challenge.[[/premise]]
 
-**One tiny goal, and nothing else.** The whole book is one small wanted thing — a lost boot, the
-animal friend who is not in their usual place, the last piece of a snack. It is named on the first
-page and found near the end. No second goal, no subplot, no twist.
+[[premise:subject]]**One tiny goal, and nothing else.** The whole book is one small wanted thing. Something ordinary in this
+child's own day, and a different thing in every book. It is named on the first
+page. No second goal, no subplot, no twist.[[/premise:subject]]
 
-**The search is the story.** The child looks in one place per page: opening, lifting, peeking behind,
+[[mechanics]]**The search is the story.** The child looks in one place per page: opening, lifting, peeking behind,
 calling out. Each page is a new place and a new thing to see there, and the answer each time is a
-friendly no — not there, but look what is.
+friendly no — not there, but look what is.[[/mechanics]]
 
-**A phrase comes back every time.** The same question or call is repeated at each place, word for
+[[craft]]**A phrase comes back every time.** The same question or call is repeated at each place, word for
 word, so the child listening can join in and say it too. The rhythm is what the book is for; the
-plot is only the excuse for it.
+plot is only the excuse for it.[[/craft]]
 
-**Nothing frightening.** No danger, no villain, nobody unkind, nothing lost for good. Whoever the
-child meets along the way is friendly and helps or simply waves.
+[[premise]]**Nothing frightening.** No danger, no villain, nobody unkind, nothing lost for good. Whoever the
+child meets along the way is friendly and helps or simply waves.[[/premise]]
 
-**The child does the finding.** They look and they find. Never anything that turns on working
-something out — clues, plans, puzzles, tricks or deciding for others.
+[[premise:agency]]**The child does the finding.** They look and they find. Never anything that turns on working
+something out — clues, plans, puzzles, tricks or deciding for others.[[/premise:agency]]
 
-**Food.** Only ordinary food a child of this age eats, named plainly. Never sweets or ice cream, and
-never anything a small child cannot chew or swallow safely.
+[[premise:resolution]]**It resolves.** The wanted thing is found before the last page.[[/premise:resolution]]
 
-**Nothing appears from nowhere.** A thing is referred to as known only after a page has shown it
-there. Nothing valuable, exciting or edible is simply found.
+[[craft]]**Food.** Only ordinary food a child of this age eats, named plainly. Never sweets or ice cream, and
+never anything a small child cannot chew or swallow safely.[[/craft]]
 
-**A make-believe story opens and closes where the child really is.** Page one shows them there,
+[[craft]]**Nothing appears from nowhere.** A thing is referred to as known only after a page has shown it
+there. Nothing valuable, exciting or edible is simply found.[[/craft]]
+
+[[premise]]**A make-believe story opens and closes where the child really is.** Page one shows them there,
 dressing up or beginning to play, and the last page brings them back to that same place. Never move
-them to somewhere real they were never shown leaving for.
+them to somewhere real they were never shown leaving for.[[/premise]]
 
-**Ending.** The thing is found, and then home, a meal or sleep. Cosy, not a triumph — no reward, no
-lesson.
+[[craft]]**A life event is weather, not a task.** What changes around the main character, and what stays the
+same in their hands. Never something they understand, explain or put right.[[/craft]]
+
+[[craft]]**Ending.** The thing is found, and then home, a meal or sleep. Cosy — the finding is the whole of
+it. No prize, no ceremony, no line about what it means.[[/craft]]

@@ -98,127 +98,152 @@ export function GenerationProgress({
     {
       en: '{name} is getting ready for their big adventure...',
       de: '{name} macht sich bereit für das grosse Abenteuer...',
-      fr: '{name} se prépare pour sa grande aventure...'
+      fr: '{name} se prépare pour sa grande aventure...',
+      it: '{name} si sta preparando per la grande avventura...'
     },
     {
       en: '{name} is practicing their hero pose...',
       de: '{name} übt gerade die Heldenpose...',
-      fr: '{name} s\'entraîne à prendre la pose du héros...'
+      fr: '{name} s\'entraîne à prendre la pose du héros...',
+      it: '{name} sta provando la posa da eroe...'
     },
     {
       en: '{name} can\'t wait to see what happens next!',
       de: '{name} kann es kaum erwarten zu sehen, was als Nächstes passiert!',
-      fr: '{name} a hâte de voir ce qui va se passer !'
+      fr: '{name} a hâte de voir ce qui va se passer !',
+      it: '{name} non vede l\'ora di sapere come va a finire!'
     },
     {
       en: '{name} is warming up for the adventure ahead...',
       de: '{name} wärmt sich für das bevorstehende Abenteuer auf...',
-      fr: '{name} s\'échauffe pour l\'aventure à venir...'
+      fr: '{name} s\'échauffe pour l\'aventure à venir...',
+      it: '{name} si sta scaldando per l\'avventura che arriva...'
     },
     {
       en: '{name} just found a magic feather! Adding it to the story...',
       de: '{name} hat gerade eine Zauberfeder gefunden! Wir fügen sie der Geschichte hinzu...',
-      fr: '{name} vient de trouver une plume magique ! On l\'ajoute au récit...'
+      fr: '{name} vient de trouver une plume magique ! On l\'ajoute au récit...',
+      it: '{name} ha appena trovato una piuma magica! La mettiamo nella storia...'
     },
     {
       en: '{name} is whispering secrets to the story wizard...',
       de: '{name} flüstert dem Geschichtenzauberer Geheimnisse zu...',
-      fr: '{name} chuchote des secrets au magicien des histoires...'
+      fr: '{name} chuchote des secrets au magicien des histoires...',
+      it: '{name} sussurra segreti al mago delle storie...'
     },
     {
       en: '{name} is peeking around the corner to see what\'s coming...',
       de: '{name} schaut um die Ecke, um zu sehen, was kommt...',
-      fr: '{name} jette un coup d\'œil au coin pour voir ce qui arrive...'
+      fr: '{name} jette un coup d\'œil au coin pour voir ce qui arrive...',
+      it: '{name} sbircia dietro l\'angolo per vedere cosa arriva...'
     },
     {
       en: '{name} is doing a little happy dance!',
       de: '{name} macht einen kleinen Freudentanz!',
-      fr: '{name} fait une petite danse de joie !'
+      fr: '{name} fait une petite danse de joie !',
+      it: '{name} si sta facendo un balletto di gioia!'
     },
     {
       en: '{name} is collecting stars for the story...',
       de: '{name} sammelt Sterne für die Geschichte...',
-      fr: '{name} collectionne des étoiles pour le récit...'
+      fr: '{name} collectionne des étoiles pour le récit...',
+      it: '{name} sta raccogliendo stelle per la storia...'
     },
     {
       en: '{name} just met a friendly dragon! Making friends...',
       de: '{name} hat gerade einen freundlichen Drachen getroffen! Sie werden Freunde...',
-      fr: '{name} vient de rencontrer un dragon amical ! Ils deviennent amis...'
+      fr: '{name} vient de rencontrer un dragon amical ! Ils deviennent amis...',
+      it: '{name} ha appena incontrato un drago gentile! Stanno diventando amici...'
     },
     {
       en: '{name} is looking for the perfect hiding spot...',
       de: '{name} sucht das perfekte Versteck...',
-      fr: '{name} cherche la cachette parfaite...'
+      fr: '{name} cherche la cachette parfaite...',
+      it: '{name} cerca il nascondiglio perfetto...'
     },
     {
       en: '{name} is trying on different hats for the story...',
       de: '{name} probiert verschiedene Hüte für die Geschichte an...',
-      fr: '{name} essaie différents chapeaux pour le récit...'
+      fr: '{name} essaie différents chapeaux pour le récit...',
+      it: '{name} sta provando cappelli diversi per la storia...'
     },
     {
       en: '{name} just spotted a rainbow! Quick, follow it...',
       de: '{name} hat gerade einen Regenbogen entdeckt! Schnell, hinterher...',
-      fr: '{name} vient de repérer un arc-en-ciel ! Vite, suivons-le...'
+      fr: '{name} vient de repérer un arc-en-ciel ! Vite, suivons-le...',
+      it: '{name} ha appena avvistato un arcobaleno! Presto, seguiamolo...'
     },
     {
       en: '{name} is teaching the story characters a secret handshake...',
       de: '{name} bringt den Figuren einen geheimen Handschlag bei...',
-      fr: '{name} apprend une poignée de main secrète aux personnages...'
+      fr: '{name} apprend une poignée de main secrète aux personnages...',
+      it: '{name} insegna ai personaggi una stretta di mano segreta...'
     },
     {
       en: '{name} found a treasure map in their pocket!',
       de: '{name} hat eine Schatzkarte in der Tasche gefunden!',
-      fr: '{name} a trouvé une carte au trésor dans sa poche !'
+      fr: '{name} a trouvé une carte au trésor dans sa poche !',
+      it: '{name} ha trovato una mappa del tesoro in tasca!'
     },
     {
       en: '{name} is building a fort out of storybooks...',
       de: '{name} baut eine Burg aus Geschichtenbüchern...',
-      fr: '{name} construit un fort avec des livres d\'histoires...'
+      fr: '{name} construit un fort avec des livres d\'histoires...',
+      it: '{name} sta costruendo un castello con i libri di fiabe...'
     },
     {
       en: '{name} is chasing butterflies between chapters...',
       de: '{name} jagt Schmetterlinge zwischen den Kapiteln...',
-      fr: '{name} court après les papillons entre les chapitres...'
+      fr: '{name} court après les papillons entre les chapitres...',
+      it: '{name} rincorre le farfalle fra un capitolo e l\'altro...'
     },
     {
       en: '{name} is counting shooting stars...',
       de: '{name} zählt Sternschnuppen...',
-      fr: '{name} compte les étoiles filantes...'
+      fr: '{name} compte les étoiles filantes...',
+      it: '{name} sta contando le stelle cadenti...'
     },
     {
       en: '{name} just learned a new magic spell!',
       de: '{name} hat gerade einen neuen Zauberspruch gelernt!',
-      fr: '{name} vient d\'apprendre un nouveau sort magique !'
+      fr: '{name} vient d\'apprendre un nouveau sort magique !',
+      it: '{name} ha appena imparato un nuovo incantesimo!'
     },
     {
       en: '{name} is drawing pictures in the sand...',
       de: '{name} malt Bilder in den Sand...',
-      fr: '{name} dessine des images dans le sable...'
+      fr: '{name} dessine des images dans le sable...',
+      it: '{name} disegna sulla sabbia...'
     },
     {
       en: '{name} packed a picnic for the adventure...',
       de: '{name} hat ein Picknick für das Abenteuer eingepackt...',
-      fr: '{name} a préparé un pique-nique pour l\'aventure...'
+      fr: '{name} a préparé un pique-nique pour l\'aventure...',
+      it: '{name} ha preparato un picnic per l\'avventura...'
     },
     {
       en: '{name} is tiptoeing past a sleeping giant...',
       de: '{name} schleicht auf Zehenspitzen an einem schlafenden Riesen vorbei...',
-      fr: '{name} passe sur la pointe des pieds devant un géant endormi...'
+      fr: '{name} passe sur la pointe des pieds devant un géant endormi...',
+      it: '{name} passa in punta di piedi davanti a un gigante addormentato...'
     },
     {
       en: '{name} made friends with a talking squirrel!',
       de: '{name} hat sich mit einem sprechenden Eichhörnchen angefreundet!',
-      fr: '{name} s\'est lié d\'amitié avec un écureuil parlant !'
+      fr: '{name} s\'est lié d\'amitié avec un écureuil parlant !',
+      it: '{name} ha fatto amicizia con uno scoiattolo parlante!'
     },
     {
       en: '{name} discovered a secret door behind the bookshelf...',
       de: '{name} hat eine Geheimtür hinter dem Bücherregal entdeckt...',
-      fr: '{name} a découvert une porte secrète derrière la bibliothèque...'
+      fr: '{name} a découvert une porte secrète derrière la bibliothèque...',
+      it: '{name} ha scoperto una porta segreta dietro la libreria...'
     },
     {
       en: '{name} is braiding flowers into a crown...',
       de: '{name} flicht Blumen zu einer Krone...',
-      fr: '{name} tresse des fleurs en couronne...'
+      fr: '{name} tresse des fleurs en couronne...',
+      it: '{name} sta intrecciando fiori per farne una corona...'
     }
   ];
 
@@ -361,7 +386,7 @@ export function GenerationProgress({
 
     const idx = messageIndicesRef.current[char.id] ?? 0;
     const template = funnyMessageTemplates[idx];
-    const msg = language === 'de' ? template.de : language === 'fr' ? template.fr : template.en;
+    const msg = language === 'de' ? template.de : language === 'fr' ? template.fr : language === 'it' ? template.it : template.en;
     const message = msg.replace('{name}', char.name);
 
     return { avatarUrl, message };
@@ -530,6 +555,28 @@ export function GenerationProgress({
       canClose: 'Cela prend 30 à 60 minutes. Vous pouvez fermer cet onglet — votre histoire continue sur nos serveurs.',
       continueInBackground: 'Continuer en arrière-plan',
     },
+    it: {
+      title: 'Stiamo creando la tua storia!',
+      timeInfo: 'La tua storia richiede 30–60 minuti. Prima si scrive, le immagini arrivano nella seconda metà.',
+      tipCharacters: 'I bambini imparano meglio quando si vedono nella storia. È la magia dei libri personalizzati!',
+      tipStoryPlot: 'Puoi modificare ogni testo e rigenerare ogni immagine — rendi la storia perfetta!',
+      tipLocations: 'Usiamo foto reali dei monumenti della tua zona nelle illustrazioni — scegli il tuo luogo per un tocco personale.',
+      tipArtStyle: 'Prova stili diversi! Acquerello per i libri illustrati, pittura a olio per i più grandi, fumetto per le avventure divertenti.',
+      tipPrintedBook: 'Ti piace la storia? Ordinala come libro stampato — e riavrai i tuoi crediti!',
+      tipSharing: 'Le storie sono private di default. Attiva la condivisione perché nonni e amici possano leggerla.',
+      tipHistoric: 'Scopri la storia! Tuo figlio può vivere lo sbarco sulla Luna, incontrare i dinosauri o scoprire leggende svizzere locali.',
+      tipLearning: 'Le storie personalizzate invogliano i bambini a leggere — molto meglio delle discussioni sullo schermo!',
+      tipCredits: `Ogni pagina costa ${CREDITS_PER_PAGE} crediti. Una storia di ${EXAMPLE_STORY_PAGES} pagine usa ${EXAMPLE_STORY_CREDITS} crediti — puoi creare storie fino a 25 pagine, ognuna con la sua illustrazione!`,
+      coversPreview: 'Il tuo libro prende forma',
+      frontCover: 'Copertina',
+      initialPage: 'Dedica',
+      backCover: 'Retro',
+      cancelJob: 'Annulla generazione',
+      cancelling: 'Annullamento...',
+      canCloseTitle: 'Ti scriviamo un\'e-mail appena è pronta',
+      canClose: 'Ci vogliono 30–60 minuti. Puoi chiudere questa scheda — la tua storia continua sui nostri server.',
+      continueInBackground: 'Continua in background',
+    },
   };
 
   const t = translations[language as keyof typeof translations] || translations.en;
@@ -633,6 +680,8 @@ export function GenerationProgress({
                 ? 'Jede Seite wird jetzt gemalt ...'
                 : language === 'fr'
                 ? 'Chaque page est maintenant peinte ...'
+                : language === 'it'
+                ? 'Ora dipingiamo ogni pagina ...'
                 : 'Now painting each page ...'}
             </p>
             <p className="text-xs text-gray-500 mt-1">
@@ -640,6 +689,8 @@ export function GenerationProgress({
                 ? 'Dies kann einige Minuten dauern. Du kannst den Browser schliessen.'
                 : language === 'fr'
                 ? 'Cela peut prendre quelques minutes. Vous pouvez fermer le navigateur.'
+                : language === 'it'
+                ? 'Può richiedere qualche minuto. Puoi chiudere il browser.'
                 : 'This may take a few minutes. You can close the browser.'}
             </p>
           </div>

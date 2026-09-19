@@ -221,12 +221,40 @@ function buildJudgeInputFromArtifacts(artifacts, context = null) {
 }
 
 /**
+ * A judge's `notes` field, flattened to a string WITHOUT losing it. Models
+ * return notes as a string most of the time and as an object ({strengths,
+ * weaknesses, ...} or a per-dimension map) some of the time — model-shaped and
+ * intermittent. `String(obj)` yields "[object Object]", which silently discards
+ * that panelist's entire qualitative feedback; a downstream retell then runs on
+ * two panelists instead of three.
+ */
+function flattenNotes(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  if (Array.isArray(v)) return v.map(flattenNotes).filter(Boolean).join('\n');
+  if (typeof v === 'object') {
+    const parts = Object.entries(v)
+      .map(([k, val]) => {
+        const s = flattenNotes(val);
+        return s ? `${k}: ${s}` : '';
+      })
+      .filter(Boolean);
+    return parts.length ? parts.join('\n') : JSON.stringify(v);
+  }
+  return String(v);
+}
+
+/**
  * The commission, as the judge should see it: what the story was asked to be.
  * `storyDetails` is the payload — it carries the role casting for historical
  * stories ("ROLES: <child>: <historical figure>"), which a premise-blind judge
  * reads as a plot hole. Everything here comes from the stored story row.
  */
-function buildBriefContext(d = {}) {
+// `arc: true` briefs an ARC judge, and hands it the identical commission the arc
+// creator worked from: the lean arc-stage shape (owner, 2026-08-31 — the full
+// page budget belongs to beats, not the arc), the age-band file, and the arc
+// budgets. Default false so the full-story scorecard path is unchanged.
+function buildBriefContext(d = {}, { arc = false } = {}) {
   const lines = [
     d.title ? `Title: ${d.title}` : null,
     d.storyCategory ? `Category: ${d.storyCategory}` : null,
@@ -247,11 +275,17 @@ function buildBriefContext(d = {}) {
   // against the real budget rather than a guess. Lazy require: promptBuilders
   // does not require this module, so there is no cycle.
   try {
-    const { buildStoryShapeSection } = require('./promptBuilders');
+    const { buildStoryShapeSection, buildAgeModeSection, buildArcBudgetSection } = require('./promptBuilders');
     const pages = parseInt(d.pages, 10) || (Array.isArray(d.sceneImages) ? d.sceneImages.length : 0);
     if (pages) {
-      const shape = buildStoryShapeSection(d, pages);
+      const shape = buildStoryShapeSection(d, pages, arc ? { arc: true } : undefined);
       if (shape) lines.push(`\n${shape}`);
+      if (arc) {
+        const ageMode = buildAgeModeSection(d);
+        if (ageMode && String(ageMode).trim()) lines.push(`\n${String(ageMode).trim()}`);
+        const budgets = buildArcBudgetSection(d, pages);
+        if (budgets && String(budgets).trim()) lines.push(`\n${String(budgets).trim()}`);
+      }
     }
   } catch { /* judge context degrades to the plain brief */ }
   return lines.length ? lines.join('\n') : '';
@@ -305,7 +339,7 @@ function scoreFromDims(input, { partial = false, only = null, rubric = null } = 
     if (extra.length) throw new Error(`${artifact} has unknown dims: ${extra.join(', ')}`);
     const score = mean(vals);
     artScores.push(score);
-    artifacts[artifact] = { dims: given.dims, score, notes: typeof given.notes === 'string' ? given.notes : '' };
+    artifacts[artifact] = { dims: given.dims, score, notes: flattenNotes(given.notes) };
   }
   if ((partial || only) && artScores.length === 0) throw new Error('partial scorecard scored no artifacts');
   return { artifacts, overall: mean(artScores) };
@@ -322,7 +356,7 @@ function parseJudgeJson(text) {
 
 module.exports = {
   RUBRIC, RUBRIC_V1, ARC_RUBRIC, RETELL_RUBRIC, EVALUATOR_RUBRICS, mean, finalBeats, finalScenes, extractArtifacts,
-  buildJudgeInput, buildJudgeInputFromArtifacts, buildBriefContext, provenanceOf,
+  buildJudgeInput, buildJudgeInputFromArtifacts, buildBriefContext, flattenNotes, provenanceOf,
   scoreFromDims, parseJudgeJson,
   EVALUATOR_VERSION, DEFAULT_EVALUATOR_VERSION, EVALUATOR_PROMPT_KEYS, EVALUATORS,
   resolveEvaluator, findEvaluatorForJudge, listScorers, evaluatorStamp,

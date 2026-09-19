@@ -1,0 +1,479 @@
+{
+  "$comment": [
+    "SIBLING REGISTRY — files and templates that must move together.",
+    "",
+    "WHY THIS EXISTS — 2026-09-15. Of 173 behaviour commits in 60 hours, 27 were",
+    "PARTIAL and every one had the same shape: a fix landed on one code or prompt",
+    "path and not its sibling. The `fixing-sibling-paths` skill already described",
+    "the failure class in prose and did not prevent a single one of the 27 — prose",
+    "is advisory, and an agent that does not invoke the skill never reads it. This",
+    "file makes the sibling relationship DATA, so two mechanical consumers can use",
+    "it: scripts/admin/check-sibling-paths.js (pre-push gate) and",
+    "tests/unit/sibling-parity.test.ts (structural parity, runs in the normal suite).",
+    "",
+    "ADDING A SET is one entry. Keep `reason` to one line and name the axis — the",
+    "gate prints both, so the person it blocks learns what to look at.",
+    "",
+    "FIELDS",
+    "  id        stable slug, used in the gate output",
+    "  axis      the recurring split this set belongs to",
+    "  reason    one line: why these move together",
+    "  members   repo-relative paths; ALL must change together (see severity)",
+    "  severity  'block' — the only accepted value. A 'warn' tier existed for one",
+    "            day; the owner retired it on 2026-09-15: EVERY set blocks, and the",
+    "            Siblings-Checked marker (same-commit or vouching) is the one escape.",
+    "            The gate rejects any other value rather than reading it as block.",
+    "  generators / critics",
+    "            A set may declare these INSTEAD of `members` (axis",
+    "            generator-vs-critic). The rule is different and looser on purpose:",
+    "            a commit touching the set must touch at least ONE generator AND at",
+    "            least ONE critic, not every member. Three judges of one generator",
+    "            are not siblings of each other; each is a sibling of the generator.",
+    "            The disease this treats: a rule is added to a judge and the",
+    "            generator is never told, so the page is penalised for something it",
+    "            was never asked to do.",
+    "",
+    "  parity    optional structural assertions for tests/unit/sibling-parity.test.ts:",
+    "              metadataKeys: true  -> the ---METADATA--- JSON example in every",
+    "                                     member declares the same top-level keys",
+    "              anchors: [\"...\"]     -> every member contains each literal string",
+    "              ruleAnchors: [{critic, generator, note}] -> for a generator-vs-critic",
+    "                                     set, a rule named on the critic side must have",
+    "                                     its counterpart instruction on the generator side",
+    "",
+    "ESCAPE HATCH — put `Siblings-Checked: <reason>` in the commit message when the",
+    "siblings genuinely need no change. It is a statement, not a silencer: write why.",
+    "A push whose FULL range covers every member passes without a marker, so a fix",
+    "split across two commits in one push is fine."
+  ],
+  "sets": [
+    {
+      "id": "art-director-templates",
+      "axis": "per-page vs all-pages Art Director",
+      "reason": "scene-expansion.txt is the per-page gap-fill/fallback template for the same Art Director contract scene-expansion-all.txt drives on the live beats path; a rule or metadata field on one and not the other silently reads as absent on whichever path runs.",
+      "members": [
+        "prompts/scene-expansion.txt",
+        "prompts/scene-expansion-all.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "metadataKeys": true
+      }
+    },
+    {
+      "id": "story-prose-writers",
+      "axis": "beats text writer vs trial writer",
+      "reason": "story-text-from-beats.txt (the live beats path, every full story) and story-trial.txt (the live /try funnel writer) both write page prose under the same shared rules; a prose rule that becomes a promptBuilders constant reaches a path only through the placeholder that path declares, so a new one is declared at both sites or it silently reads as absent there. This set now also carries the retired trial-vs-full-writer axis: the trial path has repeatedly lagged the full path by weeks. story-unified.txt / story-unified-imagefirst.txt were members until 2026-09-15, when both were deleted as unreachable (docs/decisions.md).",
+      "members": [
+        "prompts/story-text-from-beats.txt",
+        "prompts/story-trial.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{PAGE_OPENING_VARIETY}"
+        ],
+        "anchorsNote": "only {PAGE_OPENING_VARIETY} is genuinely declared by both live prose writers. {RISK_FRAMING} and {AD_COMPOSITION} were anchors of the deleted unified-writer sets and are NOT declared by story-text-from-beats.txt — the beats chain carries risk framing inside {TELLING_RULES} on the arc prompts and composition on the Art Director. Asserting them here would assert a parity into existence that does not hold."
+      }
+    },
+    {
+      "id": "text-audit-sighted-vs-blind",
+      "axis": "arc-informed audit vs blind audit",
+      "reason": "story-text-audit.txt (arc-informed) and story-text-audit-blind.txt (the blind reader) feed ONE parser and ONE merge (parseFaultLines / mergeAuditFindings, textRefine.js), and that merge dedupes on the CATEGORY TAG: same page + same category + different auditor is folded into one finding. So the FAULT-line output contract and the category vocabulary are shared state — a category name that gains a meaning on one side and not the other either folds two distinct faults into one or splits one fault into two. The question SETS are deliberately different, which is what the Siblings-Checked marker is for; the contract they share is not.",
+      "members": [
+        "prompts/story-text-audit.txt",
+        "prompts/story-text-audit-blind.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "lector-and-diff-pass",
+      "axis": "lector prompt vs diff-pass prompt",
+      "reason": "story-text-proofread.txt (the lector) and story-text-diff.txt (the diff pass) feed the SAME parser and applier (parseLectorFindings / applyLectorFindings, textRefine.js:996-999), so a change to the quoting or span contract on one breaks the other's output against the shared applier.",
+      "members": [
+        "prompts/story-text-proofread.txt",
+        "prompts/story-text-diff.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "inventory-schema",
+      "axis": "quality-eval inventory vs unified inventory",
+      "reason": "image-evaluation.txt and image-inventory-unified.txt both describe the per-figure inventory the blind judge (image-prompt-compliance.txt) consumes; a schema change on one makes the two inventories incomparable.",
+      "members": [
+        "prompts/image-evaluation.txt",
+        "prompts/image-inventory-unified.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "vb-authoring-sites",
+      "axis": "Art Director VB authoring vs writer VB authoring",
+      "reason": "the Visual Bible is authored at two LIVE sites — the all-pages Art Director on the beats path (every full story) and the trial writer — and a rule about what a VB entry must state has to exist at both. The two pre-beats unified writers were members until 2026-09-15, when they were deleted as unreachable (docs/decisions.md).",
+      "members": [
+        "prompts/scene-expansion-all.txt",
+        "prompts/story-trial.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "\"label\"",
+          "\"name\"",
+          "\"properName\"",
+          "\"type\"",
+          "\"isRealLandmark\"",
+          "\"scaleClass\"",
+          "\"generic\"",
+          "\"states\""
+        ],
+        "anchorsNote": "the VB entry keys both live authoring sites genuinely declare today. `\"size\"` was anchored until 2026-09-15 and was dropped when the free-text size field was replaced by the `scaleClass` enum as the single source of scale truth; story-trial.txt still declares a PER-PAGE `size` on its scene-hint objects, which is a different field with a different consumer and is deliberately not anchored here. `\"states\"` is anchored since 2026-09-15 — owner ruling, every bible-authoring site declares it. `\"vantages\"` stays deliberately NOT anchored: it is absent from scene-expansion-all.txt, which is a real divergence, not a parity target to assert into existence."
+      }
+    },
+    {
+      "id": "repair-entrypoints",
+      "axis": "production repair vs user regeneration vs entity char-fix",
+      "reason": "repairPipeline.js, routes/regeneration.js and entityConsistency.js each invoke character repair by their own assembly; a guard or gate added to one leaves the other two entry points unguarded.",
+      "members": [
+        "server/lib/repairPipeline.js",
+        "server/routes/regeneration.js",
+        "server/lib/entityConsistency.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "cover-cast-builders",
+      "axis": "cover path vs page path cast assembly",
+      "reason": "coverComposite.js and compositeCastBuilder.js both resolve a hint-string name to a character and both hand-roll parts of it; a resolver or costume-key fix on one leaves the other resolving by raw name.",
+      "members": [
+        "server/lib/coverComposite.js",
+        "server/lib/compositeCastBuilder.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "trial-idea-prompt-mirror",
+      "axis": "trial idea route vs its Test Lab mirror",
+      "reason": "the /try idea route (server/routes/trial.js) and the Lab's idea stage (server/lib/testlab.js, marked `route mirror:`) hand-assemble the SAME character line, category context and landmark text; a copy kept by hand at both is how the raw storyTheme ID shipped into every life-skill prompt as \"the child plays at being a farm\" (2026-09-15). Shared text belongs in one constant both require.",
+      "members": [
+        "server/routes/trial.js",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "lab-vs-prod-eval",
+      "axis": "Test Lab stage vs production call site",
+      "reason": "testlab.js re-implements the call that evalPipeline.js makes in production; when they drift the Lab measures something production never runs (version pinning, cast lists, model ids).",
+      "members": [
+        "server/lib/testlab.js",
+        "server/lib/evalPipeline.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "page-image-generator-vs-critics",
+      "axis": "generator-vs-critic",
+      "reason": "image-generation.txt is the only instruction the illustrator receives; image-evaluation.txt, image-semantic.txt and image-prompt-compliance.txt are the three judges that score the result. A rule added to a judge and not to the generator penalises a page for something it was never asked to do.",
+      "generators": [
+        "prompts/image-generation.txt"
+      ],
+      "critics": [
+        "prompts/image-evaluation.txt",
+        "prompts/image-semantic.txt",
+        "prompts/image-prompt-compliance.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "ruleAnchors": [
+          {
+            "critic": "D-24 `character_marking`",
+            "generator": "{NO_CHARACTER_MARKING}",
+            "note": "D-24 is CATASTROPHIC/CRITICAL for a mark painted on a figure, and the template forbade lettering only. The generator half is one exported constant (NO_CHARACTER_MARKING_RULE, promptBuilders.js) filled into this placeholder; that it reaches the BUILT prompt is pinned in tests/unit/generator-critic-rule-reach.test.ts, because a placeholder nobody fills is stripped silently."
+          },
+          {
+            "critic": "D-16b `action_interaction`",
+            "generator": "{HANDS_HOLD_ONLY_NAMED}",
+            "note": "D-16b is MAJOR when a hand holds something the scene never named while a named object is absent. The generator half is HANDS_HOLD_ONLY_NAMED_RULE, same mechanism and same reach test."
+          }
+        ]
+      }
+    },
+    {
+      "id": "scene-brief-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "scene-review.txt critiques the briefs scene-expansion-all.txt authors; a check the reviewer applies that the Art Director was never given produces a finding no rewrite can satisfy.",
+      "generators": [
+        "prompts/scene-expansion-all.txt"
+      ],
+      "critics": [
+        "prompts/scene-review.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "story-text-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "story-text-proofread.txt and story-text-audit.txt judge prose written under story-text-from-beats.txt (the live writer on every full story) and story-trial.txt (the /try funnel); a style or structure rule the auditor enforces must be a rule the writer was given, or every story is corrected after the fact instead of written right. The generator was story-unified.txt until 2026-09-15, when that template was deleted as unreachable — it had not been the live prose writer since the beats pipeline shipped.",
+      "generators": [
+        "prompts/story-text-from-beats.txt",
+        "prompts/story-trial.txt"
+      ],
+      "critics": [
+        "prompts/story-text-proofread.txt",
+        "prompts/story-text-audit.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "avatar-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "avatar-evaluation.txt gates avatars generated from avatar-main-prompt.txt; a criterion the judge rejects on must be an instruction the generator carries, or the retry loop burns paid calls chasing a rule nobody stated.",
+      "generators": [
+        "prompts/avatar-main-prompt.txt"
+      ],
+      "critics": [
+        "prompts/avatar-evaluation.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "empty-scene-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "empty-scene-qc.txt is validateEmptyScene's judge of the plate empty-scene.txt paints; a check the judge applies that the plate author was never given is a blind grade, which is exactly how the reserved-corner and geometry findings arose. The shared half stays shared: GEOMETRY_DIMENSIONS (sceneGeometry.js) writes the author's geometry block and the judge's {GEOMETRY_CHECK} from one source. Extracted from evalPipeline.js string literals on 2026-09-15.",
+      "generators": [
+        "prompts/empty-scene.txt"
+      ],
+      "critics": [
+        "prompts/empty-scene-qc.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "cover-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "cover-evaluation-notes.txt is the cover-only preamble the evaluator is given (viewer gaze, flat title, and the text regime), and cover-composition.txt plus the cover hint assembly in coverIterate.js is what the cover was painted from; a text or gaze rule tightened on one side and not the other scores a cover for a brief it never had. Extracted from evalPipeline.js string literals on 2026-09-15 so this pair can name a path instead of a 5,000-line module.",
+      "generators": [
+        "prompts/cover-composition.txt",
+        "server/lib/coverIterate.js"
+      ],
+      "critics": [
+        "prompts/cover-evaluation-notes.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "plan-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "plan-check.txt checks the page plan story-beats.txt produces; a constraint the checker counts must be a constraint the planner was told to satisfy.",
+      "generators": [
+        "prompts/story-beats.txt"
+      ],
+      "critics": [
+        "prompts/plan-check.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "job-liveness-heartbeat-vs-watchdog",
+      "axis": "heartbeat writer vs watchdog reader",
+      "reason": "server/lib/jobHeartbeat.js writes story_jobs.updated_at and server/routes/jobs.js is the only reader that kills a job for a stale one (two detectors, poll-time and stale-sweep); a change to when or whether the worker heartbeats, or to the timeout that reads it, is meaningless unless both sides move together.",
+      "members": [
+        "server/lib/jobHeartbeat.js",
+        "server/routes/jobs.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "scene-iteration-templates",
+      "axis": "strict iterate vs free iterate",
+      "reason": "scene-iteration.txt (the default rewrite) and scene-iteration-free.txt (the looser rewrite chosen when the composition is failing) are filled by ONE call site with one placeholder map; a rule or placeholder added to one is silently absent on whichever template that page's iterate selected.",
+      "members": [
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "art-director-vs-iterate",
+      "axis": "first Art Director vs rewrite Art Director",
+      "reason": "A page brief is authored at FOUR sites: the two Art Director templates that write it the first time, and the two iterate templates that REWRITE it when the render proves it unbuildable. The rewrite replaces the brief wholesale and becomes the page's contract with the image model, so a rule only the first author holds is a rule one repair round deletes. Measured 2026-09-17 over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx: 11 of 11 rewrites dropped `shot`, `landmarkView` and every character's `depth` and `looksAt`, and emitted no `wornItems` row at all, where the brief each replaced carried all of them. This set is why that cannot happen silently again: touch an Art Director template and the gate asks what the rewriter gets.",
+      "members": [
+        "prompts/scene-expansion.txt",
+        "prompts/scene-expansion-all.txt",
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{ONE_INSTANT}",
+          "{GAZE_TARGET}",
+          "{LOOKS_AT_FIELD}",
+          "{EXPRESSION_FIELD}",
+          "{GARMENT_REMOVED}",
+          "{WORN_ON_OTHER}",
+          "{NEVER_NAME_ABSENT}",
+          "{SCENE_INTENT_FIELD}",
+          "{CONCEALED_OBJECT}",
+          "{STAGED_PROP}",
+          "{CONTACT_VERB}",
+          "{REACHABLE_CONTACT}",
+          "{PLAN_LINE_CAST}",
+          "{COUNTING_RULE}",
+          "{MULTI_PICTURE_PROP}",
+          "{CREATURE_TONE}",
+          "{VB_ELEMENT_BUDGET}",
+          "{SHOT_ENUM}",
+          "{SEASON}"
+        ],
+        "anchorsNote": "Placeholders, not prose: each is ONE exported constant filled at all four sites, so the anchor proves the rule reaches the template and tests/unit/ad-iterate-parity.test.ts proves the constant reaches the BUILT prompt byte-identically. Three iterate-only placeholders stay deliberately unanchored because they have no Art Director counterpart to keep in step: {OBJECT_ID_STABILITY} (the Art Director MINTS the ids, so it has none to substitute), {DECLARED_TRAIT_VERBATIM} (declared where the drift was measured — see DECLARED_TRAIT_VERBATIM_RULE), and {MAX_CHARACTERS_PER_SCENE} (the image model’s face cap, which the Art Director expresses as its own staging rules)."
+      }
+    },
+    {
+      "id": "brief-corrective-loops",
+      "axis": "authored-brief correction vs rewritten-brief correction",
+      "reason": "A brief's mechanical findings are answered on two paths — the scene review on the authored path (beatsPipeline.js) and the corrective re-ask on the rewrite path (images.js iteratePageCore) — and the second was a hand-rolled copy of the first that measurably did not work: over the 11 stored iterate rounds of staging job_1789584708605_rts4wqupm and job_1789506283204_3kxqshifx it fired once per page and resolved findings on ZERO of them, because it sent the findings without the text being corrected, accepted on a COUNT (a correction that swaps one fault for another scores equal and is rejected), and re-asked the same model that had just failed the contract. Owner, 2026-09-17: 'All 3 same as pipeline. These should be siblings or even identical code.' The payload contract (assertCorrectorSeesText), the introduced-vs-survived verdict (judgeCorrection) and the model name (MODEL_DEFAULTS.briefCorrectionModel) are now ONE implementation in server/lib/briefCorrection.js; this set is what stops a call site drifting off it again.",
+      "members": [
+        "server/lib/images.js",
+        "server/lib/beatsPipeline.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "require('./briefCorrection')"
+        ]
+      }
+    },
+    {
+      "id": "detector-identity-lines",
+      "axis": "generation-time identity lines vs iterate / char-repair / cover identity lines",
+      "reason": "Four builders assemble the expectedCharacters the SoM identity call names figures from — storyJobPipeline.js phase 5b-pre (generation), images.js iteratePageCore (iterate), charRepairTarget.js buildPageCast (character repair) and coverIterate.js buildExpectedCoverCharacters (covers). Each entry needs name, description, clothing AND position: the sanitized SoM tier strips the \"Wearing:\" tail out of the description and rebuilds the wardrobe from the clothing field, and the position field is the only cue left when a figure is drawn in another character’s clothes and hair. The generation builder was given both on 2026-08-22 and the other three were not, so every iterate, repair and cover detection ran on appearance alone — measured on job_1789681157795_wkt20ckod p12 v1, where that cost a two-child name swap and a page scored 0 on findings attributed to the wrong figure.",
+      "members": [
+        "storyJobPipeline.js",
+        "server/lib/images.js",
+        "server/lib/charRepairTarget.js",
+        "server/lib/coverIterate.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "clothing: clothingText",
+          ".position || null"
+        ]
+      }
+    },
+    {
+      "id": "provider-refusal-guards",
+      "axis": "text reply guard vs image reply guard",
+      "reason": "textReplyGuard.js and imageReplyGuard.js are the same allow-list judgement over the same provider vocabulary on the two halves of the pipeline; imageReplyGuard IMPORTS NATURAL_STOP / TRUNCATING_STOP_REASONS / REFUSING_STOP_REASONS from textReplyGuard so there is one copy, and a reason class added or reclassified on one side without the other means a refusal is loud on text and silent on images (or the reverse) - the 2026-09-18 split, where the text path was inverted to an allow-list in a5052d176 and the image path's two-value refusal test was left standing in the same tree.",
+      "members": [
+        "server/lib/textReplyGuard.js",
+        "server/lib/imageReplyGuard.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "worn-vs-held-resolvers",
+      "axis": "page worn-vs-held vs cover worn-vs-held",
+      "reason": "The page path (buildImagePrompt's REQUIRED OBJECTS loop, promptBuilders.js) and the cover path (applyCoverWornHeldDedupe, coverIterate.js) each answer the same question - is this element worn on a body, or held/placed off it - for the SAME Visual Bible entries of the SAME story. They drifted for seven weeks: the page side inferred the verdict from a prose verb regex while the cover side rode the structured cover-hint 'holds:' field and on 2026-09-15 (566042c10, 80548cfd5) deliberately left its token matcher loose and moved the verdict onto declared slot identity. The page side's regex was deleted on 2026-09-18 for 0.73% precision over 247 stories. A worn-vs-held rule added to one resolver and not the other puts the same garment on the body on the cover and in the hero's hands on page 5.",
+      "members": [
+        "server/lib/promptBuilders.js",
+        "server/lib/coverIterate.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "clothing-findings-producer-vs-consumers",
+      "axis": "mechanical clothing findings: producer vs the prompt that fixes them vs the Lab mirror",
+      "reason": "clothingCheck.js decides WHICH clothing faults are sendable (REVIEWABLE) and words each one as its own fix; scene-review.txt check 0 is the only consumer and states what a reviewer may do about them; testlab.js's scene-review replay keeps a THIRD, hand-copied set of the same type list for its faults-in/faults-out measurement. A type added, removed or re-worded in one is silently absent or stale in the others - on 2026-09-18 the deletion of outfit_misattributed left check 0 instructing a garment move that can never be asked for, and left the Lab counting a type the module no longer emits.",
+      "members": [
+        "server/lib/clothingCheck.js",
+        "prompts/scene-review.txt",
+        "server/lib/testlab.js"
+      ],
+      "severity": "block"
+    },
+    {
+      "id": "text-not-a-checklist",
+      "axis": "the eight templates that author or judge a page against its text",
+      "reason": "A page's text may name several characters and several actions; its picture stages one moment, the one its brief names. Settled twice (docs/SETTLED.md, 2026-09-13: semantic eval judges image-vs-BRIEF; 'the Art Director trims cast by design') and violated repeatedly, so the owner ruled on 2026-09-18 that the rule goes to every template that sees a page's text beside a picture - and as ONE constant, promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, not eight hand-kept copies. Three partial copies already existed and had already drifted: image-semantic.txt's CHARACTER AUTHORITY paragraph covered characters and said nothing about actions, image-prompt-compliance.txt's STORY_TEXT DECLARES NOTHING block covered characters and dialogue and said nothing about actions, and book-audit.txt stated it only inside one weight's definition. The rule carries a SECOND half the first must not erase - a character the story gives a moment of their own that no page's plan line ever stages is a fault against the PLAN - because a first-half-only rule would excuse staging job_1789681157795_wkt20ckod, where an invented antagonist fell out of the plan across three pages and three of that book's six CRITICAL faults followed. prompts/image-evaluation.txt is deliberately NOT a member (owner, 2026-09-18): it is handed no page text on any path - all three sites that build it pass a brief as ORIGINAL_PROMPT, and storyText is a separate argument only the semantic and compliance judges receive - so the rule could never fire there, and an unreachable line still competes for attention in the heaviest-deducting prompt in the system. Add it back only together with a call site that actually passes the page text.",
+      "members": [
+        "prompts/image-semantic.txt",
+        "prompts/image-prompt-compliance.txt",
+        "prompts/scene-expansion-all.txt",
+        "prompts/scene-expansion.txt",
+        "prompts/scene-iteration.txt",
+        "prompts/scene-iteration-free.txt",
+        "prompts/scene-review.txt",
+        "prompts/book-audit.txt"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "{TEXT_NOT_A_CHECKLIST}"
+        ],
+        "anchorsNote": "The placeholder, not the prose: ONE exported constant (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE) filled at eight sites across four files - promptBuilders.js fills five of them through four builders (buildSceneDescriptionPrompt serves both scene-iteration templates), and evalPipeline.js, sceneValidator.js and bookAudit.js one each. The anchor proves the rule reaches the TEMPLATE; tests/unit/text-not-a-checklist-reach.test.ts proves the constant reaches the BUILT prompt, because fillTemplate deletes an undeclared placeholder silently - and pins image-evaluation.txt as carrying neither the placeholder nor the prose."
+      }
+    },
+    {
+      "id": "relationship-sentinel-predicates",
+      "axis": "wizard matrix vs prompt builders",
+      "reason": "The two matrix cell values that are NOT relationships - the auto-filled default (says nothing, emits no line) and the deliberate 'they do not know each other' choice (a fact, and it does reach the writer) - have to be recognised identically by the wizard that writes them and by every prompt path that reads them. The labels are already ONE table, shared/relationship-sentinels.json, so the strings cannot drift; the PREDICATE is written once per runtime (TypeScript for the browser, CommonJS for Node) and that pair can. The disease: the server compared the ENGLISH literal 'Not Known to' while the wizard stored the LOCALIZED label, so for de/fr/it the guard never fired and every cell the user had not answered reached the arc author as 'Levin is Nicht bekannt mit Max' - ten of them in one de-ch story, English never affected. A third sentinel, a re-worded label, or a change to what counts as unanswered (empty, legacy value, trimming) must land on both predicates in the same commit.",
+      "members": [
+        "shared/relationship-sentinels.json",
+        "client/src/constants/relationships.ts",
+        "server/lib/relationships.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "notSet",
+          "strangers",
+          "legacyNotSet"
+        ],
+        "anchorsNote": "The three keys of the shared table, which every member must read: the JSON declares them, and each predicate module resolves all three (legacyNotSet folds into the unanswered set - a pre-split save is not distinguishable from the default retroactively, so it emits nothing). A fourth sentinel added to the table and read by only one runtime is exactly the drift this set exists to catch. The predicates themselves are named identically on both sides - isNotSetRelationship and isStrangersRelationship - so a call site cannot silently get the question it did not mean; that the two agree on every label in every UI language is asserted in tests/unit/beats-brief-relationships.test.ts, which imports the client module and the server module into one test, because an anchor cannot check agreement."
+      }
+    }
+  ],
+  "withinFile": [
+    {
+      "id": "textmodel-prompt-guard",
+      "axis": "streaming vs non-streaming provider entry points",
+      "reason": "every provider entry point in textModels.js must guard its prompt string; callOpenRouterAPI shipped without it while all seven siblings had it.",
+      "file": "server/lib/textModels.js",
+      "blockPattern": "(?:async\\s+)?function\\s+(call\\w*API)\\s*\\(",
+      "mustContain": "guardPromptString",
+      "exclude": [
+        "callClaudeAPI"
+      ],
+      "excludeReason": "callClaudeAPI is a dispatcher over the provider entry points, not one itself — it guards nothing because the callee does.",
+      "severity": "block"
+    },
+    {
+      "id": "iterate-page-staging-sites",
+      "axis": "staged-figures list vs anchored-object allow-list",
+      "reason": "collectStagedFigures (names a Visual Bible figure onto the rewriter's locked cast) and partitionAnchoredObjects (lets a rewrite ADD a Visual Bible id) are the two sites that put a bible entity on a page; fa2cb3696 gated one on the bible's structured page range and not the other, so the creature the allow-list refused on p13/p16 was still staged there by its plan-line name. Both must consult vbEntityCoversPage.",
+      "file": "server/lib/iterateBeat.js",
+      "blockPattern": "function (collectStagedFigures|partitionAnchoredObjects)\\(|module\\.exports",
+      "mustContain": "vbEntityCoversPage(",
+      "exclude": [
+        "module.exports"
+      ],
+      "excludeReason": "module.exports is the terminator that closes partitionAnchoredObjects' block so its body is measured exactly; it is not a staging site.",
+      "severity": "block"
+    },
+    {
+      "id": "pipeline-page-record-vs-cover-record",
+      "axis": "the page record vs the cover pseudo-page fed to the repair pipeline",
+      "reason": "storyJobPipeline builds the records the repair pipeline consumes at TWO sites: the per-page objects returned from the Phase-5a map, and the cover pseudo-pages pushed at `rawImages.push({...})`. They are read by ONE consumer (runUnifiedRepairPipeline, whose buildVersionEntry stamps v0 from whatever the record carries), so a provenance field the page side carries and the cover push does not is silently undefined on every cover. It has happened three times: `compressedScene` (added to the cover push after every cover root stored none), `modelId` (this set's anchor — the page path has carried `modelId: activeModelId` since it was written, the cover push carried nothing, so every cover's v0 recorded modelId undefined and no cover could say which model painted it), and the cover ROOT mirror further down the file, which moved `compressedScene` onto the shipped version and left `prompt` describing the first render. An absent field here raises no error anywhere, which is why all three survived. The block is measured exactly: `evaluationType: 'cover'` is the pushed object's last key and terminates it.",
+      "file": "storyJobPipeline.js",
+      "blockPattern": "rawImages\\.push\\(\\{|evaluationType: 'cover'",
+      "mustContain": "modelId:",
+      "exclude": [
+        "evaluationType: 'cover'"
+      ],
+      "excludeReason": "evaluationType: 'cover' is the terminator that closes the push block so its body is measured exactly; it is not a record-building site.",
+      "severity": "block"
+    }
+  ]
+}

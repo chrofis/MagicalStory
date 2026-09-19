@@ -18,6 +18,9 @@ const sharp = require('sharp');
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
+const { canonicalName } = require('./castResolver');
+const { assertPromptFilled } = require('../services/prompts');
+const { baseVbId } = require('./vbIdGuard');
 const { photoAnalyzerUrl: _photoAnalyzerUrl, withAnalyzerSlot } = require('./photoAnalyzerClient');
 const { getCurrentLogger } = require('./generationLogger');
 
@@ -1099,8 +1102,17 @@ async function recoverFaceBox(imageDataUri, bodyBoxNorm, pageLabel = '') {
  *
  * Returns { nameByDet: Map(detIdx → name), answers } or null (caller falls
  * back to layout+gender matching). Answers with duplicate names are invalid.
+ *
+ * @param {Object} [opts]
+ *   startTier  first tier of the chain to run (default 0 = gemini-full). The
+ *              chain STOPS at the first success, so tiers below the one that
+ *              answered are never asked — starting higher is how a second,
+ *              independent witness is obtained from the same wiring
+ *              (secondOpinionIdentity below).
+ *   skipTiers  tier ids to leave out entirely — the caller's way of saying
+ *              "this model already answered, it is not a second witness".
  */
-async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '', badgeAnchor = 'box') {
+async function _somIdentifyFigures(imageDataUri, dets, expectedCharacters, W, H, pageLabel = '', badgeAnchor = 'box', opts = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   // EVERY EXIT FROM HERE IS LOGGED (owner, 2026-08-16). Returning null silently
   // drops the page to the layout+gender fallback, which on a page of two women
@@ -1212,6 +1224,7 @@ ${lines}${elimHint}
 Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   const fullPrompt = mkPrompt(fullLines);
   const sanitizedPrompt = mkPrompt(sanitizedLines);
+  assertPromptFilled([fullPrompt, sanitizedPrompt], '_somIdentifyFigures');
   const markedB64 = marked.toString('base64');
 
   // ── Vendor callers — each returns { text } or { fail: reason } ───────────
@@ -1220,7 +1233,7 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ inlineData: { mimeType: 'image/jpeg', data: markedB64 } }, { text: promptText }] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json', maxOutputTokens: 2000, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { temperature: 0, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
       }),
       signal: AbortSignal.timeout(30_000),
     });
@@ -1239,7 +1252,7 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     if (!key) return { fail: 'OPENROUTER_API_KEY not set' };
     const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0, max_tokens: 1500,
+      body: JSON.stringify({ model: 'qwen/qwen2.5-vl-72b-instruct', temperature: 0,
         messages: [{ role: 'user', content: [{ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${markedB64}` } }, { type: 'text', text: promptText }] }] }),
       signal: AbortSignal.timeout(45_000),
     });
@@ -1255,7 +1268,7 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     if (!key) return { fail: 'ANTHROPIC_API_KEY not set' };
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1500, temperature: 0,
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: require('../config/models').maxOutputTokensFor('claude-haiku-4-5-20251001'), temperature: 0,
         messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: markedB64 } }, { type: 'text', text: promptText }] }] }),
       signal: AbortSignal.timeout(45_000),
     });
@@ -1283,7 +1296,10 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
     for (const b of badges) {
       const raw = String(answers[b.letter] || '').trim();
       if (!raw || /^unknown$/i.test(raw)) continue;
-      const name = [...validNames].find(n => n.toLowerCase() === raw.toLowerCase());
+      // COMPARE: the SoM answer against the roster we sent it. Exact first
+      // (fast path), then the one normaliser.
+      const name = [...validNames].find(n => n === raw)
+        || [...validNames].find(n => canonicalName(n) === canonicalName(raw));
       if (!name) continue;
       if (!claims.has(name)) claims.set(name, []);
       claims.get(name).push(b.detIdx);
@@ -1308,12 +1324,23 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   // names, nothing matched) advances to the next tier; the old behaviour
   // (single sanitized Gemini call, whole-answer discard on any dupe) survives
   // only as the last tier.
-  const tiers = [
+  const allTiers = [
     { id: 'gemini-full', prompt: fullPrompt, call: askGemini },
     { id: 'qwen-vl-full', prompt: fullPrompt, call: askOpenRouterQwen },
     { id: 'haiku-full', prompt: fullPrompt, call: askHaiku },
     { id: 'gemini-sanitized', prompt: sanitizedPrompt, call: askGemini },
   ];
+  // A SECOND WITNESS COMES OUT OF THE SAME CHAIN (2026-09-18). Because the loop
+  // stops at the first success, tiers below the answering one have never been
+  // asked about any page in the corpus — every stored SoM answer on the 19
+  // pages the identity vote fires on came from `gemini-full`. Starting at a
+  // later tier therefore asks a genuinely different model the same question,
+  // for free wiring. `skipTiers` exists so the caller can drop the model that
+  // already answered: re-asking it would make the "second" witness the first
+  // one twice.
+  const skip = new Set(opts.skipTiers || []);
+  const tiers = allTiers.slice(Math.max(0, opts.startTier || 0)).filter(t => !skip.has(t.id));
+  if (tiers.length === 0) { log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM: no tier left to run (startTier=${opts.startTier || 0}, skip=${[...skip].join(',') || 'none'})`); return null; }
   const attempts = [];
   const evidence = (reason, promptUsed) => ({
     nameByDet: null, reason, prompt: promptUsed || fullPrompt, attempts,
@@ -1347,6 +1374,95 @@ Answer JSON only, e.g. {"A": "name"}. Each name at most once.`;
   }
   log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}SoM: ALL ${tiers.length} tiers failed — ${attempts.map(a => `${a.tier}: ${a.fail}`).join(' | ')}`);
   return evidence(`all tiers failed — ${attempts.map(a => `${a.tier}: ${a.fail}`).join(' | ')}`);
+}
+
+/**
+ * First tier a second opinion may use: `qwen-vl-full` (Qwen2.5-VL-72B), the
+ * tier below the Gemini call that answers the primary pass on essentially
+ * every page.
+ */
+const SECOND_OPINION_START_TIER = 1;
+
+/**
+ * Ask a THIRD party who is who on a page the evaluator and the detector
+ * disagree about — the same Set-of-Mark question, a different model.
+ *
+ * Re-badges from the STORED FIGURES rather than from the detector's internal
+ * `persons` array, so its answer is keyed by figure index and needs no second
+ * pairing step to be compared with the disagreement. (Those two arrays are not
+ * interchangeable: duplicate masks are spliced out of the figure list AFTER the
+ * primary identity pass, so a badge's `detIdx` can sit one slot off the figure
+ * it named. Keying off the figures removes that hazard entirely.)
+ *
+ * Costs exactly one VLM call and one local composite when the first tier
+ * answers, which is the normal case. When it does not, the chain's own
+ * fallback still applies — a failed witness is no witness — so the worst case
+ * is the three remaining tiers' timeouts (45s + 45s + 30s) added to ONE page's
+ * evaluation, inside its own pLimit slot, on 1.6% of versions. Returns null —
+ * never a guess — when the page cannot be asked about or no tier answers; the
+ * caller then keeps whatever it would have done without a second witness.
+ *
+ * @param {string} imageDataUri  the page image the detector and evaluator saw
+ * @param {Array}  figures       `bboxDetection.figures` — normalised boxes
+ * @param {Array}  expectedCharacters  `bboxDetection.expectedCharacters`
+ * @param {string} [pageLabel]
+ * @param {Object} [opts]  excludeModel — the tier id the primary pass used
+ * @returns {Promise<{nameByFigure: Map<number,string>, model: string, attempts: Array}|null>}
+ */
+async function secondOpinionIdentity(imageDataUri, figures, expectedCharacters, pageLabel = '', opts = {}) {
+  const figs = Array.isArray(figures) ? figures : [];
+  const chars = (Array.isArray(expectedCharacters) ? expectedCharacters : []).filter(c => c && c.name);
+  if (figs.length === 0 || chars.length === 0) return null;
+  if (!imageDataUri) return null;
+
+  let W, H;
+  try {
+    const meta = await sharp(Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64')).metadata();
+    W = meta.width; H = meta.height;
+  } catch (e) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}second opinion skipped — image unreadable (${e.message})`);
+    return null;
+  }
+  if (!W || !H) return null;
+
+  // Stored boxes are [ymin, xmin, ymax, xmax] normalised; the SoM badger works
+  // in pixel [x1, y1, x2, y2].
+  const toPx = (b) => [b[1] * W, b[0] * H, b[3] * W, b[2] * H];
+  // Index-preserving: a figure with no usable box is left out of the badging
+  // but its slot is remembered, so the answer still lines up with `figures`.
+  const dets = [];
+  const figIdxOfDet = [];
+  figs.forEach((f, i) => {
+    const body = Array.isArray(f?.bodyBox) ? f.bodyBox : (Array.isArray(f?.gdinoBox) ? f.gdinoBox : null);
+    if (!body || body.length !== 4) return;
+    // The RAW DINO face box is what the primary pass anchored its badge on;
+    // faceBox is the padded head box and is the fallback for figures from the
+    // non-DINO paths, which carry no raw box.
+    const face = Array.isArray(f.faceBoxRaw) ? f.faceBoxRaw : (Array.isArray(f.faceBox) ? f.faceBox : null);
+    figIdxOfDet.push(i);
+    dets.push({
+      box: toPx(body),
+      score: typeof f.score === 'number' ? f.score : 0,
+      face: face ? { box: toPx(face), score: typeof f.faceScore === 'number' ? f.faceScore : 0 } : null,
+    });
+  });
+  if (dets.length === 0) return null;
+
+  const badgeAnchor = opts.badgeAnchor || process.env.BADGE_ANCHOR || 'face';
+  const som = await _somIdentifyFigures(imageDataUri, dets, chars, W, H, pageLabel, badgeAnchor, {
+    startTier: SECOND_OPINION_START_TIER,
+    skipTiers: opts.excludeModel ? [opts.excludeModel] : [],
+  });
+  if (!som?.nameByDet) {
+    log.warn(`⚠️ [GDINO-DETECT] ${pageLabel}second opinion produced no answer${som?.reason ? ` — ${som.reason}` : ''}`);
+    return null;
+  }
+  const nameByFigure = new Map();
+  for (const [detIdx, name] of som.nameByDet) {
+    const figIdx = figIdxOfDet[detIdx];
+    if (figIdx != null) nameByFigure.set(figIdx, name);
+  }
+  return { nameByFigure, model: som.model || null, attempts: som.attempts || [] };
 }
 
 // Binary mask → white-on-transparent PNG (same encoding /figure-mask returns).
@@ -1918,8 +2034,10 @@ async function detectFiguresWithGroundingDino(imageData, expectedCharacters, opt
     _boxIouXyxy([bodyBox[1], bodyBox[0], bodyBox[3], bodyBox[2]], [f.bodyBox[1], f.bodyBox[0], f.bodyBox[3], f.bodyBox[2]])));
   for (const raw of (groundObjects ? expectedObjects : [])) {
     const cleaned = String(raw || '').trim();
-    if (!cleaned || /^[A-Z]{3}\d{3}(\.\d+)?$/.test(cleaned)) continue; // opaque VB id — nothing to ground
-    const hint = objectGroundingHints?.[cleaned.toLowerCase()];
+    // COMPARE: the VB-id grammar has ONE definition (vbIdGuard) — the local
+    // copy here did not know the pools and matched any 3-letter+3-digit token.
+    if (!cleaned || baseVbId(cleaned)) continue; // opaque VB id — nothing to ground
+    const hint = objectGroundingHints?.[canonicalName(cleaned)];
     if (hint?.kind === 'location') { diag.objects.push({ name: cleaned, skipped: 'location' }); continue; }
     const src = (hint?.text || cleaned);
     let text = src.split(/[—,;(.]/)[0].trim().toLowerCase();
@@ -2012,6 +2130,10 @@ async function attachSamMasksToFigures(imageData, figures, { pageLabel = '' } = 
 module.exports = {
   _shortGarmentPhrase,
   detectFiguresWithGroundingDino,
+  // The SoM chain, asked a second time from a later tier — who-is-who on a page
+  // the evaluator and the detector name differently (identityAgreement.js).
+  secondOpinionIdentity,
+  SECOND_OPINION_START_TIER,
   // Raw DINO access for callers that supply their own identity signal instead
   // of the SOM naming pass. The scene composite is one: its figures are painted
   // in known palette colours, so the dominant hue inside a box names it
@@ -2024,6 +2146,7 @@ module.exports = {
   detectPersonBoxInCrop,
   recoverFaceBox,
   attachSamMasksToFigures,
+  _mobilesamMaskFull,   // raw box→mask; the scene composite's in-place cut-out
   _cleanMaskAndCheck,
   _boxAreaPx,
   _boxContainment,

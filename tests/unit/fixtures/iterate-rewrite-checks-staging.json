@@ -1,0 +1,667 @@
+{
+ "$comment": "Stored iterate rounds of two staging runs: the Art Director brief each rewrite replaced, the rewrite as persisted, and the trimmed Visual Bible each was written against. Pulled from STAGING_DATABASE_URL 2026-09-17.",
+ "stories": {
+  "job_1789584708605_rts4wqupm": {
+   "visualBible": {
+    "secondaryCharacters": [
+     {
+      "id": "CHR001",
+      "name": "Ramon",
+      "description": "8. a boy, slightly tall for his age, lean build. hair: black, short, spiky. brown eyes, sharp jawline. Signature: blue denim jacket. Clothing: blue denim jacket over a grey t-shirt, black jeans, and black sneakers",
+      "pages": [
+       11,
+       13,
+       17
+      ],
+      "appearsInPages": [
+       11,
+       13,
+       17
+      ],
+      "states": []
+     }
+    ],
+    "animals": [
+     {
+      "id": "ANI001",
+      "name": "Big Dragon",
+      "species": "European dragon",
+      "description": "European dragon. several adults high, the size of a house. reddish-orange scales with pale yellow underbelly. large rounded friendly eyes, blunt soft snout, short blunt horns, wide leathery wings",
+      "pages": [
+       18
+      ],
+      "appearsInPages": [
+       18
+      ],
+      "states": []
+     },
+     {
+      "id": "ANI002",
+      "name": "Flämmli",
+      "species": "baby European dragon",
+      "description": "baby European dragon. about as long as an adult's forearm. reddish-orange scales with pale yellow underbelly. large rounded friendly eyes, soft rounded snout, tiny wing nubs",
+      "pages": [
+       18
+      ],
+      "appearsInPages": [
+       18
+      ],
+      "states": []
+     }
+    ],
+    "artifacts": [
+     {
+      "id": "ART001",
+      "name": "smooth egg",
+      "type": "artifact",
+      "description": "melon-sized oval egg with a smooth curved shell",
+      "pages": [
+       3,
+       4,
+       5,
+       6,
+       7,
+       9,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ],
+      "appearsInPages": [
+       3,
+       4,
+       5,
+       6,
+       7,
+       9,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16
+      ],
+      "states": [
+       {
+        "id": "ART001.1",
+        "name": "unaltered",
+        "delta": "pale orange, smooth, glowing faintly from within",
+        "pages": [
+         3,
+         4,
+         5,
+         6,
+         7,
+         9,
+         11,
+         12,
+         13,
+         14,
+         15,
+         16
+        ]
+       },
+       {
+        "id": "ART001.2",
+        "name": "cold",
+        "delta": "pale orange, smooth, matte and dark",
+        "pages": []
+       },
+       {
+        "id": "ART001.3",
+        "name": "cracked",
+        "delta": "pale orange shell broken in half, hollow empty interior",
+        "pages": []
+       }
+      ]
+     },
+     {
+      "id": "ART002",
+      "name": "paper bag",
+      "type": "container",
+      "description": "rectangular brown paper bag",
+      "pages": [
+       7,
+       10,
+       13
+      ],
+      "appearsInPages": [
+       7,
+       10,
+       13
+      ],
+      "states": [
+       {
+        "id": "ART002.1",
+        "name": "unaltered",
+        "delta": "bulging brown paper bag with rolled top",
+        "pages": [
+         7
+        ]
+       },
+       {
+        "id": "ART002.2",
+        "name": "flat",
+        "delta": "crushed and flat brown paper bag",
+        "pages": [
+         10,
+         13
+        ]
+       }
+      ]
+     },
+     {
+      "id": "ART003",
+      "name": "push scooter",
+      "type": "hand tool",
+      "description": "silver metal push scooter with two small black wheels, a flat standing deck, and a vertical steering column with a T-bar handle perpendicular to the deck",
+      "pages": [],
+      "appearsInPages": []
+     },
+     {
+      "id": "ART004",
+      "name": "fleece jacket",
+      "type": "outer layer",
+      "description": "red fleece fabric garment with a full front zipper",
+      "pages": [
+       7,
+       9,
+       10,
+       15,
+       16,
+       17,
+       18
+      ],
+      "appearsInPages": [
+       7,
+       9,
+       10,
+       15,
+       16,
+       17,
+       18
+      ],
+      "wornAs": "Levin.top",
+      "states": [
+       {
+        "id": "ART004.1",
+        "name": "unaltered",
+        "delta": "red zip-up fleece jacket with ribbed cuffs",
+        "pages": [
+         7,
+         9,
+         10
+        ]
+       },
+       {
+        "id": "ART004.2",
+        "name": "bundled",
+        "delta": "red fleece jacket rolled and wrapped tightly into a round fabric bundle",
+        "pages": [
+         15,
+         16,
+         17,
+         18
+        ]
+       }
+      ]
+     }
+    ],
+    "locations": [
+     {
+      "id": "LOC001",
+      "name": "Lindenhof",
+      "description": "outdoor, park square. Colors: yellow, red, brown, grey. gravel surface, mature trees with large exposed roots, stone retaining walls. Signature: large mature linden trees",
+      "extractedDescription": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+      "pages": [
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       17,
+       18
+      ],
+      "appearsInPages": [
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       17,
+       18
+      ]
+     },
+     {
+      "id": "LOC002",
+      "name": "Altstadt lanes",
+      "description": "outdoor, narrow street. Colors: pastel cream, grey, brown. cobblestone paths, narrow gaps between tall painted buildings, steep stone stairs. Signature: narrow cobblestone lanes between historic buildings",
+      "extractedDescription": "[entrance, green, day] Narrow Altstadt street with multi-story painted buildings in pastel colors: pink, cream, and yellow facades with shuttered windows.",
+      "pages": [
+       9,
+       10,
+       11,
+       16
+      ],
+      "appearsInPages": [
+       9,
+       10,
+       11,
+       16
+      ]
+     },
+     {
+      "id": "LOC003",
+      "name": "Rathausbruecke",
+      "description": "outdoor, bridge plaza. Colors: grey stone, blue water. wide stone bridge surface, metal railings, river flowing below. Signature: wide stone plaza over the river",
+      "extractedDescription": "[whole, green, day] Stone bridge viewed from plaza level with modern balusters and speed-limit signs. City buildings and church tower visible beyond water.",
+      "pages": [
+       12,
+       13,
+       14,
+       15
+      ],
+      "appearsInPages": [
+       12,
+       13,
+       14,
+       15
+      ]
+     },
+     {
+      "id": "LOC004",
+      "name": "Grossmuenster",
+      "description": "outdoor, distant skyline. Colors: pale stone. twin stone towers with ornamental cupolas. Signature: twin domed towers",
+      "extractedDescription": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+      "pages": [
+       12
+      ],
+      "appearsInPages": [
+       12
+      ]
+     }
+    ]
+   },
+   "castNames": [
+    "Levin",
+    "Julian",
+    "Max",
+    "Kiaan",
+    "Ramon"
+   ]
+  },
+  "job_1789506283204_3kxqshifx": {
+   "visualBible": {
+    "animals": [
+     {
+      "id": "ANI001",
+      "name": "Nia",
+      "species": "Bernese Mountain Dog",
+      "description": "Bernese Mountain Dog. reaches an adult's knee. tricolor coat: predominantly black with a bright white chest and muzzle, and rust-colored patches above the eyes and on the legs. thick fluffy fur, large friendly brown eyes, wide soft ears lying flat, thick tail, wearing a plain red leather collar around the neck",
+      "pages": [
+       3,
+       9,
+       16
+      ],
+      "appearsInPages": [
+       3,
+       9,
+       16
+      ],
+      "states": []
+     },
+     {
+      "id": "ANI002",
+      "name": "Crow",
+      "species": "carrion crow",
+      "description": "carrion crow. about as big as an adult's forearm. glossy solid black feathers all over. thick curved black beak, sharp dark eyes, sharp black claws",
+      "pages": [
+       6,
+       10,
+       15,
+       17
+      ],
+      "appearsInPages": [
+       6,
+       10,
+       15,
+       17
+      ],
+      "states": []
+     },
+     {
+      "id": "ANI003",
+      "name": "Lindi",
+      "species": "baby dragon",
+      "description": "baby dragon. about as big as an adult's forearm. warm vibrant orange and red scales. cute and rounded body, soft face, large round friendly golden eyes, a calm smiling toothless mouth, two tiny blunt horns on the head, short chubby tail, open upright posture",
+      "pages": [
+       17,
+       18
+      ],
+      "appearsInPages": [
+       17,
+       18
+      ],
+      "states": []
+     }
+    ],
+    "artifacts": [
+     {
+      "id": "ART001",
+      "name": "football-sized dragon egg",
+      "type": "egg",
+      "description": "a perfectly round, football-sized egg, built with a smooth leathery shell featuring a faint, subtle scaly texture across its surface",
+      "pages": [
+       2,
+       3,
+       4,
+       8,
+       9,
+       11,
+       13,
+       14,
+       16,
+       17
+      ],
+      "appearsInPages": [
+       2,
+       3,
+       4,
+       8,
+       9,
+       11,
+       13,
+       14,
+       16,
+       17
+      ],
+      "states": [
+       {
+        "id": "ART001.1",
+        "name": "unaltered",
+        "delta": "vibrant reddish-orange shell that emits a bright warm glow",
+        "pages": [
+         2,
+         3,
+         4,
+         8,
+         9,
+         11
+        ]
+       },
+       {
+        "id": "ART001.2",
+        "name": "cold",
+        "delta": "dull greyish-red shell, matte surface with no glow at all",
+        "pages": [
+         13,
+         14,
+         16
+        ]
+       },
+       {
+        "id": "ART001.3",
+        "name": "cracked",
+        "delta": "split open into several large broken fragments",
+        "pages": [
+         17
+        ]
+       }
+      ]
+     },
+     {
+      "id": "ART002",
+      "name": "rubber play ball",
+      "type": "toy",
+      "description": "a simple, perfectly round rubber play ball with thick alternating vertical stripes of bright blue and white",
+      "pages": [
+       1,
+       12
+      ],
+      "appearsInPages": [
+       1,
+       12
+      ]
+     },
+     {
+      "id": "ART003",
+      "name": "children's picture book",
+      "type": "book",
+      "description": "a large square children's picture book made of thick, stiff cardboard pages, slightly worn at the corners",
+      "pages": [
+       5
+      ],
+      "appearsInPages": [
+       5
+      ],
+      "states": [
+       {
+        "id": "ART003.1",
+        "name": "unaltered",
+        "delta": "closed tight, showing a glossy green front cover",
+        "pages": []
+       },
+       {
+        "id": "ART003.2",
+        "name": "face to camera",
+        "delta": "spread wide open, showing a colorful page with a drawing of a small red baby dragon sneezing sparks",
+        "pages": [
+         5
+        ]
+       }
+      ]
+     },
+     {
+      "id": "ART004",
+      "name": "hand-knitted wool cap",
+      "type": "headwear",
+      "description": "a solid red, visibly hand-knitted wool cap with a small rolled-up brim around the bottom edge, shaped slightly oversized and wide",
+      "pages": [
+       1,
+       4,
+       5,
+       7,
+       8,
+       9,
+       10,
+       18
+      ],
+      "appearsInPages": [
+       1,
+       4,
+       5,
+       7,
+       8,
+       9,
+       10,
+       18
+      ],
+      "wornAs": "Levin.headwear"
+     }
+    ],
+    "locations": [
+     {
+      "id": "LOC001",
+      "name": "Lindenhof",
+      "description": "outdoor, elevated public square. Colors: grey stone walls, brown earth, vibrant yellow and red autumn leaves. large mature linden trees with thick exposed roots, gravel paths, low stone perimeter walls overlooking the city, scattered autumn leaves. Signature: massive sprawling tree roots breaking through the gravel",
+      "extractedDescription": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+      "pages": [
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18
+      ],
+      "appearsInPages": [
+       1,
+       2,
+       3,
+       4,
+       5,
+       6,
+       7,
+       8,
+       9,
+       11,
+       12,
+       13,
+       14,
+       15,
+       16,
+       17,
+       18
+      ]
+     },
+     {
+      "id": "LOC002",
+      "name": "Lindenhofbrunnen",
+      "description": "outdoor, public fountain. Colors: weathered grey and tan limestone, dark bronze. a wide stone basin on a pedestal base, a tall classical statue rising from the center, classical carved details, and a dark, fist-sized hole in the stonework of its back wall. Signature: the classical bronze statue standing on the central stone pillar",
+      "extractedDescription": "[whole, green, day] Fountain monument with classical statue mounted on stone base, surrounded by mature trees and public square seating. People and buildings visible nearby.",
+      "pages": [
+       6,
+       7,
+       10,
+       18
+      ],
+      "appearsInPages": [
+       6,
+       7,
+       10,
+       18
+      ]
+     },
+     {
+      "id": "LOC003",
+      "name": "Grossmünster",
+      "description": "outdoor, distant city skyline. Colors: pale grey stone, dark green copper domes. twin towering stone steeples with distinctive rounded, multi-tiered ornamental cupolas on top. Signature: the identical twin stone towers dominating the skyline",
+      "extractedDescription": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+      "pages": [
+       1,
+       18
+      ],
+      "appearsInPages": [
+       1,
+       18
+      ]
+     }
+    ]
+   },
+   "castNames": [
+    "Levin",
+    "Julian",
+    "Max",
+    "Kiaan"
+   ]
+  }
+ },
+ "rounds": [
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 4,
+   "source": "iterate-round-2",
+   "planLine": "PLAN: medium — Levin — Levin presses his ear against the egg in the hollow, eyes wide — a knock from inside the egg has been heard",
+   "parentBrief": "Kneeling in the dirt beside the thick root on the Lindenhof, Levin (a preschooler, little boy, Build: average, 4.5 heads tall with light blonde, wavy, short, tousled hair and green eyes, wearing a red zip-up fleece jacket over a white long-sleeve shirt, dark blue corduroy trousers, and brown lace-up ankle boots) leans his head down into the hollow, his right ear pressed completely flat against the smooth, glowing pale orange shell of the melon-sized dragon egg. The egg rests snugly among the linden roots. His green eyes are wide open, staring straight ahead at the dark dirt wall of the hollow. Medium shot at ground level, golden afternoon light filtering through the yellow leaves above and highlighting the red fabric of his jacket as he listens intently to the shell.\n\n---METADATA---\n{\"sceneIntent\": \"Levin kneels and presses his ear against the glowing egg in the hollow. He stares wide-eyed at the dirt wall. Medium shot at ground level.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"depth\": \"foreground\", \"looksAt\": \"away\", \"expression\": \"eyes wide open, brows raised, mouth closed in focus\"}], \"shot\": \"medium\", \"crowdExpected\": false, \"landmarkView\": \"close\", \"era\": \"present day\", \"objects\": [\"ART001.1\", \"LOC001\"], \"interactions\": [{\"character\": \"Levin\", \"object\": \"ART001.1\", \"where\": \"presses his right ear flat against the egg\", \"action\": \"listening\", \"hands\": false, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"worn\"}], \"emptyScenePrompt\": \"A medium shot at ground level showing a dark hollow beneath a thick tree root, lined with dry brown leaves. Golden afternoon sunlight filters down onto the dirt outside the hollow.\"}",
+   "rewriteBrief": "Levin — a preschooler, little boy, average build, 4.5 heads tall, with light blonde wavy short tousled hair and green eyes, wearing a red zip-up fleece jacket over a white long-sleeve shirt, dark blue corduroy trousers, and brown lace-up ankle boots — kneels on the dirt beside the thick linden root at the Lindenhof, his right ear pressed flat against the smooth glowing pale orange shell of the melon-sized dragon egg. The egg rests snugly among the exposed roots, fully supported by the earth. Levin’s green eyes are wide open, staring straight ahead at the dark dirt wall of the hollow. His left hand rests palm-down on the ground beside the egg; his right hand is relaxed at his side, not touching the egg. Golden afternoon light filters through yellow linden leaves above, highlighting the red fabric of his jacket. Medium shot at ground level.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Levin kneels beside a linden root at the Lindenhof and presses his right ear against the glowing dragon egg while staring at the dirt wall of the hollow.\",\n  \"diagnosis\": [\"Evaluator: Levin wears blue jeans instead of dark blue corduroy trousers — cause: prose omitted explicit clothing description, so model defaulted to generic blue pants.\", \"Evaluator: both hands touch egg but script requires ear contact only — cause: prose said 'leans his head down' and 'pressed completely flat' but failed to restrict hand placement, allowing model to invent dual-hand support.\"],\n  \"previewMismatches\": [\"Intent: Levin’s right ear contacts egg; hands inactive or grounded. Preview: both hands hold egg, no ear contact.\", \"Intent: Levin wears dark blue corduroy trousers. Preview: blue jeans visible.\"],\n  \"issues\": [\"Clothing mismatch: corduroy trousers not specified in prose\", \"Dual-hand interaction contradicts required ear-pressing action\", \"No explicit grounding of non-contact hand\"],\n  \"corrections\": [\"Added explicit 'dark blue corduroy trousers' in clothing description\", \"Specified right ear pressed flat against egg, left hand palm-down on ground, right hand relaxed at side\", \"Removed ambiguous 'leans his head down' phrasing — replaced with precise positional verb 'kneels... his right ear pressed flat'\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"Kneeling pose allows ear-to-egg contact without hand support; left hand grounded, right hand idle — no conflict with single-action focus\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Clothing now fully declared per contract\", \"Ear contact enforced as sole interaction with egg\", \"Hand positions disambiguated: one grounded, one passive\"]\n  },\n  \"characters\": [\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"beside the thick linden root\", \"expression\": \"eyes wide open, staring straight ahead\"}\n  ],\n  \"objects\": [\"LOC001.1\", \"ART001.1\"],\n  \"interactions\": [\n    {\"character\": \"Levin\", \"object\": \"ART001.1\", \"where\": \"right ear pressed flat against the smooth glowing pale orange shell\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": true,\n  \"emptyScenePrompt\": \"Autumn daytime scene at Lindenhof town square: large mature linden trees with yellow leaves casting dappled golden light over cobblestone and packed earth. Exposed thick linden root crosses foreground. Historic buildings frame perimeter. Outdoor chess area visible midground. Medium shot from ground level, shallow depth.\",\n  \"translatedSummary\": \"Levin, ein kleiner Bub im Kindergartenalter, kniet neben einer dicken Lindenwurzel am Lindenhof und presst sein rechtes Ohr flach gegen die glühende, blassorangefarbene Schale des Dracheneis, das fest zwischen den Wurzeln liegt. Seine grünen Augen sind weit geöffnet und starren geradeaus auf die dunkle Erdbwand der Höhlung.\"\n}"
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 6,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: wide — Levin, Julian, Max, and Kiaan — all four press their hands onto the egg at once, none letting go — the four strangers are bound to the egg together",
+   "parentBrief": "Clustered tightly together around the hollow at the base of the tree on the Lindenhof, all four boys reach into the dirt toward the glowing shell of the melon-sized, pale orange dragon egg at the same moment. Levin (blonde wavy hair, red fleece jacket, blue corduroys, brown boots) kneels on the left and presses his palms flat against the left side of the shell. Julian (toddler, blonde curls, yellow body warmer, mid-blue joggers, grey sneakers) crouches beside him, pressing his small hands over Levin's shoulders as he leans in. On the right side, Max (curly light brown hair, green hoodie, grey tracksuit trousers, white sneakers) and Kiaan (straight dark brown hair, orange sweater, brown corduroys, blue boots) kneel close together, stacking their hands on top of Levin's in the dirt. Wide shot of the entire group surrounding the hollow in the bright afternoon sun, all four joined in one hold.\n\n---METADATA---\n{\"sceneIntent\": \"All four boys kneel around the hollow and reach toward the glowing egg at the same time. Levin's hands touch the shell while the other three press close and stack their hands over his hold. Wide shot of the group clustered at the tree base.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"left foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001.1\", \"expression\": \"focused, lips pressed tight, brows drawn\"}, {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001.1\", \"expression\": \"eyes wide, mouth closed, cheeks slightly puffed\"}, {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"center midground\", \"depth\": \"foreground\", \"looksAt\": \"ART001.1\", \"expression\": \"determined, jaw set, eyes focused\"}, {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"right foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001.1\", \"expression\": \"serious, eyes wide, mouth shut tight\"}], \"shot\": \"wide\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"ART001.1\", \"LOC001\"], \"interactions\": [{\"character\": \"Levin\", \"object\": \"ART001.1\", \"where\": \"presses his palms flat against the side of the egg\", \"action\": \"holding\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}, {\"character\": \"Julian + Max + Kiaan\", \"object\": \"ART001.1\", \"where\": \"lean close and stack their hands over Levin's hold\", \"action\": \"reaching\", \"hands\": false, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"worn\"}], \"emptyScenePrompt\": \"A wide shot of a dirt clearing at the base of a massive linden tree, framed by thick roots and scattered red and yellow autumn leaves. The afternoon sun casts long shadows across the empty dirt.\"}",
+   "rewriteBrief": "Levin — a school-age boy with blonde wavy hair, blue eyes, red fleece jacket, blue corduroys, brown boots — kneels in the foreground on bare earth at the base of a large mature linden tree, both palms flat against the left side of the smooth egg. Julian — a toddler with blonde curls, blue eyes, yellow body warmer, mid-blue joggers, grey sneakers — crouches beside Levin on his left, both hands pressed firmly onto Levin’s shoulders, face tilted down toward the egg, eyes fixed on it. Max — a school-age boy with curly light brown hair, green hoodie, grey tracksuit trousers, white sneakers — kneels to the right of the egg, both hands stacked over Levin’s right hand on the shell. Kiaan — a school-age boy with straight dark brown hair, orange sweater, brown corduroys, blue boots — kneels beside Max, both hands stacked over Max’s on the shell. All four faces are angled downward, eyes locked on the pale orange glowing egg resting in the shallow hollow at the tree’s base. Bright autumn afternoon sun illuminates the Lindenhof town square: historic buildings with cream facades and dark roofs frame the perimeter, outdoor chess tables sit under dappled shade, fallen leaves scatter sparsely on packed earth—not pavement—and no park bench appears. Wide shot, eye-level, full group visible in foreground with midground buildings and canopy above.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Levin, Julian, Max, and Kiaan all press their hands onto the glowing pale orange dragon egg at the base of the linden tree on the Lindenhof town square.\",\n  \"diagnosis\": [\"Evaluator: children rendered as infants (1–2 years) instead of stated ages (toddler Julian, school-age others). Cause: prose used 'crouching' and 'kneeling' without specifying proportional cues; model defaulted to infantile proportions for 'toddler' and generic smallness for 'school-age'.\", \"Evaluator: fallen leaves shown on paved ground. Cause: prose said 'on the Lindenhof' but did not specify surface type; model conflated 'autumn' with 'paved + leaves', ignoring Visual Bible's [LOC001.1] description of 'outdoor chess playing area' on packed earth under trees.\", \"Evaluator: park bench visible in background. Cause: prose mentioned 'Lindenhof' but omitted Visual Bible detail that [LOC001.1] includes 'outdoor chess playing area with figures'—not benches—and model hallucinated a bench from generic park tropes.\"],\n  \"previewMismatches\": [\"Intent: Julian is a toddler (not infant), visibly older than 2 years, with proportionate limbs and head size. Preview: Julian rendered with infantile proportions—oversized head, very short limbs, chubby cheeks.\", \"Intent: setting is Lindenhof town square with historic buildings, linden trees, and chess tables on packed earth. Preview: setting shows paved ground with scattered leaves and a wooden park bench not in Visual Bible.\"],\n  \"issues\": [\"Infantile character proportions violate age specifications\", \"Paved ground + park bench contradict LOC001.1 visual bible\", \"Fallen leaves over pavement misrepresents Lindenhof surface\"],\n  \"corrections\": [\"Replaced 'crouching' for Julian with precise relational staging: 'crouches beside Levin on his left, both hands pressed firmly onto Levin’s shoulders' — keeps action clear while anchoring scale via shoulder contact\", \"Specified 'bare earth' and 'shallow hollow' to enforce packed-earth surface per LOC001.1\", \"Omitted all mention of benches, pavements, or generic 'park' elements; named only Visual Bible-confirmed features: linden tree, historic buildings, chess tables, dappled shade\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"All characters actively engaged: Levin (palms flat on egg), Julian (hands on Levin's shoulders, face down), Max (hands stacked on egg), Kiaan (hands stacked on egg). No back views or glances away — all faces angled down toward egg. No hands holding multiple items. Julian’s hands on shoulders do not conflict with Levin’s hands on egg — separate contact points.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Julian’s age now visually anchored by shoulder-width contact with Levin (school-age boy), eliminating infantile scaling\", \"Surface specified as 'bare earth' and 'shallow hollow' to block pavement interpretation\", \"Park bench removed from prose and objects list\"]\n  },\n  \"characters\": [\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"foreground, kneeling at base of linden tree\", \"expression\": \"focused, eyes down, brows slightly furrowed\"},\n    {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"beside Levin on his left\", \"expression\": \"intense, mouth slightly open, eyes fixed on egg\"},\n    {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"right of egg, kneeling\", \"expression\": \"concentrated, eyes down, jaw set\"},\n    {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"beside Max, kneeling\", \"expression\": \"attentive, eyes down, eyebrows raised slightly\"}\n  ],\n  \"objects\": [\"LOC001.1\"],\n  \"interactions\": [\n    {\"character\": \"Levin\", \"object\": \"ART001.1\", \"where\": \"presses both palms flat against the left side of the smooth egg\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Julian\", \"object\": \"Levin\", \"where\": \"presses both hands firmly onto Levin's shoulders\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Max\", \"object\": \"ART001.1\", \"where\": \"stacks both hands over Levin's right hand on the smooth egg\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Kiaan\", \"object\": \"ART001.1\", \"where\": \"stacks both hands over Max's on the smooth egg\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": false,\n  \"emptyScenePrompt\": \"The Lindenhof town square in autumn daylight: large mature linden trees with dappled shade, historic buildings with cream facades and dark roofs framing the perimeter, outdoor chess tables with stone bases and painted boards visible under the trees, sparse fallen yellow-orange leaves scattered on packed earth ground. Eye-level wide shot, clear sky, soft directional sunlight casting long gentle shadows.\",\n  \"translatedSummary\": \"Levin, Julian, Max und Kiaan drücken alle gleichzeitig ihre Hände auf das glühende, blassorangefarbene Drachenei im hohlen Stamm der Linde auf dem Lindenhof.\"\n}"
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 9,
+   "source": "iterate-round-2",
+   "planLine": "PLAN: wide — Levin, Max, and Kiaan — the three boys carry the bundled jacket-egg together down through a narrow lane of the Altstadt toward the last sunlit strip ahead — they have left the tree and are moving toward the Rathausbrücke",
+   "parentBrief": "Walking together down a narrow, shadowed cobblestone lane in the Altstadt, Levin (blonde wavy hair, red fleece jacket, blue corduroys, brown boots) walks in the centre, his arms wrapped tightly around the melon-sized, pale orange dragon egg tucked inside the front of his red fleece jacket. Max (curly light brown hair, green hoodie, grey tracksuit trousers, white sneakers) walks on Levin's left, gripping Levin's left elbow with his right hand to help steady the heavy bulge. Kiaan (straight dark brown hair, orange sweater, brown corduroys, blue boots) walks on Levin's right, holding Levin's right elbow with his left hand. Wide shot from the front, the three boys moving shoulder-to-shoulder through the deep blue shade toward a bright strip of late afternoon sunlight hitting the stone street ahead of them.\n\n---METADATA---\n{\"sceneIntent\": \"Levin carries the egg bulging inside his jacket. Max and Kiaan walk beside him, steadying Levin's elbows as they move toward a strip of sunlight.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"depth\": \"foreground\", \"looksAt\": \"away\", \"expression\": \"lips pressed tight, brows furrowed with effort\"}, {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"left foreground\", \"depth\": \"foreground\", \"looksAt\": \"away\", \"expression\": \"focused, jaw set, eyes looking forward\"}, {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"right foreground\", \"depth\": \"foreground\", \"looksAt\": \"away\", \"expression\": \"determined, mouth closed tightly\"}], \"shot\": \"wide\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"ART001.1\", \"ART004.1\", \"LOC002\"], \"interactions\": [{\"character\": \"Levin\", \"object\": \"ART001.1\", \"where\": \"carries the heavy bulge in the front of his jacket\", \"action\": \"carrying\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}, {\"character\": \"Max + Kiaan\", \"object\": \"Levin\", \"where\": \"steady Levin's elbows as he carries the heavy bulge\", \"action\": \"supporting\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"worn\"}], \"emptyScenePrompt\": \"A narrow cobblestone street lined with tall, pastel-painted buildings in deep blue shadow. A bright, narrow strip of late afternoon sunlight falls across the stones in the distance.\"}",
+   "rewriteBrief": "Levin — a school-age boy with blonde wavy hair, blue corduroys, brown boots, and a red fleece jacket zipped halfway — walks centered in the foreground of a narrow Altstadt lane, arms wrapped tightly around his torso to hold the melon-sized pale orange dragon egg tucked inside the front of his jacket, creating a visible rounded bulge beneath the red fleece. Max — a school-age boy with curly light brown hair, green hoodie, grey tracksuit trousers, and white sneakers — walks directly beside Levin’s left side, right hand gripping Levin’s left elbow. Kiaan — a school-age boy with straight dark brown hair, orange sweater, brown corduroys, and blue boots — walks directly beside Levin’s right side, left hand gripping Levin’s right elbow. All three face forward, eyes fixed on the bright strip of late afternoon sunlight ahead on the cobblestone street. The lane is lined with pastel-painted multi-story buildings; deep blue shadows fill the midground, fading toward warm golden light at the far end near Rathausbrücke. Wide shot from the front, shoulder-to-shoulder framing, low ambient wind visible as slight motion in scattered autumn leaves on the stones.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Levin, Max, and Kiaan walk shoulder-to-shoulder down a narrow Altstadt lane, Levin cradling the pale orange dragon egg inside his red fleece jacket while Max and Kiaan grip his elbows to steady him, all moving toward a sunlit strip ahead.\",\n  \"diagnosis\": [\"Evaluator: dragon egg missing — prose omitted explicit description of egg inside jacket and its visible bulge.\", \"Evaluator: Max contacts Levin's shoulder instead of left elbow — prose used vague 'beside' without specifying grip location.\", \"Evaluator: Kiaan contacts Levin's shoulder instead of right elbow — same vagueness error.\"],\n  \"previewMismatches\": [\"Intent: Levin holds egg inside jacket with visible bulge. Preview: no bulge, no egg visible.\", \"Intent: Max grips Levin's left elbow. Preview: Max contacts Levin's shoulder.\", \"Intent: Kiaan grips Levin's right elbow. Preview: Kiaan contacts Levin's shoulder.\"],\n  \"issues\": [\"Egg not declared in VISION_INVENTORY\", \"Elbow grips mispositioned as shoulder contact\", \"No focal action anchoring eye movement\"],\n  \"corrections\": [\"Added explicit 'rounded bulge beneath the red fleece' to force egg visibility\", \"Specified 'right hand gripping Levin’s left elbow' and 'left hand gripping Levin’s right elbow'\", \"Anchored gaze direction toward sunlight strip to establish focal point\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"All hands assigned one action: Levin’s arms wrap torso (no hands free), Max’s right hand grips left elbow, Kiaan’s left hand grips right elbow — no conflict.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Explicit bulge description added\", \"Elbow specified for both grips\", \"Gaze direction tied to sunlight strip\"]\n  },\n  \"characters\": [\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"centre foreground\", \"expression\": \"focused, brows slightly furrowed, eyes forward\"},\n    {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"beside Levin’s left side\", \"expression\": \"concentrated, mouth closed, eyes forward\"},\n    {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"beside Levin’s right side\", \"expression\": \"concentrated, mouth closed, eyes forward\"}\n  ],\n  \"objects\": [\"LOC002.1\", \"ART001.1\", \"ART004.1\"],\n  \"interactions\": [\n    {\"character\": \"Levin\", \"object\": \"ART001.1\", \"where\": \"holds the pale orange dragon egg inside the front of his red fleece jacket\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Max\", \"object\": \"Levin\", \"where\": \"grips Levin's left elbow with his right hand\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Kiaan\", \"object\": \"Levin\", \"where\": \"grips Levin's right elbow with his left hand\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": true,\n  \"emptyScenePrompt\": \"A narrow Altstadt street lined with pastel-painted multi-story buildings (pink, cream, yellow facades with shuttered windows) under late afternoon light. Cobblestone street stretches diagonally into depth, shaded in deep blue tones until a bright horizontal strip of warm sunlight hits the stones near the far end. Scattered autumn leaves rest on the cobbles. Wide front-facing shot, low angle, shallow depth of field to separate foreground from background architecture.\",\n  \"translatedSummary\": \"Levin, Max und Kiaan gehen Schulter an Schulter durch eine enge Gasse der Altstadt, wobei Levin das blassorangefarbene Drachenei in seiner roten Fleecejacke hält, während Max und Kiaan seine Ellenbogen festhalten, um ihn zu stützen, alle drei auf einen sonnigen Streifen vor ihnen gerichtet.\"\n}"
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 10,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: close-up — Julian — Julian pulls the Marroni bag out of Levin's jacket and holds it to his mouth, cheeks full — the bag is now flat and cooling, the egg's warmth is threatened",
+   "parentBrief": "Standing in the narrow Altstadt lane, Julian (toddler, 4 heads tall, blonde curly hair, blue eyes, wearing his yellow quilted body warmer over a white long-sleeve shirt, mid-blue joggers, and grey sneakers) uses both hands to pull a crushed and flat brown paper bag entirely out from the top of Levin's red fleece jacket. Julian lifts the flat paper bag right up to his mouth, his cheeks puffed out full as he chews the last chestnuts. Close-up on Julian's face and hands, the crushed empty bag held high, the shadowed cream stone wall of the lane directly behind his blonde curls in the cool dusk light.\n\n---METADATA---\n{\"sceneIntent\": \"Julian pulls a flat, crushed paper bag from Levin's jacket and holds it to his mouth, cheeks full. Close-up on Julian in the shadowed lane.\", \"characters\": [{\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART002.2\", \"expression\": \"cheeks puffed out, eyes focused on the bag, calm\"}], \"shot\": \"close-up\", \"crowdExpected\": false, \"landmarkView\": \"close\", \"era\": \"present day\", \"objects\": [\"ART002.2\", \"ART004.1\", \"LOC002\"], \"interactions\": [{\"character\": \"Julian\", \"object\": \"ART002.2\", \"where\": \"holds the flat paper bag up to his mouth with both hands\", \"action\": \"holding\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [], \"emptyScenePrompt\": \"A close-up of a shadowed cream stone wall lining a narrow lane, the mortar lines clearly visible in the cool dusk light.\"}",
+   "rewriteBrief": "Julian — a toddler with blonde curly hair, blue eyes, wearing his yellow quilted body warmer over a white long-sleeve shirt, mid-blue joggers, and grey sneakers — stands in the narrow Altstadt lane, both hands gripping the top edge of Levin’s red fleece jacket as he pulls the crushed and flat brown paper bag fully out from inside its collar opening; Julian lifts the flat bag to his mouth, cheeks puffed full, jaw moving as he chews the last chestnuts. Levin — a middle-aged man with short brown hair, stubble, wearing a red fleece jacket unzipped over a grey t-shirt — stands just behind Julian, facing forward, torso angled slightly toward Julian, hands resting at his sides, jacket visibly open at the neck where the bag emerges. The shadowed cream stone wall of the lane rises directly behind Julian’s head; cool dusk light falls across their shoulders and the crumpled bag. Close-up framing Julian’s face and hands and the upper half of Levin’s torso, tight enough to include Julian’s full head and shoulders and Levin’s chest and collarbones but cropping below Julian’s waist.  \n\n---METADATA---  \n{  \n  \"sceneIntent\": \"Julian pulls the flat brown paper bag out from the collar opening of Levin's red fleece jacket and holds it to his mouth while chewing chestnuts, with Levin standing directly behind him in the narrow Altstadt lane.\",  \n  \"diagnosis\": [\"Evaluator: Julian wore Levin's red fleece jacket instead of his own yellow body warmer — cause: prose incorrectly implied Julian was inside Levin's jacket rather than pulling the bag *from* it.\", \"Evaluator: Levin missing — cause: previous brief omitted Levin despite plan line requiring him as the jacket's owner and physical anchor for the action.\", \"Evaluator: Julian cropped at waist — cause: close-up framing misapplied; action requires visible jacket collar and bag extraction point, so Levin must be included mid-torso and Julian’s full upper body shown, not cropped.\"],  \n  \"previewMismatches\": [\"Intent: Julian pulls bag from Levin's jacket collar. Preview: Julian held bag alone, no jacket visible on Levin, no extraction motion shown.\", \"Intent: Levin present and physically involved. Preview: Levin absent.\"],  \n  \"issues\": [\"Julian incorrectly depicted wearing red fleece jacket\", \"Levin missing entirely\", \"Bag shown already detached without visible extraction motion or jacket interface\", \"Julian’s lower body and full outfit not visible due to incorrect crop\"],  \n  \"corrections\": [\"Specified Julian’s full outfit verbatim from character details and locked clothing\", \"Added Levin with exact clothing (red fleece jacket unzipped) and positioned him directly behind Julian, facing forward, torso angled toward Julian\", \"Specified bag extraction from 'collar opening' of Levin’s jacket to anchor spatial relationship\", \"Adjusted close-up framing to include Julian’s full head/shoulders and Levin’s chest/collarbones — not waist-down crop — enabling visible jacket structure and bag origin\"],  \n  \"draftValidation\": {  \n    \"poseActionCheck\": \"Julian faces camera, both hands grip jacket collar and bag edge — no conflict; Levin faces camera, hands at sides, torso angled toward Julian — supports interaction without blocking view; both actions physically possible and mutually visible in frame.\",  \n    \"contradictionsFound\": [],  \n    \"fixesApplied\": [\"Added Levin with correct clothing and position\", \"Specified bag extraction point at jacket collar\", \"Reframed close-up to show upper torsos only, preserving full outfit visibility for Julian and jacket interface for Levin\"]  \n  },  \n  \"characters\": [  \n    {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"foreground, standing\", \"expression\": \"cheeks puffed full, jaw moving, eyes focused on bag\"},  \n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"directly behind Julian\", \"expression\": \"calm, attentive, neutral mouth\"}  \n  ],  \n  \"objects\": [\"LOC002.1\", \"ART002.2\", \"ART004.1\"],  \n  \"interactions\": [  \n    {\"character\": \"Julian\", \"object\": \"ART004.1\", \"where\": \"pulls the flat paper bag out from the collar opening of Levin's red fleece jacket\", \"storyRelevant\": true, \"priority\": \"essential\"},  \n    {\"character\": \"Julian\", \"object\": \"ART002.2\", \"where\": \"holds the flat paper bag to his mouth while chewing chestnuts\", \"storyRelevant\": true, \"priority\": \"essential\"}  \n  ],  \n  \"reuseEmptyScene\": false,  \n  \"emptyScenePrompt\": \"Narrow Altstadt street with multi-story pastel-colored buildings (pink, cream, yellow facades), shuttered windows, and shadowed cream stone walls. Cobblestone lane floor underfoot. Cool dusk light casts soft long shadows across vertical surfaces. Close-up framing focused on upper wall section behind two figures — no people, no props. Slightly low angle, shallow depth.\",  \n  \"translatedSummary\": \"Julian zieht die flache braune Papiertüte aus dem Kragen der roten Fleecejacke von Levin und hält sie sich zum Mund, während er die letzten Marroni kaut, während Levin direkt hinter ihm steht.\"  \n}"
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 13,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Ramon and Levin — Ramon's hands grab at the egg in Levin's arms and the Marroni bag swings out of Julian's grip — the Marroni are gone into the Limmat and the egg has been seized",
+   "parentBrief": "Ramon's hands grip the melon-sized dragon egg and pull it forcefully away on the stone deck of the Rathausbrücke. Ramon, an eight-year-old tall lanky boy with short black straight hair, brown eyes, and a sharp chin, towers over Levin. Levin, a preschooler in his red zip-up fleece jacket, white long-sleeve shirt, dark blue corduroy trousers, and brown boots, jerks back, his hands open at chest height, just missing the egg. Nearby, a crushed flat paper bag falls mid-air toward the grey stone. Medium shot in the cold autumn dusk, the sun set, and the first warm glow of street lanterns coming on over the river, the mood sharp and panicked.\n\n---METADATA---\n{\"sceneIntent\": \"Ramon forcefully pulls the egg out of Levin's arms. Levin recoils, and a flat paper bag falls through the air beside them. Cold dusk with lantern light, panicked and aggressive mood.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"right foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001\", \"expression\": \"shocked wide eyes, panicked drawn brows, open mouth\"}, {\"name\": \"Ramon\", \"clothing\": \"standard\", \"position\": \"left foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001\", \"expression\": \"greedy narrowed eyes, aggressive tight jaw\"}], \"shot\": \"medium\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"LOC003\", \"ART001\", \"ART002.2\", \"CHR001\"], \"interactions\": [{\"character\": \"CHR001\", \"object\": \"ART001\", \"where\": \"pulls the egg forcefully from Levin's arms\", \"action\": \"pulling\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}, {\"character\": \"Levin\", \"object\": \"ART001\", \"where\": \"recoils with his hands open as the egg is pulled away\", \"action\": \"watching\", \"hands\": false, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"worn\"}], \"emptyScenePrompt\": \"A wide stone bridge deck overlooking a river in the cold autumn dusk. The sun has set, leaving deep blue shadows, and warm orange lantern light begins to spill across the grey stone.\"}",
+   "rewriteBrief": "Ramon — an eight-year-old tall lanky boy with short black spiky hair, brown eyes, and a sharp chin, wearing a blue denim jacket over a grey t-shirt, black jeans, and black sneakers — stands on the stone deck of the Rathausbrücke, both hands gripping the melon-sized smooth egg as he pulls it forcefully away from Levin. Levin — a preschooler in his red zip-up fleece jacket, white long-sleeve shirt, dark blue corduroy trousers, and brown boots — jerks backward, arms recoiling, hands open at chest height, fingers splayed, body tilted away from Ramon, facing left, eyes locked on the egg. The crushed flat paper bag falls mid-air toward the grey stone between them. Medium shot in cold autumn dusk, sun fully set, warm glow of street lanterns just coming on over the river, background showing the Grossmünster’s twin towers rising beyond the water, mood sharp and panicked.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Ramon pulls the smooth egg away from Levin on the Rathausbrücke while the crushed paper bag falls mid-air; Levin recoils with open hands.\",\n  \"diagnosis\": [\"Evaluator: Levin’s left hand gripping egg — cause: prose incorrectly implied contact instead of recoil; fixed by specifying 'hands open at chest height, fingers splayed, body tilted away'.\", \"Evaluator: paper bag grounded — cause: prose said 'falls mid-air' but model placed it near feet; reinforced 'falls mid-air toward the grey stone' with relational positioning.\", \"Evaluator: Ramon holding egg with one hand — cause: 'grips' and 'pulls forcefully' require two-handed action; explicitly stated 'both hands gripping... as he pulls it forcefully away'.\", \"Evaluator: Ramon’s clothing mismatch — cause: prompt declared 'standard' but previous render used inconsistent casual wear; prose now cites exact clothing from CHARACTER DETAILS without deviation.\"],\n  \"previewMismatches\": [\"Intent: Levin recoils with hands open, no contact with egg. Preview: Levin reaches with both hands, gripping egg.\", \"Intent: paper bag falls mid-air. Preview: bag rests on ground near Ramon’s feet.\", \"Intent: Ramon uses both hands to pull egg. Preview: Ramon holds egg with left hand only.\", \"Intent: Ramon wears blue denim jacket per CHARACTER DETAILS. Preview: jacket present but rendered with inconsistent styling and contextually jarring modern casual tone.\"],\n  \"issues\": [\"Levin’s hands incorrectly shown contacting egg\", \"paper bag incorrectly grounded\", \"Ramon incorrectly shown with single-hand grip\", \"Ramon’s clothing inconsistently rendered despite explicit CHARACTER DETAILS\"],\n  \"corrections\": [\"Specified Levin’s hands as 'open at chest height, fingers splayed, body tilted away' to enforce recoil and prevent grip\", \"Reinforced 'crushed flat paper bag falls mid-air toward the grey stone' with clear motion and position\", \"Explicitly wrote 'both hands gripping the melon-sized smooth egg as he pulls it forcefully away' to mandate two-handed action\", \"Cited Ramon’s full outfit verbatim from CHARACTER DETAILS: 'blue denim jacket over a grey t-shirt, black jeans, and black sneakers'\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"Ramon faces right, both hands occupied gripping egg; Levin faces left, arms recoiling, hands open — no conflicting actions. Back view not used, so all faces visible and directed appropriately. No closed eyes, no pointing.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Levin’s hands now unambiguously non-contacting\", \"paper bag now explicitly airborne\", \"Ramon’s grip now explicitly two-handed\", \"Ramon’s clothing now fully aligned with CHARACTER DETAILS\"]\n  },\n  \"characters\": [\n    {\"name\": \"Ramon\", \"clothing\": \"standard\", \"position\": \"on the stone deck of the Rathausbrücke\", \"expression\": \"focused, mouth slightly open, brows lowered\"},\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"on the stone deck of the Rathausbrücke, beside Ramon\", \"expression\": \"alarmed, mouth open, brows pulled tight\"}\n  ],\n  \"objects\": [\"LOC003.2\",\"ART001.2\",\"ART002.2\"],\n  \"interactions\": [\n    {\"character\": \"Ramon\", \"object\": \"ART001.2\", \"where\": \"grips the smooth egg with both hands and pulls it away\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Levin\", \"object\": \"ART001.2\", \"where\": \"looks at the smooth egg as it is pulled away\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Levin\", \"object\": \"ART002.2\", \"where\": \"stands beside the falling paper bag\", \"storyRelevant\": false, \"priority\": \"secondary\"}\n  ],\n  \"reuseEmptyScene\": true,\n  \"emptyScenePrompt\": \"Stone bridge deck of Rathausbrücke at cold autumn dusk, sun set, warm glow of street lanterns lighting the river. Grossmünster’s twin towers rise beyond the water in the background. Grey stone paving, modern balusters, faint reflections on wet surface. Medium shot, eye-level, shallow depth — foreground reserved for characters, midground shows bridge structure and water, background shows skyline.\",\n  \"translatedSummary\": \"Ramon reisst das glatte Ei mit beiden Händen aus Levins Armen, während die zerknitterte Papiertüte durch die Luft fällt; Levin weicht erschrocken zurück, mit offenen Händen auf Brusthöhe.\"\n}"
+  },
+  {
+   "job": "job_1789584708605_rts4wqupm",
+   "pageNumber": 16,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Levin, Kiaan, and Julian — the three press the bundled jacket between them on the dark stairs, Kiaan holding Julian's hand on the step — they are climbing at Julian's pace with only their bodies for warmth",
+   "parentBrief": "Levin, a preschooler wearing only his white long-sleeve shirt, dark blue corduroy trousers, and brown boots, carries the tightly bundled red fleece jacket against his chest as the three boys climb the steep stone stairs of the narrow Altstadt lane. Kiaan, a preschooler in his orange pullover sweater, dark brown corduroy trousers, and blue boots, presses close beside him and holds Julian's hand on the step, while Julian, a toddler in his yellow quilted body warmer, mid-blue joggers, and grey sneakers, steps carefully up the dark stair. Medium shot in the cold autumn night, the three boys pressing close together around the bundle as they move slowly under the warm glow of street lanterns.\n\n---METADATA---\n{\"sceneIntent\": \"Levin, Kiaan, and Julian climb the dark stone stairs together while keeping the bundled jacket pressed between them. Dark night with warm lantern light, weary but determined mood.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART004.2\", \"expression\": \"tired eyes, firm determined mouth, focused brow\"}, {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"right midground\", \"depth\": \"midground\", \"looksAt\": \"ART004.2\", \"expression\": \"caring eyes, gentle supportive mouth\"}, {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"left midground\", \"depth\": \"midground\", \"looksAt\": \"ART004.2\", \"expression\": \"exhausted soft eyes, slight frown of effort\"}], \"shot\": \"medium\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"LOC002\", \"ART001\", \"ART004.2\"], \"interactions\": [{\"character\": \"Levin + Kiaan + Julian\", \"object\": \"ART004.2\", \"where\": \"press close together around the bundled jacket as they climb\", \"action\": \"carrying\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"off\", \"location\": \"carried as a bundle in Levin's arms\"}], \"emptyScenePrompt\": \"A steep, narrow flight of grey stone stairs climbing away from the camera in an old alleyway. The autumn night is dark, with warm orange lantern light spilling across the worn steps.\"}",
+   "rewriteBrief": "Levin — a preschooler with wavy, short, tousled brown hair and bright blue eyes, wearing a white long-sleeve shirt, dark blue corduroy trousers, and brown lace-up boots — stands on the lowest visible stone step of the narrow Altstadt lane, facing right, chest pressed forward to hold the tightly bundled red fleece jacket against his torso with both hands. Kiaan — a preschooler with straight black hair, round cheeks, and warm brown eyes, wearing an orange pullover sweater, dark brown corduroy trousers, and blue velcro-strap boots — stands beside Levin on the same step, facing right, left hand holding Julian’s right hand, right arm gently touching Levin’s upper arm. Julian — a toddler with soft blond curls, wide-set eyes, and a slight forward lean, wearing a yellow quilted body warmer, white long-sleeve shirt, mid-blue joggers, and grey velcro-strap sneakers — stands on the step just above them, facing right, right hand held by Kiaan, left foot lifted mid-step as he places it carefully on the next stair. All three boys press close together around the bundled jacket; their bodies form a compact cluster ascending the steep, uneven stone stairs under the warm glow of street lanterns. Autumn night: cool air, faint mist near ground level, scattered dry orange leaves on lower steps but none on the boys’ clothing or shoes. Medium shot, eye-level, framing from mid-thigh up, showing all three faces and upper bodies clearly, no egg or other objects present.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Levin holds the bundled red fleece jacket against his chest while Kiaan holds Julian's hand and all three boys climb the dark stone stairs together, pressing close for warmth.\",\n  \"diagnosis\": [\"Evaluator: 'dragon egg' object is missing from the scene — cause: previous brief omitted ART001.2 (cold egg) entirely, violating Visual Bible object requirement; story context confirms egg is wrapped inside jacket, so it must be present as ART004.2 (bundled jacket), not as separate object.\", \"Evaluator: unrequested egg-shaped object present — cause: prose incorrectly implied visible egg by describing 'glowing orange egg' instead of stating jacket is bundled around cold egg per Page 15 text.\", \"Evaluator: Levin wears blue jeans — cause: previous brief said 'dark blue corduroy trousers' but model misread 'blue' and defaulted to generic jeans; correction enforces exact fabric and colour phrase.\", \"Evaluator: Kiaan wears brown pants — cause: previous brief said 'dark brown corduroy trousers' but model dropped 'corduroy' and 'dark'; correction restates full descriptor.\", \"Evaluator: Julian wears blue jeans — cause: previous brief said 'mid-blue joggers' but model substituted 'jeans'; correction uses exact term and reinforces with visual anchor 'mid-blue joggers'.\"],\n  \"previewMismatches\": [\"Intent: boys are climbing *up* the stairs. Preview: boys descending.\", \"Intent: Levin carries jacket *against his chest* as part of group warmth. Preview: Levin holds jacket in front with arms extended, isolated posture.\", \"Intent: no egg visible — only bundled jacket. Preview: large glowing orange egg resting on step, unmentioned in plan line or story text for this page.\"],\n  \"issues\": [\"Wrong direction: descending instead of climbing up\", \"Wrong object presence: egg visible instead of fully bundled\", \"Clothing mismatches: corduroy/joggers replaced with jeans\", \"Group staging: boys spaced apart instead of pressing close\", \"Levin's trousers colour/fabric misrendered\"],\n  \"corrections\": [\"Changed 'descending' to explicit 'climbing up', 'step lifted mid-step', 'on the step just above them'\", \"Removed all egg descriptors; specified jacket is 'tightly bundled' and 'held against his torso' — consistent with ART004.2 state and Page 15 'wrapped tightly'\", \"Restated exact clothing terms: 'dark blue corduroy trousers', 'dark brown corduroy trousers', 'mid-blue joggers'\", \"Added physical contact cues: 'press close together', 'Kiaan's right arm gently touching Levin’s upper arm', 'cluster ascending'\", \"Specified Levin's trousers as 'dark blue corduroy' with no ambiguity\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"All poses physically possible: Levin holds jacket with both hands, Kiaan holds Julian's hand and touches Levin's arm, Julian lifts one foot — no hand conflict. Back view not used; all face right, consistent with climbing motion and shared focal point (jacket bundle).\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Direction corrected to upward climb via positional verbs and step hierarchy\", \"ART004.2 enforced by 'tightly bundled' + 'held against torso', eliminating egg visibility\", \"Clothing descriptors locked to Visual Bible terms\", \"Group proximity reinforced with relational touch language\", \"No pointing, no closed eyes, no camera-facing gaze\"]\n  },\n  \"characters\": [\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"on the lowest visible stone step\", \"expression\": \"focused, brows slightly lowered, mouth closed\", \"perspective\": \"facing right\"},\n    {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"beside Levin on the same step\", \"expression\": \"attentive, gentle smile, eyes on Julian's hand\", \"perspective\": \"facing right\"},\n    {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"on the step just above Levin and Kiaan\", \"expression\": \"concentrated, tongue slightly between lips, eyes down at his foot\", \"perspective\": \"facing right\"}\n  ],\n  \"objects\": [\"LOC002.1\", \"ART004.2\"],\n  \"interactions\": [\n    {\"character\": \"Levin\", \"object\": \"ART004.2\", \"where\": \"holds the tightly bundled red fleece jacket against his chest with both hands\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Kiaan\", \"object\": \"Julian\", \"where\": \"holds Julian's right hand\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": true,\n  \"emptyScenePrompt\": \"Narrow Altstadt lane at night: steep, uneven stone stairs ascending into dimness between tall pastel-coloured historic buildings (pink, cream, yellow facades with shuttered windows). Warm amber glow from wall-mounted street lanterns casts soft light on lower steps; faint autumn mist hovers near ground level. Scattered dry orange leaves on bottom three steps only. Medium shot, eye-level, cobblestone alley floor visible at base. No figures, no objects.\",\n  \"translatedSummary\": \"Levin hält die fest zusammengerollte rote Fleecejacke mit beiden Händen an seiner Brust, während Kiaan Julians Hand festhält und alle drei Buben gemeinsam die dunklen Steinstufen hinaufsteigen, eng zusammengedrängt, um sich gegenseitig warm zu halten.\"\n}"
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 2,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Julian alone — Julian pushes autumn leaves apart between two thick linden roots and reaches toward something round and glowing with warmth beneath them — the warm egg exists and has been found",
+   "parentBrief": "Kneeling in the center foreground between two thick, sprawling linden roots on the Lindenhof plaza, Julian — a toddler with ear-length curly light blonde hair and blue eyes, wearing his bright yellow quilted anorak, grey fleece-lined pull-on trousers, and dark blue rubber boots — leans forward and pushes the deep red and yellow autumn leaves apart with his left hand, reaching his right hand toward a glowing object. Nestled directly beneath the thick tree roots sits a football-sized dragon egg, its smooth, faintly scaly leathery shell glowing with a vibrant, warm reddish-orange light that softly illuminates the surrounding dry leaves. The medium shot captures the quiet wonder of the cold afternoon as the warm orange glow contrasts with the chilly grey stone and brown earth of the exposed roots.\n\n---METADATA---\n{\"sceneIntent\": \"Julian pushes the autumn leaves apart between two thick roots and reaches for a glowing dragon egg. The warm orange light illuminates the roots and his hands. The moment is filled with quiet, magical discovery.\", \"characters\": [{\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001.1\", \"expression\": \"wide-eyed wonder, mouth slightly open, raised brows\"}], \"shot\": \"medium\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"LOC001\", \"ART001.1\"], \"interactions\": [{\"character\": \"Julian\", \"object\": \"ART001.1\", \"where\": \"reaches the right hand toward the egg\", \"action\": \"reaching\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}], \"emptyScenePrompt\": \"A close view of the ground between two massive, thick linden tree roots breaking through the earth. Deep piles of red and yellow autumn leaves are scattered thickly between the dark, rough bark of the roots, with a soft warm orange light spilling over the leaves from a hollow spot.\"}",
+   "rewriteBrief": "Julian — a toddler with ear-length curly light blonde hair and blue eyes, wearing his bright yellow quilted anorak, grey fleece-lined pull-on trousers, and dark blue rubber boots — kneels in the center foreground between two thick, sprawling linden roots on the Lindenhof plaza, his left hand pushing aside deep red and yellow autumn leaves, his right hand extended forward toward the football-sized dragon egg. The egg — smooth, faintly scaly, leathery shell glowing with vibrant warm reddish-orange light — sits nestled directly beneath the roots, illuminating the dry leaves and brown earth around it. No other people or animals are present. Medium shot, clear foreground focus, cold afternoon light, grey stone and brown earth visible under shallow leaf cover, no chess board, no benches, no background figures.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Julian kneels between linden roots on the Lindenhof plaza, pushes autumn leaves aside with his left hand, and reaches his right hand toward the glowing dragon egg nestled beneath the roots.\",\n  \"diagnosis\": [\"Evaluator: Julian not pushing leaves with left hand. Cause: prose used vague 'leans forward' instead of explicit left-hand action; model ignored 'pushes' and defaulted to both-hands reach.\", \"Evaluator: 4 extra figures. Cause: prose mentioned 'Lindenhof plaza' without suppressing background context — model inserted default chess-area crowd from LOC001 photo variant.\", \"Evaluator: Julian’s right hand not reaching toward egg. Cause: ambiguous phrasing 'reaching his right hand toward a glowing object' + 'leans forward' created pose conflict; model rendered both hands near egg instead of one pushing, one reaching.\"],\n  \"previewMismatches\": [\"Intent: Julian pushes leaves with left hand while right hand reaches toward egg. Preview: Julian reaches with both hands toward egg, no leaf-pushing action visible.\", \"Intent: Julian alone on plaza. Preview: five unrelated adult figures present in midground.\", \"Intent: egg is sole glowing object, centered under roots. Preview: egg present but visually competed with chess pieces, benches, buildings, and crowd.\"],\n  \"issues\": [\"Julian’s left hand not performing declared leaf-pushing action\", \"Four extraneous adult figures added despite plan line specifying 'Julian alone'\", \"Julian’s right hand not visibly reaching toward egg — both hands converged on egg instead\"],\n  \"corrections\": [\"Replaced 'leans forward' with active 'kneels... his left hand pushing aside...' to lock left-hand action\", \"Removed all references to chess, benches, buildings, and background figures — specified 'No other people or animals are present'\", \"Explicitly separated actions: left hand pushes leaves, right hand extends forward toward egg — no ambiguity about hand roles\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"Kneeling pose permits left hand pushing leaves (ground contact) and right hand extending forward (reaching motion); no hand holds object, no conflict.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Removed all background human figures\", \"Specified only Julian as character\", \"Made left-hand action verb-driven and spatially anchored ('pushing aside deep red and yellow autumn leaves')\", \"Made right-hand action directional and target-specific ('extended forward toward the football-sized dragon egg')\"]\n  },\n  \"characters\": [\n    {\n      \"name\": \"Julian\",\n      \"clothing\": \"standard\",\n      \"position\": \"center foreground between two thick linden roots\",\n      \"expression\": \"focused, eyes wide open, looking at the egg\",\n      \"perspective\": \"facing the camera\"\n    }\n  ],\n  \"objects\": [\"LOC001.1\", \"ART001.1\"],\n  \"interactions\": [\n    {\n      \"character\": \"Julian\",\n      \"object\": \"ART001.1\",\n      \"where\": \"reaches his right hand toward the glowing dragon egg\",\n      \"storyRelevant\": true,\n      \"priority\": \"essential\"\n    },\n    {\n      \"character\": \"Julian\",\n      \"object\": \"autumn leaves\",\n      \"where\": \"pushes the deep red and yellow autumn leaves aside with his left hand\",\n      \"storyRelevant\": true,\n      \"priority\": \"essential\"\n    }\n  ],\n  \"reuseEmptyScene\": false,\n  \"emptyScenePrompt\": \"The Lindenhof plaza in autumn daylight: wide stone paving, exposed brown earth and dry fallen leaves, two thick sprawling linden tree roots arching across the foreground, historic buildings faintly visible in soft-focus background, no people, no chess board, no benches, no signage, no litter. Medium shot, slightly low angle, cool grey ambient light with warm localized glow source implied in center.\",\n  \"translatedSummary\": \"Julian, ein Kleinkind mit kurzen lockigen hellblonden Haaren und blauen Augen, kniet in der Mitte des Vordergrunds zwischen zwei dicken Lindenwurzeln auf dem Lindenhof, schiebt mit seiner linken Hand das herbstliche Laub beiseite und streckt die rechte Hand nach dem glühenden Drachenei aus, das direkt unter den Wurzeln liegt.\"\n}"
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 7,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: wide — Levin, Max and Julian — Levin walks them back and forth between the root hollow and the Lindenhofbrunnen while the last sunlight slides off the fountain steps; Max stamps his feet — Levin's indecision has cost the warm sun; he is ashamed",
+   "parentBrief": "Paused in a row on the gravel of the Lindenhof plaza, Levin, Max, and Julian are seen from behind, facing the weathered stone Lindenhofbrunnen fountain in the deep background. Levin, seen from behind in the center, walks with his shoulders slumped and his head lowered, his heels lifting from the gravel; his brow is drawn and his mouth is tight. Max, seen from behind on the left, walks in his orange pullover, dark brown dungarees, grey socks, and black rubber boots, stamping his right boot hard into the gravel as he moves; his jaw is set. Julian, seen from behind on the right, follows beside Levin in his yellow anorak, grey trousers, and blue boots, his head bowed and his mouth a small worried line. The last warm sunlight of the autumn afternoon slides off the grey stone steps of the fountain, casting long cold shadows across the red and yellow leaves on the ground.\n\n---METADATA---\n{\"sceneIntent\": \"The three boys move across the gravel toward the fountain together in one restless line. Max stamps his boot as he walks, while Levin and Julian trudge beside him toward the fading sunlight.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"center midground\", \"perspective\": \"back view\", \"depth\": \"midground\", \"looksAt\": \"LOC002\", \"expression\": \"brow furrowed, mouth tight, shoulders slumped\"}, {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"left midground\", \"perspective\": \"back view\", \"depth\": \"midground\", \"looksAt\": \"LOC002\", \"expression\": \"jaw set, brow lowered, mouth firm\"}, {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"right midground\", \"perspective\": \"back view\", \"depth\": \"midground\", \"looksAt\": \"LOC002\", \"expression\": \"head bowed, brow raised, mouth small\"}], \"shot\": \"wide\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"LOC001\", \"LOC002\", \"ART004\"], \"interactions\": [{\"character\": \"Levin + Max + Julian\", \"object\": \"LOC002\", \"where\": \"walk together across the gravel toward the fountain, Max's right boot coming down in a hard stamp\", \"action\": \"walking\", \"storyRelevant\": false, \"priority\": \"low\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"worn\"}], \"emptyScenePrompt\": \"A wide gravel plaza filled with scattered autumn leaves, leading toward a large grey stone fountain in the background. The late afternoon sun casts long, fading shadows across the stones, leaving the foreground in cool grey twilight.\"}",
+   "rewriteBrief": "Levin — a school-age boy with short dark hair and serious brown eyes, wearing a forest-green zip-up fleece jacket with patch pockets, dark blue corduroy trousers, and brown lace-up ankle boots — walks forward on the gravel of the Lindenhof plaza, back view, shoulders slumped, head lowered, right heel lifting off the gravel, brow drawn, mouth tight. Max — a school-age boy with messy light-brown hair and determined blue eyes, wearing an orange crew-neck wool pullover, dark brown corduroy dungarees with bib and suspenders, grey socks, and black rubber ankle boots — stands on the left, back view, right foot stamping hard into the gravel, jaw set, weight fully on his left foot, right boot descending. Julian — a school-age boy with straight sandy hair and wide attentive eyes, wearing a bright yellow quilted anorak, grey pull-on trousers, and blue rubber Wellington boots — stands on the right, back view, head bowed, mouth a small worried line, both feet planted, weight evenly distributed. All three face the Lindenhofbrunnen [LOC002.3] in the deep background, its grey stone steps losing the last warm sunlight as long cold shadows stretch across red and yellow autumn leaves scattered on the gravel. Wide shot, low angle, foreground gravel sharply in focus, fountain midground, historic buildings including Grossmünster [LOC003.2] visible in background.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Max stamps his right boot into the gravel while Levin walks forward and Julian stands still, all three seen from behind on the Lindenhof plaza facing the Lindenhofbrunnen as the last warm sunlight slides off its steps.\",\n  \"diagnosis\": [\"Evaluator: 'brown overalls' instead of 'dark brown corduroy dungarees with bib and suspenders' — prose omitted key structural details, so model defaulted to generic overalls.\", \"Evaluator: 'green quilted jacket and blue jeans' instead of 'forest-green zip-up fleece with patch pockets and dark blue corduroy trousers' — prose used vague colour+garment without texture or cut cues, causing misrender.\", \"Evaluator: Max not actively stamping — prose said 'walks... stamping' but rendered static stance; 'walking' and 'stamping' conflicted, forcing model to choose one motion.\"],\n  \"previewMismatches\": [\"Intent: Max actively stamping right boot. Preview: Max standing statically, left foot lifted, no downward force visible.\", \"Intent: Levin walking with right heel lifting. Preview: Levin walking with right foot lifted — correct motion but inconsistent with 'heels lifting' phrasing which implies both heels momentarily off ground; model interpreted as single-step lift.\", \"Intent: Julian head bowed, not turned. Preview: Julian's head sharply turned left, showing full face — violates back view and declared expression.\"],\n  \"issues\": [\"Max’s clothing lacked structural specificity (dungarees = bib + suspenders), causing generic overalls\", \"Levin’s jacket lacked defining features (zip-up, patch pockets) and trousers lacked texture (corduroy)\", \"Action conflict: 'walks' + 'stamping' created ambiguous motion — stamping is a discrete, grounded action, not part of gait\", \"Julian’s pose violated back view by turning head fully left\"],\n  \"corrections\": [\"Specified 'dark brown corduroy dungarees with bib and suspenders' for Max\", \"Specified 'forest-green zip-up fleece jacket with patch pockets' and 'dark blue corduroy trousers' for Levin\", \"Replaced 'walks' with 'stands' for Max to isolate stamping as primary action\", \"Replaced 'follows beside' with 'stands on the right, back view' and removed any head-turn language for Julian\", \"Clarified Levin’s motion as 'right heel lifting off the gravel' — singular, physically precise moment\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"All back views consistent: no faces visible except by error; Max’s stamping uses right foot only, left foot grounded; Levin’s heel lift requires no hand action; Julian stands still — no conflicting motions.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Removed walking verb from Max to enable stamping\", \"Removed Julian’s head-turn\", \"Added 'bib and suspenders' and 'corduroy' to clothing descriptors\", \"Specified 'right heel lifting' not 'heels lifting'\", \"Confirmed all three are back view, no glances\"]\n  },\n  \"characters\": [\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"expression\": \"brow drawn, mouth tight\", \"perspective\": \"back view\"},\n    {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"left foreground\", \"expression\": \"jaw set\", \"perspective\": \"back view\"},\n    {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"right foreground\", \"expression\": \"mouth a small worried line\", \"perspective\": \"back view\"}\n  ],\n  \"objects\": [\"LOC001\", \"LOC002.3\", \"LOC003.2\"],\n  \"interactions\": [\n    {\"character\": \"Max\", \"object\": \"gravel\", \"where\": \"stamping his right boot hard into the gravel\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Levin\", \"object\": \"Lindenhofbrunnen\", \"where\": \"facing the Lindenhofbrunnen in the deep background\", \"storyRelevant\": false, \"priority\": \"supportive\"}\n  ],\n  \"reuseEmptyScene\": true,\n  \"emptyScenePrompt\": \"Wide shot of the Lindenhof plaza in autumn daylight: gravel path strewn with red and yellow leaves, mature trees overhead casting dappled shade, Lindenhofbrunnen [LOC002.3] centred midground with classical statue on stone base, historic buildings including Grossmünster [LOC003.2] visible in background. Low angle, sharp foreground focus, golden-hour light fading from fountain steps, long cold shadows stretching across ground. Open space reserved in foreground for three figures.\",\n  \"translatedSummary\": \"Max stampft mit seinem rechten Stiefel hart auf den Kies, während Levin vorwärtsgeht und Julian stillsteht – alle drei von hinten gesehen auf dem Lindenhofplatz, die zum Lindenhofbrunnen blicken, während das letzte warme Sonnenlicht von dessen Stufen verschwindet.\"\n}"
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 10,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: close-up — the crow — the crow drops from the branch with the red wool cap caught in its beak and flaps toward the hole in the Lindenhofbrunnen wall — the cap is gone into the fountain wall; the crow is the antagonist",
+   "parentBrief": "In a tight close-up high above the plaza, a large black carrion crow drops down from a thick wooden branch in the top right, aggressively flapping its glossy black wings. Clutched firmly in its thick curved black beak is the solid red knitted wool cap, vividly bright against the bird's dark feathers. The crow flies strongly toward the left foreground, aiming directly for the weathered grey stonework of the Lindenhofbrunnen fountain visible just behind it, where a dark, fist-sized hole waits in the stone. The cold autumn air whips around the bird as it steals the nest's crucial warmth.\n\n---METADATA---\n{\"sceneIntent\": \"The crow drops from the branch, carrying the red wool cap in its beak toward the hole in the fountain wall. The antagonist has stolen the vital warmth.\", \"characters\": [], \"shot\": \"close-up\", \"crowdExpected\": false, \"landmarkView\": \"close\", \"era\": \"present day\", \"objects\": [\"LOC002\", \"ANI002\", \"ART004\"], \"interactions\": [{\"character\": \"ANI002\", \"object\": \"ART004\", \"where\": \"carries the red wool cap tightly in its beak\", \"action\": \"carrying\", \"storyRelevant\": true, \"priority\": \"essential\"}], \"emptyScenePrompt\": \"A tight view of the upper grey stonework of a weathered fountain, featuring a dark, fist-sized hole. Above it, a thick bare tree branch stretches into the cold, empty grey sky.\"}",
+   "rewriteBrief": "A carrion crow — glossy solid black feathers, thick curved black beak, sharp dark eyes, about as big as an adult’s forearm — drops sharply from a thick wooden branch in the top right of the frame, wings fully spread, facing left and slightly downward, its beak clamping the solid red hand-knitted wool cap with a small rolled-up brim. The cap is fully visible, vividly bright against the crow’s dark feathers, held securely in the beak with no talons involved. Directly below and slightly left of the crow, the weathered grey stonework of the Lindenhofbrunnen fountain fills the midground, its surface textured and aged, with a single dark fist-sized hole clearly visible in the stone wall. No other characters, statues, buildings, benches, or trees appear — only the crow, the cap, and the fountain wall with the hole. Tight close-up on the crow in flight and the target hole; shallow depth, autumn daylight, crisp cold air implied by sharp feather detail and taut wing membranes.\n\n---METADATA---\n{\n  \"sceneIntent\": \"The carrion crow dives from a branch with Levin's red wool cap clenched in its beak, aiming directly for the dark hole in the Lindenhofbrunnen fountain wall.\",\n  \"diagnosis\": [\"Evaluator: extra statue, pillar, bench, trees, and townscape added. Cause: prose included 'plaza', 'fountain', and 'autumn air' without restricting scope — model expanded setting beyond the plan line's tight close-up on crow + hole.\", \"Evaluator: crow scale exaggerated relative to environment. Cause: 'high above the plaza' and 'large black carrion crow' misread as environmental scale cue instead of action framing — model inferred full plaza context and oversized bird.\", \"Evaluator: cap shown in talons, not beak. Cause: previous brief said 'clutched firmly in its thick curved black beak' but also used 'drops down' and 'flies toward', creating ambiguity — model defaulted to talon grip for airborne objects.\"],\n  \"previewMismatches\": [\"Intent: tight close-up on crow + hole only. Preview: wide plaza scene with statue, pillar, bench, trees, townscape. \", \"Intent: crow holds cap in beak. Preview: crow appears to carry or drop cap with talons. \", \"Intent: crow is sole active figure; no secondary characters or landmarks. Preview: multiple extraneous figures and structures staged.\"],\n  \"issues\": [\"Over-extended setting beyond close-up intent\", \"Incorrect object-holding anatomy (talons vs beak)\", \"Unauthorised addition of statue, pillar, bench, trees, townscape\"],\n  \"corrections\": [\"Removed all setting descriptors except 'Lindenhofbrunnen fountain wall' and 'dark fist-sized hole'; specified 'tight close-up' and 'shallow depth'\", \"Explicitly stated 'beak clamping the cap' and 'no talons involved'\", \"Omitted all non-plan-line landmarks and figures — no statue, no pillar, no bench, no trees, no townscape, no horizon\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"Crow facing left and slightly downward matches dive motion; beak-clamping action is physically possible and unambiguous; no hands/talons conflict since only beak is used.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Removed all background elements except fountain wall and hole\", \"Specified beak-only grip, excluded talons\", \"Enforced tight close-up framing by eliminating relational distance cues to distant objects\"]\n  },\n  \"characters\": [\n    {\"name\": \"Crow\", \"clothing\": \"none\", \"position\": \"top right, centre foreground\", \"expression\": \"focused, beak tightly closed\", \"perspective\": \"facing left\"}\n  ],\n  \"objects\": [\"LOC002.1\", \"ART004\"],\n  \"interactions\": [\n    {\"character\": \"Crow\", \"object\": \"ART004\", \"where\": \"clamps the red wool cap in its beak\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Crow\", \"object\": \"LOC002.1\", \"where\": \"dives toward the dark fist-sized hole in the fountain wall\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": false,\n  \"emptyScenePrompt\": \"Tight close-up on weathered grey stonework of the Lindenhofbrunnen fountain wall, textured and aged, with a single dark fist-sized hole clearly visible. Autumn daylight, crisp cold air implied by sharp surface detail. Shallow depth, no horizon, no sky, no vegetation, no architecture beyond the stone surface. Extreme foreground focus on the hole and immediate surrounding stone.\",\n  \"translatedSummary\": \"Die Krähe stürzt mit der roten Wollkappe im Schnabel auf das dunkle Loch in der Steinwand des Lindenhofbrunnens zu.\"\n}"
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 13,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: medium — Julian and Levin — Julian presses both hands around Lindi just lifted from the leaves, his face frightened; Levin leans close — Lindi is out of the heap but the hum has stopped and the shell is cold",
+   "parentBrief": "Kneeling in the wet autumn leaves in the center foreground, Julian — a toddler with curly light blonde hair, blue eyes, and a rounded belly, wearing a bright yellow quilted anorak, grey trousers, and dark blue boots — presses both his small hands tightly around the football-sized dragon egg he has just lifted from the heap. The egg is now a dull, flat greyish-red, completely matte with no glow at all. Julian's face is drawn tight with fear. Right beside him, leaning in closely from the left, Levin, a taller preschooler with wavy light blonde hair, wearing a green fleece jacket, dark blue trousers, and brown boots, bends over the same cold shell, his hands hovering helplessly nearby. Levin's red wool cap remains hidden inside the dark hole in the Lindenhofbrunnen wall. The medium shot captures their dread as the heavy dusk settles over the plaza.\n\n---METADATA---\n{\"sceneIntent\": \"Julian holds the newly recovered egg in both hands, but it is entirely cold and grey. Levin leans close, both of them bent over the same cold shell. The loss of the hum and glow frightens Julian deeply.\", \"characters\": [{\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001.2\", \"expression\": \"frightened, brows pulled up and together, trembling lower lip\"}, {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"left foreground\", \"depth\": \"foreground\", \"looksAt\": \"ART001.2\", \"expression\": \"dismayed, eyes wide with shock, mouth slightly open\"}], \"shot\": \"medium\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"LOC001\", \"ART001.2\"], \"interactions\": [{\"character\": \"Julian\", \"object\": \"ART001.2\", \"where\": \"presses both hands tightly around the dull egg\", \"action\": \"holding\", \"hands\": true, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"off\", \"location\": \"inside the dark hole in the Lindenhofbrunnen wall\"}], \"emptyScenePrompt\": \"A close view of a bed of scattered, damp red and yellow autumn leaves on a cold evening. The heavy twilight drains the color from the surroundings, leaving deep shadows on the ground.\"}",
+   "rewriteBrief": "Julian — a toddler with curly light blonde hair, blue eyes, and a rounded belly, wearing a bright yellow quilted anorak, grey trousers, and dark blue boots — kneels in the wet autumn leaves at the center foreground of the Lindenhof plaza, both hands tightly gripping Lindi — the baby dragon — who is now cold and still, her warm vibrant orange and red scales dull and matte, her large round golden eyes dimmed, her calm smiling toothless mouth slack, her short chubby tail limp. Levin — a taller preschooler with wavy light blonde hair, wearing a green fleece jacket, dark blue trousers, and brown boots — crouches beside Julian on the left, leaning in close, his hands hovering just above Lindi’s back without touching, his face tight with fear, eyes fixed on Lindi. Levin’s red wool cap is absent — it remains inside the dark hole in the Lindenhofbrunnen wall, which is visible as a recessed black void in the stone base of the fountain to the right background. The heavy dusk settles over the plaza; no adults or park furniture appear — only historic buildings including the Grossmünster’s twin towers in the distant background, bare-branched trees casting long shadows, and fallen autumn leaves covering the cobblestones. Medium shot.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Julian kneels in wet autumn leaves holding the cold, motionless Lindi while Levin crouches beside him, hands hovering helplessly, both children focused on the silent baby dragon at the Lindenhof plaza at dusk.\",\n  \"diagnosis\": [\"Evaluator: 4 extra adult figures rendered. Cause: prose included ambient 'plaza' description without specifying 'no adults', so model added generic bystanders.\", \"Evaluator: dragon egg misrendered as pink object instead of Lindi the baby dragon. Cause: previous brief incorrectly named 'football-sized dragon egg' instead of 'Lindi' — violating Rule 3a (must name staged figures by their Visual Bible ID/name) and contradicting page plan line ('Julian presses both hands around Lindi').\", \"Evaluator: Lindenhofbrunnen wall hole missing. Cause: prose described cap location but omitted physical landmark detail — model ignored implied spatial anchor.\", \"Evaluator: scale mismatch due to using 'egg' instead of 'Lindi' — Lindi is forearm-sized, not football-sized; ART001.2 is obsolete here.\"],\n  \"previewMismatches\": [\"Intent: Julian holds Lindi (forearm-sized baby dragon). Preview: Julian held a pink football-sized egg.\", \"Intent: only Julian and Levin present. Preview: five additional adult figures visible.\", \"Intent: Lindenhofbrunnen wall with dark hole visible. Preview: fountain shown but hole obscured or absent.\", \"Intent: Levin's red wool cap hidden inside wall hole. Preview: cap not visible and no hole shown.\"],\n  \"issues\": [\"Wrong central object: used 'dragon egg' instead of 'Lindi' — violates cast lock and page plan line\", \"Extra figures added: adults inserted despite no prompt mention\", \"Missing landmark detail: dark hole in Lindenhofbrunnen wall not declared or positioned\", \"Incorrect scale: 'football-sized' contradicts Lindi's 'adult forearm' size\"],\n  \"corrections\": [\"Replaced 'football-sized dragon egg' with 'Lindi' — named and described per ANI003 Visual Bible entry\", \"Removed all references to adults, benches, plastic chairs, tables — kept only Lindenhof [LOC001], Lindenhofbrunnen [LOC002.2], and Grossmünster [LOC003.2]\", \"Added explicit placement: 'dark hole in the Lindenhofbrunnen wall, visible as a recessed black void in the stone base of the fountain to the right background'\", \"Specified Lindi’s size and state directly: 'about as big as an adult's forearm', 'dull and matte', 'dimmed eyes', 'slack mouth', 'limp tail'\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"Julian kneels and grips Lindi — two hands accounted for; Levin crouches and hovers hands — no conflicting holds; both face Lindi, not camera; back view not used so glances are valid; all actions physically possible.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Swapped ART001 for ANI003 in prose and objects\", \"Dropped all adult figures from prose and metadata\", \"Added LOC002.2 and LOC003.2 to objects\", \"Specified 'right background' for fountain hole to satisfy Rule 10 left/right use only when spatially necessary\"]\n  },\n  \"characters\": [\n    {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"center foreground, kneeling in wet autumn leaves\", \"expression\": \"alarmed, mouth slightly open, brows pulled tight\"},\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"left of Julian, crouching beside him\", \"expression\": \"fearful, eyes wide, mouth closed tight\"}\n  ],\n  \"objects\": [\"LOC001\", \"LOC002.2\", \"LOC003.2\", \"ANI003\"],\n  \"interactions\": [\n    {\"character\": \"Julian\", \"object\": \"ANI003\", \"where\": \"holds Lindi tightly with both hands\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Levin\", \"object\": \"ANI003\", \"where\": \"hovers his hands above Lindi's back without touching\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": false,\n  \"emptyScenePrompt\": \"The Lindenhof plaza at dusk: cobblestone ground covered in wet autumn leaves, mature bare-branched trees casting long shadows, historic buildings framing the perimeter including the Grossmünster’s twin towers in the distant background. The Lindenhofbrunnen fountain stands right background — stone base with visible dark recessed hole in its wall. Medium shot, eye-level, cool low-angle light, deepening violet-grey sky.\",\n  \"translatedSummary\": \"Julian kniet in nassen Herbstblättern auf dem Lindenhof und hält die kalte, reglose Lindi fest, während Levin neben ihm kauert und hilflos über ihren Rücken zu halten scheint — beide Kinder sind vom plötzlichen Verstummen und Erkalten des Babydrachens erschrocken.\"\n}"
+  },
+  {
+   "job": "job_1789506283204_3kxqshifx",
+   "pageNumber": 16,
+   "source": "iterate-round-1",
+   "planLine": "PLAN: wide — Levin, Max, Kiaan, Julian and Nia — Levin holds Lindi pressed against his chest inside his open jacket; Max, Kiaan and Julian press their backs around him in a tight huddle with Nia planted in front — Lindi is back against warmth; the four boys and the dog form the living shelter",
+   "parentBrief": "Forming a tight living circle in the center of the wide, windswept Lindenhof plaza, the four boys huddle against the cold night. In the very center facing the camera, Levin — a preschooler with wavy light blonde hair, wearing a green fleece jacket, dark blue trousers, and brown boots — sits cross-legged, holding the dull greyish-red dragon egg pressed firmly against his chest inside his widely opened jacket, his arms wrapped tight around it. Max, seen from behind on the left, wears his orange pullover, dark brown corduroy dungarees, grey wool socks, and black rubber boots; he sits with his back to the viewer, head tucked toward the egg, brow tense and mouth shut. Kiaan, seen from behind on the right, wears his deep purple hooded sweatshirt, olive trousers, and white trainers; he presses his back into the huddle, head tucked down. Julian, seen from behind behind Levin, wears his yellow anorak, grey trousers, and dark blue boots; his back forms a solid block behind his brother, his head tilted toward the egg. Planted firmly in the left foreground, the large Bernese Mountain Dog Nia sits upright, completing the living shelter. Levin's red wool cap remains hidden inside the dark hole in the Lindenhofbrunnen wall. The wide shot emphasizes their intense shared effort against the dark, cold autumn night.\n\n---METADATA---\n{\"sceneIntent\": \"The four boys and Nia form one living shelter around the cold egg. Levin holds the egg against his chest; Max, Kiaan, and Julian pack their backs around him while Nia sits in front. Levin's red cap waits in the fountain wall's hole.\", \"characters\": [{\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"center midground\", \"depth\": \"midground\", \"looksAt\": \"ART001.2\", \"expression\": \"intensely focused, eyes tightly shut in effort, jaw clenched\"}, {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"left midground\", \"perspective\": \"back view\", \"depth\": \"midground\", \"looksAt\": \"ART001.2\", \"expression\": \"brow tense, mouth pressed shut, head tucked down\"}, {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"right midground\", \"perspective\": \"back view\", \"depth\": \"midground\", \"looksAt\": \"ART001.2\", \"expression\": \"brow tense, mouth pressed shut, head tucked down\"}, {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"center background\", \"perspective\": \"back view\", \"depth\": \"background\", \"looksAt\": \"ART001.2\", \"expression\": \"brow tense, mouth pressed shut, head tucked down\"}], \"shot\": \"wide\", \"crowdExpected\": false, \"landmarkView\": \"exterior\", \"era\": \"present day\", \"objects\": [\"LOC001\", \"ART001.2\", \"ANI001\"], \"interactions\": [{\"character\": \"Levin + Max + Kiaan + Julian\", \"object\": \"ART001.2\", \"where\": \"form a tight body-shelter around the egg, with Levin holding it and the others pressing their backs around him\", \"action\": \"huddling for warmth\", \"hands\": false, \"storyRelevant\": true, \"priority\": \"essential\"}], \"wornItems\": [{\"id\": \"ART004\", \"owner\": \"Levin\", \"state\": \"off\", \"location\": \"inside the dark hole in the Lindenhofbrunnen wall\"}], \"emptyScenePrompt\": \"A wide, dark outdoor plaza swept by cold night winds. Gravel and scattered leaves sit under a deep blue-black sky, open to the elements.\"}",
+   "rewriteBrief": "Levin — a preschooler with wavy light blonde hair, bright blue eyes, and a small frame, wearing a green fleece jacket, dark blue trousers, and brown boots — sits cross-legged in the center foreground of the wide Lindenhof plaza, facing the camera, his jacket fully open and arms wrapped tightly around Lindi, who rests upright against his chest with her warm orange-red scales visible, her golden eyes open and calm. Max — a school-age boy with light brown curly hair, wearing an orange pullover, dark brown corduroy dungarees, grey wool socks pulled up over black rubber boots — sits directly left of Levin, back view, shoulders and head angled inward toward Levin and Lindi, his hands resting on his thighs. Kiaan — a school-age boy with dark brown straight short hair and bangs, wearing a deep purple hooded sweatshirt, olive trousers, and white trainers — sits directly right of Levin, back view, shoulders and head angled inward toward Levin and Lindi, hands resting on his thighs. Julian — a school-age boy with light blonde curly ear-length hair, wearing a yellow anorak, grey fleece-lined pull-on trousers, and dark blue rubber Wellington boots — sits directly behind Levin, back view, his broad back forming a solid vertical block, head tilted slightly forward toward Lindi, hands resting on Levin’s shoulders. Nia — a large Bernese Mountain Dog with a tricolor coat (black body, bright white chest and muzzle, rust patches above eyes and on legs), thick fluffy fur, large friendly brown eyes, soft ears lying flat, thick tail, and a plain red leather collar — sits upright in the left foreground, facing right toward Levin and Lindi, front paws planted firmly on the cobblestones. The plaza is bare and windswept under a dark autumn night sky; distant historic buildings including Grossmünster towers are visible in the background. Wide shot, low angle, shallow depth of field emphasizing the tight huddle.\n\n---METADATA---\n{\n  \"sceneIntent\": \"Levin holds Lindi upright against his chest inside his open jacket while Max, Kiaan, and Julian press their backs around him in a tight huddle, and Nia sits upright in the left foreground — all forming a living shelter on the windswept Lindenhof plaza at night.\",\n  \"diagnosis\": [\"Evaluator: Nia missing. Cause: prose omitted Nia despite plan line requiring her as 'planted in front' and cast lock.\", \"Evaluator: Max facing right instead of back view. Cause: prose used 'kneeling' and 'facing right' violating perspective rule for 'seen from behind'.\", \"Evaluator: Julian leaning over instead of back view. Cause: prose described 'leaning over' contradicting 'back forms a solid block behind'.\", \"Evaluator: pink egg instead of dull greyish-red dragon. Cause: prose named 'dragon egg' but failed to specify Lindi's warm vibrant orange and red scales and misaligned with ART001.2 state — Lindi is alive and warm, not an egg.\", \"Evaluator: clothing mismatches. Cause: prose listed incorrect garments instead of pulling verbatim from 'standard' avatar clothing per character.\"],\n  \"previewMismatches\": [\"Intent: Levin holds Lindi (alive baby dragon) upright against chest inside open jacket. Preview: Levin clutched pink egg-shaped object while crying with eyes shut.\", \"Intent: Max, Kiaan, Julian all back view, forming protective circle. Preview: all three kneeling and facing inward with visible faces.\", \"Intent: Nia present in left foreground, upright, completing shelter. Preview: Nia absent.\", \"Intent: Lindi depicted as warm vibrant orange-red baby dragon with golden eyes. Preview: pink egg-shaped object with no facial features.\"],\n  \"issues\": [\"Nia omitted from prose and metadata\", \"Max, Kiaan, Julian incorrectly staged as facing inward instead of back view\", \"Lindi misrepresented as egg instead of living baby dragon\", \"Clothing details inconsistent with standard avatars\", \"Levin shown crying with closed eyes instead of holding Lindi calmly\"],\n  \"corrections\": [\"Added Nia explicitly in prose and objects[] with full Visual Bible description\", \"Rewrote Max/Kiaan/Julian as back view only, with positional relational language ('directly left', 'directly right', 'directly behind') and no inward-facing verbs\", \"Replaced 'dragon egg' with 'Lindi' and specified her appearance per ANI003: warm vibrant orange and red scales, golden eyes, open upright posture\", \"Aligned clothing precisely with standard avatar listings per character\", \"Specified Levin facing camera with arms wrapped, jacket open, Lindi upright against chest — no crying, no closed eyes\"],\n  \"draftValidation\": {\n    \"poseActionCheck\": \"All back-view characters have no visible faces; Levin faces camera with open eyes looking down at Lindi; Nia faces right with visible face but no conflicting action; each hand has one purpose (resting or holding); no geometric impossibility.\",\n    \"contradictionsFound\": [],\n    \"fixesApplied\": [\"Back view enforced for Max/Kiaan/Julian with no 'looking at' verbs\", \"Lindi inserted as active subject with correct species, size, color, posture\", \"Nia added with full tricolor description and position\", \"Clothing updated to match standard avatars exactly\", \"Levin's expression changed from crying to calm focused holding\"]\n  },\n  \"characters\": [\n    {\"name\": \"Levin\", \"clothing\": \"standard\", \"position\": \"center foreground\", \"expression\": \"calm, focused, eyes open and downcast toward Lindi\"},\n    {\"name\": \"Max\", \"clothing\": \"standard\", \"position\": \"directly left of Levin\", \"perspective\": \"back view\", \"expression\": \"brow tense, mouth shut\"},\n    {\"name\": \"Kiaan\", \"clothing\": \"standard\", \"position\": \"directly right of Levin\", \"perspective\": \"back view\", \"expression\": \"head tucked down, mouth shut\"},\n    {\"name\": \"Julian\", \"clothing\": \"standard\", \"position\": \"directly behind Levin\", \"perspective\": \"back view\", \"expression\": \"head tilted forward, mouth shut\"}\n  ],\n  \"objects\": [\"LOC001\", \"LOC003.2\", \"ANI001\", \"ANI003\"],\n  \"interactions\": [\n    {\"character\": \"Levin\", \"object\": \"ANI003\", \"where\": \"holds Lindi upright against his chest inside his open jacket\", \"storyRelevant\": true, \"priority\": \"essential\"},\n    {\"character\": \"Julian\", \"object\": \"Levin\", \"where\": \"rests hands on Levin's shoulders\", \"storyRelevant\": true, \"priority\": \"essential\"}\n  ],\n  \"reuseEmptyScene\": true,\n  \"emptyScenePrompt\": \"Wide shot of the Lindenhof plaza at night: bare cobblestone expanse under a dark autumn sky, mature trees with sparse branches framing the perimeter, historic buildings including the twin towers of Grossmünster visible in the distant background. Low angle, shallow depth of field. Wind-swept atmosphere with faint motion blur on loose leaves near ground level.\",\n  \"translatedSummary\": \"Levin hält Lindi aufrecht an seiner Brust unter seiner geöffneten Jacke, während Max, Kiaan und Julian mit dem Rücken zu ihm im engen Kreis sitzen und Nia vorne im linken Vordergrund aufrecht sitzt — alle bilden einen lebendigen Schutz auf dem windigen Lindenhofplatz bei Nacht.\"\n}"
+  }
+ ]
+}

@@ -2,13 +2,42 @@ import { describe, it, expect } from 'vitest';
 
 // @ts-ignore — CommonJS lib
 import planCounters from '../../server/lib/planCounters.js';
-const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames } = planCounters as any;
+const { runPlanCounters, classifyShot, planSegments, resolveCast, collectPlaceNames, stripQuoted, namesIn, canonicalName, nameCandidates } = planCounters as any;
 
 /** A well-formed plan line: shot — who — instant — change. */
 const line = (shot: string, who: string, instant = 'something happens', change = 'something is now true') =>
   `${shot} — ${who} — ${instant} — ${change}`;
 
 const page = (n: number, planLine: string, beat = 'a beat') => ({ pageNumber: n, planLine, beat });
+
+/**
+ * The plan check's per-page roster, which the counters now require — the model
+ * answers "who is on this page, people vs things" and the counters do
+ * arithmetic on that answer (the grammar heuristic that used to guess it in
+ * code was deleted 2026-09-11).
+ *
+ * In tests the roster is DECLARED, not derived: `things` names the entries a
+ * model would classify as props or places, everything else in the who column is
+ * a person. That keeps each test stating its own intent instead of depending on
+ * a second parser.
+ */
+const rosterFor = (pages: any[], things: string[] = []) => {
+  const isThing = (n: string) => things.some(t => t.toLowerCase() === n.toLowerCase());
+  const map = new Map<number, { people: string[]; things: string[] }>();
+  for (const p of pages) {
+    // `nameCandidates` finds the capitalised runs; in production the model
+    // reports them and says which are people. Here the test declares that.
+    // The WHOLE line, not just the who column: quote-stripping pairs
+    // apostrophes across the line, and a lone possessive in one segment
+    // otherwise truncates the name ("Malva Grimm's" → "Grimm").
+    const names: string[] = nameCandidates(String(p.planLine || ''));
+    map.set(Number(p.pageNumber), {
+      people: names.filter((n: string) => !isThing(n)),
+      things: names.filter(isThing),
+    });
+  }
+  return map;
+};
 
 const CAST = ['Ana', 'Ben', 'Cara'];
 
@@ -32,7 +61,7 @@ describe('resolveCast', () => {
     const pages = [
       { pageNumber: 1, planLine: line('wide', 'Ana and Rook'), beat: 'Die Karte liegt auf dem Kartentisch.' },
     ];
-    const cast = resolveCast(pages, CAST);
+    const cast = resolveCast(pages, CAST, [], rosterFor(pages));
     // German nouns in the beat are capitalised; none may become characters.
     expect(cast.invented).not.toContain('Karte');
     expect(cast.invented).not.toContain('Kartentisch');
@@ -40,7 +69,7 @@ describe('resolveCast', () => {
 
   it('treats a titled commissioned name as that character, not a second one', () => {
     const pages = [{ pageNumber: 1, planLine: line('wide', 'Captain Ana stands at the rail'), beat: '' }];
-    expect(resolveCast(pages, CAST).invented).toHaveLength(0);
+    expect(resolveCast(pages, CAST, [], rosterFor(pages)).invented).toHaveLength(0);
   });
 });
 
@@ -75,7 +104,7 @@ describe('place names are never cast (story job_1788614817116_vxnu60yjg)', () =>
   });
 
   it('keeps places out of the invented cast, and keeps a real invented character in', () => {
-    const cast = resolveCast(PAGES, BOYS, PLACES);
+    const cast = resolveCast(PAGES, BOYS, PLACES, rosterFor(PAGES));
     expect(cast.invented).not.toContain('Uetliberg');
     expect(cast.invented).not.toContain('Aussichtsturm Uetliberg');
     expect(cast.invented).not.toContain('Oppidum Uetliberg');
@@ -84,19 +113,22 @@ describe('place names are never cast (story job_1788614817116_vxnu60yjg)', () =>
     expect(cast.places).toContain('Uetliberg');
   });
 
-  it('without the place names the same lines manufacture invented-dominant findings', () => {
-    const blind = runPlanCounters({ pages: PAGES, commissionedNames: BOYS });
+  it('the place list is the second guard when the roster reports a place as a person', () => {
+    // The roster here names every capitalised run as a person — the case where
+    // the model got it wrong. The story's own place data still outranks it, and
+    // that is the only remaining defence now the grammar test is gone.
+    const blind = runPlanCounters({ roster: rosterFor(PAGES), pages: PAGES, commissionedNames: BOYS });
     expect(blind.cast.invented).toContain('Uetliberg');
-    expect(blind.findings.map((f: any) => f.code)).toContain('INVENTED_DOMINANT_EXCESS');
+    expect(blind.stats.castPerPage[0].names).toContain('Uetliberg');
 
-    const fixed = runPlanCounters({ pages: PAGES, commissionedNames: BOYS, placeNames: PLACES });
+    const fixed = runPlanCounters({ roster: rosterFor(PAGES), pages: PAGES, commissionedNames: BOYS, placeNames: PLACES });
     expect(fixed.findings.map((f: any) => f.code)).not.toContain('INVENTED_DOMINANT_EXCESS');
     expect(fixed.stats.castPerPage[0].names).toEqual(['Levin']);
   });
 
   it('a commissioned character sharing a token with a landmark stays commissioned', () => {
     const pages = [{ pageNumber: 1, planLine: 'wide — Uetli walks the path — she climbs — she is up', beat: '' }];
-    const cast = resolveCast(pages, ['Uetli'], collectPlaceNames({ availableLandmarks: [{ name: 'Uetli Tower' }] }));
+    const cast = resolveCast(pages, ['Uetli'], collectPlaceNames({ availableLandmarks: [{ name: 'Uetli Tower' }] }), rosterFor(pages));
     expect(cast.commissioned).toContain('Uetli');
     expect(cast.invented).toHaveLength(0);
   });
@@ -104,22 +136,26 @@ describe('place names are never cast (story job_1788614817116_vxnu60yjg)', () =>
 
 describe('runPlanCounters', () => {
   it('flags a plan line missing its instant and change', () => {
-    const r = runPlanCounters({ pages: [page(1, 'wide — Ana')], commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor([page(1, 'wide — Ana')]), pages: [page(1, 'wide — Ana')], commissionedNames: CAST });
     expect(r.findings.map((f: any) => f.code)).toContain('PLAN_LINE_INCOMPLETE');
   });
 
   it('flags a book using only two shot types', () => {
     const pages = [1, 2, 3, 4].map(n => page(n, line(n % 2 ? 'wide' : 'medium', 'Ana')));
-    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     expect(r.findings.map((f: any) => f.code)).toContain('SHOT_VARIETY');
   });
 
-  it('flags a page with more than three named characters', () => {
+  // ONE cast counter, and its threshold is the CONFIGURED ceiling — the
+  // hardcoded 3 was removed 2026-09-13 when the cap went to 6 (678129944).
+  it('flags a page past the configured ceiling, and not one at the ceiling', () => {
     const pages = [page(1, line('wide', 'Ana, Ben, Cara and Rook arrive'))];
-    const r = runPlanCounters({ pages, commissionedNames: [...CAST, 'Rook'] });
-    const codes = r.findings.map((f: any) => f.code);
-    expect(codes).toContain('CAST_OVER_3');
-    expect(codes).toContain('CAST_OVER_CEILING');
+    const over = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: [...CAST, 'Rook'], maxCharactersPerScene: 3 });
+    expect(over.findings.map((f: any) => f.code)).toContain('CAST_OVER_CEILING');
+    const under = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: [...CAST, 'Rook'], maxCharactersPerScene: 6 });
+    expect(under.findings.map((f: any) => f.code)).not.toContain('CAST_OVER_CEILING');
+    // The retired code must not come back under a literal threshold.
+    expect(under.findings.map((f: any) => f.code)).not.toContain('CAST_OVER_3');
   });
 
   it('flags consecutive pages carried by invented characters, and pages with no commissioned cast', () => {
@@ -128,7 +164,7 @@ describe('runPlanCounters', () => {
       page(2, line('medium', 'Rook walks alone')),
       page(3, line('close-up', 'Rook turns away')),
     ];
-    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     const codes = r.findings.map((f: any) => f.code);
     expect(r.cast.invented).toContain('Rook');
     expect(codes).toContain('INVENTED_DOMINANT_CONSECUTIVE');
@@ -145,7 +181,7 @@ describe('runPlanCounters', () => {
       page(2, line('wide', 'Ana, Ben and Cara walk')),
       page(3, line('medium', 'Ana and Cara talk')),
     ];
-    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     const noFocal = r.findings.filter((f: any) => f.code === 'NO_FOCAL_PAGE').map((f: any) => f.detail);
     expect(noFocal.join(' ')).toContain('Ben');
     // Cara's two-person page 3 is focal for BOTH people on it.
@@ -162,7 +198,7 @@ describe('runPlanCounters', () => {
       page(3, line('medium', 'Ana and Ben talk')),
       page(4, line('ultra-wide', 'Cara stands alone')),
     ];
-    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     const under = r.findings.filter((f: any) => f.code === 'UNDER_COVERED_CHARACTER');
     expect(under.map((f: any) => f.detail).join(' ')).toContain('Cara');
     expect(under.map((f: any) => f.detail).join(' ')).not.toContain('Ben');
@@ -176,7 +212,7 @@ describe('runPlanCounters', () => {
       page(3, line('wide', 'Ana')),            // same shot, different count -> clean
       page(4, line('close-up', 'Ben')),        // different shot, same count -> clean
     ];
-    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     const same = r.findings.filter((f: any) => f.code === 'CONSECUTIVE_SAME_SHOT_CAST');
     expect(same).toHaveLength(1);
     expect(same[0].pages).toEqual([1, 2]);
@@ -184,11 +220,13 @@ describe('runPlanCounters', () => {
 
   it('never compares a pair whose plan line is incomplete or whose shot did not classify', () => {
     const incomplete = runPlanCounters({
+      roster: rosterFor([page(1, 'wide — Ana'), page(2, 'wide — Ben')]),
       pages: [page(1, 'wide — Ana'), page(2, 'wide — Ben')],
       commissionedNames: CAST,
     });
     expect(incomplete.findings.map((f: any) => f.code)).not.toContain('CONSECUTIVE_SAME_SHOT_CAST');
     const unclassified = runPlanCounters({
+      roster: rosterFor([page(1, line('worm-eye', 'Ana')), page(2, line('worm-eye', 'Ben'))]),
       pages: [page(1, line('worm-eye', 'Ana')), page(2, line('worm-eye', 'Ben'))],
       commissionedNames: CAST,
     });
@@ -202,25 +240,25 @@ describe('runPlanCounters', () => {
       page(3, line('wide', 'Ben')),
       page(4, line('wide', 'Cara')),
     ];
-    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     expect(r.findings.map((f: any) => f.code)).toContain('MAIN_UNDER_HALF');
   });
 
   it('flags a book with no peopleless page and no solo page', () => {
     const pages = [1, 2].map(n => page(n, line('wide', 'Ana and Ben')));
-    const codes = runPlanCounters({ pages, commissionedNames: CAST }).findings.map((f: any) => f.code);
+    const codes = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST }).findings.map((f: any) => f.code);
     expect(codes).toContain('NO_SOLO_PAGE');
     expect(codes).toContain('NO_PEOPLELESS_PAGE');
   });
 
   it('counts a page naming no people as peopleless', () => {
     const pages = [page(1, line('wide', 'the empty harbour at dawn'))];
-    const r = runPlanCounters({ pages, commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: CAST });
     expect(r.stats.peoplelessPages).toEqual([1]);
   });
 
   it('renders every finding as one PLAN[CODE] line', () => {
-    const r = runPlanCounters({ pages: [page(1, 'wide — Ana')], commissionedNames: CAST });
+    const r = runPlanCounters({ roster: rosterFor([page(1, 'wide — Ana')]), pages: [page(1, 'wide — Ana')], commissionedNames: CAST });
     expect(r.lines.length).toBe(r.findings.length);
     for (const l of r.lines) expect(l).toMatch(/^PLAN\[[A-Z_0-9]+\]/);
   });
@@ -274,7 +312,7 @@ describe('calendar nouns are excluded from the cast (I10)', () => {
 
   it('reproduces the bug without the fix, and clears it with the fix', () => {
     // BEFORE — the place list as commit 27c5900c5 built it.
-    const before = resolveCast(BADEN, COMMISSIONED, ['Baden', 'Switzerland', 'Stadtturm']);
+    const before = resolveCast(BADEN, COMMISSIONED, ['Baden', 'Switzerland', 'Stadtturm'], rosterFor(BADEN));
     expect(before.invented).toContain('Monday');
 
     // AFTER — collectPlaceNames now carries the story language's calendar nouns.
@@ -282,7 +320,7 @@ describe('calendar nouns are excluded from the cast (I10)', () => {
       { userLocation: { city: 'Baden', country: 'Switzerland' }, language: 'en-gb' },
       ['Stadtturm'],
     );
-    const after = resolveCast(BADEN, COMMISSIONED, places);
+    const after = resolveCast(BADEN, COMMISSIONED, places, rosterFor(BADEN));
     expect(after.invented).not.toContain('Monday');
     expect(after.invented).toEqual([]);
     expect(after.places).toContain('Monday');
@@ -294,7 +332,7 @@ describe('calendar nouns are excluded from the cast (I10)', () => {
       { pageNumber: 4, planLine: 'medium — Fünkli beside Lily at the wall — Fünkli tugs her sleeve before Monday comes — the pair have a plan', beat: '' },
     ];
     const places = collectPlaceNames({ userLocation: { city: 'Baden' }, language: 'en-gb' }, ['Stadtturm']);
-    const cast = resolveCast(pages, COMMISSIONED, places);
+    const cast = resolveCast(pages, COMMISSIONED, places, rosterFor(pages));
     expect(cast.invented).toEqual(['Fünkli']);
   });
 
@@ -303,13 +341,330 @@ describe('calendar nouns are excluded from the cast (I10)', () => {
     const pages = [{ pageNumber: 1, planLine: 'wide — April runs across the square — April jumps — she is across', beat: '' }];
     const places = collectPlaceNames({ language: 'en-gb' }, []);
     expect(places).toContain('April');
-    expect(resolveCast(pages, ['April'], places).commissioned).toContain('April');
-    expect(resolveCast(pages, ['April'], places).invented).toEqual([]);
+    expect(resolveCast(pages, ['April'], places, rosterFor(pages)).commissioned).toContain('April');
+    expect(resolveCast(pages, ['April'], places, rosterFor(pages)).invented).toEqual([]);
   });
 
   it('the numeric short-month forms some locales emit are dropped', () => {
     for (const loc of ['en-gb', 'de-ch', 'fr', 'ja']) {
       for (const n of calendarNamesForLocale(loc)) expect(n).toMatch(/[a-zA-ZÀ-ɏ]/);
     }
+  });
+});
+
+describe('article/preposition-marked names are things, never cast (job_1788983823620_csjcyp1q9)', () => {
+  // The measured plan: a ship and a town, both written the way English writes a
+  // THING — "the <ship>", "the harbour mouth of <town>", "through <town>" — and
+  // both promoted to invented figures by the acts-like-a-person test alone.
+  const CREW = ['Fiona', 'Sarah'];
+  const SHIP_TOWN = [
+    page(1, 'ultra-wide — the crew seen from behind on the deck of the Sturmfeder — the harbour mouth of Krummhafen with its rusty chain stretches across the water — Krummhafen and its chain block the way forward'),
+    page(2, 'medium — Fiona and Malva Grimm facing each other across the rail — Fiona holds the map while Malva Grimm looks up at it — Fiona has refused; the Krummhafen chain still blocks the harbour'),
+    page(3, 'close-up — Fiona at the harbour — Malva rows the boat away — the crew has earned passage through Krummhafen'),
+    page(4, 'medium — Sarah at the rail — a small boat pulls away from the Sturmfeder behind her — the map has been taken'),
+    page(5, 'ultra-wide — the Sturmfeder seen from the water, tiny in dense grey fog — two dolphins arc alongside the bow — the rocks are found'),
+  ];
+
+  it('the ship ("the Sturmfeder") is not cast', () => {
+    const cast = resolveCast(SHIP_TOWN, CREW, [], rosterFor(SHIP_TOWN, ['Sturmfeder', 'Krummhafen']));
+    expect(cast.invented).not.toContain('Sturmfeder');
+    expect(cast.places).toContain('Sturmfeder');
+  });
+
+  it('the town ("the harbour of Krummhafen", "the Krummhafen chain", "through Krummhafen") is not cast', () => {
+    const cast = resolveCast(SHIP_TOWN, CREW, [], rosterFor(SHIP_TOWN, ['Sturmfeder', 'Krummhafen']));
+    expect(cast.invented).not.toContain('Krummhafen');
+    expect(cast.places).toContain('Krummhafen');
+  });
+
+  it('a real invented person who acts without an article is still cast', () => {
+    const cast = resolveCast(SHIP_TOWN, CREW, [], rosterFor(SHIP_TOWN, ['Sturmfeder', 'Krummhafen']));
+    expect(cast.invented).toEqual(['Malva Grimm']);
+  });
+
+  it('a commissioned name is never put through the article test', () => {
+    // "to Fiona" is preposition-marked; commissioned names resolve first.
+    const pages = [page(1, 'medium — Fiona and Sarah — Sarah hands the map to Fiona — Fiona has it')];
+    const cast = resolveCast(pages, CREW, [], rosterFor(pages));
+    expect(cast.commissioned).toEqual(CREW);
+    expect(cast.places).toEqual([]);
+  });
+
+  it('a name written both as "the X" and as an actor keeps its cast slot — the article is decisive only when unopposed', () => {
+    const pages = [
+      page(1, 'medium — Fiona and Rook — Rook the gull lands on the rail — Fiona laughs'),
+      page(2, 'wide — Fiona and the Rook — Rook pulls the ribbon — Fiona has lost it'),
+    ];
+    expect(resolveCast(pages, CREW, [], rosterFor(pages)).invented).toEqual(['Rook']);
+  });
+
+  it('a vessel the roster calls a thing is excluded, even when it heads a coordinated subject', () => {
+    const pages = [
+      page(1, 'wide — Fiona on the quay — the Eisenmöwe rides at anchor — Eisenmöwe and its crew wait'),
+      page(2, 'medium — Fiona at the rail of the Eisenmöwe — Fiona ties a knot — the knot holds'),
+    ];
+    const cast = resolveCast(pages, CREW, [], rosterFor(pages, ['Eisenmöwe']));
+    expect(cast.invented).toEqual([]);
+    expect(cast.places).toEqual(['Eisenmöwe']);
+  });
+
+  it('ARC_INVENTED_UNDECLARED no longer lists the ship or the town', () => {
+    const { findings, cast } = runPlanCounters({
+      roster: rosterFor(SHIP_TOWN, ['Sturmfeder', 'Krummhafen']),
+      pages: SHIP_TOWN, commissionedNames: CREW, declaredInvented: ['Malva Grimm'], inventedAllowance: 2,
+    });
+    expect(findings.find(f => f.code === 'ARC_INVENTED_UNDECLARED')).toBeUndefined();
+    // The bare "Malva" on page 3 folds into the full name — one person.
+    expect(cast.invented).toEqual(['Malva Grimm']);
+  });
+
+  it('ARC_INVENTED_UNDECLARED still fires for an undeclared person', () => {
+    const { findings } = runPlanCounters({
+      roster: rosterFor(SHIP_TOWN, ['Sturmfeder', 'Krummhafen']),
+      pages: SHIP_TOWN, commissionedNames: CREW, declaredInvented: [], inventedAllowance: 2,
+    });
+    const f = findings.find(x => x.code === 'ARC_INVENTED_UNDECLARED');
+    expect(f).toBeDefined();
+    expect(f.detail).toContain('Malva Grimm');
+    expect(f.detail).not.toContain('Sturmfeder');
+    expect(f.detail).not.toContain('Krummhafen');
+  });
+
+  it('the counters refuse to run when the roster is missing or short a page', () => {
+    // The grammar that used to guess the cast from the prose is gone; a missing
+    // answer is reported as missing, never filled in with a guess.
+    expect(runPlanCounters({ pages: SHIP_TOWN, commissionedNames: CREW }).skipped).toBe('no-roster');
+    const short = rosterFor(SHIP_TOWN, ['Sturmfeder', 'Krummhafen']);
+    short.delete(3);
+    const r = runPlanCounters({ roster: short, pages: SHIP_TOWN, commissionedNames: CREW });
+    expect(r.skipped).toBe('no-roster');
+    expect(r.findings).toEqual([]);
+    expect(r.cast).toBeNull();
+  });
+});
+
+describe('stripQuoted: a possessive apostrophe is not an opening quote (job_1788983823620_csjcyp1q9)', () => {
+  // The old `'[^']*'` clause read "ship's … Fiona's" as one quotation and
+  // deleted everything between two possessives — 969 of 3818 plan chars (26%)
+  // on the measured plan, whole pages gone from the corpus every cast test scans.
+  it('two possessives lose nothing', () => {
+    const t = "the ship's bow and Fiona's chart";
+    expect(stripQuoted(t)).toBe(t);
+  });
+
+  it('a single possessive is untouched', () => {
+    expect(stripQuoted("Sarah's")).toBe("Sarah's");
+  });
+
+  it("a real single-quoted span loses only the span", () => {
+    expect(stripQuoted("she says 'Halt!' and runs")).toBe('she says  and runs');
+  });
+
+  it('a line-initial quote is stripped', () => {
+    expect(stripQuoted("'Go,' says Lorena")).toBe('  says Lorena');
+  });
+
+  it('guillemet and double-quote stripping are unchanged', () => {
+    expect(stripQuoted('the «Sturmfeder» sails')).toBe('the   sails');
+    expect(stripQuoted('the "Sturmfeder" sails')).toBe('the   sails');
+  });
+
+  it('resolveCast still sees a name that sits between two possessives', () => {
+    // The exact failure mode: the name on line 2 sat inside the span the old
+    // clause deleted (opened at "ship's" on line 1, closed at "Fiona's" on line 2).
+    const pages = [
+      page(1, "medium — Fiona at the ship's rail — she leans out — the chart is safe"),
+      page(2, "close-up — Malva Grimm in her rowing boat — Malva Grimm rows toward Fiona's chart — the chart is taken"),
+    ];
+    const cast = resolveCast(pages, ['Fiona'], [], rosterFor(pages));
+    expect(cast.invented).toContain('Malva Grimm');
+    expect(namesIn(planSegments(pages[1].planLine)[1], cast.all)).toEqual(['Malva Grimm']);
+  });
+});
+
+describe('a bare first name folds into its full name (job_1788983823620_csjcyp1q9)', () => {
+  // The measured page 4 of that plan: "Malva Grimm" in the who-column, "Malva"
+  // in the instant. One person, previously counted twice.
+  const MALVA = [
+    page(1, 'medium — Fiona alone at the kitchen table — she presses a torn chart flat — the chest is established'),
+    page(2, 'close-up — Fiona and Malva Grimm facing each other across the rail — Fiona holds the map while Malva in her rowing boat looks up at it — Fiona has refused'),
+  ];
+
+  it('one invented person, and the page that writes both forms counts 2 not 3', () => {
+    const res = runPlanCounters({ roster: rosterFor(MALVA), pages: MALVA, commissionedNames: ['Fiona'] });
+    expect(res.cast.invented).toEqual(['Malva Grimm']);
+    expect(res.stats.castPerPage[1].names).toEqual(['Fiona', 'Malva Grimm']);
+    expect(res.stats.castPerPage[1].names).toHaveLength(2);
+  });
+
+  it('a commissioned two-word name mentioned by first name alone is commissioned, not invented', () => {
+    const pages = [
+      page(1, 'wide — Anna Meier on the quay — she waves — the boat has left'),
+      page(2, 'close-up — Anna at the window — Anna presses her nose to the glass — the boat is out of sight'),
+    ];
+    const res = runPlanCounters({ roster: rosterFor(pages), pages, commissionedNames: ['Anna Meier'] });
+    expect(res.cast.invented).toEqual([]);
+    expect(res.stats.castPerPage[1].names).toEqual(['Anna Meier']);
+    expect(res.findings.map((f: any) => f.code)).not.toContain('NO_COMMISSIONED_ON_PAGE');
+  });
+
+  it('two full names sharing a first token: the bare token is NOT folded, both full names stay intact', () => {
+    const pages = [
+      page(1, 'wide — Anna Meier and Anna Roth on the quay — Anna Meier waves while Anna Roth turns away — the boat has left'),
+      page(2, 'close-up — Anna at the window — Anna presses her nose to the glass — the boat is out of sight'),
+    ];
+    const cast = resolveCast(pages, [], [], rosterFor(pages));
+    expect(cast.invented).toEqual(['Anna Meier', 'Anna Roth', 'Anna']);
+    expect(canonicalName('Anna', ['Anna Meier', 'Anna Roth'])).toEqual({ name: 'Anna', ambiguous: true });
+    // Neither full name may claim the bare token on page 2.
+    expect(namesIn(planSegments(pages[1].planLine)[1], cast.all, cast.aliases)).toEqual(['Anna']);
+  });
+
+  it('a single-token name with no full-name owner is unchanged', () => {
+    expect(canonicalName('Nolo', ['Malva Grimm', 'Anna Meier'])).toEqual({ name: 'Nolo', ambiguous: false });
+    const pages = [page(1, 'wide — Fiona and Nolo on the quay — Nolo waves — the boat has left')];
+    expect(resolveCast(pages, ['Fiona'], [], rosterFor(pages)).invented).toEqual(['Nolo']);
+  });
+
+  it('matches the token case-insensitively and keeps the full name\'s spelling', () => {
+    expect(canonicalName('MALVA', ['Malva Grimm'])).toEqual({ name: 'Malva Grimm', ambiguous: false });
+    expect(canonicalName('Malva Grimm', ['Malva Grimm'])).toEqual({ name: 'Malva Grimm', ambiguous: false });
+  });
+
+  it('ARC_INVENTED_UNDECLARED does not fire when the arc declared the full name and the plan writes the first name alone', () => {
+    const res = runPlanCounters({ roster: rosterFor(MALVA), pages: MALVA, commissionedNames: ['Fiona'], declaredInvented: ['Malva Grimm'] });
+    expect(res.findings.map((f: any) => f.code)).not.toContain('ARC_INVENTED_UNDECLARED');
+  });
+
+  it('the bare form acting on its own is enough to make the full name a person', () => {
+    // The who-column names her in full and punctuates; only "Malva" ever acts.
+    const pages = [page(1, 'medium — Fiona and Malva Grimm — Malva rows the boat toward Fiona — the chart is taken')];
+    expect(resolveCast(pages, ['Fiona'], [], rosterFor(pages)).invented).toEqual(['Malva Grimm']);
+  });
+});
+
+describe('the roster decides, not the shape of the sentence (replaces the acts-like-a-person test, 2026-09-11)', () => {
+  // The same vessel name in the same position used to flip on whether the next
+  // token was a lowercase verb, and whether that token was even on this page's
+  // line. Nothing about the sentence decides any more — only what the plan
+  // check reported.
+  const CREW = ['Fiona'];
+  const NAMED_AT_LINE_END = page(1, 'wide — Fiona at the rail — she paints the name on the bow — the crew names the ship Sturmfeder');
+
+  it('a vessel the roster calls a thing is never cast, wherever it sits in the line', () => {
+    const pages = [
+      NAMED_AT_LINE_END,
+      page(2, 'medium — Fiona alone — she folds the map — the map is stowed'),
+    ];
+    const cast = resolveCast(pages, CREW, [], rosterFor(pages, ['Sturmfeder']));
+    expect(cast.invented).toEqual([]);
+    expect(cast.all).toEqual(['Fiona']);
+    expect(cast.places).toEqual(['Sturmfeder']);
+  });
+
+  it('the same name is cast when the roster calls it a person', () => {
+    const pages = [
+      NAMED_AT_LINE_END,
+      page(2, 'medium — Fiona and Sturmfeder — Sturmfeder rows the boat toward her — the map is stowed'),
+    ];
+    expect(resolveCast(pages, CREW, [], rosterFor(pages)).invented).toEqual(['Sturmfeder']);
+  });
+
+  it('a real person resolves whatever the punctuation around them looks like', () => {
+    const pages = [
+      page(1, 'medium — Fiona and Nolo — Nolo pulls the rope while Fiona watches — the sail is up'),
+      page(2, 'close-up — Fiona alone — she breathes out — the crew is safe'),
+    ];
+    expect(resolveCast(pages, CREW, [], rosterFor(pages)).invented).toEqual(['Nolo']);
+  });
+
+  it('nameCandidates still never glues a name ending one line to the word opening the next', () => {
+    // Not a cast rule — the candidate scanner is still used to read names out of
+    // a line, and this line-break fix (2026-09-10) stands.
+    const pages = [
+      NAMED_AT_LINE_END,
+      page(2, 'Close-up — Fiona alone — she folds the map — the map is stowed'),
+    ];
+    expect(nameCandidates(pages.map((p: any) => p.planLine).join('\n'))).toEqual(['Fiona', 'Sturmfeder']);
+  });
+
+  it('the real plan of job_1788983823620_csjcyp1q9 resolves the same cast, places and findings as before', () => {
+    // The 16 plan lines as stored in stories.data.outline (---PAGE PLAN---, "Page N:" prefix stripped).
+    const REAL = [
+      'medium — Fiona alone at the kitchen table — she presses a torn old chart flat with both hands, her eyes on the paper, charcoal smudges on her fingers — the Grossmünster towers are visible through the rain-streaked window behind her; the chest and the need to reach it before the storms are established',
+      "wide — all five children in the kitchen — Facundo drops his sword, belt and boots in a heap on the floor while Saira balances two pirate hats on her head and Lorena is already pulling on her boots — the crew is assembled and costumed; Facundo's untidiness and Saira's indecision are shown",
+      'ultra-wide — all five children seen from behind on the deck of the Sturmfeder — the grey sea rolls ahead of them and the harbour mouth of Krummhafen with its rusty chain stretches across the water before them — the adventure world is entered; Krummhafen and its chain block the way forward',
+      "medium — Fiona and Malva Grimm facing each other across the ship's rail — Fiona holds the map flat against her coat while Malva in her rowing boat looks up at it — Fiona has refused to hand the map down; the chain still blocks the harbour",
+      'wide — Fiona and Sarah on the quay — the dead crane looms over a stack of salt barrels beside them — the problem that will earn the crew passage is established; the harbour chain is still up',
+      'medium — Fiona alone, crouching over the broken crane hook and ring — she stares at the two pieces, hands not yet moving — her perfectionism holds her back; the crane is still broken',
+      "medium — Saira and Sarah together — Saira laughs and holds up a coil of rope in one hand and a length of wood in the other — Saira's indecision is broken by Sarah's joke; the repair is about to begin",
+      "close-up — Fiona's hands driving a wooden wedge in beside the hook where it sits in the ring — the wedge is halfway in, mallet mid-swing — the crane is fixed; the crew has earned passage through Krummhafen",
+      "close-up — Facundo on the quay, the map lying on the empty ship's deck behind him just visible, fiddle players around him — he has stepped away from the ship toward the music — the map is left unguarded; this is the moment the theft becomes possible",
+      "medium — Sarah at the ship's rail, turned toward the dark water — a small boat pulls away from the Sturmfeder behind her — Sarah sees the boat but does not raise the alarm; the map has been taken",
+      'close-up — Facundo alone, facing forward, fists at his sides — he says out loud that it is his fault; Fiona stands small in the background, head bowed — the loss is named and felt; the question of turning back is open',
+      'medium — Lorena at the mast, one hand gripping it, feet planted — she stares ahead, jaw set, after a moment of visible wavering — Lorena refuses to let the ship turn back; the crew will sail on without the map',
+      'medium — Fiona and Sarah side by side at the sailcloth pinned to the mast — Fiona presses the charcoal drawing against the cloth, smudged and crooked, while Sarah points at a line on it — the charcoal chart is made and pinned up; the crew has a course to follow',
+      'ultra-wide — the Sturmfeder seen from the water, tiny in dense grey fog — two dolphins arc alongside the bow and ahead of them three dark rocks rise out of the mist exactly where the sailcloth showed them — the rocks are found; the charcoal chart has proven true',
+      'wide — Fiona, Facundo and Lorena in shoulder-deep water at the cove — Facundo pushes the spare sail under the chest while Lorena holds the line and the two barrels are lashed on — the chest breaks the surface; it is recovered',
+      'close-up — Fiona at the kitchen table in Zurich, the crooked charcoal sailcloth pinned to the wall above her and the small brass compass turning slowly on the wood beside it — the rain is on the glass behind her — the adventure is over; the ugly chart, not the beautiful map, hangs on the wall',
+    ].map((planLine, i) => page(i + 1, planLine));
+    const COMMISSIONED = ['Sarah', 'Saira', 'Facundo', 'Fiona', 'Lorena'];
+    const places = collectPlaceNames({ language: 'de-ch', userLocation: { city: 'Zurich', country: 'Switzerland' } });
+    const cast = resolveCast(REAL, COMMISSIONED, places, rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']));
+    expect(cast.invented).toEqual(['Malva Grimm']);
+    expect(cast.places).toEqual(['Grossmünster', 'Sturmfeder', 'Krummhafen']);
+    const res = runPlanCounters({ roster: rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']), pages: REAL, commissionedNames: COMMISSIONED, placeNames: places, declaredInvented: ['Malva Grimm'] });
+    expect(res.findings.map((f: any) => f.code)).toEqual([
+      'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'CONSECUTIVE_SAME_SHOT_CAST',
+    ]);
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// PEOPLELESS_ON_INTERACTION_PAGE (owner decision, 2026-09-15).
+//
+// A people-free page is a FEATURE and stays required. What was missing was any
+// constraint on WHICH page. Measured on job_1789420511893_zly5rcdej: the
+// planner spent the mandatory people-free page on the emotional climax — three
+// children shouting after a departing ship — and the page shipped with no
+// faces. The signal is what the PLAN LINE itself declares, because the plan
+// line is the only per-page text that exists at plan-check time.
+describe('PEOPLELESS_ON_INTERACTION_PAGE', () => {
+  const codesFor = (pages: any[], things: string[] = []) =>
+    runPlanCounters({ roster: rosterFor(pages, things), pages, commissionedNames: CAST })
+      .findings.map((f: any) => f.code);
+
+  it('leaves an environmental people-free page alone', () => {
+    const pages = [
+      page(1, line('ultra-wide', 'the ship alone', 'the ship tossed far out in the storm', 'the storm has the ship')),
+      page(2, line('wide', 'Ana and Ben')),
+    ];
+    expect(codesFor(pages, ['ship'])).not.toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(codesFor(pages, ['ship'])).not.toContain('NO_PEOPLELESS_PAGE');
+  });
+
+  it('flags a people-free page whose plan line stages a moment between people, naming the page', () => {
+    // The real page-12 plan line from job_1789420511893_zly5rcdej.
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(12, 'wide — the ship sliding away from the stone edge, the slack stern line trailing toward the bollard, no one at the gangway place'),
+    ];
+    const r = runPlanCounters({ roster: rosterFor(pages, ['ship']), pages, commissionedNames: CAST });
+    const finding = r.findings.find((f: any) => f.code === 'PEOPLELESS_ON_INTERACTION_PAGE');
+    expect(finding).toBeTruthy();
+    expect(finding.pages).toEqual([12]);
+  });
+
+  it('flags a people-free page that names the interaction outright', () => {
+    const pages = [
+      page(1, line('wide', 'Ana and Ben')),
+      page(2, line('wide', 'the empty quay', 'the shouting and waving carry out over the water', 'the boat is gone')),
+    ];
+    expect(codesFor(pages, ['quay'])).toContain('PEOPLELESS_ON_INTERACTION_PAGE');
+  });
+
+  it('still requires a people-free page somewhere in the book', () => {
+    const pages = [1, 2].map(n => page(n, line('wide', 'Ana and Ben')));
+    expect(codesFor(pages)).toContain('NO_PEOPLELESS_PAGE');
   });
 });

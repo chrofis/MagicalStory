@@ -291,7 +291,7 @@ const promptsSvc = require('../../server/services/prompts');
 (async () => {
   await promptsSvc.loadPromptTemplates();
   const { MODEL_DEFAULTS } = require('../../server/config/models');
-  const { buildUnifiedStoryPrompt, buildOutlineReviewPrompt } = require('../../server/lib/storyHelpers');
+  const { buildOutlineReviewPrompt } = require('../../server/lib/storyHelpers');
   Module._load = origLoad;
 
   const baseInput = {
@@ -310,25 +310,11 @@ const promptsSvc = require('../../server/services/prompts');
   const prevSplit = MODEL_DEFAULTS.splitOutlineReview;
   try {
     MODEL_DEFAULTS.splitOutlineReview = true;
-    const splitPrompt = buildUnifiedStoryPrompt({ ...baseInput }, 2);
-    check('split ON: writer prompt carries the reviewed-externally stub', splitPrompt.includes('Reviewed externally.'));
-    check('split ON: writer prompt has NO self-critique instructions', !splitPrompt.includes(ANALYSIS_PROBE));
-    check('split ON: writer prompt keeps the ---ANALYSIS--- and ---STORY PAGES--- markers',
-      splitPrompt.includes('---ANALYSIS---') && splitPrompt.includes('---STORY PAGES---'));
-    check('split ON: no unfilled {ANALYSIS_INSTRUCTIONS} placeholder left', !splitPrompt.includes('{ANALYSIS_INSTRUCTIONS}'));
-
-    // Per-job override (rerun-text harness A/B seam) beats the global default.
-    const perJobOff = buildUnifiedStoryPrompt({ ...baseInput, splitOutlineReview: false }, 2);
-    check('per-job splitOutlineReview:false overrides the global ON default', perJobOff.includes(ANALYSIS_PROBE) && !perJobOff.includes('Reviewed externally.'));
-
-    MODEL_DEFAULTS.splitOutlineReview = false;
-    const perJobOn = buildUnifiedStoryPrompt({ ...baseInput, splitOutlineReview: true }, 2);
-    check('per-job splitOutlineReview:true overrides the global OFF default', perJobOn.includes('Reviewed externally.'));
-    const singlePrompt = buildUnifiedStoryPrompt({ ...baseInput }, 2);
-    check('split OFF: writer prompt carries the full self-critique instructions', singlePrompt.includes(ANALYSIS_PROBE));
-    check('split OFF: no reviewed-externally stub', !singlePrompt.includes('Reviewed externally.'));
-    check('split OFF: analysis placeholders filled ({CHARACTER_NAMES} → names)',
-      !singlePrompt.includes('{CHARACTER_NAMES}') && singlePrompt.includes('Mira, Jonas'));
+    // The WRITER half of this seam (buildUnifiedStoryPrompt: stub vs full
+    // self-critique instructions, and the per-job splitOutlineReview override)
+    // was pinned here until 2026-09-15, when the unified writer and both its
+    // templates were deleted as unreachable (docs/decisions.md). What survives
+    // is the reviewer prompt, which the split path still builds.
 
     // Reviewer prompt
     const hints = [{ page: 2, issues: [{ type: 'metadata_char_absent_from_prose', detail: "metadata char 'Jonas' absent from prose" }] }];

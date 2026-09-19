@@ -50,7 +50,7 @@ describe('wornItems — METADATA parser', () => {
   it('parses a wornItems block out of a prose+METADATA brief', () => {
     const m = extractSceneMetadata(brief('Lily stands in the square.', P8_META));
     expect(m.wornItems).toEqual([
-      { id: 'ART001', owner: 'Lily', state: 'off', location: 'lies on the cobbles beside the log pile' },
+      { id: 'ART001', owner: 'Lily', state: 'off', location: 'lies on the cobbles beside the log pile', wearer: null },
     ]);
     expect(m.fullData.wornItems).toEqual(m.wornItems);
   });
@@ -64,13 +64,17 @@ describe('wornItems — METADATA parser', () => {
       'nonsense',
     ]);
     expect(rows).toEqual([
-      { id: 'ART001', owner: 'Lily', state: 'worn', location: null },
-      { id: 'ART002', owner: 'Lily', state: null, location: null },
+      { id: 'ART001', owner: 'Lily', state: 'worn', location: null, wearer: null },
+      { id: 'ART002', owner: 'Lily', state: null, location: null, wearer: null },
     ]);
   });
 
   it('parses the wornAs link and ignores a malformed one', () => {
-    expect(worn.parseWornAs('Lily.headwear')).toEqual({ owner: 'Lily', slot: 'headwear' });
+    // `slotKnown` (2026-09-18): a slot outside WORN_SLOTS is MARKED, never
+    // dropped — dropping the link would un-enumerate the entry entirely. Full
+    // coverage in worn-unknown-slot.test.ts.
+    expect(worn.parseWornAs('Lily.headwear')).toEqual({ owner: 'Lily', slot: 'headwear', slotKnown: true });
+    expect(worn.parseWornAs('Lily.neck')).toEqual({ owner: 'Lily', slot: 'neck', slotKnown: false });
     expect(worn.parseWornAs('Lily')).toBeNull();
     expect(worn.parseWornAs('.headwear')).toBeNull();
   });
@@ -168,7 +172,7 @@ describe('prompt lines — both directions, explicit', () => {
     const r = worn.resolveWornItemsForPage(VB, ['Lily'], P3_META);
     const [line] = worn.buildWornStateLines(r);
     expect(line).toBe(
-      "- Lily IS wearing this on this page: Lily's red woollen hat. Draw it on Lily even if the attached reference shows Lily without it.",
+      "- Lily IS wearing this on this page: Lily's red woollen hat — A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths. Draw it on Lily even if the attached reference shows Lily without it.",
     );
   });
 
@@ -176,7 +180,7 @@ describe('prompt lines — both directions, explicit', () => {
     const r = worn.resolveWornItemsForPage(VB, ['Lily'], P8_META);
     const [line] = worn.buildWornStateLines(r);
     expect(line).toBe(
-      "- Lily is NOT wearing this on this page: Lily's red woollen hat. Leave it off Lily even if the attached reference shows it worn — lies on the cobbles beside the log pile.",
+      "- Lily is NOT wearing this on this page: Lily's red woollen hat — A small hat knitted from chunky red wool, dome-shaped at the crown with a wide turned-back brim of two finger-widths. Leave it off Lily even if the attached reference shows it worn — lies on the cobbles beside the log pile.",
     );
   });
 
@@ -233,7 +237,8 @@ describe('outfit text loses exactly the off item and nothing else', () => {
 });
 
 describe('non-English story path', () => {
-  // story-unified.txt mandates ENGLISH names + descriptions for artifacts, so a
+  // The bible-authoring prompts mandate ENGLISH names + descriptions for
+  // artifacts (prompts/scene-expansion-all.txt:140), so a
   // German story carries the same English `wornAs` link and the same slot
   // vocabulary. Only the character name and the prose are localised.
   const deVB = {

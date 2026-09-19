@@ -195,7 +195,10 @@ describe('parseCellIdentification', () => {
 
   it('throws on malformed JSON rather than silently mapping nothing', () => {
     expect(() => parseCellIdentification('{"assignments": [oops]}', 2, 4)).toThrow(/not valid JSON/);
-    expect(() => parseCellIdentification('{"assignments":[{', 2, 4)).toThrow(/no JSON object/);
+    // An unclosed object still throws; since the tolerant extractor (2026-09-14)
+    // it is reported as bad JSON rather than as "no JSON object" — the
+    // behaviour pinned here is the throw, not the wording.
+    expect(() => parseCellIdentification('{"assignments":[{', 2, 4)).toThrow();
   });
 
   it('treats a missing assignments array as everything unmatched', () => {

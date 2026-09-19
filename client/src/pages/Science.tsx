@@ -106,6 +106,37 @@ const scienceContent: Record<string, {
     ctaText: 'Votre enfant comme héros de sa propre aventure. Première histoire gratuite.',
     ctaButton: 'Commencer',
   },
+  it: {
+    heroTitle: 'Perché ai bambini piace essere l\'eroe',
+    heroSubtitle: 'Ogni bambino ama una bella storia. Ma quando si vede in quella storia — il suo nome, il suo viso, il suo mondo — succede qualcosa di magico. Non si limita ad ascoltare. La vive.',
+    sections: [
+      {
+        icon: 'bookopen',
+        title: 'È la sua storia',
+        text: 'I bambini sono naturalmente attratti dalle storie che parlano di loro. Quando aprono un libro e vedono il proprio viso, la storia smette di essere qualcosa che accade a qualcun altro — diventa la loro avventura. Si avvicinano di più, girano le pagine più in fretta e chiedono di rileggerla.',
+      },
+      {
+        icon: 'brain',
+        title: 'Ricordano di più',
+        text: 'Gli studi dimostrano che i bambini ricordano oltre il 40% in più quando sono loro il protagonista della storia. Si chiama effetto di autoriferimento — il nostro cervello presta semplicemente più attenzione alle informazioni che ci riguardano. Nei bambini tra i 2 e i 10 anni, questo effetto è particolarmente forte.',
+      },
+      {
+        icon: 'sparkles',
+        title: 'Si sentono coraggiosi',
+        text: 'Quando un bambino si vede sconfiggere un drago, affrontare il primo giorno di scuola o fare un nuovo amico, comincia a credere di poterlo fare anche lui. Le storie personalizzate costruiscono fiducia in silenzio — non con lezioni, ma con l\'avventura.',
+      },
+      {
+        icon: 'heart',
+        title: 'Leggete insieme',
+        text: 'I genitori e i bambini che leggono libri personalizzati insieme ridono di più, parlano di più e si legano più in profondità. Trasforma il momento della lettura in qualcosa che entrambi aspettate con gioia.',
+      },
+    ],
+    giftTitle: 'Il regalo perfetto',
+    giftText: 'Cerchi un regalo davvero unico? Un libro per bambini personalizzato è qualcosa che nessun altro bambino possiede. Perfetto per compleanni, Natale, il primo giorno di scuola, o senza nessuna occasione particolare. Un regalo che custodiranno — e che vorranno farsi leggere ogni sera.',
+    ctaTitle: 'Crea la sua storia',
+    ctaText: 'Tuo figlio come eroe della propria avventura. Prima storia gratis.',
+    ctaButton: 'Inizia ora',
+  },
 };
 
 const iconMap = {

@@ -1,0 +1,609 @@
+{
+  "_source": "staging stories.id = job_1789506283204_3kxqshifx (\"Das Ei unter den Wurzeln\"), pulled 2026-09-16. original = sceneDescriptions[p].description metadata (the brief the iterate rewrote); rewrite = imageVersions[iterate-round-1].description metadata; evaluationFeedback = the version-0 eval exactly as executeIterateAction shapes it; planLine = sceneDescriptions[p].outlineExtract; pageText = sceneImages[p].text (== getPageText, verified). Visual Bible entries trimmed to the fields the iterate helpers read.",
+  "characters": [
+    "Levin",
+    "Julian",
+    "Max",
+    "Kiaan"
+  ],
+  "visualBible": {
+    "animals": [
+      {
+        "id": "ANI001",
+        "name": "Nia",
+        "description": "Bernese Mountain Dog. reaches an adult's knee. tricolor coat: predominantly black with a bright white chest and muzzle, and rust-colored patches above the eyes and on the legs. thick fluffy fur, large friendly brown eyes, wide soft ears lying flat, thick tail, wearing a plain red leather collar around the neck",
+        "pages": [
+          3,
+          9,
+          16
+        ],
+        "appearsInPages": [
+          3,
+          9,
+          16
+        ],
+        "states": []
+      },
+      {
+        "id": "ANI002",
+        "name": "Crow",
+        "description": "carrion crow. about as big as an adult's forearm. glossy solid black feathers all over. thick curved black beak, sharp dark eyes, sharp black claws",
+        "pages": [
+          6,
+          10,
+          15,
+          17
+        ],
+        "appearsInPages": [
+          6,
+          10,
+          15,
+          17
+        ],
+        "states": []
+      },
+      {
+        "id": "ANI003",
+        "name": "Lindi",
+        "description": "baby dragon. about as big as an adult's forearm. warm vibrant orange and red scales. cute and rounded body, soft face, large round friendly golden eyes, a calm smiling toothless mouth, two tiny blunt horns on the head, short chubby tail, open upright posture",
+        "pages": [
+          17,
+          18
+        ],
+        "appearsInPages": [
+          17,
+          18
+        ],
+        "states": []
+      }
+    ],
+    "locations": [
+      {
+        "id": "LOC001",
+        "name": "Lindenhof",
+        "description": "outdoor, elevated public square. Colors: grey stone walls, brown earth, vibrant yellow and red autumn leaves. large mature linden trees with thick exposed roots, gravel paths, low stone perimeter walls overlooking the city, scattered autumn leaves. Signature: massive sprawling tree roots breaking through the gravel",
+        "extractedDescription": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+        "pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ],
+        "appearsInPages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ]
+      },
+      {
+        "id": "LOC002",
+        "name": "Lindenhofbrunnen",
+        "description": "outdoor, public fountain. Colors: weathered grey and tan limestone, dark bronze. a wide stone basin on a pedestal base, a tall classical statue rising from the center, classical carved details, and a dark, fist-sized hole in the stonework of its back wall. Signature: the classical bronze statue standing on the central stone pillar",
+        "extractedDescription": "[whole, green, day] Fountain monument with classical statue mounted on stone base, surrounded by mature trees and public square seating. People and buildings visible nearby.",
+        "pages": [
+          6,
+          7,
+          10,
+          18
+        ],
+        "appearsInPages": [
+          6,
+          7,
+          10,
+          18
+        ]
+      },
+      {
+        "id": "LOC003",
+        "name": "Grossmünster",
+        "description": "outdoor, distant city skyline. Colors: pale grey stone, dark green copper domes. twin towering stone steeples with distinctive rounded, multi-tiered ornamental cupolas on top. Signature: the identical twin stone towers dominating the skyline",
+        "extractedDescription": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+        "pages": [
+          1,
+          18
+        ],
+        "appearsInPages": [
+          1,
+          18
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "id": "ART001",
+        "name": "football-sized dragon egg",
+        "description": "a perfectly round, football-sized egg, built with a smooth leathery shell featuring a faint, subtle scaly texture across its surface",
+        "pages": [
+          2,
+          3,
+          4,
+          8,
+          9,
+          11,
+          13,
+          14,
+          16,
+          17
+        ],
+        "appearsInPages": [
+          2,
+          3,
+          4,
+          8,
+          9,
+          11,
+          13,
+          14,
+          16,
+          17
+        ],
+        "states": [
+          {
+            "id": "ART001.1",
+            "pages": [
+              2,
+              3,
+              4,
+              8,
+              9,
+              11
+            ]
+          },
+          {
+            "id": "ART001.2",
+            "pages": [
+              13,
+              14,
+              16
+            ]
+          },
+          {
+            "id": "ART001.3",
+            "pages": [
+              17
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ART002",
+        "name": "rubber play ball",
+        "description": "a simple, perfectly round rubber play ball with thick alternating vertical stripes of bright blue and white",
+        "pages": [
+          1,
+          12
+        ],
+        "appearsInPages": [
+          1,
+          12
+        ]
+      },
+      {
+        "id": "ART003",
+        "name": "children's picture book",
+        "description": "a large square children's picture book made of thick, stiff cardboard pages, slightly worn at the corners",
+        "pages": [
+          5
+        ],
+        "appearsInPages": [
+          5
+        ],
+        "states": [
+          {
+            "id": "ART003.1",
+            "pages": []
+          },
+          {
+            "id": "ART003.2",
+            "pages": [
+              5
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ART004",
+        "name": "hand-knitted wool cap",
+        "description": "a solid red, visibly hand-knitted wool cap with a small rolled-up brim around the bottom edge, shaped slightly oversized and wide",
+        "pages": [
+          1,
+          4,
+          5,
+          7,
+          8,
+          9,
+          10,
+          18
+        ],
+        "appearsInPages": [
+          1,
+          4,
+          5,
+          7,
+          8,
+          9,
+          10,
+          18
+        ]
+      }
+    ],
+    "vehicles": [],
+    "secondaryCharacters": []
+  },
+  "pages": [
+    {
+      "pageNumber": 2,
+      "planLine": "PLAN: medium — Julian alone — Julian pushes autumn leaves apart between two thick linden roots and reaches toward something round and glowing with warmth beneath them — the warm egg exists and has been found",
+      "pageText": "Das Summen kam aus dem Boden, unter den Wurzeln der grossen Linde.\n\nJulian kniete sich hin und schob das Laub zur Seite. Zwischen zwei dicken Wurzeln lag etwas Rundes, so gross wie ein Fussball, und es leuchtete rot-orange. Als Julian die Hand ausstreckte, spürte er Wärme auf seinen Fingern, obwohl er die Schale noch gar nicht berührt hatte. Sie war warm wie eine Ofenkachel.\n\n«Levin, komm schnell!», rief er.",
+      "evaluationFeedback": {
+        "score": 60,
+        "reasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"curly, light blonde\",\n      \"clothing\": \"yellow jacket, grey pants, blue boots\",\n      \"action\": \"kneeling, reaching for glowing object\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"left-background\",\n      \"hair\": \"short, dark\",\n      \"clothing\": \"dark jacket, dark pants\",\n      \"action\": \"standing\",\n      \"view\": \"back\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 3,\n      \"zone\": \"left-background\",\n      \"hair\": \"short, dark\",\n      \"clothing\": \"dark jacket, dark pants\",\n      \"action\": \"standing\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n     ",
+        "fixableIssues": [
+          {
+            "fix": "Redraw Julian to be pushing the leaves apart with his left hand.",
+            "type": "action_interaction",
+            "sources": [
+              "quality"
+            ],
+            "severity": "MAJOR",
+            "character": "Julian",
+            "description": "Julian is not pushing the deep red and yellow autumn leaves apart with his left hand as declared in the prompt."
+          },
+          {
+            "fix": "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
+            "type": "extra_character",
+            "sources": [
+              "final_checks"
+            ],
+            "severity": "CRITICAL",
+            "character": "figure 2",
+            "derivedBy": "presence-arithmetic",
+            "description": "4 person-figure(s) are in the frame for an EXPECTED CAST of 1 person(s) — 3 more figure(s) than the page was written to hold."
+          },
+          {
+            "fix": "Modify Julian's pose to show right hand extended toward the glowing egg nestled in roots",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Julian",
+            "description": "Julian’s right hand is not shown reaching toward the dragon egg despite being declared to do so"
+          }
+        ]
+      },
+      "original": {
+        "objects": [
+          "LOC001",
+          "ART001.1"
+        ],
+        "characters": [
+          "Julian"
+        ]
+      },
+      "rewrite": {
+        "objects": [
+          "LOC001.1",
+          "ART001.1"
+        ],
+        "characters": [
+          "Julian"
+        ]
+      }
+    },
+    {
+      "pageNumber": 7,
+      "planLine": "PLAN: wide — Levin, Max and Julian — Levin walks them back and forth between the root hollow and the Lindenhofbrunnen while the last sunlight slides off the fountain steps; Max stamps his feet — Levin's indecision has cost the warm sun; he is ashamed",
+      "pageText": "Levin lief zum Brunnen. «Oder vielleicht doch dort drüben bei der Wurzel», sagte er und lief wieder zurück. Max und Julian liefen hinter ihm her, hin und her und wieder hin.\n\nDas letzte warme Sonnenlicht glitt von den Brunnenstufen weg. Da stampfte Max in den Kies. «Wir müssen jetzt anfangen!» Levins Gesicht wurde heiss. Er hatte viel zu lange gebraucht.",
+      "evaluationFeedback": {
+        "score": 55,
+        "reasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"left-foreground\",\n      \"hair\": \"brown, curly\",\n      \"clothing\": \"orange pullover, brown dungarees, black boots\",\n      \"action\": \"walking, stamping right boot\",\n      \"view\": \"back\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"blonde, curly\",\n      \"clothing\": \"red cap, green jacket, blue trousers, brown boots\",\n      \"action\": \"walking with slumped shoulders and lowered head\",\n      \"view\": \"back\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 3,\n      \"zone\": \"right-foreground\",\n      \"hair\": \"brown, curly\",\n      \"clothing\": \"yellow anorak, grey trousers, blue boots\",\n      \"action\": \"walking with bowed head\",\n      \"view\": \"back\",",
+        "fixableIssues": [
+          {
+            "fix": "Replace brown overalls with proper dungarees and black boots per clothing contract",
+            "type": "clothing",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Max",
+            "description": "Wearing brown overalls instead of dark brown corduroy dungarees with bib and suspenders; boots are dark blue instead of black rubber"
+          },
+          {
+            "fix": "Replace current jacket and trousers with specified fleece and corduroy outfit",
+            "type": "clothing",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Levin",
+            "description": "Wearing green quilted jacket and blue jeans instead of forest-green zip-up fleece with patch pockets and dark blue corduroy trousers"
+          },
+          {
+            "fix": "Adjust pose to show right boot mid-stamp into gravel, conveying motion",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Max",
+            "description": "Not actively stamping right boot as declared in prompt and story text; shown standing statically"
+          }
+        ]
+      },
+      "original": {
+        "objects": [
+          "LOC001",
+          "LOC002",
+          "ART004"
+        ],
+        "characters": [
+          "Levin",
+          "Max",
+          "Julian"
+        ]
+      },
+      "rewrite": {
+        "objects": [
+          "LOC001",
+          "LOC002.3",
+          "LOC003.2"
+        ],
+        "characters": [
+          "Levin",
+          "Max",
+          "Julian"
+        ]
+      }
+    },
+    {
+      "pageNumber": 10,
+      "planLine": "PLAN: close-up — the crow — the crow drops from the branch with the red wool cap caught in its beak and flaps toward the hole in the Lindenhofbrunnen wall — the cap is gone into the fountain wall; the crow is the antagonist",
+      "pageText": "Die Krähe stürzte herab und hackte auf die warme Schale. «Sie hackt auf Lindi ein!», schrie Max. Nia bellte, bis die Krähe vom Ei abliess.\n\nDoch im Auffliegen packte sie die rote Wollkappe. Sie flog zum Brunnen und stopfte die Kappe in das dunkle Loch.\n\n«Ich hole sie zurück», sagte Levin. «Nicht jetzt», sagte Max. «Sonst ist Lindi allein, und die Krähe kommt wieder.»",
+      "evaluationFeedback": {
+        "score": 85,
+        "reasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"top-right-midground\",\n      \"hair\": \"black\",\n      \"clothing\": \"black feathers\",\n      \"action\": \"flying, carrying a red cap\",\n      \"view\": \"side\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"red knitted wool cap\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    }\n  ],\n  \"matches\": [\n    {\n      \"figure\": 1,\n      \"reference\": \"Crow\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.69,\n        0.16,\n        0.79,\n        0.25\n      ],\n      \"body_bbox\": [\n        0.63,\n        0.07,\n        0.93,\n        0.38\n      ]\n    }\n  ],\n  \"height_order\": \"\",\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  },\n  \"coherence_gate\": {\n    \"applied\": false,\n    \"reason\": null\n  },\n  \"style_gate\": {\n    \"observed\": \"watercolor painting\",\n    \"linework\": \"no outlines at all, forms defined by paint edges\",\n    \"faces\": \"loose wash",
+        "fixableIssues": []
+      },
+      "original": {
+        "objects": [
+          "LOC002",
+          "ANI002",
+          "ART004"
+        ],
+        "characters": []
+      },
+      "rewrite": {
+        "objects": [
+          "LOC002.1",
+          "ART004"
+        ],
+        "characters": [
+          "Crow"
+        ]
+      }
+    },
+    {
+      "pageNumber": 13,
+      "planLine": "PLAN: medium — Julian and Levin — Julian presses both hands around Lindi just lifted from the leaves, his face frightened; Levin leans close — Lindi is out of the heap but the hum has stopped and the shell is cold",
+      "pageText": "«Dort!», rief Levin. Sie gruben an der Stelle und hoben Lindi aus dem Laub.\n\nJulian hielt die Schale in beiden Händen. Sie leuchtete nicht mehr, sondern war stumpf und grau-rot. Julian spürte keine Wärme, und das Summen war nur noch ein müdes Zittern. Er bekam grosse Augen vor Angst.\n\n«Wir tragen sie zurück ins Nest», sagte Levin. «Schnell.»",
+      "evaluationFeedback": {
+        "score": 46,
+        "reasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"wavy light blonde\",\n      \"clothing\": \"green fleece jacket, dark blue trousers, brown boots\",\n      \"action\": \"leaning close, hands hovering\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"curly light blonde\",\n      \"clothing\": \"yellow anorak, grey trousers, dark blue boots\",\n      \"action\": \"holding egg, bent over\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"dragon egg\",\n        \"right\": \"dragon egg\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 3,\n      \"zone\": \"left-background\",\n      \"hair\": \"short, dark\",\n      \"clothing\": \"dark jacket, blue jeans\",\n      \"action\": \"standing\",\n      \"view\": \"back\",\n      \"items_held\": {\n        \"lef",
+        "fixableIssues": [
+          {
+            "fix": "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
+            "type": "extra_character",
+            "sources": [
+              "final_checks"
+            ],
+            "severity": "CRITICAL",
+            "character": "figure 3",
+            "derivedBy": "presence-arithmetic",
+            "description": "4 person-figure(s) are in the frame for an EXPECTED CAST of 2 person(s) — 2 more figure(s) than the page was written to hold."
+          },
+          {
+            "fix": "Ensure the only egg-like object in center-foreground is the specified dragon egg matching prompt description",
+            "type": "missing_element",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "CRITICAL",
+            "character": null,
+            "description": "Dragon egg not rendered as described — missing element inferred from inventory naming a different object in its place"
+          },
+          {
+            "fix": "Verify presence of Lindenhofbrunnen structure with dark hole where Levin's red wool cap is hidden, even if partially obscured",
+            "type": "unverified_absence",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MODERATE",
+            "character": null,
+            "description": "Lindenhof landmark setting includes modern park furniture (plastic chairs, wooden table) not mentioned in prompt; however, since ART STYLE permits ambient style elements and LANDMARK CONTEXT requires Lindenhof presence, this is not a defect — BUT key story location detail 'dark hole in the Lindenhofbrunnen wall' is absent from objects and may be obscured or missing"
+          },
+          {
+            "fix": "Confirm whether extra background figures violate 'medium shot focusing on dread of two children' — if they distract or clutter, simplify background",
+            "type": "unverified_absence",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MINOR",
+            "character": null,
+            "description": "Extra adult figures present in left-midground not described in prompt; original prompt describes only Julian and Levin in foreground with dusk settling over plaza — no mention of seated/standing adults"
+          }
+        ]
+      },
+      "original": {
+        "objects": [
+          "LOC001",
+          "ART001.2"
+        ],
+        "characters": [
+          "Julian",
+          "Levin"
+        ]
+      },
+      "rewrite": {
+        "objects": [
+          "LOC001",
+          "LOC002.2",
+          "LOC003.2",
+          "ANI003"
+        ],
+        "characters": [
+          "Julian",
+          "Levin"
+        ]
+      }
+    },
+    {
+      "pageNumber": 16,
+      "planLine": "PLAN: wide — Levin, Max, Kiaan, Julian and Nia — Levin holds Lindi pressed against his chest inside his open jacket; Max, Kiaan and Julian press their backs around him in a tight huddle with Nia planted in front — Lindi is back against warmth; the four boys and the dog form the living shelter",
+      "pageText": "Diesmal überlegte Levin nicht lange. Er nahm Lindi aus dem kalten Nest und drückte sie unter seiner Jacke an die Brust.\n\n«Setzt euch eng um mich herum», sagte er. «Mit dem Rücken gegen den Wind. Nia nach vorn.» Max, Kiaan und Julian rückten dicht an ihn heran, und die Hündin setzte sich davor.\n\nSie sassen still. Nach einer Weile begann das Summen wieder, ganz leise.",
+      "evaluationFeedback": {
+        "score": -35,
+        "reasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"blonde, wavy\",\n      \"clothing\": \"green fleece jacket, dark blue trousers, brown boots\",\n      \"action\": \"sitting cross-legged, holding egg\",\n      \"view\": \"front\",\n      \"items_held\": {\n        \"left\": \"dragon egg\",\n        \"right\": \"dragon egg\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"left-midground\",\n      \"hair\": \"brown, curly\",\n      \"clothing\": \"orange pullover, dark brown dungarees, black rubber boots\",\n      \"action\": \"sitting with back to viewer, head tucked toward egg\",\n      \"view\": \"back\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 3,\n      \"zone\": \"right-midground\",\n      \"hair\": \"dark brown, short\",\n      \"clothing\": \"deep purple hooded sweatshirt, olive trousers, white trainers\",\n      \"act",
+        "fixableIssues": [
+          {
+            "fix": "Add Nia (animal, Bernese Mountain Dog) to the scene as described in the prompt.",
+            "type": "absent cast member",
+            "sources": [
+              "quality"
+            ],
+            "severity": "CRITICAL",
+            "character": "Nia",
+            "description": "Nia (animal, Bernese Mountain Dog) is missing from the scene."
+          },
+          {
+            "fix": "Repose Max to sit with shoulders, hips, heels, and toes turned fully away from camera, back visible, head tucked toward egg.",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "CRITICAL",
+            "character": "Max",
+            "description": "Max is shown kneeling and facing right toward Levin instead of presenting his back to the viewer as required by ORIGINAL_PROMPT perspective rule."
+          },
+          {
+            "fix": "Repose Julian to sit directly behind Levin with full back to camera, no forward lean, head tilted toward egg but body aligned away.",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "CRITICAL",
+            "character": "Julian",
+            "description": "Julian is leaning forward over Levin rather than presenting a solid back behind him as specified."
+          },
+          {
+            "fix": "Add Bernese Mountain Dog sitting upright in left foreground, completing the living circle in front of Levin.",
+            "type": "unverified_absence",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Nia",
+            "description": "Nia (Bernese Mountain Dog) is not present in VISION_INVENTORY.objects[] despite being a required cast member completing the shelter in front."
+          },
+          {
+            "fix": "Recolor the held egg to dull greyish-red with darker speckles, matching prompt description.",
+            "type": "object_presence",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Levin",
+            "description": "Dragon egg rendered as pinkish-red instead of dull greyish-red as described."
+          },
+          {
+            "fix": "Replace overalls with dark brown corduroy dungarees featuring bib panel and shoulder straps; ensure grey wool socks are visible above black rubber ankle boots.",
+            "type": "clothing",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Max",
+            "description": "Clothing mismatch: wearing brown overalls and dark grey boots instead of dark brown corduroy dungarees with visible grey wool socks and black rubber boots."
+          },
+          {
+            "fix": "Replace jeans with grey fleece-lined elastic-waist trousers; change footwear to dark blue rounded-toe Wellington boots.",
+            "type": "clothing",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Julian",
+            "description": "Wearing blue jeans and dark shoes instead of grey fleece-lined pull-on trousers and dark blue rubber Wellington boots."
+          }
+        ]
+      },
+      "original": {
+        "objects": [
+          "LOC001",
+          "ART001.2",
+          "ANI001"
+        ],
+        "characters": [
+          "Levin",
+          "Max",
+          "Kiaan",
+          "Julian"
+        ]
+      },
+      "rewrite": {
+        "objects": [
+          "LOC001",
+          "LOC003.2",
+          "ANI001",
+          "ANI003"
+        ],
+        "characters": [
+          "Levin",
+          "Max",
+          "Kiaan",
+          "Julian"
+        ]
+      }
+    }
+  ]
+}

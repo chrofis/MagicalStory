@@ -1,0 +1,5929 @@
+{
+ "note": "Every value is a real stored image version pulled from staging on 2026-09-18 — the evaluator matches[] (stored rename undone via evaluatorReference), the detector bboxDetection.figures[] and the evaluator fixableIssues[]. Only the fields reconcileIdentity reads are kept; nothing is hand-built. `kind` is what the Part-1 replay produced for that version, so the trigger can be asserted against measured ground truth rather than against a hand-picked example.",
+ "versions": [
+  {
+   "key": "job_1787493968756_4fgr5nukroz|p4|v0",
+   "storyId": "job_1787493968756_4fgr5nukroz",
+   "pageNumber": 4,
+   "versionIndex": "0",
+   "kind": "no-vote-uncorrectable-not-a-permutation",
+   "conflictPairs": [
+    "Sarah->Emma"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Sarah",
+     "body_bbox": [
+      0.24,
+      0.16,
+      0.5,
+      0.99
+     ],
+     "face_bbox": [
+      0.29,
+      0.16,
+      0.4,
+      0.26
+     ]
+    },
+    {
+     "reference": "Emma",
+     "body_bbox": [
+      0,
+      0.5,
+      0.29,
+      0.99
+     ],
+     "face_bbox": [
+      0.09,
+      0.52,
+      0.19,
+      0.6
+     ]
+    },
+    {
+     "reference": "Noah",
+     "body_bbox": [
+      0.24,
+      0.39,
+      0.46,
+      0.99
+     ],
+     "face_bbox": [
+      0.29,
+      0.4,
+      0.38,
+      0.47
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Sarah",
+     "bodyBox": [
+      0.07080078125,
+      0.46875,
+      1,
+      0.759765625
+     ],
+     "faceBox": [
+      0.07080078125,
+      0.494580078125,
+      0.33056640625,
+      0.715380859375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Noah",
+     "bodyBox": [
+      0.244140625,
+      0.3517578125,
+      1,
+      0.5642578125
+     ],
+     "faceBox": [
+      0.244140625,
+      0.3517578125,
+      0.494140625,
+      0.5642578125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Emma",
+     "bodyBox": [
+      0.3310546875,
+      0.203125,
+      1,
+      0.59111328125
+     ],
+     "faceBox": [
+      0.45361328125,
+      0.37861328125,
+      0.70361328125,
+      0.59111328125
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Emma",
+     "description": "Emma is holding a single note instead of two torn pieces of an off-white note, and is not receiving a strip of translucent pale-yellow tape from Sarah.",
+     "fix": "Emma should be holding two torn pieces of an off-white note in one hand, and receiving a strip of translucent pale-yellow tape from Sarah in her closing fingers.",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah is not resting one hand lightly on a bean plant beside her.",
+     "fix": "Sarah should have one hand resting lightly on a bean plant beside her.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Noah",
+     "description": "Noah is standing beside Emma, not one step behind her.",
+     "fix": "Noah should be positioned one step behind Emma.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Emma",
+     "description": "Emma's hair is down, not in a low side ponytail.",
+     "fix": "Emma's hair should be in a low side ponytail.",
+     "type": "hair",
+     "severity": "MINOR"
+    },
+    {
+     "character": "Scene-wide",
+     "description": "The pale-yellow translucent repair tape strip is absent from the visual inventory despite being essential to the main action per prompt and story text",
+     "fix": "Add a short strip of pale-yellow translucent tape being pressed by Sarah into Emma’s fingers",
+     "type": "missing_element",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Emma",
+     "description": "Emma holds a single piece of paper with both hands instead of two torn note pieces (larger piece and apple-drawn corner) in one hand while receiving tape with the other",
+     "fix": "Split the held paper into two distinct torn pieces — one larger, one small with an apple drawing — held together in Emma’s left hand",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah’s hands are shown interacting directly with the note rather than handing tape to Emma",
+     "fix": "Reposition Sarah’s right hand to press a pale-yellow tape strip into Emma’s closing fingers, not resting on the note",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1787777447720_ll5dyf4k8g|p4|v0",
+   "storyId": "job_1787777447720_ll5dyf4k8g",
+   "pageNumber": 4,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Sarah->Saira",
+    "Facundo->Fiona",
+    "Saira->Sarah",
+    "Fiona->Facundo"
+   ],
+   "renamedByPart1": 9,
+   "matches": [
+    {
+     "reference": "Sarah",
+     "body_bbox": [
+      0.29,
+      0.56,
+      0.36,
+      0.86
+     ]
+    },
+    {
+     "reference": "Facundo",
+     "body_bbox": [
+      0.36,
+      0.56,
+      0.43,
+      0.86
+     ]
+    },
+    {
+     "reference": "Saira",
+     "body_bbox": [
+      0.43,
+      0.56,
+      0.5,
+      0.86
+     ]
+    },
+    {
+     "reference": "Fiona",
+     "body_bbox": [
+      0.5,
+      0.56,
+      0.57,
+      0.86
+     ]
+    },
+    {
+     "reference": null,
+     "body_bbox": [
+      0.62,
+      0.5,
+      0.65,
+      0.58
+     ]
+    },
+    {
+     "reference": null,
+     "body_bbox": [
+      0.65,
+      0.5,
+      0.68,
+      0.58
+     ]
+    },
+    {
+     "reference": null,
+     "body_bbox": [
+      0.68,
+      0.5,
+      0.71,
+      0.58
+     ]
+    },
+    {
+     "reference": null,
+     "body_bbox": [
+      0.71,
+      0.5,
+      0.74,
+      0.58
+     ]
+    },
+    {
+     "reference": null,
+     "body_bbox": [
+      0.74,
+      0.5,
+      0.77,
+      0.58
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Facundo",
+     "bodyBox": [
+      0.3974609375,
+      0.3818359375,
+      0.7919921875,
+      0.6140625
+     ],
+     "faceBox": [
+      0.3974609375,
+      0.4015625,
+      0.6474609375,
+      0.6140625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Saira",
+     "bodyBox": [
+      0.5654296875,
+      0.2470703125,
+      0.767578125,
+      0.3115234375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Sarah",
+     "bodyBox": [
+      0.5830078125,
+      0.4462890625,
+      0.7939453125,
+      0.53125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Fiona",
+     "bodyBox": [
+      0.5712890625,
+      0.310546875,
+      0.7822265625,
+      0.3828125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.5078125,
+      0.796875,
+      0.5595703125,
+      0.8291015625
+     ],
+     "confidence": "low"
+    },
+    {
+     "name": "Kapitänin Rossa",
+     "bodyBox": [
+      0.4990234375,
+      0.82421875,
+      0.5498046875,
+      0.85546875
+     ],
+     "confidence": "medium"
+    },
+    {
+     "name": "Rossa's Crew",
+     "bodyBox": [
+      0.51171875,
+      0.666015625,
+      0.556640625,
+      0.6943359375
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Sarah",
+     "description": "Sarah rendered as a child in red tunic instead of adult pirate-costumed woman",
+     "fix": "Replace child figure in red tunic with adult female pirate-costumed character matching prompt description",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Facundo",
+     "description": "Facundo rendered as a child in blue tunic instead of adult pirate-costumed man",
+     "fix": "Replace child figure in blue tunic with adult male pirate-costumed character matching prompt description",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Saira",
+     "description": "Saira rendered as a child in green tunic instead of adult pirate-costumed woman",
+     "fix": "Replace child figure in green tunic with adult female pirate-costumed character matching prompt description",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Fiona",
+     "description": "Fiona rendered as a child in yellow tunic with red sash, not at the ship's wheel despite essential interaction",
+     "fix": "Replace child figure with adult female pirate-costumed Fiona positioned at the ship's wheel, hands on it, actively steering",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Fiona",
+     "description": "Fiona's clothing is childlike tunic/sash rather than expected pirate costume; base garment type mismatch",
+     "fix": "Re-render Fiona in correct pirate-costume appropriate for adult female character as implied by original prompt",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1787867402809_z9bwoo3yp|p5|v1",
+   "storyId": "job_1787867402809_z9bwoo3yp",
+   "pageNumber": 5,
+   "versionIndex": "1",
+   "kind": "no-vote-uncorrectable-not-a-permutation",
+   "conflictPairs": [
+    "Fiona->Lorena"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Fiona",
+     "body_bbox": [
+      0.14,
+      0.47,
+      0.34,
+      0.99
+     ],
+     "face_bbox": [
+      0.18,
+      0.48,
+      0.29,
+      0.57
+     ]
+    },
+    {
+     "reference": "Saira",
+     "body_bbox": [
+      0.29,
+      0.41,
+      0.46,
+      0.98
+     ],
+     "face_bbox": [
+      0.32,
+      0.42,
+      0.42,
+      0.5
+     ]
+    },
+    {
+     "reference": "Sarah",
+     "body_bbox": [
+      0.48,
+      0.47,
+      0.68,
+      0.99
+     ],
+     "face_bbox": [
+      0.53,
+      0.48,
+      0.63,
+      0.56
+     ]
+    },
+    {
+     "reference": "Lorena",
+     "body_bbox": [
+      0.67,
+      0.46,
+      0.87,
+      0.99
+     ],
+     "face_bbox": [
+      0.71,
+      0.47,
+      0.82,
+      0.56
+     ]
+    },
+    {
+     "reference": "Facundo",
+     "body_bbox": [
+      0.51,
+      0.37,
+      0.65,
+      0.63
+     ],
+     "face_bbox": [
+      0.54,
+      0.38,
+      0.61,
+      0.44
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Saira",
+     "bodyBox": [
+      0.3515625,
+      0.294140625,
+      0.97265625,
+      0.506640625
+     ],
+     "faceBox": [
+      0.3515625,
+      0.294140625,
+      0.6015625,
+      0.506640625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Lorena",
+     "bodyBox": [
+      0.42138671875,
+      0.15234375,
+      1,
+      0.36650390625
+     ],
+     "faceBox": [
+      0.42138671875,
+      0.15400390625,
+      0.67138671875,
+      0.36650390625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.41650390625,
+      0.64326171875,
+      1,
+      0.85576171875
+     ],
+     "faceBox": [
+      0.41650390625,
+      0.64326171875,
+      0.66650390625,
+      0.85576171875
+     ],
+     "confidence": "low"
+    },
+    {
+     "name": "Fiona",
+     "bodyBox": [
+      0.42041015625,
+      0.48212890625,
+      1,
+      0.69462890625
+     ],
+     "faceBox": [
+      0.42041015625,
+      0.48212890625,
+      0.67041015625,
+      0.69462890625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Facundo",
+     "bodyBox": [
+      0.30908203125,
+      0.47724609375,
+      0.5859375,
+      0.68974609375
+     ],
+     "faceBox": [
+      0.30908203125,
+      0.47724609375,
+      0.55908203125,
+      0.68974609375
+     ],
+     "confidence": "low"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Fiona",
+     "description": "Lorena is holding the Schatzkarte with both hands, but the prompt states she should be holding it pressed flat against her chest. Sarah is also holding the map, which was not requested.",
+     "fix": "Reposition Lorena's hands to hold the map against her chest. Remove the map from Sarah's hands.",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah is holding the Schatzkarte, but the prompt states she should be gripping the dark wood bow rail with both hands.",
+     "fix": "Remove the map from Sarah's hands and reposition her to grip the bow rail with both hands.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Facundo",
+     "description": "Facundo is standing on the deck, but the prompt states he should be in the rigging mid-ship, left hand gripping a taut brown hemp line.",
+     "fix": "Reposition Facundo in the rigging mid-ship, with his left hand gripping a taut brown hemp line.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "description": "The ship is not pointing straight at a large dark rock dead ahead, and the stone channel walls are not narrowing the frame to a tight vertical slit.",
+     "fix": "Adjust the ship's direction to point at a large dark rock dead ahead and narrow the channel walls to create a tight vertical slit.",
+     "type": "setting",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Saira",
+     "description": "Saira's trousers are not black tied canvas trousers, they appear to be plain green trousers.",
+     "fix": "Change Saira's trousers to black tied canvas trousers.",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah is missing her black tricorn hat.",
+     "fix": "Add a black tricorn hat to Sarah's head.",
+     "type": "accessory_missing",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Fiona",
+     "description": "Rendered as adult woman (30) wearing long-sleeved purple tunic instead of teenage Lorena in purple linen blouse",
+     "fix": "Adjust age to teenage appearance and change top to sleeveless or short-sleeve purple linen blouse",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Saira",
+     "description": "Rendered as adult woman (25) wearing long-sleeved white shirt under green vest instead of sleeveless pirate vest over white linen undershirt",
+     "fix": "Replace long-sleeved shirt with visible white linen undershirt and ensure vest is sleeveless",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Sarah",
+     "description": "Rendered as adult woman (28) in grey long-sleeved shirt instead of school-age girl in fitted grey linen coat; holding map instead of gripping bow rail",
+     "fix": "Re-render as young girl in correct coat, remove map from hands, show her gripping wooden bow rail",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Lorena",
+     "description": "Rendered as adult woman (35) in long-sleeved dark purple tunic instead of teenage Lorena in purple linen blouse",
+     "fix": "Adjust age to teenage and switch top to appropriate blouse",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Facundo",
+     "description": "Rendered as adult man (22) with short brown hair standing on deck instead of teenage Facundo in rigging gripping hemp line",
+     "fix": "Relocate figure to ship's rigging mid-ship, give wavy brown hair, and show left hand gripping taut brown hemp line",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Fiona",
+     "description": "Holding rolled-out map instead of pressing Schatzkarte flat against chest",
+     "fix": "Change map presentation to flat against chest, not rolled-out",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1787867402809_z9bwoo3yp|p16|v0",
+   "storyId": "job_1787867402809_z9bwoo3yp",
+   "pageNumber": 16,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Sarah->Lorena",
+    "Lorena->Sarah"
+   ],
+   "renamedByPart1": 4,
+   "matches": [
+    {
+     "reference": "Sarah",
+     "body_bbox": [
+      0.2,
+      0.39,
+      0.5,
+      0.9
+     ],
+     "face_bbox": [
+      0.4,
+      0.4,
+      0.5,
+      0.49
+     ]
+    },
+    {
+     "reference": "Saira",
+     "body_bbox": [
+      0.39,
+      0.39,
+      0.6,
+      0.9
+     ],
+     "face_bbox": [
+      0.4,
+      0.4,
+      0.5,
+      0.49
+     ]
+    },
+    {
+     "reference": "Fiona",
+     "body_bbox": [
+      0.5,
+      0.39,
+      0.7,
+      0.9
+     ],
+     "face_bbox": [
+      0.52,
+      0.4,
+      0.62,
+      0.49
+     ]
+    },
+    {
+     "reference": "Lorena",
+     "body_bbox": [
+      0.58,
+      0.51,
+      0.75,
+      0.9
+     ],
+     "face_bbox": [
+      0.6,
+      0.52,
+      0.68,
+      0.59
+     ]
+    },
+    {
+     "reference": "Facundo",
+     "body_bbox": [
+      0.7,
+      0.51,
+      0.9,
+      0.9
+     ],
+     "face_bbox": [
+      0.72,
+      0.52,
+      0.8,
+      0.59
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Fiona",
+     "bodyBox": [
+      0.32470703125,
+      0.0244140625,
+      0.8984375,
+      0.490234375
+     ],
+     "faceBox": [
+      0.32470703125,
+      0.15107421875,
+      0.57470703125,
+      0.36357421875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Facundo",
+     "bodyBox": [
+      0.46826171875,
+      0.6103515625,
+      0.986328125,
+      0.9150390625
+     ],
+     "faceBox": [
+      0.46826171875,
+      0.65693359375,
+      0.71826171875,
+      0.86943359375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Sarah",
+     "bodyBox": [
+      0.44921875,
+      0.5509765625,
+      0.9052734375,
+      0.767578125
+     ],
+     "faceBox": [
+      0.44921875,
+      0.5509765625,
+      0.69921875,
+      0.7634765625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Lorena",
+     "bodyBox": [
+      0.31982421875,
+      0.30732421875,
+      0.884765625,
+      0.51982421875
+     ],
+     "faceBox": [
+      0.31982421875,
+      0.30732421875,
+      0.56982421875,
+      0.51982421875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Saira",
+     "bodyBox": [
+      0.31787109375,
+      0.46064453125,
+      0.7841796875,
+      0.67314453125
+     ],
+     "faceBox": [
+      0.31787109375,
+      0.46064453125,
+      0.56787109375,
+      0.67314453125
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Fiona",
+     "description": "Fiona wears blue tunic and dark belt instead of white linen blouse, red sash, dark brown breeches, tall boots; missing grey-metal heart pendant, bracelet, and high-crowned brown leather captain's hat",
+     "fix": "Replace blue tunic with white linen blouse, add red sash, dark brown breeches, tall boots, grey-metal heart pendant, bracelet, and high-crowned brown leather captain's hat",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Saira",
+     "description": "Saira wears purple shirt and yellow skirt instead of pirate costume; missing all specified accessories and captain's hat",
+     "fix": "Replace purple shirt and yellow skirt with white linen blouse, red sash, dark brown breeches, tall boots; add grey-metal heart pendant, bracelet, and high-crowned brown leather captain's hat",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Facundo",
+     "description": "Facundo wears orange shirt and blue jeans — jeans are modern and anachronistic for age-of-sail pirate setting",
+     "fix": "Replace blue jeans with dark brown breeches; ensure white linen blouse, red sash, tall boots, and grey-metal accessories are added per prompt",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Lorena",
+     "description": "Lorena's outfit lacks red sash, grey-metal pendant/bracelet, captain's hat, and tall boots as specified",
+     "fix": "Add red sash over white blouse; include grey-metal heart pendant and bracelet; provide tall dark brown boots and captain's hat",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah shown laughing with arms up but should be speaking mid-sentence; missing captain's hat and full accessory set",
+     "fix": "Adjust expression to mid-speech (mouth open forming words, not laughter); add high-crowned brown leather captain's hat and complete grey-metal accessories",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Saira",
+     "description": "Saira is smiling at viewer rather than focused intently on chest contents as described",
+     "fix": "Change gaze direction to look downward into chest; adjust expression to show focused attention, not general smile",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Background",
+     "description": "Two extra figures in white garments appear in center-background not described in prompt",
+     "fix": "Remove or blend background figures in white to match scene intent of isolated ledge with only five crew members",
+     "type": "unverified_absence",
+     "severity": "MINOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1787867402809_z9bwoo3yp|p16|v1",
+   "storyId": "job_1787867402809_z9bwoo3yp",
+   "pageNumber": 16,
+   "versionIndex": "1",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Saira->Lorena",
+    "Lorena->Saira"
+   ],
+   "renamedByPart1": 5,
+   "matches": [
+    {
+     "reference": "Fiona",
+     "body_bbox": [
+      0.149,
+      0.348,
+      0.402,
+      0.908
+     ],
+     "face_bbox": [
+      0.206,
+      0.39,
+      0.306,
+      0.48
+     ]
+    },
+    {
+     "reference": "Saira",
+     "body_bbox": [
+      0.32,
+      0.39,
+      0.502,
+      0.898
+     ],
+     "face_bbox": [
+      0.358,
+      0.402,
+      0.438,
+      0.478
+     ]
+    },
+    {
+     "reference": "Sarah",
+     "body_bbox": [
+      0.45,
+      0.39,
+      0.62,
+      0.898
+     ],
+     "face_bbox": [
+      0.49,
+      0.402,
+      0.57,
+      0.478
+     ]
+    },
+    {
+     "reference": "Lorena",
+     "body_bbox": [
+      0.55,
+      0.52,
+      0.71,
+      0.898
+     ],
+     "face_bbox": [
+      0.602,
+      0.53,
+      0.662,
+      0.588
+     ]
+    },
+    {
+     "reference": "Facundo",
+     "body_bbox": [
+      0.68,
+      0.52,
+      0.86,
+      0.98
+     ],
+     "face_bbox": [
+      0.73,
+      0.53,
+      0.79,
+      0.588
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Fiona",
+     "bodyBox": [
+      0.3466796875,
+      0.0263671875,
+      0.8984375,
+      0.490234375
+     ],
+     "faceBox": [
+      0.3466796875,
+      0.1359375,
+      0.5966796875,
+      0.3484375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Lorena",
+     "bodyBox": [
+      0.31982421875,
+      0.30732421875,
+      0.8837890625,
+      0.51982421875
+     ],
+     "faceBox": [
+      0.31982421875,
+      0.30732421875,
+      0.56982421875,
+      0.51982421875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Facundo",
+     "bodyBox": [
+      0.4677734375,
+      0.6103515625,
+      0.986328125,
+      0.9150390625
+     ],
+     "faceBox": [
+      0.4677734375,
+      0.6564453125,
+      0.7177734375,
+      0.8689453125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Saira",
+     "bodyBox": [
+      0.44921875,
+      0.55,
+      0.9052734375,
+      0.767578125
+     ],
+     "faceBox": [
+      0.44921875,
+      0.55,
+      0.69921875,
+      0.7625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Sarah",
+     "bodyBox": [
+      0.31787109375,
+      0.46064453125,
+      0.7958984375,
+      0.67314453125
+     ],
+     "faceBox": [
+      0.31787109375,
+      0.46064453125,
+      0.56787109375,
+      0.67314453125
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Saira",
+     "description": "Lorena wears purple blouse and yellow skirt instead of age-of-sail pirate costume (white linen blouse, red sash, dark brown breeches, boots, captain's hat, heart pendant)",
+     "fix": "Replace purple/yellow outfit with correct pirate-era garments per prompt",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah wears blue blouse and dark belt without red sash, captain's hat, or grey-metal pendant; missing key costume elements for age-of-sail pirate",
+     "fix": "Add red sash, captain's hat, and heart pendant; ensure blouse matches white linen description",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Lorena",
+     "description": "Saira lacks red sash, boots, and pirate accessories; wearing plain white shirt and dark pants inconsistent with crew pirate costume",
+     "fix": "Add red sash, tall dark brown boots, and grey-metal heart pendant/bracelet as specified",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Facundo",
+     "description": "Facundo wears blue jeans and orange shirt—jeans are modern anachronism; missing white linen blouse, red sash, and period-appropriate attire",
+     "fix": "Replace orange shirt and blue jeans with white linen blouse, red sash, dark brown breeches, and period-correct boots",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah is laughing with hands at sides, but story requires her arms spread wide and mouth open mid-sentence (talking, not laughing)",
+     "fix": "Adjust pose to show arms spread wide and open-mouthed speech gesture, not laughter",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Saira",
+     "description": "Lorena is smiling with hands clasped, but story requires chin up, eyes down on chest contents, lips slightly parted in focused observation",
+     "fix": "Repose figure to look downward into chest with neutral/observant expression, not smiling or hands clasped",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1787867402809_z9bwoo3yp|p16|v2",
+   "storyId": "job_1787867402809_z9bwoo3yp",
+   "pageNumber": 16,
+   "versionIndex": "2",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Sarah->Lorena",
+    "Lorena->Sarah"
+   ],
+   "renamedByPart1": 4,
+   "matches": [
+    {
+     "reference": "Sarah",
+     "body_bbox": [
+      0.2,
+      0.39,
+      0.5,
+      0.9
+     ],
+     "face_bbox": [
+      0.4,
+      0.4,
+      0.5,
+      0.49
+     ]
+    },
+    {
+     "reference": "Saira",
+     "body_bbox": [
+      0.39,
+      0.39,
+      0.6,
+      0.9
+     ],
+     "face_bbox": [
+      0.4,
+      0.4,
+      0.5,
+      0.49
+     ]
+    },
+    {
+     "reference": "Fiona",
+     "body_bbox": [
+      0.5,
+      0.39,
+      0.7,
+      0.9
+     ],
+     "face_bbox": [
+      0.52,
+      0.4,
+      0.62,
+      0.49
+     ]
+    },
+    {
+     "reference": "Lorena",
+     "body_bbox": [
+      0.58,
+      0.51,
+      0.75,
+      0.9
+     ],
+     "face_bbox": [
+      0.6,
+      0.52,
+      0.68,
+      0.59
+     ]
+    },
+    {
+     "reference": "Facundo",
+     "body_bbox": [
+      0.7,
+      0.51,
+      0.9,
+      0.9
+     ],
+     "face_bbox": [
+      0.72,
+      0.52,
+      0.8,
+      0.59
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Fiona",
+     "bodyBox": [
+      0.32470703125,
+      0.0244140625,
+      0.8984375,
+      0.490234375
+     ],
+     "faceBox": [
+      0.32470703125,
+      0.15107421875,
+      0.57470703125,
+      0.36357421875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Facundo",
+     "bodyBox": [
+      0.46826171875,
+      0.6103515625,
+      0.986328125,
+      0.9150390625
+     ],
+     "faceBox": [
+      0.46826171875,
+      0.65693359375,
+      0.71826171875,
+      0.86943359375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Sarah",
+     "bodyBox": [
+      0.44921875,
+      0.5509765625,
+      0.9052734375,
+      0.767578125
+     ],
+     "faceBox": [
+      0.44921875,
+      0.5509765625,
+      0.69921875,
+      0.7634765625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Lorena",
+     "bodyBox": [
+      0.31982421875,
+      0.30732421875,
+      0.884765625,
+      0.51982421875
+     ],
+     "faceBox": [
+      0.31982421875,
+      0.30732421875,
+      0.56982421875,
+      0.51982421875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Saira",
+     "bodyBox": [
+      0.31787109375,
+      0.46064453125,
+      0.7841796875,
+      0.67314453125
+     ],
+     "faceBox": [
+      0.31787109375,
+      0.46064453125,
+      0.56787109375,
+      0.67314453125
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Fiona",
+     "description": "Fiona wears blue tunic and dark belt instead of white linen blouse, red sash, dark brown breeches, tall boots; missing grey-metal heart pendant, bracelet, and high-crowned brown leather captain's hat",
+     "fix": "Replace blue tunic with white linen blouse, add red sash, dark brown breeches, tall boots, grey-metal heart pendant, bracelet, and high-crowned brown leather captain's hat",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Saira",
+     "description": "Saira wears purple shirt and yellow skirt instead of pirate costume; missing all specified accessories and captain's hat",
+     "fix": "Replace purple shirt and yellow skirt with white linen blouse, red sash, dark brown breeches, tall boots; add grey-metal heart pendant, bracelet, and high-crowned brown leather captain's hat",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Facundo",
+     "description": "Facundo wears orange shirt and blue jeans — jeans are modern and anachronistic for age-of-sail pirate setting",
+     "fix": "Replace blue jeans with dark brown breeches; ensure white linen blouse, red sash, tall boots, and grey-metal accessories are added per prompt",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Lorena",
+     "description": "Lorena's outfit lacks red sash, grey-metal pendant/bracelet, captain's hat, and tall boots as specified",
+     "fix": "Add red sash over white blouse; include grey-metal heart pendant and bracelet; provide tall dark brown boots and captain's hat",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Sarah",
+     "description": "Sarah shown laughing with arms up but should be speaking mid-sentence; missing captain's hat and full accessory set",
+     "fix": "Adjust expression to mid-speech (mouth open forming words, not laughter); add high-crowned brown leather captain's hat and complete grey-metal accessories",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Saira",
+     "description": "Saira is smiling at viewer rather than focused intently on chest contents as described",
+     "fix": "Change gaze direction to look downward into chest; adjust expression to show focused attention, not general smile",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Background",
+     "description": "Two extra figures in white garments appear in center-background not described in prompt",
+     "fix": "Remove or blend background figures in white to match scene intent of isolated ledge with only five crew members",
+     "type": "unverified_absence",
+     "severity": "MINOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p2|v0",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 2,
+   "versionIndex": "0",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.11,
+      0.35,
+      0.22,
+      0.44
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.34,
+      0.38,
+      0.44,
+      0.46
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.54,
+      0.36,
+      0.64,
+      0.45
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.75,
+      0.36,
+      0.85,
+      0.45
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3519965277777778,
+      0.6871527777777778,
+      0.9826388888888888,
+      0.9479166666666666
+     ],
+     "faceBox": [
+      0.3519965277777778,
+      0.6871527777777778,
+      0.6019965277777778,
+      0.8996527777777777
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.3263888888888889,
+      0.07291666666666667,
+      0.96875,
+      0.4837962962962963
+     ],
+     "faceBox": [
+      0.3263888888888889,
+      0.1125,
+      0.5763888888888888,
+      0.325
+     ],
+     "confidence": "medium"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.3450520833333333,
+      0.5204861111111112,
+      0.9322916666666666,
+      0.7650462962962963
+     ],
+     "faceBox": [
+      0.3450520833333333,
+      0.5204861111111112,
+      0.5950520833333333,
+      0.7329861111111111
+     ],
+     "confidence": "medium"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.38845486111111116,
+      0.3275462962962963,
+      0.8732638888888888,
+      0.553587962962963
+     ],
+     "faceBox": [
+      0.38845486111111116,
+      0.34108796296296295,
+      0.6384548611111112,
+      0.553587962962963
+     ],
+     "confidence": "medium"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.18229166666666669,
+      0.21898148148148144,
+      0.4322916666666667,
+      0.43148148148148147
+     ],
+     "faceBox": [
+      0.18229166666666669,
+      0.21898148148148144,
+      0.4322916666666667,
+      0.43148148148148147
+     ],
+     "confidence": "low"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.1520138888888889,
+      0.1310925925925926,
+      0.3559027777777778,
+      0.2534722222222222
+     ],
+     "faceBox": [
+      0.1520138888888889,
+      0.1310925925925926,
+      0.2820138888888889,
+      0.24159259259259258
+     ],
+     "confidence": "low"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.03776041666666666,
+      0.04479166666666666,
+      0.3932291666666667,
+      0.3055555555555556
+     ],
+     "faceBox": [
+      0.03776041666666666,
+      0.04479166666666666,
+      0.28776041666666663,
+      0.25729166666666664
+     ],
+     "confidence": "low"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.2864583333333333,
+      0.3113425925925926,
+      0.3932291666666667,
+      0.33912037037037035
+     ],
+     "confidence": "low"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.2829861111111111,
+      0.22569444444444445,
+      0.3949652777777778,
+      0.3402777777777778
+     ],
+     "confidence": "low"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "description": "page is photographic; the commissioned style is a bold, expressive traditional watercolor painting",
+     "fix": "Regenerate the image in a bold, expressive traditional watercolor painting style with prominent visible brushstrokes, strong wet-on-wet washes, pigment pooling and granulating, and rough cold-press paper texture throughout. Ensure no hard outlines, ink, or pencil lines. Characters should be fully opaque with warm, not overly vibrant colors. Avoid bokeh, lens flare, photographic grain, skin pores, or camera-real fabric. Depth should come from atmospheric haze, not optical blur. Visible brushwork should be present on every surface, including faces. Faces should be loose washes with visible brushstroke texture. Characters should maintain their real ages.",
+     "type": "style_consistency",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian's shorts are dark brown denim shorts, not dungaree shorts with a square bib panel and adjustable shoulder straps.",
+     "fix": "Replace Julian's dark brown denim shorts with dark brown denim dungaree shorts with a square bib panel held by two adjustable shoulder straps.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan's picture book is tucked under his right arm, not his left arm.",
+     "fix": "Move Kiaan's picture book to be tucked under his left arm.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "description": "The yellow wooden trailhead signpost is behind the group of boys, not between the group and the fork.",
+     "fix": "Reposition the yellow wooden trailhead signpost to be between the group of boys and the fork in the path.",
+     "type": "setting",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin points toward Julian instead of the quiet side track behind the signpost",
+     "fix": "Redirect Levin's pointing arm toward the narrow grass-edged side path behind the signpost, not at Julian",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan holds two books in both hands instead of tucking a single hardcover picture book under his left arm",
+     "fix": "Replace two books held in both hands with one warm red hardcover picture book tucked securely under left arm",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Hair rendered as short curly blonde instead of wavy light blonde tousled",
+     "fix": "Adjust Levin's hair to appear wavy and tousled, not short and curly",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Book has reddish-brown cover with light blue spine instead of warm red cover with cream spine",
+     "fix": "Recolor book cover to warm red with cream spine, matching prompt specification",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p3|v1",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 3,
+   "versionIndex": "1",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Kiaan",
+    "Kiaan->Levin"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.25,
+      0.48,
+      0.35,
+      0.56
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.38,
+      0.48,
+      0.48,
+      0.56
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.55,
+      0.49,
+      0.64,
+      0.56
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.69,
+      0.49,
+      0.78,
+      0.56
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.4301215277777778,
+      0.2114583333333333,
+      0.9861111111111112,
+      0.42453703703703705
+     ],
+     "faceBox": [
+      0.4305555555555556,
+      0.21203703703703702,
+      0.6805555555555556,
+      0.42453703703703705
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.43880208333333337,
+      0.35150462962962964,
+      0.859375,
+      0.5810185185185185
+     ],
+     "faceBox": [
+      0.43967013888888884,
+      0.3538194444444444,
+      0.6896701388888888,
+      0.5663194444444444
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.43880208333333337,
+      0.5694444444444444,
+      0.8680555555555556,
+      0.8116898148148147
+     ],
+     "faceBox": [
+      0.43880208333333337,
+      0.5991898148148148,
+      0.6888020833333334,
+      0.8116898148148147
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.4383680555555556,
+      0.6111111111111112,
+      0.9166666666666666,
+      0.8261574074074074
+     ],
+     "faceBox": [
+      0.4383680555555556,
+      0.6136574074074075,
+      0.6883680555555556,
+      0.8261574074074074
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Wearing dark grey shorts instead of black denim shorts as specified",
+     "fix": "Recolor shorts from dark grey to black denim texture on leftmost child",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Wearing orange T-shirt under brown overalls instead of yellow T-shirt with dark brown dungaree shorts",
+     "fix": "Replace orange T-shirt and brown overalls with yellow T-shirt and dark brown dungaree shorts on center-left child",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Max",
+     "description": "Wearing blue shorts instead of dark purple jogger shorts",
+     "fix": "Recolor blue shorts to dark purple jogger style on center-right child",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "All",
+     "description": "Group is standing upright rather than leaning forward toward the cave opening behind the waterfall",
+     "fix": "Adjust postures of all four children to show forward-leaning torsos toward the waterfall's dark cave opening",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p3|v2",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 3,
+   "versionIndex": "2",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Max",
+    "Max->Kiaan",
+    "Kiaan->Levin"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.28,
+      0.53,
+      0.39,
+      0.63
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.4,
+      0.49,
+      0.52,
+      0.6
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.58,
+      0.49,
+      0.69,
+      0.59
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.72,
+      0.5,
+      0.83,
+      0.6
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.48828125,
+      0.1736111111111111,
+      0.9704861111111112,
+      0.4771990740740741
+     ],
+     "faceBox": [
+      0.48828125,
+      0.26469907407407406,
+      0.73828125,
+      0.4771990740740741
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.4375,
+      0.34976851851851853,
+      0.8888888888888888,
+      0.5833333333333334
+     ],
+     "faceBox": [
+      0.4375,
+      0.34976851851851853,
+      0.6875,
+      0.5622685185185186
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.48611111111111116,
+      0.5465277777777778,
+      0.9053819444444444,
+      0.7590277777777777
+     ],
+     "faceBox": [
+      0.48611111111111116,
+      0.5465277777777778,
+      0.7361111111111112,
+      0.7590277777777777
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.3745659722222222,
+      0.5960648148148148,
+      0.9522569444444444,
+      0.8591435185185184
+     ],
+     "faceBox": [
+      0.3745659722222222,
+      0.6466435185185185,
+      0.6245659722222222,
+      0.8591435185185184
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Levin wears dark blue shorts instead of black denim shorts; hair rendered as light brown instead of light blonde",
+     "fix": "Recolor shorts to black denim and adjust hair to light blonde",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian wears orange T-shirt and brown overalls with yellow patch instead of yellow T-shirt and dark brown dungaree shorts",
+     "fix": "Replace orange T-shirt with yellow T-shirt and overalls with dark brown dungaree shorts",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Max",
+     "description": "Max wears blue shorts instead of dark purple jogger shorts",
+     "fix": "Recolor shorts to dark purple jogger style",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan wears red T-shirt and dark blue shorts instead of orange T-shirt and dark grey shorts",
+     "fix": "Replace red T-shirt with orange and dark blue shorts with dark grey",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan looks down at book held in both hands instead of facing right toward cave with book under left arm",
+     "fix": "Reposition head and body to face right toward waterfall/cave; move book to under left arm",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "All",
+     "description": "Group does not collectively face the cave behind the waterfall as required by prompt and story text",
+     "fix": "Adjust all characters’ head direction to face the dark cave opening behind the waterfall",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p12|v0",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 12,
+   "versionIndex": "0",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Kiaan->Levin",
+    "Levin->Julian",
+    "Julian->Kiaan"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.16,
+      0.38,
+      0.23,
+      0.44
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.33,
+      0.38,
+      0.4,
+      0.44
+     ]
+    },
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.55,
+      0.38,
+      0.62,
+      0.44
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.79,
+      0.4,
+      0.86,
+      0.46
+     ]
+    },
+    {
+     "reference": "The Young Dragon",
+     "face_bbox": [
+      0.63,
+      0.6,
+      0.7,
+      0.66
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.2743055555555556,
+      0.47361111111111115,
+      0.8116319444444444,
+      0.7476851851851852
+     ],
+     "faceBox": [
+      0.2743055555555556,
+      0.47361111111111115,
+      0.5243055555555556,
+      0.6861111111111111
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.2821180555555556,
+      0.25462962962962965,
+      0.7595486111111112,
+      0.48935185185185187
+     ],
+     "faceBox": [
+      0.2821180555555556,
+      0.27685185185185185,
+      0.5321180555555556,
+      0.48935185185185187
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.3355034722222222,
+      0.08564814814814815,
+      0.8793402777777778,
+      0.32905092592592594
+     ],
+     "faceBox": [
+      0.3355034722222222,
+      0.11655092592592593,
+      0.5855034722222222,
+      0.32905092592592594
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3732638888888889,
+      0.7375,
+      0.8871527777777778,
+      0.95
+     ],
+     "faceBox": [
+      0.3732638888888889,
+      0.7375,
+      0.6232638888888888,
+      0.95
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "description": "The distant landmark is a waterfall, not a dark cave notch as described in the prompt.",
+     "fix": "Replace the waterfall with a dark cave notch between the trees in the background.",
+     "type": "setting",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "The Young Dragon",
+     "description": "The young dragon is positioned to the right of Julian, not between Julian and Levin as described.",
+     "fix": "Reposition the young dragon to walk between Julian and Levin.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian is wearing dark brown shorts, not dark brown dungaree shorts with a square bib panel.",
+     "fix": "Change Julian's shorts to dark brown dungaree shorts with a square bib panel.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin is wearing black denim shorts, not black denim shorts with white ankle socks and grey canvas sneakers. He is also barefoot.",
+     "fix": "Add white ankle socks and grey canvas sneakers to Levin's outfit.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Max",
+     "description": "Max is wearing dark purple jogger shorts, not dark purple jogger shorts with white ankle socks and blue canvas sneakers. He is also barefoot.",
+     "fix": "Add white ankle socks and blue canvas sneakers to Max's outfit.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan is wearing dark grey shorts, not dark grey shorts with white ankle socks and white canvas sneakers with light grey rubber soles. He is also barefoot.",
+     "fix": "Add white ankle socks and white canvas sneakers with light grey rubber soles to Kiaan's outfit.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "The Young Dragon",
+     "description": "The dragon's head is turned back over his right shoulder, not his left shoulder, and is not looking toward the far end of the frame where the cave entrance should be.",
+     "fix": "Turn the dragon's head back over his left shoulder, looking toward the distant cave entrance.",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Levin",
+     "description": "Footwear is dark grey/black flip-flops instead of grey canvas sneakers",
+     "fix": "Replace flip-flops with grey canvas sneakers",
+     "type": "accessory",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Julian",
+     "description": "Feet are bare instead of wearing light grey canvas sneakers",
+     "fix": "Add light grey canvas sneakers to Julian's feet",
+     "type": "accessory",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Wearing grey denim shorts (not matching 'dark grey shorts') and light grey slip-ons instead of white canvas sneakers with light grey soles",
+     "fix": "Change shoes to white canvas sneakers with light grey rubber soles; ensure shorts match dark grey specification",
+     "type": "accessory",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "The Young Dragon",
+     "description": "Dragon should be looking back at a dark cave notch between trees far behind the group, but VISION_INVENTORY reports a waterfall in center-background and omits the cave entirely",
+     "fix": "Remove waterfall; add small dark cave notch shadow between trees in background; reposition dragon's head turned back over left shoulder looking toward that cave",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Scene Background",
+     "description": "Waterfall is present in background though prompt explicitly states 'not the waterfall' and specifies a dark cave notch as the distant landmark",
+     "fix": "Replace waterfall with dense forest canopy and a subtle dark cave opening between trees far behind the group",
+     "type": "object_presence",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p12|v1",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 12,
+   "versionIndex": "1",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Kiaan->Levin",
+    "Levin->Kiaan"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.19,
+      0.39,
+      0.25,
+      0.45
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.34,
+      0.36,
+      0.4,
+      0.42
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.5,
+      0.36,
+      0.56,
+      0.42
+     ]
+    },
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.8,
+      0.46,
+      0.86,
+      0.52
+     ]
+    },
+    {
+     "reference": "The Young Dragon",
+     "face_bbox": [
+      0.62,
+      0.57,
+      0.69,
+      0.64
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.2795138888888889,
+      0.4666666666666666,
+      0.78125,
+      0.7164351851851852
+     ],
+     "faceBox": [
+      0.2795138888888889,
+      0.4666666666666666,
+      0.5295138888888888,
+      0.6791666666666666
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.3359375,
+      0.08564814814814815,
+      0.8793402777777778,
+      0.3296296296296296
+     ],
+     "faceBox": [
+      0.3359375,
+      0.11712962962962963,
+      0.5859375,
+      0.3296296296296296
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.2825520833333333,
+      0.25578703703703703,
+      0.7604166666666666,
+      0.5188657407407408
+     ],
+     "faceBox": [
+      0.2825520833333333,
+      0.30636574074074074,
+      0.5325520833333333,
+      0.5188657407407408
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3732638888888889,
+      0.7375,
+      0.8871527777777778,
+      0.95
+     ],
+     "faceBox": [
+      0.3732638888888889,
+      0.7375,
+      0.6232638888888888,
+      0.95
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Levin is wearing a yellow t-shirt and brown shorts instead of a red short-sleeved cotton T-shirt and black denim shorts.",
+     "fix": "Regenerate Levin wearing a red short-sleeved cotton T-shirt and black denim shorts.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "The Young Dragon",
+     "description": "The young dragon is walking to the right of Julian and Levin, not between them.",
+     "fix": "Reposition the young dragon to walk between Julian and Levin.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "description": "The distant dark cave notch is missing; a waterfall is shown instead.",
+     "fix": "Replace the waterfall with a dark cave notch between the trees far behind the group.",
+     "type": "missing_element",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian is wearing dungaree shorts with a square bib panel, but the bib panel is not visible.",
+     "fix": "Adjust Julian's dungaree shorts to clearly show the square bib panel.",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan's canvas sneakers are white with light grey rubber soles, but the soles are not clearly light grey.",
+     "fix": "Adjust Kiaan's canvas sneakers to clearly show light grey rubber soles.",
+     "type": "accessory",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Max",
+     "description": "Max's canvas sneakers are blue, but they appear to be a darker shade of blue.",
+     "fix": "Adjust Max's canvas sneakers to a lighter blue.",
+     "type": "accessory",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian's canvas sneakers are light grey, but they appear to be a darker grey.",
+     "fix": "Adjust Julian's canvas sneakers to a lighter grey.",
+     "type": "accessory",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin's canvas sneakers are grey, but they appear to be a darker grey.",
+     "fix": "Adjust Levin's canvas sneakers to a lighter grey.",
+     "type": "accessory",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin wears yellow T-shirt, brown shorts, and bare feet instead of red T-shirt, black denim shorts, white ankle socks, and grey canvas sneakers",
+     "fix": "Fix: Levin wears yellow T-shirt, brown shorts, and bare feet instead of red T-shirt, black denim shorts, white ankle socks, and grey canvas sneakers",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian’s hair appears light brown/auburn instead of light blonde; footwear described inconsistently with prompt (light grey shoes with white soles vs light grey canvas sneakers)",
+     "fix": "Fix: Julian’s hair appears light brown/auburn instead of light blonde; footwear described inconsistently with prompt (light grey shoes with white soles vs light grey canvas sneakers)",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Max",
+     "description": "Max missing white ankle socks; footwear sole color not matching prompt (white soles shown but prompt specifies blue canvas sneakers without mention of white soles — acceptable if base shoe color correct, but socks are missing)",
+     "fix": "Fix: Max missing white ankle socks; footwear sole color not matching prompt (white soles shown but prompt specifies blue canvas sneakers without mention of white soles — acceptable if base shoe color correct, but socks are missing)",
+     "type": "accessory",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan’s shoes are dark grey with white soles instead of white canvas with light grey rubber soles; quality figures note bare right foot, conflicting with inventory and prompt",
+     "fix": "Fix: Kiaan’s shoes are dark grey with white soles instead of white canvas with light grey rubber soles; quality figures note bare right foot, conflicting with inventory and prompt",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "The Young Dragon",
+     "description": "Scene shows waterfall in center-background as notable landmark, but prompt explicitly states 'not the waterfall' and requires a dark cave notch far behind the group to be the focus of the dragon’s gaze",
+     "fix": "Fix: Scene shows waterfall in center-background as notable landmark, but prompt explicitly states 'not the waterfall' and requires a dark cave notch far behind the group to be the focus of the dragon’s gaze",
+     "type": "wrong_action",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p12|v2",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 12,
+   "versionIndex": "2",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Kiaan->Levin",
+    "Levin->Kiaan"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.14,
+      0.48,
+      0.19,
+      0.53
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.32,
+      0.48,
+      0.37,
+      0.53
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.51,
+      0.48,
+      0.56,
+      0.53
+     ]
+    },
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.79,
+      0.48,
+      0.84,
+      0.53
+     ]
+    },
+    {
+     "reference": "The Young Dragon",
+     "face_bbox": [
+      0.62,
+      0.59,
+      0.69,
+      0.65
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.3194444444444444,
+      0.4932870370370371,
+      0.7821180555555556,
+      0.7175925925925926
+     ],
+     "faceBox": [
+      0.3194444444444444,
+      0.4932870370370371,
+      0.5694444444444444,
+      0.705787037037037
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3732638888888889,
+      0.7375,
+      0.8871527777777778,
+      0.95
+     ],
+     "faceBox": [
+      0.3732638888888889,
+      0.7375,
+      0.6232638888888888,
+      0.95
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.3350694444444444,
+      0.08564814814814815,
+      0.8793402777777778,
+      0.3284722222222222
+     ],
+     "faceBox": [
+      0.3350694444444444,
+      0.11597222222222221,
+      0.5850694444444444,
+      0.3284722222222222
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.2821180555555556,
+      0.25578703703703703,
+      0.7604166666666666,
+      0.48935185185185187
+     ],
+     "faceBox": [
+      0.2821180555555556,
+      0.27685185185185185,
+      0.5321180555555556,
+      0.48935185185185187
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Levin is wearing a yellow T-shirt and dark brown shorts, but the prompt specified a red short-sleeved cotton T-shirt and black denim shorts.",
+     "fix": "Change Levin's T-shirt to red and his shorts to black denim.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "description": "The distant landmark is a waterfall, but the prompt specified a dark cave entrance.",
+     "fix": "Replace the waterfall with a dark cave entrance.",
+     "type": "setting",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian is wearing a yellow T-shirt and dark brown dungaree shorts, but the prompt specified white ankle socks and light grey canvas sneakers, which are missing.",
+     "fix": "Add white ankle socks and light grey canvas sneakers to Julian's outfit.",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Max",
+     "description": "Max is wearing a green T-shirt and dark purple jogger shorts, but the prompt specified white ankle socks and blue canvas sneakers, which are missing.",
+     "fix": "Add white ankle socks and blue canvas sneakers to Max's outfit.",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan is wearing an orange T-shirt and dark grey shorts, but the prompt specified white ankle socks and white canvas sneakers with light grey rubber soles, which are missing.",
+     "fix": "Add white ankle socks and white canvas sneakers with light grey rubber soles to Kiaan's outfit.",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin is wearing a yellow T-shirt and dark brown shorts, but the prompt specified white ankle socks and grey canvas sneakers, which are missing.",
+     "fix": "Add white ankle socks and grey canvas sneakers to Levin's outfit.",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "The Young Dragon",
+     "description": "The dragon's head is turned back over his left shoulder, but his eyes are looking towards the viewer/camera, not toward the far end of the frame where the cave entrance should be.",
+     "fix": "Adjust the dragon's gaze to look towards the distant cave entrance.",
+     "type": "action_interaction",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "The Young Dragon",
+     "description": "Background shows a white waterfall where the prompt explicitly requires a dark cave entrance visible behind the group. The dragon must be looking back at that cave, not a waterfall.",
+     "fix": "Replace the waterfall in center-background with a subtle dark notch between trees indicating a cave entrance, consistent with 'dark notch... barely visible as a small shadow'",
+     "type": "setting",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Levin",
+     "description": "VISION_INVENTORY describes Figure 4 (matched as Levin) with blonde curly hair and yellow T-shirt, matching Julian’s prompt description, while Figure 3 is labeled Julian but has dark brown curly hair and yellow T-shirt — suggests character positions may be swapped in rendering despite correct matches",
+     "fix": "Ensure Levin (front-left, rightmost foreground) has wavy light blonde tousled hair and red T-shirt per prompt; currently rendered with traits matching Julian",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p18|v0",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 18,
+   "versionIndex": "0",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Max->Julian",
+    "Julian->Max"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.09,
+      0.37,
+      0.15,
+      0.43
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.29,
+      0.34,
+      0.36,
+      0.41
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.52,
+      0.32,
+      0.6,
+      0.39
+     ]
+    },
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.71,
+      0.22,
+      0.8,
+      0.3
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.2578125,
+      0.2800925925925926,
+      0.8680555555555556,
+      0.5287037037037037
+     ],
+     "faceBox": [
+      0.2578125,
+      0.3162037037037037,
+      0.5078125,
+      0.5287037037037037
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.2951388888888889,
+      0.08564814814814815,
+      0.8602430555555556,
+      0.325
+     ],
+     "faceBox": [
+      0.2951388888888889,
+      0.1125,
+      0.5451388888888888,
+      0.325
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.11979166666666666,
+      0.5219907407407407,
+      0.8611111111111112,
+      0.9039351851851852
+     ],
+     "faceBox": [
+      0.11979166666666666,
+      0.64375,
+      0.36979166666666663,
+      0.85625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.22569444444444442,
+      0.45162037037037034,
+      0.8671875,
+      0.7199074074074074
+     ],
+     "faceBox": [
+      0.22569444444444442,
+      0.45162037037037034,
+      0.4756944444444444,
+      0.6641203703703703
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Julian wears grey socks instead of white cotton ankle socks",
+     "fix": "Recolor Julian's socks to white cotton ankle socks",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Max",
+     "description": "Max wears blue socks instead of white cotton ankle socks",
+     "fix": "Recolor Max's socks to white cotton ankle socks",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1787349305313_hpv76p0rokg|p18|v1",
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 18,
+   "versionIndex": "1",
+   "kind": "no-vote-uncorrectable-face-paired",
+   "conflictPairs": [
+    "Max->Julian",
+    "Julian->Max"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.09,
+      0.37,
+      0.15,
+      0.43
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.29,
+      0.34,
+      0.36,
+      0.41
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.52,
+      0.32,
+      0.6,
+      0.39
+     ]
+    },
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.71,
+      0.22,
+      0.8,
+      0.3
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.2578125,
+      0.2800925925925926,
+      0.8680555555555556,
+      0.5287037037037037
+     ],
+     "faceBox": [
+      0.2578125,
+      0.3162037037037037,
+      0.5078125,
+      0.5287037037037037
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.2951388888888889,
+      0.08564814814814815,
+      0.8602430555555556,
+      0.325
+     ],
+     "faceBox": [
+      0.2951388888888889,
+      0.1125,
+      0.5451388888888888,
+      0.325
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.11979166666666666,
+      0.5219907407407407,
+      0.8611111111111112,
+      0.9039351851851852
+     ],
+     "faceBox": [
+      0.11979166666666666,
+      0.64375,
+      0.36979166666666663,
+      0.85625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.22569444444444442,
+      0.45162037037037034,
+      0.8671875,
+      0.7199074074074074
+     ],
+     "faceBox": [
+      0.22569444444444442,
+      0.45162037037037034,
+      0.4756944444444444,
+      0.6641203703703703
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Julian wears grey socks instead of white cotton ankle socks",
+     "fix": "Recolor Julian's socks to white cotton ankle socks",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Max",
+     "description": "Max wears blue socks instead of white cotton ankle socks",
+     "fix": "Recolor Max's socks to white cotton ankle socks",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1788727233899_1dpnym94p|p18|v2",
+   "storyId": "job_1788727233899_1dpnym94p",
+   "pageNumber": 18,
+   "versionIndex": "2",
+   "kind": "no-vote-uncorrectable-not-a-permutation",
+   "conflictPairs": [
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.28,
+      0.2,
+      0.49,
+      0.86
+     ],
+     "face_bbox": [
+      0.31,
+      0.22,
+      0.44,
+      0.38
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.46,
+      0.2,
+      0.67,
+      0.86
+     ],
+     "face_bbox": [
+      0.49,
+      0.22,
+      0.62,
+      0.38
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.61,
+      0.2,
+      0.82,
+      0.86
+     ],
+     "face_bbox": [
+      0.64,
+      0.22,
+      0.77,
+      0.38
+     ]
+    },
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.76,
+      0.2,
+      0.97,
+      0.86
+     ],
+     "face_bbox": [
+      0.79,
+      0.22,
+      0.92,
+      0.38
+     ]
+    },
+    {
+     "reference": "Nia",
+     "body_bbox": [
+      0.55,
+      0.31,
+      0.75,
+      0.58
+     ],
+     "face_bbox": [
+      0.58,
+      0.33,
+      0.68,
+      0.43
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.10205078125,
+      0.27900390625,
+      0.4619140625,
+      0.49150390625
+     ],
+     "faceBox": [
+      0.10205078125,
+      0.27900390625,
+      0.35205078125,
+      0.49150390625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.18505859375,
+      0.5546875,
+      0.638671875,
+      0.8505859375
+     ],
+     "faceBox": [
+      0.18505859375,
+      0.61201171875,
+      0.43505859375,
+      0.82451171875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.10888671875,
+      0.482421875,
+      0.52734375,
+      0.69658203125
+     ],
+     "faceBox": [
+      0.10888671875,
+      0.48408203125,
+      0.35888671875,
+      0.69658203125
+     ],
+     "confidence": "medium"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.1279296875,
+      0.3751953125,
+      0.51171875,
+      0.5876953125
+     ],
+     "faceBox": [
+      0.1279296875,
+      0.3751953125,
+      0.3779296875,
+      0.5876953125
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Kiaan",
+     "description": "Kiaan wears white sneakers with grey soles instead of brown leather sneakers",
+     "fix": "Change Kiaan’s footwear to brown leather sneakers as specified",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Levin wears blue denim overalls instead of grey dungaree bib shorts",
+     "fix": "Replace denim overalls with grey dungaree bib shorts on Levin",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin wears blue shorts instead of mid-blue denim shorts and is missing his grey backpack",
+     "fix": "Update Levin’s shorts to mid-blue denim and add grey backpack",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin missing grey backpack",
+     "fix": "Add grey backpack to Levin’s figure",
+     "type": "unverified_absence",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1788727233899_1dpnym94p|p18|v3",
+   "storyId": "job_1788727233899_1dpnym94p",
+   "pageNumber": 18,
+   "versionIndex": "3",
+   "kind": "no-vote-uncorrectable-not-a-permutation",
+   "conflictPairs": [
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.28,
+      0.2,
+      0.49,
+      0.86
+     ],
+     "face_bbox": [
+      0.31,
+      0.22,
+      0.44,
+      0.38
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.48,
+      0.2,
+      0.69,
+      0.86
+     ],
+     "face_bbox": [
+      0.51,
+      0.22,
+      0.64,
+      0.38
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.62,
+      0.2,
+      0.83,
+      0.86
+     ],
+     "face_bbox": [
+      0.65,
+      0.22,
+      0.78,
+      0.38
+     ]
+    },
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.77,
+      0.2,
+      0.98,
+      0.86
+     ],
+     "face_bbox": [
+      0.8,
+      0.22,
+      0.93,
+      0.38
+     ]
+    },
+    {
+     "reference": "Nia",
+     "body_bbox": [
+      0.56,
+      0.38,
+      0.76,
+      0.6
+     ],
+     "face_bbox": [
+      0.62,
+      0.38,
+      0.72,
+      0.48
+     ]
+    },
+    {
+     "reference": null,
+     "body_bbox": [
+      0.05,
+      0.05,
+      0.25,
+      0.25
+     ],
+     "face_bbox": []
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.18994140625,
+      0.5615234375,
+      0.642578125,
+      0.82421875
+     ],
+     "faceBox": [
+      0.18994140625,
+      0.60224609375,
+      0.43994140625,
+      0.81474609375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.10205078125,
+      0.27900390625,
+      0.4619140625,
+      0.49150390625
+     ],
+     "faceBox": [
+      0.10205078125,
+      0.27900390625,
+      0.35205078125,
+      0.49150390625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.10888671875,
+      0.48046875,
+      0.5283203125,
+      0.69658203125
+     ],
+     "faceBox": [
+      0.10888671875,
+      0.48408203125,
+      0.35888671875,
+      0.69658203125
+     ],
+     "confidence": "medium"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.1279296875,
+      0.3751953125,
+      0.51171875,
+      0.5876953125
+     ],
+     "faceBox": [
+      0.1279296875,
+      0.3751953125,
+      0.3779296875,
+      0.5876953125
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Levin wears blue denim overalls instead of grey dungaree bib shorts",
+     "fix": "Replace blue denim overalls with grey dungaree bib shorts on the young boy in yellow seated center-foreground",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin's hair rendered as light brown instead of light blonde",
+     "fix": "Adjust hair colour of the young boy in red (right-foreground) from light brown to short tousled light blonde",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1788471969309_9cg9dqyirre|p3|v0",
+   "storyId": "job_1788471969309_9cg9dqyirre",
+   "pageNumber": 3,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Saira->Lorena",
+    "Lorena->Saira"
+   ],
+   "renamedByPart1": 2,
+   "matches": [
+    {
+     "reference": "Fiona",
+     "body_bbox": [
+      0.04,
+      0.23,
+      0.23,
+      0.89
+     ],
+     "face_bbox": [
+      0.07,
+      0.24,
+      0.19,
+      0.34
+     ]
+    },
+    {
+     "reference": "Saira",
+     "body_bbox": [
+      0.19,
+      0.23,
+      0.36,
+      0.86
+     ],
+     "face_bbox": [
+      0.21,
+      0.24,
+      0.32,
+      0.34
+     ]
+    },
+    {
+     "reference": "Sarah",
+     "body_bbox": [
+      0.32,
+      0.23,
+      0.49,
+      0.89
+     ],
+     "face_bbox": [
+      0.34,
+      0.24,
+      0.45,
+      0.34
+     ]
+    },
+    {
+     "reference": "Lorena",
+     "body_bbox": [
+      0.45,
+      0.27,
+      0.61,
+      0.88
+     ],
+     "face_bbox": [
+      0.47,
+      0.27,
+      0.56,
+      0.35
+     ]
+    },
+    {
+     "reference": "Facundo",
+     "body_bbox": [
+      0.49,
+      0.23,
+      0.66,
+      0.89
+     ],
+     "face_bbox": [
+      0.5,
+      0.24,
+      0.61,
+      0.34
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Fiona",
+     "bodyBox": [
+      0.19384765625,
+      0.04072265625,
+      0.8916015625,
+      0.25322265625
+     ],
+     "faceBox": [
+      0.19384765625,
+      0.04072265625,
+      0.44384765625,
+      0.25322265625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Sarah",
+     "bodyBox": [
+      0.20263671875,
+      0.29462890625,
+      0.9013671875,
+      0.50712890625
+     ],
+     "faceBox": [
+      0.20263671875,
+      0.29462890625,
+      0.45263671875,
+      0.50712890625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Lorena",
+     "bodyBox": [
+      0.208984375,
+      0.161328125,
+      0.8642578125,
+      0.373828125
+     ],
+     "faceBox": [
+      0.208984375,
+      0.161328125,
+      0.458984375,
+      0.373828125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Facundo",
+     "bodyBox": [
+      0.17626953125,
+      0.45673828125,
+      0.865234375,
+      0.66923828125
+     ],
+     "faceBox": [
+      0.17626953125,
+      0.45673828125,
+      0.42626953125,
+      0.66923828125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Saira",
+     "bodyBox": [
+      0.24169921875,
+      0.39716796875,
+      0.8955078125,
+      0.60966796875
+     ],
+     "faceBox": [
+      0.24169921875,
+      0.39716796875,
+      0.49169921875,
+      0.60966796875
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Facundo",
+     "description": "Facundo does not hold the rope roll as required by story text",
+     "fix": "Add a coiled rope roll held in both hands for Facundo",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Fiona",
+     "description": "Fiona does not hold or tuck the map under her arm as required by story text",
+     "fix": "Add a rolled map tucked firmly under Fiona's arm",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Facundo",
+     "description": "Facundo faces right while all other crew members face viewer; breaks unity of group stance implied by prompt and story",
+     "fix": "Rotate Facundo's upper body and head to face forward with the rest of the crew",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1788614817116_vxnu60yjg|p7|v0",
+   "storyId": "job_1788614817116_vxnu60yjg",
+   "pageNumber": 7,
+   "versionIndex": "0",
+   "kind": "no-vote-uncorrectable-not-a-permutation",
+   "conflictPairs": [
+    "Max->Julian"
+   ],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.598,
+      0.448,
+      0.998,
+      0.968
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.358,
+      0.528,
+      0.948,
+      0.968
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.188,
+      0.608,
+      0.738,
+      0.968
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.298,
+      0.608,
+      0.738,
+      0.968
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.40451388888888884,
+      0.6041666666666666,
+      0.9678819444444444,
+      0.8993055555555556
+     ],
+     "faceBox": [
+      0.40451388888888884,
+      0.6194444444444445,
+      0.6545138888888888,
+      0.8319444444444444
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.53125,
+      0.38425925925925924,
+      0.9036458333333334,
+      0.5949074074074074
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.5095486111111112,
+      0.1527777777777778,
+      0.7352430555555556,
+      0.29398148148148145
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.5069444444444444,
+      0.29282407407407407,
+      0.7100694444444444,
+      0.4166666666666667
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Hair rendered as light brown, short, curly instead of light blonde, short wavy",
+     "fix": "Adjust hair color to light blonde and texture to short wavy for Levin in right-foreground",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Hair rendered as light brown, short, curly instead of light blonde, curly",
+     "fix": "Adjust hair color to light blonde while retaining curly texture for Julian in center-midground",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Max",
+     "description": "Wearing green shorts instead of olive-green cargo shorts; hair rendered as dark brown instead of light brown; pushing balance bike instead of pedal bicycle",
+     "fix": "Replace green shorts with olive-green cargo shorts, correct hair to light brown curly, and change balance bike to blue pedal bicycle for Max in center-background",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Wearing white sneakers instead of black trainers; pushing balance bike instead of pedal bicycle",
+     "fix": "Change sneakers to black trainers and replace orange balance bike with orange pedal bicycle for Kiaan in left-background",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1788614817116_vxnu60yjg|p16|v0",
+   "storyId": "job_1788614817116_vxnu60yjg",
+   "pageNumber": 16,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Julian->Max",
+    "Max->Julian"
+   ],
+   "renamedByPart1": 2,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.17,
+      0.2,
+      0.4,
+      0.97
+     ],
+     "face_bbox": [
+      0.2,
+      0.22,
+      0.35,
+      0.38
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.38,
+      0.35,
+      0.57,
+      0.97
+     ],
+     "face_bbox": [
+      0.4,
+      0.36,
+      0.5,
+      0.47
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.55,
+      0.38,
+      0.74,
+      0.97
+     ],
+     "face_bbox": [
+      0.57,
+      0.39,
+      0.67,
+      0.5
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.73,
+      0.38,
+      0.92,
+      0.97
+     ],
+     "face_bbox": [
+      0.75,
+      0.39,
+      0.85,
+      0.5
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.2074652777777778,
+      0.09606481481481481,
+      0.9696180555555556,
+      0.4513888888888889
+     ],
+     "faceBox": [
+      0.2074652777777778,
+      0.15185185185185185,
+      0.4574652777777778,
+      0.36435185185185187
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.31423611111111116,
+      0.3821759259259259,
+      0.9522569444444444,
+      0.6342592592592593
+     ],
+     "faceBox": [
+      0.31423611111111116,
+      0.3821759259259259,
+      0.5642361111111112,
+      0.5946759259259259
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3172743055555556,
+      0.7357638888888889,
+      0.9210069444444444,
+      0.9791666666666666
+     ],
+     "faceBox": [
+      0.3172743055555556,
+      0.7357638888888889,
+      0.5672743055555556,
+      0.9482638888888888
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.3532986111111111,
+      0.5754629629629631,
+      0.9375,
+      0.8078703703703703
+     ],
+     "faceBox": [
+      0.3532986111111111,
+      0.5754629629629631,
+      0.6032986111111112,
+      0.787962962962963
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Dragon shown held in left hand, but prompt and story require it to perch on railing beside his hands while he grips railing with both hands",
+     "fix": "Reposition dragon onto railing beside Levin's hands; ensure both hands visibly grip railing",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Wearing dark blue shorts instead of dark grey jogger shorts",
+     "fix": "Recolor shorts from dark blue to dark grey",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1788614817116_vxnu60yjg|p16|v1",
+   "storyId": "job_1788614817116_vxnu60yjg",
+   "pageNumber": 16,
+   "versionIndex": "1",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Julian->Max",
+    "Max->Julian"
+   ],
+   "renamedByPart1": 4,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.15,
+      0.2,
+      0.44,
+      0.97
+     ],
+     "face_bbox": [
+      0.19,
+      0.22,
+      0.36,
+      0.38
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.39,
+      0.35,
+      0.6,
+      0.94
+     ],
+     "face_bbox": [
+      0.42,
+      0.36,
+      0.54,
+      0.48
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.56,
+      0.39,
+      0.76,
+      0.94
+     ],
+     "face_bbox": [
+      0.59,
+      0.4,
+      0.7,
+      0.51
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.75,
+      0.39,
+      0.95,
+      0.94
+     ],
+     "face_bbox": [
+      0.78,
+      0.4,
+      0.89,
+      0.51
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.3663194444444444,
+      0.40162037037037035,
+      0.9513888888888888,
+      0.6342592592592593
+     ],
+     "faceBox": [
+      0.3368055555555556,
+      0.4039351851851852,
+      0.5399305555555556,
+      0.5729166666666666
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.2404513888888889,
+      0.09722222222222222,
+      0.96875,
+      0.4513888888888889
+     ],
+     "faceBox": [
+      0.21180555555555555,
+      0.14814814814814814,
+      0.4513888888888889,
+      0.37037037037037035
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3819444444444444,
+      0.7847222222222222,
+      0.9201388888888888,
+      0.9791666666666666
+     ],
+     "faceBox": [
+      0.3585069444444444,
+      0.7754629629629629,
+      0.5390625,
+      0.9490740740740741
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.4079861111111111,
+      0.6030092592592593,
+      0.9375,
+      0.8055555555555556
+     ],
+     "faceBox": [
+      0.3836805555555556,
+      0.5983796296296297,
+      0.5729166666666666,
+      0.7650462962962963
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Dragon is held in right hand but should be perched beside hands on railing",
+     "fix": "Reposition small amber-gold juvenile dragon to perch on railing beside Levin's hands, freeing both hands to grip the rail",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Levin",
+     "description": "Only left hand grips railing; right hand holds dragon",
+     "fix": "Adjust pose so both hands grip the red metal railing, matching prompt and story text",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Footwear is dark grey sneakers; prompt implies white low-top canvas trainers for all boys based on Levin's description pattern",
+     "fix": "Change Max's footwear to white low-top canvas trainers",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Max",
+     "description": "Apparent age 2 years vs expected 3; footwear mismatch",
+     "fix": "Render Julian with slightly older appearance consistent with 3-year-old; ensure footwear matches style",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Shorts are dark blue instead of dark grey jogger shorts",
+     "fix": "Recolor Kiaan's shorts to dark grey",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "description": "Setting shows mountains, clouds, cobblestones, daylight/overcast lighting — contradicts prompt's 'complete darkness', 'deep blue-black night sky', 'valley swallowed in black shadow'",
+     "fix": "Replace background with deep blue-black starless sky and total darkness below railing; remove visible terrain, clouds, and mountains; ensure lighting matches night",
+     "type": "setting",
+     "severity": "CRITICAL"
+    },
+    {
+     "description": "Railing material described as wood in vision inventory, but prompt specifies red-painted metal safety railing",
+     "fix": "Render railing as metallic (not wooden) with red paint",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1788614817116_vxnu60yjg|p16|v3",
+   "storyId": "job_1788614817116_vxnu60yjg",
+   "pageNumber": 16,
+   "versionIndex": "3",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Julian->Max",
+    "Max->Julian"
+   ],
+   "renamedByPart1": 4,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.15,
+      0.2,
+      0.41,
+      0.97
+     ],
+     "face_bbox": [
+      0.19,
+      0.23,
+      0.33,
+      0.35
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.39,
+      0.35,
+      0.6,
+      0.95
+     ],
+     "face_bbox": [
+      0.42,
+      0.36,
+      0.52,
+      0.45
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.56,
+      0.39,
+      0.75,
+      0.95
+     ],
+     "face_bbox": [
+      0.59,
+      0.4,
+      0.68,
+      0.48
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.75,
+      0.39,
+      0.94,
+      0.95
+     ],
+     "face_bbox": [
+      0.78,
+      0.4,
+      0.87,
+      0.48
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.2065972222222222,
+      0.08680555555555555,
+      0.9696180555555556,
+      0.45601851851851855
+     ],
+     "faceBox": [
+      0.2065972222222222,
+      0.15185185185185185,
+      0.4565972222222222,
+      0.36435185185185187
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.3133680555555556,
+      0.3821759259259259,
+      0.9513888888888888,
+      0.6400462962962963
+     ],
+     "faceBox": [
+      0.3133680555555556,
+      0.3821759259259259,
+      0.5633680555555556,
+      0.5946759259259259
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3185763888888889,
+      0.7351851851851853,
+      0.9210069444444444,
+      0.9791666666666666
+     ],
+     "faceBox": [
+      0.3185763888888889,
+      0.7351851851851853,
+      0.5685763888888888,
+      0.9476851851851852
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.3524305555555555,
+      0.5754629629629631,
+      0.9375,
+      0.8078703703703703
+     ],
+     "faceBox": [
+      0.3524305555555555,
+      0.5754629629629631,
+      0.6024305555555556,
+      0.787962962962963
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Levin faces left and has eyes wide open, but should be facing background with eyes squeezed shut while shouting",
+     "fix": "Repaint Levin to face outward (back view), head tilted back, eyes squeezed shut",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Max faces left but should be facing background (outward)",
+     "fix": "Repaint Max to face outward (back view), head tilted back, eyes looking upward",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Max",
+     "description": "Julian faces left but should be facing background (outward)",
+     "fix": "Repaint Julian to face outward (back view), head tilted back, eyes looking upward",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan wears dark blue shorts instead of dark grey jogger shorts",
+     "fix": "Recolour Kiaan's shorts to dark grey and ensure style matches jogger cut",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Scene",
+     "description": "Setting includes visible mountains and clouds under overcast lighting, contradicting prompt's 'deep blue-black night sky' and 'valley falls away into complete darkness'",
+     "fix": "Replace background with deep blue-black night sky and complete darkness below platform; remove mountains and clouds",
+     "type": "setting",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1789078732136_622wecmhj|p7|v0",
+   "storyId": "job_1789078732136_622wecmhj",
+   "pageNumber": 7,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Kiaan->Max",
+    "Max->Kiaan"
+   ],
+   "renamedByPart1": 3,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.15,
+      0.36,
+      0.54,
+      0.96
+     ],
+     "face_bbox": [
+      0.24,
+      0.37,
+      0.38,
+      0.52
+     ]
+    },
+    {
+     "reference": "unmatched",
+     "body_bbox": [
+      0,
+      0.52,
+      0.32,
+      0.99
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.6,
+      0.04,
+      0.95,
+      0.96
+     ],
+     "face_bbox": [
+      0.65,
+      0.04,
+      0.8,
+      0.2
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.0498046875,
+      0.58984375,
+      0.955078125,
+      0.8955078125
+     ],
+     "faceBox": [
+      0.0498046875,
+      0.642041015625,
+      0.3291015625,
+      0.879443359375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.2705078125,
+      0.0869140625,
+      0.95703125,
+      0.5107421875
+     ],
+     "faceBox": [
+      0.27587890625,
+      0.18125,
+      0.57666015625,
+      0.4369140625
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Kiaan",
+     "description": "Max holds a blue frisbee instead of the required palm-sized oval deep teal scale",
+     "fix": "Replace frisbee with deep teal scale in Max's hands, oriented toward dog's nose",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "dog",
+     "description": "Dog described as golden-tan with pale cream muzzle and orange-red collar, but inventory notes light golden-brown with white chest/paws and no mention of orange-red collar",
+     "fix": "Adjust dog coloring to golden-tan with pale cream muzzle and add visible orange-red collar",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    },
+    {
+     "description": "Signpost plank lacks any lettering despite prompt implying readable text ('Windchopf' in story)",
+     "fix": "Add faded painted lettering 'Windchopf' on the signpost plank",
+     "type": "rendered_text",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1789078732136_622wecmhj|p7|v1",
+   "storyId": "job_1789078732136_622wecmhj",
+   "pageNumber": 7,
+   "versionIndex": "1",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Kiaan->Max",
+    "Max->Kiaan"
+   ],
+   "renamedByPart1": 3,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0,
+      0.31,
+      0.58,
+      0.99
+     ],
+     "face_bbox": [
+      0.26,
+      0.33,
+      0.42,
+      0.48
+     ]
+    },
+    {
+     "reference": "unmatched",
+     "body_bbox": [
+      0,
+      0.55,
+      0.38,
+      0.99
+     ],
+     "face_bbox": [
+      0,
+      0.55,
+      0.26,
+      0.71
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.63,
+      0.05,
+      0.99,
+      0.99
+     ],
+     "face_bbox": [
+      0.66,
+      0.05,
+      0.83,
+      0.22
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.0498046875,
+      0.587890625,
+      0.958984375,
+      0.89453125
+     ],
+     "faceBox": [
+      0.0498046875,
+      0.6392578125,
+      0.3310546875,
+      0.8783203125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.271484375,
+      0.0869140625,
+      0.9599609375,
+      0.5341796875
+     ],
+     "faceBox": [
+      0.28125,
+      0.18647460937500002,
+      0.580078125,
+      0.44047851562499996
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Kiaan",
+     "description": "Max holds a blue frisbee instead of the required deep teal scale",
+     "fix": "Replace the blue frisbee in Max's hands with a palm-sized oval deep teal scale oriented toward the dog’s nose",
+     "type": "object_presence",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Nia (dog)",
+     "description": "Dog is present but not shown interacting with the scale because the scale is missing",
+     "fix": "Ensure the dog’s nose contacts the scale once it is correctly rendered in Max's hand",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1789078732136_622wecmhj|p10|v0",
+   "storyId": "job_1789078732136_622wecmhj",
+   "pageNumber": 10,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 3,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.1,
+      0.08,
+      0.68,
+      0.9
+     ],
+     "face_bbox": [
+      0.33,
+      0.09,
+      0.52,
+      0.26
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.6,
+      0.09,
+      0.96,
+      0.96
+     ],
+     "face_bbox": [
+      0.71,
+      0.1,
+      0.87,
+      0.25
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.1103515625,
+      0.5810546875,
+      0.916015625,
+      0.9716796875
+     ],
+     "faceBox": [
+      0.1103515625,
+      0.6671875,
+      0.3603515625,
+      0.8796875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.08056640625,
+      0.095703125,
+      0.693359375,
+      0.607421875
+     ],
+     "faceBox": [
+      0.08056640625,
+      0.373388671875,
+      0.35205078125,
+      0.604150390625
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Wearing blue jeans instead of dark blue straight-leg trousers; grey sneakers rendered with velcro straps instead of lace-up",
+     "fix": "Adjust trousers to straight-leg dark blue style and change sneakers to grey lace-up",
+     "type": "clothing_detail",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Both",
+     "description": "Scene depicts mid-leap rescue action, but story text shows both boys standing still, looking down at a ball in the leaves below a gap",
+     "fix": "Redraw scene to show both boys standing on solid ground near the gap, looking downward at a white-striped ball in autumn leaves; remove mid-air leap",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1789078732136_622wecmhj|p17|v0",
+   "storyId": "job_1789078732136_622wecmhj",
+   "pageNumber": 17,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 8,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.118,
+      0.198,
+      0.502,
+      0.978
+     ],
+     "face_bbox": [
+      0.198,
+      0.208,
+      0.34,
+      0.35
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.32,
+      0.15,
+      0.69,
+      0.938
+     ],
+     "face_bbox": [
+      0.39,
+      0.158,
+      0.53,
+      0.302
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.12841796875,
+      0.08090820312500001,
+      0.9775390625,
+      0.5849609375
+     ],
+     "faceBox": [
+      0.12841796875,
+      0.08090820312500001,
+      0.41943359375,
+      0.328271484375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.1376953125,
+      0.314453125,
+      0.9326171875,
+      0.68359375
+     ],
+     "faceBox": [
+      0.1376953125,
+      0.3818359375,
+      0.4111328125,
+      0.6142578125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Fenn",
+     "bodyBox": [
+      0.1015625,
+      0.5283203125,
+      1,
+      1
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Inventory states Julian holds nothing, but prompt and story require him to hold the deep teal scale with both hands",
+     "fix": "Modify figure 1 to clearly hold the scale with both hands pressed against the wing’s bare patch",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Julian",
+     "description": "Inventory states Levin holds nothing, but prompt requires him to place both palms on the scale and one hand on Julian's shoulder for leverage",
+     "fix": "Modify figure 2 to show both palms on the scale and one hand resting on Julian's shoulder",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "object",
+     "description": "Object described as 'a large oval-shaped object resembling a shield or shell' instead of a 'forearm-length, strongly convex deep teal dragon scale'",
+     "fix": "Replace the shield-like object with a strongly convex, deep teal dragon scale matching prompt description",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Hair described as 'curly, light brown, shoulder-length' vs prompt 'curly ear-length light blonde'",
+     "fix": "Adjust hair color to light blonde and length to ear-length",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Hair described as 'curly, reddish-brown, short' vs prompt 'short wavy light blonde'",
+     "fix": "Adjust hair color to light blonde and texture to wavy",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Apparent age 2 vs expected age 5",
+     "fix": "Render Julian as an older child (age 5) consistent with expected age",
+     "type": "scale",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Apparent age 2 vs expected age 3",
+     "fix": "Slightly adjust Levin's proportions to appear closer to age 3",
+     "type": "scale",
+     "severity": "MINOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1789083667794_17lz946ik|p6|v0",
+   "storyId": "job_1789083667794_17lz946ik",
+   "pageNumber": 6,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Kiaan->Max",
+    "Max->Kiaan"
+   ],
+   "renamedByPart1": 4,
+   "matches": [
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.128,
+      0.348,
+      0.308,
+      0.928
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.296,
+      0.38,
+      0.472,
+      0.928
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.472,
+      0.372,
+      0.648,
+      0.928
+     ]
+    },
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.648,
+      0.348,
+      0.86,
+      0.928
+     ]
+    },
+    {
+     "reference": "unmatched",
+     "body_bbox": [
+      0.28,
+      0.092,
+      0.712,
+      0.612
+     ],
+     "face_bbox": [
+      0.308,
+      0.104,
+      0.492,
+      0.292
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.22119140625,
+      0.51337890625,
+      0.9130859375,
+      0.8984375
+     ],
+     "faceBox": [
+      0.22119140625,
+      0.51337890625,
+      0.47119140625,
+      0.72587890625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.31201171875,
+      0.1298828125,
+      0.9130859375,
+      0.37919921875
+     ],
+     "faceBox": [
+      0.31201171875,
+      0.16669921875,
+      0.56201171875,
+      0.37919921875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.375,
+      0.5146484375,
+      0.92578125,
+      0.708984375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.41015625,
+      0.3134765625,
+      0.923828125,
+      0.5
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Kiaan",
+     "description": "Wearing blue long-sleeved shirt instead of blue track jacket; orange pants acceptable as joggers equivalent but material unspecified",
+     "fix": "Replace blue long-sleeved shirt with blue track jacket on the curly brown-haired boy in left-foreground",
+     "type": "clothing",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Julian",
+     "description": "Wearing dark blue jeans instead of grey corduroy trousers; yellow hooded sweatshirt acceptable as sweatshirt variant",
+     "fix": "Replace dark blue jeans with grey corduroy trousers on the light brown curly-haired boy in center-foreground",
+     "type": "clothing",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Max",
+     "description": "Wearing beige pants instead of brown chinos; green long-sleeved shirt instead of green sweatshirt",
+     "fix": "Replace green long-sleeved shirt with green sweatshirt and beige pants with brown chinos on the black-haired boy in right-foreground",
+     "type": "clothing",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Levin",
+     "description": "Wearing red long-sleeved shirt instead of red pullover; green backpack correctly present",
+     "fix": "Replace red long-sleeved shirt with red pullover on the brown curly-haired boy with green backpack in right-foreground",
+     "type": "clothing",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1789083667794_17lz946ik|p10|v1",
+   "storyId": "job_1789083667794_17lz946ik",
+   "pageNumber": 10,
+   "versionIndex": "1",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 9,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.31,
+      0.48,
+      0.45,
+      0.79
+     ],
+     "face_bbox": [
+      0.33,
+      0.49,
+      0.43,
+      0.58
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.6,
+      0.3,
+      0.78,
+      0.76
+     ],
+     "face_bbox": [
+      0.63,
+      0.31,
+      0.73,
+      0.41
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.267578125,
+      0.58515625,
+      0.7607421875,
+      0.81640625
+     ],
+     "faceBox": [
+      0.267578125,
+      0.58515625,
+      0.517578125,
+      0.79765625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.45166015625,
+      0.27607421875,
+      0.7861328125,
+      0.48857421875
+     ],
+     "faceBox": [
+      0.45166015625,
+      0.27607421875,
+      0.70166015625,
+      0.48857421875
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "The three-year-old boy is missing his dark grey corduroy trousers and white velcro sneakers.",
+     "fix": "Add dark grey corduroy trousers and white velcro sneakers to the three-year-old boy.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "The three-year-old boy's ball is red instead of bright yellow with two white horizontal bands.",
+     "fix": "Change the ball to bright yellow with two white horizontal bands.",
+     "type": "garment_colour",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "The five-year-old boy is missing his white sneakers.",
+     "fix": "Add white sneakers to the five-year-old boy.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Julian wears red long-sleeved shirt instead of red pullover",
+     "fix": "Replace red long-sleeved shirt with red pullover while retaining green backpack and dark blue jeans",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Levin wears yellow long-sleeved shirt instead of yellow hooded sweatshirt, and dark pants instead of dark grey corduroy trousers",
+     "fix": "Replace yellow shirt with yellow hooded sweatshirt and ensure trousers are dark grey corduroy; add white velcro sneakers if visible",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Levin holds a red ball instead of a bright yellow ball with two white horizontal bands",
+     "fix": "Replace red ball with correct yellow ball featuring two white horizontal bands, held tightly against chest",
+     "type": "object_presence",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Julian",
+     "description": "Levin is smiling and looking at viewer instead of showing fear and staring at stepping stones",
+     "fix": "Adjust expression to fearful (wide eyes, tense mouth) and redirect gaze toward stepping stones across brook",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    }
+   ]
+  },
+  {
+   "key": "job_1789083667794_17lz946ik|p10|v2",
+   "storyId": "job_1789083667794_17lz946ik",
+   "pageNumber": 10,
+   "versionIndex": "2",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 4,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.3,
+      0.51,
+      0.48,
+      0.8
+     ],
+     "face_bbox": [
+      0.32,
+      0.52,
+      0.42,
+      0.6
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.64,
+      0.31,
+      0.8,
+      0.7
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.4482421875,
+      0.29609375,
+      0.7998046875,
+      0.50859375
+     ],
+     "faceBox": [
+      0.4482421875,
+      0.29609375,
+      0.6982421875,
+      0.50859375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.2744140625,
+      0.5919921875,
+      0.7646484375,
+      0.8044921875
+     ],
+     "faceBox": [
+      0.2744140625,
+      0.5919921875,
+      0.5244140625,
+      0.8044921875
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Levin wears blue jeans instead of dark grey corduroy trousers as specified in prompt.",
+     "fix": "Replace blue jeans with dark grey corduroy trousers on the child in yellow.",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Levin holds a red ball instead of a bright yellow ball with two white horizontal bands.",
+     "fix": "Recolor and add white bands to the ball held by Levin to match the described yellow ball with two white horizontal bands.",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1789147573901_m3uam0nxi|p2|v0",
+   "storyId": "job_1789147573901_m3uam0nxi",
+   "pageNumber": 2,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Julian->Levin",
+    "Levin->Julian"
+   ],
+   "renamedByPart1": 7,
+   "matches": [
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0,
+      0.12,
+      0.49,
+      0.99
+     ],
+     "face_bbox": [
+      0.29,
+      0.15,
+      0.42,
+      0.28
+     ]
+    },
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.5,
+      0.18,
+      1,
+      0.9
+     ],
+     "face_bbox": [
+      0.65,
+      0.19,
+      0.77,
+      0.31
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.1455078125,
+      0.0830078125,
+      0.994140625,
+      0.4638671875
+     ],
+     "faceBox": [
+      0.1455078125,
+      0.188623046875,
+      0.4208984375,
+      0.422705078125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.1943359375,
+      0.56640625,
+      0.8232421875,
+      0.8583984375
+     ],
+     "faceBox": [
+      0.1943359375,
+      0.5880859375,
+      0.4443359375,
+      0.8005859375
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Hair described as light brown curly in inventory but prompt specifies light blonde wavy",
+     "fix": "Adjust hair color to light blonde and texture to short tousled wavy for the child in red T-shirt",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Hair described as light brown curly in inventory but prompt specifies light blonde curly",
+     "fix": "Adjust hair color to light blonde for the child in yellow T-shirt while retaining curly texture",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Apparent age listed as 2 years but expected age is 3",
+     "fix": "Render Levin with slightly more developed proportions consistent with a 3-year-old",
+     "type": "scale",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Apparent age listed as 2 years but expected age is 5",
+     "fix": "Render Julian with proportions consistent with a 5-year-old, notably taller than Levin",
+     "type": "scale",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Scene",
+     "description": "Road surface described as pale grey-beige tarmac in prompt but rendered as dirt path in inventory",
+     "fix": "Change path material from dirt/gravel to pale grey-beige tarmac surface",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Scene",
+     "description": "Grassy hillside with low wooden fenceposts and distant rooftops beyond curve not fully represented; instead wildflowers, trees, shrubs, rolling hills and village shown",
+     "fix": "Add low wooden fenceposts along verge and ensure rooftops appear as soft haze beyond curve",
+     "type": "unverified_absence",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Levin",
+     "description": "Zone listed as right-foreground in inventory but should be right-midground per prompt",
+     "fix": "Reposition Julian's bicycle slightly farther back into midground relative to Levin",
+     "type": "naturalness",
+     "severity": "MINOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1789147573901_m3uam0nxi|p2|v1",
+   "storyId": "job_1789147573901_m3uam0nxi",
+   "pageNumber": 2,
+   "versionIndex": "1",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Julian->Levin",
+    "Levin->Julian"
+   ],
+   "renamedByPart1": 7,
+   "matches": [
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0,
+      0.11,
+      0.49,
+      0.99
+     ],
+     "face_bbox": [
+      0.19,
+      0.16,
+      0.33,
+      0.3
+     ]
+    },
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.5,
+      0.19,
+      1,
+      0.91
+     ],
+     "face_bbox": [
+      0.63,
+      0.2,
+      0.75,
+      0.32
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.1435546875,
+      0.1044921875,
+      0.9228515625,
+      0.4638671875
+     ],
+     "faceBox": [
+      0.1435546875,
+      0.186962890625,
+      0.4228515625,
+      0.424365234375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.19482421875,
+      0.568359375,
+      0.8271484375,
+      0.869140625
+     ],
+     "faceBox": [
+      0.19482421875,
+      0.59150390625,
+      0.44482421875,
+      0.80400390625
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Hair described as light blonde wavy in prompt but rendered as light brown curly in inventory",
+     "fix": "Adjust hair color to light blonde and texture to short tousled wavy for the child in red",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Hair described as light blonde curly in prompt but rendered as light brown curly in inventory",
+     "fix": "Adjust hair color to light blonde for the child in yellow while retaining curly texture",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Apparent age rendered as 2 years old but expected age is 3",
+     "fix": "Adjust facial proportions and body scale of the child in red to reflect 3-year-old appearance",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Apparent age rendered as 2 years old but expected age is 5",
+     "fix": "Adjust facial proportions and body scale of the child in yellow to reflect 5-year-old appearance",
+     "type": "character_identity",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Placed in right-foreground per inventory but should be in right-midground per prompt",
+     "fix": "Shift the yellow bicycle and rider slightly deeper into the midground to match scene depth",
+     "type": "naturalness",
+     "severity": "MINOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1789584708605_rts4wqupm|p18|v0",
+   "storyId": "job_1789584708605_rts4wqupm",
+   "pageNumber": 18,
+   "versionIndex": "0",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Levin->Julian",
+    "Julian->Levin"
+   ],
+   "renamedByPart1": 3,
+   "matches": [
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.24,
+      0.48,
+      0.37,
+      0.76
+     ],
+     "face_bbox": [
+      0.26,
+      0.49,
+      0.33,
+      0.56
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.35,
+      0.47,
+      0.48,
+      0.76
+     ],
+     "face_bbox": [
+      0.37,
+      0.48,
+      0.44,
+      0.55
+     ]
+    },
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0.47,
+      0.48,
+      0.6,
+      0.76
+     ],
+     "face_bbox": [
+      0.49,
+      0.49,
+      0.56,
+      0.56
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.6,
+      0.49,
+      0.72,
+      0.76
+     ],
+     "face_bbox": [
+      0.62,
+      0.5,
+      0.69,
+      0.57
+     ]
+    },
+    {
+     "reference": "Big Dragon",
+     "body_bbox": [
+      0.36,
+      0,
+      0.99,
+      0.36
+     ],
+     "face_bbox": [
+      0.37,
+      0,
+      0.49,
+      0.1
+     ]
+    },
+    {
+     "reference": "Flämmli",
+     "body_bbox": [
+      0.44,
+      0.19,
+      0.68,
+      0.35
+     ],
+     "face_bbox": [
+      0.45,
+      0.2,
+      0.5,
+      0.24
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.3330078125,
+      0.2296875,
+      0.7529296875,
+      0.4421875
+     ],
+     "faceBox": [
+      0.3330078125,
+      0.2296875,
+      0.5830078125,
+      0.4421875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.486328125,
+      0.583203125,
+      0.888671875,
+      0.795703125
+     ],
+     "faceBox": [
+      0.486328125,
+      0.583203125,
+      0.736328125,
+      0.795703125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.46044921875,
+      0.3720703125,
+      0.798828125,
+      0.67412109375
+     ],
+     "faceBox": [
+      0.46044921875,
+      0.46162109375,
+      0.71044921875,
+      0.67412109375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.51416015625,
+      0.45869140625,
+      0.83984375,
+      0.67119140625
+     ],
+     "faceBox": [
+      0.51416015625,
+      0.45869140625,
+      0.76416015625,
+      0.67119140625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Big Dragon",
+     "bodyBox": [
+      0,
+      0.34075,
+      0.310546875,
+      1
+     ],
+     "faceBox": [
+      0,
+      0.34075,
+      0.2465,
+      0.55325
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Flämmli",
+     "bodyBox": [
+      0.10750000000000001,
+      0.3759765625,
+      0.3720703125,
+      0.6904296875
+     ],
+     "faceBox": [
+      0.10750000000000001,
+      0.38975,
+      0.35750000000000004,
+      0.60225
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Levin wears blue jeans instead of dark blue corduroy trousers as specified in CLOTHING CONTRACT",
+     "fix": "Replace blue jeans with dark blue corduroy trousers on the boy in white shirt standing tallest in foreground",
+     "type": "clothing",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1789681157795_wkt20ckod|p12|v1",
+   "storyId": "job_1789681157795_wkt20ckod",
+   "pageNumber": 12,
+   "versionIndex": "1",
+   "kind": "vote-fires",
+   "conflictPairs": [
+    "Kiaan->Julian",
+    "Julian->Kiaan"
+   ],
+   "renamedByPart1": 4,
+   "matches": [
+    {
+     "reference": "Max",
+     "body_bbox": [
+      0,
+      0.25,
+      0.44,
+      0.99
+     ],
+     "face_bbox": [
+      0.23,
+      0.26,
+      0.33,
+      0.36
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "body_bbox": [
+      0.27,
+      0.29,
+      0.6,
+      0.99
+     ],
+     "face_bbox": [
+      0.39,
+      0.3,
+      0.48,
+      0.39
+     ]
+    },
+    {
+     "reference": "Levin",
+     "body_bbox": [
+      0.53,
+      0.29,
+      0.84,
+      0.99
+     ],
+     "face_bbox": [
+      0.65,
+      0.3,
+      0.74,
+      0.39
+     ]
+    },
+    {
+     "reference": "Julian",
+     "body_bbox": [
+      0.54,
+      0.06,
+      0.74,
+      0.5
+     ],
+     "face_bbox": [
+      0.59,
+      0.07,
+      0.67,
+      0.15
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.3173828125,
+      0.5517578125,
+      0.9287109375,
+      0.9658203125
+     ],
+     "faceBox": [
+      0.34228515625,
+      0.59052734375,
+      0.59228515625,
+      0.80302734375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.2666015625,
+      0.0068359375,
+      0.9091796875,
+      0.478515625
+     ],
+     "faceBox": [
+      0.29296875,
+      0.223828125,
+      0.54296875,
+      0.436328125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.0322265625,
+      0.5412109375,
+      0.5361328125,
+      0.7537109375
+     ],
+     "faceBox": [
+      0.0322265625,
+      0.5412109375,
+      0.2822265625,
+      0.7537109375
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.2939453125,
+      0.2646484375,
+      0.771484375,
+      0.642578125
+     ],
+     "faceBox": [
+      0.2939453125,
+      0.3888671875,
+      0.5439453125,
+      0.6013671875
+     ],
+     "confidence": "medium"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "Kiaan wears red duffle coat with toggle closures, but should wear sunshine-yellow fleece zip-up hoodie over white thermal top and navy corduroy pull-on trousers per clothing contract",
+     "fix": "Replace red duffle coat and dark pants with yellow fleece hoodie, white thermal shirt, and navy corduroy trousers on the midground figure",
+     "type": "clothing",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Julian wears red corduroy-style jacket instead of brick-red wool duffle coat with large wooden toggle fastenings",
+     "fix": "Replace red corduroy jacket with brick-red wool duffle coat featuring wooden toggles on the center-foreground figure",
+     "type": "clothing",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin is missing red knitted mittens specified in clothing contract; hands shown bare",
+     "fix": "Add bright red knitted wool mittens to both hands of the right-foreground blonde boy wearing green sweater and orange scarf",
+     "type": "accessory",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1787436913379_mfedxinwqd|p4|v0",
+   "storyId": "job_1787436913379_mfedxinwqd",
+   "pageNumber": 4,
+   "versionIndex": "0",
+   "kind": "no-vote-clean",
+   "conflictPairs": [],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.15,
+      0.33,
+      0.28,
+      0.45
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.31,
+      0.34,
+      0.43,
+      0.45
+     ]
+    },
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.58,
+      0.3,
+      0.7,
+      0.42
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.7,
+      0.42,
+      0.8,
+      0.52
+     ]
+    },
+    {
+     "reference": "ANI001",
+     "face_bbox": [
+      0.51,
+      0.67,
+      0.6,
+      0.74
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.3263888888888889,
+      0.06828703703703703,
+      0.8611111111111112,
+      0.3611111111111111
+     ],
+     "faceBox": [
+      0.3151041666666667,
+      0.14351851851851852,
+      0.4973958333333333,
+      0.33564814814814814
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.3446180555555556,
+      0.3055555555555556,
+      0.7855902777777778,
+      0.4699074074074074
+     ],
+     "faceBox": [
+      0.3263888888888889,
+      0.2962962962962963,
+      0.4861111111111111,
+      0.46296296296296297
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.3072916666666667,
+      0.5543981481481481,
+      0.8090277777777778,
+      0.7314814814814815
+     ],
+     "faceBox": [
+      0.2942708333333333,
+      0.5520833333333334,
+      0.4557291666666667,
+      0.7303240740740741
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.4114583333333333,
+      0.6111111111111112,
+      0.8559027777777778,
+      0.8553240740740741
+     ],
+     "faceBox": [
+      0.3940972222222222,
+      0.6747685185185185,
+      0.5572916666666666,
+      0.8298611111111112
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "description": "Football [ART003] declared in prompt and story text as resting on the path behind Max and Kiaan, but not listed in VISION_INVENTORY notable objects.",
+     "fix": "Verify presence of standard-size black-and-white panel football partially visible behind tree trunk on left forest path; if missing, add according to prompt placement.",
+     "type": "unverified_absence",
+     "severity": "MODERATE"
+    }
+   ]
+  },
+  {
+   "key": "job_1787436913379_mfedxinwqd|p10|v0",
+   "storyId": "job_1787436913379_mfedxinwqd",
+   "pageNumber": 10,
+   "versionIndex": "0",
+   "kind": "no-vote-clean",
+   "conflictPairs": [],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.2,
+      0.49,
+      0.27,
+      0.56
+     ]
+    },
+    {
+     "reference": "Kiaan",
+     "face_bbox": [
+      0.3,
+      0.49,
+      0.37,
+      0.56
+     ]
+    },
+    {
+     "reference": "Max",
+     "face_bbox": [
+      0.43,
+      0.48,
+      0.5,
+      0.55
+     ]
+    },
+    {
+     "reference": "CHR001",
+     "face_bbox": [
+      0.6,
+      0.49,
+      0.68,
+      0.56
+     ]
+    },
+    {
+     "reference": "ANI001",
+     "face_bbox": [
+      0.58,
+      0.82,
+      0.63,
+      0.86
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.4379340277777778,
+      0.13969907407407406,
+      0.939,
+      0.3521990740740741
+     ],
+     "faceBox": [
+      0.4379340277777778,
+      0.13969907407407406,
+      0.6879340277777778,
+      0.3521990740740741
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Kiaan",
+     "bodyBox": [
+      0.4305555555555556,
+      0.2537037037037037,
+      0.91,
+      0.46620370370370373
+     ],
+     "faceBox": [
+      0.4305555555555556,
+      0.2537037037037037,
+      0.6805555555555556,
+      0.46620370370370373
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Max",
+     "bodyBox": [
+      0.4105902777777778,
+      0.3625,
+      0.907,
+      0.575
+     ],
+     "faceBox": [
+      0.4105902777777778,
+      0.3625,
+      0.6605902777777778,
+      0.575
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Billy Goat",
+     "bodyBox": [
+      0.4315,
+      0.5337500000000001,
+      0.839,
+      0.838
+     ],
+     "faceBox": [
+      0.4315,
+      0.5337500000000001,
+      0.6815,
+      0.74625
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.7322048611111112,
+      0.4996527777777778,
+      0.9822048611111112,
+      0.7121527777777777
+     ],
+     "faceBox": [
+      0.7322048611111112,
+      0.4996527777777778,
+      0.9822048611111112,
+      0.7121527777777777
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "description": "The character Julian is entirely absent from the scene.",
+     "fix": "Add Julian to the scene, standing at the back of the group, the shortest, peering forward.",
+     "type": "missing_character",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "CHR001",
+     "description": "The billy goat is not standing on a large flat sun-warmed stone block inside the gap of the ruins, but rather in the foreground to the right of the boys.",
+     "fix": "Move the billy goat to stand on a large flat sun-warmed stone block inside the gap between the ruined walls.",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "ANI001",
+     "description": "The hatchling dragon is not near Levin's feet, but rather near the goat's feet.",
+     "fix": "Move the hatchling dragon to stand near Levin's feet.",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin's expression does not match 'weight pulled back, brows raised, eyes on the goat'. He appears to be looking forward with a neutral expression.",
+     "fix": "Adjust Levin's expression to show weight pulled back, brows raised, and eyes on the goat.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Kiaan",
+     "description": "Kiaan's expression does not match 'eyes wide, brows up, mouth slightly open'. He appears to be looking forward with a neutral expression.",
+     "fix": "Adjust Kiaan's expression to show eyes wide, brows up, and mouth slightly open.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Max",
+     "description": "Max's expression does not match 'brows raised, eyes on the goat, lips pressed'. He appears to be looking forward with a neutral expression.",
+     "fix": "Adjust Max's expression to show brows raised, eyes on the goat, and lips pressed.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Julian",
+     "description": "Julian (toddler, yellow T-shirt, grey joggers) is absent from QUALITY_FIGURES.matches[] and has no plausibly-matching figure in VISION_INVENTORY despite being named in ORIGINAL_PROMPT and STORY_TEXT.",
+     "fix": "Add Julian at back-right of boy group, shortest, peering forward, matching prompt description.",
+     "type": "missing_character",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Scene layout",
+     "description": "Narrow gap between two ruined wall sections framing deep orange sky is absent; instead, ruins appear as generic background structure. Goat stands beside boys in right-foreground rather than centered in gap on sun-warmed stone.",
+     "fix": "Recompose scene with clear central gap in ruins, sky visible through it, goat standing on stone block within that gap.",
+     "type": "missing_element",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "ANI001",
+     "description": "Hatchling dragon positioned in front of goat’s legs (right-foreground), but should be near Levin’s feet (left-foreground).",
+     "fix": "Relocate dragon to base of Levin’s position, near his feet on left side.",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    },
+    {
+     "character": "Levin",
+     "description": "Levin shows gentle smile and curious gaze, but metadata requires weight pulled back, brows raised, eyes on goat — indicating startled pause.",
+     "fix": "Adjust expression to show surprise: raised brows, open eyes, neutral or tense mouth, weight shifted backward.",
+     "type": "naturalness",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Max",
+     "description": "Max is smiling widely, but metadata specifies lips pressed and brows raised — a tense, alert expression.",
+     "fix": "Change expression to alert concentration: brows up, lips closed and pressed together, eyes fixed on goat.",
+     "type": "naturalness",
+     "severity": "MODERATE"
+    },
+    {
+     "character": "Goat",
+     "description": "Goat described as white with light brown horns and beard, but prompt specifies pale cream-white coat, pale pink muzzle, amber-yellow horizontal-pupil eyes, and pale-grey horns. Inventory simplifies to 'white domestic goat' with 'light brown horns/beard'.",
+     "fix": "Refine goat rendering to match prompt: pale cream-white coat, pale-grey slightly upward-curving horns, amber-yellow horizontal-pupil eyes, pale pink muzzle, short chin beard.",
+     "type": "object_presence",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1787436913379_mfedxinwqd|p12|v0",
+   "storyId": "job_1787436913379_mfedxinwqd",
+   "pageNumber": 12,
+   "versionIndex": "0",
+   "kind": "no-vote-clean",
+   "conflictPairs": [],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Levin",
+     "face_bbox": [
+      0.23,
+      0.44,
+      0.31,
+      0.5
+     ]
+    },
+    {
+     "reference": "CHR001",
+     "face_bbox": [
+      0.42,
+      0.46,
+      0.52,
+      0.53
+     ]
+    },
+    {
+     "reference": "Julian",
+     "face_bbox": [
+      0.63,
+      0.46,
+      0.7,
+      0.52
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Julian",
+     "bodyBox": [
+      0.4930555555555556,
+      0.5717592592592593,
+      0.9583333333333334,
+      0.7858796296296297
+     ],
+     "faceBox": [
+      0.4800347222222222,
+      0.6122685185185185,
+      0.6362847222222222,
+      0.7835648148148148
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Levin",
+     "bodyBox": [
+      0.4913194444444444,
+      0.20023148148148148,
+      0.9618055555555556,
+      0.3819444444444444
+     ],
+     "faceBox": [
+      0.4817708333333333,
+      0.17476851851851852,
+      0.6345486111111112,
+      0.3414351851851852
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "UNKNOWN",
+     "bodyBox": [
+      0.5078125,
+      0.4039351851851852,
+      0.7803819444444444,
+      0.6817129629629629
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "description": "Weggli piece is tucked into backpack instead of being held flat on open palm toward the goat",
+     "fix": "Move the Weggli piece from the backpack to Levin's open left palm, extended outward toward the goat",
+     "type": "action_interaction",
+     "severity": "CRITICAL"
+    },
+    {
+     "character": "billy goat [CHR001]",
+     "description": "Goat is positioned center-midground but not shown stepping down from a stone block toward Levin's hand",
+     "fix": "Reposition goat so it is stepping down from a visible warm flat stone block in the center, head lowered toward Levin's palm",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    }
+   ]
+  },
+  {
+   "key": "job_1787493968756_4fgr5nukroz|p1|v0",
+   "storyId": "job_1787493968756_4fgr5nukroz",
+   "pageNumber": 1,
+   "versionIndex": "0",
+   "kind": "no-vote-clean",
+   "conflictPairs": [],
+   "renamedByPart1": 0,
+   "matches": [
+    {
+     "reference": "Hans",
+     "body_bbox": [
+      0.23,
+      0.09,
+      0.6,
+      0.9
+     ],
+     "face_bbox": [
+      0.35,
+      0.1,
+      0.49,
+      0.19
+     ]
+    },
+    {
+     "reference": "Noah",
+     "body_bbox": [
+      0.39,
+      0.29,
+      0.62,
+      0.94
+     ],
+     "face_bbox": [
+      0.43,
+      0.3,
+      0.53,
+      0.37
+     ]
+    },
+    {
+     "reference": "Emma",
+     "body_bbox": [
+      0.55,
+      0.27,
+      0.77,
+      0.96
+     ],
+     "face_bbox": [
+      0.59,
+      0.28,
+      0.7,
+      0.36
+     ]
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Hans",
+     "bodyBox": [
+      0.068359375,
+      0.228515625,
+      0.9150390625,
+      0.51953125
+     ],
+     "faceBox": [
+      0.068359375,
+      0.33203125,
+      0.31640625,
+      0.51953125
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Emma",
+     "bodyBox": [
+      0.25634765625,
+      0.4794921875,
+      0.978515625,
+      0.8017578125
+     ],
+     "faceBox": [
+      0.25634765625,
+      0.53388671875,
+      0.50634765625,
+      0.74638671875
+     ],
+     "confidence": "high"
+    },
+    {
+     "name": "Noah",
+     "bodyBox": [
+      0.2724609375,
+      0.419140625,
+      0.955078125,
+      0.631640625
+     ],
+     "faceBox": [
+      0.2724609375,
+      0.419140625,
+      0.5224609375,
+      0.631640625
+     ],
+     "confidence": "high"
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Emma",
+     "description": "Emma holds the note with Noah, but should only be rising on her toes to listen without touching the clue",
+     "fix": "Remove the note from Emma’s hands; adjust her pose to show her listening attentively beside Noah without contact with the clue",
+     "type": "action_interaction",
+     "severity": "MAJOR"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,203 @@
+import { test } from 'vitest';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+/**
+ * Pure-function tests for server/lib/scoring.js. No DB, no R2.
+ *
+ * Run: npx vitest run tests/unit/scoring.test.ts
+ */
+const assert = require('assert');
+const {
+  computeFinalScore,
+  applyScore,
+  pickBestVersionIndex,
+  shouldRedo,
+  SCORE_THRESHOLDS,
+} = require('../../server/lib/scoring');
+
+
+// computeFinalScore
+test('null/undefined → null', () => {
+  assert.strictEqual(computeFinalScore(null), null);
+  assert.strictEqual(computeFinalScore(undefined), null);
+  assert.strictEqual(computeFinalScore({}), null);
+});
+test('modern shape: trusts finalScore field', () => {
+  assert.strictEqual(computeFinalScore({ finalScore: 73 }), 73);
+});
+test('intermediate shape: evalScore − entityPenalty', () => {
+  assert.strictEqual(computeFinalScore({ evalScore: 80, entityPenalty: 30 }), 50);
+});
+test('intermediate shape: missing entityPenalty defaults to 0', () => {
+  assert.strictEqual(computeFinalScore({ evalScore: 80 }), 80);
+});
+test('legacy shape: score field, no entity penalty', () => {
+  assert.strictEqual(computeFinalScore({ score: 65 }), 65);
+});
+test('legacy shape: qualityScore + entityPenalty', () => {
+  assert.strictEqual(computeFinalScore({ qualityScore: 80, entityPenalty: 60 }), 20);
+});
+test('mixed: prefer finalScore over score/qualityScore', () => {
+  assert.strictEqual(computeFinalScore({ finalScore: 70, qualityScore: 95, score: 88 }), 70);
+});
+
+// DELETED 2026-09-15: buildScoreBreakdown / composeEvalScore / composeFinalScore /
+// applyScoreBreakdown no longer exist - they went with the two-scale score model
+// (ONE SCALE, ONE NUMBER, 2026-08-08). Their tests asserted against removed
+// functions and had never run, because vitest only collects *.test.ts.
+
+// \napplyScore — compliance issues counted once
+test('three-stage issue merged into fixableIssues is deducted once, not twice', () => {
+  // evaluateImageQuality merges threeStageResult.fixableIssues into the
+  // returned fixableIssues list, tagged source:'three-stage'. composeDeductions
+  // must not count those copies in the quality bucket on top of the
+  // compliance bucket (which reads threeStageResult directly).
+  const tsIssue = { description: 'guard missing from the marketplace scene', severity: 'CRITICAL', type: 'compliance', source: 'three-stage' };
+  const evalResult = {
+    qualityScore: 75,
+    fixableIssues: [tsIssue],                                  // merged display copy
+    threeStageResult: { score: 75, fixableIssues: [tsIssue] }, // single source
+  };
+  const v = {};
+  applyScore(v, { evalResult });
+  assert.strictEqual(v.finalScore, 75);  // 100 − 25 once, not 100 − 50
+  assert.strictEqual(v.deductions.quality.length, 0);
+  assert.strictEqual(v.deductions.compliance.length, 1);
+  // Dev panel breakdown: visual card must not re-list the three-stage issue
+  assert.strictEqual(v.scoreBreakdown.visual.issues.length, 0);
+  assert.strictEqual(v.scoreBreakdown.threeStage.issues.length, 1);
+});
+
+// \napplyScore — consolidated (deduped) scoring
+test('consolidatedPlan.deduped_issues drive the math — raw overlapping issues ignored', () => {
+  // Three evaluators flagged the same defect; the consolidator merged them
+  // into ONE deduped entry. finalScore must deduct once (25), not 65.
+  const evalResult = {
+    qualityScore: 60,
+    fixableIssues: [{ description: 'hero not holding the wooden lantern', severity: 'CRITICAL' }],
+    semanticResult: { score: 70, semanticIssues: [{ description: 'wooden lantern absent, hero should carry it', severity: 'CRITICAL' }] },
+    threeStageResult: { score: 80, fixableIssues: [{ description: 'declared object wooden lantern not visible', severity: 'MAJOR' }] },
+  };
+  const consolidatedPlan = {
+    deduped_issues: [
+      { description: 'Hero is not holding the wooden lantern', severity: 'CRITICAL', sources: ['quality', 'semantic', 'compliance'] },
+    ],
+  };
+  const v = {};
+  applyScore(v, { evalResult, consolidatedPlan });
+  assert.strictEqual(v.finalScore, 75);                       // 100 − 25 once
+  assert.strictEqual(v.scoreSource, 'consolidated');
+  assert.strictEqual(v.deductions.consolidated.length, 1);
+  assert.strictEqual(v.deductions.quality.length, 0);         // raw lists not double-counted
+  assert.strictEqual(v.deductions.semantic.length, 0);
+  assert.strictEqual(v.deductions.compliance.length, 0);
+  assert.deepStrictEqual(v.consolidatedPlan, consolidatedPlan); // persisted for dev panel
+});
+test('fail-soft without consolidation: math over raw (undeduped) issues', () => {
+  const evalResult = {
+    qualityScore: 60,
+    fixableIssues: [{ description: 'hero not holding the wooden lantern', severity: 'CRITICAL' }],
+    semanticResult: { score: 70, semanticIssues: [{ description: 'wooden lantern absent, hero should carry it', severity: 'CRITICAL' }] },
+    threeStageResult: { score: 80, fixableIssues: [{ description: 'declared object wooden lantern not visible', severity: 'MAJOR' }] },
+  };
+  const v = {};
+  applyScore(v, { evalResult });
+  // 100 − 25 once. Even without a consolidator plan, sumDeductionPoints groups
+  // ACROSS the four buckets by billing identity (deductionClassKey), so the
+  // same defect reported by quality, semantic and compliance is one charge at
+  // its worst severity. The old expectation of 35 (three separate charges) was
+  // written before cross-bucket billing and had never run.
+  assert.strictEqual(v.finalScore, 75);
+  assert.strictEqual(v.scoreSource, 'raw');
+});
+test('entity minor: displayed (table) penalty equals charged (SEVERITY_POINTS) penalty', () => {
+  // The pipeline's ENTITY_PENALTIES table (images.js getEntityPenaltyAndIssues,
+  // mirrored in useRepairWorkflow.ts) derives from SEVERITY_POINTS — the dev
+  // panel number and the score charge must be the same scale.
+  const { SEVERITY_POINTS } = require('../../server/lib/scoring');
+  const ENTITY_PENALTIES = { critical: SEVERITY_POINTS.critical, major: SEVERITY_POINTS.major, minor: SEVERITY_POINTS.minor };
+  const issues = [{ name: 'X', severity: 'minor', description: 'hair tie colour drifted on this page' }];
+  const displayed = issues.reduce((s, i) => s + ENTITY_PENALTIES[i.severity], 0);
+  const v = {};
+  applyScore(v, { evalResult: { qualityScore: 90, fixableIssues: [] }, entityResult: { issues, penalty: displayed } });
+  assert.strictEqual(displayed, 2);                              // minor = 2, not 10
+  assert.strictEqual(v.entityPenalty, displayed);                // charged == displayed
+  assert.strictEqual(v.scoreBreakdown.entity.penalty, displayed);
+  assert.strictEqual(v.finalScore, 100 - displayed);
+});
+test('entity-only deduped issues keep the capped entity bucket', () => {
+  const consolidatedPlan = {
+    deduped_issues: [
+      { description: 'Character hair colour drifted to blonde on this page', severity: 'CRITICAL', sources: ['entity'] },
+      { description: 'Character glasses missing versus reference portrait', severity: 'CRITICAL', sources: ['entity'] },
+    ],
+  };
+  const v = {};
+  applyScore(v, { evalResult: { qualityScore: 90, fixableIssues: [] }, consolidatedPlan });
+  // 2 × 25 = 50 raw entity points, capped at 40 → finalScore 60.
+  assert.strictEqual(v.entityPenalty, 40);
+  assert.strictEqual(v.finalScore, 60);
+  assert.strictEqual(v.deductions.entity.length, 2);
+  assert.strictEqual(v.deductions.consolidated.length, 0);
+});
+
+// \npickBestVersionIndex
+test('empty array → -1', () => {
+  assert.strictEqual(pickBestVersionIndex([]), -1);
+  assert.strictEqual(pickBestVersionIndex(null), -1);
+});
+test('all unscored → -1', () => {
+  assert.strictEqual(pickBestVersionIndex([{}, {}, {}]), -1);
+});
+test('picks highest finalScore', () => {
+  const versions = [
+    { finalScore: 30 },
+    { finalScore: 70 },  // ← winner
+    { finalScore: 50 },
+  ];
+  assert.strictEqual(pickBestVersionIndex(versions), 1);
+});
+test('score tie broken by smaller deduction total first (v1 ded30 beats v2 ded60)', () => {
+  const versions = [
+    { qualityScore: 10, finalScore: 10 },                 // v0
+    { qualityScore: 50, entityPenalty: 30, finalScore: 20 },  // v1
+    { qualityScore: 80, entityPenalty: 60, finalScore: 20 },  // v2 (same final as v1)
+    { qualityScore: 0, entityPenalty: 60, finalScore: 0 },   // v3 (worst, was active in prod)
+  ];
+  // On the 20-vs-20 finalScore tie, the un-clamped deduction total decides
+  // FIRST (fewest/lightest issues wins): v1 carries −30 vs v2's −60 → v1.
+  // Index direction only breaks a FULL tie of score AND deductions.
+  // (This test previously asserted pure later-wins and had been failing.)
+  assert.strictEqual(pickBestVersionIndex(versions), 1);
+});
+test('full tie (score + deductions): latest wins by default, earliest with tieBreak option', () => {
+  const versions = [
+    { finalScore: 20, entityPenalty: 30 },  // v0
+    { finalScore: 20, entityPenalty: 30 },  // v1 — identical
+  ];
+  assert.strictEqual(pickBestVersionIndex(versions), 1);                            // interactive default
+  assert.strictEqual(pickBestVersionIndex(versions, { tieBreak: 'earliest' }), 0);  // repair pipeline
+});
+test('un-evaluated newer version does NOT beat scored older one', () => {
+  const versions = [
+    { finalScore: 50 },
+    {},  // un-evaluated
+  ];
+  assert.strictEqual(pickBestVersionIndex(versions), 0);
+});
+
+// \nshouldRedo
+test('score below threshold → redo', () => {
+  assert.strictEqual(shouldRedo({ finalScore: SCORE_THRESHOLDS.REDO - 1 }), true);
+});
+test('score at threshold → no redo', () => {
+  assert.strictEqual(shouldRedo({ finalScore: SCORE_THRESHOLDS.REDO }), false);
+});
+test('many fixable issues → redo even at high score', () => {
+  const issues = new Array(SCORE_THRESHOLDS.ISSUES).fill({ severity: 'minor' });
+  assert.strictEqual(shouldRedo({ finalScore: 90, fixableIssues: issues }), true);
+});
+test('un-evaluated version → no redo (we don\'t know yet)', () => {
+  assert.strictEqual(shouldRedo({}), false);
+});
+

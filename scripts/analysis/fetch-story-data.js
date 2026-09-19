@@ -23,6 +23,24 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 const { ch, chTime, fromPgNaive } = require('../lib/chTime');
+const { pageAttemptCount } = require('../../server/lib/storyMetrics');
+
+/**
+ * Render a page's render-attempt count for the CLI.
+ *
+ * `pageAttemptCount` returns null when a page carries NEITHER `retryHistory`
+ * NOR `totalAttempts`. That is the normal shape for every unified-pipeline page
+ * (no generation path writes `totalAttempts` since the 2026-08 unification), so
+ * the old `page.totalAttempts || 1` default reported an absent counter as one
+ * clean attempt on literally every evaluated story. Absent is not 1.
+ *
+ * @param {object} img a sceneImage
+ * @returns {string}
+ */
+function formatAttempts(img) {
+  const n = pageAttemptCount(img);
+  return n === null ? 'not measured' : String(n);
+}
 
 // Connect to Railway database
 const pool = new Pool({
@@ -500,7 +518,7 @@ async function fetchStoryAnalysis(storyId) {
     fixTargets: img.evaluation?.fixTargets || [],
     repairHistory: img.repairHistory || [],
     retryHistory: img.retryHistory || [],
-    totalAttempts: img.totalAttempts || 1,
+    attemptCount: pageAttemptCount(img),   // null = not measured; never default to 1
     wasRegenerated: img.wasRegenerated || false,
     wasAutoRepaired: img.wasAutoRepaired || false
   })) || [];
@@ -629,7 +647,8 @@ async function fetchPageDetails(storyId, pageNumber) {
     sceneCharacterClothing: page.sceneCharacterClothing,
     qualityScore: page.qualityScore,
     qualityReasoning: page.qualityReasoning,
-    totalAttempts: page.totalAttempts,
+    attemptCount: pageAttemptCount(page),  // null = not measured; never default to 1
+    attemptsLabel: formatAttempts(page),
     wasRegenerated: page.wasRegenerated,
     retryHistory: page.retryHistory?.length || 0,
     repairHistory: page.repairHistory?.length || 0
@@ -693,7 +712,7 @@ function printPageDetails(page) {
 
   console.log('\nQUALITY:');
   console.log(`   Score: ${page.qualityScore || 'N/A'}`);
-  console.log(`   Attempts: ${page.totalAttempts || 1}`);
+  console.log(`   Attempts: ${page.attemptsLabel}`);
   console.log(`   Regenerated: ${page.wasRegenerated ? 'Yes' : 'No'}`);
   console.log(`   Retry history: ${page.retryHistory} entries`);
   console.log(`   Repair history: ${page.repairHistory} entries`);
@@ -977,12 +996,12 @@ function printAnalysisSummary(analysis) {
     for (const e of analysis.evaluations) {
       const score = e.qualityScore !== undefined ? e.qualityScore.toFixed(1) : 'N/A';
       const fixes = e.fixTargets.length;
-      const attempts = e.totalAttempts || 1;
+      const attempts = e.attemptCount;
       const flags = [
         e.wasRegenerated ? 'REGEN' : null,
         e.wasAutoRepaired ? 'REPAIRED' : null,
       ].filter(Boolean).join(', ');
-      console.log(`   Page ${e.pageNumber}: score=${score}${fixes > 0 ? `, fixes=${fixes}` : ''}${attempts > 1 ? `, attempts=${attempts}` : ''}${flags ? ` [${flags}]` : ''}`);
+      console.log(`   Page ${e.pageNumber}: score=${score}${fixes > 0 ? `, fixes=${fixes}` : ''}${attempts === null ? ', attempts=not measured' : (attempts > 1 ? `, attempts=${attempts}` : '')}${flags ? ` [${flags}]` : ''}`);
     }
   }
 
@@ -1111,4 +1130,6 @@ async function main() {
   }
 }
 
-main();
+if (require.main === module) main();
+
+module.exports = { formatAttempts, printPageDetails, printAnalysisSummary };

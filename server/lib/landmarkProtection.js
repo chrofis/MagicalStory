@@ -96,19 +96,54 @@ function computeLandmarkProtection({ landmarkPhotos = null, era = null } = {}) {
 }
 
 /**
- * The block injected into the three-stage compliance eval prompt
- * ({LANDMARK_CONTEXT}).
+ * THE NAME OF THE DECLARED SUBJECT FIELD. One spelling, shared by the prompt
+ * contract below and by the code that reads it — so a rename cannot land on one
+ * side only.
+ */
+const LANDMARK_ELEMENT_FIELD = 'landmark_element';
+
+/**
+ * The subject contract, appended to every non-empty landmark block.
+ *
+ * This is what makes the guard trigger on the finding's SUBJECT rather than on
+ * its TYPE. The judge — not code — decides whether a finding is about the real
+ * place; docs/SETTLED.md gives classification to the prompt and leaves code only
+ * what a declared field says.
+ *
+ * NO ENUMERATED SCENE NOUNS, for the reason recorded below: a list a model is
+ * shown is a list a model will echo. The domain is given by relationship ("part
+ * of the real place named above"), and the false side by role, never by naming
+ * objects a page might contain.
+ */
+const LANDMARK_SUBJECT_CONTRACT = `SUBJECT FLAG — required on every \`fixable_issues[]\` entry for as long as this block is non-empty:
+\`${LANDMARK_ELEMENT_FIELD}\`: true when the thing this finding is about is part of the real place named above — its geography, or any structure or fixture standing on it — and false for everything else, including every character, every garment and every prop the story brought into the scene. Answer it on every entry; never omit it and never leave it null.`;
+
+/**
+ * THE landmark block, and the only copy of it. Injected as `{LANDMARK_CONTEXT}`
+ * into EVERY judge that can emit a removal-shaped fix — the three-stage
+ * compliance judge (image-prompt-compliance.txt), the semantic judge
+ * (image-semantic.txt) and the quality judge (image-evaluation.txt).
+ *
+ * It used to reach the compliance judge alone, which is why the other two kept
+ * proposing the removals this module then had to catch: the one production fire
+ * on record came from the semantic judge, which had never been told the page
+ * carries a real place. A second, third and fourth hand-written copy of this
+ * wording is exactly the drift the owner ruled against ("fix the mirror class,
+ * not the instance") — so there is one builder and the templates carry one
+ * placeholder each.
  *
  * - protected page → the landmark's geography and structures are PRESENT BY
- *   DESIGN and can never be `object_presence` / unrequested / anachronism.
+ *   DESIGN and can never be reported as unrequested / modern / a setting
+ *   mismatch, at any type.
  * - historical page carrying a landmark → the era guard's own semantics, so
  *   modern infrastructure REMAINS a legitimate finding.
- * - no landmark → empty (unchanged behaviour).
+ * - no landmark → empty (unchanged behaviour); the guard cannot run on such a
+ *   page, so the subject flag is not asked for either.
  *
  * @param {ReturnType<typeof computeLandmarkProtection>} protection
  * @returns {string}
  */
-function buildLandmarkComplianceBlock(protection) {
+function buildLandmarkContextBlock(protection) {
   if (!protection || !protection.landmarkPresent) return '';
   const names = protection.names.join(', ');
   if (protection.protect) {
@@ -120,12 +155,22 @@ function buildLandmarkComplianceBlock(protection) {
     // page contains. A list a model is shown is a list a model will echo, so
     // both copies now name the landmark and refer to what belongs to it.
     return `LANDMARK ELEMENTS — PRESENT BY DESIGN: ${names}.
-This page was rendered from a reference photo of that real place, and the story is set in the present day. Everything that belongs to that place — its geography and every structure standing on it — is there because the real place has it. Never report any of it as unrequested, unauthorized, extra, added, modern, out of period, anachronistic, or as a setting mismatch, at any severity, on any axis. Never ask for it to be removed or for the background to be replaced. Judge only whether the landmark is rendered well; do not infer a historical period from words in the prose.`;
+This page was rendered from a reference photo of that real place, and the story is set in the present day. Everything that belongs to that place — its geography and every structure standing on it — is there because the real place has it. Never report any of it as unrequested, unauthorized, extra, added, modern, out of period, anachronistic, or as a setting mismatch, at any severity, on any axis. Never ask for it to be removed or for the background to be replaced. Judge only whether the landmark is rendered well; do not infer a historical period from words in the prose.
+
+${LANDMARK_SUBJECT_CONTRACT}`;
   }
   return `LANDMARK ELEMENTS: ${names}. This page was rendered from a reference photo of that real place, but the story is NOT set in the present day:
 ${protection.eraGuard}
-Modern infrastructure visible on this page remains a legitimate finding.`;
+Modern infrastructure visible on this page remains a legitimate finding.
+
+${LANDMARK_SUBJECT_CONTRACT}`;
 }
+
+/**
+ * Historical name, kept because it is the name the compliance call site and the
+ * existing tests use. Same function — never a second implementation.
+ */
+const buildLandmarkComplianceBlock = buildLandmarkContextBlock;
 
 /**
  * Removal-shaped fix detector.
@@ -137,16 +182,83 @@ Modern infrastructure visible on this page remains a legitimate finding.`;
  * the proposed edit is a destructive removal/replacement, which is exactly the
  * operation the owner ruled must not run unmasked on a landmark page.
  */
-const REMOVAL_FIX = /\b(remove|removing|removal|delete|deleting|erase|erasing|eliminat\w*|strip|paint\s+out|paint\s+over|take\s+out|replace|replacing)\b/i;
+// `strip` is the one token here that is also a common NOUN in an illustration
+// brief — "a bright strip at the top of the frame", "the sky strip", "a daylight
+// strip". Measured over the stored corpus it matched 5 fixes and every one of
+// them was the noun: "Adjust the camera angle … so the Kapellbrücke appears as a
+// distant, bright strip". Harmless while the trigger was a prop type; with the
+// subject trigger those are landmark findings and all five would have been
+// dropped. So the verb is required to be doing something to something.
+const REMOVAL_FIX = /\b(remove|removing|removal|delete|deleting|erase|erasing|eliminat\w*|strip(?:s|ped|ping)?\s+(?:out|away|off|from|it|the|this|that|all|every|any)\b|paint\s+out|paint\s+over|take\s+out|replace|replacing)\b/i;
 
 function isRemovalShapedFix(issue) {
+  // A finding whose `fix` is NOT the judge's own edit instruction carries no
+  // edit instruction at all: the compliance/quality parsers stand one in from
+  // the description (`fix: i.fix || \`Fix: ${i.description}\``) and stamp
+  // `fixAuthored: false` when they do. Running the removal regex over THAT
+  // string would be classifying the finding from its description prose, which
+  // docs/SETTLED.md forbids — the very thing this detector's header claims it
+  // does not do. Latent until now (measured: 0 of 15 fires had a stand-in fix),
+  // and closed here rather than left to fire on the first story that hits it.
+  if (issue && issue.fixAuthored === false) return false;
   const fix = String(issue?.fix || issue?.suggestion || '').trim();
   if (!fix) return false;
   return REMOVAL_FIX.test(fix);
 }
 
 /**
- * HARD GUARD. Drop `object_presence` removal findings on a protected page.
+ * THE DECLARED SUBJECT of a finding: is the thing it is about part of the real
+ * place this page depicts?
+ *
+ * THREE states, and the third is not the second. `undeclared` covers every
+ * finding stored before the judges were asked the question, plus any judge or
+ * Lab template that does not ask it. Collapsing it into `other` is precisely
+ * the bug shape the owner has now been bitten by twice in one day — an unknown
+ * value defaulting to "safe to act on".
+ *
+ * Only a real boolean (or its exact JSON-ish string spelling) counts as an
+ * answer. `null`, `''`, `'unknown'`, a number and a missing key are all
+ * `undeclared`.
+ *
+ * @param {object} issue
+ * @returns {'landmark'|'other'|'undeclared'}
+ */
+function landmarkSubject(issue) {
+  if (!issue || typeof issue !== 'object') return 'undeclared';
+  const v = issue[LANDMARK_ELEMENT_FIELD];
+  if (v === true || v === 'true') return 'landmark';
+  if (v === false || v === 'false') return 'other';
+  return 'undeclared';
+}
+
+/**
+ * HARD GUARD. Drop removal-shaped fixes aimed AT the landmark on a protected
+ * page.
+ *
+ * THE TRIGGER IS THE SUBJECT, NOT THE TYPE (2026-09-18). It used to be
+ * `type === 'object_presence'`, which is the compliance template's code for a
+ * PROP — "present but wrong", a wrong object colour. The findings that actually
+ * destroy a landmark arrive as `setting` / `object` / `extra_object` /
+ * `background`: measured over 842 stored landmark pages, 53 removal-shaped
+ * fixes on protected pages, at least 8 of them unmistakably aimed at the real
+ * place, none of which the type trigger could see. On one page
+ * (job_1789681157795_wkt20ckod p11) it dropped the harmless finding ("Remove
+ * windows from the stone wall") and kept "Replace urban background with natural
+ * hillside" — the real Zürich cityscape seen from the Lindenhof.
+ *
+ * The three subject states map to three actions:
+ *   landmark   → DROP. Any type. This is the guard.
+ *   other      → KEEP. Any type, `object_presence` included: the judge looked at
+ *                the subject and said it is not the real place. This is what
+ *                ends the false drops (11 of 15 measured fires on staging were
+ *                a prop, a held object or a colour error being suppressed —
+ *                twice the story's own plot object, on pages that then stored a
+ *                perfect 100 with no findings at all).
+ *   undeclared → the OLD rule, unchanged: drop iff `type === 'object_presence'`.
+ *                Stored findings predate the field and must keep the outcome
+ *                they were scored under; a judge that stops declaring falls back
+ *                to the previous guard rather than to no guard. It is never read
+ *                as `false`, and every such decision is logged.
  *
  * Fails loudly: every drop logs a WARN naming the page and the landmark. Never
  * silent — a dropped finding that nobody can see in the log is how the original
@@ -154,7 +266,7 @@ function isRemovalShapedFix(issue) {
  *
  * @param {Array} issues
  * @param {ReturnType<typeof computeLandmarkProtection>} protection
- * @param {{pageNumber?: number|string|null, label?: string}} [ctx]
+ * @param {{pageNumber?: number|string|null, label?: string, quiet?: boolean}} [ctx]
  * @returns {{kept: Array, dropped: Array}}
  */
 function filterProtectedRemovals(issues, protection, ctx = {}) {
@@ -162,22 +274,31 @@ function filterProtectedRemovals(issues, protection, ctx = {}) {
   if (!protection?.protect || list.length === 0) return { kept: list, dropped: [] };
   const kept = [];
   const dropped = [];
+  const undeclared = [];
   for (const iss of list) {
-    const type = String(iss?.type || '').toLowerCase();
-    if (type === 'object_presence' && isRemovalShapedFix(iss)) {
-      dropped.push(iss);
-      continue;
-    }
-    kept.push(iss);
+    if (!isRemovalShapedFix(iss)) { kept.push(iss); continue; }
+    const subject = landmarkSubject(iss);
+    if (subject === 'landmark') { dropped.push({ issue: iss, subject }); continue; }
+    if (subject === 'other') { kept.push(iss); continue; }
+    // undeclared — the pre-2026-09-18 rule, verbatim.
+    undeclared.push(iss);
+    if (String(iss?.type || '').toLowerCase() === 'object_presence') dropped.push({ issue: iss, subject });
+    else kept.push(iss);
   }
-  if (dropped.length && !ctx.quiet) {
+  if (!ctx.quiet) {
     const page = ctx.pageNumber != null ? `P${ctx.pageNumber}` : 'page';
     const where = ctx.label ? `${ctx.label} ` : '';
     for (const d of dropped) {
-      log.warn(`🏛️  [LANDMARK-GUARD] ${where}${page}: dropped ${String(d.severity || 'MODERATE').toUpperCase()} object_presence removal on a page carrying landmark "${protection.names.join(', ')}" in a present-day story — an unmasked whole-frame removal would erase the real place. Finding: ${String(d.description || d.issue || '(no description)').slice(0, 300)}`);
+      const why = d.subject === 'landmark'
+        ? `the judge declared its subject part of the landmark (${LANDMARK_ELEMENT_FIELD}=true)`
+        : `its subject was NOT declared — falling back to the type rule (object_presence)`;
+      log.warn(`🏛️  [LANDMARK-GUARD] ${where}${page}: dropped ${String(d.issue.severity || 'MODERATE').toUpperCase()} ${String(d.issue.type || 'unknown')} removal on a page carrying landmark "${protection.names.join(', ')}" in a present-day story — ${why}; an unmasked whole-frame removal would erase the real place. Finding: ${String(d.issue.description || d.issue.issue || '(no description)').slice(0, 300)}`);
+    }
+    if (undeclared.length) {
+      log.warn(`🏛️  [LANDMARK-GUARD] ${where}${page}: ${undeclared.length} removal-shaped finding(s) carried no \`${LANDMARK_ELEMENT_FIELD}\` — the judge that emitted them is not declaring the subject, so this page fell back to the pre-2026-09-18 type rule. Types: ${[...new Set(undeclared.map(i => String(i?.type || 'unknown')))].join(', ')}`);
     }
   }
-  return { kept, dropped };
+  return { kept, dropped: dropped.map(d => d.issue) };
 }
 
 /**
@@ -210,7 +331,13 @@ module.exports = {
   resolveSceneEra,
   landmarkNames,
   computeLandmarkProtection,
+  LANDMARK_ELEMENT_FIELD,
+  LANDMARK_SUBJECT_CONTRACT,
+  buildLandmarkContextBlock,
+  // Same function under its original name — the compliance call site and the
+  // existing tests use this one.
   buildLandmarkComplianceBlock,
+  landmarkSubject,
   isRemovalShapedFix,
   filterProtectedRemovals,
   seedPreserveWithLandmarks,

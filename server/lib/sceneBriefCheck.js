@@ -130,8 +130,9 @@ function checkTextZoneCollision(page, metadata) {
 
 /**
  * R1 — the distribution floors, tallied across the finished book. Verbatim from
- * the old unified chain (story-unified.txt "Distribution requirements across the
- * full story" + outline-analysis check 20): full-width between 30% and 50% of
+ * the old unified chain (the since-deleted story-unified.txt "Distribution
+ * requirements across the full story" + outline-analysis check 20; the live
+ * statement of the rule is prompts/scene-expansion-all.txt): full-width between 30% and 50% of
  * pages, at least 30% top-*, at least 30% bottom-*, never more than 3
  * consecutive pages in the same half. Parity is NOT re-checked here — it
  * survived into the Art Director's own rule set.
@@ -184,12 +185,298 @@ function checkTextZoneDistribution(pages = []) {
   return findings;
 }
 
+// ── Object states ─────────────────────────────────────────────────────────
+// A stated object (`states[]`) has NO base cell — its states ARE the rendered
+// cells — so every page citing it lands on one of them, and a bare citation
+// falls back to `states[0]` (visualBible.defaultObjectState). The authoring
+// templates make that safe by requiring the UNALTERED look first; when the Art
+// Director instead opens with a change, every page before the story makes that
+// change is rendered in it.
+//
+// Measured on staging job_1789343124794_z2c779f7i: an artifact's first state
+// was "muddy and cracked" claiming pages 3-15, while the story finds the object
+// clean and glowing on p3-p8, muddies it on p9 and cracks it on p10. The
+// page-prompt path caught the disagreement (`resolveObjectState` →
+// `contradicted`) and dropped the delta from the PROSE, but that happens after
+// the review and it cannot swap the attached reference cell: p3-p5 rendered a
+// dark, cracked, mud-crusted object six pages before the mud exists.
+//
+// Both checks below are the same fault seen from two sides, and the review is
+// the one place with the plan lines in front of it, so it is the one place the
+// page ranges can be corrected.
+
+/** Entries carrying a non-empty `states[]`, by base id. */
+function statedEntries(visualBible) {
+  const out = new Map();
+  for (const key of VB_COLLECTIONS) {
+    const entries = visualBible && visualBible[key];
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      const id = entry && entry.id && String(entry.id).trim().toUpperCase().split('.')[0];
+      if (!id || !Array.isArray(entry.states) || entry.states.length === 0) continue;
+      out.set(id, entry);
+    }
+  }
+  return out;
+}
+
+/** The id claims in a brief's `objects[]`, as {base, handle}. */
+function objectHandles(metadata) {
+  const objects = (metadata && Array.isArray(metadata.objects)) ? metadata.objects : [];
+  const out = [];
+  for (const raw of objects) {
+    if (typeof raw !== 'string') continue;
+    const handle = raw.trim();
+    const m = VB_ID.exec(handle.toUpperCase());
+    if (m) out.push({ base: m[1] + m[2], handle });
+  }
+  return out;
+}
+
+/**
+ * I — the page's own instant disagrees with the state it resolves to.
+ *
+ * Reuses `resolveObjectState`, the ONE place a page's state is decided, in
+ * `silent` mode: the prompt path logs the same disagreement later, and a second
+ * WARN per page would read as two faults.
+ */
+function checkObjectStateContradiction(page, metadata, visualBible) {
+  const stated = statedEntries(visualBible);
+  if (stated.size === 0) return [];
+  const { resolveObjectState } = require('./visualBible');
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const findings = [];
+  const seen = new Set();
+  for (const { base, handle } of objectHandles(metadata)) {
+    const entry = stated.get(base);
+    if (!entry || seen.has(base)) continue;
+    seen.add(base);
+    try {
+      const r = resolveObjectState(entry, handle, page.pageNumber, metadata, { silent: true, visualBible });
+      if (!r || !r.contradicted || !r.state) continue;
+      const label = elementDisplayLabel(entry) || entry.name || base;
+      // The WORDS the verdict rests on, not just the sentence they sit in: this
+      // axis decides on vocabulary two states share, and the reviewer is the
+      // one reader who can tell "the egg in the hollow" (a cavity in the
+      // ground) from a cracked shell's hollow interior. Evidence, not a
+      // classification - the type and its severity are untouched.
+      const words = (r.evidenceTokens || []).map(t => `"${t}"`).join(', ');
+      const asserts = r.contradictedBy === 'appearance' && r.rival
+        ? `the page's own instant asserts "${r.rival.name}" instead${words ? `, on the word(s) ${words}` : ''}${r.evidence ? ` ("${r.evidence}")` : ''}`
+        : "the page's own interactions[] contradict that state's contact";
+      findings.push({
+        pageNumber: page.pageNumber,
+        type: 'vb_state_contradicted',
+        ids: [base],
+        detail: `This page resolves ${label} (${base}) to ${r.state.id} ("${r.state.name}": ${r.state.delta}), and ${asserts}. `
+          + `The reference cell follows the state, so the object is drawn in a look the page has not reached. `
+          + `Correct the entry's state pages: a state's pages begin at the page whose plan line makes that change, `
+          + `and the pages before it belong to the object's unaltered first state.`,
+      });
+    } catch (err) {
+      log.warn(`[BRIEF-CHECK] page ${page && page.pageNumber}: object state ${base}: ${err.message}`);
+    }
+  }
+  return findings;
+}
+
+/**
+ * J — the unaltered look is missing or mis-ranged.
+ *
+ * Whole-book, because the earliest page that cites an entry is only visible
+ * across the briefs — and it is read from the BRIEFS, never from the bible's
+ * own `pages`, which is the thing under suspicion.
+ */
+function checkObjectStateBase(pages = [], visualBible = null) {
+  const stated = statedEntries(visualBible);
+  if (stated.size === 0) return [];
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const earliest = new Map();
+  for (const page of (pages || [])) {
+    const n = Number(page && page.pageNumber);
+    if (!Number.isFinite(n)) continue;
+    const metadata = (page && page.metadata) || extractSceneMetadata(String((page && page.brief) || ''));
+    for (const { base } of objectHandles(metadata)) {
+      if (!stated.has(base)) continue;
+      if (!earliest.has(base) || n < earliest.get(base)) earliest.set(base, n);
+    }
+  }
+  const findings = [];
+  for (const [base, first] of earliest) {
+    const entry = stated.get(base);
+    try {
+      const opening = entry.states[0];
+      const covers = Array.isArray(opening && opening.pages) && opening.pages.map(Number).includes(first);
+      if (covers) continue;
+      const label = elementDisplayLabel(entry) || entry.name || base;
+      findings.push({
+        pageNumber: first,
+        type: 'vb_state_no_base',
+        ids: [base],
+        detail: `${label} (${base}) is first staged on page ${first}, and its first state ${opening && opening.id ? `${opening.id} ` : ''}`
+          + `("${(opening && opening.name) || '?'}": ${(opening && opening.delta) || '?'}) covers page(s) ${JSON.stringify((opening && opening.pages) || [])}, not page ${first}. `
+          + `A bare citation falls back to the first state, so page ${first} is drawn in a change the story has not made there. `
+          + `The unaltered look must be the first state, carrying the pages up to the first change, and each later state starts at the page whose plan line makes it.`,
+      });
+    } catch (err) {
+      log.warn(`[BRIEF-CHECK] object state base ${base}: ${err.message}`);
+    }
+  }
+  return findings;
+}
+
+// ── Bible page tables vs brief citations ─────────────────────────────
+// The Art Director is told, verbatim: "An entry's `pages` and the `objects[]` of
+// the page briefs below say the same thing" (prompts/scene-expansion-all.txt,
+// the `pages` is earned rule). Both halves are written in one call and nothing
+// compared them, so the two tables were free to drift — and every consumer
+// downstream reads ONE of them. `pages` drives the reference-cell pick, the
+// element budget and the usage rebuild; `objects[]` drives REQUIRED OBJECTS and
+// what the illustrator is actually shown. When they disagree the page is built
+// from one table and judged against the other.
+//
+// Structured only: the entry ids, the citation handles and the page numbers.
+// Never the prose, never a finding's text.
+//
+// The page table is read through `vbEntityCoversPage` (iterateBeat.js), the one
+// place that already answers "does this entry claim this page" — `pages` unioned
+// with `appearsInPages` and every `states[]` row's own pages. It returns null
+// when an entry declares no page anywhere, and null is UNKNOWN, not "no page":
+// an entry with an empty or missing `pages[]` is skipped in both directions
+// rather than coerced into an absence (the same fallback `normalizeCitedHandles`
+// takes, 796b070e5). A state handle resolves through its parent — `ART001.2` is
+// a citation of ART001 — because the page tables being compared belong to the
+// entry, and which FACET a page lands on is what `vb_state_contradicted` and
+// `vb_state_no_base` already judge.
+
+// The pools whose entries a brief is REQUIRED to cite. `clothing` is the one
+// member of VB_COLLECTIONS deliberately left out: the citation rule lists
+// "secondary characters, animals, artifacts and vehicles" and locations, and a
+// CLO entry reaches the illustrator through the wearer's clothing contract, not
+// through `objects[]` — it is never cited, so every CLO entry would flag on
+// every page it claims. Measured on the corpus below: 104 of them.
+const CITABLE_POOLS = VB_COLLECTIONS.filter(k => k !== 'clothing');
+
+/** Every visual-bible entry that carries a citable id, by base id. */
+function bibleEntries(visualBible) {
+  const out = [];
+  for (const key of CITABLE_POOLS) {
+    const raw = visualBible && visualBible[key];
+    const list = Array.isArray(raw) ? raw : Object.values(raw || {});
+    for (const entry of list) {
+      if (!entry || !entry.id) continue;
+      const id = String(entry.id).trim().toUpperCase().split('.')[0];
+      if (!VB_ID.test(id)) continue;
+      out.push({ id, entry, pool: key });
+    }
+  }
+  return out;
+}
+
+/**
+ * The base ids a page's `objects[]` cites, whatever shape the rows are in.
+ *
+ * Read with `findVbIds`, not an anchored match: a row is `ART001`, `ART002.2`
+ * or the labelled prose form the trial writer emits (`red leaf bucket
+ * [ART002]`), and an anchored regex sees a citation in the first two and none
+ * in the third. Every 6-page story in the corpus is written that way, and
+ * reading them anchored flagged every element on every page.
+ */
+function citedBaseIds(metadata) {
+  const objects = (metadata && Array.isArray(metadata.objects)) ? metadata.objects : [];
+  const { findVbIds, baseVbId } = require('./vbIdGuard');
+  const out = new Map();
+  for (const raw of objects) {
+    const row = String(typeof raw === 'string' ? raw : (raw && raw.id) || '').trim();
+    if (!row) continue;
+    for (const hit of findVbIds(row)) {
+      const base = baseVbId(hit);
+      if (base && !out.has(base)) out.set(base, hit);
+    }
+  }
+  return out;
+}
+
+/**
+ * K — the bible's authored page table and the page's own citations disagree.
+ *
+ * Two directions, reported as two types because the fix differs:
+ *   vb_page_uncited  the entry claims this page and the brief cites nothing that
+ *                    resolves to it — the element reaches the illustrator through
+ *                    its id and nothing else, so it is either drawn from nothing
+ *                    or the page does not belong in its `pages`.
+ *   vb_cite_offpage  the brief cites the entry here and the entry's page table
+ *                    leaves this page out — the citation earns a page the bible
+ *                    never granted, and the budget, the state pick and the usage
+ *                    rebuild all read the table, not the citation.
+ *
+ * A figure carried in `characters[]` counts as cited: a secondary character on
+ * the roster is in the frame already, and `objects[]` is not where they belong.
+ * Compared with `isSameFigureName`, for the same reason check A is.
+ */
+function checkBiblePageTable(page, metadata, visualBible) {
+  const n = Number(page && page.pageNumber);
+  if (!Number.isFinite(n) || n <= 0) return [];
+  const entries = bibleEntries(visualBible);
+  if (entries.length === 0) return [];
+  const { vbEntityCoversPage } = require('./iterateBeat');
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  const cited = citedBaseIds(metadata);
+  const onCast = ((metadata && Array.isArray(metadata.characters)) ? metadata.characters : [])
+    .map(c => String(typeof c === 'string' ? c : (c && c.name) || '').trim()).filter(Boolean);
+  const uncited = [];
+  const offpage = [];
+  for (const { id, entry } of entries) {
+    const covers = vbEntityCoversPage(entry, n);
+    if (covers === null) continue; // no page table anywhere: unknown, not an absence
+    if (covers) {
+      // A figure on the roster is in the frame already — a name match only ever
+      // SUPPRESSES an absence, it is never itself a citation. The other way
+      // round costs a false positive: an animal entry named "Mother Dragon"
+      // against a cast entry "Mother" is one name under isSameFigureName, and
+      // reading that as a citation reported the creature off-page on a page it
+      // was never on (staging job_1789163494908_kc2joi4ax p2).
+      if (!cited.has(id) && !onCast.some(name => isSameFigureName(name, entry.name))) uncited.push({ id, entry });
+    } else if (cited.has(id)) {
+      offpage.push({ id, entry, handle: cited.get(id) });
+    }
+  }
+  const label = (e) => elementDisplayLabel(e.entry) || e.entry.name || e.id;
+  const findings = [];
+  if (uncited.length > 0) {
+    findings.push({
+      pageNumber: n,
+      type: 'vb_page_uncited',
+      ids: uncited.map(e => e.id),
+      detail: `The Visual Bible puts ${uncited.map(e => `${label(e)} (${e.id})`).join(' and ')} on page ${n}, `
+        + `and this page's objects[] cites ${cited.size ? [...cited.values()].join(', ') : 'no bible id at all'}. `
+        + `An entry's \`pages\` and the page briefs' \`objects[]\` say the same thing: either stage `
+        + `${uncited.length > 1 ? 'them' : 'it'} in the prose and cite the id here, or drop page ${n} from `
+        + `${uncited.length > 1 ? 'those entries' : 'that entry'}'s \`pages\`.`,
+    });
+  }
+  if (offpage.length > 0) {
+    findings.push({
+      pageNumber: n,
+      type: 'vb_cite_offpage',
+      ids: offpage.map(e => e.id),
+      detail: `objects[] cites ${offpage.map(e => `${e.handle} (${label(e)})`).join(' and ')} on page ${n}, `
+        + `and ${offpage.length > 1 ? 'those entries claim' : 'that entry claims'} `
+        + `${offpage.map(e => `${e.id} ${JSON.stringify(Array.isArray(e.entry.pages) ? e.entry.pages : [])}`).join(', ')} — page ${n} is not among them. `
+        + `The page table is what the element budget, the state pick and the reference cell all read, so add page ${n} `
+        + `to the entry's \`pages\` if it really is in frame here, and withdraw the citation if it is not.`,
+    });
+  }
+  return findings;
+}
+
 /**
  * Check one page.
  *
  * @param {Object} page
  * @param {number} page.pageNumber
  * @param {string} page.brief          the full scene brief (prose + ---METADATA---)
+ * @param {string} [page.planLine]     the page's plan line, for element coverage
  * @param {Object} [page.metadata]     already-parsed metadata, when the caller has it
  * @param {string[]} castNames         the story cast
  * @param {Object} [visualBible]
@@ -346,6 +633,12 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   const overflow = checkVbElementBudget(page.pageNumber, metadata, visualBible);
   if (overflow) findings.push(overflow);
 
+  // I — the page's instant disagrees with the object state it resolves to.
+  findings.push(...checkObjectStateContradiction(page, metadata, visualBible));
+
+  // K — the bible's page table and this page's citations disagree.
+  findings.push(...checkBiblePageTable(page, metadata, visualBible));
+
   // F — R4, the text half only. The depth-mismatch half of the old check 24b
   // is deliberately not restored (owner ruling, rule-survival audit 2026-09-03).
   if (opts && opts.textZoneRules) {
@@ -372,6 +665,11 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
     } catch (err) {
       log.warn(`[BRIEF-CHECK] page ${page && page.pageNumber}: ${err.message}`);
     }
+  }
+  try {
+    all.push(...checkObjectStateBase(pages, visualBible));
+  } catch (err) {
+    log.warn(`[BRIEF-CHECK] object state base: ${err.message}`);
   }
   if (opts && opts.textZoneRules) {
     try {
@@ -419,8 +717,108 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 //     elements per page (2026-09-06). Mechanical, and the fix is a deletion the
 //     reviewer can make without inventing anything. SENT; what survives the
 //     review is truncated in code.
+//   vb_state_contradicted / vb_state_no_base  a stated object whose states[]
+//     page ranges disagree with the story (2026-09-14). Both are mechanical —
+//     the first reuses `resolveObjectState`, the second compares the first
+//     state's pages against the earliest page a brief cites the entry on — and
+//     the fix is a page-range edit the reviewer can make from the plan lines it
+//     already holds. Evidence: job_1789343124794_z2c779f7i, where the opening
+//     state was a change claiming 12 pages and the first six rendered altered.
+//     SENT.
+//   vb_page_uncited / vb_cite_offpage  the bible's authored page table and the
+//     briefs' citations disagree (2026-09-17). scene-expansion-all.txt states
+//     the contract verbatim — "An entry's `pages` and the `objects[]` of the
+//     page briefs below say the same thing" — and nothing verified it.
+//     MEASURED over every staging story whose bible was authored under that
+//     rule (15 stories, 209 pages, the rule landed with 061521b95 on
+//     2026-09-11): 34 findings on 31 pages of 209, 29 uncited and 5 off-page.
+//     Every one inspected by hand against its plan line, and every one a real
+//     disagreement — no false positives. Four stories carry all 34 and eleven
+//     are clean; the two worst (17 and 13) are the first two runs after the
+//     rule landed, and the five most recent stories produce none. The shapes:
+//     a blanket `pages` range over the whole book, a page table that runs a
+//     page past the location change, a table that claims more elements for a
+//     page than the element budget allows (the brief obeyed the budget, the
+//     bible did not), and — the other way — a citation the plan line justifies
+//     on a page the bible forgot to grant. The fix is a page-range or citation
+//     edit the reviewer can make from the plan lines it already holds, and the
+//     table it corrects is what the reference-cell pick, the element budget and
+//     the usage rebuild all read. SENT.
+//     The same sweep over all 124 stored stories returns 758 flagged pages of
+//     1370; those bibles were authored before the rule existed, by the writer
+//     rather than the Art Director, and their `pages` was never a claim about
+//     the briefs. That number measures the old contract, not this one.
+//     NOT the catcher for job_1789584708605_rts4wqupm p14/p15: applyBriefUsage
+//     emptied those state rows AFTER the review, and this check runs before it.
+//     On that story's AUTHORED table it names p18, the page the cracked state
+//     claimed and no brief stages (tests/unit/scene-brief-bible-pages.test.ts).
+//   element_uncited      REMOVED 2026-09-18, after six days live (owner call).
+//     It fired when a word taken from a bible entry's name/type appeared in the
+//     plan line's staged segment while `objects[]` did not cite that entry's
+//     id — it decided what a page stages by matching prose, which is the one
+//     thing a code check may not do (classification belongs to the PROMPT; code
+//     may only change a severity).
+//     MEASURED before removal, replayed over the 138 stored staging stories (30
+//     carry both a bible and plan lines; 451 pages in scope): 137 findings on
+//     118 pages — 26% of every page it could see — of which 28 TRUE (20%), 103
+//     FALSE (75%) and 6 unclear. IN PRODUCTION, over the 10 runs since it
+//     shipped in 4d169a6a3 (2026-09-12): 43 fired, 9 true, 33 false, 1 unclear.
+//     The scene review ACTED on 20 of those 43 and got it wrong 12 times, and
+//     the damage is in the stored final briefs: a hatched dragon added to SIX
+//     egg pages of 9oxos7dwv; the correct cold-egg citation ART001.2 REMOVED
+//     from 3kxqshifx p16 and replaced by the dragon, one page before the hatch;
+//     VEH001 — a wreck "spanning the width of a house" — added to a museum
+//     interior holding a forearm-length model in y3n0euk3z p1; an iron crowbar
+//     added to ueh8h145m p1, whose own plan line puts it in a bunk aboard
+//     another ship.
+//     Three false shapes are STRUCTURAL, not tunable: a creature entry reduced
+//     to its name matches the unhatched egg the story calls by that name (19
+//     findings); the head-noun rule took the LAST token of the `type` sentence,
+//     so "Julian's bicycle" typed "child's balance or pedal bicycle, smaller
+//     than Levin's" yielded the word `levin` (11 findings in one story); and a
+//     one-word head noun cannot separate a wedged stone from a stone wall, or a
+//     lantern from a lantern man. This entry's own former claim — "1 page of 18
+//     and no false ones" — does not reproduce: on that same story it names 2 of
+//     18, one true and one false.
+//     THE RULE ITSELF STAYS, stated where classification belongs:
+//     `prompts/scene-review.txt:72` check 9d for the critic, and
+//     `prompts/scene-expansion-all.txt:157` for the Art Director ("An entry's
+//     `pages` and the `objects[]` of the page briefs below say the same
+//     thing"). Over the same briefs 9d named 4 pages this code structurally
+//     could not see — one where the plan line says "shell" while the code's
+//     word for that entry was `egg` — and declined to repeat 20 of the 41 pages
+//     the code handed it, nearly all false. HONEST LIMIT: it is not proven the
+//     reviewer finds all 9 true ones unaided, because 9d and this check shipped
+//     in the SAME commit and the reviewer has never run without the code's line
+//     in front of it. Do not rebuild it as a code check; widen 9d instead.
+//     docs/decisions.md, 2026-09-18.
+//
+// THE SECOND READER (2026-09-17). Everything above measures these types against
+// the AUTHORED brief, the one the scene review reads once before any render. A
+// repaired page's brief is written a second time, by the iterate rewrite, and
+// that rewrite BECOMES the page's contract — the judges score against it and it
+// is promoted onto the page record. `iterateBeat.checkRewrittenBrief` runs
+// `checkPage` over it, so these same types are now the rewrite's contract too.
+// Three differences, all decided there and all measured on the 11 stored
+// iterate rounds of two staging runs:
+//   - `cast_unlisted` fires on the rewrite whatever the parent did
+//     (`element_uncited` did too until it was removed on 2026-09-18 — see its
+//     entry above); the interaction family, `cast_id_unresolved`,
+//     `vb_element_overflow` and `vb_state_contradicted` fire only when the
+//     PARENT brief was free of that type, because a rewrite inherits the
+//     bible's page tables and cannot be asked inside a page rewrite to fix what
+//     it was handed.
+//   - `vb_page_uncited` / `vb_cite_offpage` are NOT run on the rewrite. They
+//     fire there (5 and 3 of those 11 rounds) and every one of the 8 names a
+//     defect `iterateBeat.checkDeclaredSet` already names from the parent's own
+//     citation list, in a re-ask of its own. One basis per defect.
+//   - `vb_state_no_base` is whole-book (`checkObjectStateBase`) and `checkPage`
+//     never produces it, so the iterate path cannot see it.
+//   - the `textzone_*` family is not run there: `opts.textZoneRules` is off on
+//     that call, and a repaired page usually has its text position locked.
 const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
-  'vb_element_overflow',
+  'vb_element_overflow', 'vb_state_contradicted', 'vb_state_no_base',
+  'vb_page_uncited', 'vb_cite_offpage',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They
@@ -454,5 +852,7 @@ function renderFindingsBlock(byPage) {
 
 module.exports = {
   checkPage, checkScenes, renderFindingsBlock, knownIds, REVIEWABLE,
+  checkObjectStateContradiction, checkObjectStateBase, statedEntries,
+  checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
   checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition,
 };

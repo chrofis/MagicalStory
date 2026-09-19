@@ -11,6 +11,27 @@ A bug found at one call site is almost never alone in this codebase. The #1 hist
 
 **Core principle: a fix is done when every sibling of the buggy code is fixed or consolidated — not when the reported symptom disappears.**
 
+## The registry is the first stop, not this file
+
+`scripts/admin/sibling-registry.json` declares the sibling sets mechanically, and
+two consumers enforce them: the pre-push gate `scripts/admin/check-sibling-paths.js`
+(gate 9 in `.githooks/pre-push`) and `tests/unit/sibling-parity.test.ts`. Run
+
+    node scripts/admin/check-sibling-paths.js --list
+
+before declaring any fix done, and **add a set the moment you discover a sibling
+pair the registry does not know about** — that is the only way this stops
+repeating. Full explainer: `docs/sibling-paths.md`.
+
+This skill existed for five weeks and did not prevent a single one of the 27
+partial fixes found in the 2026-09-15 sweep of a 60-hour window. A skill is
+advisory; the registry is a control. Use both, and trust the registry.
+
+**Editing a judge or evaluator?** That axis has its own skill:
+`syncing-generator-and-critic` — a rule a judge can deduct for is a rule the
+generator was given. Registry sets with `axis: "generator-vs-critic"` are enforced
+the same way, directionally.
+
 ## Procedure
 
 1. Root-cause the reported site first (systematic-debugging skill).
@@ -18,11 +39,27 @@ A bug found at one call site is almost never alone in this codebase. The #1 hist
 3. Walk the sibling axes below and name each counterpart explicitly ("prod route = X, dev route = Y — checked both").
 4. If ≥3 copies exist, consolidate into one helper/chokepoint instead of patching copies. Consolidation always won historically; it just always arrived many fixes too late.
 5. Commit message lists the siblings checked, so the next session can see coverage.
+   If a declared sibling genuinely needs no change, say why with the gate's escape
+   marker: `Siblings-Checked: <reason>`. An empty marker is not accepted.
+6. If the gate blocks an EARLIER commit whose sibling was fixed in an already-pushed
+   commit, do not rebase to reword it — add one `git commit --allow-empty` that
+   vouches for it by sha: `Siblings-Checked: <sha-prefix ≥ 7> — <reason>`. One such
+   commit can carry a line per blocked commit, and the gate prints `vouched by <sha>`.
+   A vouch adds history instead of rewriting hashes other notes cite. It fails closed
+   on an unresolvable, out-of-range, ambiguous or self-referential sha, or a missing
+   reason — and a vouch for another commit never excuses its own siblings.
 
 ## Sibling axes (every one has shipped a one-sided fix before)
 
+Every axis below with a registry entry BLOCKS the push — there is no soft tier
+(owner, 2026-09-15). The rest are still yours to walk by hand — and to add.
+
 | Axis | Real example that stayed broken |
 |---|---|
+| Per-page vs all-pages Art Director template | `crowdExpected` declared only in `scene-expansion.txt`; the live beats path runs `scene-expansion-all.txt`, read it as false on all 16 pages, and 9 took an `extra_character` CRITICAL for correct crowds |
+| Lector prompt vs diff-pass prompt | "quote the whole sentence" landed on the lector; the diff pass kept "the shortest span" against the same applier |
+| Streaming vs non-streaming provider entry point | `callOpenRouterAPI` shipped with no `guardPromptString`; all seven siblings had it |
+| Gemini primary vs Grok fallback branch | fallback reassigned `modelId` on one branch only, so `servedByModel` named Gemini while Grok answered — an A/B comparing a model with itself |
 | Prod route vs dev route | cover imageUrl fallback fixed in dev iterate, missed in `/regenerate/cover` |
 | Single-pass vs fallback branch | cover solid-ground rule fixed in single-pass, missed in two-pass |
 | Grok path vs Gemini path | repair fix on Grok path, Gemini inpaint fallback kept sending Grok model id |
@@ -46,3 +83,4 @@ A bug found at one call site is almost never alone in this codebase. The #1 hist
 - You're about to say "fixed" having edited exactly one file.
 - The bug involves a value that exists in more than one store (versions, clothing, language, credits).
 - You found the same expression pasted in a second place and kept going.
+- You are about to write `Siblings-Checked:` without a concrete reason.

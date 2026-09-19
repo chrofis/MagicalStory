@@ -161,6 +161,12 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
     const isAdminDraft = req.user.impersonating === true;
     inputData.adminDraft = isAdminDraft;
 
+    // This payload DID come from a request body, so it is never server-authored.
+    // Forced here (after the spread, same reason as adminDraft above) so a
+    // client cannot set the marker that exempts a job from the pipeline's
+    // non-admin developer-field strip.
+    inputData.serverAuthoredInput = false;
+
     // Characters must belong to the caller. The wizard sends whole character
     // objects from client state, and that state survives an account switch, so
     // `job_1786309527338_4zwhrn08y` was submitted under the smoke account
@@ -269,10 +275,13 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
           : jobAgeMinutes;
 
         // Two detectors (owner ruling 2026-09-04, evidence job_1788551692337_bc479p945):
-        // 1. Heartbeat staleness (10 min) — the REAL stall detector. Every pipeline
-        //    phase touches updated_at at least once a minute (20s text-phase timer,
-        //    60s image-phase timer, every progress write), so a dead or wedged
-        //    process goes stale within minutes of dying.
+        // 1. Heartbeat staleness (10 min) — the REAL stall detector. The worker
+        //    arms a WHOLE-JOB 60s heartbeat for the lifetime of the job
+        //    (startJobHeartbeat, server/lib/jobHeartbeat.js), so a dead or
+        //    wedged process goes stale within minutes of dying while no live
+        //    phase can ever be outside the heartbeat. Phase-local timers used
+        //    to be the only writers and every silent phase between them killed
+        //    healthy runs.
         // 2. Total age (180 min) — runaway BACKSTOP only. The old 60-min cap
         //    predated the beats pipeline and killed a healthy 18-page run at 89%;
         //    a legitimate run must never hit this, only a job that heartbeats
@@ -536,9 +545,10 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
           : jobAgeMinutes;
 
         // Two detectors (owner ruling 2026-09-04, evidence job_1788551692337_bc479p945):
-        // 1. Heartbeat staleness (10 min) — the REAL stall detector; every pipeline
-        //    phase touches updated_at at least once a minute, so a dead process
-        //    (crash, server restart, wedge) goes stale within minutes.
+        // 1. Heartbeat staleness (10 min) — the REAL stall detector; the worker's
+        //    whole-job 60s heartbeat (startJobHeartbeat, server/lib/jobHeartbeat.js)
+        //    runs for the lifetime of the job, so a dead process (crash, server
+        //    restart, wedge) goes stale within minutes and a live one never does.
         // 2. Total age (180 min) — runaway BACKSTOP only. The old 60-min cap killed
         //    a healthy 18-page beats run at 89% while the pipeline kept working;
         //    the old 120-min 'abandoned' branch was the same age-based false kill.

@@ -379,6 +379,13 @@ const TRIAL_REMINDER_COPY = {
       ctaLabel: 'Réclamer mon histoire gratuite',
       perksIntro: 'Avec un compte complet, vous débloquez aussi :',
     },
+    ITALIAN: {
+      subject: 'I tuoi {credits} crediti gratuiti ti aspettano ancora',
+      headline: 'I tuoi {credits} crediti gratuiti ti aspettano ancora.',
+      body: 'Hai provato MagicalStory qualche giorno fa — i tuoi crediti gratuiti sono ancora sul tuo conto, abbastanza per creare un\'altra storia completa, del tutto gratis. Imposta la tua password per riscattarli.',
+      ctaLabel: 'Ottieni la mia storia gratuita',
+      perksIntro: 'Con un conto completo ottieni inoltre:',
+    },
   },
   day25: {
     ENGLISH: {
@@ -402,6 +409,13 @@ const TRIAL_REMINDER_COPY = {
       ctaLabel: 'Activer mon compte maintenant',
       perksIntro: 'Une fois votre compte activé, vous débloquez aussi :',
     },
+    ITALIAN: {
+      subject: 'I tuoi crediti gratuiti scadono tra {daysLeft} giorni',
+      headline: 'Ultima occasione — i tuoi crediti gratuiti scadono tra {daysLeft} giorni.',
+      body: 'Il tuo link di attivazione sta per scadere. Imposta subito la tua password per conservare i tuoi {credits} crediti gratuiti e la storia che hai già creato. Dopo {daysLeft} giorni il link sparisce definitivamente.',
+      ctaLabel: 'Attiva ora il mio conto',
+      perksIntro: 'Una volta attivato il conto, ottieni inoltre:',
+    },
   },
 };
 
@@ -411,7 +425,7 @@ const TRIAL_REMINDER_COPY = {
  * @param {string} userEmail
  * @param {string} firstName
  * @param {string} claimUrl - Already-built /claim/<token> URL
- * @param {string} language - English | German | French (case-insensitive, prefix-tolerant)
+ * @param {string} language - English | German | French | Italian (case-insensitive, prefix-tolerant)
  * @param {object} options
  * @param {('day5'|'day25')} options.reminderType - which reminder this is
  * @param {number} [options.daysLeft] - required for day25 (days until token expiry)
@@ -441,7 +455,7 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
     return null;
   }
 
-  const langKey = normalizeLanguage(language); // ENGLISH | GERMAN | FRENCH
+  const langKey = normalizeLanguage(language); // ENGLISH | GERMAN | FRENCH | ITALIAN
   const copy = TRIAL_REMINDER_COPY[reminderType][langKey] || TRIAL_REMINDER_COPY[reminderType].ENGLISH;
 
   const credits = String(CREDIT_CONFIG.LIMITS.INITIAL_USER);

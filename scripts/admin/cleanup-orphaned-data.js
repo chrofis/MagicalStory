@@ -6,6 +6,9 @@
 
 const { Pool } = require('pg');
 require('dotenv').config();
+// Stories marked as evidence are never orphan-swept — one predicate, shared
+// with the admin route (server/lib/evidenceStories.js, migration 038).
+const { ORPHAN_STORIES_WHERE } = require('../../server/lib/evidenceStories');
 
 const DRY_RUN = !process.argv.includes('--apply');
 
@@ -29,7 +32,7 @@ async function cleanupOrphanedData() {
 
     // Check for orphaned stories
     const orphanedStoriesResult = await client.query(
-      `SELECT COUNT(*) as count FROM stories WHERE user_id IS NULL OR user_id = ''`
+      `SELECT COUNT(*) as count FROM stories ${ORPHAN_STORIES_WHERE}`
     );
     const orphanedStoriesCount = parseInt(orphanedStoriesResult.rows[0].count);
     console.log(`Found ${orphanedStoriesCount} orphaned stories (no user_id)`);
@@ -57,21 +60,27 @@ async function cleanupOrphanedData() {
     // Delete orphaned stories
     if (orphanedStoriesCount > 0) {
       const deleteStoriesResult = await client.query(
-        `DELETE FROM stories WHERE user_id IS NULL OR user_id = '' RETURNING id`
+        `DELETE FROM stories ${ORPHAN_STORIES_WHERE} RETURNING id`
       );
       console.log(`✓ Deleted ${deleteStoriesResult.rowCount} orphaned stories`);
 
-      // Prune R2 prefixes for the orphans we just dropped.
-      try {
-        const r2 = require('../../server/lib/r2');
-        let totalR2 = 0;
-        for (const row of deleteStoriesResult.rows) {
-          totalR2 += await r2.deleteStoryArtefacts(row.id);
+      // Prune R2 prefixes for the orphans we just dropped — through the
+      // failed-prune ledger (server/lib/r2Pending.js), so a prune that does not
+      // finish is recorded in r2_pending_deletions and retried daily. pruneStory
+      // records its own failures and does not throw; anything that reaches the
+      // catch means the prune could not even be RECORDED, which is an error,
+      // not a partial cleanup.
+      const r2Pending = require('../../server/lib/r2Pending');
+      let totalR2 = 0;
+      for (const row of deleteStoriesResult.rows) {
+        try {
+          totalR2 += await r2Pending.pruneStory(row.id, 'orphan cleanup');
+        } catch (r2Err) {
+          console.error(`✗ R2 prune for orphaned story ${row.id} failed and could NOT be recorded for retry: ${r2Err.message}`);
+          process.exitCode = 1;
         }
-        if (totalR2 > 0) console.log(`☁️  Pruned ${totalR2} R2 objects for orphaned stories`);
-      } catch (r2Err) {
-        console.warn(`⚠️  R2 cleanup partial: ${r2Err.message}`);
       }
+      if (totalR2 > 0) console.log(`☁️  Pruned ${totalR2} R2 objects for orphaned stories`);
     }
 
     console.log('\n✅ Cleanup complete!');
@@ -86,7 +95,7 @@ async function cleanupOrphanedData() {
 }
 
 cleanupOrphanedData()
-  .then(() => process.exit(0))
+  .then(() => process.exit(process.exitCode || 0))
   .catch(err => {
     console.error(err);
     process.exit(1);

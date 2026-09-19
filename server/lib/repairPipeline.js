@@ -28,12 +28,14 @@
 const { log } = require('../utils/logger');
 const { MODEL_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { pickBestVersionIndex, applyScore, computeFinalScore } = require('./scoring');
-const { decideRepairMethod, findBadPages, collectCriticalFindings } = require('./repairLogic');
+const { decideRepairMethod, findBadPages, collectCriticalFindings, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, AUDIT_ADMIT_MAX } = require('./repairLogic');
 const { sanitizeIssueForInpaint } = require('./imageCompositing');
 const pLimit = require('p-limit');
 const { getFacePhoto } = require('./characterPhotos');
 
 const getStoryHelpers = () => require('./storyHelpers');
+// Leaf module (parsers only) — safe to require eagerly, no cycle back here.
+const { resolveEvalSceneHint } = require('./sceneMetadata');
 const images = () => require('./images');
 
 function selectBestVersion(versions) {
@@ -276,6 +278,21 @@ function mergeEntityIssues(base, fresh, repairedPages) {
  * content. Covers (page < 0) have no scene record, so they take the first
  * characters with a sheet. Never throws — no sheet means prompt-only.
  *
+ * EMPTY IS NOT ABSENT (fixed 2026-09-14). The scene record's `sceneCharacters`
+ * has three states and they mean three different things:
+ *   - an array with names  → that page's cast; filter the sheets to exactly them
+ *   - an array of length 0 → the page has NO cast (real on staging, e.g.
+ *     job_1789337998754_apslnsq1z p13/p15/p19). Nobody from the cast is painted
+ *     on it, so there is no face whose style matters: collect NOTHING. The old
+ *     `wanted.size === 0` truthiness check read this as "no filter given" and
+ *     handed style repair the first two character sheets in the book — foreign
+ *     people, the exact leak the sheet mechanism exists to avoid.
+ *   - not an array (key missing, or no scene record at all — covers, page < 0)
+ *     → the caller did not say. Unfiltered, first characters with a sheet.
+ *     That is the documented cover behaviour above and is kept deliberately.
+ *
+ * @param {Array|null|undefined} rawImages scene records; a record whose
+ *   `sceneCharacters` is an array is authoritative, empty included.
  * @returns {Promise<string[]>} data-URIs, possibly empty
  */
 async function collectStyleRefSheets(page, rawImages, characters, artStyle) {
@@ -283,8 +300,13 @@ async function collectStyleRefSheets(page, rawImages, characters, artStyle) {
   try {
     const { getStyledAvatarForClothing } = require('./entityConsistency');
     const scene = (rawImages || []).find(r => r.pageNumber === page) || null;
-    const wanted = new Set((scene?.sceneCharacters || []).map(c => String(c?.name || '').toLowerCase()).filter(Boolean));
-    const pool = (characters || []).filter(c => wanted.size === 0 || wanted.has(String(c?.name || '').toLowerCase()));
+    // `declaredCast === null` is "not specified"; `[]` is "specified as nobody".
+    const declaredCast = Array.isArray(scene?.sceneCharacters) ? scene.sceneCharacters : null;
+    if (declaredCast && declaredCast.length === 0) return [];
+    const wanted = declaredCast
+      ? new Set(declaredCast.map(c => String(c?.name || '').toLowerCase()).filter(Boolean))
+      : null;
+    const pool = (characters || []).filter(c => !wanted || wanted.has(String(c?.name || '').toLowerCase()));
     const sheets = [];
     for (const char of pool) {
       if (sheets.length >= MAX_SHEETS) break;
@@ -326,6 +348,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   const { runEntityConsistencyChecks, getStyledAvatarForClothing } = require('./entityConsistency');
   const { extractSceneMetadata } = getStoryHelpers();
+
+  // Story identity for the eval's own bookkeeping. evaluateImageBatch defaults
+  // `storyId` to null, and evalPipeline keys every runMetrics counter it records
+  // (presence_*, eval_matches_missing) off it — so with no caller passing it,
+  // those counters went to the NOOP recorder and no story ever stored one.
+  // Same id the repair pipeline already uses for its own counters below.
+  const evalStoryMeta = {
+    storyId: storyData?.id || jobId || null,
+    language: storyData?.language || null,
+    genre: storyData?.genre || null,
+  };
 
   const imagesWithData = rawImages.filter(r => r.imageData);
   const effectiveUseIteratePage = useIteratePage && !!storyData;
@@ -371,13 +404,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   log.info(`🔍 [UNIFIED PIPELINE] Step 1: Evaluating ${imagesWithData.length} images + entity consistency...`);
   const step1Start = Date.now();
 
-  // Build ALL character photos for evaluation (matches re-evaluate endpoint behavior)
-  const allCharacterPhotos = characters
-    .filter(c => c.photoUrl || c.avatars?.styled)
-    .map(c => ({
-      name: c.name,
-      photoUrl: c.avatars?.styled || c.photoUrl
-    }));
+  // Whole-cast references for the judge — built by the SAME resolver the
+  // generator uses (page gen: getCharacterPhotoDetails + applyStyledAvatars).
+  // The old hand-rolled `c.photoUrl || c.avatars?.styled` filter matched
+  // nothing once character storage normalised to photos[]/styledAvatars, so
+  // every batch eval ran with zero references and no clothing contract.
+  const { buildWholeCastReferencePhotos } = getStoryHelpers();
+  const allCharacterPhotos = buildWholeCastReferencePhotos(
+    characters,
+    artStyle,
+    storyData?.clothingRequirements || null
+  );
 
   // Reusable helper: build eval inputs for an array of image entries
   const buildEvalInputs = (imageEntries) => imageEntries.map(entry => {
@@ -404,7 +441,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       characterPhotos: orig.characterPhotos,
       allCharacterPhotos,
       sceneDescription: entry.description || orig.sceneDescription,
-      sceneCharacters: entry.sceneCharacters || orig.sceneCharacters,
+      // The post-shrink prose THIS version's render actually received, by
+      // lineage — its own when it was compressed, the page's when it is
+      // original-lineage, null when it authored a brief that fit. One rule,
+      // shared with the promotion at final assembly (resolveVersionCompressedScene).
+      compressedScene: resolveVersionCompressedScene(entry, orig),
+      // An ARRAY on the entry is that version's own declaration (an iterate
+      // rewrite can legitimately empty the cast); anything else inherits the
+      // page's. `||` cannot say that — `[]` is truthy. See resolveDeclaredCast.
+      sceneCharacters: resolveDeclaredCast(entry.sceneCharacters, orig.sceneCharacters),
       sceneMetadata: entry.sceneMetadata || orig.sceneMetadata,
       pageText: orig.text,
       // Era-aware landmark protection (2026-09-05): the real-landmark refs this
@@ -412,15 +457,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // to keep a present-day landmark's own structures out of `object_presence`.
       landmarkPhotos: orig.landmarkPhotos || null,
       era: resolveSceneEra(entry.sceneMetadata || orig.sceneMetadata),
-      // SCENE_HINT = what the image was MADE from (2026-08-31). Pages were
-      // judged against the beats SCENE (scene.sceneHint) while the render
-      // obeyed the Art Director brief — job_1788123310558 p6 got a CRITICAL
-      // "missing character" and p9 a MAJOR "object not in hand" for content
-      // the AD brief never asked for. Covers are unchanged: their
-      // scene.outlineExtract IS the cover brief the image was generated
-      // from (pages never set outlineExtract, so they fall through to the
-      // AD brief; entry.description wins on an iterate rewrite).
-      sceneHint: orig.scene?.outlineExtract || entry.description || orig.sceneDescription || orig.scene?.sceneHint || null,
+      // SCENE_HINT = what the image was MADE from. One resolver for every eval
+      // call site (sceneMetadata.resolveEvalSceneHint) — the inline `||` chain
+      // this replaced assumed pages never set `outlineExtract`, an assumption
+      // 824fb02d9 broke two days later by storing "PLAN: <planLine>" on every
+      // beats page. See the helper's own comment for the full history.
+      sceneHint: resolveEvalSceneHint({
+        evaluationType: orig.evaluationType,
+        entryDescription: entry.description,
+        sceneDescription: orig.sceneDescription,
+        outlineExtract: orig.scene?.outlineExtract,
+        sceneHint: orig.scene?.sceneHint,
+      }),
       evaluationType: orig.evaluationType,
       // Structured cover text contract (replaces the old prompt-string surgery):
       // 'appOverlay' → evaluator must never flag missing/present title text;
@@ -513,6 +561,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // rendered story outfits as mismatches and emits fixInstructions to repaint
     // them into the default.
     clothingRequirements: storyData?.clothingRequirements || null,
+    // The bible, for ONE purpose: resolving which outfit clause a page's
+    // `wornItems[]` OFF entry belongs to, so the grid judge is handed the same
+    // stripped outfit the generator used (wornItems.resolveGeneratedOutfit).
+    // Deliberately NOT the plain `visualBible` key: that one ALSO switches on
+    // visual-bible secondary-character checks, which this path has never run —
+    // a separate behaviour change with its own paid grid evals.
+    wornItemsVisualBible: visualBible || null,
     artStyle: artStyle || 'pixar'
   });
 
@@ -521,7 +576,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   // Run both in parallel
   const [evaluations, entityReport] = await Promise.all([
-    images().evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
+    images().evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
       // Objects (LOC/ART/VEH/ANI) are NOT cross-page identity entities — a boat
@@ -599,20 +654,28 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       characterPhotos: img.characterPhotos,
       allCharacterPhotos,
       sceneDescription: img.sceneDescription,
+      // Same as buildEvalInputs: this IS the original render, so it evaluates
+      // against the sent (post-shrink) description when there was one.
+      compressedScene: img.compressedScene || null,
       sceneCharacters: img.sceneCharacters,
       sceneMetadata: img.sceneMetadata,
       pageText: img.text,
       landmarkPhotos: img.landmarkPhotos || null,
       era: resolveSceneEra(img.sceneMetadata),
-      // Same SCENE_HINT rule as buildEvalInputs above: the AD brief for
-      // pages, the cover brief (scene.outlineExtract) for covers.
-      sceneHint: img.scene?.outlineExtract || img.sceneDescription || img.scene?.sceneHint || null,
+      // Same resolver as buildEvalInputs above: the AD brief for pages, the
+      // cover brief (scene.outlineExtract) for covers.
+      sceneHint: resolveEvalSceneHint({
+        evaluationType: img.evaluationType,
+        sceneDescription: img.sceneDescription,
+        outlineExtract: img.scene?.outlineExtract,
+        sceneHint: img.scene?.sceneHint,
+      }),
       evaluationType: img.evaluationType,
     });
   }
   const baselineEvalsByPage = new Map();
   if (baselineEvalInputs.length > 0) {
-    const baselineEvals = await images().evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
+    const baselineEvals = await images().evaluateImageBatch(baselineEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
     for (const ev of baselineEvals) {
       baselineEvalsByPage.set(ev.pageNumber, ev);
       if (ev.usage && usageTracker) {
@@ -727,6 +790,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // ---------------------------------------------------------------------
   const readerFindingsByPage = new Map();   // pageNumber -> [{ severity, line }]
   const bookAuditRounds = [];
+  // Per-round, per-method repair effectiveness — see summarizeRepairRound.
+  const repairRounds = [];
 
   const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null) => {
     try {
@@ -839,8 +904,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           grokRefImages: img.grokRefImages || null,
           referencePhotos: img.referencePhotos || null,
           prompt: img.prompt || null,
+          // The page's post-shrink prose: this IS the original render, and
+          // every repair layered on it inherits from here.
+          compressedScene: img.compressedScene || null,
           entityPenalty: 0,
           entityIssues: [],
+          // Step 1 ran on the scale-repair OUTPUT, never on these pixels.
+          step1Pixels: false,
           evaluatedAt: new Date().toISOString(),
         }
       : {
@@ -860,6 +930,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           modelId: img.modelId,
           grokRefImages: img.grokRefImages || null,
           referencePhotos: img.referencePhotos || null,
+          // THE LINEAGE ROOT'S OWN PROMPT. v0 IS the page's first render, so the
+          // page-level prompt is genuinely this version's — it is stamped HERE,
+          // at creation, instead of being reached for by a fallback in the
+          // version builder. That fallback (`v.prompt || img.prompt`) handed the
+          // SAME string to every later version: staging
+          // job_1789759147125_p08djwhbl initialPage stored one 7,366-char prompt
+          // on v0, v1 (iterate) and v2 (style-repair) alike, so reading
+          // `imageVersions[1].prompt` gave a confident wrong answer.
+          prompt: img.prompt || null,
+          // The page's post-shrink prose: this IS the original render, and
+          // every repair layered on it inherits from here.
+          compressedScene: img.compressedScene || null,
           entityPenalty: baseEntityPenalty,
           entityPenaltyRaw: baseEntityPenaltyRaw,
           entityIssues: baseEntityIssues,
@@ -880,6 +962,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           modelId: img.modelId,
           grokRefImages: img.scaleRepairGrokRefImages || null,
           inpaintInstruction: img.scaleRepairPrompt || null,
+          // Its OWN render prompt — the scale-repair edit instruction, not the
+          // page's first-render prompt.
+          prompt: img.scaleRepairPrompt || null,
           entityPenalty: baseEntityPenalty,
           entityPenaltyRaw: baseEntityPenaltyRaw,
           entityIssues: baseEntityIssues,
@@ -923,6 +1008,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           evaluatedAt: new Date().toISOString(),
           // Surface the text-space repair inputs in the viewer's repair section.
           inpaintInstruction: c.prompt || null,
+          // Each candidate's OWN render prompt: a repair attempt carries the
+          // text-space prompt it was rendered from; the untouched `original`
+          // candidate IS the page's first render, so the page prompt is its own.
+          // Nothing else borrows — this branch REPLACES the version list, so
+          // without a stamp here every candidate fell back to the page prompt.
+          prompt: c.prompt || (isOriginal ? (img.prompt || null) : null),
           textSpaceCoveragePct: c.coveragePct,
           textSpacePosition: c.position,
         };
@@ -969,10 +1060,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const canIterate = effectiveUseIteratePage && img.pageNumber > 0;
     let result;
     if (canIterate) {
+      // THE EVALUATOR'S OWN ACCOUNT, not just its verdict (2026-09-17). Until
+      // the rewriter was given a reader for it, `reasoning` was carried here and
+      // dropped on the floor, and the 1,000-char cap that cost nothing then cuts
+      // the figure inventory mid-object now. `fixTargets` names WHERE the
+      // evaluator looked and was never forwarded at all: the rewrite was asked
+      // to diagnose a root cause from a list of sentences with no regions.
       const evalFeedback = latestEval ? {
         score: latestEval.score ?? latestEval.qualityScore,
-        reasoning: latestEval.reasoning?.substring(0, 1000),
+        reasoning: latestEval.reasoning?.substring(0, 4000),
         fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
+        fixTargets: (latestEval.enrichedFixTargets || latestEval.fixTargets || []).slice(0, 8),
       } : null;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
@@ -1160,6 +1258,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // Era-aware landmark protection for inpaint's own consolidator call.
       landmarkPhotos: img.landmarkPhotos || null,
       era: resolveSceneEra(img.sceneMetadata),
+      sceneMetadata: img.sceneMetadata || null,
     });
     // Re-composite the cover text onto the repainted textless art (reuses
     // composeCover). The served image keeps its title; artImageData is the new
@@ -1249,10 +1348,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return { pageNumber, imageData: null, error: borrowed.message, borrowedLabel: borrowed };
     }
 
-    const character = characters.find(c => c.name === charName);
-    if (!character) {
-      return { pageNumber, imageData: null, error: `character ${charName} not found` };
+    // "not found" was the wrong sentence for the commonest case: the figure is
+    // right there, drawn and detected, and what is missing is the REFERENCE a
+    // repaint needs. charFixReferenceGap says which — one answer shared with
+    // the router (which now declines earlier) and the manual endpoint.
+    const { charFixReferenceGap } = require('./charRepairTarget');
+    const refGap = charFixReferenceGap({ characters, characterName: charName });
+    if (refGap) {
+      require('./runMetrics').forJob(storyData?.id || jobId).count('char_repair_skip_no_reference');
+      log.warn(`🚫 [CHAR-FIX] p${pageNumber}: ${refGap.message}`);
+      return { pageNumber, imageData: null, error: `char-fix skipped: ${refGap.message}`, referenceGap: refGap.reason };
     }
+    // Same comparison the gap check just made, so the two can never disagree:
+    // a canonical match that passed the gap must resolve to a character here.
+    const { canonicalName } = require('./castResolver');
+    const character = characters.find(c => c && c.name === charName)
+      || characters.find(c => c && c.name && canonicalName(c.name) === canonicalName(charName));
 
     // Case-insensitive lookup — scene metadata can key perCharClothing with
     // different casing than the canonical character name, and an exact-key
@@ -1273,7 +1384,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     if (!rawCharClothing) {
       log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing`);
     }
-    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
+    // WARDROBE STATE — the third repair entry point gets the same sheet the
+    // page was generated against. Without it a character repair repaints the
+    // garment the brief took off straight back onto the body, because the only
+    // reference it holds shows it worn.
+    const wardrobeLookupCategory = (() => {
+      try {
+        const { wornResolvedForPage } = require('./storyAvatars');
+        const { offIdsForCharacter, buildOffCategory } = require('./wardrobeVariants');
+        const worn = wornResolvedForPage(storyData?.visualBible || null, img.sceneMetadata, img.sceneCharacters, pageNumber);
+        const offIds = offIdsForCharacter(charName, worn);
+        return offIds.length > 0 ? buildOffCategory(clothingCategory, offIds) : clothingCategory;
+      } catch (err) {
+        log.warn(`👕 [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: wardrobe-state lookup failed (${err.message}) — using the base sheet`);
+        return clothingCategory;
+      }
+    })();
+    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, wardrobeLookupCategory);
     let avatarPhoto = styledAvatar || getFacePhoto(character);
     let avatarPhotoType = styledAvatar
       ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`)
@@ -1365,6 +1492,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       return character.avatars?.clothing?.[clothingCategory] || '';
     })();
     const sceneDesc = img.sceneDescription || img.text || '';
+    // …and then THIS PAGE's worn state on top (2026-09-15). A repaint dresses
+    // the character the way the page did, through the same one resolver the
+    // image prompt and every judge use — otherwise it paints the story-level
+    // contract back onto a page that took a garment off or swapped it.
+    const pageClothingDesc = require('./wornItems')
+      .resolveOutfitForStoryPage(clothingDesc, charName, storyData, pageNumber, sceneDesc);
     const pageTextPosition = (storyData?.sceneImages || []).find(s => s.pageNumber === pageNumber)?.textPosition || null;
     // Appearance text for the repair prompt (face/hair/build). The Lab passed
     // this; PRODUCTION did not, so every live repair rendered the appearance
@@ -1388,7 +1521,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       repairResult = await images().repairCharacterMismatch(currentImageData, avatarPhoto, repairBbox, charName, buildCharRepairRequest({
         imageBackend: 'grok',
         issueDescription: decision.issueDescription,
-        clothingDescription: clothingDesc,
+        clothingDescription: pageClothingDesc,
         characterDescription: charDescForPrompt,
         photoType: avatarPhotoType,
         sceneDescription: sceneDesc,
@@ -1422,6 +1555,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     if (!repairResult?.imageData || repairResult.imageData.length < 1000) {
       return { pageNumber, imageData: null, error: 'char-fix produced no usable image' };
+    }
+
+    // FACE-INTEGRITY GATE — one implementation, shared with the two manual
+    // char-repair entry points (faceIntegrityGate.js carries the rationale).
+    const faceGate = await require('./faceIntegrityGate').checkFaceIntegrity(
+      currentImageData,
+      repairResult.imageData,
+      charName,
+      { log, usageTracker, jobKey: storyData?.id || jobId, context: `CHAR-FIX Page ${pageNumber} ${charName}` }
+    );
+    if (!faceGate.ok) {
+      log.warn(`🚫 [CHAR-FIX] Page ${pageNumber} ${charName}: REFUSED — the repair left the face unreadable (${faceGate.reason}). Keeping the original.`);
+      return { pageNumber, imageData: null, error: `char-fix refused: face not intact after repair (${faceGate.reason})` };
     }
 
     if (repairResult.usage && usageTracker) {
@@ -1465,6 +1611,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       source: `char-fix-round-${roundNum}`,
       modelId: `grok-imagine (${repairResult.method || 'grok_blended'})`,
       grokRefImages: null,
+      // The string THIS render was handed. `promptSent` is always returned by
+      // repairCharacterMismatchWithGrok; debug.prompt only with includeDebug.
+      // It already reached charFixDetails above and stopped there, so the stored
+      // version had no prompt of its own and inherited the page's.
+      prompt: repairResult.promptSent || repairResult.debug?.prompt || null,
       inpaintInstruction: repairResult.debug?.prompt || null,
       inpaintReferenceImages: [
         repairResult.debug?.avatarSent || repairResult.croppedAvatar || null,
@@ -1623,7 +1774,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // the Visual-Bible secondaries.
   const redetectVersionImage = async (r, roundLabel) => {
     const orig = rawImages.find(i => i.pageNumber === r.pageNumber);
-    const sceneChars = r.sceneCharacters || orig?.sceneCharacters || [];
+    const sceneChars = resolveDeclaredCast(r.sceneCharacters, orig?.sceneCharacters) || [];
     const meta = r.sceneMetadata || orig?.sceneMetadata || {};
     const clothingByName = r.sceneCharacterClothing || orig?.sceneCharacterClothing || meta.characterClothing || {};
     // ONE cast builder, shared with the manual repair endpoint.
@@ -1797,7 +1948,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     if (detection) {
       carried = { ...detection };
       if (detection._gdinoMasks) {
-        Object.defineProperty(carried, '_gdinoMasks', { value: detection._gdinoMasks, enumerable: false });
+        Object.defineProperty(carried, '_gdinoMasks', { value: detection._gdinoMasks, enumerable: false, configurable: true });
       }
       // Same fingerprint function the stamping wrapper uses (imageFingerprint)
       // — hashImageData is a different keyspace and would never match a verify.
@@ -1812,7 +1963,100 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
   const { decideRepairMethod } = require('./repairLogic');
 
-  for (let round = 1; round <= maxRegenAttempts; round++) {
+  // The round budget is MUTABLE by exactly one step: the final round's book
+  // audit may grant ONE extra round (owner, 2026-09-13) -- and never past
+  // `maxRegenAttempts`, the configured budget (2026-09-17). See
+  // planBookAuditRound.
+  let roundLimit = maxRegenAttempts;
+  let extraAuditRoundUsed = false;
+  // Pages the final audit re-admitted to repair. Consumed by the next round's
+  // bad-page list, then cleared — it can only ever be filled once.
+  let auditAdmittedNums = [];
+
+  /**
+   * ONE book-audit round. Extracted from the round loop so the two early exits
+   * (no bad pages left, nothing actionable) can run it before they break: this
+   * audit reads the book that actually SHIPS, and its one-extra-round grant is
+   * the only route back into repair for a CRITICAL the per-page judges missed.
+   * A run that converged in round 2 of 3 left the loop before this block and
+   * was never audited at all.
+   */
+  const runBookAuditRound = async ({ round, bookUnchanged, finalRound }) => {
+    const { planBookAuditRound, admitPagesFromAudit } = require('./repairLogic');
+    const auditPlan = planBookAuditRound({ round, roundLimit, bookUnchanged, extraRoundUsed: extraAuditRoundUsed, finalRound, maxPasses: maxRegenAttempts });
+    if (auditPlan.runAudit) {
+      try {
+        const { auditStoryBook, buildAuditPages } = require('./bookAudit');
+        // ONE resolver for "what does the reader actually get on this page" —
+        // the picked version's bytes and the final page text. Never rebuild
+        // this expression inline: the inline version read `img.text` straight
+        // off the page object, which was PRE-REFINE prose.
+        const auditPages = buildAuditPages(rawImages, (pageNumber) => selectBestVersion(pageVersions.get(pageNumber) || []));
+        const audit = auditPages.length > 0
+          ? await auditStoryBook({ id: consolidatorStoryId, sceneImages: auditPages }, { usageTracker })
+          : null;
+        if (audit) {
+          readerFindingsByPage.clear();
+          for (const f of audit.byRoute.IMG) {
+            // Page-scoped only — a fault with no page number cannot be routed
+            // to a consolidator call, which is per page.
+            if (f.page == null) continue;
+            if (!readerFindingsByPage.has(f.page)) readerFindingsByPage.set(f.page, []);
+            // PROVENANCE (2026-09-14): a `missing_character` CRITICAL that came
+            // from the READER pass rather than a per-page judge is by design, not
+            // a bug — a diagnosis that cost an investigation because this merge
+            // dropped the origin. `reader` rides along from here.
+            const fs_ = require('./findingSources');
+            readerFindingsByPage.get(f.page).push({
+              severity: f.severity || null,
+              line: f.line,
+              sources: fs_.mergeSources(fs_.sourcesOf(f), [fs_.FINDING_SOURCES.READER]),
+            });
+          }
+          // Compact per-round record — same shape as entityHistory's entries.
+          // The full `raw` transcript is kept for the FINAL audit only.
+          bookAuditRounds.push({
+            round,
+            checkedAt: new Date().toISOString(),
+            modelId: audit.modelId,
+            faults: audit.faults,
+            byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
+            // IMG faults verbatim — the evidence for what the next round was
+            // told. TEXT faults are the final audit's business.
+            imgFaults: audit.byRoute.IMG,
+            pagesRead: audit.pagesRead,
+            pagesSkipped: audit.pagesSkipped,
+          });
+          const record = bookAuditRounds[bookAuditRounds.length - 1];
+          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);
+
+          // FINAL AUDIT → ONE EXTRA ROUND. Severity decides admission and
+          // nothing else; the fault lines reach the consolidator unread by code.
+          record.finalRound = finalRound === true || round >= roundLimit;
+          if (auditPlan.mayGrantExtraRound) {
+            const admitted = admitPagesFromAudit(audit.byRoute.IMG);
+            if (admitted.length > 0) {
+              auditAdmittedNums = admitted;
+              extraAuditRoundUsed = true;
+              // Provably a no-op given planBookAuditRound's budget gate above;
+              // it stands as the invariant, at the one line that can break it.
+              roundLimit = Math.min(round + 1, maxRegenAttempts);
+              record.extraRoundGranted = true;
+              record.extraRoundAdmittedPages = admitted;
+              log.warn(`📖 [BOOK-AUDIT] Final audit of the shipping book found CRITICAL/CATASTROPHIC IMG fault(s) on page(s) ${admitted.join(', ')} — granting ONE extra repair round (round ${roundLimit})`);
+            } else {
+              record.extraRoundGranted = false;
+              log.info(`📖 [BOOK-AUDIT] Final audit: no CRITICAL/CATASTROPHIC IMG fault — book ships as audited`);
+            }
+          }
+        }
+      } catch (auditErr) {
+        // A missing measurement never costs a paid-for repair round.
+        log.warn(`⚠️ [BOOK-AUDIT] Round ${round} mid-loop audit skipped: ${auditErr.message}`);
+      }
+    }
+  };
+  for (let round = 1; round <= roundLimit; round++) {
     // Build eval map for this round using best versions so far. Each entry now
     // carries explicit visualScore / semanticPenalty / imageScore / entityPenalty /
     // finalScore so bad-page detection and the per-page method decision can
@@ -1889,28 +2133,94 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         };
     }
 
-    const badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
+    let badPageNums = findBadPages(roundEvalPages, { scoreThreshold: regenThreshold });
+    // AUDIT-ADMITTED PAGES (owner, 2026-09-13). A page the final book audit hit
+    // with a CRITICAL/CATASTROPHIC IMG fault re-enters repair even when its
+    // score says it is fine — the audit is the only judge that reads the words
+    // and the picture together.
+    //
+    // THEY BYPASS THE PER-ROUND CAP (owner, 2026-09-14), up to AUDIT_ADMIT_MAX.
+    // Measured on the first two stories that ran with the grant
+    // (job_1789348171785_9oxos7dwv, job_1789343124794_z2c779f7i): the audit
+    // admitted 7 pages on CATASTROPHIC/CRITICAL faults and SIX were never
+    // repaired. They were appended before `applyRoundCap`, which keeps 30% of
+    // bad pages ranked WORST-FIRST BY SCORE — and an admitted page is by
+    // definition not low-scoring, because its score is exactly what failed to
+    // notice the fault. p16 of the first story ("the dragon is already hatched
+    // while the text has it still tapping inside the shell") scored 80 and was
+    // dropped; p12 of the second ("the picture shows page 11's scene") scored
+    // 85 and was dropped. The cap was discarding precisely the pages the grant
+    // existed to rescue.
+    //
+    // So the cap is applied to the score-ranked pages FIRST, and admitted pages
+    // are appended afterwards — a reserved allowance on top of the round's
+    // budget, not a share of it. The allowance is bounded so a noisy audit
+    // cannot turn one extra round into a whole-book regeneration.
+    const auditAdmittedForRound = auditAdmittedNums.filter(pn => roundEvalPages[pn]);
+    auditAdmittedNums = [];
+    // PER-ROUND CAP (owner, 2026-09-09): a round may work on at most 50% (round 1)
+    // / 30% (later rounds) of the story's pages, worst first. Capped-out pages are
+    // DEFERRED — they are still bad next round and come back. Never fails a job.
+    const { applyRoundCap } = require('./repairLogic');
+    const cappedRound = applyRoundCap(badPageNums, {
+      round,
+      totalPages: Object.keys(roundEvalPages).length,
+    });
+    badPageNums = cappedRound.admitted;
+    // The reserved allowance, appended AFTER the cap so it cannot be displaced.
+    if (auditAdmittedForRound.length > 0) {
+      const alreadyIn = new Set(badPageNums);
+      const added = auditAdmittedForRound.filter(pn => !alreadyIn.has(pn)).slice(0, AUDIT_ADMIT_MAX);
+      const overflow = auditAdmittedForRound.filter(pn => !alreadyIn.has(pn)).length - added.length;
+      if (added.length > 0) {
+        log.info(`📖 [BOOK-AUDIT] Round ${round}: ${added.length} page(s) admitted by the final audit, exempt from the round cap: ${added.join(', ')}${overflow > 0 ? ` (${overflow} over the ${AUDIT_ADMIT_MAX}-page allowance, dropped)` : ''}`);
+        badPageNums = [...badPageNums, ...added];
+      }
+    }
     // A page whose ONLY fault is garment colour scores fine — colour carries no
     // severity by design — so findBadPages never returns it and it would never
     // be touched. A flagged garment is a reason to work on a page.
     const garmentWork = MODEL_DEFAULTS.garmentColourFix
       ? collectGarmentWork(currentEntityReport) : new Map();
-    const colourOnlyNums = [...garmentWork.keys()].filter(pn => !badPageNums.includes(pn));
-    const badPages = rawImages.filter(img =>
-      badPageNums.includes(img.pageNumber) || colourOnlyNums.includes(img.pageNumber));
+    // A page DEFERRED by the cap is excluded here too — otherwise a deferred page
+    // that also carries a garment-colour flag would be pulled straight back in and
+    // the cap would not hold.
+    const colourOnlyNums = [...garmentWork.keys()].filter(pn =>
+      !badPageNums.includes(pn) && !cappedRound.deferred.includes(pn));
+    // Worst-first ORDER is preserved (findBadPages ranks, applyRoundCap slices):
+    // a plain rawImages.filter would silently re-sort back to page order, which
+    // matters wherever a downstream budget consumes this list from the front.
+    const byPageNumber = new Map(rawImages.map(img => [img.pageNumber, img]));
+    const badPages = [...badPageNums, ...colourOnlyNums]
+      .map(pn => byPageNumber.get(pn))
+      .filter(Boolean);
+    // Score each page carried INTO this round, before any repair touches it —
+    // the same finalScore findBadPages ranked on. This is the "before" half of
+    // the per-method effectiveness record; taken here because roundEvalPages is
+    // rebuilt at the top of every round.
+    const roundBeforeScores = {};
+    for (const img of badPages) {
+      const fs = roundEvalPages[img.pageNumber]?.finalScore;
+      roundBeforeScores[img.pageNumber] = typeof fs === 'number' ? fs : null;
+    }
     if (colourOnlyNums.length) {
       log.info(`🎨 [GARMENT-COLOUR] Round ${round}: ${colourOnlyNums.length} colour-only page(s) pulled in: ${colourOnlyNums.join(', ')}`);
     }
 
     if (badPages.length === 0) {
       log.info(`✅ [UNIFIED PIPELINE] Round ${round}: No bad pages, stopping repair loop`);
+      // The book that SHIPS is read before the loop exits. Converging early
+      // used to skip the audit entirely, so the one-extra-round grant could
+      // never fire on a run that finished ahead of its round limit.
+      await runBookAuditRound({ round, bookUnchanged: false, finalRound: true });
+      if (auditAdmittedNums.length > 0) continue;  // the audit bought one more round
       break;
     }
     require('./runMetrics').forJob(storyData?.id || jobId).add('redo_trigger', badPages.length);
 
     // Progress: spread rounds across 35-60% range
-    const progressBase = 68 + Math.floor((round - 1) / maxRegenAttempts * 20);
-    await updateProgress(progressBase, `Round ${round}/${maxRegenAttempts}: Repairing ${badPages.length} pages...`);
+    const progressBase = 68 + Math.floor((round - 1) / roundLimit * 20);
+    await updateProgress(progressBase, `Round ${round}/${roundLimit}: Repairing ${badPages.length} pages...`);
 
     // Per-page decision: ONE method per page per round.
     //   1. catastrophic visual/semantic → iterate
@@ -1965,7 +2275,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         return { img, method: null, latestEval, skipped: true };
       }
 
-      const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport);
+      // The roster travels with the decision so the two char-fix gates can
+      // decline a figure the repaint has no reference for (an invented
+      // secondary) instead of spending the page's round on a certain failure.
+      const decision = decideRepairMethod(img.pageNumber, latestEval, currentEntityReport, { characters });
       let method = decision.method;
       let reason = decision.reason;
 
@@ -2005,6 +2318,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const repairableCount = (counts.iterate || 0) + (counts.inpaint || 0) + (counts['char-fix'] || 0) + (counts.recolour || 0);
     if (repairableCount === 0) {
       log.info(`✅ [UNIFIED PIPELINE] Round ${round}: nothing actionable, stopping repair loop`);
+      // The book that SHIPS is read before the loop exits. Converging early
+      // used to skip the audit entirely, so the one-extra-round grant could
+      // never fire on a run that finished ahead of its round limit.
+      await runBookAuditRound({ round, bookUnchanged: bookAuditRounds.length > 0, finalRound: true });
+      if (auditAdmittedNums.length > 0) continue;  // the audit bought one more round
       break;
     }
 
@@ -2064,7 +2382,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           try {
             recolourEvals = await images().evaluateImageBatch(
               buildEvalInputs(recolourResults),
-              { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }
+              { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }
             );
           } catch (err) {
             // No score → no version. The bytes still go to the repair via
@@ -2093,6 +2411,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             if (!versions || !rc) continue;
             const evEntityResult = getEntityPenaltyAndIssues(ev.pageNumber, currentEntityReport);
             const { applyScore } = require('./scoring');
+            // Lineage: a recolour repaints a garment on the version it was
+            // handed — same contract, new pixels.
+            const recolourParent = selectBestVersion(versions);
             const recolourVersion = {
               imageData: rc.imageData,
               score: ev.score ?? ev.qualityScore ?? null,
@@ -2121,6 +2442,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             if (ev.evalImageFp && images().hashImageData(rc.imageData) !== ev.evalImageFp) {
               log.error(`❌ [GARMENT-COLOUR] p${ev.pageNumber} round ${round}: version bytes do not match the bytes the eval graded (eval fp ${ev.evalImageFp}) — eval/bytes decoupled at creation`);
             }
+            inheritSceneContract(recolourVersion, recolourParent);
             versions.push(recolourVersion);
             recolourVersioned.add(ev.pageNumber);
           }
@@ -2147,6 +2469,11 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     // Execute all repairs in parallel
     let roundResults;
+    // THE VERSION EACH REPAIR EDITS, recorded as a link rather than re-derived.
+    // Every action resolves its input the same way — selectBestVersion(versions)
+    // falling back to the page's original bytes — so the parent is known at
+    // dispatch. Read again after the round to carry that version's contract.
+    const roundParent = new Map();
     try {
       roundResults = await Promise.all(
       pageStrategies.map(({ img, method, latestEval, decision, skipped }) => repairLimit(async () => {
@@ -2154,6 +2481,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (skipped || method === 'skip' || method == null) {
           return { pageNumber, imageData: null, skipped: true };
         }
+        roundParent.set(pageNumber, selectBestVersion(pageVersions.get(pageNumber) || []));
         try {
           // The recolour already ran in the recolour phase above and became its
           // own scored version. Its bytes are handed to the repair here so the
@@ -2186,6 +2514,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 imageData: inpaintResult.imageData,
                 source: `inpaint-round-${round}`,
                 modelId: inpaintResult.usage?.model || 'grok-text-edit',
+                // The full string handed to the editor for THIS render
+                // (`instruction` is the un-wrapped core of it). Stamped so the
+                // version stops falling back to the original page prompt.
+                prompt: inpaintResult.promptSent || inpaintResult.instruction || null,
                 inpaintInstruction: inpaintResult.instruction,
                 inpaintReferenceImages: inpaintResult.referenceImages || null,
                 inpaintReferenceSources: inpaintResult.referenceImageSources || null,
@@ -2231,7 +2563,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 // page prompt), which makes the dev panel + audit trail show
                 // the wrong text and hides whether feedback was actually
                 // appended.
-                prompt: result.imagePrompt || null,
+                //
+                // THREE BRANCHES, NOT ONE (2026-09-19). executeIterateAction
+                // dispatches to iteratePage (returns `imagePrompt`, plus
+                // `promptSent` — the post-shrink string the model really got),
+                // to iterateCover (returns `prompt`) and to a plain
+                // generateImageOnly regen (also `prompt`). Reading only
+                // `imagePrompt` meant EVERY cover iterate stored null and
+                // inherited the original cover prompt — measured on staging
+                // job_1789759147125_p08djwhbl initialPage v1.
+                prompt: result.promptSent || result.imagePrompt || result.prompt || null,
+                // The rewrite's own post-shrink prose, when ITS prompt went over
+                // the model's cap. Its brief differs from the page's, so the
+                // page's sent prose can never stand in for it.
+                compressedScene: result.compressedScene || null,
                 description: result.newScene || null,
                 // The iterate's rewritten scene contract — evaluation of this
                 // version MUST use these, not the original page metadata (a
@@ -2270,6 +2615,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
 
     const roundSuccess = roundResults.filter(r => r.imageData);
+    // THE CONTRACT FOLLOWS THE LINEAGE (owner, 2026-09-16). Iterate is a SECOND
+    // ART DIRECTOR: once it has rewritten the brief, that rewrite IS the
+    // contract — for its own output and for every repair layered on top of it.
+    // Stamped here, before this round's detection / eval / entity check /
+    // consolidation, so all four judge the repaired pixels against the brief the
+    // version they were painted over carried. An iterate result authored its own
+    // contract and keeps it (inheritSceneContract only fills absent fields); an
+    // inpaint or char-fix over an iterate output inherits the iterate brief, and
+    // one over the original inherits nothing and falls back to the page record.
+    for (const r of roundSuccess) inheritSceneContract(r, roundParent.get(r.pageNumber) || null);
     const roundDuration = ((Date.now() - roundStart) / 1000).toFixed(1);
     log.info(`✅ [UNIFIED PIPELINE] Round ${round}: ${roundSuccess.length}/${badPages.length} repaired in ${roundDuration}s`);
 
@@ -2357,7 +2712,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           minAppearances: 1,
           onHeartbeat: pingHeartbeat
         }),
-        images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle }),
+        images().evaluateImageBatch(roundEvalInputs, { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta }),
       ]);
 
       if (freshEntityResult.status === 'fulfilled') {
@@ -2437,7 +2792,38 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // through to buildVersionEntry so dev panel shows what was
             // actually sent to Grok, not the stale original page prompt.
             prompt: repairResult.prompt || null,
+            // ...and the prose that prompt was SHRUNK to before it was sent.
+            // THE SECOND WHITELIST (2026-09-17): 434ea1e89 wired
+            // `compressedScene` through the round result, the eval inputs, the
+            // page OUTPUT whitelist and buildVersionEntry -- but this object,
+            // the one that actually becomes the version, dropped it again. So
+            // originals and inpaint/char-fix lineage stamped correctly while
+            // every iterate version stored null: on staging
+            // job_1789584708605_rts4wqupm all six rewrites built prompts of
+            // 7,981-9,233 chars against Grok's 7,900 cap, and their judges then
+            // scored 4 of the 18 shipped pages against the untruncated brief
+            // (resolveVersionCompressedScene falls back to `description`).
+            compressedScene: repairResult.compressedScene || null,
+            // Lineage breadcrumb stamped by inheritSceneContract -- which
+            // version's pixels this one edited. Dropped here it occurred zero
+            // times in the stored story, so no repair chain was auditable.
+            parentSource: repairResult.parentSource || null,
             description: repairResult.description || null,
+            // THE REWRITTEN CONTRACT TRAVELS WITH THE VERSION (2026-09-13).
+            // executeIterateAction already returns the cast it re-derived from
+            // the rewritten brief (images.js iteratePageCore → newSceneCharacters,
+            // newSceneMetadata) and buildVersionEntry / final assembly already
+            // read `v.sceneCharacters` / `v.sceneMetadata` — but this object,
+            // the one that becomes the version, never copied them across. So
+            // the rewrite's description was promoted to the page and its CAST
+            // was not: on job_1789207854566_l43qgl34w p15 the iterate rewrite
+            // named six people and the page record kept `[Fiona]`, leaving the
+            // final image judged against a roster of 2 against 6 drawn figures
+            // and taking an `extra_character` CRITICAL for its own cast.
+            // Declared-or-unknown: `|| null` would swallow a rewrite that
+            // legitimately empties the cast, so the array passes through as-is.
+            sceneCharacters: Array.isArray(repairResult.sceneCharacters) ? repairResult.sceneCharacters : null,
+            sceneMetadata: repairResult.sceneMetadata || null,
             // Detection is part of every image version (owner decision
             // 2026-07-31): the ONE detection made on this result's bytes
             // (iterate's internal or the round pre-detect), stamped directly
@@ -2480,20 +2866,51 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       }
     }
 
+    // ── PER-ROUND, PER-METHOD EFFECTIVENESS ───────────────────────────────
+    // Which repair method earned its money this round. Pure aggregation over
+    // data the round already produced — no extra calls, no cost. The "after"
+    // score is the finalScore applyScore stamped on the new version a few
+    // lines above; a page whose eval failed has no after score and is recorded
+    // as `unknown` rather than being counted as unchanged.
+    {
+      const { summarizeRepairRound, repairAttemptFromResult } = require('./repairLogic');
+      const roundAfterScores = {};
+      for (const r of roundSuccess) {
+        const versions = pageVersions.get(r.pageNumber) || [];
+        const latest = versions[versions.length - 1];
+        roundAfterScores[r.pageNumber] = typeof latest?.finalScore === 'number' ? latest.finalScore : null;
+      }
+      repairRounds.push(summarizeRepairRound({
+        round,
+        attempts: roundResults.filter(Boolean).map(repairAttemptFromResult),
+        beforeScores: roundBeforeScores,
+        afterScores: roundAfterScores,
+      }));
+      const summary = repairRounds[repairRounds.length - 1];
+      const methodLine = Object.entries(summary.byMethod)
+        .map(([m, s]) => `${m} ${s.improved}↑/${s.regressed}↓/${s.unchanged}=/${s.failed}✗ (avg ${s.avgDelta ?? 'n/a'})`)
+        .join(' | ') || 'no attempts';
+      log.info(`📈 [REPAIR-EFFECT] Round ${round}: ${methodLine}`);
+    }
+
     // ── MID-LOOP BOOK AUDIT — the reader's-eye pass, fed forward ──────────
     // Reads the CURRENT state of the book (each page's picked version + its
     // text, in order) and hands its IMG faults to the next round's
     // consolidator via readerFindingsByPage.
     //
-    // Skipped on the LAST round: nothing would consume the findings. (The
-    // post-repair final audit that used to cover the shipped state was
-    // removed — owner ruling, 2026-09-01, docs/decisions.md — it wrote
-    // findings to a field with zero consumers. Run it on demand instead via
-    // the Test Lab "book_audit" stage.)
+    // It runs on the LAST round too (owner, 2026-09-13, superseding the
+    // 2026-09-01 removal): the book that actually ships must be read. Its
+    // CRITICAL/CATASTROPHIC IMG faults may buy exactly ONE extra repair round —
+    // admission only, the consolidator still decides what to fix.
     //
-    // The text here may be PRE-REFINE. That is fine: refine rewrites wording,
-    // never events — a fault about the picture disagreeing with what happens
-    // on the page reads the same before and after.
+    // THE TEXT IS THE FINAL TEXT (owner, 2026-09-13). It used to be
+    // PRE-REFINE, defended as "refine rewrites wording, never events". Measured
+    // on 12 staging stories that is false twice over: the refiner rewrote 172
+    // of 178 pages (97%), and it merges dialogue, drops beats and changes the
+    // depicted action — exactly what an IMG fault judges. Stored audits show
+    // the cost: nearly every fault is of the form "the picture contradicts the
+    // text", read off prose the book did not ship. The text-refine join now
+    // runs BEFORE this pipeline (storyJobPipeline.js, joinTextRefinement).
     //
     // Non-blocking: auditStoryBook never throws, and a null result
     // contributes nothing.
@@ -2501,49 +2918,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // Second spend guard: a round where every repair failed leaves the book
     // byte-identical, so re-auditing it buys the same findings twice. It still
     // runs when no audit has happened yet — those findings are new.
-    const bookUnchanged = roundSuccess.length === 0 && bookAuditRounds.length > 0;
-    if (round < maxRegenAttempts && !bookUnchanged) {
-      try {
-        const { auditStoryBook } = require('./bookAudit');
-        const auditPages = rawImages.map(img => {
-          const best = selectBestVersion(pageVersions.get(img.pageNumber) || []);
-          const imageData = best?.imageData || img.imageData;
-          if (!imageData) return null;
-          return { pageNumber: img.pageNumber, text: img.text, imageData };
-        }).filter(Boolean);
-        const audit = auditPages.length > 0
-          ? await auditStoryBook({ id: consolidatorStoryId, sceneImages: auditPages }, { usageTracker })
-          : null;
-        if (audit) {
-          readerFindingsByPage.clear();
-          for (const f of audit.byRoute.IMG) {
-            // Page-scoped only — a fault with no page number cannot be routed
-            // to a consolidator call, which is per page.
-            if (f.page == null) continue;
-            if (!readerFindingsByPage.has(f.page)) readerFindingsByPage.set(f.page, []);
-            readerFindingsByPage.get(f.page).push({ severity: f.severity || null, line: f.line });
-          }
-          // Compact per-round record — same shape as entityHistory's entries.
-          // The full `raw` transcript is kept for the FINAL audit only.
-          bookAuditRounds.push({
-            round,
-            checkedAt: new Date().toISOString(),
-            modelId: audit.modelId,
-            faults: audit.faults,
-            byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
-            // IMG faults verbatim — the evidence for what the next round was
-            // told. TEXT faults are the final audit's business.
-            imgFaults: audit.byRoute.IMG,
-            pagesRead: audit.pagesRead,
-            pagesSkipped: audit.pagesSkipped,
-          });
-          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);
-        }
-      } catch (auditErr) {
-        // A missing measurement never costs a paid-for repair round.
-        log.warn(`⚠️ [BOOK-AUDIT] Round ${round} mid-loop audit skipped: ${auditErr.message}`);
-      }
-    }
+    // Mid-loop audit of the CURRENT book. `finalRound` says this is the book
+    // that ships, which is what may buy one extra repair round.
+    await runBookAuditRound({
+      round,
+      bookUnchanged: roundSuccess.length === 0 && bookAuditRounds.length > 0,
+      finalRound: round >= roundLimit,
+    });
   }
 
   // =========================================================================
@@ -2594,7 +2975,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
     if (rescueEntries.length > 0) {
       log.info(`📊 [UNIFIED PIPELINE] Step 3b: scoring ${rescueEntries.length} unscored version(s) so every candidate has a score: page(s) ${rescueEntries.map(r => r.pageNumber).join(', ')}`);
-      const rescueEvals = await images().evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, artStyle });
+      const rescueEvals = await images().evaluateImageBatch(buildEvalInputs(rescueEntries), { concurrency: evalConcurrency, qualityModelOverride, visualBible, clothingRequirements: storyData?.clothingRequirements || null, storyData, artStyle, ...evalStoryMeta });
       for (const ev of rescueEvals) {
         const entry = rescueEntries.find(r => r.pageNumber === ev.pageNumber);
         if (!entry) continue;
@@ -2615,8 +2996,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // clothing_match:true for both characters. The originals' entity
         // evidence is the STEP-1 report, which was computed on their pixels.
         const isOriginalVersion = !entry.version.source || entry.version.source === 'original';
-        const rescueEntityReport = isOriginalVersion ? (entityReport || null) : currentEntityReport;
-        if (isOriginalVersion && !entityReport) {
+        // A pre-scale-repair original (step1Pixels false) was never seen by
+        // Step 1 either: that report describes the composite. job_1789083667794
+        // p18 charged the direct render for the composite's leftover silhouettes
+        // (93 -> 53) and p10 for its clipped figure (100 -> 85).
+        const step1SawIt = entry.version.step1Pixels !== false;
+        const rescueEntityReport = isOriginalVersion ? (step1SawIt ? (entityReport || null) : null) : currentEntityReport;
+        if (isOriginalVersion && !step1SawIt) {
+          log.info(`[UNIFIED PIPELINE] Page ${ev.pageNumber}: pre-scale-repair original scored without the Step-1 entity report (it was computed on the composite)`);
+        } else if (isOriginalVersion && !entityReport) {
           log.warn(`⚠️ [UNIFIED PIPELINE] Page ${ev.pageNumber}: rescue-eval has no Step-1 entity report for the original — scoring it with no entity penalty rather than charging it the round's findings`);
         }
         const entityResult = getEntityPenaltyAndIssues(ev.pageNumber, rescueEntityReport);
@@ -2753,6 +3141,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // activeVersion then pointed at a different version than the flattened
         // root imageData.
         const { applyScore: stampTextSpace } = require('./scoring');
+        // Lineage: recomposed from the picked best — its contract, its brief.
+        inheritSceneContract(newVersion, best);
         newVersion.consolidatedPlan = best.consolidatedPlan || null;
         stampTextSpace(newVersion, {
           evalResult: newVersion.evaluation,
@@ -2894,7 +3284,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // toward the dominant cluster, one attempt per outlier, gated by
       // checkStyleMatch inside repairPageStyle. Flag-gated by
       // MODEL_DEFAULTS.styleRepairProduction (env STYLE_REPAIR_PRODUCTION,
-      // default true); model per MODEL_DEFAULTS.styleRepairModel.
+      // default FALSE since 2026-09-19 — owner directive, decisions.md
+      // "Production style repair is OFF"; STYLE_REPAIR_PRODUCTION=true
+      // re-arms it); model per MODEL_DEFAULTS.styleRepairModel.
+      // The DETECTION above is deliberately outside the flag: the verdict and
+      // the outliers still reach finalChecksReport.styleConsistency with the
+      // repaints off, so a drifting book is still measurable.
       // Absolute guard (2026-08-06): style-repair repaints outliers TOWARD the
       // dominant cluster. When the dominant cluster is itself off the
       // commissioned style, that drags the few correctly-styled pages into the
@@ -3074,7 +3469,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               modelId: rep.modelId,
               entityIssues: prevBest.entityIssues || [],
               evaluatedAt: new Date().toISOString(),
-              prompt: null,
+              // The repaint prompt repairPageStyle actually sent. This was
+              // hardcoded null and the version builder then substituted the
+              // PAGE prompt, so a style-repair version reported the original
+              // render's 7,366-char scene prompt as the string that produced a
+              // ~40-char restyle edit (staging job_1789759147125_p08djwhbl
+              // initialPage v2). null only if the repainter reported none.
+              prompt: rep.prompt || null,
               description: prevBest.description || null,
               styleRepair: {
                 targetRefPage: target.targetRefPage,
@@ -3091,6 +3492,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               },
               pageNumber: target.page,
             };
+            // Lineage: a style transfer repaints prevBest — same contract.
+            inheritSceneContract(newVersion, prevBest);
             newVersion.consolidatedPlan = prevBest.consolidatedPlan || null;
             stampStyleRepair(newVersion, {
               evalResult: newVersion.evaluation,
@@ -3114,7 +3517,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         log.info(`🎨 [UNIFIED PIPELINE] Step 5: ${styleConsistency.repairs.length} repaint(s) — ` +
           `kept ${tally.kept || 0}, rejected ${tally.rejected || 0} (${contentVetoes} for altering content), error ${tally.error || 0}`);
       } else if ((styleConsistency.outliers?.length || 0) > 0) {
-        log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair disabled (STYLE_REPAIR_PRODUCTION=false) — ${styleConsistency.outliers.length} outlier(s) surfaced only`);
+        log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair OFF (styleRepairProduction=false; set STYLE_REPAIR_PRODUCTION=true to re-arm) — ${styleConsistency.outliers.length} outlier(s) detected and surfaced, none repainted`);
       }
     } else {
       log.info(`🎨 [UNIFIED PIPELINE] Step 5: skipped (need ≥2 images, got ${stylePages.length})`);
@@ -3282,6 +3685,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // is answerable from the stored story instead of only from live logs.
       coherenceGate: v.evaluation?.coherenceGate || null,
       styleGate: v.evaluation?.styleGate || null,
+      // Dimensions the evaluator could NOT judge on THESE bytes (2026-09-14).
+      // Whitelisted for the same reason as entityIssues and styleGate: without
+      // this line the record exists only in memory and a stored story cannot
+      // answer "was clothing actually checked on this version".
+      // null = the evaluator never ran; [] = it ran and judged everything.
+      notEvaluated: v.evaluation?.notEvaluated ?? null,
       // The style repaint's own record — which anchor it aimed at, and the
       // comparative verdict the gate decided on. Same whitelist lesson as
       // rawOutput and styleGate above: without this line the field exists only
@@ -3323,9 +3732,34 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // is a new contract, and the picked version's contract is promoted to
       // the scene level at final assembly.
       description: v.description || img.sceneDescription || null,
-      prompt: v.prompt || img.prompt || null,
+      // A VERSION'S PROMPT IS ITS OWN OR IT IS NOTHING (2026-09-19). This read
+      // `v.prompt || img.prompt || null`, so a version that recorded no prompt
+      // of its own reported the PAGE's — i.e. the FIRST render's — as the string
+      // that produced its pixels. Measured on staging job_1789759147125_p08djwhbl
+      // `coverImages.initialPage`: v0 (original), v1 (iterate-round-1) and v2
+      // (style-repair-grok) all carried the identical 7,366-char string, while
+      // `compressedScene` — resolved per version two lines below — correctly
+      // differed (4,227 / 1,370 / 1,370 chars). The field was not missing, it was
+      // WRONG, which is worse: it answers confidently. Every render path now
+      // stamps its own prompt at creation (original, scale-repair, text-space,
+      // inpaint, char-fix, iterate, style-repair); a mechanical pass that sent no
+      // prompt at all (garment recolour) legitimately stores null. Consumers that
+      // need the page's prompt read the PAGE record explicitly — buildEvalInputs
+      // above already does (`entry.prompt || orig.prompt`).
+      prompt: resolveOwnRenderPrompt(v),
+      // The prose the model received for THIS version's bytes. Persisted so a
+      // repair rerun from the stored story resolves the same lineage.
+      compressedScene: resolveVersionCompressedScene(v, img),
+      // WHICH VERSION'S PIXELS THIS ONE EDITED (2026-09-17). Set by
+      // inheritSceneContract on every round result, and whitelisted away here
+      // -- `parentSource` occurred zero times in the stored story, so a repair
+      // chain could not be read back from the record at all.
+      parentSource: v.parentSource || null,
       sceneMetadata: v.sceneMetadata || null,
-      sceneCharacters: v.sceneCharacters || null,
+      // Declared-or-unknown, never a coincidence of truthiness: `|| null`
+      // leaves an empty array intact (it is truthy), so a version could ship
+      // `[]` and override the page's real cast downstream.
+      sceneCharacters: resolveDeclaredCast(v.sceneCharacters),
       grokRefImages: v.grokRefImages || null,
       referencePhotos: v.referencePhotos || null,
       // O6: direct-path cover refs (landmark photo, VB grid) — captured by
@@ -3384,7 +3818,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // plan it superseded.
       sceneDescription: best?.description || img.sceneDescription,
       scene: img.scene,
-      prompt: best?.prompt || img.prompt,
+      // THE ROOT DESCRIBES THE VERSION THAT SHIPPED — same direction as
+      // `compressedScene` below, so the two can never name different renders.
+      // One named rule instead of an inline `||` chain, because the fallback
+      // here is deliberate and the one on the VERSION entry is not: see
+      // resolveVersionPrompt's docstring for why the root keeps it.
+      prompt: resolveVersionPrompt(best, img),
+      // …and the prose that prompt was SHRUNK to, by the same lineage rule the
+      // evaluation used. This whitelist carried no such key, so the field the
+      // generation path had stamped was dropped here and storyJobPipeline wrote
+      // `null` for every page of every story that ran the repair pipeline.
+      compressedScene: resolveVersionCompressedScene(best, img),
       characterPhotos: img.characterPhotos,
       landmarkPhotos: img.landmarkPhotos,
       visualBibleGrid: img.visualBibleGrid,
@@ -3395,7 +3839,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       textAreaMask: img.textAreaMask || null,
       emptySceneVbGrid: img.emptySceneVbGrid || null,
       textCoverageReport: img.textCoverageReport || null,
-      sceneCharacters: best?.sceneCharacters || img.sceneCharacters,
+      // A declared cast of [] is a decision, not an absence — `||` promoted the
+      // ORIGINAL roster over a version that deliberately emptied it. Same
+      // resolver buildEvalInputs uses, so promotion and evaluation agree in both
+      // directions: an iterate-lineage winner promotes the rewrite's cast, an
+      // original-lineage winner (no declaration of its own) promotes the page's.
+      sceneCharacters: resolveDeclaredCast(best?.sceneCharacters, img.sceneCharacters),
       sceneMetadata: best?.sceneMetadata || img.sceneMetadata,
       perCharClothing: img.perCharClothing,
       modelId: best?.modelId || img.modelId,
@@ -3414,6 +3863,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // repair budget was spent. Null (not []) when the page is clean, so a
       // consumer can tell "no criticals" from "never evaluated for this".
       unrepairedCritical: unrepairedCritical.length > 0 ? unrepairedCritical : null,
+      // Dimensions never judged on the version that SHIPS. Same null/[]
+      // contract as unrepairedCritical above: null = no evaluation at all.
+      notEvaluated: finalEval?.notEvaluated ?? null,
       qualityReasoning: finalEval?.reasoning ?? null,
       semanticScore: finalEval?.semanticResult?.score ?? finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,
@@ -3474,6 +3926,54 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   }
 
+  // SHIPPED DEFECTIVE (D7, 2026-09-11). The warnings above are log lines, and a
+  // page whose score never recovered but which carries no CRITICAL had no line
+  // at all: on job_1789147573901_m3uam0nxi p6 shipped at finalScore 0 and p9 at
+  // 5, both as the ACTIVE version, and nothing in the run's stored output, the
+  // job status or the story said so. A gate is a guideline and never kills a
+  // paid run — but "ship with a warning" has to produce a warning somewhere a
+  // reader will find. This is that record: structured, returned to the caller,
+  // and counted.
+  //
+  // The floor is the SAME `regenThreshold` the loop uses to call a page bad —
+  // never a second number that could disagree with it.
+  const { collectShippedDefective } = require('./repairLogic');
+  const shippedDefective = collectShippedDefective(results, regenThreshold);
+
+  if (shippedDefective.length > 0) {
+    const worst = shippedDefective.map(p => `p${p.pageNumber}=${p.finalScore ?? '?'}`).join(', ');
+    log.error(`🚨 [UNIFIED PIPELINE] ${shippedDefective.length} page(s) SHIP BELOW THE THRESHOLD (${regenThreshold}) after ${maxRegenAttempts} round${maxRegenAttempts === 1 ? '' : 's'}: ${worst}`);
+    try {
+      const m = require('./runMetrics').forJob(storyData?.id || jobId);
+      m.add('shipped_defective_pages', shippedDefective.length);
+      if (shippedDefective.some(p => p.finalScore != null && p.finalScore <= 5)) m.count('shipped_page_near_zero');
+    } catch { /* metrics are best-effort */ }
+  }
+
+  // SURVIVING CRITICALS (owner, 2026-09-14). The per-page warnings above are log
+  // lines; `shippedDefective` is structured but says nothing about WHICH repair
+  // methods were spent on a page, and its threshold framing hides the case that
+  // matters most — a page that ships ABOVE the floor with a CRITICAL still on
+  // it. A CRITICAL does get a route (`chooseRepairStrategy` sends every critical
+  // to iterate), and the owner chose to KEEP that routing and record the
+  // evidence instead: iterate is a re-roll, inpaint cannot add an absent person,
+  // and nothing verifies the person arrived. Judging whether rerouting is worth
+  // it needs method-vs-outcome data across many stories — this is that data.
+  // Report only: it decides nothing and never fails a run.
+  const { collectSurvivingCriticals } = require('./repairLogic');
+  const survivingCriticals = collectSurvivingCriticals(results, repairRounds, regenThreshold);
+  if (survivingCriticals) {
+    try {
+      const m = require('./runMetrics').forJob(storyData?.id || jobId);
+      m.add('surviving_critical_pages', survivingCriticals.pageCount);
+      m.add('surviving_critical_findings', survivingCriticals.findingCount);
+      if (survivingCriticals.aboveThresholdCount > 0) {
+        m.add('surviving_critical_above_threshold', survivingCriticals.aboveThresholdCount);
+      }
+    } catch { /* metrics are best-effort */ }
+    log.warn(`⚠️  [UNIFIED PIPELINE] ${survivingCriticals.findingCount} CRITICAL finding(s) survived repair on ${survivingCriticals.pageCount} page(s) (${survivingCriticals.aboveThresholdCount} of them ABOVE the ${regenThreshold} threshold); methods tried: ${JSON.stringify(survivingCriticals.byMethod)}`);
+  }
+
   // Convert charFixDetails Map to plain object for serialization.
   // Image fields can arrive in three shapes after R2 migration:
   //   - data:image/...;base64,XXX  → pass through
@@ -3506,7 +4006,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     }
   }
 
-  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds };
+  // `shippedDefective` travels with the result so the job status and the stored
+  // story can say which pages are known-broken — a log line alone is what let
+  // two pages ship at 0 and 5 unremarked (D7).
+  // UNJUDGED DIMENSIONS (2026-09-14). Rolled up per page so `finalChecksReport`
+  // can answer "which checks could not run, on which pages" without replaying
+  // the run's logs — the same reason shippedDefective travels with the result.
+  const notEvaluated = require('./notEvaluated').collectNotEvaluated(results);
+  if (notEvaluated) {
+    log.warn(`⚠️  [UNIFIED PIPELINE] ${notEvaluated.entryCount} dimension(s) went UNEVALUATED across ${notEvaluated.pages.length} page(s): ${notEvaluated.dimensions.join(', ')}`);
+  }
+
+  // `survivingCriticals` travels with the result for the same reason
+  // `shippedDefective` does — and carries the one thing that record cannot: the
+  // repair methods a still-broken page actually consumed, which is the evidence
+  // a future routing decision would have to be made on (owner, 2026-09-14).
+  return { results, charFixDetails: charFixDetailsObj, styleConsistency, bookAuditRounds, repairRounds, shippedDefective, survivingCriticals, notEvaluated };
 }
 
 module.exports = {

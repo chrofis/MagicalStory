@@ -1,0 +1,16 @@
+# Line-ending normalisation.
+#
+# Every text file is stored LF in the index (verified 2026-09-14: 2176/2176
+# tracked text blobs were already i/lf, so adding this rewrites nothing).
+# `text=auto` keeps it that way — a CRLF file can no longer be committed as CRLF.
+* text=auto
+
+# Files that are PARSED LINE-BY-LINE also get LF in the WORKING TREE.
+# `core.autocrlf=true` (the Windows default, and what this machine has set) checks
+# text files out as CRLF, so a repo-consistent index still produced a mixed working
+# tree — prompts/adventure-guides.txt was CRLF while its four sibling guide files
+# were LF. Header regexes anchored with `$` (e.g. /^\[([a-z0-9-]+)\]$/) then failed
+# silently and all 15 adventure guides parsed as null on Windows only (parser fixed
+# in 711ea7558; `eol=lf` removes the input that caused it).
+*.txt text eol=lf
+*.md text eol=lf

@@ -4,6 +4,13 @@
  *
  * Run: node scripts/ads/keyword-ideas.js            (German, Switzerland)
  *      node scripts/ads/keyword-ideas.js --lang=fr
+ *      node scripts/ads/keyword-ideas.js --seeds="geschenke für 5 jährige mädchen,geschenk göttikind" --max-cpc=0.20
+ *        --seeds=    comma-separated seeds replacing the built-in list (one seed family per call keeps the planner honest)
+ *        --max-cpc=  keep only ideas whose LOW top-of-page bid is <= this (CHF); unbid ideas (no estimate) are kept too
+ *        --min-vol=  minimum avg monthly searches (default 10)
+ *        --limit=    rows to print (default 60)
+ *        --json=     also write the kept rows to this file (for the cheap-clicks plan)
+ * Read-only: Keyword Planner idea requests + GAQL, no mutate calls.
  *
  * Seeds come from three places, all evidence-based:
  *  1. the creation-intent cluster the SEO audit found least contested
@@ -40,7 +47,13 @@ const SEEDS = {
 };
 
 async function main() {
-  const langArg = (process.argv.find((a) => a.startsWith('--lang=')) || '--lang=de').split('=')[1];
+  const arg = (k, d) => { const a = process.argv.find((x) => x.startsWith(`--${k}=`)); return a ? a.slice(k.length + 3) : d; };
+  const langArg = arg('lang', 'de');
+  const seeds = arg('seeds', '') ? arg('seeds', '').split(',').map((s) => s.trim()).filter(Boolean) : SEEDS[langArg];
+  const maxCpc = arg('max-cpc', '') ? Number(arg('max-cpc')) : null;
+  const minVol = Number(arg('min-vol', '10'));
+  const limit = Number(arg('limit', '60'));
+  const jsonOut = arg('json', '');
   const { customer } = getClient();
 
   // Keywords already live in the account — so we can flag duplicates.
@@ -61,27 +74,30 @@ async function main() {
     language: LANG[langArg],
     geo_target_constants: [GEO_CH],
     include_adult_keywords: false,
-    keyword_seed: { keywords: SEEDS[langArg] },
+    keyword_seed: { keywords: seeds },
   });
 
   const rows = [];
   for (const r of res) {
     const m = r.keyword_idea_metrics || {};
     const vol = Number(m.avg_monthly_searches || 0);
-    if (vol < 10) continue;                       // no volume, no point
+    if (vol < minVol) continue;                   // no volume, no point
     const text = r.text.toLowerCase();
     if ([...negatives].some((n) => text.includes(n))) continue;   // we already excluded it
     const low = Number(m.low_top_of_page_bid_micros || 0) / 1e6;
     const high = Number(m.high_top_of_page_bid_micros || 0) / 1e6;
-    rows.push({ text, vol, comp: COMP[m.competition] || '?', low, high, have: existing.has(text) });
+    // --max-cpc: keep cheap (low estimate <= cap) AND unbid (no estimate at all — too few advertisers to price)
+    if (maxCpc != null && low > maxCpc) continue;
+    rows.push({ text, vol, comp: COMP[m.competition] || '?', low, high, unbid: !low && !high, have: existing.has(text) });
   }
+  if (jsonOut) require('fs').writeFileSync(jsonOut, JSON.stringify({ seeds, maxCpc, rows }, null, 2));
 
   // Cheapest first among things we do NOT already have.
   const fresh = rows.filter((r) => !r.have).sort((a, b) => (a.high || 99) - (b.high || 99) || b.vol - a.vol);
 
   console.log(`\n=== ${langArg.toUpperCase()} / Switzerland — ${rows.length} ideas with volume, ${fresh.length} not yet bid on ===`);
   console.log('  vol/mo  comp    top-of-page bid   keyword');
-  for (const r of fresh.slice(0, 60)) {
+  for (const r of fresh.slice(0, limit)) {
     console.log(`  ${String(r.vol).padStart(6)}  ${r.comp.padEnd(6)}  CHF ${r.low.toFixed(2)}-${r.high.toFixed(2)}`.padEnd(46) + `  ${r.text}`);
   }
   const already = rows.filter((r) => r.have);

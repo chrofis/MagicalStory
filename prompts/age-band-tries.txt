@@ -1,29 +1,38 @@
-# THREE TRIES (age 3)
+[[premise]]# THREE TRIES (age 3)[[/premise]]
 
-The child this book is for is three. Write for that child. These rules override any instruction
-elsewhere to build several challenges or a complicated plot.
+[[premise]]The child this book is for is three. Write for that child. These rules override any instruction
+elsewhere to build several challenges or a complicated plot.[[/premise]]
 
-**One problem, met three times.** The book has a single concrete problem, plain enough to point at:
-something is stuck, too high, too heavy, spilled, or an animal friend cannot manage on their own. For
-a life-skill topic the problem is the outside event that makes the skill necessary — one thing wanted
-by two at once, the last piece, something lost or broken — never a feeling on its own, and never the
-same request made three times. The main character tries, and it does not work. They try again
-differently, and it still does not work. The third try succeeds.
+[[premise:subject]]**One problem, met three times.** The book has a single concrete problem, plain enough to point at. It is a thing, a place or a creature that will not do what
+is wanted, and it is different in every book. For a life-skill topic the problem is the outside event
+that makes the skill necessary — something that happens in the world, never a feeling on its own, and
+never the same request made three times. Three tries, no more. [[/premise:subject]][[mechanics]]Each try is a different kind of attempt, not
+more of the last one — pulling harder after pulling is the same try twice. The first two do not
+work.[[/mechanics]]
 
-**The child's own doing.** The third try works because of what the main character does — a different
-idea, a bit more effort, asking the right friend for a hand. Never luck, never a grown-up stepping in
-to do it for them, never the problem simply going away.
+[[premise:agency]]**The child's own doing.** Before the third try the main character notices something about the
+problem the first two missed. The third try comes from that noticing. Never luck, never a
+grown-up stepping in to do it for them, never the problem simply going away.[[/premise:agency]]
 
-**Kindness is the motive.** Helping an animal friend or another child is the natural reason to keep
-going. Heroism at this age is being kind and not giving up.
+[[premise:resolution]]**It resolves.** The third try works, and the problem is solved before the last page.[[/premise:resolution]]
 
-**A gentle obstacle, never a villain.** Nobody is unkind on purpose. What stands in the way is a
-thing, the weather, or a size — not a person who means harm.
+[[premise]]**Small noticing, not cleverness.** What the main character notices is the size of a three-year-old's
+noticing. Never a plan, a trick, or a child who reasons like a grown-up.[[/premise]]
 
-**Feelings named plainly.** Say what the main character feels in the simplest word for it: sad, then
-helped, then happy. One feeling per turn of the story, on the face and in what the body does.
+[[premise]]**Kindness is the motive.** Helping an animal friend or another child is the natural reason to keep
+going. Heroism at this age is being kind and not giving up.[[/premise]]
 
-**Food.** Only ordinary food a child of this age eats, named plainly. Never anything a small child
-cannot chew or swallow safely.
+[[premise]]**A gentle obstacle, never a villain.** Nobody is unkind on purpose. What stands in the way is a
+thing, the weather, or a size — not a person who means harm.[[/premise]]
 
-**Ending.** The problem is solved and somebody is glad. Warm and small — not a reward, not a lesson.
+[[premise]]**Feelings named plainly.** Say what the main character feels in the simplest word for it: sad, then
+helped, then happy.[[/premise]][[craft]] One feeling per turn of the story, on the face and in what the body does.[[/craft]]
+
+[[craft]]**Food.** Only ordinary food a child of this age eats, named plainly. Never anything a small child
+cannot chew or swallow safely.[[/craft]]
+
+[[craft]]**A life event is weather, not a task.** What changes around the main character, and what they still
+do the same way. Never something they explain, put right, or are told the meaning of.[[/craft]]
+
+[[craft]]**Ending.** The problem is solved and somebody is glad. Warm and small — no prize, no ceremony, no
+line about what it means or what the main character has learned.[[/craft]]

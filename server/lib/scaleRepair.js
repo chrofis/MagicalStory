@@ -32,6 +32,20 @@ const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('./r2');
 
 /**
+ * Lowercased name set of the characters the composite can cast, or null when no
+ * list was supplied (caller cannot tell us — count every characters[] row).
+ */
+function normaliseCastableNames(castableCharacters) {
+  if (!castableCharacters) return null;
+  if (castableCharacters instanceof Set) return castableCharacters;
+  if (!Array.isArray(castableCharacters)) return null;
+  return new Set(castableCharacters
+    .map(c => (typeof c === 'string' ? c : c?.name) || '')
+    .map(n => n.trim().toLowerCase())
+    .filter(Boolean));
+}
+
+/**
  * Returns true if the scene metadata declares at least one background
  * character AND at least one FOREGROUND character — the only
  * composition pattern this pass targets.
@@ -52,18 +66,44 @@ const { stripDataUriPrefix } = require('./r2');
  *     only midground + background (no foreground), skip.
  *
  * @param {Object} sceneMetadata - extractSceneMetadata() output
+ * @param {Array|Set|null} castableCharacters - the story's photo-backed characters
+ *        (`storyData.characters` / `inputData.characters`), as objects with `name`,
+ *        as names, or as a Set of lowercased names. When given, only figures the
+ *        composite can actually cast are counted. Omit only where that list is
+ *        genuinely unavailable.
  * @returns {boolean}
  */
-function needsScaleRepair(sceneMetadata) {
+function needsScaleRepair(sceneMetadata, castableCharacters = null) {
   const chars = sceneMetadata?.fullData?.characters
     || (Array.isArray(sceneMetadata?.characters) && typeof sceneMetadata.characters[0] === 'object'
         ? sceneMetadata.characters
         : null);
-  if (!Array.isArray(chars) || chars.length < 2) return false;
+  // Only figures the composite can ACTUALLY cast count. Two doors lead to the
+  // same hole:
+  //   - CHR-id secondaries read out of objects[]/interactions[] were counted as
+  //     midground figures for one day (2026-09-10); the composite renders
+  //     characters[] only, so the trigger fired on pages whose second figure it
+  //     could not draw and the dragon vanished from four plates
+  //     (job_1789083667794). Fixed by counting characters[] only.
+  //   - From 2026-09-13 the scene reviewer promotes a Visual Bible secondary
+  //     INTO characters[] (scene-review rules 5/5a reconcile the cast against
+  //     the page plan line, which names the secondary — job_1789304198359,
+  //     pages 9/10/14/15). A characters[] row is therefore no longer proof the
+  //     composite has a photo-backed character to cast.
+  // So intersect against the story's real characters before the < 2 gate. The
+  // trigger site already intersects when it builds its bg refs; without this it
+  // passed the count and then resolved to nothing.
+  let figures = Array.isArray(chars) ? chars.slice() : [];
+  const castable = normaliseCastableNames(castableCharacters);
+  if (castable) figures = figures.filter(c => castable.has((c?.name || '').trim().toLowerCase()));
+  if (figures.length < 2) return false;
   const depthOf = (c) => (c.depth || '').toLowerCase();
-  const bg = chars.filter(c => depthOf(c) === 'background');
-  const fg = chars.filter(c => depthOf(c) === 'foreground');
-  if (bg.length === 0 || fg.length === 0) return false;
+  // One figure in front and one further back is the depth the composite exists
+  // to hold; midground counts as 'further back' now that a midground figure can
+  // be a secondary the plate places on its own level (a boat below a rail).
+  const fg = figures.filter(c => depthOf(c) === 'foreground');
+  const back = figures.filter(c => depthOf(c) === 'background' || depthOf(c) === 'midground');
+  if (back.length === 0 || fg.length === 0) return false;
 
   // Skip indoor scenes. Rooms have limited depth — there's no "deep
   // background" to push a character into, so the relocate-and-shrink pass
@@ -89,8 +129,9 @@ function needsScaleRepair(sceneMetadata) {
   // mounts ("mounted on a horse", "on horseback") are NOT a shared vessel —
   // they're a single bg figure on their own animal, which is exactly what
   // scale-repair handles best (page 9: Gessler on horse, distant on path).
-  const SHARED_VESSEL_RE = /\b(?:inside (?:the|a|its)|aboard (?:the|a)|in (?:the|a) (?:tilting )?(?:boat|raft|ship|vessel|cart|wagon|carriage|coach|sleigh|train|car|carriage|coach))\b/i;
-  if (bg.some(c => SHARED_VESSEL_RE.test(c.position || ''))) return false;
+  // The shared-vessel exclusion (a background figure 'in the boat' skipped the
+  // composite) is gone: the populated-plate prompt now seats a figure in what
+  // its action names, which was the failure the exclusion worked around.
 
   return true;
 }
@@ -255,7 +296,7 @@ async function verifyScaleRepair(imageData, bgChars, { pageNumber = null, usageT
  */
 async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
   if (!currentImage) return null;
-  if (!needsScaleRepair(sceneMetadata)) return null;
+  if (!needsScaleRepair(sceneMetadata, options.castableCharacters || null)) return null;
 
   const { MODEL_DEFAULTS } = require('../config/models');
   const {
@@ -347,6 +388,7 @@ async function runScaleRepair(currentImage, sceneMetadata, options = {}) {
 
 module.exports = {
   needsScaleRepair,
+  normaliseCastableNames,
   runScaleRepair,
   buildScaleRepairPrompt,
   verifyScaleRepair,

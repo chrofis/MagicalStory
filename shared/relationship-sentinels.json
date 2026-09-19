@@ -1,0 +1,50 @@
+{
+  "$comment": [
+    "The two RELATIONSHIP SENTINELS, in every UI language. ONE table, two consumers:",
+    "client/src/constants/relationships.ts (the wizard matrix) and",
+    "server/lib/relationships.js (every prompt path). Same one-source shape as",
+    "shared/topic-age-windows.json.",
+    "",
+    "WHY IT EXISTS — 2026-09-19. The server compared the ENGLISH literal",
+    "'Not Known to' to decide whether a matrix cell said anything. The wizard",
+    "stores the LOCALIZED label, so the guard never fired for de/fr/it and every",
+    "cell the user had not answered was sent to the arc author as a positive",
+    "assertion ('Levin is Nicht bekannt mit Max', ten of them in one de-ch story).",
+    "Hand-copying the label list into the server would have made a second",
+    "maintained copy; this file makes it one.",
+    "",
+    "notSet     the DEFAULT the matrix auto-fills. The user has not answered.",
+    "           Emits NOTHING to any prompt.",
+    "strangers  a DELIBERATE choice. The user has stated these two are strangers.",
+    "           It is a fact about the cast, so it IS sent to the writer.",
+    "           Symmetric and reciprocal: rendered as one sentence per pair.",
+    "legacyNotSet",
+    "           values saved before the split, when one value was both the",
+    "           auto-fill default and the only way to say 'strangers'. The two are",
+    "           not distinguishable retroactively, so every stored occurrence reads",
+    "           as notSet (owner 2026-09-19) — it emits nothing, which is what the",
+    "           English path already did. No migration invents a deliberate choice.",
+    "",
+    "Both sentinels are their own inverse. Swiss German: ss, never the eszett."
+  ],
+  "notSet": {
+    "en": "Not set",
+    "de": "Nicht festgelegt",
+    "fr": "Non défini",
+    "it": "Non definito"
+  },
+  "strangers": {
+    "en": "Don't know each other",
+    "de": "Kennen sich nicht",
+    "fr": "Ne se connaissent pas",
+    "it": "Non si conoscono"
+  },
+  "legacyNotSet": [
+    {
+      "en": "Not Known to",
+      "de": "Nicht bekannt mit",
+      "fr": "Pas connu de",
+      "it": "Non conosce"
+    }
+  ]
+}

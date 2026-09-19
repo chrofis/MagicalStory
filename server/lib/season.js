@@ -92,7 +92,87 @@ function buildSeasonNote(inputData = {}, opts = {}) {
   return `**SEASON:** ${label}. Foliage, ground cover, sky and daylight colour are ${label.toLowerCase()}'s throughout the book — identical from page to page for the same place, and matching ${label.toLowerCase()} even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.`;
 }
 
+/**
+ * The TEXT-side instruction: what the writer of the premise/story is told. It
+ * constrains DETAIL — light, weather, underfoot, wardrobe — never subject or
+ * plot. Stated as a hard fact next to softer neighbours it dominated the
+ * premise instead: 24 of 28 rated trial ideas came back as autumn-leaf stories
+ * on 2026-09-15, every cell having a distinct setting. Its image-side sibling
+ * `buildSeasonNote` still WANTS the visual detail and is unchanged.
+ * `buildSeasonNote` is its image-side sibling. Kept here so the trial idea, the
+ * trial story and the wizard's two idea endpoints cannot drift apart, and so
+ * the season is never welded into another prompt block again (a fantasy idea
+ * blanks the location block, which used to blank the season with it —
+ * decisions.md 2026-09-09).
+ */
+function buildSeasonInstruction(inputData = {}, opts = {}) {
+  const label = seasonLabel(inputData, opts);
+  if (!label) return '';
+  return `**SEASON**: It is ${label}. The season shows in the light, the weather, what is underfoot and what the cast wears — in an invented world too. It never decides what the story is about: any subject, any plot, any place can happen in ${label.toLowerCase()}.`;
+}
+
+/**
+ * The WARDROBE-side instruction: what a character REFERENCE SHEET is told about
+ * the outfit. Sibling of `buildSeasonNote` (scenery) and
+ * `buildSeasonInstruction` (text), and here for the same reason — one resolver,
+ * never a second season notion grown next to this one.
+ *
+ * It exists because on the trial path NO clothing text reaches any prompt: the
+ * contract is `standard: { used: true, signature: 'none' }`, which every
+ * resolver discards, so the rendered outfit is whatever the child was
+ * photographed in — a summer t-shirt in a winter book, deterministically
+ * (staging job_1789296188291_thezv15y1, an autumn story with no clothing word
+ * in any of its six scene briefs).
+ *
+ * Two invariants are baked into the wording:
+ *   - it governs GARMENTS only — face, hair, skin tone, build and apparent age
+ *     are the identity the sheet exists to anchor and are never touched;
+ *   - warm seasons are as explicit as cold ones. A summer story must not gain a
+ *     coat merely because the rule says "dress for the season".
+ *
+ * Footwear rides in its own field: the sheet prompt already owns one footwear
+ * rule (`buildFootwearRule`), and a second sentence about shoes would compete
+ * with it.
+ */
+const SEASON_OUTFIT = {
+  spring: {
+    outfit: 'a light layer — a thin jacket, cardigan or long-sleeved top — over ordinary trousers, a skirt or a dress; nothing heavy, no winter coat',
+    footwear: 'closed everyday shoes',
+  },
+  summer: {
+    outfit: 'light warm-weather clothing with short sleeves or bare arms and NO outer layer at all — no coat, jacket, knitwear, scarf or gloves',
+    footwear: 'light everyday shoes or sandals',
+  },
+  autumn: {
+    outfit: 'long sleeves under a light outer layer — a jacket, anorak or knit — with long trousers, or a dress or skirt over tights; no bare arms',
+    footwear: 'closed everyday shoes',
+  },
+  winter: {
+    outfit: 'a warm outer layer — a padded coat, parka or thick jacket — over long sleeves, with long trousers, or a dress or skirt over thick tights; a hat, scarf or gloves suit it but are not required',
+    footwear: 'closed, warm shoes or boots',
+  },
+};
+
+/**
+ * @returns {{season: string, label: string, outfit: string, footwear: string}|null}
+ *   null when the story's clothing is not the season's business at all.
+ */
+function seasonOutfitGuidance(inputData = {}, opts = {}) {
+  // Period dress is set by the era, not by this year's weather. The trial
+  // premise already blanks the season for `historical` (server/routes/trial.js);
+  // the same exclusion belongs here rather than at each caller, so the two
+  // cannot drift.
+  if (String(inputData?.storyCategory || '').toLowerCase() === 'historical') return null;
+  const season = resolveSeason(inputData, opts);
+  const guidance = SEASON_OUTFIT[season];
+  if (!guidance) return null;
+  return { season, label: SEASON_LABELS[season], outfit: guidance.outfit, footwear: guidance.footwear };
+}
+
 module.exports = {
+  buildSeasonInstruction,
+  seasonOutfitGuidance,
+  SEASON_OUTFIT,
   SEASONS,
   SEASON_LABELS,
   seasonForDate,

@@ -91,6 +91,17 @@ fi
 # temperature:0 determinism with no error. See check-gemini-sampling.js.
 node "$HOOK_DIR/../scripts/admin/check-gemini-sampling.js" || exit 1
 
+# Gate 9: a fix must reach every sibling of the path it fixes. A 2026-09-15
+# sweep of 173 behaviour commits from a 60-hour window found 27 partial fixes,
+# all the same shape — the change landed on one code or prompt path and not its
+# sibling. One of them was the story's root cause: a metadata field added to the
+# per-page Art Director template and not to the all-pages one the live pipeline
+# runs, so the guard reading it saw false on every page. The sibling sets are
+# declared in scripts/admin/sibling-registry.json. Escape, when the sibling
+# genuinely needs no change: put `Siblings-Checked: <reason>` in the commit
+# message. See docs/sibling-paths.md.
+node "$HOOK_DIR/../scripts/admin/check-sibling-paths.js" || exit 1
+
 # Task hygiene (WARNS, never blocks): open work added to a doc should be
 # reachable from tasks/BACKLOG.md. A 2026-08-20 sweep found ~184 live open items
 # across ~40 files with no index tying them together; this notices a file of open

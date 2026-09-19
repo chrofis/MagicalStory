@@ -1,0 +1,7560 @@
+{
+ "note": "Every value is a real stored image version pulled from staging on 2026-09-18 — the evaluator matches[] (with the stored rename undone via evaluatorReference) and the detector bboxDetection.figures[]. Nothing is hand-built.",
+ "versions": [
+  {
+   "storyId": "job_1787867402809_z9bwoo3yp",
+   "pageNumber": 3,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "artefact",
+   "why": "Five pirates, both sides naming all five correctly; the evaluator emitted a compressed ladder shifted right and greedy nearest-centre matched every name one slot over — the 3-cycle that erased Fiona and put Saira on the page twice.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0.24,
+      0.28,
+      0.42,
+      0.98
+     ],
+     "face_bbox": [
+      0.28,
+      0.29,
+      0.36,
+      0.36
+     ],
+     "reference": "Fiona",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.32,
+      0.3,
+      0.49,
+      0.98
+     ],
+     "face_bbox": [
+      0.36,
+      0.31,
+      0.43,
+      0.37
+     ],
+     "reference": "Lorena",
+     "confidence": 0.9
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.4,
+      0.29,
+      0.56,
+      0.98
+     ],
+     "face_bbox": [
+      0.44,
+      0.3,
+      0.51,
+      0.36
+     ],
+     "reference": "Sarah",
+     "confidence": 0.9
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.48,
+      0.27,
+      0.64,
+      0.98
+     ],
+     "face_bbox": [
+      0.52,
+      0.28,
+      0.59,
+      0.35
+     ],
+     "reference": "Saira",
+     "confidence": 0.9
+    },
+    {
+     "figure": 5,
+     "body_bbox": [
+      0.56,
+      0.22,
+      0.73,
+      0.98
+     ],
+     "face_bbox": [
+      0.6,
+      0.23,
+      0.68,
+      0.3
+     ],
+     "reference": "Facundo",
+     "confidence": 0.9
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Facundo",
+     "label": "young-adult boy/man, build: average, angular jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.677,
+     "maskPx": 91589,
+     "samBox": [
+      574,
+      233,
+      945,
+      974
+     ],
+     "bodyBox": [
+      0.16796875,
+      0.540234375,
+      0.9814453125,
+      0.9169921875
+     ],
+     "faceBox": [
+      0.16796875,
+      0.540234375,
+      0.41796875,
+      0.752734375
+     ],
+     "gdinoBox": [
+      0.2275390625,
+      0.560546875,
+      0.951171875,
+      0.9228515625
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": [
+      658,
+      301
+     ],
+     "faceScore": 0.524,
+     "samPoints": [
+      {
+       "at": [
+        658,
+        301
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        658,
+        285
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        658,
+        317
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        682,
+        462
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        682,
+        462
+       ],
+       "px": 26115,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.524,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.25390625,
+      0.61328125,
+      0.3330078125,
+      0.6708984375
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 1,
+     "maskCoverage": 1.021,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.16796875,
+      0.540234375,
+      0.41796875,
+      0.752734375
+     ]
+    },
+    {
+     "name": "Saira",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.655,
+     "maskPx": 89695,
+     "samBox": [
+      415,
+      289,
+      612,
+      988
+     ],
+     "bodyBox": [
+      0.21044921875,
+      0.4033203125,
+      0.96484375,
+      0.61748046875
+     ],
+     "faceBox": [
+      0.21044921875,
+      0.40498046875,
+      0.46044921875,
+      0.61748046875
+     ],
+     "gdinoBox": [
+      0.2822265625,
+      0.4052734375,
+      0.96484375,
+      0.59765625
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      520,
+      343
+     ],
+     "faceScore": 0.544,
+     "samPoints": [
+      {
+       "at": [
+        520,
+        343
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        520,
+        327
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        520,
+        359
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "black",
+       "garment": "bottom"
+      },
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "green",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.544,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.294921875,
+      0.482421875,
+      0.375,
+      0.533203125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "both",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.995,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.21044921875,
+      0.40498046875,
+      0.46044921875,
+      0.61748046875
+     ]
+    },
+    {
+     "name": "Lorena",
+     "label": "young-adult girl/woman, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones",
+     "score": 0.627,
+     "maskPx": 53809,
+     "samBox": [
+      180,
+      322,
+      350,
+      954
+     ],
+     "bodyBox": [
+      0.24365234375,
+      0.17744140625,
+      0.931640625,
+      0.38994140625
+     ],
+     "faceBox": [
+      0.24365234375,
+      0.17744140625,
+      0.49365234375,
+      0.38994140625
+     ],
+     "gdinoBox": [
+      0.314453125,
+      0.17578125,
+      0.931640625,
+      0.341796875
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": [
+      281,
+      377
+     ],
+     "faceScore": 0.53,
+     "samPoints": [
+      {
+       "at": [
+        281,
+        377
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        281,
+        361
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        281,
+        393
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        308,
+        536
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "purple",
+       "garment": "top"
+      },
+      {
+       "at": [
+        222,
+        454
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "purple",
+       "garment": "top"
+      },
+      {
+       "at": [
+        268,
+        628
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        186,
+        411
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "white",
+       "figure": 4
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        308,
+        536
+       ],
+       "px": 2978,
+       "colour": "purple",
+       "garment": "top"
+      },
+      {
+       "at": [
+        222,
+        454
+       ],
+       "px": 2015,
+       "colour": "purple",
+       "garment": "top"
+      },
+      {
+       "at": [
+        268,
+        628
+       ],
+       "px": 492,
+       "colour": "yellow",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.53,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.328125,
+      0.2470703125,
+      0.4072265625,
+      0.3017578125
+     ],
+     "occludedBy": [
+      "Fiona"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 3,
+     "maskCoverage": 0.969,
+     "pxLostToFront": 753,
+     "_geminiFaceBox": [
+      0.24365234375,
+      0.17744140625,
+      0.49365234375,
+      0.38994140625
+     ]
+    },
+    {
+     "name": "Sarah",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.611,
+     "maskPx": 51389,
+     "samBox": [
+      325,
+      297,
+      461,
+      929
+     ],
+     "bodyBox": [
+      0.2265625,
+      0.2921875,
+      0.9052734375,
+      0.5046875
+     ],
+     "faceBox": [
+      0.2265625,
+      0.2921875,
+      0.4765625,
+      0.5046875
+     ],
+     "gdinoBox": [
+      0.2900390625,
+      0.3173828125,
+      0.9072265625,
+      0.4501953125
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      406,
+      353
+     ],
+     "faceScore": 0.541,
+     "samPoints": [
+      {
+       "at": [
+        406,
+        353
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        406,
+        339
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        406,
+        367
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        402,
+        522
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "top"
+      },
+      {
+       "at": [
+        396,
+        605
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "grey",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        402,
+        522
+       ],
+       "px": 3863,
+       "colour": "blue",
+       "garment": "top"
+      },
+      {
+       "at": [
+        396,
+        605
+       ],
+       "px": 1023,
+       "colour": "blue",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.541,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.310546875,
+      0.3701171875,
+      0.37890625,
+      0.421875
+     ],
+     "occludedBy": [
+      "Saira"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "both",
+     "garmentSeeds": 2,
+     "maskCoverage": 0.878,
+     "pxLostToFront": 2498,
+     "_geminiFaceBox": [
+      0.2265625,
+      0.2921875,
+      0.4765625,
+      0.5046875
+     ]
+    },
+    {
+     "name": "Fiona",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.531,
+     "maskPx": 73739,
+     "samBox": [
+      17,
+      287,
+      299,
+      1008
+     ],
+     "bodyBox": [
+      0.228515625,
+      0.0185546875,
+      0.984375,
+      0.298828125
+     ],
+     "faceBox": [
+      0.228515625,
+      0.030468750000000003,
+      0.478515625,
+      0.24296875
+     ],
+     "gdinoBox": [
+      0.2802734375,
+      0.0166015625,
+      0.984375,
+      0.2919921875
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": [
+      139,
+      359
+     ],
+     "faceScore": 0.547,
+     "samPoints": [
+      {
+       "at": [
+        139,
+        359
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        139,
+        345
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        139,
+        373
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        47,
+        494
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "white",
+       "garment": "top"
+      },
+      {
+       "at": [
+        186,
+        411
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "white",
+       "garment": "top"
+      },
+      {
+       "at": [
+        281,
+        377
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 2
+      },
+      {
+       "at": [
+        222,
+        454
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "purple",
+       "figure": 2
+      },
+      {
+       "at": [
+        268,
+        628
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "yellow",
+       "figure": 2
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        47,
+        494
+       ],
+       "px": 17877,
+       "colour": "white",
+       "garment": "top"
+      },
+      {
+       "at": [
+        186,
+        411
+       ],
+       "px": 3952,
+       "colour": "white",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.547,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.31640625,
+      0.1064453125,
+      0.3837890625,
+      0.1640625
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "both",
+     "garmentSeeds": 2,
+     "maskCoverage": 1.015,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.228515625,
+      0.030468750000000003,
+      0.478515625,
+      0.24296875
+     ]
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Sarah",
+     "severity": "MAJOR",
+     "description": "Hair described as blonde in prompt but appears light brown in inventory; headscarf described as black cotton but rendered as dark blue bandana"
+    },
+    {
+     "character": "Fiona",
+     "severity": "MAJOR",
+     "description": "Apparent age listed as 40 in inventory but expected age is 25"
+    },
+    {
+     "character": "Lorena",
+     "severity": "MAJOR",
+     "description": "Apparent age listed as 45 in inventory but expected age is 22"
+    },
+    {
+     "character": "Sarah",
+     "severity": "MAJOR",
+     "description": "Apparent age listed as 40 in inventory but expected age is 25"
+    },
+    {
+     "character": "Saira",
+     "severity": "MODERATE",
+     "description": "Apparent age listed as 20 in inventory but expected age is 24"
+    },
+    {
+     "character": null,
+     "severity": "MAJOR",
+     "description": "Prompt specifies red sail, but inventory describes 'light brown sail' for small ship in right-midground and 'red sails' only for a different small ship in bottom-right corner"
+    }
+   ],
+   "storedReferences": [
+    "Lorena",
+    "Sarah",
+    "Saira",
+    "Saira",
+    "Facundo"
+   ],
+   "storedRenamed": 3
+  },
+  {
+   "storyId": "job_1788727233899_1dpnym94p",
+   "pageNumber": 18,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "artefact",
+   "why": "Every evaluator body box sits ~0.2 below the detector’s, so every same-name pair failed the raw gate and only one cross-name pair survived it.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0.28,
+      0.2,
+      0.49,
+      0.86
+     ],
+     "face_bbox": [
+      0.31,
+      0.22,
+      0.44,
+      0.38
+     ],
+     "reference": "Kiaan",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.43,
+      0.2,
+      0.64,
+      0.86
+     ],
+     "face_bbox": [
+      0.46,
+      0.22,
+      0.59,
+      0.38
+     ],
+     "reference": "Max",
+     "confidence": 0.9
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.58,
+      0.2,
+      0.79,
+      0.86
+     ],
+     "face_bbox": [
+      0.61,
+      0.22,
+      0.74,
+      0.38
+     ],
+     "reference": "Julian",
+     "confidence": 0.9
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.73,
+      0.2,
+      0.94,
+      0.86
+     ],
+     "face_bbox": [
+      0.76,
+      0.22,
+      0.89,
+      0.38
+     ],
+     "reference": "Levin",
+     "confidence": 0.9
+    },
+    {
+     "figure": 5,
+     "body_bbox": [
+      0.52,
+      0.31,
+      0.7,
+      0.58
+     ],
+     "face_bbox": [
+      0.55,
+      0.31,
+      0.64,
+      0.42
+     ],
+     "reference": "Nia",
+     "confidence": 0.9
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Kiaan",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.643,
+     "maskPx": 24446,
+     "samBox": [
+      318,
+      171,
+      441,
+      476
+     ],
+     "bodyBox": [
+      0.1015625,
+      0.278515625,
+      0.4619140625,
+      0.491015625
+     ],
+     "faceBox": [
+      0.1015625,
+      0.278515625,
+      0.3515625,
+      0.491015625
+     ],
+     "gdinoBox": [
+      0.1669921875,
+      0.310546875,
+      0.46484375,
+      0.4306640625
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      387,
+      233
+     ],
+     "faceScore": 0.459,
+     "samPoints": [
+      {
+       "at": [
+        387,
+        233
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        387,
+        217
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        387,
+        249
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        393,
+        342
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "purple",
+       "garment": "top"
+      },
+      {
+       "at": [
+        346,
+        420
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        393,
+        342
+       ],
+       "px": 6630,
+       "colour": "purple",
+       "garment": "top"
+      },
+      {
+       "at": [
+        346,
+        420
+       ],
+       "px": 4471,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.459,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.1884765625,
+      0.345703125,
+      0.265625,
+      0.4091796875
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 2,
+     "maskCoverage": 0.947,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.150390625,
+      0.314453125,
+      0.3046875,
+      0.44140625
+     ]
+    },
+    {
+     "name": "Levin",
+     "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+     "score": 0.642,
+     "maskPx": 52986,
+     "samBox": [
+      595,
+      252,
+      836,
+      627
+     ],
+     "bodyBox": [
+      0.18798828125,
+      0.5537109375,
+      0.6396484375,
+      0.83037109375
+     ],
+     "faceBox": [
+      0.18798828125,
+      0.61787109375,
+      0.43798828125,
+      0.83037109375
+     ],
+     "gdinoBox": [
+      0.24609375,
+      0.5810546875,
+      0.6123046875,
+      0.81640625
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": [
+      733,
+      322
+     ],
+     "faceScore": 0.426,
+     "samPoints": [
+      {
+       "at": [
+        733,
+        322
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        733,
+        306
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        733,
+        338
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        719,
+        422
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        676,
+        390
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        770,
+        397
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        666,
+        468
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        748,
+        438
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        605,
+        556
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        719,
+        422
+       ],
+       "px": 2524,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        676,
+        390
+       ],
+       "px": 1163,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        770,
+        397
+       ],
+       "px": 633,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        666,
+        468
+       ],
+       "px": 1168,
+       "colour": "blue",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        748,
+        438
+       ],
+       "px": 851,
+       "colour": "blue",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        605,
+        556
+       ],
+       "px": 567,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.426,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.275390625,
+      0.6845703125,
+      0.353515625,
+      0.74609375
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "both",
+     "garmentSeeds": 6,
+     "maskCoverage": 1.235,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.236328125,
+      0.654296875,
+      0.392578125,
+      0.77734375
+     ]
+    },
+    {
+     "name": "Max",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.589,
+     "maskPx": 30524,
+     "samBox": [
+      474,
+      176,
+      679,
+      579
+     ],
+     "bodyBox": [
+      0.10888671875,
+      0.466796875,
+      0.560546875,
+      0.69658203125
+     ],
+     "faceBox": [
+      0.10888671875,
+      0.48408203125,
+      0.35888671875,
+      0.69658203125
+     ],
+     "gdinoBox": [
+      0.171875,
+      0.462890625,
+      0.5654296875,
+      0.6630859375
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      597,
+      243
+     ],
+     "faceScore": 0.449,
+     "samPoints": [
+      {
+       "at": [
+        597,
+        243
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        597,
+        226
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        597,
+        260
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        547,
+        304
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "green",
+       "garment": "top"
+      },
+      {
+       "at": [
+        563,
+        470
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "orange",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        521,
+        421
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "orange",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        484,
+        259
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 3
+      },
+      {
+       "at": [
+        676,
+        390
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "red",
+       "figure": 1
+      },
+      {
+       "at": [
+        666,
+        468
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "blue",
+       "figure": 1
+      },
+      {
+       "at": [
+        605,
+        556
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "blue",
+       "figure": 1
+      },
+      {
+       "at": [
+        494,
+        317
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "yellow",
+       "figure": 3
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        547,
+        304
+       ],
+       "px": 4229,
+       "colour": "green",
+       "garment": "top"
+      },
+      {
+       "at": [
+        563,
+        470
+       ],
+       "px": 1874,
+       "colour": "orange",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        521,
+        421
+       ],
+       "px": 566,
+       "colour": "orange",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.449,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.1962890625,
+      0.5517578125,
+      0.27734375,
+      0.6142578125
+     ],
+     "occludedBy": [
+      "Levin"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 3,
+     "maskCoverage": 0.947,
+     "pxLostToFront": 1297,
+     "_geminiFaceBox": [
+      0.15625,
+      0.5205078125,
+      0.318359375,
+      0.6455078125
+     ]
+    },
+    {
+     "name": "Julian",
+     "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.571,
+     "maskPx": 22487,
+     "samBox": [
+      420,
+      192,
+      531,
+      502
+     ],
+     "bodyBox": [
+      0.1279296875,
+      0.3751953125,
+      0.51171875,
+      0.5876953125
+     ],
+     "faceBox": [
+      0.1279296875,
+      0.3751953125,
+      0.3779296875,
+      0.5876953125
+     ],
+     "gdinoBox": [
+      0.1875,
+      0.41015625,
+      0.490234375,
+      0.5185546875
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      484,
+      259
+     ],
+     "faceScore": 0.439,
+     "samPoints": [
+      {
+       "at": [
+        484,
+        259
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        484,
+        243
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        484,
+        275
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        449,
+        332
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        494,
+        317
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        521,
+        421
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "orange",
+       "figure": 2
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "grey",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        449,
+        332
+       ],
+       "px": 1736,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        494,
+        317
+       ],
+       "px": 586,
+       "colour": "yellow",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.439,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.212890625,
+      0.4423828125,
+      0.2919921875,
+      0.5029296875
+     ],
+     "occludedBy": [
+      "Max"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 2,
+     "maskCoverage": 0.981,
+     "pxLostToFront": 14,
+     "_geminiFaceBox": [
+      0.173828125,
+      0.412109375,
+      0.33203125,
+      0.533203125
+     ]
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "severity": "CRITICAL",
+     "description": "Levin wears blue denim overalls instead of grey dungaree bib shorts"
+    },
+    {
+     "character": "Kiaan",
+     "severity": "MAJOR",
+     "description": "Kiaan wears white sneakers instead of brown leather sneakers"
+    },
+    {
+     "character": "Max",
+     "severity": "MAJOR",
+     "description": "Max wears white sneakers instead of grey canvas sneakers"
+    },
+    {
+     "character": "Levin",
+     "severity": "MAJOR",
+     "description": "Levin's hair rendered as light brown curly instead of short tousled light blonde"
+    },
+    {
+     "character": "Levin",
+     "severity": "MAJOR",
+     "description": "Levin wears blue shorts instead of mid-blue denim shorts"
+    },
+    {
+     "character": "dragon",
+     "severity": "MODERATE",
+     "description": "Dragon lacks described interlocking silvery-grey scale on repaired left wing gap"
+    },
+    {
+     "character": "raven",
+     "severity": "unverified_absence",
+     "description": "Raven not positioned near mountain summit silhouette in top left midground as described"
+    },
+    {
+     "character": "Grossmünster",
+     "severity": "unverified_absence",
+     "description": "Twin Romanesque towers of Grossmünster not confirmed passing below in background"
+    }
+   ],
+   "storedReferences": [
+    "Kiaan",
+    "Max",
+    "Levin",
+    "Levin",
+    "Nia"
+   ],
+   "storedRenamed": 1
+  },
+  {
+   "storyId": "job_1789348171785_9oxos7dwv",
+   "pageNumber": 13,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "artefact",
+   "why": "Two adjacent boys; the evaluator’s Levin box is 0.012 from the detector’s Levin, and its Julian box 0.040 from the same figure. With no exclusivity both claimed it.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0.38,
+      0.38,
+      0.68,
+      0.9
+     ],
+     "face_bbox": [
+      0.43,
+      0.38,
+      0.55,
+      0.49
+     ],
+     "reference": "Levin",
+     "confidence": 0.85
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.4,
+      0.49,
+      0.68,
+      0.89
+     ],
+     "face_bbox": [
+      0.44,
+      0.5,
+      0.54,
+      0.59
+     ],
+     "reference": "Julian",
+     "confidence": 0.85
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.78,
+      0.2,
+      0.97,
+      0.82
+     ],
+     "face_bbox": [
+      0.81,
+      0.2,
+      0.92,
+      0.3
+     ],
+     "reference": "Max",
+     "confidence": 0.85
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.66,
+      0.53,
+      0.78,
+      0.76
+     ],
+     "face_bbox": [
+      0.68,
+      0.53,
+      0.74,
+      0.59
+     ],
+     "reference": "Nia",
+     "confidence": 0.85
+    },
+    {
+     "figure": 5,
+     "body_bbox": [
+      0.46,
+      0.05,
+      0.7,
+      0.64
+     ],
+     "face_bbox": null,
+     "reference": "Frau Brunner",
+     "confidence": 0.85
+    },
+    {
+     "figure": 6,
+     "body_bbox": [
+      0.28,
+      0.3,
+      0.37,
+      0.4
+     ],
+     "face_bbox": [
+      0.29,
+      0.3,
+      0.34,
+      0.34
+     ],
+     "reference": "Ofeli",
+     "confidence": 0.85
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Frau Brunner",
+     "label": "Frau Brunner (secondary character). 55. a woman, average height, sturdy broad-shouldered build. hair: grey, straight, ti",
+     "score": 0.69,
+     "maskPx": 82623,
+     "samBox": [
+      41,
+      97,
+      280,
+      667
+     ],
+     "bodyBox": [
+      0.0966796875,
+      0.0419921875,
+      0.650390625,
+      0.2705078125
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.0947265625,
+      0.0400390625,
+      0.6513671875,
+      0.2734375
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "high",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.974,
+     "pxLostToFront": 0
+    },
+    {
+     "name": "Max",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.645,
+     "maskPx": 82471,
+     "samBox": [
+      817,
+      202,
+      1012,
+      840
+     ],
+     "bodyBox": [
+      0.1728515625,
+      0.7794921875,
+      0.8203125,
+      0.9919921875
+     ],
+     "faceBox": [
+      0.1728515625,
+      0.7794921875,
+      0.4228515625,
+      0.9919921875
+     ],
+     "gdinoBox": [
+      0.197265625,
+      0.7978515625,
+      0.8203125,
+      0.98828125
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "_depthTier": "foreground",
+     "confidence": "high",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "_cascadeFace": "both",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.973,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.1728515625,
+      0.7794921875,
+      0.4228515625,
+      0.9919921875
+     ]
+    },
+    {
+     "name": "Levin",
+     "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+     "score": 0.632,
+     "maskPx": 39453,
+     "samBox": [
+      352,
+      381,
+      733,
+      945
+     ],
+     "bodyBox": [
+      0.380859375,
+      0.3447265625,
+      0.9228515625,
+      0.712890625
+     ],
+     "faceBox": [
+      0.39501953125,
+      0.38740234375,
+      0.64501953125,
+      0.59990234375
+     ],
+     "gdinoBox": [
+      0.3720703125,
+      0.34375,
+      0.9228515625,
+      0.7158203125
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      516,
+      519
+     ],
+     "faceScore": 0.299,
+     "samPoints": [
+      {
+       "at": [
+        516,
+        519
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        516,
+        499
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        516,
+        539
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        507,
+        641
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 3
+      },
+      {
+       "at": [
+        363,
+        731
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "yellow",
+       "figure": 3
+      },
+      {
+       "at": [
+        394,
+        834
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "blue",
+       "figure": 3
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "grey",
+       "garment": "bottom"
+      },
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.299,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.45703125,
+      0.44921875,
+      0.556640625,
+      0.5576171875
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.974,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.39501953125,
+      0.38740234375,
+      0.64501953125,
+      0.59990234375
+     ]
+    },
+    {
+     "name": "Julian",
+     "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.567,
+     "maskPx": 83671,
+     "samBox": [
+      290,
+      535,
+      601,
+      955
+     ],
+     "bodyBox": [
+      0.47314453125,
+      0.287109375,
+      0.9306640625,
+      0.6162109375
+     ],
+     "faceBox": [
+      0.47314453125,
+      0.38251953125,
+      0.72314453125,
+      0.59501953125
+     ],
+     "gdinoBox": [
+      0.5224609375,
+      0.283203125,
+      0.9326171875,
+      0.5869140625
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      507,
+      641
+     ],
+     "faceScore": 0.274,
+     "samPoints": [
+      {
+       "at": [
+        507,
+        641
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        507,
+        622
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        507,
+        660
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        363,
+        731
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        394,
+        834
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        363,
+        731
+       ],
+       "px": 2853,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        394,
+        834
+       ],
+       "px": 5999,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.274,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.580078125,
+      0.4453125,
+      0.6708984375,
+      0.544921875
+     ],
+     "occludedBy": [
+      "Levin"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "anime",
+     "garmentSeeds": 2,
+     "maskCoverage": 1.104,
+     "pxLostToFront": 8579,
+     "_geminiFaceBox": [
+      0.47314453125,
+      0.38251953125,
+      0.72314453125,
+      0.59501953125
+     ]
+    },
+    {
+     "name": "Ofeli",
+     "label": "character",
+     "maskPx": 13261,
+     "samBox": [
+      211,
+      261,
+      428,
+      517
+     ],
+     "_source": "gemini-extra",
+     "bodyBox": [
+      0.255,
+      0.20575,
+      0.505,
+      0.41825
+     ],
+     "faceBox": [
+      0.255,
+      0.20575,
+      0.505,
+      0.41825
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      320,
+      389
+     ],
+     "samPoints": [
+      {
+       "at": [
+        320,
+        389
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        320,
+        338
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        320,
+        440
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no garment colour in the identity line",
+       "description": "Ofeli (animal). small dragon. about the size of a large cat. rusty red and gold scales. soft rounded snout, large friend"
+      }
+     ],
+     "confidence": "high",
+     "occludedBy": [],
+     "samApplied": true,
+     "description": "Ofeli (animal). small dragon. about the size of a large cat. rusty red and gold scales. soft rounded snout, large friendly round orange eyes, small blunt crest on the head, short rounded wings, upright friendly posture",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.735,
+     "_sizeAdjusted": true,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.31,
+      0.274,
+      0.45,
+      0.35
+     ]
+    },
+    {
+     "name": "Nia",
+     "label": "character",
+     "maskPx": 22916,
+     "samBox": [
+      696,
+      543,
+      860,
+      778
+     ],
+     "_source": "gemini-extra",
+     "bodyBox": [
+      0.5400390625,
+      0.6884765625,
+      0.763671875,
+      0.8447265625
+     ],
+     "faceBox": null,
+     "occluded": false,
+     "position": "center",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "high",
+     "occludedBy": [],
+     "samApplied": true,
+     "description": "Nia (animal). terrier mix dog. comes up to a preschooler's knee. scruffy light brown and white coat. floppy ears, short tail, plain red collar, large round friendly eyes",
+     "maskVerdict": "mask-ok",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.951,
+     "pxLostToFront": 0
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "severity": "MAJOR",
+     "description": "Levin wears light grey long-sleeved shirt instead of red zip-up hoodie over white pullover as per clothing contract"
+    },
+    {
+     "character": "Frau Brunner",
+     "severity": "MAJOR",
+     "description": "Frau Brunner wears dark green long-sleeved coat instead of green sweater per original prompt and clothing expectations"
+    }
+   ],
+   "storedReferences": [
+    "Levin",
+    "Levin",
+    "Max",
+    "Nia",
+    "Frau Brunner",
+    "Ofeli"
+   ],
+   "storedRenamed": 1
+  },
+  {
+   "storyId": "job_1789304198359_y3n0euk3z",
+   "pageNumber": 6,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "artefact",
+   "why": "Liz’s nearest figure is Maman’s, 0.025 closer than her own — but Maman’s own match is 0.050 from it and owns it.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0.06,
+      0.16,
+      0.37,
+      0.83
+     ],
+     "face_bbox": [
+      0.13,
+      0.19,
+      0.28,
+      0.34
+     ],
+     "reference": "Sarah",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.21,
+      0.21,
+      0.49,
+      0.95
+     ],
+     "face_bbox": [
+      0.29,
+      0.22,
+      0.41,
+      0.34
+     ],
+     "reference": "Ayan",
+     "confidence": 0.9
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.36,
+      0.36,
+      0.74,
+      0.95
+     ],
+     "face_bbox": [
+      0.42,
+      0.37,
+      0.54,
+      0.49
+     ],
+     "reference": "Liz",
+     "confidence": 0.9
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.47,
+      0.31,
+      0.84,
+      0.95
+     ],
+     "face_bbox": [
+      0.53,
+      0.32,
+      0.66,
+      0.44
+     ],
+     "reference": "Maman",
+     "confidence": 0.9
+    },
+    {
+     "figure": 5,
+     "body_bbox": [
+      0.29,
+      0.8,
+      0.36,
+      0.87
+     ],
+     "face_bbox": null,
+     "reference": "Pink Fairy",
+     "confidence": 0.9
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Maman",
+     "label": "adult girl/woman, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, full",
+     "score": 0.666,
+     "maskPx": 121778,
+     "samBox": [
+      437,
+      330,
+      826,
+      918
+     ],
+     "bodyBox": [
+      0.3125,
+      0.421875,
+      0.89453125,
+      0.8037109375
+     ],
+     "faceBox": [
+      0.3125,
+      0.477734375,
+      0.5625,
+      0.690234375
+     ],
+     "gdinoBox": [
+      0.322265625,
+      0.4267578125,
+      0.896484375,
+      0.806640625
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      597,
+      440
+     ],
+     "faceScore": 0.603,
+     "samPoints": [
+      {
+       "at": [
+        597,
+        440
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        597,
+        418
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        597,
+        462
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        524,
+        486
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 3
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.603,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.375,
+      0.537109375,
+      0.4833984375,
+      0.6279296875
+     ],
+     "occludedBy": [
+      "Liz"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.995,
+     "pxLostToFront": 18628,
+     "_geminiFaceBox": [
+      0.3125,
+      0.477734375,
+      0.5625,
+      0.690234375
+     ]
+    },
+    {
+     "name": "Sarah",
+     "label": "adult girl/woman, build: stocky, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, full ",
+     "score": 0.616,
+     "maskPx": 87359,
+     "samBox": [
+      59,
+      168,
+      369,
+      844
+     ],
+     "bodyBox": [
+      0.12744140625,
+      0.060546875,
+      0.8232421875,
+      0.29228515625
+     ],
+     "faceBox": [
+      0.12744140625,
+      0.07978515625,
+      0.37744140625,
+      0.29228515625
+     ],
+     "gdinoBox": [
+      0.1640625,
+      0.0576171875,
+      0.82421875,
+      0.3603515625
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": [
+      188,
+      244
+     ],
+     "faceScore": 0.567,
+     "samPoints": [
+      {
+       "at": [
+        188,
+        244
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        188,
+        224
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        188,
+        264
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        182,
+        334
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "white",
+       "garment": "top"
+      },
+      {
+       "at": [
+        166,
+        310
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "white",
+       "garment": "top"
+      },
+      {
+       "at": [
+        130,
+        607
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "brown",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        305,
+        289
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 2
+      },
+      {
+       "at": [
+        303,
+        434
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "green",
+       "figure": 2
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        182,
+        334
+       ],
+       "px": 805,
+       "colour": "white",
+       "garment": "top"
+      },
+      {
+       "at": [
+        166,
+        310
+       ],
+       "px": 434,
+       "colour": "white",
+       "garment": "top"
+      },
+      {
+       "at": [
+        130,
+        607
+       ],
+       "px": 47563,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.567,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.189453125,
+      0.1474609375,
+      0.2861328125,
+      0.2197265625
+     ],
+     "occludedBy": [
+      "Ayan"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "both",
+     "garmentSeeds": 3,
+     "maskCoverage": 0.672,
+     "pxLostToFront": 1064,
+     "_geminiFaceBox": [
+      0.12744140625,
+      0.07978515625,
+      0.37744140625,
+      0.29228515625
+     ]
+    },
+    {
+     "name": "Ayan",
+     "label": "young-school-age boy/man, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+     "score": 0.557,
+     "maskPx": 68862,
+     "samBox": [
+      212,
+      198,
+      383,
+      845
+     ],
+     "bodyBox": [
+      0.1640625,
+      0.1935546875,
+      0.8251953125,
+      0.4060546875
+     ],
+     "faceBox": [
+      0.1640625,
+      0.1935546875,
+      0.4140625,
+      0.4060546875
+     ],
+     "gdinoBox": [
+      0.193359375,
+      0.20703125,
+      0.8251953125,
+      0.3740234375
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": [
+      305,
+      289
+     ],
+     "faceScore": 0.498,
+     "samPoints": [
+      {
+       "at": [
+        305,
+        289
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        305,
+        271
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        305,
+        307
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        303,
+        434
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "green",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        303,
+        434
+       ],
+       "px": 20098,
+       "colour": "green",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.498,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.2373046875,
+      0.2607421875,
+      0.3271484375,
+      0.333984375
+     ],
+     "occludedBy": [
+      "Liz"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "both",
+     "garmentSeeds": 1,
+     "maskCoverage": 1.145,
+     "pxLostToFront": 2327,
+     "_geminiFaceBox": [
+      0.1640625,
+      0.1935546875,
+      0.4140625,
+      0.4060546875
+     ]
+    },
+    {
+     "name": "Liz",
+     "label": "kindergartner girl/woman, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbon",
+     "score": 0.427,
+     "maskPx": 65754,
+     "samBox": [
+      158,
+      407,
+      707,
+      966
+     ],
+     "bodyBox": [
+      0.2998046875,
+      0.1943359375,
+      0.9404296875,
+      0.7060546875
+     ],
+     "faceBox": [
+      0.2998046875,
+      0.4884765625,
+      0.5498046875,
+      0.7009765625
+     ],
+     "gdinoBox": [
+      0.3974609375,
+      0.154296875,
+      0.943359375,
+      0.6904296875
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      524,
+      486
+     ],
+     "faceScore": 0.519,
+     "samPoints": [
+      {
+       "at": [
+        524,
+        486
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        524,
+        466
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        524,
+        506
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        597,
+        440
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 0
+      },
+      {
+       "at": [
+        303,
+        434
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "green",
+       "figure": 2
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no garment colour in the identity line",
+       "description": "kindergartner girl/woman, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbon"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.519,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.42578125,
+      0.4755859375,
+      0.5234375,
+      0.5478515625
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "anime",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.972,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.2998046875,
+      0.4884765625,
+      0.5498046875,
+      0.7009765625
+     ]
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Sarah",
+     "severity": "CRITICAL",
+     "description": "Sarah is shown with arm around Ayan’s shoulder and hand on his arm instead of fingers wrapped around Maman's forearm"
+    },
+    {
+     "character": "Maman",
+     "severity": "MAJOR",
+     "description": "Maman wears a red knitted coat and dark grey scarf instead of a deep-red chunky-knit sweater"
+    },
+    {
+     "character": "Sarah",
+     "severity": "MODERATE",
+     "description": "Sarah wears a white collared shirt under yellow cardigan and round glasses not described in prompt"
+    }
+   ],
+   "storedReferences": [
+    "Sarah",
+    "Ayan",
+    "Maman",
+    "Maman",
+    "Pink Fairy"
+   ],
+   "storedRenamed": 1
+  },
+  {
+   "storyId": "job_1787812110559_n311ykfmin",
+   "pageNumber": 5,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "artefact",
+   "why": "Three tiny quay figures clustered within 0.1; every evaluator name’s own figure is 0.005–0.06 further than a neighbour’s.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0.42,
+      0.44,
+      0.53,
+      0.84
+     ],
+     "face_bbox": [
+      0.45,
+      0.45,
+      0.5,
+      0.49
+     ],
+     "reference": "Fiona",
+     "confidence": 0.8
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.49,
+      0.44,
+      0.59,
+      0.84
+     ],
+     "face_bbox": [
+      0.51,
+      0.45,
+      0.56,
+      0.49
+     ],
+     "reference": "Sarah",
+     "confidence": 0.7
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.84,
+      0.48,
+      0.92,
+      0.7
+     ],
+     "face_bbox": [
+      0.86,
+      0.49,
+      0.89,
+      0.52
+     ],
+     "reference": "Kapitänin Rossa",
+     "confidence": 0
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.8,
+      0.48,
+      0.87,
+      0.7
+     ],
+     "face_bbox": [
+      0.82,
+      0.49,
+      0.85,
+      0.52
+     ],
+     "reference": "Saira",
+     "confidence": 0.7
+    },
+    {
+     "figure": 5,
+     "body_bbox": [
+      0.76,
+      0.48,
+      0.83,
+      0.7
+     ],
+     "face_bbox": [
+      0.78,
+      0.49,
+      0.81,
+      0.52
+     ],
+     "reference": "Facundo",
+     "confidence": 0.7
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Fiona",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.694,
+     "maskPx": 26887,
+     "samBox": [
+      351,
+      469,
+      493,
+      836
+     ],
+     "bodyBox": [
+      0.37451171875,
+      0.31416015625,
+      0.818359375,
+      0.52666015625
+     ],
+     "faceBox": [
+      0.37451171875,
+      0.31416015625,
+      0.62451171875,
+      0.52666015625
+     ],
+     "gdinoBox": [
+      0.4580078125,
+      0.3427734375,
+      0.81640625,
+      0.4814453125
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      427,
+      512
+     ],
+     "faceScore": 0.341,
+     "samPoints": [
+      {
+       "at": [
+        427,
+        512
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        427,
+        504
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        427,
+        520
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        377,
+        736
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "black",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        377,
+        736
+       ],
+       "px": 1783,
+       "colour": "blue",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.341,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.4814453125,
+      0.3984375,
+      0.5185546875,
+      0.4345703125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.899,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.37451171875,
+      0.31416015625,
+      0.62451171875,
+      0.52666015625
+     ]
+    },
+    {
+     "name": "Sarah",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.689,
+     "maskPx": 36160,
+     "samBox": [
+      507,
+      464,
+      630,
+      902
+     ],
+     "bodyBox": [
+      0.369140625,
+      0.4337890625,
+      0.9091796875,
+      0.6462890625
+     ],
+     "faceBox": [
+      0.369140625,
+      0.4337890625,
+      0.619140625,
+      0.6462890625
+     ],
+     "gdinoBox": [
+      0.453125,
+      0.4951171875,
+      0.880859375,
+      0.615234375
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      558,
+      508
+     ],
+     "faceScore": 0.387,
+     "samPoints": [
+      {
+       "at": [
+        558,
+        508
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        558,
+        498
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        558,
+        518
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        580,
+        743
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "black",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        580,
+        743
+       ],
+       "px": 6603,
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.387,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.47265625,
+      0.5263671875,
+      0.51953125,
+      0.5634765625
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "both",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.995,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.369140625,
+      0.4337890625,
+      0.619140625,
+      0.6462890625
+     ]
+    },
+    {
+     "name": "Kapitänin Rossa",
+     "label": "Kapitänin Rossa (secondary character). adult, mid-thirties. tall, lean. hair: dark red, straight, long, worn in a low ta",
+     "score": 0.533,
+     "maskPx": 4954,
+     "samBox": [
+      961,
+      519,
+      1004,
+      684
+     ],
+     "bodyBox": [
+      0.5068359375,
+      0.9404296875,
+      0.6689453125,
+      0.98046875
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.5068359375,
+      0.9384765625,
+      0.66796875,
+      0.98046875
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "medium",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.959,
+     "pxLostToFront": 0
+    },
+    {
+     "name": "Facundo",
+     "label": "young-adult boy/man, build: average, angular jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.52,
+     "maskPx": 3988,
+     "samBox": [
+      900,
+      518,
+      940,
+      671
+     ],
+     "bodyBox": [
+      0.505859375,
+      0.8798828125,
+      0.654296875,
+      0.9169921875
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.505859375,
+      0.87890625,
+      0.6552734375,
+      0.91796875
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "medium",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.944,
+     "pxLostToFront": 0
+    },
+    {
+     "name": "Saira",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.509,
+     "maskPx": 3616,
+     "samBox": [
+      935,
+      511,
+      969,
+      673
+     ],
+     "bodyBox": [
+      0.5,
+      0.916015625,
+      0.6572265625,
+      0.947265625
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.4990234375,
+      0.9130859375,
+      0.6572265625,
+      0.9462890625
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "medium",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.935,
+     "pxLostToFront": 0
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "CRITICAL",
+     "description": "Kapitänin Rossa is entirely absent from the scene."
+    },
+    {
+     "character": "Fiona",
+     "severity": "CRITICAL",
+     "description": "Fiona's brass compass is missing from the wheel's hub ring."
+    },
+    {
+     "character": null,
+     "severity": "MAJOR",
+     "description": "The Rote Möwe is not in the middle arch, and its mainsail is not full and taut. The Goldene Möwe's golden-gull sail is unfurled, not furled on the yard, and the ship is not at anchor."
+    },
+    {
+     "character": null,
+     "severity": "MAJOR",
+     "description": "The bronze figurative sculpture on its plinth with one arm extended horizontally outward toward the river is missing from the fountain's center above the bridge on the hill. The two small figures (Rossa's shore party) moving on the gravel path toward the fountain are also missing."
+    },
+    {
+     "character": "Fiona",
+     "severity": "MODERATE",
+     "description": "Fiona's silver heart-pendant necklace is missing."
+    },
+    {
+     "character": "Fiona",
+     "severity": "MODERATE",
+     "description": "Fiona's three-section collapsible brass telescope is missing from the rail beside her."
+    },
+    {
+     "character": "Sarah",
+     "severity": "MODERATE",
+     "description": "Sarah's gold stud earrings are missing."
+    },
+    {
+     "character": "Saira",
+     "severity": "MODERATE",
+     "description": "Saira's bracelets on both wrists are missing."
+    },
+    {
+     "character": "Facundo",
+     "severity": "CRITICAL",
+     "description": "Facundo depicted wearing brown long coat instead of orange pirate coat per prompt"
+    },
+    {
+     "character": "Saira",
+     "severity": "MAJOR",
+     "description": "Saira described as male with short dark hair in inventory, but prompt specifies female with dark brown straight hair"
+    },
+    {
+     "character": "Sarah",
+     "severity": "MAJOR",
+     "description": "Sarah shown with reddish-brown wavy shoulder-length hair and no freckles, but prompt specifies blonde wavy hair, light freckles"
+    },
+    {
+     "character": "Fiona",
+     "severity": "MODERATE",
+     "description": "Fiona shown in dark blue trousers without visible white collarless shirt; prompt specifies black linen trousers and white linen collarless shirt"
+    },
+    {
+     "character": "Sarah",
+     "severity": "MODERATE",
+     "description": "Three-section collapsible brass telescope not visible on rail beside Sarah as required"
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MAJOR",
+     "description": "Kapitänin Rossa absent from matches[] and no plausible inventory figure matches her location (right-foreground ship wheel) and description"
+    },
+    {
+     "character": "Scene",
+     "severity": "CRITICAL",
+     "description": "Main narrative action — Rossa blocking the arch while Fiona’s crew watches — is not visually fulfilled due to Rossa’s absence"
+    }
+   ],
+   "storedReferences": [
+    "Fiona",
+    "Sarah",
+    "Kapitänin Rossa",
+    "Saira",
+    "Facundo"
+   ],
+   "storedRenamed": 0
+  },
+  {
+   "storyId": "job_1789147573901_m3uam0nxi",
+   "pageNumber": 2,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "genuine-detector-right",
+   "why": "A clean left/right swap of two boys in wildly different outfits, judged on the pixels in Lab set 66: the detector is right. The evaluator’s own names sit 0.47 away.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0,
+      0.12,
+      0.49,
+      0.99
+     ],
+     "face_bbox": [
+      0.29,
+      0.15,
+      0.42,
+      0.28
+     ],
+     "reference": "Julian",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.5,
+      0.18,
+      1,
+      0.9
+     ],
+     "face_bbox": [
+      0.65,
+      0.19,
+      0.77,
+      0.31
+     ],
+     "reference": "Levin",
+     "confidence": 0.9
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+     "score": 0.748,
+     "maskPx": 126080,
+     "samBox": [
+      106,
+      169,
+      469,
+      942
+     ],
+     "bodyBox": [
+      0.1455078125,
+      0.0830078125,
+      0.994140625,
+      0.4638671875
+     ],
+     "faceBox": [
+      0.1455078125,
+      0.188623046875,
+      0.4208984375,
+      0.422705078125
+     ],
+     "gdinoBox": [
+      0.1650390625,
+      0.103515625,
+      0.919921875,
+      0.4580078125
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": [
+      291,
+      285
+     ],
+     "faceScore": 0.326,
+     "samPoints": [
+      {
+       "at": [
+        291,
+        285
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        291,
+        257
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        291,
+        313
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        220,
+        495
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        334,
+        671
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        220,
+        495
+       ],
+       "px": 46403,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        334,
+        671
+       ],
+       "px": 11548,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.326,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.208984375,
+      0.2314453125,
+      0.3466796875,
+      0.3369140625
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 2,
+     "maskCoverage": 1.174,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.140625,
+      0.1787109375,
+      0.416015625,
+      0.3896484375
+     ]
+    },
+    {
+     "name": "Julian",
+     "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.715,
+     "maskPx": 83382,
+     "samBox": [
+      583,
+      223,
+      866,
+      808
+     ],
+     "bodyBox": [
+      0.1943359375,
+      0.56640625,
+      0.8232421875,
+      0.8583984375
+     ],
+     "faceBox": [
+      0.1943359375,
+      0.5880859375,
+      0.4443359375,
+      0.8005859375
+     ],
+     "gdinoBox": [
+      0.2177734375,
+      0.5693359375,
+      0.7890625,
+      0.845703125
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": [
+      728,
+      320
+     ],
+     "faceScore": 0.294,
+     "samPoints": [
+      {
+       "at": [
+        728,
+        320
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        728,
+        298
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        728,
+        342
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        783,
+        423
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "grey",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        783,
+        423
+       ],
+       "px": 27832,
+       "colour": "yellow",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.294,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.2578125,
+      0.6650390625,
+      0.3671875,
+      0.7568359375
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 1,
+     "maskCoverage": 1.12,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.203125,
+      0.619140625,
+      0.421875,
+      0.802734375
+     ]
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "severity": "MAJOR",
+     "description": "Hair described as light brown curly in inventory but prompt specifies light blonde wavy"
+    },
+    {
+     "character": "Levin",
+     "severity": "MAJOR",
+     "description": "Hair described as light brown curly in inventory but prompt specifies light blonde curly"
+    },
+    {
+     "character": "Julian",
+     "severity": "MAJOR",
+     "description": "Apparent age listed as 2 years but expected age is 3"
+    },
+    {
+     "character": "Levin",
+     "severity": "MAJOR",
+     "description": "Apparent age listed as 2 years but expected age is 5"
+    },
+    {
+     "character": "Scene",
+     "severity": "MAJOR",
+     "description": "Road surface described as pale grey-beige tarmac in prompt but rendered as dirt path in inventory"
+    },
+    {
+     "character": "Scene",
+     "severity": "MODERATE",
+     "description": "Grassy hillside with low wooden fenceposts and distant rooftops beyond curve not fully represented; instead wildflowers, trees, shrubs, rolling hills and village shown"
+    },
+    {
+     "character": "Levin",
+     "severity": "MINOR",
+     "description": "Zone listed as right-foreground in inventory but should be right-midground per prompt"
+    }
+   ],
+   "storedReferences": [
+    "Levin",
+    "Julian"
+   ],
+   "storedRenamed": 2
+  },
+  {
+   "storyId": "job_1788614817116_vxnu60yjg",
+   "pageNumber": 16,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "genuine-detector-right",
+   "why": "The tightest detector-right margin in the set: Max’s own name is 0.143 away against a rival at 0.055. The name bonus must NOT rescue it.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0.17,
+      0.2,
+      0.4,
+      0.97
+     ],
+     "face_bbox": [
+      0.2,
+      0.22,
+      0.35,
+      0.38
+     ],
+     "reference": "Levin",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.38,
+      0.35,
+      0.57,
+      0.97
+     ],
+     "face_bbox": [
+      0.4,
+      0.36,
+      0.5,
+      0.47
+     ],
+     "reference": "Julian",
+     "confidence": 0.8
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.55,
+      0.38,
+      0.74,
+      0.97
+     ],
+     "face_bbox": [
+      0.57,
+      0.39,
+      0.67,
+      0.5
+     ],
+     "reference": "Max",
+     "confidence": 0.8
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.73,
+      0.38,
+      0.92,
+      0.97
+     ],
+     "face_bbox": [
+      0.75,
+      0.39,
+      0.85,
+      0.5
+     ],
+     "reference": "Kiaan",
+     "confidence": 0.8
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+     "score": 0.693,
+     "maskPx": 107942,
+     "samBox": [
+      73,
+      275,
+      357,
+      1118
+     ],
+     "bodyBox": [
+      0.2074652777777778,
+      0.09606481481481481,
+      0.9696180555555556,
+      0.4513888888888889
+     ],
+     "faceBox": [
+      0.2074652777777778,
+      0.15185185185185185,
+      0.4574652777777778,
+      0.36435185185185187
+     ],
+     "gdinoBox": [
+      0.2387152777777778,
+      0.08449074074074074,
+      0.9704861111111112,
+      0.4131944444444444
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": [
+      223,
+      383
+     ],
+     "faceScore": 0.39,
+     "samPoints": [
+      {
+       "at": [
+        223,
+        383
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        223,
+        356
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        223,
+        410
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        223,
+        520
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        186,
+        707
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        214,
+        873
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        238,
+        790
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        223,
+        520
+       ],
+       "px": 10806,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        186,
+        707
+       ],
+       "px": 7556,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        214,
+        873
+       ],
+       "px": 9773,
+       "colour": "blue",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        238,
+        790
+       ],
+       "px": 2304,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "_faceScore": 0.39,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.2725694444444444,
+      0.2025462962962963,
+      0.3914930555555556,
+      0.3125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 4,
+     "maskCoverage": 1.077,
+     "_sizeAdjusted": true,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.21354166666666666,
+      0.14814814814814814,
+      0.4513888888888889,
+      0.3680555555555556
+     ]
+    },
+    {
+     "name": "Max",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.691,
+     "maskPx": 85892,
+     "samBox": [
+      346,
+      419,
+      550,
+      1097
+     ],
+     "bodyBox": [
+      0.31423611111111116,
+      0.3821759259259259,
+      0.9522569444444444,
+      0.6342592592592593
+     ],
+     "faceBox": [
+      0.31423611111111116,
+      0.3821759259259259,
+      0.5642361111111112,
+      0.5946759259259259
+     ],
+     "gdinoBox": [
+      0.3637152777777778,
+      0.40046296296296297,
+      0.9522569444444444,
+      0.6365740740740741
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      422,
+      506
+     ],
+     "faceScore": 0.366,
+     "samPoints": [
+      {
+       "at": [
+        422,
+        506
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        422,
+        483
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        422,
+        529
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        469,
+        631
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "top"
+      },
+      {
+       "at": [
+        451,
+        830
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "olive",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        469,
+        631
+       ],
+       "px": 21836,
+       "colour": "blue",
+       "garment": "top"
+      },
+      {
+       "at": [
+        451,
+        830
+       ],
+       "px": 21297,
+       "colour": "olive",
+       "garment": "bottom"
+      }
+     ],
+     "_faceScore": 0.366,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.3880208333333333,
+      0.44560185185185186,
+      0.4895833333333333,
+      0.5300925925925926
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 2,
+     "maskCoverage": 0.978,
+     "_sizeAdjusted": true,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.3376736111111111,
+      0.4039351851851852,
+      0.5407986111111112,
+      0.5729166666666666
+     ]
+    },
+    {
+     "name": "Kiaan",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.667,
+     "maskPx": 71706,
+     "samBox": [
+      678,
+      438,
+      848,
+      1061
+     ],
+     "bodyBox": [
+      0.3172743055555556,
+      0.7357638888888889,
+      0.9210069444444444,
+      0.9791666666666666
+     ],
+     "faceBox": [
+      0.3172743055555556,
+      0.7357638888888889,
+      0.5672743055555556,
+      0.9482638888888888
+     ],
+     "gdinoBox": [
+      0.3802083333333333,
+      0.7847222222222222,
+      0.9210069444444444,
+      0.9814814814814815
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": [
+      745,
+      516
+     ],
+     "faceScore": 0.327,
+     "samPoints": [
+      {
+       "at": [
+        745,
+        516
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        745,
+        495
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        745,
+        537
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        792,
+        622
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "grey",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        792,
+        622
+       ],
+       "px": 17498,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.327,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.4019097222222222,
+      0.8182870370370371,
+      0.4939236111111111,
+      0.90625
+     ],
+     "occludedBy": [
+      "Julian"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.979,
+     "pxLostToFront": 54,
+     "_geminiFaceBox": [
+      0.3172743055555556,
+      0.7357638888888889,
+      0.5672743055555556,
+      0.9482638888888888
+     ]
+    },
+    {
+     "name": "Julian",
+     "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.659,
+     "maskPx": 75566,
+     "samBox": [
+      518,
+      467,
+      700,
+      1081
+     ],
+     "bodyBox": [
+      0.3532986111111111,
+      0.5754629629629631,
+      0.9375,
+      0.8078703703703703
+     ],
+     "faceBox": [
+      0.3532986111111111,
+      0.5754629629629631,
+      0.6032986111111112,
+      0.787962962962963
+     ],
+     "gdinoBox": [
+      0.4053819444444444,
+      0.5995370370370371,
+      0.9383680555555556,
+      0.8101851851851852
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": [
+      589,
+      551
+     ],
+     "faceScore": 0.335,
+     "samPoints": [
+      {
+       "at": [
+        589,
+        551
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        589,
+        529
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        589,
+        573
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        565,
+        699
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        640,
+        629
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        619,
+        777
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        565,
+        699
+       ],
+       "px": 5729,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        640,
+        629
+       ],
+       "px": 1334,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        619,
+        777
+       ],
+       "px": 48359,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "_faceScore": 0.335,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.4296875,
+      0.6400462962962963,
+      0.5260416666666666,
+      0.7233796296296297
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 3,
+     "maskCoverage": 0.972,
+     "_sizeAdjusted": true,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.3819444444444444,
+      0.5983796296296297,
+      0.5746527777777778,
+      0.7650462962962963
+     ]
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Levin",
+     "severity": "CRITICAL",
+     "description": "Dragon shown held in left hand, but prompt and story require it to perch on railing beside his hands while he grips railing with both hands"
+    },
+    {
+     "character": "Kiaan",
+     "severity": "MAJOR",
+     "description": "Wearing dark blue shorts instead of dark grey jogger shorts"
+    }
+   ],
+   "storedReferences": [
+    "Levin",
+    "Max",
+    "Julian",
+    "Kiaan"
+   ],
+   "storedRenamed": 2
+  },
+  {
+   "storyId": "job_1789681157795_wkt20ckod",
+   "pageNumber": 12,
+   "versionIndex": "1",
+   "env": "staging",
+   "kind": "genuine-evaluator-right",
+   "why": "The motivating page. Judged on the pixels the EVALUATOR is right and the detector followed a duplicated garment. This change does not fix it and must not pretend to: the conflicts stand exactly as before.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0,
+      0.25,
+      0.44,
+      0.99
+     ],
+     "face_bbox": [
+      0.23,
+      0.26,
+      0.33,
+      0.36
+     ],
+     "reference": "Max",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.27,
+      0.29,
+      0.6,
+      0.99
+     ],
+     "face_bbox": [
+      0.39,
+      0.3,
+      0.48,
+      0.39
+     ],
+     "reference": "Kiaan",
+     "confidence": 0.9
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.53,
+      0.29,
+      0.84,
+      0.99
+     ],
+     "face_bbox": [
+      0.65,
+      0.3,
+      0.74,
+      0.39
+     ],
+     "reference": "Levin",
+     "confidence": 0.9
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.54,
+      0.06,
+      0.74,
+      0.5
+     ],
+     "face_bbox": [
+      0.59,
+      0.07,
+      0.67,
+      0.15
+     ],
+     "reference": "Julian",
+     "confidence": 0.9
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Levin",
+     "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+     "score": 0.729,
+     "maskPx": 122776,
+     "samBox": [
+      568,
+      323,
+      992,
+      953
+     ],
+     "bodyBox": [
+      0.3173828125,
+      0.5517578125,
+      0.9287109375,
+      0.9658203125
+     ],
+     "faceBox": [
+      0.34228515625,
+      0.59052734375,
+      0.59228515625,
+      0.80302734375
+     ],
+     "gdinoBox": [
+      0.3154296875,
+      0.5546875,
+      0.9306640625,
+      0.96875
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": [
+      730,
+      466
+     ],
+     "faceScore": 0.424,
+     "samPoints": [
+      {
+       "at": [
+        730,
+        466
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        730,
+        445
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        730,
+        487
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        775,
+        649
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "green",
+       "garment": "top"
+      },
+      {
+       "at": [
+        891,
+        724
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        775,
+        649
+       ],
+       "px": 23807,
+       "colour": "green",
+       "garment": "top"
+      },
+      {
+       "at": [
+        891,
+        724
+       ],
+       "px": 6625,
+       "colour": "blue",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.424,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.40234375,
+      0.65625,
+      0.5068359375,
+      0.76953125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 2,
+     "maskCoverage": 0.994,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.34228515625,
+      0.59052734375,
+      0.59228515625,
+      0.80302734375
+     ]
+    },
+    {
+     "name": "Max",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.711,
+     "maskPx": 142707,
+     "samBox": [
+      3,
+      270,
+      455,
+      933
+     ],
+     "bodyBox": [
+      0.2666015625,
+      0.0068359375,
+      0.9091796875,
+      0.478515625
+     ],
+     "faceBox": [
+      0.29296875,
+      0.223828125,
+      0.54296875,
+      0.436328125
+     ],
+     "gdinoBox": [
+      0.263671875,
+      0.0029296875,
+      0.9111328125,
+      0.4443359375
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": [
+      319,
+      414
+     ],
+     "faceScore": 0.464,
+     "samPoints": [
+      {
+       "at": [
+        319,
+        414
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        319,
+        391
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        319,
+        437
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        351,
+        556
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "grey",
+       "garment": "top"
+      },
+      {
+       "at": [
+        121,
+        684
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        351,
+        556
+       ],
+       "px": 28546,
+       "colour": "grey",
+       "garment": "top"
+      },
+      {
+       "at": [
+        121,
+        684
+       ],
+       "px": 111216,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.464,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.34765625,
+      0.25390625,
+      0.4609375,
+      0.3681640625
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 2,
+     "maskCoverage": 1.061,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.29296875,
+      0.223828125,
+      0.54296875,
+      0.436328125
+     ]
+    },
+    {
+     "name": "Kiaan",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.696,
+     "maskPx": 46336,
+     "samBox": [
+      560,
+      76,
+      761,
+      576
+     ],
+     "bodyBox": [
+      0.0322265625,
+      0.5412109375,
+      0.5361328125,
+      0.7537109375
+     ],
+     "faceBox": [
+      0.0322265625,
+      0.5412109375,
+      0.2822265625,
+      0.7537109375
+     ],
+     "gdinoBox": [
+      0.07421875,
+      0.546875,
+      0.5625,
+      0.7431640625
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      665,
+      157
+     ],
+     "faceScore": 0.396,
+     "samPoints": [
+      {
+       "at": [
+        665,
+        157
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        665,
+        142
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        665,
+        172
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        679,
+        258
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        631,
+        245
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        730,
+        466
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 0
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "grey",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        679,
+        258
+       ],
+       "px": 8817,
+       "colour": "red",
+       "garment": "top"
+      },
+      {
+       "at": [
+        631,
+        245
+       ],
+       "px": 3153,
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.396,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.1162109375,
+      0.6171875,
+      0.1904296875,
+      0.681640625
+     ],
+     "occludedBy": [
+      "Levin",
+      "Julian"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 2,
+     "maskCoverage": 0.93,
+     "pxLostToFront": 91,
+     "_geminiFaceBox": [
+      0.0322265625,
+      0.5412109375,
+      0.2822265625,
+      0.7537109375
+     ]
+    },
+    {
+     "name": "Julian",
+     "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.569,
+     "maskPx": 62171,
+     "samBox": [
+      247,
+      299,
+      623,
+      845
+     ],
+     "bodyBox": [
+      0.2939453125,
+      0.2646484375,
+      0.771484375,
+      0.642578125
+     ],
+     "faceBox": [
+      0.2939453125,
+      0.3888671875,
+      0.5439453125,
+      0.6013671875
+     ],
+     "gdinoBox": [
+      0.2919921875,
+      0.2412109375,
+      0.8251953125,
+      0.6083984375
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      506,
+      433
+     ],
+     "faceScore": 0.438,
+     "samPoints": [
+      {
+       "at": [
+        506,
+        433
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        506,
+        413
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        506,
+        453
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        319,
+        414
+       ],
+       "role": "other-face",
+       "label": 0,
+       "figure": 1
+      },
+      {
+       "at": [
+        351,
+        556
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "grey",
+       "figure": 1
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "yellow",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.438,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.3740234375,
+      0.4423828125,
+      0.470703125,
+      0.544921875
+     ],
+     "occludedBy": [
+      "Max",
+      "Levin"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "both",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.92,
+     "pxLostToFront": 2222,
+     "_geminiFaceBox": [
+      0.2939453125,
+      0.3888671875,
+      0.5439453125,
+      0.6013671875
+     ]
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": "Julian",
+     "severity": "CRITICAL",
+     "description": "Kiaan wears red duffle coat with toggle closures, but should wear sunshine-yellow fleece zip-up hoodie over white thermal top and navy corduroy pull-on trousers per clothing contract"
+    },
+    {
+     "character": "Kiaan",
+     "severity": "MAJOR",
+     "description": "Julian wears red corduroy-style jacket instead of brick-red wool duffle coat with large wooden toggle fastenings"
+    },
+    {
+     "character": "Levin",
+     "severity": "MODERATE",
+     "description": "Levin is missing red knitted mittens specified in clothing contract; hands shown bare"
+    }
+   ],
+   "storedReferences": [
+    "Max",
+    "Julian",
+    "Levin",
+    "Kiaan"
+   ],
+   "storedRenamed": 2
+  },
+  {
+   "storyId": "job_1787349305313_hpv76p0rokg",
+   "pageNumber": 2,
+   "versionIndex": "0",
+   "env": "staging",
+   "kind": "face-only",
+   "why": "Face-only evaluator record. Head-to-head makes it comparable at all (every cross-channel distance was over the gate). Judged on the pixels against the stored clothing contract, the EVALUATOR is right and the detector is wrong — so it is measured, never renamed.",
+   "matches": [
+    {
+     "figure": 1,
+     "face_bbox": [
+      0.11,
+      0.35,
+      0.22,
+      0.44
+     ],
+     "reference": "Levin",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "face_bbox": [
+      0.34,
+      0.38,
+      0.44,
+      0.46
+     ],
+     "reference": "Julian",
+     "confidence": 0.85
+    },
+    {
+     "figure": 3,
+     "face_bbox": [
+      0.54,
+      0.36,
+      0.64,
+      0.45
+     ],
+     "reference": "Max",
+     "confidence": 0.88
+    },
+    {
+     "figure": 4,
+     "face_bbox": [
+      0.75,
+      0.36,
+      0.85,
+      0.45
+     ],
+     "reference": "Kiaan",
+     "confidence": 0.87
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Kiaan",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.626,
+     "maskPx": 79317,
+     "samBox": [
+      610,
+      455,
+      820,
+      1130
+     ],
+     "bodyBox": [
+      0.3519965277777778,
+      0.6871527777777778,
+      0.9826388888888888,
+      0.9479166666666666
+     ],
+     "faceBox": [
+      0.3519965277777778,
+      0.6871527777777778,
+      0.6019965277777778,
+      0.8996527777777777
+     ],
+     "gdinoBox": [
+      0.3949652777777778,
+      0.7060185185185185,
+      0.9809027777777778,
+      0.9490740740740741
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": [
+      702,
+      552
+     ],
+     "faceScore": 0.445,
+     "samPoints": [
+      {
+       "at": [
+        702,
+        552
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        702,
+        532
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        702,
+        572
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        763,
+        646
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "grey",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        763,
+        646
+       ],
+       "px": 16523,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.445,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.4357638888888889,
+      0.7638888888888888,
+      0.5225694444444444,
+      0.8611111111111112
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 1,
+     "maskCoverage": 1.065,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.3519965277777778,
+      0.6871527777777778,
+      0.6019965277777778,
+      0.8996527777777777
+     ]
+    },
+    {
+     "name": "Julian",
+     "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.599,
+     "maskPx": 141106,
+     "samBox": [
+      62,
+      410,
+      360,
+      1116
+     ],
+     "bodyBox": [
+      0.3263888888888889,
+      0.07291666666666667,
+      0.96875,
+      0.4837962962962963
+     ],
+     "faceBox": [
+      0.3263888888888889,
+      0.1125,
+      0.5763888888888888,
+      0.325
+     ],
+     "gdinoBox": [
+      0.3559027777777778,
+      0.07175925925925926,
+      0.96875,
+      0.4166666666666667
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": [
+      175,
+      519
+     ],
+     "faceScore": 0.468,
+     "samPoints": [
+      {
+       "at": [
+        175,
+        519
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        175,
+        495
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        175,
+        543
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        305,
+        719
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        348,
+        702
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        161,
+        973
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "brown",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        315,
+        960
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        305,
+        719
+       ],
+       "px": 1806,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        348,
+        702
+       ],
+       "px": 1391,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "at": [
+        161,
+        973
+       ],
+       "px": 14081,
+       "colour": "brown",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        315,
+        960
+       ],
+       "px": 9183,
+       "colour": "brown",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.468,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.3993055555555556,
+      0.14699074074074073,
+      0.5017361111111112,
+      0.25810185185185186
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "both",
+     "garmentSeeds": 4,
+     "maskCoverage": 1.188,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.3263888888888889,
+      0.1125,
+      0.5763888888888888,
+      0.325
+     ]
+    },
+    {
+     "name": "Max",
+     "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+     "score": 0.585,
+     "maskPx": 75678,
+     "samBox": [
+      461,
+      443,
+      661,
+      1071
+     ],
+     "bodyBox": [
+      0.3450520833333333,
+      0.5204861111111112,
+      0.9322916666666666,
+      0.7650462962962963
+     ],
+     "faceBox": [
+      0.3450520833333333,
+      0.5204861111111112,
+      0.5950520833333333,
+      0.7329861111111111
+     ],
+     "gdinoBox": [
+      0.3845486111111111,
+      0.5335648148148148,
+      0.9296875,
+      0.7650462962962963
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      556,
+      538
+     ],
+     "faceScore": 0.468,
+     "samPoints": [
+      {
+       "at": [
+        556,
+        538
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        556,
+        517
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        556,
+        559
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        541,
+        656
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "green",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        541,
+        656
+       ],
+       "px": 5893,
+       "colour": "green",
+       "garment": "top"
+      },
+      {
+       "none": "no blob of that colour below the top",
+       "colour": "purple",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.468,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.4210069444444444,
+      0.5949074074074074,
+      0.5121527777777778,
+      0.6921296296296297
+     ],
+     "occludedBy": [
+      "Kiaan"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.997,
+     "pxLostToFront": 39,
+     "_geminiFaceBox": [
+      0.3450520833333333,
+      0.5204861111111112,
+      0.5950520833333333,
+      0.7329861111111111
+     ]
+    },
+    {
+     "name": "Levin",
+     "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+     "score": 0.571,
+     "maskPx": 11661,
+     "samBox": [
+      276,
+      497,
+      460,
+      1087
+     ],
+     "bodyBox": [
+      0.38845486111111116,
+      0.3275462962962963,
+      0.8732638888888888,
+      0.553587962962963
+     ],
+     "faceBox": [
+      0.38845486111111116,
+      0.34108796296296295,
+      0.6384548611111112,
+      0.553587962962963
+     ],
+     "gdinoBox": [
+      0.4314236111111111,
+      0.3194444444444444,
+      0.9435763888888888,
+      0.5324074074074074
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      377,
+      586
+     ],
+     "faceScore": 0.458,
+     "samPoints": [
+      {
+       "at": [
+        377,
+        586
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        377,
+        565
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        377,
+        607
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        305,
+        719
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "yellow",
+       "figure": 1
+      },
+      {
+       "at": [
+        348,
+        702
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "yellow",
+       "figure": 1
+      },
+      {
+       "at": [
+        315,
+        960
+       ],
+       "role": "other-garment",
+       "label": 0,
+       "colour": "brown",
+       "figure": 1
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "black",
+       "garment": "bottom"
+      },
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.458,
+     "confidence": "medium",
+     "faceBoxRaw": [
+      0.4626736111111111,
+      0.38773148148148145,
+      0.5546875,
+      0.4837962962962963
+     ],
+     "occludedBy": [
+      "Julian"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.755,
+     "pxLostToFront": 8275,
+     "_geminiFaceBox": [
+      0.38845486111111116,
+      0.34108796296296295,
+      0.6384548611111112,
+      0.553587962962963
+     ]
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.39,
+     "maskPx": 5488,
+     "samBox": [
+      280,
+      321,
+      343,
+      490
+     ],
+     "bodyBox": [
+      0.18229166666666669,
+      0.21898148148148144,
+      0.4322916666666667,
+      0.43148148148148147
+     ],
+     "faceBox": [
+      0.18229166666666669,
+      0.21898148148148144,
+      0.4322916666666667,
+      0.43148148148148147
+     ],
+     "gdinoBox": [
+      0.2786458333333333,
+      0.32407407407407407,
+      0.4253472222222222,
+      0.39699074074074076
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "_depthTier": "foreground",
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.863,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.24229166666666668,
+      0.26998148148148143,
+      0.3722916666666667,
+      0.3804814814814815
+     ]
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.317,
+     "maskPx": 1609,
+     "samBox": [
+      183,
+      325,
+      220,
+      409
+     ],
+     "bodyBox": [
+      0.1520138888888889,
+      0.1310925925925926,
+      0.3559027777777778,
+      0.2534722222222222
+     ],
+     "faceBox": [
+      0.1520138888888889,
+      0.1310925925925926,
+      0.2820138888888889,
+      0.24159259259259258
+     ],
+     "gdinoBox": [
+      0.2821180555555556,
+      0.21180555555555555,
+      0.3550347222222222,
+      0.25462962962962965
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "_depthTier": "foreground",
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.739,
+     "pxLostToFront": 18,
+     "_geminiFaceBox": [
+      0.1820138888888889,
+      0.1565925925925926,
+      0.25201388888888887,
+      0.21609259259259259
+     ]
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.296,
+     "maskPx": 0,
+     "samBox": null,
+     "bodyBox": [
+      0.03776041666666666,
+      0.04479166666666666,
+      0.3932291666666667,
+      0.3055555555555556
+     ],
+     "faceBox": [
+      0.03776041666666666,
+      0.04479166666666666,
+      0.28776041666666663,
+      0.25729166666666664
+     ],
+     "gdinoBox": [
+      0.3081597222222222,
+      0.2569444444444444,
+      0.3932291666666667,
+      0.3055555555555556
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": null,
+     "samPoints": null,
+     "seedTrace": null,
+     "_depthTier": "foreground",
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": false,
+     "maskVerdict": "rejected-not-its-face",
+     "_cascadeFace": "anime",
+     "garmentSeeds": null,
+     "maskCoverage": null,
+     "pxLostToFront": 2220,
+     "_geminiFaceBox": [
+      0.09776041666666666,
+      0.09579166666666666,
+      0.22776041666666666,
+      0.20629166666666665
+     ]
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.283,
+     "maskPx": 387,
+     "samBox": [
+      265,
+      331,
+      295,
+      446
+     ],
+     "bodyBox": [
+      0.2864583333333333,
+      0.3113425925925926,
+      0.3932291666666667,
+      0.33912037037037035
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.2873263888888889,
+      0.30671296296296297,
+      0.3871527777777778,
+      0.3414351851851852
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.856,
+     "pxLostToFront": 1579
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.266,
+     "maskPx": 5214,
+     "samBox": [
+      179,
+      317,
+      340,
+      469
+     ],
+     "bodyBox": [
+      0.2829861111111111,
+      0.22569444444444445,
+      0.3949652777777778,
+      0.3402777777777778
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.2751736111111111,
+      0.20717592592592593,
+      0.4071180555555556,
+      0.39351851851851855
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.522,
+     "pxLostToFront": 1139
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": null,
+     "severity": "MAJOR",
+     "description": "page is photographic; the commissioned style is a bold, expressive traditional watercolor painting"
+    },
+    {
+     "character": "Julian",
+     "severity": "MAJOR",
+     "description": "Julian's shorts are dark brown denim shorts, not dungaree shorts with a square bib panel and adjustable shoulder straps."
+    },
+    {
+     "character": "Kiaan",
+     "severity": "MAJOR",
+     "description": "Kiaan's picture book is tucked under his right arm, not his left arm."
+    },
+    {
+     "character": null,
+     "severity": "MODERATE",
+     "description": "The yellow wooden trailhead signpost is behind the group of boys, not between the group and the fork."
+    },
+    {
+     "character": "Levin",
+     "severity": "CRITICAL",
+     "description": "Levin points toward Julian instead of the quiet side track behind the signpost"
+    },
+    {
+     "character": "Kiaan",
+     "severity": "MAJOR",
+     "description": "Kiaan holds two books in both hands instead of tucking a single hardcover picture book under his left arm"
+    },
+    {
+     "character": "Levin",
+     "severity": "MAJOR",
+     "description": "Hair rendered as short curly blonde instead of wavy light blonde tousled"
+    },
+    {
+     "character": "Kiaan",
+     "severity": "MAJOR",
+     "description": "Book has reddish-brown cover with light blue spine instead of warm red cover with cream spine"
+    }
+   ],
+   "storedReferences": [
+    "Levin",
+    "Julian",
+    "Max",
+    "Kiaan"
+   ],
+   "storedRenamed": 0
+  },
+  {
+   "storyId": "job_1787423677246_r9llf5yi9",
+   "pageNumber": 14,
+   "versionIndex": "2",
+   "env": "staging",
+   "kind": "face-only",
+   "why": "Face-only record where the cross-channel offset handed Lorena to Saira (0.129 vs her own 0.203). Head-to-head her own figure is 0.026 against 0.151.",
+   "matches": [
+    {
+     "figure": 1,
+     "face_bbox": [
+      0.15,
+      0.23,
+      0.29,
+      0.36
+     ],
+     "reference": "Fiona",
+     "confidence": 0.85
+    },
+    {
+     "figure": 2,
+     "face_bbox": [
+      0.31,
+      0.23,
+      0.43,
+      0.34
+     ],
+     "reference": "Sarah",
+     "confidence": 0.85
+    },
+    {
+     "figure": 3,
+     "face_bbox": [
+      0.44,
+      0.21,
+      0.55,
+      0.32
+     ],
+     "reference": "Facundo",
+     "confidence": 0.85
+    },
+    {
+     "figure": 4,
+     "face_bbox": [
+      0.56,
+      0.23,
+      0.67,
+      0.34
+     ],
+     "reference": "Lorena",
+     "confidence": 0.85
+    },
+    {
+     "figure": 5,
+     "face_bbox": [
+      0.68,
+      0.1,
+      0.8,
+      0.22
+     ],
+     "reference": "Kapitänin Rossa",
+     "confidence": 0.85
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Fiona",
+     "label": "Fiona is a adult woman (Looks: adult), 155 cm tall, average build. Hair: light brown, straight, neck-length, brushed bac",
+     "score": 0.708,
+     "maskPx": 99490,
+     "samBox": [
+      142,
+      242,
+      354,
+      992
+     ],
+     "bodyBox": [
+      0.2392578125,
+      0.142578125,
+      0.9677734375,
+      0.3447265625
+     ],
+     "faceBox": [
+      0.23046875,
+      0.169921875,
+      0.388671875,
+      0.296875
+     ],
+     "gdinoBox": [
+      0.236328125,
+      0.138671875,
+      0.96875,
+      0.345703125
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": [
+      239,
+      317
+     ],
+     "faceScore": 0.639,
+     "samPoints": [
+      {
+       "at": [
+        239,
+        317
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        239,
+        301
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        239,
+        333
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        247,
+        490
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "white",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        247,
+        490
+       ],
+       "px": 29390,
+       "colour": "white",
+       "garment": "top"
+      }
+     ],
+     "_faceScore": 0.639,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.26953125,
+      0.201171875,
+      0.3486328125,
+      0.2646484375
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.971,
+     "pxLostToFront": 0
+    },
+    {
+     "name": "Saira",
+     "label": "Saira is a young-adult young woman (Looks: young-adult), 174 cm tall, average build. Hair: dark brown, straight, shoulde",
+     "score": 0.689,
+     "maskPx": 52405,
+     "samBox": [
+      648,
+      128,
+      833,
+      591
+     ],
+     "bodyBox": [
+      0.1259765625,
+      0.638671875,
+      0.576171875,
+      0.8125
+     ],
+     "faceBox": [
+      0.1064453125,
+      0.666015625,
+      0.2314453125,
+      0.755859375
+     ],
+     "gdinoBox": [
+      0.125,
+      0.6328125,
+      0.5771484375,
+      0.8134765625
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": [
+      728,
+      173
+     ],
+     "faceScore": 0.608,
+     "samPoints": [
+      {
+       "at": [
+        728,
+        173
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        728,
+        160
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        728,
+        186
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no garment colour in the identity line",
+       "description": "Saira is a young-adult young woman (Looks: young-adult), 174 cm tall, average build. Hair: dark brown, straight, shoulde"
+      }
+     ],
+     "_faceScore": 0.608,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.1376953125,
+      0.6884765625,
+      0.2001953125,
+      0.7333984375
+     ],
+     "occludedBy": [
+      "Lorena"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.958,
+     "pxLostToFront": 4
+    },
+    {
+     "name": "Sarah",
+     "label": "Sarah is a young-adult young woman (Looks: young-adult), 165 cm tall, average build. Hair: blonde, wavy, shoulder-length",
+     "score": 0.686,
+     "maskPx": 55728,
+     "samBox": [
+      321,
+      239,
+      465,
+      838
+     ],
+     "bodyBox": [
+      0.234375,
+      0.318359375,
+      0.8193359375,
+      0.451171875
+     ],
+     "faceBox": [
+      0.216796875,
+      0.318359375,
+      0.357421875,
+      0.421875
+     ],
+     "gdinoBox": [
+      0.2333984375,
+      0.3134765625,
+      0.818359375,
+      0.4541015625
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      379,
+      294
+     ],
+     "faceScore": 0.633,
+     "samPoints": [
+      {
+       "at": [
+        379,
+        294
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        379,
+        280
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        379,
+        308
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        422,
+        388
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        422,
+        388
+       ],
+       "px": 19470,
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "_faceScore": 0.633,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.251953125,
+      0.34375,
+      0.322265625,
+      0.3955078125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.944,
+     "pxLostToFront": 0
+    },
+    {
+     "name": "Lorena",
+     "label": "Lorena is a young-adult young woman (Looks: young-adult), 163 cm tall, average build. Hair: dark brown, wavy, shoulder-l",
+     "score": 0.681,
+     "maskPx": 50736,
+     "samBox": [
+      521,
+      248,
+      699,
+      751
+     ],
+     "bodyBox": [
+      0.2431640625,
+      0.515625,
+      0.7314453125,
+      0.6806640625
+     ],
+     "faceBox": [
+      0.2158203125,
+      0.53515625,
+      0.3720703125,
+      0.646484375
+     ],
+     "gdinoBox": [
+      0.2421875,
+      0.5087890625,
+      0.7333984375,
+      0.6826171875
+     ],
+     "occluded": true,
+     "position": "center",
+     "facePoint": [
+      605,
+      301
+     ],
+     "faceScore": 0.617,
+     "samPoints": [
+      {
+       "at": [
+        605,
+        301
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        605,
+        285
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        605,
+        317
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        609,
+        419
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "purple",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        609,
+        419
+       ],
+       "px": 10886,
+       "colour": "purple",
+       "garment": "top"
+      }
+     ],
+     "_faceScore": 0.617,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.2548828125,
+      0.5625,
+      0.3330078125,
+      0.6181640625
+     ],
+     "occludedBy": [
+      "Facundo"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.944,
+     "pxLostToFront": 265
+    },
+    {
+     "name": "Facundo",
+     "label": "Facundo is a young-adult young man (Looks: young-adult), 178 cm tall, average build. Hair: dark brown, wavy, short, tous",
+     "score": 0.673,
+     "maskPx": 48525,
+     "samBox": [
+      432,
+      209,
+      578,
+      796
+     ],
+     "bodyBox": [
+      0.2041015625,
+      0.4208984375,
+      0.779296875,
+      0.5615234375
+     ],
+     "faceBox": [
+      0.1904296875,
+      0.43359375,
+      0.3251953125,
+      0.533203125
+     ],
+     "gdinoBox": [
+      0.2041015625,
+      0.421875,
+      0.77734375,
+      0.564453125
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      495,
+      264
+     ],
+     "faceScore": 0.625,
+     "samPoints": [
+      {
+       "at": [
+        495,
+        264
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        495,
+        250
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        495,
+        278
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        509,
+        362
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        509,
+        362
+       ],
+       "px": 12184,
+       "colour": "orange",
+       "garment": "top"
+      }
+     ],
+     "_faceScore": 0.625,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.2236328125,
+      0.4580078125,
+      0.291015625,
+      0.5078125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.99,
+     "pxLostToFront": 0
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": null,
+     "severity": "MAJOR",
+     "description": "page is photographic; the commissioned style is a bold, expressive traditional watercolor painting"
+    },
+    {
+     "character": "Fiona",
+     "severity": "MODERATE",
+     "description": "Fiona is missing her black felt tricorn hat."
+    },
+    {
+     "character": "Sarah",
+     "severity": "MODERATE",
+     "description": "Sarah's sleeves are not rolled to the elbow."
+    },
+    {
+     "character": "Facundo",
+     "severity": "MODERATE",
+     "description": "Facundo's sleeves are not rolled to the elbow."
+    },
+    {
+     "character": "Lorena",
+     "severity": "MODERATE",
+     "description": "Lorena's sleeves are not rolled to the elbow."
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MINOR",
+     "description": "Kapitänin Rossa's hair is jaw-length, not shoulder-length."
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MINOR",
+     "description": "Kapitänin Rossa's trousers are not cut to mid-calf."
+    },
+    {
+     "character": "Fiona",
+     "severity": "MODERATE",
+     "description": "Headwear is described as a soft cap or beret-like hat, but should be a black felt tricorn hat worn back from the face"
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MAJOR",
+     "description": "Shovel not held horizontally across body as required to block the cave exit; currently held vertically in one hand with blade on ground"
+    }
+   ],
+   "storedReferences": [
+    "Fiona",
+    "Sarah",
+    "Facundo",
+    "Lorena",
+    "Kapitänin Rossa"
+   ],
+   "storedRenamed": 0
+  },
+  {
+   "storyId": "job_1787777447720_ll5dyf4k8g",
+   "pageNumber": 12,
+   "versionIndex": "1",
+   "env": "staging",
+   "kind": "near-tie",
+   "why": "Saira’s own figure is 0.092 away and \"Rossa’s Crew\" 0.091 — a margin of 0.001 that renamed a named pirate into a crowd label.",
+   "matches": [
+    {
+     "figure": 1,
+     "body_bbox": [
+      0.05,
+      0.42,
+      0.2,
+      0.95
+     ],
+     "face_bbox": [
+      0.08,
+      0.43,
+      0.16,
+      0.5
+     ],
+     "reference": "Fiona",
+     "confidence": 0.9
+    },
+    {
+     "figure": 2,
+     "body_bbox": [
+      0.16,
+      0.42,
+      0.3,
+      0.95
+     ],
+     "face_bbox": [
+      0.18,
+      0.43,
+      0.25,
+      0.5
+     ],
+     "reference": "Facundo",
+     "confidence": 0.9
+    },
+    {
+     "figure": 3,
+     "body_bbox": [
+      0.29,
+      0.42,
+      0.44,
+      0.95
+     ],
+     "face_bbox": [
+      0.32,
+      0.43,
+      0.4,
+      0.5
+     ],
+     "reference": "Sarah",
+     "confidence": 0.9
+    },
+    {
+     "figure": 4,
+     "body_bbox": [
+      0.46,
+      0.42,
+      0.61,
+      0.95
+     ],
+     "face_bbox": [
+      0.49,
+      0.43,
+      0.57,
+      0.5
+     ],
+     "reference": "Saira",
+     "confidence": 0.9
+    },
+    {
+     "figure": 5,
+     "body_bbox": [
+      0.73,
+      0.39,
+      0.99,
+      0.95
+     ],
+     "face_bbox": null,
+     "reference": "Kapitänin Rossa",
+     "confidence": 0.9
+    },
+    {
+     "figure": 6,
+     "body_bbox": [
+      0.65,
+      0.16,
+      0.75,
+      0.44
+     ],
+     "face_bbox": null,
+     "reference": null,
+     "confidence": 0.7
+    },
+    {
+     "figure": 7,
+     "body_bbox": [
+      0.72,
+      0.16,
+      0.82,
+      0.44
+     ],
+     "face_bbox": null,
+     "reference": null,
+     "confidence": 0.7
+    },
+    {
+     "figure": 8,
+     "body_bbox": [
+      0.8,
+      0.16,
+      0.9,
+      0.44
+     ],
+     "face_bbox": null,
+     "reference": null,
+     "confidence": 0.7
+    },
+    {
+     "figure": 9,
+     "body_bbox": [
+      0.87,
+      0.16,
+      0.97,
+      0.44
+     ],
+     "face_bbox": null,
+     "reference": null,
+     "confidence": 0.7
+    }
+   ],
+   "detectorFigures": [
+    {
+     "name": "Sarah",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.678,
+     "maskPx": 41780,
+     "samBox": [
+      305,
+      448,
+      470,
+      914
+     ],
+     "bodyBox": [
+      0.359375,
+      0.2638671875,
+      0.89453125,
+      0.4763671875
+     ],
+     "faceBox": [
+      0.359375,
+      0.2638671875,
+      0.609375,
+      0.4763671875
+     ],
+     "gdinoBox": [
+      0.4375,
+      0.2978515625,
+      0.892578125,
+      0.458984375
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      377,
+      497
+     ],
+     "faceScore": 0.295,
+     "samPoints": [
+      {
+       "at": [
+        377,
+        497
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        377,
+        487
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        377,
+        507
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        389,
+        563
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "yellow",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "at": [
+        389,
+        563
+       ],
+       "px": 3648,
+       "colour": "yellow",
+       "garment": "top"
+      },
+      {
+       "none": "no blob of that colour below the top",
+       "colour": "green",
+       "garment": "bottom"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.295,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.4609375,
+      0.3466796875,
+      0.509765625,
+      0.388671875
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 1,
+     "maskCoverage": 0.984,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.4365234375,
+      0.326171875,
+      0.5341796875,
+      0.41015625
+     ]
+    },
+    {
+     "name": "Saira",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.675,
+     "maskPx": 37221,
+     "samBox": [
+      564,
+      444,
+      684,
+      905
+     ],
+     "bodyBox": [
+      0.3564453125,
+      0.4943359375,
+      0.8837890625,
+      0.7068359375
+     ],
+     "faceBox": [
+      0.3564453125,
+      0.4943359375,
+      0.6064453125,
+      0.7068359375
+     ],
+     "gdinoBox": [
+      0.43359375,
+      0.55078125,
+      0.8837890625,
+      0.66796875
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": [
+      617,
+      491
+     ],
+     "faceScore": 0.299,
+     "samPoints": [
+      {
+       "at": [
+        617,
+        491
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        617,
+        480
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        617,
+        502
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "black",
+       "garment": "bottom"
+      },
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "red",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.299,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.453125,
+      0.58203125,
+      0.5048828125,
+      0.6220703125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "both",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.965,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.427734375,
+      0.5625,
+      0.53125,
+      0.642578125
+     ]
+    },
+    {
+     "name": "Fiona",
+     "label": "young-adult girl/woman, build: average, soft jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.663,
+     "maskPx": 53334,
+     "samBox": [
+      55,
+      441,
+      208,
+      979
+     ],
+     "bodyBox": [
+      0.3544921875,
+      0.044140625,
+      0.9560546875,
+      0.256640625
+     ],
+     "faceBox": [
+      0.3544921875,
+      0.044140625,
+      0.6044921875,
+      0.256640625
+     ],
+     "gdinoBox": [
+      0.4306640625,
+      0.0537109375,
+      0.9560546875,
+      0.203125
+     ],
+     "occluded": false,
+     "position": "left",
+     "facePoint": [
+      145,
+      494
+     ],
+     "faceScore": 0.283,
+     "samPoints": [
+      {
+       "at": [
+        145,
+        494
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        145,
+        484
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        145,
+        504
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "blue",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.283,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.458984375,
+      0.12109375,
+      0.505859375,
+      0.1611328125
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 1.116,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.435546875,
+      0.1015625,
+      0.529296875,
+      0.181640625
+     ]
+    },
+    {
+     "name": "Facundo",
+     "label": "young-adult boy/man, build: average, angular jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+     "score": 0.648,
+     "maskPx": 40204,
+     "samBox": [
+      174,
+      435,
+      306,
+      926
+     ],
+     "bodyBox": [
+      0.3408203125,
+      0.1505859375,
+      0.90625,
+      0.3630859375
+     ],
+     "faceBox": [
+      0.3408203125,
+      0.1505859375,
+      0.5908203125,
+      0.3630859375
+     ],
+     "gdinoBox": [
+      0.4248046875,
+      0.169921875,
+      0.904296875,
+      0.298828125
+     ],
+     "occluded": true,
+     "position": "left",
+     "facePoint": [
+      252,
+      481
+     ],
+     "faceScore": 0.289,
+     "samPoints": [
+      {
+       "at": [
+        252,
+        481
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        252,
+        473
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        252,
+        489
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no blob of that colour below the head",
+       "colour": "green",
+       "garment": "top"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.289,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.44921875,
+      0.2265625,
+      0.490234375,
+      0.2646484375
+     ],
+     "occludedBy": [
+      "Fiona"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.956,
+     "pxLostToFront": 298,
+     "_geminiFaceBox": [
+      0.4287109375,
+      0.2080078125,
+      0.5107421875,
+      0.2841796875
+     ]
+    },
+    {
+     "name": "Kapitänin Rossa",
+     "label": "Kapitänin Rossa (secondary character). adult, mid-thirties. tall, sturdy, broad-shouldered. hair: dark red, thick, worn ",
+     "score": 0.639,
+     "maskPx": 70419,
+     "samBox": [
+      760,
+      403,
+      1018,
+      978
+     ],
+     "bodyBox": [
+      0.3251953125,
+      0.700390625,
+      0.955078125,
+      0.990234375
+     ],
+     "faceBox": [
+      0.3251953125,
+      0.700390625,
+      0.5751953125,
+      0.912890625
+     ],
+     "gdinoBox": [
+      0.3935546875,
+      0.7421875,
+      0.955078125,
+      0.994140625
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": [
+      826,
+      461
+     ],
+     "faceScore": 0.273,
+     "samPoints": [
+      {
+       "at": [
+        826,
+        461
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        826,
+        452
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        826,
+        470
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      },
+      {
+       "at": [
+        859,
+        869
+       ],
+       "role": "garment",
+       "label": 1,
+       "colour": "black",
+       "garment": "top"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "neutral colour, skipped by design",
+       "colour": "black",
+       "garment": "bottom"
+      },
+      {
+       "at": [
+        859,
+        869
+       ],
+       "px": 45255,
+       "colour": "black",
+       "garment": "top"
+      }
+     ],
+     "_faceScore": 0.273,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.427734375,
+      0.791015625,
+      0.4716796875,
+      0.822265625
+     ],
+     "occludedBy": [],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-face-separated",
+     "garmentSeeds": 1,
+     "maskCoverage": 1.11,
+     "_sizeAdjusted": true,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": [
+      0.40625,
+      0.775390625,
+      0.494140625,
+      0.837890625
+     ]
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.637,
+     "maskPx": 9208,
+     "samBox": [
+      453,
+      355,
+      530,
+      546
+     ],
+     "bodyBox": [
+      0.284609375,
+      0.3773671875,
+      0.54296875,
+      0.5166015625
+     ],
+     "faceBox": [
+      0.284609375,
+      0.3773671875,
+      0.414609375,
+      0.4878671875
+     ],
+     "gdinoBox": [
+      0.3466796875,
+      0.4423828125,
+      0.533203125,
+      0.517578125
+     ],
+     "occluded": false,
+     "position": "center",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "_depthTier": "foreground",
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "_cascadeFace": "haar_only",
+     "garmentSeeds": 0,
+     "maskCoverage": 1.015,
+     "pxLostToFront": 0,
+     "_geminiFaceBox": null
+    },
+    {
+     "name": "Rossa's Crew",
+     "label": "Rossa's Crew (secondary character). mixed adults. varied; shown as a group of four to six figures. hair: varied dark and",
+     "score": 0.636,
+     "maskPx": 36155,
+     "samBox": [
+      679,
+      441,
+      798,
+      930
+     ],
+     "bodyBox": [
+      0.427734375,
+      0.471875,
+      0.9052734375,
+      0.77734375
+     ],
+     "faceBox": [
+      0.46484375,
+      0.471875,
+      0.71484375,
+      0.684375
+     ],
+     "gdinoBox": [
+      0.4306640625,
+      0.6630859375,
+      0.908203125,
+      0.779296875
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": [
+      724,
+      489
+     ],
+     "faceScore": 0.285,
+     "samPoints": [
+      {
+       "at": [
+        724,
+        489
+       ],
+       "role": "face",
+       "label": 1
+      },
+      {
+       "at": [
+        724,
+        481
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "-20%"
+      },
+      {
+       "at": [
+        724,
+        497
+       ],
+       "role": "face-extra",
+       "label": 1,
+       "offset": "+20%"
+      }
+     ],
+     "seedTrace": [
+      {
+       "none": "no garment colour in the identity line",
+       "description": "Rossa's Crew (secondary character). mixed adults. varied; shown as a group of four to six figures. hair: varied dark and"
+      }
+     ],
+     "_depthTier": "foreground",
+     "_faceScore": 0.285,
+     "confidence": "high",
+     "faceBoxRaw": [
+      0.45703125,
+      0.6875,
+      0.498046875,
+      0.7255859375
+     ],
+     "occludedBy": [
+      "Kapitänin Rossa"
+     ],
+     "samApplied": true,
+     "_faceSource": "dino",
+     "maskVerdict": "mask-ok-occluded",
+     "_cascadeFace": "anime",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.941,
+     "pxLostToFront": 2480,
+     "_geminiFaceBox": [
+      0.4365234375,
+      0.6689453125,
+      0.5185546875,
+      0.7451171875
+     ]
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.557,
+     "maskPx": 8454,
+     "samBox": [
+      714,
+      244,
+      781,
+      445
+     ],
+     "bodyBox": [
+      0.2392578125,
+      0.6982421875,
+      0.435546875,
+      0.76171875
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.23828125,
+      0.697265625,
+      0.4345703125,
+      0.7626953125
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [
+      "Rossa's Crew"
+     ],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.97,
+     "pxLostToFront": 43
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.521,
+     "maskPx": 6581,
+     "samBox": [
+      840,
+      244,
+      900,
+      411
+     ],
+     "bodyBox": [
+      0.24609375,
+      0.8251953125,
+      0.4013671875,
+      0.8779296875
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.23828125,
+      0.8203125,
+      0.4013671875,
+      0.87890625
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.857,
+     "pxLostToFront": 147
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.517,
+     "maskPx": 9729,
+     "samBox": [
+      889,
+      228,
+      960,
+      447
+     ],
+     "bodyBox": [
+      0.2158203125,
+      0.875,
+      0.4365234375,
+      0.9375
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.22265625,
+      0.8681640625,
+      0.4365234375,
+      0.9375
+     ],
+     "occluded": false,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.93,
+     "pxLostToFront": 0
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.48,
+     "maskPx": 7709,
+     "samBox": [
+      781,
+      239,
+      846,
+      421
+     ],
+     "bodyBox": [
+      0.2353515625,
+      0.7646484375,
+      0.40625,
+      0.8251953125
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.2333984375,
+      0.7626953125,
+      0.4111328125,
+      0.826171875
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.917,
+     "pxLostToFront": 149
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.343,
+     "maskPx": 45,
+     "samBox": [
+      662,
+      165,
+      1023,
+      282
+     ],
+     "bodyBox": [
+      0.1630859375,
+      0.7001953125,
+      0.2705078125,
+      0.998046875
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.1611328125,
+      0.646484375,
+      0.275390625,
+      0.9990234375
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.794,
+     "pxLostToFront": 6523
+    },
+    {
+     "name": "UNKNOWN",
+     "label": "unmatched person",
+     "score": 0.267,
+     "maskPx": 6733,
+     "samBox": [
+      662,
+      165,
+      1023,
+      437
+     ],
+     "bodyBox": [
+      0.1630859375,
+      0.6484375,
+      0.3974609375,
+      1
+     ],
+     "faceBox": null,
+     "gdinoBox": [
+      0.1611328125,
+      0.646484375,
+      0.4267578125,
+      0.9990234375
+     ],
+     "occluded": true,
+     "position": "right",
+     "facePoint": null,
+     "samPoints": [],
+     "seedTrace": [],
+     "confidence": "low",
+     "faceBoxRaw": null,
+     "occludedBy": [],
+     "samApplied": true,
+     "maskVerdict": "mask-ok-occluded",
+     "garmentSeeds": 0,
+     "maskCoverage": 0.88,
+     "pxLostToFront": 262
+    }
+   ],
+   "fixableIssues": [
+    {
+     "character": null,
+     "severity": "MAJOR",
+     "description": "page is photographic; the commissioned style is a traditional watercolor painting"
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MAJOR",
+     "description": "Kapitänin Rossa is not at the stair-head on the far right edge of the Lindenhof hilltop, both arms spread wide across the top of the wide stone staircase, facing left toward the fountain, back view. Instead, she is standing on the ground level, facing right, with one arm raised."
+    },
+    {
+     "character": "Kapitänin Rossa's crew",
+     "severity": "MAJOR",
+     "description": "Kapitänin Rossa's crew is not in a tight horizontal line directly behind her, all facing left, back views. Instead, they are standing on the stairs, spread out, and not all facing left."
+    },
+    {
+     "character": "Loréna",
+     "severity": "CRITICAL",
+     "description": "Loréna is entirely absent from the scene."
+    },
+    {
+     "character": null,
+     "severity": "MAJOR",
+     "description": "The Telldenkmal pedestal is entirely absent from the scene."
+    },
+    {
+     "character": "Kapitänin Rossa's crew",
+     "severity": "MODERATE",
+     "description": "The crew's hats are not all battered wide-brimmed brown and black hats. Some appear to be tricorn hats."
+    },
+    {
+     "character": "Kapitänin Rossa's crew",
+     "severity": "MODERATE",
+     "description": "The crew's sashes are not all wide dark grey fabric sashes. Some appear to be brown or black."
+    },
+    {
+     "character": "Loréna",
+     "severity": "MAJOR",
+     "description": "Loréna named in prompt but absent from QUALITY_FIGURES.matches[] and no plausible VISION_INVENTORY figure matches her description"
+    },
+    {
+     "character": "Fiona",
+     "severity": "MAJOR",
+     "description": "Fiona faces toward viewer but must face left toward Rossa per prompt and story"
+    },
+    {
+     "character": "Facundo",
+     "severity": "MAJOR",
+     "description": "Facundo faces right but must face left toward Rossa"
+    },
+    {
+     "character": "Sarah",
+     "severity": "MAJOR",
+     "description": "Sarah faces toward viewer but must face left toward Rossa"
+    },
+    {
+     "character": "Saira",
+     "severity": "MAJOR",
+     "description": "Rossa's Crew wears dark grey trousers and purple sash instead of dark blue wide-leg trousers and pale blue sash"
+    },
+    {
+     "character": "Saira",
+     "severity": "MAJOR",
+     "description": "Rossa's Crew faces toward viewer but must face left toward Rossa"
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MAJOR",
+     "description": "Rossa's hair rendered as dark brown braided instead of dark red thick in low knot"
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MAJOR",
+     "description": "Rossa's coat rendered as dark red instead of deep burgundy"
+    },
+    {
+     "character": "Kapitänin Rossa",
+     "severity": "MAJOR",
+     "description": "Rossa faces right with only one arm extended, but prompt requires back view with both arms spread wide across staircase top"
+    },
+    {
+     "character": null,
+     "severity": "MINOR",
+     "description": "Telldenkmal pedestal (low square pale grey stone base, flat empty top) not listed in VISION_INVENTORY objects"
+    }
+   ],
+   "storedReferences": [
+    "Fiona",
+    "Facundo",
+    "Sarah",
+    "Rossa's Crew",
+    "Kapitänin Rossa",
+    null,
+    null,
+    null,
+    null
+   ],
+   "storedRenamed": 1
+  }
+ ]
+}

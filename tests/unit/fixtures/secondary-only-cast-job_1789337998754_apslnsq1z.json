@@ -1,0 +1,82 @@
+[
+  {
+    "pageNumber": 13,
+    "sceneCharacters": [],
+    "sceneCharacterClothing": {
+      "Lantern man": "standard"
+    },
+    "hasEmptySceneImage": true,
+    "emptyScenePromptLength": 5932,
+    "emptyScenePromptHead": "**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, e",
+    "sceneMetadata": {
+      "characters": [
+        "Lantern man"
+      ],
+      "fullData": {
+        "characters": [
+          {
+            "name": "Lantern man",
+            "depth": "foreground",
+            "looksAt": "ART001",
+            "clothing": "dark green wool apron over a white long-sleeve collared shirt, dark grey wool trousers, heavy brown leather boots",
+            "position": "center",
+            "expression": "eyes lifted to the egg, brows raised, mouth in a proud line"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "pageNumber": 15,
+    "sceneCharacters": [],
+    "sceneCharacterClothing": {
+      "Lantern man": "standard"
+    },
+    "hasEmptySceneImage": true,
+    "emptyScenePromptLength": 5709,
+    "emptyScenePromptHead": "**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, e",
+    "sceneMetadata": {
+      "characters": [
+        "Lantern man"
+      ],
+      "fullData": {
+        "characters": [
+          {
+            "name": "Lantern man",
+            "clothing": "standard",
+            "position": "centre foreground, walking along Limmatquai",
+            "expression": "neutral, eyes forward",
+            "perspective": "back view"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "pageNumber": 19,
+    "sceneCharacters": [],
+    "sceneCharacterClothing": {
+      "Lantern man": "standard"
+    },
+    "hasEmptySceneImage": true,
+    "emptyScenePromptLength": 5918,
+    "emptyScenePromptHead": "**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, e",
+    "sceneMetadata": {
+      "characters": [
+        "Lantern man"
+      ],
+      "fullData": {
+        "characters": [
+          {
+            "name": "Lantern man",
+            "depth": "foreground",
+            "looksAt": "ANI002",
+            "clothing": "dark green wool apron over a white collared shirt, dark grey wool trousers, heavy brown leather boots",
+            "position": "foreground",
+            "expression": "face lifted to the sky, eyes wide with wonder, brows raised, mouth softly open"
+          }
+        ]
+      }
+    }
+  }
+]

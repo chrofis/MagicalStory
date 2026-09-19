@@ -48,6 +48,7 @@ const { log } = require('../utils/logger');
 const { baseVbId } = require('./vbIdGuard');
 const { MODEL_DEFAULTS } = require('../config/models');
 const { coverLabel, COVER_PAGE_NUMBERS } = require('./coverKeys');
+const { parseHoldsId } = require('./coverHolds');
 const { stripDataUriPrefix } = require('./r2');
 const { rembgRemoveBackground } = require('./rembg');
 const { getStandardAvatar } = require('./characterPhotos');
@@ -214,10 +215,16 @@ function parseExplicitSequence(coverHint, characters) {
   };
   parsed.sort((a, b) => score(a) - score(b));
 
+  // RESOLVE: one resolver decides which character a hint name refers to. A raw
+  // lower-cased equality match saw neither a diacritic spelled differently nor
+  // a short form ("Rossa" for "Kapitänin Rossa"), and a miss is silent — the
+  // character simply drops out of the ordered cover sequence.
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  const castIdx = buildCastIndex({ characters }, null);
   const result = [];
   for (const p of parsed) {
-    const ch = characters.find(c => c.name?.toLowerCase() === p.name.toLowerCase());
-    if (ch) result.push(ch);
+    const hit = resolveEntity(p.name, castIdx);
+    if (hit && hit.kind === 'cast') result.push(hit.entry);
   }
   return result.length >= 2 ? result : null;
 }
@@ -784,9 +791,9 @@ async function generateCoverViaComposite({
     if (!holds || holds.toLowerCase() === 'nothing') continue;
     // Resolve ART### references to the artifact's name when known.
     let holdsPhrase;
-    const artMatch = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
-    if (artMatch && artNames[artMatch[1].toUpperCase()]) {
-      holdsPhrase = `holds the ${artNames[artMatch[1].toUpperCase()]}, both hands visibly gripping it`;
+    const heldId = parseHoldsId(holds);
+    if (heldId && artNames[heldId]) {
+      holdsPhrase = `holds the ${artNames[heldId]}, both hands visibly gripping it`;
     } else {
       holdsPhrase = `holds ${holds}`;
     }
@@ -1013,10 +1020,9 @@ Keep the same characters — no additions, no removals. The background stays a p
       const holds = String(d.holds || '').trim();
       let phrase = d.name;
       if (holds && holds.toLowerCase() !== 'nothing') {
-        const m = holds.match(/^((?:ART|ANI|LOC|VEH)\d+)/i);
         // ART/VEH: prefer the ENGLISH descriptor map (VB names follow the
-        // story language). Animals/locations keep their proper name.
-        const id = m ? m[1].toUpperCase() : null;
+        // story language). Animals keep their proper name.
+        const id = parseHoldsId(holds);
         const name = id
           ? (coverHint?._artifactDescsEn?.[id] || artNames[id] || holds)
           : holds;

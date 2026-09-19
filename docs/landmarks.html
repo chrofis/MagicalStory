@@ -81,7 +81,7 @@
 
 <p><strong>How Claude learns about variants:</strong></p>
 <ul>
-  <li><strong>Full mode</strong> (story-unified.txt): scene expansion runs as a second pass after <code>loadLandmarkPhotoDescriptions</code> has populated per-variant descriptions onto the visual bible. The scene-expansion prompt has direct access to descriptions and can write <code>[LOC###.N]</code>.</li>
+  <li><strong>Full mode</strong> (the beats chain; the pre-2026-09-15 unified writer is deleted): scene expansion runs as a second pass after <code>loadLandmarkPhotoDescriptions</code> has populated per-variant descriptions onto the visual bible. The scene-expansion prompt has direct access to descriptions and can write <code>[LOC###.N]</code>.</li>
   <li><strong>Trial mode</strong> (story-trial.txt): no second pass. Per-variant info is surfaced in the <code>{LANDMARKS}</code> section of the trial prompt as a <code>PHOTO ANGLES</code> block per landmark, plus an explicit instruction to use <code>[LOC###.N]</code> when picking interior vs exterior framing. Built by <code>buildTrialStoryPrompt</code> in <code>server/lib/storyHelpers.js</code>. The variant carry-through happens in <code>server/routes/storyIdeas.js</code>, which maps <code>photo_url_N + photo_description_N</code> into a structured <code>photoVariants: [{n, description}]</code> array on each landmark.</li>
 </ul>
 

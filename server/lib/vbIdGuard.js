@@ -19,7 +19,7 @@
  *
  * The id grammar matches the sanitiser's, INCLUDING the dotted vantage form
  * (`LOC005.1` — one camera viewpoint of a location, see
- * prompts/story-unified.txt "vantages").
+ * prompts/scene-expansion-all.txt "vantages").
  */
 
 const { log } = require('../utils/logger');
@@ -120,7 +120,7 @@ const VB_ID_LEGITIMATE_LABELS = [
   'clothing_review',
   'outline_review',
   'regen_expansion', 'regen_iterate', 'regen_refine', 'regen_scene',
-  'scene_expansion', 'scene_iterate', 'scene_rewrite', 'scene_validation',
+  'scene_expansion', 'scene_iterate', 'scene_review', 'scene_rewrite', 'scene_validation',
   'story_ideas',
 ];
 
@@ -205,16 +205,81 @@ function scrubVbIds(text, visualBible = null, pageNumber = null) {
  * @param {Object|null} [visualBible]
  * @returns {string} the block, or '(none declared)'.
  */
-function formatInteractionsBlock(interactions, visualBible = null) {
+// `characters` (optional): the brief's characters[]; each `looksAt` becomes a
+// gaze line, so the judges enforce a DECLARED gaze instead of inferring one
+// from what a character holds.
+function formatInteractionsBlock(interactions, visualBible = null, characters = null) {
   const list = Array.isArray(interactions) ? interactions : [];
-  if (list.length === 0) return '(none declared)';
-  const block = list
-    .map(i => `- ${i?.character || '?'} + ${i?.object || '?'}: ${i?.where || '(no placement given)'}`)
-    .join('\n');
+  const gazes = (Array.isArray(characters) ? characters : [])
+    .filter(c => c?.name && c.looksAt)
+    .map(c => `- ${c.name} looks at ${String(c.looksAt).trim()}`);
+  if (list.length === 0 && gazes.length === 0) return '(none declared)';
+  const block = [
+    ...list.map(i => `- ${i?.character || '?'} + ${i?.object || '?'}: ${i?.where || '(no placement given)'}`),
+    ...gazes,
+  ].join('\n');
   return scrubVbIds(block, visualBible) || '(none declared)';
 }
 
+/**
+ * The legend an evaluator names elements from: one line per element this page
+ * is built from, "<id> — <name>". The evaluator copies an id back onto each
+ * finding as `element`, and the repair attaches that element's reference by
+ * id — no name ever travels through code. Ids are base ids (a cited state
+ * `ART002.4` is listed as `ART002`), because the repair resolves the state
+ * for the page itself. Nothing in the bible for an id → the id is left out.
+ *
+ * @param {Array<string>} objectIds - the page's declared objects (sceneMetadata.objects)
+ * @param {Object|null} visualBible
+ * @returns {string} the legend, or '(none)'
+ */
+/**
+ * The name a JUDGE, a reviewer or a reference-sheet cell calls an element by.
+ *
+ * The element's ONE authored English label (vbLabel.labelOf) when the bible
+ * carries one, so every consumer says the same word. With no label — a bible
+ * stored before labels existed — the entry's `name`, unchanged: labelOf's
+ * backfill is deliberately terse and would re-word a stored story's elements.
+ *
+ * @param {Object} entry
+ * @returns {string}
+ */
+function elementDisplayLabel(entry) {
+  const { labelOf } = require('./vbLabel');
+  if (!entry || typeof entry !== 'object') return labelOf(entry);
+  if (String(entry.label || '').trim()) return labelOf(entry);
+  const name = String(entry.name || '').trim();
+  return name || labelOf(entry);
+}
+
+function formatElementsBlock(objectIds, visualBible = null) {
+  const ids = Array.isArray(objectIds) ? objectIds : [];
+  if (ids.length === 0 || !visualBible) return '(none)';
+  const pools = ['artifacts', 'animals', 'secondaryCharacters', 'vehicles', 'locations', 'mainCharacters'];
+  const seen = new Set();
+  const lines = [];
+  for (const raw of ids) {
+    const base = baseVbId(String(raw || ''));
+    if (!base || seen.has(base)) continue;
+    let entry = null;
+    for (const pool of pools) {
+      entry = (visualBible[pool] || []).find(e => String(e?.id || '').toUpperCase() === base.toUpperCase());
+      if (entry) break;
+    }
+    if (!entry) continue;
+    // The element's ONE authored English label — the same string the page
+    // prompt and the detector use. The id stays: a text/vision JUDGE may see
+    // ids, and the repair resolves the reference by id.
+    const label = elementDisplayLabel(entry);
+    if (!label) continue;
+    seen.add(base);
+    lines.push(`${base} — ${label}`);
+  }
+  return lines.length ? lines.join('\n') : '(none)';
+}
+
 module.exports = {
+  elementDisplayLabel,
   VB_ID_POOLS,
   VB_ID_PATTERN,
   baseVbId,
@@ -226,4 +291,5 @@ module.exports = {
   VB_ID_LEGITIMATE_LABELS,
   scrubVbIds,
   formatInteractionsBlock,
+  formatElementsBlock,
 };

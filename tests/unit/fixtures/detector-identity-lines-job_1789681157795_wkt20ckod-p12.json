@@ -1,0 +1,473 @@
+{
+  "_source": "staging story job_1789681157795_wkt20ckod page 12, imageVersions[1] (source: iterate-round-1) — the version that shipped with finalScore 0",
+  "sceneCharacters": [
+    {
+      "id": 1786902471660,
+      "name": "Levin",
+      "age": "5",
+      "gender": "male",
+      "height": "110",
+      "ageCategory": "kindergartner",
+      "physical": {
+        "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+        "build": "average",
+        "other": "none",
+        "glasses": "none",
+        "eyeColor": "green",
+        "skinTone": "light",
+        "hairColor": "light blonde",
+        "facialHair": "none",
+        "apparentAge": "preschooler",
+        "eyeColorHex": "#6A7B54",
+        "skinToneHex": "#F0D2BC",
+        "hairColorHex": "#D4B27C",
+        "detailedHairAnalysis": {
+          "type": "wavy",
+          "density": "full",
+          "parting": "none",
+          "styling": "tousled",
+          "texture": "fine",
+          "lengthTop": "short",
+          "bangsEndAt": "no bangs",
+          "salonLevel": 8,
+          "lengthSides": "same as top",
+          "baseColorHex": "#E8C690",
+          "highlightsHex": "none"
+        }
+      },
+      "structuredClothing": {
+        "shoes": "black and white sneakers",
+        "fullBody": null,
+        "lowerBody": "dark blue jeans",
+        "upperBody": "yellow long-sleeve sweatshirt with a dinosaur graphic"
+      },
+      "avatars": {
+        "clothing": {
+          "summer": "white short-sleeved t-shirt, light brown shorts, dark sneakers",
+          "winter": "white hooded winter jacket, grey gloves, khaki snow pants, dark grey winter boots",
+          "standard": "white hooded sweatshirt, khaki pants, white sneakers"
+        }
+      }
+    },
+    {
+      "id": 1786902747333,
+      "name": "Julian",
+      "age": "3",
+      "gender": "male",
+      "height": "102",
+      "ageCategory": "preschooler",
+      "physical": {
+        "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+        "build": "average",
+        "other": "none",
+        "glasses": "none",
+        "eyeColor": "blue",
+        "skinTone": "light",
+        "hairColor": "light blonde",
+        "facialHair": "none",
+        "apparentAge": "toddler",
+        "eyeColorHex": "#6F9ECF",
+        "skinToneHex": "#E8BEAC",
+        "hairColorHex": "#DDC29E",
+        "detailedHairAnalysis": {
+          "type": "curly",
+          "parting": "none",
+          "styling": "natural",
+          "texture": "medium",
+          "lengthTop": "ear-length",
+          "bangsEndAt": "no bangs",
+          "lengthSides": "same as top",
+          "baseColorHex": "#DDC29E",
+          "highlightsHex": "none"
+        }
+      },
+      "structuredClothing": {
+        "shoes": "gray sneakers with white soles",
+        "fullBody": null,
+        "lowerBody": "light brown khaki pants",
+        "upperBody": "white-collared polo shirt with brown shoulders and light blue and white horizontal stripes"
+      },
+      "avatars": {
+        "clothing": {
+          "summer": "white polo shirt with brown shoulders and blue and white horizontal stripes across the chest, light brown shorts, brown sandals",
+          "winter": "A hooded winter jacket with horizontal panels in shades of brown, light blue, and white, featuring a zipper closure., Khaki or light brown pants., Dark brown or black winter boots.",
+          "standard": "white-collared polo shirt with brown shoulders and light blue and white horizontal stripes, light brown khaki pants, gray sneakers with white soles"
+        }
+      }
+    },
+    {
+      "id": 1786904058132,
+      "name": "Max",
+      "age": "3",
+      "gender": "male",
+      "height": "98",
+      "ageCategory": "preschooler",
+      "physical": {
+        "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+        "build": "average",
+        "other": "none",
+        "glasses": "none",
+        "eyeColor": "brown",
+        "skinTone": "light",
+        "hairColor": "light brown",
+        "facialHair": "none",
+        "apparentAge": "preschooler",
+        "eyeColorHex": "#6B4423",
+        "skinToneHex": "#E8BEAC",
+        "hairColorHex": "#B58C5A",
+        "detailedHairAnalysis": {
+          "type": "curly",
+          "density": "full",
+          "parting": "none",
+          "styling": "natural",
+          "texture": "medium",
+          "lengthTop": "short",
+          "bangsEndAt": "no bangs",
+          "salonLevel": 6,
+          "lengthSides": "short",
+          "baseColorHex": "#A07E5B",
+          "highlightsHex": "none"
+        }
+      },
+      "structuredClothing": {
+        "shoes": "dark brown lace-up shoes",
+        "fullBody": null,
+        "lowerBody": "khaki pants",
+        "upperBody": "brown and white striped t-shirt"
+      },
+      "avatars": {
+        "clothing": {
+          "summer": "brown and off-white striped t-shirt, light brown shorts, brown sandals",
+          "winter": "brown and white striped hooded jacket, dark brown pants, dark brown gloves, dark brown boots",
+          "standard": "brown and white striped t-shirt, khaki pants, dark brown lace-up shoes"
+        }
+      }
+    },
+    {
+      "id": 1786904387136,
+      "name": "Kiaan",
+      "age": "3",
+      "gender": "male",
+      "height": "102",
+      "ageCategory": "preschooler",
+      "physical": {
+        "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+        "build": "average",
+        "other": "none",
+        "glasses": "none",
+        "eyeColor": "brown",
+        "skinTone": "light",
+        "hairColor": "dark brown",
+        "facialHair": "none",
+        "apparentAge": "preschooler",
+        "eyeColorHex": "#4A2C1F",
+        "skinToneHex": "#E8BEAC",
+        "hairColorHex": "#3A251C",
+        "detailedHairAnalysis": {
+          "type": "straight",
+          "density": "full",
+          "parting": "none",
+          "styling": "natural",
+          "texture": "medium",
+          "lengthTop": "short",
+          "bangsEndAt": "at eyebrows",
+          "salonLevel": 4,
+          "lengthSides": "short",
+          "baseColorHex": "#5C4131",
+          "highlightsHex": "none"
+        }
+      },
+      "structuredClothing": {
+        "shoes": "grey sneakers",
+        "fullBody": null,
+        "lowerBody": "dark blue jeans",
+        "upperBody": "grey camouflage hoodie"
+      },
+      "avatars": {
+        "clothing": {
+          "summer": "gray and black camouflage short-sleeve t-shirt, light brown shorts, brown flip-flops",
+          "winter": "Gray and black camouflage hooded winter jacket with a zipper and snap buttons, Dark gray winter pants, Black winter boots",
+          "standard": "grey camouflage hoodie, dark blue jeans, grey sneakers"
+        }
+      }
+    }
+  ],
+  "characterPositions": {
+    "Max": "foreground, left of centre, at the wall gap",
+    "Kiaan": "foreground, centre-left, at the wall gap",
+    "Levin": "foreground, centre-right, at the wall gap",
+    "Julian": "midground, directly behind the trio"
+  },
+  "sceneCharacterClothing": {
+    "Max": "standard",
+    "Kiaan": "standard",
+    "Levin": "standard",
+    "Julian": "standard"
+  },
+  "clothingRequirements": {
+    "Max": {
+      "summer": {
+        "used": false
+      },
+      "winter": {
+        "used": false
+      },
+      "costumed": {
+        "used": false
+      },
+      "standard": {
+        "used": true,
+        "description": "A cobalt-blue padded quilted gilet with a zip front and two side pockets, worn over a grey long-sleeve cotton top with a crew neck; dark brown wool twill trousers with a straight leg and cuffed hems; chunky black rubber-soled lace-up boots that reach the ankle."
+      }
+    },
+    "Kiaan": {
+      "summer": {
+        "used": false
+      },
+      "winter": {
+        "used": false
+      },
+      "costumed": {
+        "used": false
+      },
+      "standard": {
+        "used": true,
+        "description": "A brick-red wool duffle coat with large wooden toggle fastenings down the front and a small standing collar, worn over a white crew-neck long-sleeve top; dark grey slim-fit cotton trousers; dark brown suede pull-on ankle boots with a rounded toe."
+      }
+    },
+    "Levin": {
+      "summer": {
+        "used": false
+      },
+      "winter": {
+        "used": false
+      },
+      "costumed": {
+        "used": false
+      },
+      "standard": {
+        "used": true,
+        "description": "A forest-green knitted pullover with a round neck and ribbed cuffs, worn over a white long-sleeve shirt whose cuffs show at the wrists; mid-blue denim jeans with a straight leg; brown lace-up ankle boots; a long rust-orange wool scarf wound twice around the neck with both ends hanging down the front; red knitted mittens on both hands."
+      }
+    },
+    "Julian": {
+      "summer": {
+        "used": false
+      },
+      "winter": {
+        "used": false
+      },
+      "costumed": {
+        "used": false
+      },
+      "standard": {
+        "used": true,
+        "description": "A sunshine-yellow fleece zip-up hoodie with a full-length front zip and two hand pockets at the hip, worn over a white long-sleeve thermal top; soft navy blue corduroy pull-on trousers with an elasticated waist and a slightly rounded belly fit; red rubber-soled ankle boots with velcro straps."
+      }
+    }
+  },
+  "artStyle": "watercolor",
+  "evalMatches": [
+    {
+      "figure": 1,
+      "reference": "Max",
+      "body_bbox": [
+        0,
+        0.25,
+        0.44,
+        0.99
+      ],
+      "face_bbox": [
+        0.23,
+        0.26,
+        0.33,
+        0.36
+      ],
+      "confidence": 0.9
+    },
+    {
+      "figure": 2,
+      "reference": "Kiaan",
+      "body_bbox": [
+        0.27,
+        0.29,
+        0.6,
+        0.99
+      ],
+      "face_bbox": [
+        0.39,
+        0.3,
+        0.48,
+        0.39
+      ],
+      "confidence": 0.9
+    },
+    {
+      "figure": 3,
+      "reference": "Levin",
+      "body_bbox": [
+        0.53,
+        0.29,
+        0.84,
+        0.99
+      ],
+      "face_bbox": [
+        0.65,
+        0.3,
+        0.74,
+        0.39
+      ],
+      "confidence": 0.9
+    },
+    {
+      "figure": 4,
+      "reference": "Julian",
+      "body_bbox": [
+        0.54,
+        0.06,
+        0.74,
+        0.5
+      ],
+      "face_bbox": [
+        0.59,
+        0.07,
+        0.67,
+        0.15
+      ],
+      "confidence": 0.9
+    }
+  ],
+  "detFigures": [
+    {
+      "name": "Levin",
+      "bodyBox": [
+        0.3173828125,
+        0.5517578125,
+        0.9287109375,
+        0.9658203125
+      ],
+      "faceBox": [
+        0.34228515625,
+        0.59052734375,
+        0.59228515625,
+        0.80302734375
+      ],
+      "confidence": "high",
+      "score": 0.729,
+      "garmentSeeds": 2,
+      "occluded": false
+    },
+    {
+      "name": "Max",
+      "bodyBox": [
+        0.2666015625,
+        0.0068359375,
+        0.9091796875,
+        0.478515625
+      ],
+      "faceBox": [
+        0.29296875,
+        0.223828125,
+        0.54296875,
+        0.436328125
+      ],
+      "confidence": "high",
+      "score": 0.711,
+      "garmentSeeds": 2,
+      "occluded": false
+    },
+    {
+      "name": "Kiaan",
+      "bodyBox": [
+        0.0322265625,
+        0.5412109375,
+        0.5361328125,
+        0.7537109375
+      ],
+      "faceBox": [
+        0.0322265625,
+        0.5412109375,
+        0.2822265625,
+        0.7537109375
+      ],
+      "confidence": "high",
+      "score": 0.696,
+      "garmentSeeds": 2,
+      "occluded": true
+    },
+    {
+      "name": "Julian",
+      "bodyBox": [
+        0.2939453125,
+        0.2646484375,
+        0.771484375,
+        0.642578125
+      ],
+      "faceBox": [
+        0.2939453125,
+        0.3888671875,
+        0.5439453125,
+        0.6013671875
+      ],
+      "confidence": "medium",
+      "score": 0.569,
+      "garmentSeeds": 0,
+      "occluded": true
+    }
+  ],
+  "storedExpectedCharacters": [
+    {
+      "name": "Levin",
+      "description": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: A forest-green knitted pullover with a round neck and ribbed cuffs, worn over a white long-sleeve shirt whose cuffs show at the wrists; mid-blue denim jeans with a straight leg; brown lace-up ankle boots; a long rust-orange wool scarf wound twice around the neck with both ends hanging down the front; red knitted mittens on both hands."
+    },
+    {
+      "name": "Julian",
+      "description": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: A sunshine-yellow fleece zip-up hoodie with a full-length front zip and two hand pockets at the hip, worn over a white long-sleeve thermal top; soft navy blue corduroy pull-on trousers with an elasticated waist and a slightly rounded belly fit; red rubber-soled ankle boots with velcro straps."
+    },
+    {
+      "name": "Max",
+      "description": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips. Wearing: A cobalt-blue padded quilted gilet with a zip front and two side pockets, worn over a grey long-sleeve cotton top with a crew neck; dark brown wool twill trousers with a straight leg and cuffed hems; chunky black rubber-soled lace-up boots that reach the ankle."
+    },
+    {
+      "name": "Kiaan",
+      "description": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips. Wearing: A brick-red wool duffle coat with large wooden toggle fastenings down the front and a small standing collar, worn over a white crew-neck long-sleeve top; dark grey slim-fit cotton trousers; dark brown suede pull-on ankle boots with a rounded toe."
+    }
+  ],
+  "storedIdentityAnswers": {
+    "A": "Levin",
+    "B": "Max",
+    "C": "Kiaan",
+    "D": "Julian"
+  },
+  "storedIdentityAgreement": {
+    "agreed": 2,
+    "renamed": 4,
+    "compared": 4,
+    "pairedOn": "body",
+    "conflicts": [
+      {
+        "detector": "Julian",
+        "evaluator": "Kiaan",
+        "centreDistance": 0.109
+      },
+      {
+        "detector": "Kiaan",
+        "evaluator": "Julian",
+        "centreDistance": 0.009
+      }
+    ],
+    "renameMap": {
+      "kiaan": "Julian",
+      "julian": "Kiaan"
+    },
+    "agreedNames": [
+      "Max",
+      "Levin"
+    ],
+    "agreementRate": 0.5,
+    "contestedCharacters": [
+      "Kiaan",
+      "Julian"
+    ]
+  }
+}

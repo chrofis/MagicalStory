@@ -1,0 +1,1507 @@
+{
+  "_source": {
+    "db": "staging",
+    "storyId": "job_1789348171785_9oxos7dwv",
+    "pulled": "2026-09-14"
+  },
+  "page": {
+    "finalScore": 100,
+    "fixTargets": [],
+    "pageNumber": 1,
+    "qualityScore": 100,
+    "bboxDetection": {
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      "figures": [
+        {
+          "name": "Levin",
+          "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+          "score": 0.741,
+          "maskPx": 117510,
+          "samBox": [
+            437,
+            278,
+            767,
+            999
+          ],
+          "bodyBox": [
+            0.2724609375,
+            0.4287109375,
+            0.9755859375,
+            0.7470703125
+          ],
+          "faceBox": [
+            0.28271484375,
+            0.44892578125,
+            0.53271484375,
+            0.66142578125
+          ],
+          "gdinoBox": [
+            0.271484375,
+            0.4267578125,
+            0.9755859375,
+            0.7490234375
+          ],
+          "occluded": false,
+          "position": "center",
+          "facePoint": [
+            575,
+            405
+          ],
+          "faceScore": 0.517,
+          "samPoints": [
+            {
+              "at": [
+                575,
+                405
+              ],
+              "role": "face",
+              "label": 1
+            },
+            {
+              "at": [
+                575,
+                383
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "-20%"
+            },
+            {
+              "at": [
+                575,
+                427
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "+20%"
+            },
+            {
+              "at": [
+                626,
+                561
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "red",
+              "garment": "top"
+            },
+            {
+              "at": [
+                551,
+                508
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "red",
+              "garment": "top"
+            }
+          ],
+          "seedTrace": [
+            {
+              "none": "neutral colour, skipped by design",
+              "colour": "grey",
+              "garment": "bottom"
+            },
+            {
+              "at": [
+                626,
+                561
+              ],
+              "px": 28745,
+              "colour": "red",
+              "garment": "top"
+            },
+            {
+              "at": [
+                551,
+                508
+              ],
+              "px": 19152,
+              "colour": "red",
+              "garment": "top"
+            }
+          ],
+          "_depthTier": "foreground",
+          "_faceScore": 0.517,
+          "confidence": "high",
+          "faceBoxRaw": [
+            0.3408203125,
+            0.509765625,
+            0.4501953125,
+            0.61328125
+          ],
+          "occludedBy": [],
+          "samApplied": true,
+          "_faceSource": "dino",
+          "maskVerdict": "mask-ok-face-separated",
+          "_cascadeFace": "haar_only",
+          "garmentSeeds": 2,
+          "maskCoverage": 0.987,
+          "pxLostToFront": 0,
+          "_geminiFaceBox": [
+            0.28271484375,
+            0.44892578125,
+            0.53271484375,
+            0.66142578125
+          ]
+        },
+        {
+          "name": "Julian",
+          "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+          "score": 0.681,
+          "maskPx": 65019,
+          "samBox": [
+            284,
+            328,
+            512,
+            879
+          ],
+          "bodyBox": [
+            0.2841796875,
+            0.279296875,
+            0.8583984375,
+            0.50859375
+          ],
+          "faceBox": [
+            0.2841796875,
+            0.29609375,
+            0.5341796875,
+            0.50859375
+          ],
+          "gdinoBox": [
+            0.3203125,
+            0.27734375,
+            0.8583984375,
+            0.5
+          ],
+          "occluded": true,
+          "position": "center",
+          "facePoint": [
+            405,
+            415
+          ],
+          "faceScore": 0.512,
+          "samPoints": [
+            {
+              "at": [
+                405,
+                415
+              ],
+              "role": "face",
+              "label": 1
+            },
+            {
+              "at": [
+                405,
+                396
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "-20%"
+            },
+            {
+              "at": [
+                405,
+                434
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "+20%"
+            },
+            {
+              "at": [
+                396,
+                560
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                375,
+                680
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "blue",
+              "garment": "bottom"
+            },
+            {
+              "at": [
+                418,
+                699
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "blue",
+              "garment": "bottom"
+            }
+          ],
+          "seedTrace": [
+            {
+              "at": [
+                396,
+                560
+              ],
+              "px": 9868,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                375,
+                680
+              ],
+              "px": 2056,
+              "colour": "blue",
+              "garment": "bottom"
+            },
+            {
+              "at": [
+                418,
+                699
+              ],
+              "px": 1533,
+              "colour": "blue",
+              "garment": "bottom"
+            }
+          ],
+          "_depthTier": "foreground",
+          "_faceScore": 0.512,
+          "confidence": "high",
+          "faceBoxRaw": [
+            0.3583984375,
+            0.35546875,
+            0.4521484375,
+            0.4345703125
+          ],
+          "occludedBy": [
+            "Levin"
+          ],
+          "samApplied": true,
+          "_faceSource": "dino",
+          "maskVerdict": "mask-ok-occluded",
+          "_cascadeFace": "both",
+          "garmentSeeds": 3,
+          "maskCoverage": 0.884,
+          "pxLostToFront": 105,
+          "_geminiFaceBox": [
+            0.2841796875,
+            0.29609375,
+            0.5341796875,
+            0.50859375
+          ]
+        }
+      ],
+      "objects": [],
+      "gdinoDiag": {
+        "mode": "generic",
+        "faces": [
+          {
+            "box": [
+              522,
+              349,
+              628,
+              461
+            ],
+            "score": 0.517
+          },
+          {
+            "box": [
+              364,
+              367,
+              445,
+              463
+            ],
+            "score": 0.512
+          }
+        ],
+        "reason": null,
+        "backend": "grounding-dino",
+        "objects": [
+          {
+            "count": 1,
+            "skipped": "object grounding disabled"
+          }
+        ],
+        "pairing": {
+          "faces": 2,
+          "method": "global-once",
+          "paired": 2,
+          "persons": 2,
+          "recovered": 0,
+          "redetected": 0
+        },
+        "persons": [
+          {
+            "box": [
+              437,
+              278,
+              767,
+              999
+            ],
+            "score": 0.741
+          },
+          {
+            "box": [
+              284,
+              328,
+              512,
+              879
+            ],
+            "score": 0.681
+          }
+        ],
+        "fellBack": false,
+        "identity": {
+          "model": "gemini-full",
+          "badges": [
+            {
+              "at": [
+                575,
+                483
+              ],
+              "detIdx": 0,
+              "letter": "A"
+            },
+            {
+              "at": [
+                405,
+                482
+              ],
+              "detIdx": 1,
+              "letter": "B"
+            }
+          ],
+          "method": "som-gemini",
+          "answers": {
+            "A": "Levin",
+            "B": "Julian"
+          }
+        },
+        "assignment": [],
+        "badgeAnchor": "face",
+        "pairingCheck": {
+          "agree": 2,
+          "disputed": []
+        },
+        "seededFigures": 2,
+        "faceLeaksDropped": [
+          {
+            "box": [
+              439,
+              278,
+              767,
+              997
+            ],
+            "score": 0.252
+          }
+        ]
+      },
+      "rawPrompt": "grounding-dino",
+      "timestamp": "2026-09-14T02:02:49.472Z",
+      "rawResponse": null,
+      "sourceImageFp": "84de72c66e83671b",
+      "unknownFigures": 0,
+      "expectedObjects": [
+        "LOC001"
+      ],
+      "detectionBackend": "grounding-dino",
+      "expectedCastNames": [
+        "Levin",
+        "Julian"
+      ],
+      "expectedPositions": {
+        "Levin": "left foreground",
+        "Julian": "right midground"
+      },
+      "expectedCharacters": [
+        {
+          "name": "Levin",
+          "clothing": "A red zip-up hoodie sweatshirt worn over a white long-sleeve pullover, dark grey cotton straight-leg trousers, and brown leather lace-up ankle boots.",
+          "position": "left foreground",
+          "description": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: A red zip-up hoodie sweatshirt worn over a white long-sleeve pullover, dark grey cotton straight-leg trousers, and brown leather lace-up ankle boots."
+        },
+        {
+          "name": "Julian",
+          "clothing": "A yellow quilted vest over a white long-sleeve shirt, mid-blue denim dungaree trousers — square bib panel over the chest held by two shoulder straps — and white rubber-toe sneakers.",
+          "position": "right midground",
+          "description": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: A yellow quilted vest over a white long-sleeve shirt, mid-blue denim dungaree trousers — square bib panel over the chest held by two shoulder straps — and white rubber-toe sneakers."
+        }
+      ],
+      "positionMismatches": [
+        {
+          "actual": "center",
+          "expected": "left foreground",
+          "character": "Levin",
+          "expectedLCR": "left"
+        },
+        {
+          "actual": "center",
+          "expected": "right midground",
+          "character": "Julian",
+          "expectedLCR": "right"
+        }
+      ],
+      "characterDescriptions": {
+        "Levin": {
+          "richDescription": "Levin is a preschooler little boy (Looks: preschooler), 110 cm tall, average build. Hair: light blonde, wavy, short, tousled, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+          "clothingDescriptions": {
+            "summer": "white short-sleeved t-shirt, light brown shorts, dark sneakers",
+            "winter": "white hooded winter jacket, grey gloves, khaki snow pants, dark grey winter boots",
+            "costumed": "costume as shown in reference",
+            "standard": "A red zip-up hoodie sweatshirt worn over a white long-sleeve pullover, dark grey cotton straight-leg trousers, and brown leather lace-up ankle boots."
+          }
+        },
+        "Julian": {
+          "richDescription": "Julian is a toddler little boy (Looks: toddler), 102 cm tall, average build. Hair: light blonde, curly, ear-length, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+          "clothingDescriptions": {
+            "summer": "white polo shirt with brown shoulders and blue and white horizontal stripes across the chest, light brown shorts, brown sandals",
+            "winter": "A hooded winter jacket with horizontal panels in shades of brown, light blue, and white, featuring a zipper closure., Khaki or light brown pants., Dark brown or black winter boots.",
+            "costumed": "costume as shown in reference",
+            "standard": "A yellow quilted vest over a white long-sleeve shirt, mid-blue denim dungaree trousers — square bib panel over the chest held by two shoulder straps — and white rubber-toe sneakers."
+          }
+        }
+      }
+    },
+    "fixableIssues": [],
+    "issuesSummary": null,
+    "semanticScore": 100,
+    "semanticResult": {
+      "score": 100,
+      "usage": {
+        "tokens": 6181,
+        "elapsed": 10417,
+        "input_tokens": 5859,
+        "estimatedCost": 0.00107205,
+        "output_tokens": 322
+      },
+      "issues": [],
+      "verdict": "PASS",
+      "visible": {
+        "action": "Two boys walking through fallen leaves; the older boy (Levin) is focused on the ground, and the younger boy (Julian) is watching him.",
+        "objects": [
+          "red and yellow fallen leaves",
+          "trees with yellow leaves"
+        ],
+        "setting": "outdoor square/park area with buildings and church towers in the background, autumn, overcast sky",
+        "characters": [
+          "Levin (preschooler, red hoodie, grey trousers, brown boots, walking forward, looking down)",
+          "Julian (toddler, yellow vest, blue dungarees, white sneakers, walking forward, looking at Levin)"
+        ]
+      },
+      "expected": {
+        "action": "Levin walks low to the ground through autumn leaves, scanning the dirt, while Julian walks just behind him and watches Levin's search.",
+        "source": "SCENE_HINT + IMAGE_PROMPT (not STORY_TEXT)",
+        "objects": [
+          "red and yellow fallen leaves",
+          "twin stone towers with ornamental cupolas of the Grossmünster"
+        ],
+        "setting": "Lindenhof square, cold autumn afternoon, overcast sky",
+        "characters": [
+          "Levin",
+          "Julian"
+        ]
+      },
+      "storyActions": [],
+      "semanticChecks": [],
+      "semanticIssues": [],
+      "semanticScore10": 10
+    },
+    "wasRegenerated": false,
+    "bboxOverlayImage": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/debug/p1/bbox-overlay-v0.jpg",
+    "evalTemplateHash": "ed23e19c",
+    "qualityRawOutput": "```json\n{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"blonde, curly\",\n      \"clothing\": \"red hoodie, grey pants, brown boots\",\n      \"action\": \"walking forward\",\n      \"view\": \"front\",\n      \"items_held\": [],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"center-midground\",\n      \"hair\": \"blonde, curly\",\n      \"clothing\": \"yellow vest, white shirt, blue overalls, white sneakers\",\n      \"action\": \"walking forward\",\n      \"view\": \"front\",\n      \"items_held\": [],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    }\n  ],\n  \"matches\": [\n    {\n      \"figure\": 1,\n      \"reference\": \"Levin\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.47,\n        0.28,\n        0.62,\n        0.43\n      ],\n      \"body_bbox\": [\n        0.43,\n        0.27,\n        0.73,\n        0.99\n      ]\n    },\n    {\n      \"figure\": 2,\n      \"reference\": \"Julian\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.29,\n        0.34,\n        0.42,\n        0.47\n      ],\n      \"body_bbox\": [\n        0.25,\n        0.33,\n        0.5,\n        0.86\n      ]\n    }\n  ],\n  \"height_order\": \"Julian (shortest) -> Levin (taller)\",\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  },\n  \"coherence_gate\": {\n    \"applied\": false,\n    \"reason\": null\n  },\n  \"style_gate\": {\n    \"observed\": \"watercolour painting\",\n    \"linework\": \"no outlines at all, forms defined by paint edges\",\n    \"faces\": \"loose paint washes with no outline\",\n    \"matches_style\": true,\n    \"reason\": null\n  },\n  \"verdict\": \"PASS\",\n  \"issues_summary\": \"\",\n  \"fixable_issues\": []\n}\n```",
+    "qualityReasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"blonde, curly\",\n      \"clothing\": \"red hoodie, grey pants, brown boots\",\n      \"action\": \"walking forward\",\n      \"view\": \"front\",\n      \"items_held\": [],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"center-midground\",\n      \"hair\": \"blonde, curly\",\n      \"clothing\": \"yellow vest, white shirt, blue overalls, white sneakers\",\n      \"action\": \"walking forward\",\n      \"view\": \"front\",\n      \"items_held\": [],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    }\n  ],\n  \"matches\": [\n    {\n      \"figure\": 1,\n      \"reference\": \"Levin\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.47,\n        0.28,\n        0.62,\n        0.43\n      ],\n      \"body_bbox\": [\n        0.43,\n        0.27,\n        0.73,\n        0.99\n      ]\n    },\n    {\n      \"figure\": 2,\n      \"reference\": \"Julian\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.29,\n        0.34,\n        0.42,\n        0.47\n      ],\n      \"body_bbox\": [\n        0.25,\n        0.33,\n        0.5,\n        0.86\n      ]\n    }\n  ],\n  \"height_order\": \"Julian (shortest) -> Levin (taller)\",\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  },\n  \"coherence_gate\": {\n    \"applied\": false,\n    \"reason\": null\n  },\n  \"style_gate\": {\n    \"observed\": \"watercolour painting\",\n    \"linework\": \"no outlines at all, forms defined by paint edges\",\n    \"faces\": \"loose paint washes with no outline\",\n    \"matches_style\": true,\n    \"reason\": null\n  },\n  \"verdict\": \"PASS\",\n  \"issues_summary\": \"\",\n  \"fixable_issues\": []\n}",
+    "threeStageResult": {
+      "score": 100,
+      "usage": {
+        "stage1_input_tokens": 2748,
+        "stage2_input_tokens": 7986,
+        "stage1_output_tokens": 1193,
+        "stage2_output_tokens": 432,
+        "threeStage_input_tokens": 10734,
+        "threeStage_output_tokens": 1625
+      },
+      "verdict": "PASS",
+      "fixableIssues": [],
+      "issuesSummary": "",
+      "visionInventory": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"label\": \"the young boy in yellow overalls\",\n      \"zone\": \"center-foreground\",\n      \"facing\": \"toward viewer\",\n      \"hair\": \"curly, light brown, short\",\n      \"clothing\": \"white long-sleeved shirt, yellow quilted vest with blue straps, blue jeans, white sneakers\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"standing, both feet on the ground covered with autumn leaves, hands at sides\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"eyes wide, mouth slightly open, looking directly forward\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 2,\n      \"standing_surface\": \"ground covered with fallen leaves and cobblestones\",\n      \"body_bbox\": [\n        0.27,\n        0.32,\n        0.49,\n        0.85\n      ],\n      \"face_bbox\": [\n        0.31,\n        0.34,\n        0.44,\n        0.46\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"shorter\"\n    },\n    {\n      \"id\": 2,\n      \"label\": \"the young boy in red hoodie\",\n      \"zone\": \"center-foreground\",\n      \"facing\": \"down and right\",\n      \"hair\": \"curly, light brown, short\",\n      \"clothing\": \"red zip-up hoodie, white undershirt, dark grey pants, brown lace-up shoes\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"walking, left foot forward on the leaf-covered ground, right foot behind, hands at sides\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"eyes downcast, mouth closed, focused on the ground\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 3,\n      \"standing_surface\": \"ground covered with fallen leaves and cobblestones\",\n      \"body_bbox\": [\n        0.42,\n        0.27,\n        0.75,\n        0.97\n      ],\n      \"face_bbox\": [\n        0.48,\n        0.29,\n        0.62,\n        0.43\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"taller\"\n    }\n  ],\n  \"interactions\": [\n    {\n      \"from\": \"the young boy in yellow overalls\",\n      \"to\": \"the young boy in red hoodie\",\n      \"observed\": \"faces him, standing close beside him, but does not touch or reach\"\n    },\n    {\n      \"from\": \"the young boy in red hoodie\",\n      \"to\": \"the young boy in yellow overalls\",\n      \"observed\": \"walks slightly ahead, facing away from him, not making eye contact\"\n    }\n  ],\n  \"objects\": [\n    {\n      \"what\": \"a large tree with exposed roots\",\n      \"colour\": \"brown trunk, yellow leaves\",\n      \"material\": \"wood, bark, foliage\",\n      \"position\": \"right-foreground\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than both figures\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"fallen autumn leaves\",\n      \"colour\": \"yellow, orange, red, brown\",\n      \"material\": \"foliage\",\n      \"position\": \"covering the ground across the foreground and midground\",\n      \"grounded\": true,\n      \"relative_size\": \"smaller than the figures, scattered\"\n    },\n    {\n      \"what\": \"buildings with tiled roofs and towers\",\n      \"colour\": \"white walls, brown and grey roofs, blue shutters\",\n      \"material\": \"stone, wood, tile\",\n      \"position\": \"left-background to center-background\",\n      \"grounded\": true,\n      \"relative_size\": \"much larger than the figures\"\n    },\n    {\n      \"what\": \"low stone wall\",\n      \"colour\": \"grey, weathered\",\n      \"material\": \"stone\",\n      \"position\": \"left-midground\",\n      \"grounded\": true,\n      \"relative_size\": \"about waist height of the figures\"\n    }\n  ],\n  \"setting\": {\n    \"indoor_outdoor\": \"outdoor\",\n    \"elements\": \"autumn street scene with trees, fallen leaves, cobblestones, European-style buildings with towers and spires\",\n    \"lighting\": \"soft daylight, diffused by clouds, with highlights on the leaves and rooftops\",\n    \"camera\": \"eye-level, medium shot, slightly angled toward the right\"\n  },\n  \"lettering\": [],\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"cross_eyes\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  }\n}",
+      "complianceResult": {
+        "scene": {
+          "extra": [],
+          "missing": [],
+          "all_present": true,
+          "setting_match": true
+        },
+        "verdict": "PASS",
+        "fixable_issues": [],
+        "issues_summary": "",
+        "main_action_check": {
+          "issue": "",
+          "match": true,
+          "severity": "PASS",
+          "prompt_action": "Levin walks low to the ground through fallen leaves, scanning the dirt; Julian watches him from behind",
+          "inventory_action": "Levin walking with eyes downcast, focused on ground; Julian standing close beside him, facing him, eyes wide, looking directly forward",
+          "story_text_action": "Levin goes bent through the foliage searching for dragon tracks; Julian trots closely behind and observes everything carefully"
+        },
+        "character_compliance": [
+          {
+            "name": "Levin",
+            "label": "the young boy in red hoodie",
+            "severity": "PASS",
+            "facing_issue": "",
+            "facing_match": true,
+            "clothing_issue": "",
+            "clothing_match": true
+          },
+          {
+            "name": "Julian",
+            "label": "the young boy in yellow overalls",
+            "severity": "PASS",
+            "facing_issue": "",
+            "facing_match": true,
+            "clothing_issue": "",
+            "clothing_match": true
+          }
+        ],
+        "interaction_compliance": [
+          {
+            "match": true,
+            "actual": "walking, left foot forward on the leaf-covered ground",
+            "object": "autumn leaves",
+            "expected": "steps through the autumn leaves",
+            "severity": "PASS",
+            "character": "Levin"
+          },
+          {
+            "match": true,
+            "actual": "faces him, standing close beside him",
+            "object": "Levin",
+            "expected": "watches Levin",
+            "severity": "PASS",
+            "character": "Julian"
+          }
+        ]
+      }
+    },
+    "identityAgreement": {
+      "agreed": 2,
+      "compared": 2,
+      "pairedOn": "body",
+      "conflicts": [],
+      "agreementRate": 1,
+      "contestedCharacters": []
+    },
+    "wasCharacterFixed": false,
+    "unrepairedCritical": null
+  },
+  "coverRoot": {
+    "finalScore": 100,
+    "fixTargets": [],
+    "qualityScore": 100,
+    "bboxDetection": {
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      },
+      "figures": [
+        {
+          "name": "Julian",
+          "label": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, m",
+          "score": 0.714,
+          "maskPx": 77330,
+          "samBox": [
+            247,
+            470,
+            453,
+            1064
+          ],
+          "bodyBox": [
+            0.3589409722222222,
+            0.28935185185185186,
+            0.9227430555555556,
+            0.5219907407407407
+          ],
+          "faceBox": [
+            0.3589409722222222,
+            0.3040509259259259,
+            0.6089409722222222,
+            0.5165509259259259
+          ],
+          "gdinoBox": [
+            0.4079861111111111,
+            0.28587962962962965,
+            0.9236111111111112,
+            0.5243055555555556
+          ],
+          "occluded": false,
+          "position": "center",
+          "facePoint": [
+            353,
+            551
+          ],
+          "faceScore": 0.598,
+          "samPoints": [
+            {
+              "at": [
+                353,
+                551
+              ],
+              "role": "face",
+              "label": 1
+            },
+            {
+              "at": [
+                353,
+                532
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "-20%"
+            },
+            {
+              "at": [
+                353,
+                570
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "+20%"
+            },
+            {
+              "at": [
+                339,
+                627
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                296,
+                625
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                402,
+                644
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                394,
+                833
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "blue",
+              "garment": "bottom"
+            },
+            {
+              "at": [
+                311,
+                843
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "blue",
+              "garment": "bottom"
+            }
+          ],
+          "seedTrace": [
+            {
+              "at": [
+                339,
+                627
+              ],
+              "px": 993,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                296,
+                625
+              ],
+              "px": 765,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                402,
+                644
+              ],
+              "px": 743,
+              "colour": "yellow",
+              "garment": "top"
+            },
+            {
+              "at": [
+                394,
+                833
+              ],
+              "px": 6441,
+              "colour": "blue",
+              "garment": "bottom"
+            },
+            {
+              "at": [
+                311,
+                843
+              ],
+              "px": 6301,
+              "colour": "blue",
+              "garment": "bottom"
+            }
+          ],
+          "_depthTier": "foreground",
+          "_faceScore": 0.598,
+          "confidence": "high",
+          "faceBoxRaw": [
+            0.4375,
+            0.36342592592592593,
+            0.5182291666666666,
+            0.4537037037037037
+          ],
+          "occludedBy": [],
+          "samApplied": true,
+          "_faceSource": "dino",
+          "maskVerdict": "mask-ok-face-separated",
+          "_cascadeFace": "both",
+          "garmentSeeds": 5,
+          "maskCoverage": 0.986,
+          "pxLostToFront": 0,
+          "_geminiFaceBox": [
+            0.3589409722222222,
+            0.3040509259259259,
+            0.6089409722222222,
+            0.5165509259259259
+          ]
+        },
+        {
+          "name": "Levin",
+          "label": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones,",
+          "score": 0.712,
+          "maskPx": 100757,
+          "samBox": [
+            53,
+            368,
+            278,
+            1073
+          ],
+          "bodyBox": [
+            0.2717013888888889,
+            0.0625,
+            0.9314236111111112,
+            0.32060185185185186
+          ],
+          "faceBox": [
+            0.2717013888888889,
+            0.0974537037037037,
+            0.5217013888888888,
+            0.3099537037037037
+          ],
+          "gdinoBox": [
+            0.3194444444444444,
+            0.061342592592592594,
+            0.9314236111111112,
+            0.32175925925925924
+          ],
+          "occluded": false,
+          "position": "left",
+          "facePoint": [
+            175,
+            457
+          ],
+          "faceScore": 0.615,
+          "samPoints": [
+            {
+              "at": [
+                175,
+                457
+              ],
+              "role": "face",
+              "label": 1
+            },
+            {
+              "at": [
+                175,
+                436
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "-20%"
+            },
+            {
+              "at": [
+                175,
+                478
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "+20%"
+            },
+            {
+              "at": [
+                136,
+                687
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "red",
+              "garment": "top"
+            },
+            {
+              "at": [
+                205,
+                676
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "red",
+              "garment": "top"
+            }
+          ],
+          "seedTrace": [
+            {
+              "none": "neutral colour, skipped by design",
+              "colour": "grey",
+              "garment": "bottom"
+            },
+            {
+              "at": [
+                136,
+                687
+              ],
+              "px": 22769,
+              "colour": "red",
+              "garment": "top"
+            },
+            {
+              "at": [
+                205,
+                676
+              ],
+              "px": 14980,
+              "colour": "red",
+              "garment": "top"
+            }
+          ],
+          "_depthTier": "foreground",
+          "_faceScore": 0.615,
+          "confidence": "high",
+          "faceBoxRaw": [
+            0.3515625,
+            0.1550925925925926,
+            0.4418402777777778,
+            0.2488425925925926
+          ],
+          "occludedBy": [],
+          "samApplied": true,
+          "_faceSource": "dino",
+          "maskVerdict": "mask-ok-face-separated",
+          "_cascadeFace": "both",
+          "garmentSeeds": 2,
+          "maskCoverage": 0.99,
+          "pxLostToFront": 0,
+          "_geminiFaceBox": [
+            0.2717013888888889,
+            0.0974537037037037,
+            0.5217013888888888,
+            0.3099537037037037
+          ]
+        },
+        {
+          "name": "Kiaan",
+          "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+          "score": 0.686,
+          "maskPx": 76179,
+          "samBox": [
+            630,
+            507,
+            839,
+            1082
+          ],
+          "bodyBox": [
+            0.3793402777777778,
+            0.7314814814814815,
+            0.9392361111111112,
+            0.9675925925925926
+          ],
+          "faceBox": [
+            0.3793402777777778,
+            0.7328703703703704,
+            0.6293402777777778,
+            0.9453703703703703
+          ],
+          "gdinoBox": [
+            0.4401041666666667,
+            0.7291666666666666,
+            0.9392361111111112,
+            0.9710648148148148
+          ],
+          "occluded": false,
+          "position": "right",
+          "facePoint": [
+            728,
+            584
+          ],
+          "faceScore": 0.559,
+          "samPoints": [
+            {
+              "at": [
+                728,
+                584
+              ],
+              "role": "face",
+              "label": 1
+            },
+            {
+              "at": [
+                728,
+                566
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "-20%"
+            },
+            {
+              "at": [
+                728,
+                602
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "+20%"
+            },
+            {
+              "at": [
+                758,
+                783
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "purple",
+              "garment": "top"
+            },
+            {
+              "at": [
+                696,
+                728
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "purple",
+              "garment": "top"
+            },
+            {
+              "at": [
+                696,
+                902
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "brown",
+              "garment": "bottom"
+            }
+          ],
+          "seedTrace": [
+            {
+              "at": [
+                758,
+                783
+              ],
+              "px": 14767,
+              "colour": "purple",
+              "garment": "top"
+            },
+            {
+              "at": [
+                696,
+                728
+              ],
+              "px": 6704,
+              "colour": "purple",
+              "garment": "top"
+            },
+            {
+              "at": [
+                696,
+                902
+              ],
+              "px": 43789,
+              "colour": "brown",
+              "garment": "bottom"
+            }
+          ],
+          "_depthTier": "foreground",
+          "_faceScore": 0.559,
+          "confidence": "high",
+          "faceBoxRaw": [
+            0.4670138888888889,
+            0.7986111111111112,
+            0.546875,
+            0.8865740740740741
+          ],
+          "occludedBy": [],
+          "samApplied": true,
+          "_faceSource": "dino",
+          "maskVerdict": "mask-ok-face-separated",
+          "_cascadeFace": "both",
+          "garmentSeeds": 3,
+          "maskCoverage": 0.973,
+          "pxLostToFront": 0,
+          "_geminiFaceBox": [
+            0.3793402777777778,
+            0.7328703703703704,
+            0.6293402777777778,
+            0.9453703703703703
+          ]
+        },
+        {
+          "name": "Max",
+          "label": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, mediu",
+          "score": 0.675,
+          "maskPx": 75401,
+          "samBox": [
+            435,
+            496,
+            638,
+            1073
+          ],
+          "bodyBox": [
+            0.3828125,
+            0.5057870370370371,
+            0.9314236111111112,
+            0.7361111111111112
+          ],
+          "faceBox": [
+            0.3828125,
+            0.51875,
+            0.6328125,
+            0.73125
+          ],
+          "gdinoBox": [
+            0.4305555555555556,
+            0.5034722222222222,
+            0.9314236111111112,
+            0.7384259259259259
+          ],
+          "occluded": false,
+          "position": "center",
+          "facePoint": [
+            540,
+            583
+          ],
+          "faceScore": 0.598,
+          "samPoints": [
+            {
+              "at": [
+                540,
+                583
+              ],
+              "role": "face",
+              "label": 1
+            },
+            {
+              "at": [
+                540,
+                563
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "-20%"
+            },
+            {
+              "at": [
+                540,
+                603
+              ],
+              "role": "face-extra",
+              "label": 1,
+              "offset": "+20%"
+            },
+            {
+              "at": [
+                551,
+                695
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "green",
+              "garment": "top"
+            },
+            {
+              "at": [
+                565,
+                843
+              ],
+              "role": "garment",
+              "label": 1,
+              "colour": "orange",
+              "garment": "bottom"
+            }
+          ],
+          "seedTrace": [
+            {
+              "at": [
+                551,
+                695
+              ],
+              "px": 22579,
+              "colour": "green",
+              "garment": "top"
+            },
+            {
+              "at": [
+                565,
+                843
+              ],
+              "px": 15004,
+              "colour": "orange",
+              "garment": "bottom"
+            }
+          ],
+          "_depthTier": "foreground",
+          "_faceScore": 0.598,
+          "confidence": "high",
+          "faceBoxRaw": [
+            0.4635416666666667,
+            0.5787037037037037,
+            0.5486111111111112,
+            0.6701388888888888
+          ],
+          "occludedBy": [],
+          "samApplied": true,
+          "_faceSource": "dino",
+          "maskVerdict": "mask-ok-face-separated",
+          "_cascadeFace": "both",
+          "garmentSeeds": 2,
+          "maskCoverage": 0.979,
+          "pxLostToFront": 0,
+          "_geminiFaceBox": [
+            0.3828125,
+            0.51875,
+            0.6328125,
+            0.73125
+          ]
+        }
+      ],
+      "objects": [],
+      "gdinoDiag": {
+        "mode": "generic",
+        "faces": [
+          {
+            "box": [
+              134,
+              405,
+              215,
+              509
+            ],
+            "score": 0.615
+          },
+          {
+            "box": [
+              500,
+              534,
+              579,
+              632
+            ],
+            "score": 0.598
+          },
+          {
+            "box": [
+              314,
+              504,
+              392,
+              597
+            ],
+            "score": 0.598
+          },
+          {
+            "box": [
+              690,
+              538,
+              766,
+              630
+            ],
+            "score": 0.559
+          }
+        ],
+        "reason": null,
+        "backend": "grounding-dino",
+        "objects": [
+          {
+            "count": 2,
+            "skipped": "object grounding disabled"
+          }
+        ],
+        "pairing": {
+          "faces": 4,
+          "method": "global-once",
+          "paired": 4,
+          "persons": 4,
+          "recovered": 0,
+          "redetected": 0
+        },
+        "persons": [
+          {
+            "box": [
+              247,
+              470,
+              453,
+              1064
+            ],
+            "score": 0.714
+          },
+          {
+            "box": [
+              53,
+              368,
+              278,
+              1073
+            ],
+            "score": 0.712
+          },
+          {
+            "box": [
+              630,
+              507,
+              839,
+              1082
+            ],
+            "score": 0.686
+          },
+          {
+            "box": [
+              435,
+              496,
+              638,
+              1073
+            ],
+            "score": 0.675
+          }
+        ],
+        "fellBack": false,
+        "identity": {
+          "model": "gemini-full",
+          "badges": [
+            {
+              "at": [
+                353,
+                616
+              ],
+              "detIdx": 0,
+              "letter": "A"
+            },
+            {
+              "at": [
+                175,
+                530
+              ],
+              "detIdx": 1,
+              "letter": "B"
+            },
+            {
+              "at": [
+                728,
+                648
+              ],
+              "detIdx": 2,
+              "letter": "C"
+            },
+            {
+              "at": [
+                540,
+                652
+              ],
+              "detIdx": 3,
+              "letter": "D"
+            }
+          ],
+          "method": "som-gemini",
+          "answers": {
+            "A": "Julian",
+            "B": "Levin",
+            "C": "Kiaan",
+            "D": "Max"
+          }
+        },
+        "assignment": [],
+        "badgeAnchor": "face",
+        "pairingCheck": {
+          "agree": 4,
+          "disputed": []
+        },
+        "seededFigures": 4
+      },
+      "rawPrompt": "grounding-dino",
+      "timestamp": "2026-09-14T02:02:58.697Z",
+      "rawResponse": null,
+      "sourceImageFp": "d6684ec39bd20905",
+      "unknownFigures": 0,
+      "expectedObjects": [
+        "LOC001",
+        "ART001"
+      ],
+      "detectionBackend": "grounding-dino",
+      "expectedCastNames": [
+        "Levin",
+        "Julian",
+        "Max",
+        "Kiaan"
+      ],
+      "expectedPositions": {
+        "Max": "center right",
+        "Kiaan": "far right",
+        "Levin": "center left",
+        "Julian": "center"
+      },
+      "expectedCharacters": [
+        {
+          "name": "Levin",
+          "clothing": "A red zip-up hoodie sweatshirt worn over a white long-sleeve pullover, dark grey cotton straight-leg trousers, and brown leather lace-up ankle boots.",
+          "position": "center left",
+          "description": "kindergartner boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: A red zip-up hoodie sweatshirt worn over a white long-sleeve pullover, dark grey cotton straight-leg trousers, and brown leather lace-up ankle boots."
+        },
+        {
+          "name": "Julian",
+          "clothing": "A yellow quilted vest over a white long-sleeve shirt, mid-blue denim dungaree trousers — square bib panel over the chest held by two shoulder straps — and white rubber-toe sneakers.",
+          "position": "center",
+          "description": "preschooler boy/man, build: average, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips. Wearing: A yellow quilted vest over a white long-sleeve shirt, mid-blue denim dungaree trousers — square bib panel over the chest held by two shoulder straps — and white rubber-toe sneakers."
+        },
+        {
+          "name": "Max",
+          "clothing": "A green crew-neck pullover sweater, orange corduroy trousers, and grey velcro-strap sneakers.",
+          "position": "center right",
+          "description": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips. Wearing: A green crew-neck pullover sweater, orange corduroy trousers, and grey velcro-strap sneakers."
+        },
+        {
+          "name": "Kiaan",
+          "clothing": "A purple waterproof anorak jacket with a front zip, brown cotton straight-leg trousers, and dark brown leather ankle boots with rubber soles.",
+          "position": "far right",
+          "description": "preschooler boy/man, build: average, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips. Wearing: A purple waterproof anorak jacket with a front zip, brown cotton straight-leg trousers, and dark brown leather ankle boots with rubber soles."
+        }
+      ],
+      "positionMismatches": [
+        {
+          "actual": "center",
+          "expected": "center right",
+          "character": "Max",
+          "expectedLCR": "right"
+        }
+      ],
+      "characterDescriptions": {
+        "Max": {
+          "richDescription": "Max is a preschooler little boy (Looks: preschooler), 98 cm tall, average build. Hair: light brown, curly, short, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+          "clothingDescriptions": {
+            "summer": "brown and off-white striped t-shirt, light brown shorts, brown sandals",
+            "winter": "brown and white striped hooded jacket, dark brown pants, dark brown gloves, dark brown boots",
+            "costumed": "costume as shown in reference",
+            "standard": "A green crew-neck pullover sweater, orange corduroy trousers, and grey velcro-strap sneakers."
+          }
+        },
+        "Kiaan": {
+          "richDescription": "Kiaan is a preschooler little boy (Looks: preschooler), 102 cm tall, average build. Hair: dark brown, straight, short, bangs at eyebrows, soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+          "clothingDescriptions": {
+            "summer": "gray and black camouflage short-sleeve t-shirt, light brown shorts, brown flip-flops",
+            "winter": "Gray and black camouflage hooded winter jacket with a zipper and snap buttons, Dark gray winter pants, Black winter boots",
+            "costumed": "costume as shown in reference",
+            "standard": "A purple waterproof anorak jacket with a front zip, brown cotton straight-leg trousers, and dark brown leather ankle boots with rubber soles."
+          }
+        },
+        "Levin": {
+          "richDescription": "Levin is a preschooler little boy (Looks: preschooler), 110 cm tall, average build. Hair: light blonde, wavy, short, tousled, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+          "clothingDescriptions": {
+            "summer": "white short-sleeved t-shirt, light brown shorts, dark sneakers",
+            "winter": "white hooded winter jacket, grey gloves, khaki snow pants, dark grey winter boots",
+            "costumed": "costume as shown in reference",
+            "standard": "A red zip-up hoodie sweatshirt worn over a white long-sleeve pullover, dark grey cotton straight-leg trousers, and brown leather lace-up ankle boots."
+          }
+        },
+        "Julian": {
+          "richDescription": "Julian is a toddler little boy (Looks: toddler), 102 cm tall, average build. Hair: light blonde, curly, ear-length, rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+          "clothingDescriptions": {
+            "summer": "white polo shirt with brown shoulders and blue and white horizontal stripes across the chest, light brown shorts, brown sandals",
+            "winter": "A hooded winter jacket with horizontal panels in shades of brown, light blue, and white, featuring a zipper closure., Khaki or light brown pants., Dark brown or black winter boots.",
+            "costumed": "costume as shown in reference",
+            "standard": "A yellow quilted vest over a white long-sleeve shirt, mid-blue denim dungaree trousers — square bib panel over the chest held by two shoulder straps — and white rubber-toe sneakers."
+          }
+        }
+      }
+    },
+    "fixableIssues": [],
+    "issuesSummary": null,
+    "semanticScore": 100,
+    "semanticResult": {
+      "score": 100,
+      "usage": {
+        "tokens": 5815,
+        "elapsed": 9840,
+        "input_tokens": 5440,
+        "estimatedCost": 0.001041,
+        "output_tokens": 375
+      },
+      "issues": [],
+      "verdict": "PASS",
+      "visible": {
+        "action": "Four boys posing for a wide group portrait, looking at the viewer",
+        "objects": [
+          "dragon egg (held by Julian)",
+          "big linden tree",
+          "autumn foliage on the ground",
+          "twin stone church towers (distant)"
+        ],
+        "setting": "Lindenhof square in autumn",
+        "characters": [
+          "Levin (preschooler, center left, red hoodie, grey pants, brown boots)",
+          "Julian (toddler, center, yellow vest, blue dungarees, white shirt, white sneakers)",
+          "Max (preschooler, center right, green sweater, orange pants, grey sneakers)",
+          "Kiaan (preschooler, far right, purple jacket, brown pants, dark brown boots)"
+        ]
+      },
+      "expected": {
+        "action": "A wide group portrait with characters standing and looking at the viewer",
+        "source": "SCENE_HINT + IMAGE_PROMPT (not STORY_TEXT)",
+        "objects": [
+          "dragon egg",
+          "big linden tree",
+          "autumn foliage",
+          "twin stone church towers",
+          "massive gnarled roots"
+        ],
+        "setting": "Lindenhof square with big linden tree, autumn",
+        "characters": [
+          "Levin (preschooler)",
+          "Julian (toddler)",
+          "Max (preschooler)",
+          "Kiaan (preschooler)"
+        ]
+      },
+      "storyActions": [],
+      "semanticChecks": [],
+      "semanticIssues": [],
+      "semanticScore10": 10
+    },
+    "bboxOverlayImage": "https://images-staging.magicalstory.ch/stories/job_1789348171785_9oxos7dwv/debug/frontCover/bbox-overlay-v0.jpg",
+    "qualityReasoning": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"zone\": \"center-left-foreground\",\n      \"hair\": \"brown, curly, short\",\n      \"clothing\": \"red zip-up hoodie, dark grey trousers, brown boots\",\n      \"action\": \"standing\",\n      \"view\": \"front\",\n      \"items_held\": [],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 2,\n      \"zone\": \"center-foreground\",\n      \"hair\": \"brown, curly, short\",\n      \"clothing\": \"yellow quilted vest, white long-sleeve shirt, blue denim dungarees, white sneakers\",\n      \"action\": \"holding dragon egg\",\n      \"view\": \"front\",\n      \"items_held\": [\n        \"dragon egg\"\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 3,\n      \"zone\": \"center-right-foreground\",\n      \"hair\": \"brown, curly, short\",\n      \"clothing\": \"green crew-neck sweater, orange trousers, grey sneakers\",\n      \"action\": \"standing\",\n      \"view\": \"front\",\n      \"items_held\": [],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    },\n    {\n      \"id\": 4,\n      \"zone\": \"right-foreground\",\n      \"hair\": \"dark brown, straight, short\",\n      \"clothing\": \"purple anorak jacket, brown trousers, dark brown boots\",\n      \"action\": \"standing\",\n      \"view\": \"front\",\n      \"items_held\": [],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\"\n    }\n  ],\n  \"matches\": [\n    {\n      \"figure\": 1,\n      \"reference\": \"Levin\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.12,\n        0.32,\n        0.23,\n        0.43\n      ],\n      \"body_bbox\": [\n        0.06,\n        0.31,\n        0.31,\n        0.93\n      ]\n    },\n    {\n      \"figure\": 2,\n      \"reference\": \"Julian\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.31,\n        0.34,\n        0.41,\n        0.44\n      ],\n      \"body_bbox\": [\n        0.26,\n        0.33,\n        0.49,\n        0.93\n      ]\n    },\n    {\n      \"figure\": 3,\n      \"reference\": \"Max\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.5,\n        0.34,\n        0.6,\n        0.44\n      ],\n      \"body_bbox\": [\n        0.45,\n        0.33,\n        0.66,\n        0.93\n      ]\n    },\n    {\n      \"figure\": 4,\n      \"reference\": \"Kiaan\",\n      \"confidence\": 0.9,\n      \"face_bbox\": [\n        0.7,\n        0.34,\n        0.8,\n        0.44\n      ],\n      \"body_bbox\": [\n        0.65,\n        0.33,\n        0.87,\n        0.93\n      ]\n    }\n  ],\n  \"height_order\": \"Julian (shortest) -> Max (similar height) -> Kiaan (similar height) -> Levin (taller)\",\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  },\n  \"coherence_gate\": {\n    \"applied\": false,\n    \"reason\": null\n  },\n  \"style_gate\": {\n    \"observed\": \"watercolor painting\",\n    \"linework\": \"no outlines at all, forms defined by paint edges\",\n    \"faces\": \"loose washes with visible brushstroke texture\",\n    \"matches_style\": true,\n    \"reason\": null\n  },\n  \"verdict\": \"PASS\",\n  \"issues_summary\": \"\",\n  \"fixable_issues\": []\n}"
+  }
+}

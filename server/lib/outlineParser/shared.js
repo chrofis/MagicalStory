@@ -60,7 +60,8 @@ function parseCharacterClothingBlock(content) {
   const characterPerspectives = {};
   const characters = [];
 
-  // JSON scene hint format (current story-unified.txt page hints):
+  // JSON scene hint format (the page metadata block in
+  // prompts/scene-expansion-all.txt and prompts/story-trial.txt):
   //   "characters": [
   //     { "name": "Lukas", "position": "left", "clothing": "costumed:roman" },
   //     { "name": "Sophie", "clothing": "costumed:roman", "depth": "background", "perspective": "back view" }
@@ -100,7 +101,8 @@ function parseCharacterClothingBlock(content) {
     if (characters.length > 0) return { characterClothing, characterPerspectives, characters };
   }
 
-  // Bullet list format (used by cover scene hints in story-unified.txt):
+  // Bullet list format (used by cover scene hints:
+  // prompts/scene-expansion-all.txt §"Cover scene hints"):
   //   Characters:
   //   - Name1 (position): standard, holds: book
   //   - Name2 (alias): costumed:type, depth: background, perspective: back view
@@ -116,7 +118,8 @@ function parseCharacterClothingBlock(content) {
     // "gazes at" has a space inside the key — regex matches both with and without space.
     // Clothing tokens: bare `standard|winter|summer|formal|costumed` OR
     // `costumed:type` / `costumed:{type with spaces}`. The cover-hints prompt
-    // (prompts/story-unified.txt §COVER SCENE HINTS) instructs Sonnet to use
+    // (prompts/scene-expansion-all.txt §"Cover scene hints"; the rule lived in
+    // the since-deleted story-unified.txt when this was written) allows
     // bare `costumed`; earlier the regex required `costumed:something`, so
     // every cover character line that used bare `costumed` failed the match
     // → characters[] stayed empty → buildCoverSceneFromHint produced nothing
@@ -711,6 +714,22 @@ const VB_AGE_INDICATOR = /\b(?:\d{1,3}\s*(?:-|\s)?(?:year|yr)s?(?:\s*-?\s*old)?|
 // not a statement of sex, and "Rossa"/"Mrs Baker" must not satisfy the rule.
 const VB_PROSE_FIELDS = ['description', 'age', 'build', 'face', 'hair', 'signatureLook', 'clothing', 'features', 'type', 'setting'];
 
+// The authoring prompt mandates `age` as a NUMBER of years ("8", "34"), never
+// prose — so the compliant form is exactly the one VB_AGE_INDICATOR cannot
+// match and vbEntryProse drops before matching. A plausible year count is a
+// statement of apparent age in its own right. 0 and anything non-finite or out
+// of human range is NOT: an unset, defaulted or garbage field is precisely the
+// omission this rule exists to catch.
+const VB_AGE_YEARS_MAX = 120;
+
+/** True when `age` holds a plausible number of years (numeric or a numeric string). */
+function vbHasNumericAge(entry) {
+  const raw = entry?.age;
+  if (typeof raw !== 'number' && !(typeof raw === 'string' && /^\s*\d{1,3}(?:\.\d+)?\s*$/.test(raw))) return false;
+  const years = Number(raw);
+  return Number.isFinite(years) && years > 0 && years <= VB_AGE_YEARS_MAX;
+}
+
 const VB_CATEGORIES = ['secondaryCharacters', 'animals', 'artifacts', 'locations', 'vehicles', 'clothing'];
 
 /** Prose an entry actually authored, joined for indicator matching. */
@@ -765,7 +784,7 @@ function auditVisualBibleContract(visualBible, options = {}) {
     const prose = vbEntryProse(entry);
     const missing = [];
     if (!VB_SEX_INDICATOR.test(prose)) missing.push('sex');
-    if (!VB_AGE_INDICATOR.test(prose)) missing.push('apparent age');
+    if (!vbHasNumericAge(entry) && !VB_AGE_INDICATOR.test(prose)) missing.push('apparent age');
     if (missing.length) {
       findings.push({
         code: 'character-missing-sex-or-age',
@@ -776,11 +795,56 @@ function auditVisualBibleContract(visualBible, options = {}) {
     }
   }
 
-  // (2) A range covering nearly the whole book was almost certainly not earned.
+  // (2) `wornAs` names a slot that exists.
+  //
+  // THE ONE LOUD PLACE (2026-09-18). `wornAs: "<Name>.<slot>"` is free text the
+  // writer composes, and staging job_1789681157795_wkt20ckod composed
+  // `Levin.hands` for mittens and `Levin.neck` for a scarf — both `accessories`
+  // in the only slot vocabulary there is. Nothing said a word: the parse
+  // accepted the string, and nine pages later the resolver quietly declined to
+  // strip either garment from the contract the generator and all three judges
+  // read. This is the moment the fault is created and the only moment it can be
+  // seen once for the whole story, so it is reported here; wornItems.js reports
+  // again, per page, on the pages where it actually costs a garment.
+  //
+  // REPORT, never repair. Mapping `neck` onto `accessories` here would be this
+  // module inferring what the writer meant, and the authoring prompt is where
+  // the closed list belongs.
+  {
+    const { WORN_SLOTS, parseWornAs } = require('../wornItems');
+    for (const cat of ['artifacts', 'clothing', 'vehicles']) {
+      for (const entry of entriesOf(cat)) {
+        const link = parseWornAs(entry.wornAs);
+        if (!link || link.slotKnown) continue;
+        findings.push({
+          code: 'worn-as-unknown-slot',
+          id: entry?.id || entry?.name || '(unnamed)',
+          category: cat,
+          message: `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" declares wornAs "${entry.wornAs}" — `
+            + `"${link.slot}" is not an outfit slot (${WORN_SLOTS.join(', ')}), so a page that takes the item off `
+            + `strips nothing from ${link.owner}'s clothing and every judge still demands it`,
+        });
+      }
+    }
+  }
+
+  // (3) A range covering nearly the whole book was almost certainly not earned.
   // A genuinely single-setting story can trip this on its one location; the
   // warning is a prompt for a human look, not a defect claim.
+  //
+  // The HARM differs by category, so the message does too. For an ELEMENT
+  // (secondary character, animal, artifact, vehicle, clothing) a blanket range
+  // is what bakes it into scenes that never contain it — those are the
+  // collections `vbElementBudget.ELEMENT_COLLECTIONS` ranks and the page
+  // references are drawn from. A LOCATION is not an element (docs/SETTLED.md,
+  // 2026-09-08): it is the plate the cast is composited into, never a reference
+  // cell, and the one reader of a location's pages is the landmark page gate
+  // (storyHelpers.js), where a wide range is permissive rather than harmful. So
+  // a location keeps the tripwire but is told what it actually means — usually
+  // a single-setting book, worth one look to confirm it really stays there.
   if (pageCount >= 4) {
     for (const cat of VB_CATEGORIES) {
+      const isLocation = cat === 'locations';
       for (const entry of entriesOf(cat)) {
         const pages = pagesOf(entry);
         const covered = new Set(pages.filter(p => Number.isFinite(p))).size;
@@ -789,7 +853,9 @@ function auditVisualBibleContract(visualBible, options = {}) {
             code: 'blanket-appears-in-pages',
             id: entry?.id || entry?.name || '(unnamed)',
             category: cat,
-            message: `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — a blanket range bakes the element into scenes that never contain it`,
+            message: isLocation
+              ? `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — expected for a single-setting story; confirm the book really stays there`
+              : `${entry?.id || '(no id)'} "${entry?.name || '(unnamed)'}" claims ${covered} of ${pageCount} pages — a blanket range bakes the element into scenes that never contain it`,
           });
         }
       }
@@ -809,6 +875,7 @@ module.exports = {
   CLOTHING_CATEGORIES,
   auditVisualBibleContract,
   vbEntryProse,
+  vbHasNumericAge,
   parseCharacterClothingBlock,
   cleanPageText,
   parsePatchSections,
@@ -824,4 +891,5 @@ module.exports = {
   CLOTHING_CATEGORY_PATTERN,
   extractCharacterNamesFromScene,
   getExtractJsonFromText,
+  extractBalancedJsonObject,
 };

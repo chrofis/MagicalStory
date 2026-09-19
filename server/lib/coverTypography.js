@@ -67,6 +67,41 @@ function resolveCoverTitleMode(coverType, storyTitle, { modeOverride = null } = 
   };
 }
 
+/**
+ * COVER TEXT CONTRACT — what text the judge is allowed to see on this render.
+ *
+ * One resolver for every cover eval call site (owner, 2026-09-13). The rule was
+ * written inline in the pipeline's cover pseudo-page loop only, so the cover
+ * ITERATE path (regeneration, repair, Test Lab) passed neither field and the
+ * "the title is an app overlay, never flag it" branch in evaluateImageQuality
+ * was unreachable there — a correctly textless regenerated cover could be
+ * marked down for a missing title.
+ *
+ * 'painted'    — the image model rendered the text (baked front cover, or
+ *                appSideCoverType off): the judge letter-checks `expectedText`.
+ * 'appOverlay' — the art is textless and typography is composited afterwards:
+ *                the judge must never flag missing or present title text.
+ *
+ * @param {string} coverKeyOrType 'frontCover'|'initialPage'|'backCover' (or 'front'/'back')
+ * @param {{titleBaked?: boolean, title?: string|null, dedication?: string|null}} opts
+ * @returns {{ textMode: 'painted'|'appOverlay', expectedText: string|null }}
+ */
+function resolveCoverTextContract(coverKeyOrType, { titleBaked = false, title = null, dedication = null } = {}) {
+  const { MODEL_DEFAULTS } = require('../config/models');
+  const { coverTypeToKey } = require('./coverKeys');
+  const key = coverTypeToKey(coverKeyOrType) || coverKeyOrType;
+  // A BAKED front cover is 'painted' even while the flag says app-side: the
+  // model painted the title, so the evaluator must verify its spelling.
+  const textMode = (titleBaked === true || !MODEL_DEFAULTS.appSideCoverType) ? 'painted' : 'appOverlay';
+  let expectedText = null;
+  if (textMode === 'painted') {
+    if (key === 'frontCover') expectedText = title || null;
+    else if (key === 'initialPage') expectedText = dedication || null;
+    else if (key === 'backCover') expectedText = 'magicalstory.ch';
+  }
+  return { textMode, expectedText };
+}
+
 // ---------------------------------------------------------------------------
 // colour helpers (verbatim from prototype)
 // ---------------------------------------------------------------------------
@@ -1000,6 +1035,7 @@ async function paintServedCoverTitle(storyId, storyData, { coverKey = 'frontCove
 module.exports = {
   composeCover, composeFrontTitle, composeDedication, composeBrand, applyCoverTypography, bakeCoverTypographyPostPersist,
   resolveCoverTitleMode,
+  resolveCoverTextContract,
   restampCover, restampServedCover, paintServedCoverTitle, sanitizeTitleStyle, sanitizeDedicationStyle,
   TITLE_LAYOUTS, TITLE_FONT_IDS: Object.keys(FONTS), DEDICATION_FONTS: WFONTS.map(f => f.family),
   // exported for the standalone verify CLI / tests

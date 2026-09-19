@@ -16,6 +16,7 @@ import {
   getLifeChallengesByGroup,
   getEducationalTopicsByGroup,
   getHistoricalEventsByGroup,
+  topicFitsAge,
 } from '@/constants/storyTypes';
 import { storyService } from '@/services/storyService';
 import type { Language, SwissCity, SwissStoriesData, SwissLocalizedString } from '@/types/story';
@@ -48,6 +49,12 @@ interface StoryCategorySelectorProps {
   storyTheme: string;  // Adventure theme (or 'realistic')
   customThemeText?: string;  // Custom theme description when theme is 'custom'
   userLocation?: { city: string | null; region: string | null; country: string | null } | null;
+  /**
+   * Age of the oldest main character — the same child the server's age band is
+   * resolved from. Life-skill topics that only land inside a developmental
+   * window are sorted first and the rest flagged; nothing is ever hidden.
+   */
+  focusAge?: number | null;
   // Callbacks
   onCategoryChange: (category: StoryCategoryId) => void;
   onTopicChange: (topic: string) => void;
@@ -114,6 +121,7 @@ export function StoryCategorySelector({
   onThemeChange,
   onCustomThemeTextChange,
   onLegacyStoryTypeChange,
+  focusAge,
 }: StoryCategorySelectorProps) {
   const { language } = useLanguage();
   const lang = language as Language;
@@ -138,6 +146,7 @@ export function StoryCategorySelector({
   const translations = {
     en: {
       storyType: 'Story Type',
+      outsideAgeWindow: 'Usually chosen for ages',
       theme: 'Theme',
       topic: 'Topic',
       setting: 'Setting',
@@ -166,6 +175,7 @@ export function StoryCategorySelector({
     },
     de: {
       storyType: 'Geschichte',
+      outsideAgeWindow: 'Meist gewählt für Alter',
       theme: 'Thema',
       topic: 'Thema',
       setting: 'Setting',
@@ -194,6 +204,7 @@ export function StoryCategorySelector({
     },
     fr: {
       storyType: 'Histoire',
+      outsideAgeWindow: 'Habituellement choisi pour les âges',
       theme: 'Thème',
       topic: 'Sujet',
       setting: 'Cadre',
@@ -219,6 +230,35 @@ export function StoryCategorySelector({
       ideas: 'idées',
       km: 'km',
       loading: 'Chargement...',
+    },
+    it: {
+      storyType: 'Storia',
+      outsideAgeWindow: 'Di solito scelto per le età',
+      theme: 'Tema',
+      topic: 'Argomento',
+      setting: 'Ambientazione',
+      optionalTheme: 'Opzionale: aggiungi un tema avventura',
+      optionalThemeDesc: 'Trasformala in una storia di pirati, maghi o altra avventura',
+      noTheme: 'Nessun tema (realistico)',
+      selectedCategory: 'Tipo di storia',
+      selectedTopic: 'Argomento',
+      selectedTheme: 'Tema',
+      change: 'Cambia',
+      customThemePlaceholder: 'Descrivi qui la tua idea di storia...\n\nAd esempio:\n- Una storia sull\'imparare ad andare in bicicletta\n- Un\'avventura sulle montagne svizzere\n- Un drago amichevole che aiuta con i compiti',
+      customThemeLabel: 'Il tuo tema personalizzato:',
+      currentSelection: 'Selezione attuale',
+      changeStory: 'Scegli un\'altra storia',
+      category: 'Categoria',
+      yourCity: 'La tua città',
+      nearby: 'Nelle vicinanze',
+      byCanton: 'Per cantone',
+      sagen: 'Leggende e fiabe',
+      sageStoryIdea: 'Idea di storia',
+      sageBackground: 'Contesto',
+      sageChoose: 'Scegli questa storia',
+      ideas: 'idee',
+      km: 'km',
+      loading: 'Caricamento...',
     },
   };
   const t = translations[lang as keyof typeof translations] || translations.en;
@@ -503,7 +543,8 @@ export function StoryCategorySelector({
 
         <div className="space-y-3">
           {lifeChallengeGroups.map((group) => {
-            const challenges = getLifeChallengesByGroup(group.id);
+            const challenges = [...getLifeChallengesByGroup(group.id)]
+              .sort((a, b) => Number(topicFitsAge(b, focusAge)) - Number(topicFitsAge(a, focusAge)));
             const isExpanded = expandedLifeGroups.includes(group.id);
 
             return (
@@ -521,18 +562,27 @@ export function StoryCategorySelector({
 
                 {isExpanded && (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 p-3">
-                    {challenges.map((challenge) => (
-                      <button
-                        key={challenge.id}
-                        onClick={() => handleTopicSelect(challenge.id)}
-                        className="p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
-                      >
-                        <span className="text-xl mr-2">{challenge.emoji}</span>
-                        <span className="text-sm font-medium">
-                          {challenge.name[lang] || challenge.name.en}
-                        </span>
-                      </button>
-                    ))}
+                    {challenges.map((challenge) => {
+                      const fits = topicFitsAge(challenge, focusAge);
+                      return (
+                        <button
+                          key={challenge.id}
+                          onClick={() => handleTopicSelect(challenge.id)}
+                          className={`p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left${fits ? '' : ' opacity-60'}`}
+                          title={fits ? undefined : `${t.outsideAgeWindow} (${challenge.suitableAges?.[0]}-${challenge.suitableAges?.[1]})`}
+                        >
+                          <span className="text-xl mr-2">{challenge.emoji}</span>
+                          <span className="text-sm font-medium">
+                            {challenge.name[lang] || challenge.name.en}
+                          </span>
+                          {!fits && (
+                            <span className="ml-1 text-xs text-gray-400">
+                              {challenge.suitableAges?.[0]}-{challenge.suitableAges?.[1]}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -638,7 +688,7 @@ export function StoryCategorySelector({
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
           <Sparkles className="text-indigo-500" size={24} />
-          {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement Historique' : 'Historical Event'}
+          {lang === 'de' ? 'Historisches Ereignis' : lang === 'fr' ? 'Événement Historique' : lang === 'it' ? 'Evento storico' : 'Historical Event'}
         </h2>
 
         <div className="space-y-3">
@@ -854,7 +904,7 @@ export function StoryCategorySelector({
                 >
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
                     <span>🏘️</span> {t.nearby}
-                    <span className="text-xs text-gray-500 font-normal">({nearbyCities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : 'cities'})</span>
+                    <span className="text-xs text-gray-500 font-normal">({nearbyCities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : lang === 'it' ? 'città' : 'cities'})</span>
                   </span>
                   {expandedSwissSection === 'nearby' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </button>
@@ -915,7 +965,7 @@ export function StoryCategorySelector({
                           >
                             <span className="text-sm font-medium text-gray-700">
                               {cantonName}
-                              <span className="text-xs text-gray-400 ml-2">({cities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : 'cities'})</span>
+                              <span className="text-xs text-gray-400 ml-2">({cities.length} {lang === 'de' ? 'Städte' : lang === 'fr' ? 'villes' : lang === 'it' ? 'città' : 'cities'})</span>
                             </span>
                             {isCantonExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                           </button>

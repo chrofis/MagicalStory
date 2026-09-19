@@ -16,7 +16,7 @@ import { createRequire } from 'node:module';
 // gives two module instances and the templates never arrive.
 const require = createRequire(import.meta.url);
 const { loadPromptTemplates } = require('../../server/services/prompts.js');
-const { buildStoryBibleFromBeatsPrompt } = require('../../server/lib/promptBuilders.js');
+const { buildStoryBibleFromBeatsPrompt, buildSceneExpansionAllPrompt } = require('../../server/lib/promptBuilders.js');
 const { characterAgeCue } = require('../../server/lib/referenceSheets.js');
 const { buildCharacterDescription } = require('../../server/lib/visualBible.js');
 const ageBand = require('../../server/lib/inventedAgeBand.js');
@@ -49,8 +49,10 @@ describe('bible prompt carries the commissioned children band', () => {
     expect(prompt.match(/\{[A-Z_]{3,}\}/g)).toBeNull();
   });
 
+  // The band rides with the Visual Bible, which the ALL-PAGES Art Director
+  // authors since 2026-09-11 — so this assertion follows it there.
   it('states the 6-9 band and the peer contract for this story', () => {
-    const prompt = buildStoryBibleFromBeatsPrompt(INPUT_DATA, BEATS);
+    const prompt = buildSceneExpansionAllPrompt(INPUT_DATA, BEATS, {});
     expect(prompt).toContain('the commissioned children are 6-9');
     expect(prompt).toContain('peer: yes');
     // The age field is a number now, not prose.
@@ -60,9 +62,11 @@ describe('bible prompt carries the commissioned children band', () => {
 
   it('an all-adult commission gets no band at all', () => {
     const adults = { ...INPUT_DATA, characters: INPUT_DATA.characters.slice(2) };
-    const prompt = buildStoryBibleFromBeatsPrompt(adults, BEATS);
+    const prompt = buildSceneExpansionAllPrompt(adults, BEATS, {});
     expect(prompt).not.toContain('PEER AGES');
     expect(prompt.match(/\{[A-Z_]{3,}\}/g)).toBeNull();
+    // The wardrobe stage still builds cleanly, with no leftover placeholders.
+    expect(buildStoryBibleFromBeatsPrompt(adults, BEATS).match(/\{[A-Z_]{3,}\}/g)).toBeNull();
   });
 });
 

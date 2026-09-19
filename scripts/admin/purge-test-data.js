@@ -72,6 +72,11 @@ async function main() {
     ['testlab', `select distinct t->>'storyId' id from testlab_experiments e,
         jsonb_array_elements(case when jsonb_typeof(e.targets)='array' then e.targets else '[]'::jsonb end) t
         where t->>'storyId' is not null`],
+    // Stories that are the measured basis for a finding or a docs/decisions.md
+    // entry. On staging ownerFilter is `true` and KEEP_EVERY is 0, so without
+    // this every evidence story dies at 30 days and the conclusions drawn from
+    // it become unfalsifiable. See server/lib/evidenceStories.js, migration 038.
+    ['evidence', `select id from stories where evidence_reason is not null`],
   ]) {
     try {
       const r = await pool.query(sql);
