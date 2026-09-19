@@ -6896,6 +6896,11 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // Only a re-plan declares changes; a first division has nothing to declare.
     CHANGES_FORMAT: String(replan || '').trim() ? REPLAN_CHANGES_FORMAT : '',
     READER_LINE: readerLine,
+    DEED_AND_EFFECT_DEF,
+    TWO_HEIGHTS_DEF,
+    NAMING_DEF,
+    ENDING_EVENT_DEF,
+    WANTED_PICTURE_DEF,
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
     // A HINT IS A STORY CHANGE, NOT A LICENCE TO BREAK A PICTURE RULE
     // (2026-09-19).
@@ -7245,6 +7250,31 @@ const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only wha
  * ever checks an exact number the generator was not allowed to receive.
  * Pinned in tests/unit/built-prompt-values.test.ts against the real builders.
  */
+/**
+ * FIVE DEFINITIONS THE PLANNER AND ITS CHECKER SHARE (owner, 2026-09-19).
+ *
+ * story-beats.txt states each as a RULE ("do this") and plan-check.txt as an
+ * AUDIT ("name every page that does not") — which is the generator/critic shape
+ * this codebase wants, and it is deliberately NOT collapsed. What was written
+ * out twice by hand is the DEFINITION inside each: what counts as an action,
+ * which heights are two heights, what is not a naming, when a last page owes the
+ * ending's event, and which three acts owe a wanted picture.
+ *
+ * A definition that drifts between the rule and the audit is a generator that
+ * cannot satisfy the judge grading it. They had not drifted; five hand-kept
+ * pairs across two live prompts is where drift comes from, and the registry set
+ * `beats-planner-vs-plan-check` blocks a commit that moves one side only.
+ *
+ * Each constant is ONE sentence of definition with no framing, so a rule can
+ * precede it with an imperative and an audit with "name every page whose…".
+ */
+const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions.';
+const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
+// No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
+const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
+const ENDING_EVENT_DEF = "When the story's ending has an event of its own, the last page stages that event as its instant.";
+const WANTED_PICTURE_DEF = "For each act — setup, middle, ending — the picture a child most wants to see there, and the page whose plan line stages it as its instant. The ending's own event — the reunion, the goodbye, the parting — is always one of them.";
+
 const COUNTING_RULE = 'Counting rule: an exact number for a group of like things may be stated only up to three, and then it is drawn exactly. Above three the group is staged as more than three, a cluster, a row, a few or several — never an exact number, in the prose, `sceneIntent` or `emptyScenePrompt`. A group that recurs across pages holds the same size impression, role and placement.';
 
 /**
@@ -8027,6 +8057,12 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counter
   }
   const counted = (Array.isArray(counterFindings) ? counterFindings.join('\n') : String(counterFindings || '')).trim();
   return fillTemplate(template, {
+    DEED_AND_EFFECT_DEF,
+    TWO_HEIGHTS_DEF,
+    NAMING_DEF,
+    ENDING_EVENT_DEF,
+    WANTED_PICTURE_DEF,
+
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: beats.length,
     // The plan line per page IS the division (2026-09-02); the block the
@@ -9475,6 +9511,14 @@ module.exports = {
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
+  // The five definitions story-beats.txt and plan-check.txt share — one
+  // constant each, filled into the rule AND the audit (sibling set
+  // `beats-planner-vs-plan-check`).
+  DEED_AND_EFFECT_DEF,
+  TWO_HEIGHTS_DEF,
+  NAMING_DEF,
+  ENDING_EVENT_DEF,
+  WANTED_PICTURE_DEF,
   MULTI_PICTURE_PROP_RULE,
   CONCEALED_OBJECT_RULE,
   STAGED_PROP_RULE,

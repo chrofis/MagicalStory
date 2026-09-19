@@ -49115,3 +49115,82 @@ counts and points per bucket. Add the result here when it lands.
 `tests/unit/compliance-judge-scope.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The planner's dead-letter continuity rule is gone, and five shared definitions become one constant each
+
+**B7 — a rule the generator ignored and no checker audited.** Two planner rules pulled
+opposite ways:
+
+- *"A character in frame on a page is in frame on the next one unless a plan line says
+  where they went."*
+- *"The main character appears on most pages; the others come and go in different
+  combinations, not the whole group on every page."*
+
+To satisfy the first, every cast change needs an explicit departure clause; to satisfy
+the second, the cast must change constantly. Measured on `job_1789759147125_p08djwhbl`:
+**10 of 17 page transitions drop a named character and not one plan line says where
+anyone went.** The planner obeyed the variety rule and ignored this one, and no checker
+audits it.
+
+Owner, 2026-09-19: delete it. The thing-continuity half — *"What a page establishes about
+a thing — stuck, heavy, hidden, out of reach — stays true until a later page changes
+it"* — nothing contradicted, and it stays.
+
+**B9 — five definitions written out twice by hand.** `story-beats.txt` states each page
+rule as an imperative and `plan-check.txt` audits the same rule as a question. That
+framing difference is the generator/critic shape this codebase wants and is deliberately
+NOT collapsed. What was duplicated is the DEFINITION inside each: what counts as an
+action, which heights are two heights, what is not a naming, when a last page owes the
+ending's event, and which three acts owe a wanted picture.
+
+Each is now one constant — `DEED_AND_EFFECT_DEF`, `TWO_HEIGHTS_DEF`, `NAMING_DEF`,
+`ENDING_EVENT_DEF`, `WANTED_PICTURE_DEF` — filled into both templates, exactly as
+`COUNTING_RULE` and `ONE_INSTANT_RULE` already are. They had not drifted; five hand-kept
+pairs across two live prompts is where drift comes from.
+
+`NAMING_DEF` carries no leading article, because the planner says *"stages **their**
+arrival"* and the checker *"stages **an** arrival"* — both wordings are pinned by tests,
+including a pre-existing one (`plan-critic-rules-reach-planner`) that caught the first
+attempt at this refactor for dropping "their".
+
+Registered as sibling set `beats-planner-vs-plan-check` (`axis: generator-vs-critic`), so
+a sixth pair cannot be hand-copied instead.
+
+**Touched:** `prompts/story-beats.txt`, `prompts/plan-check.txt`,
+`server/lib/promptBuilders.js`, `scripts/admin/sibling-registry.json`,
+`tests/unit/plan-shared-definitions.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-19 — PARKED: the beats planner receives 2,031 chars of author permissions it cannot act on
+
+**Not a decision — an open question recorded so it is not re-derived.**
+
+`story-beats.txt` opens *"The story below is finished… divide it, never retell or repair
+it"* and then receives the whole age-band block, including *"A real antagonist is
+allowed"*, *"Humour and mild peril"*, *"The hero's own idea turns it"* and *"It
+resolves"* — permissions granted to an AUTHOR, in a stage forbidden to author. Only two
+of its eight paragraphs are page-division business: the low point (`[[craft]]`) and the
+beats on the page in order (`[[mechanics]]`).
+
+The band subsystem already has the mechanism: `BAND_VIEW_KEEPS` composes a view by
+allow-list over `[[premise]]` / `[[craft]]` / `[[mechanics]]` / `[[example]]`. A
+`plan: ['craft', 'mechanics']` view would drop the permissions — but it orphans a
+cross-reference, because the `mechanics` span says *"Every one of those beats…"* and the
+enumeration lives in `[[premise:subject]]`. Taking that one slot requires slot-qualified
+keeps, and **`band-view-totality` T1 ("every premise slot reaches every premise-shaped
+reader") blocks it**: every view must carry all three premise slots.
+
+That invariant was set deliberately on 2026-09-16. Relaxing it — so T1 applies only to
+views that take the bare `premise` role — is a change to someone else's recent design,
+not a bug fix, so it was attempted, **reverted**, and is raised rather than decided from
+outside (owner, 2026-09-19).
+
+**Open:** `tasks/BACKLOG.md`. Whoever set T1 decides whether a non-premise-shaped view
+may take a single slot.
+
+**Status:** 🟡 open question — no code change

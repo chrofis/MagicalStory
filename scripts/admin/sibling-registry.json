@@ -482,6 +482,16 @@
         "prompts/story-text-from-beats.txt"
       ],
       "severity": "block"
+    },
+    {
+      "id": "beats-planner-vs-plan-check",
+      "axis": "generator-vs-critic",
+      "reason": "story-beats.txt states each page rule as an imperative and plan-check.txt audits the same rule as a question — the generator/critic pair for page division. The FRAMING is deliberately different and is not shared; the DEFINITION inside each was written out twice by hand, and a definition that drifts between the rule and the audit is a generator that cannot satisfy the judge grading it. Five of them are now single constants in promptBuilders.js (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, NAMING_DEF, ENDING_EVENT_DEF, WANTED_PICTURE_DEF) filled into both templates; this set stops a sixth pair being hand-copied instead.",
+      "members": [
+        "prompts/story-beats.txt",
+        "prompts/plan-check.txt"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [
