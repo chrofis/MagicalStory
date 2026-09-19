@@ -2080,28 +2080,61 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         log.debug(`📊 [EVAL P1] Shared blind inventory launched for ${pageContext || 'scene'}`);
       }
       qualityFiguresPromise = new Promise((resolve) => { qualityFiguresResolve = resolve; });
-      threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
-        inventoryPromise: p1Promise,
-        expectedAges: expectedAgesBlock,
-        pageContext,
-        storyText: fidelityRef,
-        qualityFiguresPromise,
-        complianceModelOverride: evalOptions.complianceModelOverride || null,
-        compliancePromptOverride: evalOptions.compliancePromptOverride || null,
-        artStyle: artStyleForEval,
-        clothingContract: clothingContractBlock,
-        // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
-        expectedCast: expectedCast.block,
-        // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
-        // caller has a bible; without one they still become generic nouns.
-        visualBible: evalOptions.visualBible || null,
-        // Era-aware landmark protection inputs (2026-09-05). Callers that know
-        // the page's landmark refs + era pass them; everything else defaults to
-        // no protection, i.e. unchanged behaviour.
-        landmarkPhotos: evalOptions.landmarkPhotos || null,
-        era: evalOptions.era || null,
-      });
-      log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
+      // THE BLIND COMPLIANCE JUDGE IS GATED (owner, 2026-09-19). Default OFF —
+      // MODEL_DEFAULTS.promptComplianceJudge, env PROMPT_COMPLIANCE_JUDGE=true
+      // to re-arm without a deploy. OFF means the Stage-2 call is NOT MADE, so
+      // `threeStagePromise` stays null and every `threeStageResult` reader below
+      // sees null — the shape they already handle for "the judge failed".
+      //
+      // Stage 1 (p1Promise, above) deliberately stays OUTSIDE this gate: the
+      // quality eval's own figure merge consumes it further down, and that feeds
+      // the empty-inventory score floor in images.js. Gating stage 1 would move
+      // scores; gating stage 2 does not.
+      //
+      // The absence is RECORDED, not silent. Without the entry below, a page
+      // judged with this off is byte-for-byte a page the judge cleared — the
+      // exact conflation notEvaluated.js exists to remove. Recording only: this
+      // entry is never a deduction and never routes a page to repair.
+      // THE LAB FOLLOWS PRODUCTION BY DEFAULT, and can opt back in explicitly.
+      // This stage is the harness that measured the judge (experiment 1333), so
+      // it must stay able to run it — but always-on here would be the Lab/prod
+      // drift the sibling registry exists to catch, so the knob is explicit:
+      // `complianceJudgeOverride` true forces the judge on, false forces it off,
+      // null/absent follows the production flag.
+      const complianceJudgeOn = evalOptions.complianceJudgeOverride == null
+        ? MODEL_DEFAULTS.promptComplianceJudge
+        : !!evalOptions.complianceJudgeOverride;
+      if (!complianceJudgeOn) {
+        notEvaluated.record(
+          'prompt_compliance',
+          'compliance_judge_disabled',
+          'The blind prompt-compliance judge did not run (promptComplianceJudge is off) — nothing on this page was checked against the prompt by that judge'
+        );
+        log.debug(`📊 [THREE-STAGE] ${pageContext || 'scene'}: compliance judge OFF (promptComplianceJudge=false; set PROMPT_COMPLIANCE_JUDGE=true to re-arm) — Stage 2 not called; Stage 1 inventory still ran`);
+      } else {
+        threeStagePromise = evaluateThreeStage(imageData, originalPrompt, sceneHint, {
+          inventoryPromise: p1Promise,
+          expectedAges: expectedAgesBlock,
+          pageContext,
+          storyText: fidelityRef,
+          qualityFiguresPromise,
+          complianceModelOverride: evalOptions.complianceModelOverride || null,
+          compliancePromptOverride: evalOptions.compliancePromptOverride || null,
+          artStyle: artStyleForEval,
+          clothingContract: clothingContractBlock,
+          // ONE ROSTER (2026-09-14). The compliance judge had no cast list at all.
+          expectedCast: expectedCast.block,
+          // Resolves the VB ids in INTERACTIONS_BLOCK to real names when the
+          // caller has a bible; without one they still become generic nouns.
+          visualBible: evalOptions.visualBible || null,
+          // Era-aware landmark protection inputs (2026-09-05). Callers that know
+          // the page's landmark refs + era pass them; everything else defaults to
+          // no protection, i.e. unchanged behaviour.
+          landmarkPhotos: evalOptions.landmarkPhotos || null,
+          era: evalOptions.era || null,
+        });
+        log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
+      }
     }
 
     // Extract base64 and mime type for generated image

@@ -27,6 +27,15 @@ function buildFeedbackInput({
   fixableIssues = [],
   semanticIssues = [],
   complianceIssues = [],
+  // Did the blind prompt-compliance judge RUN on this page? An empty
+  // `complianceIssues` has meant "it ran and cleared the page" for as long as
+  // this section has existed, and since the judge became gateable
+  // (MODEL_DEFAULTS.promptComplianceJudge, default off) it also means "it never
+  // looked". Telling a model that authors the repair plan "(none)" for a judge
+  // that did not run is the false-clean this codebase keeps paying for, so the
+  // two states are rendered differently. Default true = unchanged for every
+  // caller that has an opinion to report.
+  complianceEvaluated = true,
   entityIssues = [],
   finalCheckIssues = [],
   // Page-scoped IMG faults from the mid-loop book audit ({ severity, line }).
@@ -123,7 +132,11 @@ function buildFeedbackInput({
   parts.push('');
 
   parts.push('## Compliance evaluation issues (prompt-compliance evaluator)');
-  if (complianceIssues.length === 0) {
+  if (!complianceEvaluated) {
+    // NOT "(none)". This evaluator has no opinion on this page at all; saying
+    // it found nothing would hand the consolidator a clean bill it never issued.
+    parts.push('(this evaluator did not run on this page — it has no opinion, clean or otherwise)');
+  } else if (complianceIssues.length === 0) {
     parts.push('(none)');
   } else {
     for (const iss of complianceIssues) {
@@ -409,6 +422,11 @@ async function consolidateFeedback({
       fixableIssues,
       semanticIssues,
       complianceIssues,
+      // The house null-contract: `threeStageResult` is an object when the
+      // compliance judge produced a verdict and null when it never ran (gated
+      // off, or it failed). Same test images.js / repairPipeline.js / testlab.js
+      // already apply to that field — no new signal invented here.
+      complianceEvaluated: !!evaluation.threeStageResult,
       entityIssues,
       readerFindings: Array.isArray(readerFindings) ? readerFindings : [],
       bboxFigures,

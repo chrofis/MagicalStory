@@ -533,6 +533,41 @@ const MODEL_DEFAULTS = {
   // Sonnet's $2.16. Sonnet stays the key-missing fallback. Env COMPLIANCE_MODEL.
   complianceModel: process.env.COMPLIANCE_MODEL || 'qwen3-max',
 
+  // THE BLIND PROMPT-COMPLIANCE JUDGE IS OFF (owner, 2026-09-19).
+  //
+  // What this gates: the Stage-2 call in evalPipeline's `evaluateThreeStage`
+  // — the judge that never sees the picture and rules on it from a text
+  // inventory alone (`image-prompt-compliance.txt`, model `complianceModel`
+  // above). OFF means the call is not made at all. This is a COST change only
+  // in its mechanism; the reason is precision, see below.
+  //
+  // Stage 1 (`image-vision-inventory` / `runVisualInventory`) is NOT gated and
+  // keeps running: it is launched separately in `evaluateImageQuality` and the
+  // quality eval's own figure merge consumes it (evalPipeline.js, `p1Result.
+  // figures` when the evaluator named nobody), which then feeds the
+  // empty-inventory score floor in images.js. Gating stage 1 would change
+  // scoring; gating stage 2 does not.
+  //
+  // WHY, measured twice finding-by-finding against the pixels on staging
+  // job_1789759147125_p08djwhbl:
+  //   - pre-narrowing, 8 pages / 46 findings / 528 deduction points: 8.6% of
+  //     this judge's points were defensible. It produced 64% of ALL deduction
+  //     points and 16 of the 24 false findings, while the two judges that can
+  //     SEE the image produced 1 false finding in 11.
+  //   - post-narrowing (Test Lab experiment 1333), 8 pages / 29 findings:
+  //     3 keepers out of 29, ~11% of points defensible. Precision did not move.
+  //     Attribution FALSE_JUDGE 12 / FALSE_STAGE1 6 — most of the errors
+  //     survive even a perfect inventory, because they are the blind judge's.
+  // The cost is NOT the reason. False findings floor correct pages and route
+  // them to PAID repair: one inpaint round already went to recolouring trousers
+  // measured at #202d40, the contract navy they already were, and a false
+  // CRITICAL on p17 ordered a scarf back onto a neck the story empties on
+  // purpose.
+  //
+  // Env override: PROMPT_COMPLIANCE_JUDGE=true re-arms it without a deploy.
+  // Any other value (unset, 'false') leaves it off.
+  promptComplianceJudge: process.env.PROMPT_COMPLIANCE_JUDGE === 'true',
+
   // Image models
   //
   // pageImage is the EDIT-AND-INPAINT key, NOT the page render. It is the

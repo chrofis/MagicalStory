@@ -49481,3 +49481,105 @@ its first real exercise should be watched.
 `docs/image-routing.md`, `tests/unit/gap-action-framing.test.ts`.
 
 **Status:** 🟡 conditional — active, and unproven on a real render.
+
+---
+
+## 2026-09-19 — The blind prompt-compliance judge is OFF: it deducts wrongly about nine times out of ten, and the wrong deductions buy paid repairs
+
+**Context.** The eval misnamed "three-stage" (`evaluateThreeStage`, `server/lib/evalPipeline.js`) is
+two calls, not three. **Stage 1** (`runVisualInventory`, `prompts/image-vision-inventory.txt`) LOOKS at
+the page and writes a structured inventory. **Stage 2** (`prompts/image-prompt-compliance.txt`, model
+`complianceModel` = `qwen3-max`) never sees the picture: it rules on the page by comparing stage 1's
+text against the prompt. Its findings are merged into `fixableIssues` tagged `source: 'three-stage'`,
+scored in the `compliance` deduction bucket, and from there reach `findBadPages` and paid repair.
+
+**Decision.** New flag `MODEL_DEFAULTS.promptComplianceJudge`, **default `false`**. When off the
+Stage-2 call **is not made at all** — this is a gate on the call, not a filter on its output.
+`PROMPT_COMPLIANCE_JUDGE=true` re-arms it without a deploy (same default-off env idiom as
+`styleRepairProduction`, `env === 'true'`), so **this is reversible by environment variable**.
+
+**Stage 1 is NOT gated and keeps running.** It is launched by `evaluateImageQuality` itself, above the
+gate, and stage 2 is not its only consumer: the quality eval's own figure merge reads it
+(`evalPipeline.js`, `if (p1Result.figures?.length && matches.length === 0) figures = p1Result.figures`)
+and that list then feeds the empty-inventory score floor in `images.js` (`figures.length === 0` →
+`score = 40`), the `eval_matches_missing` metric, and `crossCheckFigureIdentity`. Gating stage 1 would
+move scores; gating stage 2 does not. The Lab's `inventory_ab` stage and the dev panel's
+`visual-inventory` endpoint call it independently and are unaffected either way.
+
+**Rationale — THE COST IS NOT THE REASON.** The reason is that this judge's false findings floor
+correct pages and route them to **paid repair**. Two finding-by-finding audits against the actual
+pixels, both on staging `job_1789759147125_p08djwhbl`:
+
+- **Pre-narrowing** — 8 pages, 46 findings, 528 deduction points: **8.6% of this judge's points were
+  defensible.** It produced **64% of ALL deduction points** in the story and **16 of the 24 false
+  findings**, while the two judges that can SEE the image produced **1 false finding in 11** between them.
+- **Post-narrowing** (Test Lab experiment **1333**) — 8 pages, 29 findings: **3 keepers out of 29**,
+  ~11% of points defensible. **Precision did not move.** Attribution: **FALSE_JUDGE 12, FALSE_STAGE1 6**
+  — i.e. most of the errors are the blind judge's own and survive even a perfect inventory. Narrowing
+  the input is not the fix, because the input was not the fault.
+
+And the false findings are not free. One inpaint round already went to **recolouring trousers measured
+at `#202d40`** — the contract navy they already were — and a false CRITICAL on p17 carries a `fix` that
+orders a scarf back onto a neck the story deliberately empties. Every one of those is a paid image edit
+bought with a wrong finding, on a page that was right.
+
+**The saving, measured from stored `tokenUsage.byFunction`, is a by-product.** The `semantic_compliance`
+bucket is **exactly** this judge: `usageLabel: 'semantic_compliance'` has one writer in the repo
+(`evalPipeline.js`, the Stage-2 `callTextModel`). It does **not** also cover the semantic judge, which
+calls Gemini directly and registers no `byFunction` bucket at all.
+
+| story | pages | story total | `semantic_compliance` | share | calls |
+|---|---|---|---|---|---|
+| staging `job_1789759147125_p08djwhbl` | 18 | $7.2392 | **$0.3539** | **4.9%** | 32 |
+| prod `job_1789227389389_z18dmvnt6` | 15 | $6.6239 | **$0.3666** | **5.5%** | 45 |
+
+Stage-1-vs-stage-2 split, from the per-version `threeStageResult.usage` (`stage1_*` / `stage2_*`),
+deduped to distinct calls: **28.5% / 71.5%** (staging, 27 calls) and **27.8% / 72.2%** (prod, 34 calls).
+Since stage 1 stays, the ~$0.35 above is the stage-2 share and is what actually stops being spent.
+
+**What could NOT be attributed, stated rather than estimated.** `evaluateImageQuality` rolls
+`threeStage_input_tokens` (which itself already contains stage 1) **and** `p1_*` (stage 1 again) into its
+returned `usage.input_tokens`, and `images.js` / `repairPipeline.js` record that rollup under
+`page_quality` at the **gemini_quality** price. So an additional, unknown slice of `page_quality`
+($0.4711 staging / $0.3198 prod) is stage-2 tokens double-counted and mis-priced, and it will also
+disappear. It cannot be sized from stored data: the rolled-up `usage` object is not persisted on stored
+versions (`usage.threeStage_*` and `usage.p1_*` are null on all 72 stored nodes of the staging story).
+**The ~$0.35 is therefore a floor, not a point estimate.** The double-count is pre-existing and was not
+touched here. The second story named in the original brief, `job_1789681157795_wkt20ckod`, **no longer
+exists in either database** (staging holds 14 jobs, prod 6 — housekeeping reaped it), so the prod story
+above was substituted rather than inventing its numbers.
+
+**Absence is RECORDED, never silent.** A page judged with the flag off carries
+`notEvaluated: { dimension: 'prompt_compliance', reason: 'compliance_judge_disabled' }`
+(`server/lib/notEvaluated.js`), because otherwise it is byte-for-byte identical to a page the judge
+cleared — the exact conflation that module exists to remove. Recording only: the entry is never a
+deduction and never routes a page to repair. `scoreBreakdown.threeStage` already resolves to `null`
+(not a zero-score card) when there is no result, so the distinction survives into stored data; and the
+consolidator's prompt section now says the evaluator **did not run** instead of `(none)`, which had
+been handing the model that authors the repair plan a clean bill no judge ever issued.
+
+**The Test Lab follows production, and can still measure the judge.** `image_eval` passes
+`complianceJudgeOverride`, defaulting to the production flag so the Lab baseline equals production;
+`complianceJudge: true` asks for the judge outright, and setting `complianceModel` or
+`compliancePrompt` implies it (an A/B on the judge's model or template is meaningless with it off).
+Always-on in the Lab would be exactly the prod/Lab drift the sibling registry exists to catch.
+
+**Known and deliberately NOT changed** (each would be a scoring change, which this is not):
+`scoring.js`'s `composeDeductions` still returns `compliance: []` for both "did not run" and "ran
+clean"; `versionDeductionTotal` / `hasCatastrophic` therefore skip the bucket, so in a **mixed**
+`imageVersions[]` — old judged versions beside new unjudged ones, only reachable by repairing a
+pre-flag story after the deploy — an unjudged version can out-rank a judged one by not having been
+judged. `testlab.js`'s `newestWith('threeStageResult')` can still carry a stale compliance verdict from
+an older version onto a Lab consolidate run. Both are reported, not fixed here.
+
+**Touched:** `server/config/models.js` (`promptComplianceJudge`), `server/lib/evalPipeline.js` (the
+gate + the `notEvaluated` record), `server/lib/testlab.js` (`complianceJudgeOverride`),
+`server/lib/feedbackConsolidator.js` (`complianceEvaluated`), `docs/SETTLED.md`,
+`tests/unit/compliance-judge-off.test.ts` (new, 19 tests).
+**Verified:** flag resolves `false` with no env, `true` under `PROMPT_COMPLIANCE_JUDGE=true`, `false`
+under `=false` and 8 other values; with it off no `semantic_compliance` call goes out, stage 1 still
+runs (identical vision-call count), and the page carries the `notEvaluated` entry; the quality, semantic
+and entity buckets are byte-identical either way. Full unit suite 4097/4097 green. `check-settled`: OK.
+**No paid API call was made for this change.**
+
+**Status:** ✅ active — reversible with `PROMPT_COMPLIANCE_JUDGE=true`.

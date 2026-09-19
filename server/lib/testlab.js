@@ -851,6 +851,19 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
       // template to test the over-strict-CRITICAL problem.
       complianceModelOverride: params.complianceModel || null,
       compliancePromptOverride: params.compliancePrompt || null,
+      // THE COMPLIANCE JUDGE IS OFF IN PRODUCTION (2026-09-19,
+      // MODEL_DEFAULTS.promptComplianceJudge). This stage's baseline must equal
+      // production, so it follows the flag by default rather than forcing the
+      // judge on — otherwise every image_eval run would score against a judge
+      // prod never consults. Two ways to measure it anyway:
+      //   - `complianceJudge: true` asks for it outright (how experiment 1333
+      //     would be re-run);
+      //   - setting `complianceModel` or `compliancePrompt` IS asking for it —
+      //     an A/B on the judge's model or template is meaningless with the
+      //     judge off, so either one implies it.
+      complianceJudgeOverride: params.complianceJudge != null
+        ? !!params.complianceJudge
+        : ((params.complianceModel || params.compliancePrompt) ? true : null),
     },
   });
   const result = await evaluateImageQuality(
