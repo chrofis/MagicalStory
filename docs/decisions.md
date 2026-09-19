@@ -82,6 +82,66 @@ only the value fed into it is now evidence-backed, so the generator↔critic pai
 
 ---
 
+## 2026-09-19 — The book audit reads the WHOLE book in ONE call (6-page chunking deleted); the object-size ask stays a SECOND call, measured
+
+**Context.** The reader's-eye book audit split the book into `CHUNK_PAGES = 6` chunks. The comment
+above that constant gave three reasons: the inline-data request ceiling, keeping "the judge's
+attention on a readable stretch", and "the questions are per-page, so nothing is lost by splitting".
+None had ever been measured, and the third is the assumption that made the object-scale question
+measure nothing (entry above).
+
+**Measured** on `job_1789759147125_p08djwhbl` (18 pages, `gemini-2.5-flash`, temp 0, 2 runs per
+mode, CHF 0.115):
+
+| | chunked (3x6) | single call (18) |
+|---|---|---|
+| cost | $0.041-0.051 | **$0.026** |
+| wall | 68-86 s | **40-43 s** |
+| thinking | 14.6k-18.6k | **8.8k-9.2k** |
+| output vs the 65,536 ceiling | — | **9.5k = 15%, ~6.8x headroom** |
+| complete? | yes | yes — `FAULTS: n` matched the parsed count, finishReason STOP, no truncation |
+
+All three reasons fail on the evidence: 18 images are 7.2k prompt tokens, so the ceiling is never
+approached; there is no tail thinning, and the single call caught cross-page faults (a scarf gone on
+p15, a head that was cold on p18) that a 6-page window is structurally blind to; and a serial walk of
+one call is a better rate-limit profile than three. Thinking does not scale with pages — 18 pages
+think LESS in total than 3 chunks, because the model reasons once.
+
+**Caveat, stated rather than hidden:** run-to-run variance (15 vs 23 faults between two chunked runs)
+is LARGER than the difference between the modes. Fault COUNTS therefore prove nothing about quality
+either way. The solid gains are cost, latency, headroom and the cross-page faults only one call
+can see.
+
+**Decision.** `CHUNK_PAGES = 6` is gone. The whole book goes in one call, with
+`MAX_PAGES_PER_CALL = 24` as a guard, not a working chunk size: the 18-page book wrote 9.5k output
+tokens (15% of the ceiling), so 24 pages is ~20% of it and still ~5x headroom. A book of 25+ pages —
+longer than anything this pipeline produces — splits into calls of at most 24.
+
+**The object-size ask was folded back in, measured, and REVERTED.** With the whole book in one
+context the only reason the size question needed its own call was gone, so it was appended to the
+single call (it needs exactly the images that call already carries) — an 18-page book would have
+made ONE audit call in total. Run on the same story, the folded call cost the reading most of its
+findings:
+
+| | reader's-eye faults | thinking |
+|---|---|---|
+| single call, no size question | **16** | 8.6k |
+| single call + size question (run 1) | 5 | 7.7k |
+| single call + size question (run 2) | 6 | 7.0k |
+
+Two folded runs, both far below the unfolded call of the same day; the model also thinks less when
+carrying the extra question. The size ask therefore keeps its own call. Per story:
+**4 calls → 2** (one whole-book read + one whole-book size ask), not 1.
+
+**Touched:** `server/lib/bookAudit.js` (`MAX_PAGES_PER_CALL` replaces `CHUNK_PAGES`, its comment
+rewritten to carry these numbers instead of the three false reasons), `server/lib/objectScaleAudit.js`
+(header), `tests/unit/book-audit-whole-book.test.ts` (new),
+`tests/unit/book-audit-object-scale.test.ts`, `docs/image-routing.md`.
+
+**Status:** ✅ active. Validated against the real story before shipping, in the shipped shape.
+
+---
+
 ## 2026-09-19 — The shipped single-call object-scale question does NOT carry the cross-page signal (measured, reported, not re-engineered)
 
 **Context.** `4578a1540` demoted the object-scale audit from three shuffled reads + intersection
@@ -130,14 +190,13 @@ was understated: it is not "2-3 false positives come back", it is "the true outl
    pass per page. A blob-wide search for any egg-labelled box in the story found zero. The ratio
    route is therefore not buildable from stored data and was not built.
 
-2. *The chunking defect is fixed.* The question no longer rides in the six-page chunk prompt. It is
-   built ONCE over every page the audit resolved and sent in its own single call carrying only the
-   pages a candidate prop appears on (`askObjectScale`, bookAudit.js). Three partial asks became
-   one complete ask, so the owner's one-ask ruling holds. **This costs one MORE call, not fewer:**
-   the question used to ride inside the chunk calls for free, so an 18-page book now makes 4 audit
-   calls where it made 3. The call is cheap — images only, no page text, only the pages a candidate
-   prop is on: 3.7k input / 36 output tokens measured on this story.
-   `{OBJECT_SCALE_QUESTION}` is gone from `prompts/book-audit.txt`.
+2. *The chunking defect is fixed — and then the chunking itself was deleted.* The question no
+   longer rides in a chunk prompt. It is built ONCE over every page the audit resolved and sent in
+   its own single call carrying only the pages a candidate prop appears on (`askObjectScale`,
+   bookAudit.js); `{OBJECT_SCALE_QUESTION}` is gone from `prompts/book-audit.txt`. Later the same
+   day the audit stopped chunking at all (see the entry below), so an 18-page book makes TWO audit
+   calls — the whole-book read, plus this one. The scale call is cheap: images only, no page text,
+   only the pages a candidate prop is on, 3.7k input / 36 output tokens measured on this story.
 
 3. *And the signal is only half there.* Validated against the same real story (truth by eye: egg
    LARGER p3 1.69 / p5 1.83, SMALLER p9 0.65, borderline p8 0.88, the rest 0.94-1.32):
@@ -161,17 +220,19 @@ what it replaces) and the finding text now carries the measured result verbatim 
 as "go and look", not as a verdict`. Whether a check with this hit rate should exist at all is an OWNER decision, not one to
 take by deleting it; it is on `tasks/BACKLOG.md`. The question the owner is being asked is
 concrete: does a check that finds the small outlier, misses both large ones and names two or three
-clean pages earn one extra cheap vision call per story?
+clean pages earn one extra cheap vision call per story? (Folding it back into the reading call to
+make it free was tried and measured — see the entry below — and it costs the reading most of its
+findings, so "free" is not on the menu.)
 
-**Touched:** `server/lib/bookAudit.js` (`askObjectScale`, the chunk loop, `judgeChunk`),
+**Touched:** `server/lib/bookAudit.js` (`askObjectScale`, the reading loop, `judgeChunk`),
 `server/lib/objectScaleAudit.js` (`buildScaleQuestion` whole-book, `buildScaleFinding` honesty),
 `prompts/book-audit.txt` (placeholder removed), `tests/unit/book-audit-object-scale.test.ts`,
 `docs/image-routing.md`.
 
 **Status:** 🟡 conditional — the check ships, asks the right question once over the whole book, and
 on the one story it has been validated against it finds 1 of 3 true outliers (the small one), misses
-both large ones and names 2-3 clean pages, for one extra cheap call. Owner decision pending on
-whether to keep it.
+both large ones and names 2-3 clean pages, for one extra cheap call (the second of the story's two
+audit calls). Owner decision pending on whether to keep it.
 
 ---
 

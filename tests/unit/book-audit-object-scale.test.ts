@@ -11,12 +11,14 @@ const require_ = createRequire(import.meta.url);
  * The first shipped shape asked it inside the book audit's six-page chunks and
  * MEASURED NOTHING: on job_1789759147125_p08djwhbl the egg's nine pages were
  * split across three calls, so "larger than on the other pages" was only ever
- * asked of a fragment — 0 of 3 true outliers, 2 false positives. The whole-book
+ * asked of a fragment - 0 of 3 true outliers, 2 false positives. The whole-book
  * ask then scored 1 of 3 on the same story (the small outlier; both large ones
- * missed), in its OWN call — an 18-page book makes 4 audit calls, not 3. These tests
- * pin the fix: the question is built over the WHOLE book, it is sent in its own
- * single call with the pages the prop is on, and it is no longer wired into the
- * chunk prompt at all.
+ * missed). Folding it into the audit's (now whole-book) call was then built and
+ * measured on the same story: 5 and 6 reader's-eye faults with the size question
+ * appended, against 16 without it. So it keeps its OWN call, and an 18-page book
+ * makes two audit calls - down from four. These tests pin that: the question is
+ * built over the WHOLE book and sent in one separate call with the pages the
+ * prop is on, never inside the reading call.
  *
  * They also keep pinning what the earlier measurement bought: per-page numeric
  * estimates are forbidden (ignoring that ban truncated a read), an empty answer
@@ -278,10 +280,14 @@ describe('the wiring — ONE complete ask, not one per chunk', () => {
     }
   });
 
-  it('the chunk loop knows nothing about scale — the loop call takes no question', () => {
+  it('the question is asked in its OWN call, over the whole book, never per chunk', () => {
+    // Folding it into the (now whole-book) audit call was built and measured on
+    // 2026-09-19 and reverted: the reader's-eye pass returned 5 and 6 faults
+    // with the size question appended, against 16 without it on the same story.
     expect(src).toMatch(/await judgeChunk\(template, chunk, modelId, thinkingLevel\)/);
     expect(src.match(/await judgeChunk\(/g)?.length).toBe(1);
     expect(src.match(/await askObjectScale\(/g)?.length).toBe(1);
+    expect(src).not.toMatch(/foldedScale|scaleQuestion/);
     expect(src).not.toMatch(/intersectOutliers|shuffleWithSeed|MIN_ANSWERS|maxCalls/);
   });
 

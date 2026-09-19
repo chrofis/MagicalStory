@@ -7,13 +7,12 @@
  * one page and fist-sized on another scores clean on both. Size is only
  * visible when the pages that carry the prop are read TOGETHER.
  *
- * WHY IT IS NOT A QUESTION INSIDE THE BOOK AUDIT'S CHUNKS (measured
- * 2026-09-19, and the defect this file's second rewrite fixes): the audit
- * splits the book into 6-page chunks, so a question rebuilt per chunk asks
- * "larger than on the OTHER pages" of a fragment. On
+ * WHY IT IS ONE WHOLE-BOOK ASK AND NOT A PER-CHUNK ONE (measured 2026-09-19):
+ * the audit used to split the book into 6-page chunks, so a question rebuilt
+ * per chunk asked "larger than on the OTHER pages" of a fragment. On
  * job_1789759147125_p08djwhbl the egg's 9 pages were split across three calls
  * and the whole-book question was never asked once: the run returned
- * "SCALE: none" twice and named an unrelated animal in the third chunk —
+ * "SCALE: none" twice and named an unrelated animal in the third chunk -
  * 0 of 3 true outliers, 2 false positives, with parsing and scoping working
  * perfectly. The measurement failed, not the plumbing.
  *
@@ -25,12 +24,17 @@
  * existed and each object cost a DINO forward pass per page. The ratio route
  * has no input, so it is not built.
  *
- * ONE COMPLETE ASK, AND IT COSTS ONE MORE CALL. The scale question used to ride
- * inside the audit's chunk calls, so it added none; it now has its own call.
- * On an 18-page book the audit therefore makes 4 calls where it made 3 — the
- * scale ASKS drop from three partial ones to one complete one, but the story's
- * call count goes UP by one. The call is cheap (images only, no page text, only
- * the pages a candidate prop is on: 3.7k input / 36 output tokens measured).
+ * ONE COMPLETE ASK, IN ITS OWN CALL - and that separation was measured, not
+ * assumed. The book audit now reads the WHOLE book in one call
+ * (bookAudit.MAX_PAGES_PER_CALL), which removed the only reason this question
+ * could not ride along, so folding it in was built and run: on
+ * job_1789759147125_p08djwhbl the folded call returned 5 and 6 reader's-eye
+ * faults on two runs where the same call WITHOUT the size question returned 16
+ * on the same book the same day, and thought less (7.0-7.7k vs 8.6k thinking
+ * tokens). The size question takes attention from the reading, so it keeps its
+ * own call: an 18-page book makes TWO audit calls, down from four. The ask is
+ * cheap (images only, no page text, only the pages a candidate prop is on:
+ * 3.7k input / 36 output measured).
  *
  * AND IT STILL BARELY MEASURES THE THING (validated on the real story,
  * 2026-09-19 — this is the honest state of the check, read it before trusting

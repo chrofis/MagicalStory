@@ -18,15 +18,16 @@
  * explicitly, and a run that flags pages for being picture-heavy or word-heavy
  * is a failed prompt, not a finding.
  *
- * OBJECT SIZE is asked ONCE, in its own call, over every page a recurring
- * Visual Bible prop appears on (2026-09-19). It cannot ride inside the audit's
- * chunks: the audit reads six pages at a time, and "larger than on the other
- * pages" asked of a fragment is not the question — measured, it found 0 of 3
- * true outliers with 2 false positives on job_1789759147125_p08djwhbl, and
- * the whole-book ask finds 1 of 3 on the same story. One complete ask replaces
- * three partial ones, but it is its OWN call: an 18-page book now makes 4
- * audit calls where it made 3. Its answer stays OUT of `byRoute` — it flags for
- * a human and fires no repair. See objectScaleAudit.js.
+ * OBJECT SIZE is asked ONCE, over every page a recurring Visual Bible prop
+ * appears on, in its OWN call (2026-09-19). A per-chunk ask saw only a six-page
+ * fragment, and "larger than on the other pages" asked of a fragment is not the
+ * question (measured: 0 of 3 true outliers, 2 false positives on
+ * job_1789759147125_p08djwhbl; the whole-book ask finds 1 of 3). Folding it
+ * back into the now-whole-book audit call was then built and measured, and
+ * REVERTED: it cost the reader's-eye pass most of its findings (5 and 6 faults
+ * against 16 without it, same story, same day). So an 18-page book makes TWO
+ * audit calls — down from four. Its answer stays OUT of `byRoute` — it flags
+ * for a human and fires no repair. See objectScaleAudit.js.
  *
  * Faults are ROUTED, not scored: FAULT[IMG] means a different image would fix
  * it, FAULT[TEXT] means different prose would. Nothing here repaints anything.
@@ -37,12 +38,33 @@ const { MODEL_DEFAULTS } = require('../config/models');
 const r2Lib = require('./r2');
 const { assertPromptFilled } = require('../services/prompts');
 
-// Pages per vision call. Six pages = six images + six text parts per request,
-// which keeps a chunk well under the inline-data request ceiling and keeps the
-// judge's attention on a readable stretch of book. Chunks run sequentially:
-// the questions are per-page, so nothing is lost by splitting, and a serial
-// walk keeps the rate-limit profile of one cheap Flash call at a time.
-const CHUNK_PAGES = 6;
+// THE WHOLE BOOK GOES IN ONE CALL. This is a guard against a book long enough
+// to strain the output, not a working chunk size — a normal book never reaches
+// it.
+//
+// Measured 2026-09-19 on job_1789759147125_p08djwhbl (18 pages,
+// gemini-2.5-flash, temp 0, 2 runs per mode). The three reasons the old 6-page
+// chunking gave were all false:
+//   - "well under the inline-data ceiling": 18 images are 7.2k prompt tokens.
+//     The ceiling is never approached.
+//   - "keeps the judge's attention on a readable stretch": no tail thinning,
+//     and the single call caught cross-page faults (a scarf gone on p15, a head
+//     that was cold on p18) that a 6-page window is structurally blind to.
+//   - "the questions are per-page, so nothing is lost by splitting": false, and
+//     it is the assumption that made the object-scale question measure nothing.
+// What the single call bought: $0.026 vs $0.041-0.051, 40-43 s vs 68-86 s,
+// 8.8-9.2k thinking vs 14.6-18.6k (the model reasons ONCE, so thinking does not
+// scale with pages), and the serial rate-limit argument favours one call too.
+// NOT proven: quality. Run-to-run variance (15 vs 23 faults between two chunked
+// runs) is larger than the difference between modes, so fault COUNTS prove
+// nothing either way. The solid gains are cost, latency, headroom, and the
+// cross-page faults only one call can see.
+//
+// The guard number: 18 pages wrote 9.5k output tokens against the model's
+// 65,536 ceiling — 15%, ~6.8x headroom. 24 pages is 1.33x that book, ~20% of
+// the ceiling, still ~5x headroom, and no book this pipeline produces is
+// longer. A book of 25+ pages splits into calls of at most 24.
+const MAX_PAGES_PER_CALL = 24;
 
 // Every fault line, tagged with its route. LEADING WHITESPACE IS TOLERATED on
 // purpose: the judge sometimes nests a fault under the page it was reasoning
@@ -212,7 +234,14 @@ async function judgeParts(parts, modelId, thinkingLevel) {
   return judgeGeminiParts(parts, modelId, thinkingLevel);
 }
 
-/** One vision call over one chunk of pages. Returns raw text + usage. */
+/**
+ * One vision call over one chunk of pages — normally the WHOLE book.
+ *
+ * It asks the reader's-eye questions and nothing else. Folding the object-size
+ * question into this same call was built and measured on 2026-09-19 and REVERTED:
+ * it thinned the reader's-eye faults to 5 and 6 where the same call without it
+ * found 16 on the same story. Returns raw text + usage.
+ */
 async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   const { fillTemplate } = require('../services/prompts');
   const instructions = fillTemplate(template, {
@@ -473,11 +502,13 @@ async function auditStoryBook(storyData, opts = {}) {
     }
 
     const chunks = [];
-    for (let i = 0; i < prepared.length; i += CHUNK_PAGES) chunks.push(prepared.slice(i, i + CHUNK_PAGES));
+    for (let i = 0; i < prepared.length; i += MAX_PAGES_PER_CALL) {
+      chunks.push(prepared.slice(i, i + MAX_PAGES_PER_CALL));
+    }
 
-    // OBJECT SIZE — one extra question inside the calls the audit already
-    // makes. Absences use the shared notEvaluated vocabulary so an analyst
-    // reading stored data sees "could not check" the same way everywhere.
+    // OBJECT SIZE — one whole-book question. Absences use the shared
+    // notEvaluated vocabulary so an analyst reading stored data sees
+    // "could not check" the same way everywhere.
     const scaleLib = require('./objectScaleAudit');
     const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext: 'book' });
     let scaleCandidates = [];
@@ -516,7 +547,16 @@ async function auditStoryBook(storyData, opts = {}) {
     }
     if (raws.length === 0) throw new Error('every chunk failed');
 
-    // ONE complete ask, after the reader's-eye pass, over the whole book.
+    // ONE complete ask, in its OWN call, over the whole book.
+    //
+    // It is NOT folded into the audit call above, and that was measured rather
+    // than assumed (2026-09-19, job_1789759147125_p08djwhbl, gemini-2.5-flash,
+    // temp 0): with the size question appended to the single whole-book call
+    // the reader's-eye pass returned 5 and 6 faults on two runs, where the same
+    // call without it returned 16 on the same book the same day — it also
+    // thought less (7.0-7.7k vs 8.6k). The extra call is cheap (images only, no
+    // page text, only the pages a candidate prop is on); the attention it costs
+    // the reader's-eye pass is not.
     let objectScale = null;
     if (objectScaleEnabled) {
       const scaleRun = await askObjectScale(scaleCandidates, prepared, modelId, thinkingLevel);
@@ -572,5 +612,5 @@ module.exports = {
   parseRoutes,
   collectObjectScale,
   askObjectScale,
-  CHUNK_PAGES,
+  MAX_PAGES_PER_CALL,
 };
