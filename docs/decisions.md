@@ -21,6 +21,51 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — The shipped single-call object-scale question does NOT carry the cross-page signal (measured, reported, not re-engineered)
+
+**Context.** `4578a1540` demoted the object-scale audit from three shuffled reads + intersection
+(a RESEARCH method) to ONE more question inside the book reviewer's existing call. That refactor
+was unit-tested but had never been run against a real story. The earlier result that correctly
+named pages 3 and 5 came from the three-call version.
+
+**Decision.** Run it once, on stored staging data, and record the outcome. It was run against
+`job_1789759147125_p08djwhbl` (18 pages, `gemini-2.5-flash`, 3 chunks of 6, 9,391 input /
+14,598 output-incl-thinking tokens, ≈ $0.039 ≈ CHF 0.03). **It named none of the three true
+outliers.**
+
+Ground truth by eye on the shipped pages: the dragon egg (`ART001`, cited on p2,3,4,5,7,8,9,14,16)
+is larger on p3 (1.69x) and p5 (1.83x) and smaller on p9 (0.65x), with p8 (0.88) borderline.
+
+What the shipped question returned:
+- chunk p1-6 (holds p2,3,4,5 — both LARGE outliers): `SCALE: none`
+- chunk p7-12 (holds p7,8,9 — the SMALL outlier): `SCALE[LARGER]: Raven — p8`, `SCALE[SMALLER]: Raven — p11`
+- chunk p13-18 (holds p14,16): `SCALE: none`
+- egg verdict: `larger: [], smaller: []`. Hits 0/3. Misses 3/3. False positives 2, both on a bird
+  whose apparent size varies with wing spread.
+
+The `SCALE[...]` grammar parsed correctly — `parseScaleAnswer` read both lines, `collectObjectScale`
+matched labels and the `notEvaluated` record for the single-page `Fünkli` fired as designed. **The
+plumbing works; the measurement does not.**
+
+A second structural finding the run exposed: the audit reads the book in `CHUNK_PAGES = 6` chunks
+and the scale question is rebuilt **per chunk**, so no call ever sees more than the egg's pages that
+fall inside one chunk (4, then 3, then 2). "Larger than on the rest of the book" is not a question
+the reviewer is ever actually asked.
+
+**Rationale.** The owner has ruled one call, once, and re-engineering back to three shuffled reads
+is explicitly out of scope. The honest record is that the accuracy cost documented in `4578a1540`
+was understated: it is not "2-3 false positives come back", it is "the true outliers are also lost".
+The finding is reported and the code is left alone pending an owner decision.
+
+**Touched:** nothing — this entry records a measurement. The code under test is
+`server/lib/objectScaleAudit.js`, `server/lib/bookAudit.js` (`collectObjectScale`, `CHUNK_PAGES`)
+and `prompts/book-audit.txt`.
+
+**Status:** 🟡 conditional — the object-scale question ships as-is and flags a human; on this
+evidence it flags the wrong pages. Owner decision pending.
+
+---
+
 ## 2026-09-19 — The obstacle is the outside event that FORCES the commissioned skill, not the skill itself — and the metric that measured it was wrong
 
 **Context.** Two live instructions on the trial idea path contradicted each other for roughly half
