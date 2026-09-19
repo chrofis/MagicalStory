@@ -2288,9 +2288,11 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // gets it wrong (a real trial put a town on the wrong river). Name the town,
     // and let no other place be invented beside the ones supplied.
     // The arms fire in parallel, so neither can be told to differ from the
-    // other — the difference is built in: the own-town arm carries the band's
-    // plot mechanics, the make-believe arm only its tone, and each arm draws its
-    // own rotated variety axis (Lab 1273, docs/decisions.md 2026-09-14).
+    // other — the difference is built in: both arms carry every PREMISE rule of
+    // the band (the make-believe arm reads the `premise-open` view, widened from
+    // the old tone-only one on 2026-09-16), the own-town arm additionally carries
+    // the band's plot mechanics, and the two arms draw variety axes of DIFFERENT
+    // shape classes (Lab 1273, docs/decisions.md 2026-09-14 and 2026-09-19).
     // Assembly lives in buildTrialIdeaPrompts so the Lab's variety stage
     // measures the prompt production actually sends.
     const { buildTrialIdeaPrompts } = require('../lib/promptBuilders');

@@ -192,6 +192,46 @@ describe('the variety axis varies across draws', () => {
     expect(d1.fantasy).not.toBe(d2.fantasy);
   });
 
+  // Round 6: 5 of 14 cells came back with the two arms on the SAME premise shape
+  // in different nouns, because one cursor called twice handed the arms adjacent
+  // entries and four of the seven entries are the same `deliver` shape
+  // (docs/decisions.md, 2026-09-19). Pins the CONTRACT — the arms never share a
+  // shape class, and no entry is starved — never the wording of an axis.
+  it('the two arms of a cell never share a shape class', () => {
+    for (let cell = 0; cell < 40; cell++) {
+      const { local, fantasy } = pb.nextIdeaAxisPair();
+      expect(local.shape).toBeTruthy();
+      expect(fantasy.shape).not.toBe(local.shape);
+      expect(fantasy.want).not.toBe(local.want);
+    }
+  });
+
+  it('every want entry still reaches both arms over a rotation', () => {
+    const seen = { local: new Set<string>(), fantasy: new Set<string>() };
+    for (let cell = 0; cell < 60; cell++) {
+      const { local, fantasy } = pb.nextIdeaAxisPair();
+      seen.local.add(local.want);
+      seen.fantasy.add(fantasy.want);
+    }
+    const total = pb.IDEA_WANT_AXES.length;
+    expect(seen.local.size).toBe(total);
+    expect(seen.fantasy.size).toBe(total);
+  });
+
+  it('the companion axis is untouched — it alternates, never repeating across a cell', () => {
+    for (let cell = 0; cell < 20; cell++) {
+      const { local, fantasy } = pb.nextIdeaAxisPair();
+      expect(fantasy.companion).not.toBe(local.companion);
+    }
+  });
+
+  it('the built prompts carry the two differing axes', () => {
+    const { local, fantasy, axes } = pb.buildTrialIdeaPrompts(args(5));
+    expect(axes.local.shape).not.toBe(axes.fantasy.shape);
+    expect(local).toContain(axes.local.text);
+    expect(fantasy).toContain(axes.fantasy.text);
+  });
+
   it('costs nothing of consequence — one short line per arm', () => {
     const { text } = pb.nextIdeaVarietyAxis();
     expect(text.split(/\s+/).length).toBeLessThan(30);

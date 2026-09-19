@@ -63,6 +63,57 @@ nothing traceable to the card.
 
 ---
 
+## 2026-09-19 — RESOLVED: the trial idea arms draw wants of DIFFERENT SHAPE CLASSES, from two cursors
+
+**Context.** Resolves the open question recorded below the same day (round 6: 2 clear duplicate
+premise shapes and 3 near-duplicates across 14 cells, invisible to a Jaccard word-overlap check).
+Cause as measured there: `nextIdeaVarietyAxis()` ran off ONE module-global cursor that
+`buildTrialIdeaPrompts` called twice in a row, so a cell got entries `i` and `i+1` of
+`IDEA_WANT_AXES` — and four of that list's seven entries are the same move-an-object shape.
+
+**Decision (owner, 2026-09-19).** Each `IDEA_WANT_AXES` entry now carries a **shape class**, and the
+fantasy arm draws a want of a DIFFERENT class from the local arm's:
+
+| # | want | shape |
+|---|------|-------|
+| 0 | give away, not to get | `deliver` |
+| 1 | put back where it belongs | `deliver` |
+| 2 | somewhere to reach | `arrive` |
+| 3 | finished before a moment passes | `finish` |
+| 4 | someone to bring along | `deliver` |
+| 5 | something to make | `make` |
+| 6 | carried safely to the end | `deliver` |
+
+`nextIdeaAxisPair()` is the new draw. The local arm and BOTH companions still come off the shared
+cursor, so the companion sequence is byte-identical to the old one (it never collided: list length 4
+against a cursor that advances twice per cell). The fantasy arm has its **own** cursor — added
+deliberately, so the arms are not phase-locked — walking the same want list in order; a shape
+collision does NOT consume its turn (that entry meets a different local axis next cell), and the
+cell is served from a small substitute rotation instead. Rendered over 14 consecutive cells the two
+arms differ in class **every** time and all seven wants still reach **both** arms; over 200 more,
+still all seven, still zero collisions. Three of the four classes have a single member, so when the
+local arm draws `deliver` (four of seven entries) the fantasy arm must land on `arrive`, `finish` or
+`make` — that is the intent, not a degenerate case; the substitute scan is bounded by the list
+length and falls back to the next slot if a future list ever collapsed to one class.
+
+**Rejected, explicitly: re-thinning the fantasy arm's rule set.** Making the arms differ by giving
+the make-believe arm fewer rules would reintroduce exactly the fault `fdc85a290`, `862432a85` and
+the band-view migration were built to fix — that arm stopping on the problem instead of resolving it
+— and would weaken the 2026-08-25 "the arms differ in KIND" decision rather than serve it. Both arms
+stay fully ruled; only the axis draw carries the difference. No rule set and no prompt text was
+touched.
+
+**Also fixed:** the stale comment at `server/routes/trial.js` still said the make-believe arm gets
+"only its tone" — that view was renamed and widened to `premise-open` on 2026-09-16.
+
+**Touched:** `server/lib/promptBuilders.js` (`IDEA_WANT_AXES`, `ideaAxisAt`, `nextIdeaVarietyAxis`,
+`nextIdeaAxisPair`, `buildTrialIdeaPrompts`), `server/routes/trial.js` (comment),
+`tests/unit/trial-idea-variety.test.ts` (4 contract tests: never the same class, no entry starved on
+either arm, companion unchanged, the built prompts carry both axes).
+**Status:** ✅ active — staging only.
+
+---
+
 ## 2026-09-19 — OPEN QUESTION: the two trial idea arms converge on one premise SHAPE, and lexical overlap cannot see it
 
 **Context.** The `/try` idea endpoint returns two cards per cell — an own-town card and a
@@ -125,7 +176,7 @@ kind; both arms are meant to be fully ruled. Only the axis draw can carry the di
 **Touched:** nothing — recorded as an open question. Reading: `server/lib/promptBuilders.js`
 (`nextIdeaVarietyAxis`, `IDEA_WANT_AXES`, `buildTrialIdeaPrompts`, `BAND_VIEW_KEEPS`),
 `server/routes/trial.js`.
-**Status:** 🟡 open — awaiting the owner.
+**Status:** ✅ closed — resolved the same day by the entry above (shape-class draw).
 
 ---
 
