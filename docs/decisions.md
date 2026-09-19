@@ -47934,3 +47934,87 @@ which already stores both its prompt and its model's full text.
 `tests/unit/beats-report-keeps-its-evidence.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The worn-item cast gate tests the person the row CHANGES, not only the owner (and an off-page name never reaches the prompt)
+
+**Context.** `wearer` shipped 2026-09-15 (`c3e92e2f0`, `46fa1a22c`, `2193438b6`): the
+`wornItems[]` schema, the handover line in `buildWornStateLines`, the swap in
+`applyWornItemsToOutfit` and `resolveWearer` all support a garment being worn by
+someone other than its owner. **The cast gate did not.** Both resolver sources in
+`server/lib/wornItems.js` asked the same question of the same person —
+`castNames.some(n => sameName(n, item.owner))` — so a handover row whose OWNER is
+off the page was discarded before `resolveWearer` ever saw it. The page then
+shipped with no WORN ITEMS block at all and the garment was drawn wherever the
+attached references happened to put it.
+
+Measured (read-only staging pulls, resolver replayed against the stored final
+briefs): `job_1789759147125_p08djwhbl` **p17** — cast `["Julian","Julian"]`, row
+`{id: CLO002, owner: Levin, wearer: Julian, state: worn}`, Levin off-page —
+resolved to `[]` on the deployed code. Two adjacent pages were checked and are
+**not** this shape and are unchanged: p9 of the same story and p10 of
+`job_1789348171785_9oxos7dwv` each carry an `off` row owned by an off-page Levin
+with `wearer: null`, which is an ordinary absent-owner row and is correctly, and
+still silently, dropped.
+
+**Decision.**
+1. **One predicate, `castKeepsWornRow`, for both resolver sources.** A row is kept
+   when the owner **or** the declared wearer is in the page cast. The fork it
+   replaces is exactly the class of hand-maintained copy that drifts.
+2. **No off-page name in a prompt-facing string.** When a handover row survives on
+   its WEARER alone, the built line names only the wearer — `"- <wearer> IS
+   wearing this on this page: <item>. Draw it on <wearer>."` — instead of the
+   two-name form. Naming the absent owner would put an off-page name into the
+   image prompt and invite the model to draw the character the page excludes,
+   which is the fault `2193438b6` exists to prevent; that commit's mechanism was
+   to withhold the name at the point the string is built, and this follows it. The
+   full two-name form is unchanged when both are in the cast. Rows carry
+   `ownerInCast`, and the new branch is gated on `=== false` so a row built
+   without the field renders exactly as before.
+3. **The genuine drop is loud.** When NEITHER owner nor wearer is on the page the
+   row is still discarded — but a *handover* dropped that way means the brief
+   wrote a garment transfer between two characters the page does not contain, and
+   it now warns with the module's `[WORN] Page N:` prefix. An ordinary row whose
+   owner is simply elsewhere stays silent: that is the common case on every page
+   of every story, and the existing loud path (`unlinkedWornCandidates`) only ever
+   fired for `state: "off"`.
+
+**This COMPLETES the 2026-09-15 handover feature; it does not reverse it.** No
+`docs/SETTLED.md` line covers the worn-item handover resolver, the cast filter on
+`wornItems`, or the three 2026-09-15 commits — searched before any code moved.
+
+**Touched:** `server/lib/wornItems.js` (`castKeepsWornRow`,
+`resolveWornItemsForPage` both sources, `buildWornStateLines`),
+`tests/unit/worn-handover-owner-offcast.test.ts`.
+**Status:** ✅ active
+
+## 2026-09-19 — Restoring an undeclared cast removal is idempotent, and an unparseable cast is not an emptied cast
+
+**Context.** `restoreUndeclaredRemovals` (2026-09-17) splices the rows a review
+dropped back into the reviewed brief's `characters[]`. It appended blind. On
+staging `job_1789759147125_p08djwhbl` p17 that produced `characters:
+["Julian","Julian"]` — the fingerprint being a pretty-printed first row (model
+output) beside a compact `JSON.stringify` second (this function's). The trigger
+was a metadata parse failure feeding `diffCastRemovals` a false "cast emptied"
+diff. That parser is fixed (`b5443396a`), but a guard whose correctness depends
+on a parser succeeding upstream is not a guard.
+
+**Decision.** Two independent belts:
+1. Before splicing, the function reads the **reviewed brief's own**
+   `characters[]` and drops every `undeclared` name already present, comparing
+   canonically through the module's `castNameSet` — never raw string equality. A
+   page where every "dropped" name turns out to be present restores nothing and,
+   crucially, is **not** reverted either. The whole-brief revert fallback for a
+   brief whose `characters[]` cannot be located structurally is unchanged.
+2. The caller in `beatsPipeline.js` skips a page whose post-review metadata came
+   back `isRecovered === true` (the recovery-path marker documented at
+   `sceneMetadata.js` `describeDegradedSceneMetadata`) rather than reading its
+   empty `characters[]` as a silent removal of the whole cast. A degraded brief is
+   a recorded input, never a fault verdict — the same contract `isRecovered`
+   already carries everywhere else.
+
+**Touched:** `server/lib/sceneReviewGuard.js` (`restoreUndeclaredRemovals`),
+`server/lib/beatsPipeline.js` (the `diffCastRemovals` call site),
+`tests/unit/worn-handover-owner-offcast.test.ts`.
+**Status:** ✅ active

@@ -328,7 +328,21 @@ function restoreUndeclaredRemovals(expansions, sceneDiffs, changed, audit) {
     const x = (expansions || []).find(e => e && e.pageNumber === row.pageNumber);
     if (diffAt < 0 || !x) continue;
     const before = sceneDiffs[diffAt].before;
-    const rows = castEntriesFor(before, row.undeclared);
+    // IDEMPOTENT (2026-09-19). The splice used to append blind, so a name the
+    // reviewed brief already lists was added a SECOND time: staging
+    // job_1789759147125_p08djwhbl p17 shipped `characters: ["Julian","Julian"]`
+    // — the fingerprint being a pretty-printed first row (model output) and a
+    // compact `JSON.stringify` second (this function's). The root trigger there
+    // was a parse failure feeding a false "cast emptied" diff, and that parser
+    // is fixed (b5443396a) — but this guard must not depend on a parser
+    // succeeding upstream. Comparison is canonical, through `castNameSet`,
+    // never raw string equality.
+    const alreadyThere = castNameSet(castEntriesFor(x.brief, row.undeclared).map(r => r.name));
+    const stillMissing = row.undeclared.filter(n => !alreadyThere.has(String(n).trim().toLowerCase()));
+    // Every "dropped" name is in fact present: nothing was removed, so nothing
+    // is restored and — crucially — the page is NOT reverted either.
+    if (stillMissing.length === 0) continue;
+    const rows = castEntriesFor(before, stillMissing);
     const span = rows.length > 0 ? castArraySpan(x.brief) : null;
     if (span) {
       const inner = String(x.brief).slice(span.open + 1, span.close);
@@ -347,7 +361,7 @@ function restoreUndeclaredRemovals(expansions, sceneDiffs, changed, audit) {
     sceneDiffs.splice(diffAt, 1);
     const ci = (changed || []).indexOf(row.pageNumber);
     if (ci >= 0) changed.splice(ci, 1);
-    revertRows.push({ pageNumber: row.pageNumber, undeclared: row.undeclared });
+    revertRows.push({ pageNumber: row.pageNumber, undeclared: stillMissing });
   }
   return { restored, reverted: revertRows };
 }

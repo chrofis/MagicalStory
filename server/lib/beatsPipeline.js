@@ -2542,6 +2542,18 @@ ${bibleBody}` : bibleBody;
       castRemovalAudit = diffCastRemovals(
         sceneDiffs.map(d => {
           const mb = metaOf(d.before), ma = metaOf(d.after);
+          // CAST UNPARSEABLE IS NOT CAST EMPTIED (2026-09-19). A brief whose
+          // parsers all failed comes back from the recovery path with
+          // `isRecovered: true` and an empty `characters[]`
+          // (sceneMetadata.js, describeDegradedSceneMetadata) — and the name
+          // arithmetic below would read that emptiness as the reviewer having
+          // silently dropped the entire page cast, then "restore" rows into a
+          // roster that in fact still lists them. Skip the page instead; a
+          // degraded brief is a known-recorded input, never a fault verdict.
+          if (ma.isRecovered === true) {
+            log.warn(`⚠️ [BEATS] Page ${d.pageNumber}: reviewed brief came back from the metadata recovery path — cast-removal diff skipped for this page (unparseable is not emptied)`);
+            return null;
+          }
           // `objects[]` carries the Visual Bible secondaries. A name that moved
           // there is still commissioned — routing, not removal.
           return {
@@ -2550,7 +2562,7 @@ ${bibleBody}` : bibleBody;
             afterCast: ma.characters || [],
             afterObjects: (ma.objects || []).map(o => (typeof o === 'string' ? o : (o && (o.id || o.name)))).filter(Boolean),
           };
-        }),
+        }).filter(Boolean),
         castRemovals
       );
       if (castRemovals.malformed.length > 0) {

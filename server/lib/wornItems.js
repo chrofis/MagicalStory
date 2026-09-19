@@ -300,6 +300,46 @@ function resolveWearer({ id, owner, declaredWearer, state, location, castNames, 
 }
 
 /**
+ * Does this page's cast keep a worn row? (2026-09-19)
+ *
+ * THE GATE TESTS THE PERSON THE ROW CHANGES, NOT ONLY THE OWNER. `wornAs` names
+ * the item's HOME — one owner, one slot — and until now both resolver sources
+ * gated on that home alone: `castNames.some(n => sameName(n, item.owner))`. A
+ * HANDOVER row (2026-09-15) names a different `wearer`, and when the owner is
+ * off this page the row was discarded before `resolveWearer` ever saw it, so
+ * the page shipped with no WORN ITEMS block at all and the garment was drawn
+ * wherever the references put it. Measured on staging:
+ * `job_1789759147125_p08djwhbl` p17 and p9 (CLO002, a jacket handed to another
+ * child while its owner is off-page) and `job_1789348171785_9oxos7dwv` p10 —
+ * all three resolved to `[]`.
+ *
+ * This COMPLETES the handover feature; it does not reverse it. The schema, the
+ * prompt line, `applyWornItemsToOutfit`'s swap and `resolveWearer` all already
+ * supported a wearer who is not the owner — only the gate did not.
+ *
+ * ONE predicate for both resolver sources on purpose: the fork it replaces is
+ * exactly the class of hand-maintained copy that drifts.
+ *
+ * A row neither of whose named people is on the page is correctly dropped — but
+ * a HANDOVER dropped that way is loud, because it means the brief wrote a
+ * garment transfer between two characters the page does not contain. An
+ * ordinary row whose owner is simply elsewhere stays silent: that is the common
+ * case on every page of every story.
+ *
+ * @returns {boolean} keep the row
+ */
+function castKeepsWornRow({ castNames, owner, declaredWearer, id, pageLabel }) {
+  const inCast = (n) => !!String(n || '').trim() && castNames.some(x => sameName(x, n));
+  if (inCast(owner)) return true;
+  const wearer = String(declaredWearer || '').trim();
+  if (!wearer || sameName(wearer, owner)) return false;
+  if (inCast(wearer)) return true;
+  log.warn(`[WORN] Page ${pageLabel}: ${id} declares a handover from "${owner}" to "${wearer}" and NEITHER is in this page's cast `
+    + `(${castNames.join(', ') || 'no cast'}) — the row is dropped. Nothing is stripped or swapped on this page.`);
+  return false;
+}
+
+/**
  * Per-page worn state for every worn element whose OWNER is in the page cast.
  *
  * TWO sources, and the second is why e403345b1 was inert in practice
@@ -347,8 +387,10 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
   const linked = new Set();
   for (const item of wornAsEntries(visualBible)) {
     linked.add(item.id);
-    if (!castNames.some(n => sameName(n, item.owner))) continue;
     const d = declared.get(item.id) || null;
+    // The gate tests the person the row CHANGES — owner OR declared wearer.
+    // See castKeepsWornRow.
+    if (!castKeepsWornRow({ castNames, owner: item.owner, declaredWearer: d && d.wearer, id: item.id, pageLabel })) continue;
     const stateDeclared = d && d.state ? d.state : null;
     const location = (d && d.location) || null;
     // HANDOVER (2026-09-15). `wornAs` names the item's HOME — one owner, one
@@ -376,6 +418,10 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       owner: item.owner,
       wearer,
       handedOver,
+      // Is the OWNER on this page? A handover row survives the gate on its
+      // WEARER alone, and then the owner's name must not reach a prompt-facing
+      // string — see buildWornStateLines and commit 2193438b6.
+      ownerInCast: castNames.some(n => sameName(n, item.owner)),
       // The writer LINKED this item to an outfit (`wornAs`), so the owner's
       // avatar reference demonstrably carries it — see referenceCarriesItem.
       wornAsLinked: true,
@@ -424,7 +470,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       }
       continue;
     }
-    if (!castNames.some(n => sameName(n, owner))) continue;
+    if (!castKeepsWornRow({ castNames, owner, declaredWearer: d.wearer, id: d.id, pageLabel })) continue;
     const w2 = resolveWearer({
       id: d.id, owner, declaredWearer: d.wearer || null,
       state: d.state, location: d.location || null, castNames, pageLabel,
@@ -436,6 +482,7 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
       owner,
       wearer: w2.wearer,
       handedOver: !sameName(w2.wearer, owner),
+      ownerInCast: castNames.some(n => sameName(n, owner)),
       // NO `wornAs` link: nothing promises this item is part of the wearer's
       // wardrobe, so no attached reference shows it on them.
       wornAsLinked: false,
@@ -566,6 +613,16 @@ function buildWornStateLines(resolved) {
     if (!name) continue;
     const look = wornItemLook(r);
     const item = look ? `${name} — ${look}` : name;
+    // OWNER OFF THIS PAGE (2026-09-19). The row survived the cast gate on its
+    // WEARER; naming the owner here would put an off-page name into a
+    // prompt-facing string and invite the model to draw the absent character —
+    // the fault commit 2193438b6 exists to prevent. Say only what the page
+    // needs: this character is wearing it, draw it on them. `=== false` on
+    // purpose — a row built without the field keeps the old rendering.
+    if (r.ownerInCast === false && r.handedOver) {
+      lines.push(`- ${r.wearer} IS wearing this on this page: ${item}. Draw it on ${r.wearer}.`);
+      continue;
+    }
     // The item NAME sits at the end of its own clause on purpose: every VB name
     // in a prompt is substituted for an English description-derived ref by
     // sanitizeVbIdsInPrompt, and that ref can end mid-phrase. At a clause
