@@ -1252,7 +1252,7 @@
       "impact": "Every protected landmark page. Stored eval data silently disagrees with the judge's own complianceResult, so any later audit of judge precision, guard precision or finding counts reads short — and the guard's own false-drop rate (11 of 15 measured fires on staging were a prop, not the landmark, before the 2026-09-18 subject trigger) cannot be measured from stored rows at all.",
       "status": "fixed",
       "fixedAt": "2026-09-19",
-      "fixedIn": "PENDING",
+      "fixedIn": "7c1aa836dd94748d3a125c052f4b1c227acece1e",
       "fix": "filterProtectedRemovals gains a third return value, `suppressed`: the dropped findings, copied (never mutated) and stamped `suppressed: 'landmark_protected'` plus `suppressedBy` naming which of the guard's two rules fired. evaluateThreeStage carries it as `suppressedIssues` and applyScore stores it as scoreBreakdown.threeStage.suppressedIssues — a SIBLING of `issues`, in the same recording-only shape `notEvaluated` already uses, never a member of it. `kept` is byte-identical to before, so deductions, hasCatastrophic, shouldRedo, findBadPages' issueThreshold count and the consolidator are untouched and a suppressed CRITICAL cannot push a page over a count threshold. No text matching: the guard still triggers on the declared landmark_element field and the `fix` edit instruction. Pinned by tests/unit/landmark-suppressed-record.test.ts (9 cases, fixtures are the real stored p1 findings), including an explicit score-identity assertion."
     },
     {
@@ -1264,7 +1264,7 @@
       "impact": "68 of 1,392 stored staging pages (4.9%), purely additive — no page loses a roster name. On those pages the judge was never told a named creature was staged, so an absent one could not be reported and a drawn one could be read as a surplus figure. NOT FIXED BY THIS, measured the same way: of 85 distinct missing_character subjects in the corpus, 16 are off-roster and ALL 16 name a figure in no Visual Bible pool at all — a separate defect (a judge inventing a name), untriaged.",
       "status": "fixed",
       "fixedAt": "2026-09-19",
-      "fixedIn": "PENDING",
+      "fixedIn": "7c1aa836dd94748d3a125c052f4b1c227acece1e",
       "fix": "buildSecondaryExpectedForPage takes the same `includeAnimals` opt-in its sibling buildSecondaryCharacterDescriptions already has, default OFF, and the evaluator roster opts in — an extension of the existing enrichment, not a second roster builder. It stays off by default because the other caller is the DETECTOR roster (storyJobPipeline), where the owner's 2026-08-19 ruling holds: GroundingDINO detects `person`, so an animal on a detector roster is a guaranteed missing person. Its description builder now also reads species/coloring/features. Nothing identity-matches a creature against a photo it does not have: the photo-backed cast is sceneCharacters alone, vbNonHumanNames already pools vb.animals so the new entries land in nonHumanNames and stay out of the people arithmetic, and charRepairTarget never passes pageNumber so this branch does not run on the repair path. testlab.js calls the same builder with pageNumber, so the Lab mirror inherits the fix. Pinned by tests/unit/creature-declares-page-roster.test.ts (11 cases, real stored Visual Bible)."
     }
   ]
