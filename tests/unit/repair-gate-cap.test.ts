@@ -15,7 +15,7 @@ import { describe, it, expect } from 'vitest';
 //      one 14-page story repaired all 14 in round 2 AND all 14 again in round 3.
 
 // @ts-expect-error - JS module without types
-import { findBadPages, applyRoundCap, SAFE_REPAIRABLE_TYPES } from '../../server/lib/repairLogic.js';
+import { findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, SAFE_REPAIRABLE_TYPES } from '../../server/lib/repairLogic.js';
 // @ts-expect-error - JS module without types
 import { REPAIR_DEFAULTS } from '../../server/config/models.js';
 
@@ -146,6 +146,49 @@ describe('per-round cap', () => {
     const r = applyRoundCap([4, 9], { round: 1, totalPages: 14 });
     expect(r.admitted).toEqual([4, 9]);
     expect(r.deferred).toEqual([]);
+  });
+
+  // LAST ROUND: a deferral is a drop, so an over-cap CRITICAL is rescued
+  // (2026-09-19, job_1789759147125_p08djwhbl p14/p18).
+  it('on the LAST round, over-cap pages carrying a CRITICAL are admitted on the reserved allowance', () => {
+    const worstFirst = [2, 17, 10, 11, 8, 12, 7, 3, 1, 14, 18, 15, 16];
+    const r = applyRoundCap(worstFirst, {
+      round: 1, totalPages: 18, lastRound: true,
+      criticalPageNums: [2, 17, 10, 11, 8, 12, 7, 3, 1, 14, 18, 15, 16],
+    });
+    expect(r.cap).toBe(9);
+    expect(r.admitted.slice(0, 9)).toEqual([2, 17, 10, 11, 8, 12, 7, 3, 1]);
+    expect(r.lastRoundCritical).toEqual([14, 18, 15, 16]);
+    expect(r.admitted).toContain(14);
+    expect(r.admitted).toContain(18);
+    expect(r.deferred).toEqual([]);
+  });
+
+  it('the last-round allowance is bounded and severity-driven', () => {
+    const worstFirst = Array.from({ length: 20 }, (_, i) => i + 1);
+    const allCritical = applyRoundCap(worstFirst, {
+      round: 1, totalPages: 20, lastRound: true, criticalPageNums: worstFirst,
+    });
+    // cap 10 + at most LAST_ROUND_CRITICAL_MAX (5) — never the whole book.
+    expect(allCritical.admitted).toHaveLength(10 + LAST_ROUND_CRITICAL_MAX);
+    expect(allCritical.deferred).toHaveLength(20 - 10 - LAST_ROUND_CRITICAL_MAX);
+
+    // No CRITICAL over the cap → the cap is exactly what it always was.
+    const noneCritical = applyRoundCap(worstFirst, {
+      round: 1, totalPages: 20, lastRound: true, criticalPageNums: [1, 2, 3],
+    });
+    expect(noneCritical.admitted).toEqual(worstFirst.slice(0, 10));
+    expect(noneCritical.lastRoundCritical).toEqual([]);
+  });
+
+  it('a NON-final round still defers criticals unchanged (they come back)', () => {
+    const worstFirst = [7, 2, 9, 4, 1, 8, 3];
+    const r = applyRoundCap(worstFirst, {
+      round: 2, totalPages: 10, lastRound: false, criticalPageNums: [4, 1],
+    });
+    expect(r.admitted).toEqual([7, 2, 9]);
+    expect(r.deferred).toEqual([4, 1, 8, 3]);
+    expect(r.lastRoundCritical).toEqual([]);
   });
 
   it('bounds the measured runaway: 14 pages bad on a 14-page story', () => {

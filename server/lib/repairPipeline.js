@@ -2161,10 +2161,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // PER-ROUND CAP (owner, 2026-09-09): a round may work on at most 50% (round 1)
     // / 30% (later rounds) of the story's pages, worst first. Capped-out pages are
     // DEFERRED — they are still bad next round and come back. Never fails a job.
-    const { applyRoundCap } = require('./repairLogic');
+    // ON THE LAST ROUND A DEFERRAL IS A DROP (2026-09-19) — with repairMaxPasses
+    // at 1 (staging/local) round 1 is already the last round. The cap therefore
+    // gets told whether a later round exists and which pages carry a CRITICAL,
+    // so those cannot be dropped unrepaired. See repairLogic.applyRoundCap.
+    const { applyRoundCap, hasCriticalSeverityFinding } = require('./repairLogic');
+    const criticalPageNums = Object.keys(roundEvalPages)
+      .map(pn => parseInt(pn, 10))
+      .filter(pn => !isNaN(pn) && hasCriticalSeverityFinding(roundEvalPages[pn]));
     const cappedRound = applyRoundCap(badPageNums, {
       round,
       totalPages: Object.keys(roundEvalPages).length,
+      lastRound: round >= roundLimit,
+      criticalPageNums,
     });
     badPageNums = cappedRound.admitted;
     // The reserved allowance, appended AFTER the cap so it cannot be displaced.

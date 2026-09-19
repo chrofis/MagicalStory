@@ -199,6 +199,14 @@ function admitPagesFromAudit(imgFaults) {
 }
 
 /**
+ * How many over-cap pages carrying a CRITICAL/CATASTROPHIC finding the LAST
+ * repair round may take on top of its cap (2026-09-19). Reserved, not shared —
+ * appended after the score-ranked slice — and bounded so a book full of
+ * CRITICALs cannot turn the final round into a whole-book regeneration.
+ */
+const LAST_ROUND_CRITICAL_MAX = 5;
+
+/**
  * PER-ROUND REPAIR CAP (owner, 2026-09-09).
  *
  * Limits how many of a story's pages a single repair round may work on: round 1
@@ -211,11 +219,29 @@ function admitPagesFromAudit(imgFaults) {
  * findBadPages returns them again. The cap never fails a job — it only bounds the
  * work (and the spend) per round.
  *
+ * THERE IS NO "NEXT ROUND" ON THE LAST ROUND (2026-09-19). The deferral above is
+ * the cap's whole justification, and it is only true while a later round exists.
+ * With `repairMaxPasses` at 1 (staging, local) round 1 IS the last round, so every
+ * deferral was a silent DROP — measured on `job_1789759147125_p08djwhbl`: 15 bad
+ * pages on an 18-page story, cap 9, and the 6 over the cap were never looked at
+ * again. p14 (finalScore 45, `clothing` CRITICAL) and p18 (48, `action_interaction`
+ * CRITICAL) shipped with one version and an empty retryHistory, in flat
+ * contradiction of the 2026-09-04 ruling that a CRITICAL forces a redo regardless
+ * of score. So on the LAST round the cap keeps its slice for the score-ranked
+ * pages, and pages carrying a CRITICAL/CATASTROPHIC finding that it would
+ * otherwise drop are admitted as a RESERVED allowance on top — the same shape as
+ * the book audit's allowance, and bounded by `LAST_ROUND_CRITICAL_MAX` so a
+ * many-CRITICAL book cannot turn the final round into a whole-book regeneration.
+ * The allowance is severity-driven only; WHAT to fix stays the consolidator's call.
+ *
  * @param {number[]} orderedPageNums - Bad pages, WORST FIRST (findBadPages order)
  * @param {Object} opts
  * @param {number} opts.round - 1-based round number
  * @param {number} opts.totalPages - Pages in the story
- * @returns {{ admitted: number[], deferred: number[], cap: number }}
+ * @param {boolean} [opts.lastRound] - No further round will run after this one
+ * @param {Iterable<number>} [opts.criticalPageNums] - Pages carrying a
+ *   CRITICAL/CATASTROPHIC finding this round (from `hasCriticalSeverityFinding`)
+ * @returns {{ admitted: number[], deferred: number[], cap: number, lastRoundCritical: number[] }}
  */
 function applyRoundCap(orderedPageNums, opts = {}) {
   const pages = Array.isArray(orderedPageNums) ? orderedPageNums : [];
@@ -227,12 +253,26 @@ function applyRoundCap(orderedPageNums, opts = {}) {
   const minPages = REPAIR_DEFAULTS.minRepairPagesPerRound ?? 3;
   const cap = Math.max(Math.round(totalPages * share), Math.min(minPages, pages.length));
 
-  if (pages.length <= cap) return { admitted: pages, deferred: [], cap };
+  if (pages.length <= cap) return { admitted: pages, deferred: [], cap, lastRoundCritical: [] };
 
-  const admitted = pages.slice(0, cap);
-  const deferred = pages.slice(cap);
-  log.warn(`🚧 [REPAIR-CAP] Round ${round}: ${pages.length} page(s) eligible for repair on a ${totalPages}-page story — cap is ${cap} (${Math.round(share * 100)}%). Admitting ${admitted.length} worst-first: ${admitted.join(', ')}. DEFERRED to a later round: ${deferred.join(', ')}`);
-  return { admitted, deferred, cap };
+  let admitted = pages.slice(0, cap);
+  let deferred = pages.slice(cap);
+  let lastRoundCritical = [];
+
+  if (opts.lastRound) {
+    const criticals = new Set(opts.criticalPageNums || []);
+    lastRoundCritical = deferred.filter(pn => criticals.has(pn)).slice(0, LAST_ROUND_CRITICAL_MAX);
+    if (lastRoundCritical.length > 0) {
+      const rescued = new Set(lastRoundCritical);
+      admitted = [...admitted, ...lastRoundCritical];
+      deferred = deferred.filter(pn => !rescued.has(pn));
+      const dropped = [...criticals].filter(pn => deferred.includes(pn));
+      log.warn(`🚧 [REPAIR-CAP] Round ${round} is the LAST round — ${lastRoundCritical.length} over-cap page(s) carrying a CRITICAL admitted on the reserved allowance: ${lastRoundCritical.join(', ')}${dropped.length ? ` (${dropped.length} more over the ${LAST_ROUND_CRITICAL_MAX}-page allowance, still dropped: ${dropped.join(', ')})` : ''}`);
+    }
+  }
+
+  log.warn(`🚧 [REPAIR-CAP] Round ${round}: ${pages.length} page(s) eligible for repair on a ${totalPages}-page story — cap is ${cap} (${Math.round(share * 100)}%). Admitting ${admitted.length} worst-first: ${admitted.join(', ')}. ${opts.lastRound ? 'DROPPED (no further round)' : 'DEFERRED to a later round'}: ${deferred.join(', ') || 'none'}`);
+  return { admitted, deferred, cap, lastRoundCritical };
 }
 
 /**
@@ -1177,4 +1217,4 @@ const SAFE_REPAIRABLE_TYPES = new Set([
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };

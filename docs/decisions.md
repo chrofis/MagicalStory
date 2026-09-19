@@ -50083,3 +50083,40 @@ outside still exists — so a future renumber has to notice what it would break.
 `tests/unit/ad-rule-ids-unique.test.ts`.
 
 **Status:** ✅ active
+
+## On the LAST repair round a deferral is a DROP — the cap keeps a reserved allowance for CRITICAL pages (2026-09-19)
+**Context:** Staging `job_1789759147125_p08djwhbl`, 18 pages. p14 (finalScore 45, `clothing`
+CRITICAL) and p18 (48, `action_interaction` CRITICAL) shipped with ONE stored version, an empty
+retry history and no repair attempt at all — both below the 60 floor AND carrying a CRITICAL, i.e.
+two independent redo conditions. Replayed from the stored round-1 evals
+(`scripts/analysis/replay-round1-badpages.js`): `findBadPages` returned 15 bad pages ordered
+`2, 17, 10, 11, 8, 12, 7, 3, 1, 14, 18, 15, 16, 5, 13` and `applyRoundCap` admitted exactly the
+first 9 — which is EXACTLY the set of pages that has a second version in the database. p14/p18 were
+ranks 10 and 11.
+
+**Decision:** `applyRoundCap` takes `lastRound` and `criticalPageNums`. When no further round will
+run, over-cap pages carrying a CRITICAL/CATASTROPHIC finding are admitted as a RESERVED allowance
+appended after the score-ranked slice, bounded by `LAST_ROUND_CRITICAL_MAX = 5`. The cap's shares
+(50% / 30%), its floor of 3, `scoreThreshold` 60 and `issueThreshold` 5 are all unchanged, and a
+non-final round defers exactly as it did.
+
+**Rationale:** The 2026-09-09 cap is justified entirely by its own contract — "over-cap pages are
+DEFERRED, not dropped; they are still bad next round and come back". That premise holds only while a
+later round exists. `runtime.repairMaxPasses` is **1 on staging and locally** (3 in production), so
+round 1 is already the last round and every deferral was a silent, permanent drop — in flat
+contradiction of the 2026-09-04 ruling that a CRITICAL forces a redo regardless of score. The fix is
+to the MECHANISM, not the numbers: the cap was lying about what it did, so it is told whether a later
+round exists. Severity-driven admission only — WHAT to fix stays the consolidator's decision from the
+prompt, never read from finding prose. The allowance mirrors the existing book-audit allowance
+(`AUDIT_ADMIT_MAX`), which exists for the same reason: a reserved lane for pages the cap would
+otherwise discard precisely because their score is not what is wrong with them. Bounded so a
+CRITICAL-heavy book cannot turn the final round into a whole-book regeneration.
+**Replay over the stored run:** the 9 previously repaired pages stay admitted in the same order, p14,
+p18, p15 and p16 join them (4 of the 5-page allowance), and only p5/p13 — neither carrying a CRITICAL
+— remain out.
+
+**Touched:** `server/lib/repairLogic.js` (`applyRoundCap`, `LAST_ROUND_CRITICAL_MAX`),
+`server/lib/repairPipeline.js` (cap call site passes `lastRound` + the round's critical pages),
+`tests/unit/repair-gate-cap.test.ts`, `scripts/analysis/replay-round1-badpages.js` (the replay),
+`tasks/bugs.json`.
+**Status:** ✅ active
