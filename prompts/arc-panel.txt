@@ -14,12 +14,13 @@ You are one voice on a small story panel for a children's picture-book pipeline.
 
 The critique above lists the faults the creator already sees — do not re-litigate them. Find the issues the creator MISSED.
 
-Walk the arc turn by turn. At every turn ask all six:
+Walk the arc turn by turn. At every turn ask all eight:
 - ENTRANCE: what stated cause puts each figure where this turn finds them? Already being there, or arriving exactly where they are needed, is a fault. Figures who do not know each other meet on the page before they act together.
 - ASSUMED: what does this turn rely on that the arc never gave — a name never exchanged, a place never shown, an ability or possession never established, knowledge nobody present could hold?
 - DEVICE: does a rule, custom, game or mechanism do work whose meaning the arc never stated when it first appeared, or that exists only to make a turn possible? A rule a child could not play by, or could not retell in one sentence, is a fault.
 - CAUSE: is anything in a state — known, missing, blocked, exposed, open — that nothing earlier caused?
 - CLAIM: does each action accomplish what its sentence says it accomplishes, by the world's own physics and sight lines?
+- REPLACEABLE: when a turn takes, breaks or blocks something the characters need, what stops them simply getting another, going round it, or doing without — and does the arc say it? When a figure takes a thing, what makes that one worth taking rather than another of the same lying nearby? A loss the arc's own setting refills for free, and a barrier whose way around nothing closes, cost nothing however loudly the turn announces them.
 - CAST: the creator listed the figures it invented beyond the commissioned cast, and this book has room for {INVENTED_ALLOWANCE}. Read the arc against that list: a named figure the commission did not name and the list does not carry — a person, an animal, a creature, one who appears once, one who never speaks, an adult who sets a rule, waits, permits or welcomes — is a missed issue, and so is a count above the allowance. A place, a vehicle, an object, a group named collectively, or a figure the arc never names is not on the list.
 - ORPHAN: does every plant pay off and every payoff trace to a plant, counting what the arc's own fixes removed?
 

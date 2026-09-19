@@ -21,6 +21,90 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — A taken thing the world hands straight back is a fault the arc must name, and the page plan must keep the story's one object in frame
+
+**Context.** Two findings from the same story, one about the arc and one about the page plan.
+
+**#42 — the cost the world refunds.** An arc split a theft in two: an animal took part of the thing
+the cast needed, and the WIND took the rest. The page plan then collapsed the two halves and handed
+the whole consequence to the animal — but the deeper fault is upstream of that collapse, and it is
+that **nothing in the live arc machine ever asks what stops the characters simply replacing what was
+taken.** A loss the setting refills for free costs nothing however loudly the turn announces it, and
+neither the creator's self-critique, the panel's turn-by-turn walk, nor the re-teller's fresh critique
+contained a question that would surface it.
+
+The question that WOULD have caught it already exists in the repo. `prompts/story-arc-audit.txt`
+check 10 (CONVENIENT) ends *"name every barrier the story does not go around whose way around nothing
+closes"*, and check 2 (UNFORCED) asks *"is a cost or consequence declared while an easier option
+stands open? What closes the easier option — and does the arc say it?"* — which is the finding almost
+word for word. **That template has been Lab-only since 2026-08-30**, when the arc machine
+(create → panel → re-tell) replaced the old audit chain and these questions were simply not carried
+across. It is registered at `server/services/prompts.js:305` with zero production consumers, and
+`tasks/BACKLOG.md` already flags it as a dead template. So this was not a gap nobody had thought of —
+it was a working question dropped on the floor during a stage swap, and it stayed dropped for three
+weeks. That is the real finding, and it is worth more than the fix: **when a stage is replaced, its
+question set is inventory, not scaffolding.**
+
+**#53 — the story's one object leaves the book.** Measured on staging `job_1789759147125_p08djwhbl`:
+the object the whole problem belongs to is in frame on pages **2, 3, 4, 5, 7, 8, 9, 14, 16** and
+absent on **10, 11, 12, 13, 15**. The existing planner rule is *"the main character appears on most
+pages"*, and that rule alone would **not** have fired here — nine of the fifteen pages in the span is
+a majority. **The anti-run clause is the load-bearing half of this fix, not the "most pages" half:**
+it is the four-page run 10–13 that makes the object stop being the story's, and only a rule about
+consecutive absence sees it.
+
+**Decision.**
+1. `prompts/arc-panel.txt` gains a new lens, **REPLACEABLE**, in sixth position between CLAIM and CAST, and the header
+   count moves six → eight (it was already stale at six against seven bullets; it is now eight against
+   eight — the count is stated twice in this family of prompts and both were wrong).
+2. `prompts/arc-create.txt` and `prompts/arc-retell.txt` gain the matching **fault shape** in the
+   "they usually look like:" list — *a cost the world undoes for free* — so the creator and the
+   re-teller are told the shape the panel now scores by, rather than being corrected after the fact.
+3. `prompts/story-beats.txt` gains a Requirements bullet: the thing the problem belongs to is in frame
+   on most pages between the page it enters and the page its problem is settled, **and never absent
+   from more than two of those pages in a row**; a page whose instant is a change in that thing stages
+   the thing itself.
+4. `prompts/plan-check.txt` gains check **12** for the same property, and both header count words move
+   eleven → twelve.
+
+**Rationale.**
+
+*Why the arc edit is three files, not one.* A lens the panel scores by must be a fault-shape the
+creator and the re-teller were given — otherwise the arc is corrected after the fact instead of
+written right, which costs a whole extra round trip and is exactly the generator-vs-critic disease the
+sibling registry exists to catch. This set was NOT in the registry; it is added in this commit
+(see below).
+
+*Why a per-page presence rule was REJECTED for #53.* The obvious rule — "the object is in frame on
+every page of the span" — is unwritable, because `prompts/story-beats.txt` **requires** a peopleless
+page whose drama is a place or an object seen from afar, and `NO_PEOPLELESS_PAGE`
+(`server/lib/planCounters.js:609`) fires when a book has none. A per-page presence rule would make a
+mandatory page impossible to write, so the rule is deliberately a *density + anti-run* rule instead:
+it tolerates the gaps the book needs and catches only the stretch where the object has left the story.
+
+**Known cost — this spends against a settled budget.** More plan lines will carry the central object,
+so more page briefs will carry it, and that spends against **"Three Visual Bible elements per page"**
+(`docs/SETTLED.md`, owner 2026-09-08; `VB_ELEMENT_BUDGET`, enforced by `rankPageElements` /
+`truncateBriefToBudget`). This is accepted, not overlooked: the object the story is ABOUT has the
+strongest claim on one of the three slots. If the budget starts evicting secondary characters to make
+room, that is the trade landing, and it is a reason to revisit this rule — not a new bug.
+
+**Status: structural evidence only — NOT yet validated semantically.** What is verified at commit time
+is that the prompts build, the counts are true, the placeholders fill, and the suite is green. Whether
+the REPLACEABLE lens actually surfaces refundable-cost faults, and whether check 12 fires on the right
+books without over-firing, is a **Lab A/B being run separately by the main session**. No paid call was
+made for this commit. If the A/B says the lens over-fires, the entry to amend is this one.
+
+**Touched:** `prompts/arc-panel.txt` (REPLACEABLE lens, six → eight), `prompts/arc-create.txt` +
+`prompts/arc-retell.txt` (the matching fault shape in both hand-maintained critique lists),
+`prompts/story-beats.txt` (Requirements bullet), `prompts/plan-check.txt` (check 12 + both count
+words), `scripts/admin/sibling-registry.json` (new `arc-generator-vs-critic` set — the arc trio was in
+no set at all, so a one-sided arc edit was unguarded).
+**Verified:** `npx vitest run` green; `plan-check-question-count.test.ts` passes on twelve questions
+with both headers agreeing; `sibling-parity.test.ts` passes with the new set; `check-sibling-paths.js`,
+`check-settled.js`, `check-open-bugs.js`, `check-backlog-index.js`, `check-doc-coupling.js` all OK.
+**Not run:** any story, any Lab stage, any model call.
+
 ## 2026-09-19 — Production style repair is OFF: the owner's cost call, made against the evidence
 
 **Context.** The Step-5 style audit in `runUnifiedRepairPipeline` has two halves. `checkStoryStyleConsistency`

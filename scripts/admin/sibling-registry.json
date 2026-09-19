@@ -262,6 +262,19 @@
       "severity": "block"
     },
     {
+      "id": "arc-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "arc-panel.txt walks the committed arc lens by lens and names what the creator missed; arc-create.txt writes the arc and arc-retell.txt rewrites it against the panel. A lens the panel scores by must be a fault-shape the creator and the re-teller were GIVEN — otherwise the arc is corrected after the fact instead of written right, which buys a fault the generator could have avoided at the price of a whole extra round trip. Note the shape of the hazard: arc-create.txt and arc-retell.txt each carry their OWN hand-maintained near-duplicate copy of the same 'they usually look like:' fault-shape list, so they drift from each other as well as from the panel — adding a lens means editing three files, two of which look identical and are not. Prefer one promptBuilders constant injected into both generators over a third hand-kept copy; {TELLING_RULES} and {ARC_BUDGETS} are the existing precedent in this family.",
+      "generators": [
+        "prompts/arc-create.txt",
+        "prompts/arc-retell.txt"
+      ],
+      "critics": [
+        "prompts/arc-panel.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "plan-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "plan-check.txt checks the page plan story-beats.txt produces; a constraint the checker counts must be a constraint the planner was told to satisfy.",
