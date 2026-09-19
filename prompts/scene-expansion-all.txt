@@ -416,7 +416,7 @@ Then a single-line JSON object:
 - `clothing` is copied EXACTLY from AVAILABLE CLOTHING PER CHARACTER — `standard`, `winter`, `summer`, or `costumed:<costume>` as that list spells it. That list covers main and primary characters only — a secondary character never carries a clothing category, because they have no avatar for a category to select. One costume per character per story; when a character is `costumed`, also describe the costume in the prose.
 - `position` is a short phrase matching the prose ("right foreground", "center", "left background", "behind the desk") — the bbox detector reads it structurally.
 - Only add `perspective` for back view or side profile.
-- `looksAt` on every foreground/midground character: another character's name, a Visual Bible id (`ART001`, `CHR001`), `camera`, or `away`. Eyes only — see rule 8j. Never the object a character merely holds.
+- `looksAt` on every foreground/midground character: another character's name, a Visual Bible id (`ART001`, `CHR001`), or `away`. Eyes only — see rule 8j. Never the object a character merely holds, and never the viewer.
 - `era` is the story's time period in 2-4 words (medieval, 1920s, present day). It feeds the anachronism guard — omit only if the story has no defined era.
 - `shot` is the page's camera framing: {SHOT_ENUM}. Decide it once — the scene prose and the metadata use this same framing, and it is a framing the plate of the vantage this page cites can hold. Omitting it makes the plate default to a wide shot.
 - `population` says how populated the page's setting is, in one of three values, and it is about the SETTING, not about who matters to the story.
