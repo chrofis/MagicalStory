@@ -36816,7 +36816,7 @@ letterforms, not the band.
 **Decision:** new runtime key `inventoryModel` — `qwen3-vl` on staging and local, `gemini-2.5-flash` in production until staging stories confirm compliance scores hold (owner). `runVisualInventory` reads it (a Lab quality-model override still wins), normalises every provider's boxes through `server/lib/inventoryBoxes.js`, and falls back to gemini-2.5-flash when the OpenRouter call throws, times out (120s, one retry) or returns non-2xx. The owner's first proposal — a separate Gemini call for boxes — was dropped: the real boxes come from GroundingDINO at $0, the inventory box is only a pairing estimate, and a second model's figure labels cannot be joined to Qwen's.
 **Cost:** ~$0.0011/call with the fallback rate observed vs $0.0029 today (~$0.05 vs $0.12 per 43-call story). The gain is sight, not cents.
 **Touched:** server/config/runtime.js, server/config/models.js, server/lib/evalPipeline.js, server/lib/images.js (timeout/retry), server/lib/inventoryBoxes.js (new), tests/unit/inventory-boxes.test.ts (7).
-**Status:** ✅ active on staging; production pending owner promotion.
+**Status:** 🗄 superseded by "Stage-1 inventory unified on Qwen3-VL in every environment (2026-09-19)" at the bottom of this file — the staged rollout below is closed, and `inventoryModel` is no longer per-environment.
 **Follow-up the same evening (Lab 1055):** with Qwen live, the inventory returned `complete: false` for the headless animal and the compliance judge filed nothing — the rule lived only in the STEP 4 severity list, which the judge reads after it has chosen its findings. It is now a STEP 1b scene-check step (`prompts/image-prompt-compliance.txt`), together with "animals live in `objects`, never `figures`": the same run filed a false `unverified_absence` because the judge looked for the animal among the figures. Also observed on one control page: Qwen described two short-haired children as shoulder-length, which the judge turned into a MAJOR identity finding (page 40 → 0). One page; watch hair-length findings on staging stories before promoting.
 **Closed 2026-09-08 (owner: stop here, keep Qwen on staging, record it).** Five runs of the same headless-animal page through the Qwen inventory at temperature 0 (experiments 1049, 1055, 1057 → `complete: false`; 1058, 1059 → `complete: true`): 3 catches in 5, the OpenRouter upstream is not deterministic. When the flag was false (1057) the compliance judge (qwen3-max) filed nothing despite the STEP 1b rule; in 1058 it filed the animal as `missing_character` against the rule that says animals live in `objects`. The judge prompt is ~30k characters and both judges treat a rule a third of the way in as noise. The deterministic alternative — code turning the typed `complete: false` field into a `figure_completeness` finding — was offered and declined for now. Net: Qwen stays the staging inventory for its verified gains (ghost figures on the crowded set, ~4x cheaper, boxes normalised, Gemini fallback); the animal-completeness check remains documentation of intent and ships no finding in either environment. The first staging story evaluated under Qwen (job_1788816451791, 18 pages) completed with no fallback logged and scores in the normal range. `quality_eval` Lab results now carry `complianceRaw` so the next judge investigation can see what the judge wrote.
 
@@ -49768,5 +49768,61 @@ read-time repair, no dual-format reader.
 
 **Touched:** `tests/unit/stage1-inventory-audit.test.ts` (round-trip pin, so a
 real spread fails a test), `tasks/BACKLOG.md`.
+
+**Status:** ✅ active
+
+## 2026-09-19 — Stage-1 inventory unified on Qwen3-VL in every environment (supersedes the 2026-09-07 staged rollout)
+
+**Context:** `inventoryModel` shipped on 2026-09-07 (`d64cf25c9`) as
+`perEnvironment({ default: 'gemini-2.5-flash', staging: 'qwen3-vl', local: 'qwen3-vl' })`,
+with an explicit gate in the code comment: *"production follows once staging
+stories confirm the compliance scores hold."* Twelve days later the gate had
+never been closed, so every staging measurement of stage 1 described a different
+model from the one production ran (995 production stage-1 calls to date, 995 of
+them Gemini), and any staging audit of inventory quality was silently about a
+model production does not use.
+
+**Decision:** the owner has made the promotion call. `inventoryModel` is now the
+plain value `'qwen3-vl'` — no longer `perEnvironment` — so every environment
+resolves to the same stage-1 model. This follows the `pageRenderModel` /
+`coverRenderModel` precedent (2026-09-06), which collapsed to a plain value on
+the same kind of promotion rather than keeping three identical branches.
+`/api/health/config` still reports it. The Gemini 2.5 Flash **fallback stays**
+(`evalPipeline.js:112-133`, on an OpenRouter throw, 120s timeout or non-2xx) —
+it is a provider-failure path, not a second implementation, and qwen3-vl has a
+single upstream (Alibaba) which stalled 3 of 20 Lab pages once.
+
+**Rationale:** the evidence is sight, not cost.
+- Headless-animal Lab sets, experiments **1038-1054**: gemini-2.5-flash,
+  2.5-pro, 3.1-pro, grok-4.6, minimax-m3 and kimi-k2.6 all described a headless
+  animal as whole; **qwen3-vl** and gemini-3.7-flash saw it.
+- 20 crowded pages, experiments **1053 vs 1054**: figure counts 107 vs 87, and
+  Qwen flagged 2 see-through ghost figures Gemini missed — verified on the pixels.
+- 34-page head-to-head, experiments **1060/1061** (Gemini) vs **1062/1063**
+  (Qwen): *"nothing Gemini caught was missed by Qwen; Qwen adds prop recall and
+  drops boxes into a usable form."*
+- Fallback rate since the 2026-09-08 override fix (`86ea3d9ab`): **2 of 814
+  calls = 0.25%**, so a story's inventories are effectively single-model.
+- Price measured 2026-09-19: **$0.00083/call (qwen3-vl-32b) vs $0.00360/call
+  (gemini-2.5-flash)** — Gemini 4.3x dearer, ~$0.125/story.
+
+**Known costs carried into production with this promotion,** stated so they are
+not rediscovered as surprises: one **occlusion false positive** (a body inside a
+cave read as `complete: false`, against the template's own "occlusion by scenery
+is not incomplete" line); a **hair-length and apparent-age drift** (shoulder-length
+for long hair and for a toddler's short curls; ages read ~5-10 years older than
+Gemini); and **single-vendor exposure** — one upstream, non-deterministic at
+temperature 0, mitigated only by the Gemini fallback.
+
+**Touched:** `server/config/runtime.js` (`inventoryModel` collapsed to a plain
+value; the `repairMaxPasses` comment corrected — it is now genuinely the only
+per-environment difference), `docs/decisions.md` (2026-09-07 entry marked
+superseded), `docs/image-routing.md` (the Blind visual inventory row stated
+Gemini "unchanged" and never mentioned the split),
+`tests/unit/inventory-model-unified.test.ts`, `tasks/BACKLOG.md`.
+
+**What does NOT change today:** production keeps running Gemini until `master`
+is deployed. This lands on `staging` only; the master deploy is the owner's
+separate call.
 
 **Status:** ✅ active

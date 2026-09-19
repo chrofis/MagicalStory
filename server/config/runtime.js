@@ -116,7 +116,8 @@ const SETTINGS = {
   textZoneRules: true,
 
   // ── Repair ─────────────────────────────────────────────────────────────
-  // The ONE deliberate environment difference. A paying customer's book gets
+  // The ONLY deliberate environment difference left, since `inventoryModel`
+  // was unified on 2026-09-19. A paying customer's book gets
   // every recovery attempt; staging runs a single pass so a showcase finishes
   // in reviewable time — rounds 2 and 3 of the Berger run
   // (job_1786193650012_7baiaeftb) cost ~15 of its 50 minutes, and the owner is
@@ -130,11 +131,17 @@ const SETTINGS = {
   // judge measured to SEE a headless animal or a ghost figure — Gemini 2.5
   // Flash, 2.5 Pro, 3.1 Pro and Grok 4.6 all described a headless dragon as
   // whole (Lab sets 24-26, experiments 1038-1054, 2026-09-07). Its boxes come
-  // back on mixed 0-1 / 0-1000 scales and are normalised in the parser; a
-  // failed or stalled call falls back to Gemini 2.5 Flash. Staging first
-  // (owner, 2026-09-07): production follows once staging stories confirm the
-  // compliance scores hold.
-  inventoryModel: perEnvironment({ default: 'gemini-2.5-flash', staging: 'qwen3-vl', local: 'qwen3-vl' }),
+  // back on mixed 0-1 / 0-1000 scales and are normalised in the parser.
+  // Qwen3-VL in EVERY environment since 2026-09-19 (owner promotion): it was
+  // staging+local only from 2026-09-07 while the compliance scores were
+  // watched, and the gate is now closed — 34 pages head-to-head (exps
+  // 1060/1061 vs 1062/1063) found nothing Gemini caught that Qwen missed, and
+  // the measured Gemini fallback rate is 2 of 814 calls. Carried into
+  // production with it: one occlusion false positive, a hair-length/age drift,
+  // and a single upstream vendor. The fallback to Gemini 2.5 Flash on an
+  // OpenRouter throw, timeout or non-2xx STAYS (evalPipeline.js:112-133) — it
+  // is a provider-failure path, not a second implementation.
+  inventoryModel: 'qwen3-vl',
 };
 
 /**
