@@ -49370,3 +49370,48 @@ any question about the stage can be answered. Text only, no images.
 `tests/unit/scene-expansion-report.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — A removed garment is shown by what IS there, not by naming what is gone
+
+**Context.** Art Director rule 10d opened *"the prose and `sceneIntent` both state the
+character is **WITHOUT** it"* — which instructs exactly what rule 12b in the same prompt
+forbids: *"Never name what must be absent… 'no glow', 'bare rail' each paint the named
+thing into the picture."* Two rules, one demanding the phrasing the other bans.
+
+**Measured on staging `job_1789759147125_p08djwhbl`**, where Levin's jacket comes off on
+p6 and his cap on p15. The Art Director obeyed 12b and the INTENT of 10d, and disobeyed
+its letter — **not one of the 18 briefs contains "without"**. It wrote *"his wavy light
+blonde hair exposed to the evening chill"*, *"his light blonde hair uncovered"*, *"He
+stands bareheaded in the cold alley"*, and named where the item had gone every time.
+
+The rest of the machinery was right on all 18 pages: `off` rows with a tracking
+`location` (*held out flat* → *held sagging between the boys* → *resting underneath the
+egg* → *resting on the cobblestones*), Julian's scarf `off/falling away down the steps`
+matching its plan line, and on p17 the hard case of rule 10e — the owner's jacket carried
+as `worn` with `wearer: Julian`.
+
+**Decision.** `GARMENT_REMOVED_RULE` now asks for the positive description the model
+already produces: *"show the character without it by describing what is there instead
+(the bare head, the uncovered hair, the shirt now outermost) — never by naming the
+missing item, which paints it back into the picture"*. Every contract it carried is
+unchanged: the new place is named, the `interactions[]` entry stands, and the `wornItems`
+row still carries `state: "off"` with a `location` and its `redressNote`.
+
+One constant, both Art Director templates (`{GARMENT_REMOVED}`) — the registered
+`art-director-templates` sibling pair, which already shared it.
+
+**NOT changed here, and owned elsewhere.** These garments carry no `wornAs` link, and 10d
+scopes itself to elements that have one — so strictly **zero** rows were owed and the AD
+emitted 40+ correct ones anyway. The real gap is that an UNLINKED garment with no row
+silently defaults to WORN: on p16 no `CLO001` row exists while the cap lies on the
+cobblestones three steps away, on the page whose whole point is giving it to the raven —
+Levin escapes being drawn in it only because the prose says *"hair uncovered"*. That is an
+open backlog item owned by another session (`server/lib/wornItems.js`,
+`prompts/scene-expansion-all.txt:471`) and is deliberately left to them.
+
+**Touched:** `server/lib/promptBuilders.js` (`GARMENT_REMOVED_RULE`),
+`tests/unit/garment-removed-wording.test.ts`.
+
+**Status:** ✅ active

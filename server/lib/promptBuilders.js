@@ -7536,7 +7536,29 @@ const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `lo
  */
 const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `expression`, and a rewrite carries it through. A page whose beat is a character sensing something — listening, feeling, watching, smelling — states that in the eyes and mouth as much as in the pose.";
 
-const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both state the character is WITHOUT it and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once. An `off` row also carries `redressNote`, the wardrobe instruction for redrawing that character's reference sheet without the item: name the garments that stay by colour plus garment noun only — never the outfit contract's own words for their fabric, cut or weave, which make a renderer repaint a garment it was told to leave alone; state which item is off and that nothing takes its place; and describe in full whatever the removal leaves outermost there, because that one has to be drawn. Wardrobe only — no cells, no layout, no art style, no reference image. The same item off the same character reads the same on every page.";
+/**
+ * SAY WHAT IS THERE, NOT WHAT IS GONE (2026-09-19).
+ *
+ * This rule used to open "the prose and `sceneIntent` both state the character
+ * is WITHOUT it" — which instructs exactly what rule 12b forbids ("Never name
+ * what must be absent… 'no glow', 'bare rail' each paint the named thing into
+ * the picture"). Two rules in one prompt, one demanding the phrasing the other
+ * bans.
+ *
+ * Measured on staging job_1789759147125_p08djwhbl, where Levin's jacket comes
+ * off on p6 and his cap on p15: the Art Director obeyed 12b and the INTENT of
+ * this rule, and disobeyed its letter. Not one of the 18 briefs says "without".
+ * It wrote "his wavy light blonde hair exposed to the evening chill", "his light
+ * blonde hair uncovered", "He stands bareheaded in the cold alley" — the head as
+ * it now looks — and named where the item had gone every time. The `wornItems`
+ * rows were right on all 18 pages, including the owner's jacket worn by another
+ * character on p17.
+ *
+ * So the rule now asks for what the model already does correctly. What it
+ * CONTRACTS is unchanged: the absence is stated, its new place is named, and the
+ * row carries `state: "off"` with a `location`.
+ */
+const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both show the character without it by describing what is there instead (the bare head, the uncovered hair, the shirt now outermost) — never by naming the missing item, which paints it back into the picture — and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once. An `off` row also carries `redressNote`, the wardrobe instruction for redrawing that character's reference sheet without the item: name the garments that stay by colour plus garment noun only — never the outfit contract's own words for their fabric, cut or weave, which make a renderer repaint a garment it was told to leave alone; state which item is off and that nothing takes its place; and describe in full whatever the removal leaves outermost there, because that one has to be drawn. Wardrobe only — no cells, no layout, no art style, no reference image. The same item off the same character reads the same on every page.";
 
 const WORN_ON_OTHER_RULE = "When the page has a character other than the item's owner wearing it, the row is `state: \"worn\"` plus `wearer` naming that character — not `off`. The prose puts the item on the wearer and on nobody else; the owner's description does not mention it.";
 
