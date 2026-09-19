@@ -21,6 +21,60 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — The obstacle is the outside event that FORCES the commissioned skill, not the skill itself — and the metric that measured it was wrong
+
+**Context.** Two live instructions on the trial idea path contradicted each other for roughly half
+the topic catalogue. The life-challenge category context (`server/routes/trial.js`, mirrored in
+`server/lib/testlab.js`) asks for *"one outside event that forces the child to use this skill"* — the
+obstacle is an event, the skill is the response. Change A of the 2026-09-19 three-slot entry
+(`prompts/trial-idea.txt`, `426234692`) said *"what gets in the way is the difficulty this story was
+asked for"* — the obstacle IS the challenge. Both readings are right for part of the catalogue: for
+**task topics** (getting-dressed, potty-training, first-steps, first-words, going-outside, homework)
+the challenge genuinely can be the obstacle; for **skill topics** (waiting-turn, being-brave,
+saying-sorry, not-giving-up, managing-emotions, making-friends, anxiety-worrying) the skill is a
+response and something else must be in the way. Change A over-generalised to all topics.
+
+**Evidence — round 8** (28 ideas, 14 fixed cells): "obstacle IS the commissioned challenge" fell
+23/28 → 20/28. Reading the three clearest failures shows the fault is not a *substituted* difficulty
+but a **missing causal link** — the event and the skill sit adjacent and the event never forces the
+skill:
+- `first-words`: the obstacle is a heavy glass; a first word is spoken, but a heavy glass does not
+  force speech.
+- `homework`: the obstacle is a theft, detective work follows, and the homework is bolted on as the
+  final clause — the theft never forces it.
+- `waiting-turn`: the obstacle is fear of a dark crevice; waiting never happens at all.
+
+**Decision (owner).** The FORCES link is the rule. The template paragraph is reworded so the obstacle
+is the outside event that leaves the main character no way through but the hard thing the story was
+asked for, the event is what makes that hard thing unavoidable, and slot 2 is the character doing it;
+an event that merely happens alongside it is a fault. "The hard thing this story was asked for" reads
+correctly for a task topic and a skill topic alike, so **no task/skill classification exists or is to
+be built**. What change A got right is kept verbatim in force: never a different difficulty put in
+its place, never named outright (0/28 in every round since — not to be lost), and the setting is
+where the struggle happens rather than scenery around it.
+
+**Only the template was changed.** The category context already states the FORCES relation and now
+reads as the same instruction, so touching it would risk a second, differently-worded copy of one
+rule — and it is a hand-kept mirror across the `trial-idea-prompt-mirror` sibling set
+(`server/routes/trial.js` ↔ `server/lib/testlab.js`), two edits where one suffices.
+
+**The metric was wrong, and this is the correction.** "Obstacle IS the commissioned challenge" is an
+**identity** check, and on a skill topic it penalises exactly what the category context asks for:
+inventing an outside event scores as "a different difficulty put in its place". Part of the 23 → 20
+slide is therefore the instrument, not the output. **Going forward the axis is measured as "the
+outside event forces the skill" — a causal check.** Numbers from earlier rounds on the identity axis
+are **not comparable** to any future round measured the new way; do not put them in one column.
+
+**Verification (static, no paid calls).** `buildTrialIdeaPrompts` built for both arms, for
+`getting-dressed` (task) and `waiting-turn` (skill), at ages 3 and 8 — all eight prompts carry the
+reworded paragraph and none carries the old one; the three-slot contract with the bound slot 2, the
+50-word cap, the animal-fate rule and the make-believe-world sentence are all present, and reverted
+change D is still absent. Unit suite: 320 files / 3974 tests, all passing.
+
+**Touched:** `prompts/trial-idea.txt`, `docs/decisions.md`.
+**Status:** ✅ active, NOT yet measured — committed on `staging`, not pushed. Round 9 tests it, on the
+causal metric.
+
 ## 2026-09-19 — A ROLE is not a WORLD: the make-believe idea arm words its world by the theme's KIND
 
 **Context.** The `/try` idea endpoint returns two cards per cell — one in the child's own town, one
