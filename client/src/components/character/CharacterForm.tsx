@@ -4,6 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import TraitSelector from './TraitSelector';
+import { MAX_STRENGTHS, MAX_FLAWS } from '@/constants/traitLimits';
 import CharacterHistoryPanel from './CharacterHistoryPanel';
 import CharacterRelationships from './CharacterRelationships';
 import { strengths as defaultStrengths, flaws as defaultFlaws, challenges as defaultChallenges } from '@/constants/traits';
@@ -897,6 +898,7 @@ export function CharacterForm({
             selectedTraits={character.traits?.strengths || []}
             onSelect={(traits) => updateTraits('strengths', traits)}
             minRequired={2}
+            maxAllowed={MAX_STRENGTHS}
             defaultExpanded={true}
           />
 
@@ -906,6 +908,7 @@ export function CharacterForm({
             selectedTraits={character.traits?.flaws || []}
             onSelect={(traits) => updateTraits('flaws', traits)}
             minRequired={1}
+            maxAllowed={MAX_FLAWS}
             defaultExpanded={true}
           />
 
@@ -1618,6 +1621,7 @@ export function CharacterForm({
             selectedTraits={character.traits?.strengths || []}
             onSelect={(traits) => updateTraits('strengths', traits)}
             minRequired={2}
+            maxAllowed={MAX_STRENGTHS}
           />
 
           <TraitSelector
@@ -1626,6 +1630,7 @@ export function CharacterForm({
             selectedTraits={character.traits?.flaws || []}
             onSelect={(traits) => updateTraits('flaws', traits)}
             minRequired={1}
+            maxAllowed={MAX_FLAWS}
           />
 
           <TraitSelector

@@ -8,6 +8,21 @@ interface TraitSelectorProps {
   selectedTraits: string[];
   onSelect: (traits: string[]) => void;
   minRequired?: number;
+  /**
+   * The most traits a parent may pick. Omitted = no limit.
+   *
+   * Uncapped, the picker let a parent select everything: staging
+   * job_1789759147125_p08djwhbl shipped a five-year-old with 25 strengths and 7
+   * flaws — the entire vocabulary — and a second child with 20. A profile that
+   * says a child is every good thing at once says nothing, and the arc rule
+   * "each character's nature causes a problem or solves one" has nothing to
+   * act on.
+   *
+   * A character saved before the cap keeps every trait it has: the limit blocks
+   * ADDING past it, never removes what a parent already chose. Deselecting is
+   * always allowed, which is how such a character comes back under the limit.
+   */
+  maxAllowed?: number;
   allowCustom?: boolean;
   defaultExpanded?: boolean;
 }
@@ -18,6 +33,7 @@ export function TraitSelector({
   selectedTraits,
   onSelect,
   minRequired = 0,
+  maxAllowed,
   allowCustom = true,
   defaultExpanded = false,
 }: TraitSelectorProps) {
@@ -28,15 +44,19 @@ export function TraitSelector({
   // Track custom traits added via the input field
   const [localCustomTraits, setLocalCustomTraits] = useState<string[]>([]);
 
+  const atLimit = maxAllowed !== undefined && selectedTraits.length >= maxAllowed;
+
   const toggleTrait = (trait: string) => {
     if (selectedTraits.includes(trait)) {
       onSelect(selectedTraits.filter((t) => t !== trait));
     } else {
+      if (atLimit) return;
       onSelect([...selectedTraits, trait]);
     }
   };
 
   const addCustomTrait = () => {
+    if (atLimit) return;
     if (customTrait.trim() && !selectedTraits.includes(customTrait.trim())) {
       const newTrait = customTrait.trim();
       setLocalCustomTraits([...localCustomTraits, newTrait]);
@@ -80,6 +100,11 @@ export function TraitSelector({
                   ({t.selectAtLeast} {minRequired})
                 </span>
               )}
+              {maxAllowed !== undefined && (
+                <span className={`text-sm font-normal ml-1 ${atLimit ? 'text-indigo-600 font-semibold' : 'text-gray-500'}`}>
+                  ({t.selectAtMost} {maxAllowed})
+                </span>
+              )}
               {selectedTraits.length > 0 && (
                 <span className={`text-sm font-normal ml-1 ${toneClass}`}>
                   - {selectedTraits.length} {language === 'de' ? 'gewählt' : language === 'fr' ? 'sélectionné' : language === 'it' ? 'selezionato' : 'selected'}
@@ -120,9 +145,12 @@ export function TraitSelector({
               <button
                 key={trait}
                 onClick={() => toggleTrait(trait)}
+                disabled={atLimit && !selectedTraits.includes(trait)}
                 className={`px-3 py-1 rounded-full text-sm transition-colors ${
                   selectedTraits.includes(trait)
                     ? 'bg-indigo-500 text-white'
+                    : atLimit
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
                 }`}
               >
@@ -139,6 +167,7 @@ export function TraitSelector({
                 value={customTrait}
                 onChange={(e) => setCustomTrait(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addCustomTrait()}
+                disabled={atLimit}
                 placeholder={
                   language === 'de'
                     ? 'Eigene hinzufügen...'
@@ -152,9 +181,9 @@ export function TraitSelector({
               />
               <button
                 onClick={addCustomTrait}
-                disabled={!customTrait.trim()}
+                disabled={!customTrait.trim() || atLimit}
                 className={`flex-shrink-0 w-10 h-10 rounded-lg font-semibold flex items-center justify-center transition-colors ${
-                  customTrait.trim()
+                  customTrait.trim() && !atLimit
                     ? 'bg-indigo-500 text-white hover:bg-indigo-600'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}

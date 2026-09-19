@@ -47440,3 +47440,48 @@ Generator and critic stay in sync: the surviving sentence is the one
 `tests/unit/arc-peril-single-ceiling.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The trait picker is capped at 5 strengths / 3 flaws, at the wizard
+
+**Context.** The trait picker enforced a MINIMUM (2 strengths, 1 flaw) and no maximum
+anywhere — `toggleTrait` appended unconditionally, custom traits were unlimited, and no
+pill was ever disabled. Staging story `job_1789759147125_p08djwhbl` therefore shipped
+Levin (5) with **25 strengths and 7 flaws** — effectively the entire vocabulary — and
+Kiaan with 20 strengths. All of it reached the arc prompt, under the telling rule *"Each
+character's nature causes a problem or solves one."* A character who is cheerful,
+friendly, helpful, protective, forgiving, loyal, fair, honest, trustworthy, patient,
+curious, imaginative, clever, creative, attentive, resourceful, adventurous, fast,
+strong, hard-working, a leader, brave, generous, confident and funny has no nature, and
+the story cannot turn on one.
+
+**Decision.** Cap at the wizard, not in the prompt (owner, 2026-09-19): **5 strengths, 3
+flaws**, as one constant in `client/src/constants/traitLimits.ts`. Challenges are not
+capped — they were never the problem and no limit was asked for.
+
+The cap reaches all THREE trait-edit entry points: `CharacterForm`'s new-character step
+and its full/edit layout (both via a `maxAllowed` prop on the shared `TraitSelector`),
+and the trial wizard's own inline picker, which does not use that component. Both paths
+into `TraitSelector` are blocked — the pill list and the custom-trait input — because
+capping one leaves the other open.
+
+**A character saved before this keeps every trait it has.** The limit blocks ADDING past
+it and never deletes a parent's existing choice; deselecting is always allowed, which is
+how such a character comes back under the limit. Nothing is migrated and nothing is
+truncated at read time, so the profiles already in the database still send their full
+lists to the prompt until someone edits them.
+
+**Rationale.** Capping in the prompt would have hidden data the parent deliberately
+entered and left the profile itself meaningless everywhere else. Capping at the source
+makes the saved profile mean something for every consumer at once — arc, images, avatars
+— and makes the parent's choice an actual choice.
+
+**Touched:** `client/src/constants/traitLimits.ts` (new),
+`client/src/components/character/TraitSelector.tsx` (`maxAllowed`),
+`client/src/components/character/CharacterForm.tsx` (4 call sites),
+`client/src/pages/trial/TrialCharacterStep.tsx`,
+`client/src/constants/translations.ts` (`selectAtMost`, 4 languages),
+`tests/unit/trait-cap-reaches-every-picker.test.ts`.
+
+**Status:** ✅ active

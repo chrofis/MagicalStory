@@ -5,6 +5,7 @@ import { Turnstile } from '@marsidev/react-turnstile';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import type { CharacterData } from '../TrialWizard';
 import { defaultStrengths } from '@/constants/traits';
+import { MAX_STRENGTHS } from '@/constants/traitLimits';
 import type { Language } from '@/types/story';
 import { trackTrialStep } from '@/utils/trialFunnel';
 
@@ -714,11 +715,18 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     onChange({ ...characterData, [key]: value });
   };
 
+  // The trial picker offers strengths only, and carries the SAME cap as the full
+  // wizard's (constants/traitLimits). A cap on one entry point and not the other
+  // is not a cap — a parent who fills the trial and then saves the character
+  // would otherwise arrive in the full wizard already over the limit.
+  const traitsAtLimit = characterData.traits.length >= MAX_STRENGTHS;
+
   const toggleTrait = (trait: string) => {
     const current = characterData.traits;
     if (current.includes(trait)) {
       updateField('traits', current.filter((t) => t !== trait));
     } else {
+      if (traitsAtLimit) return;
       updateField('traits', [...current, trait]);
     }
   };
@@ -943,16 +951,19 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           {/* Traits — optional, never gates Next */}
           <div className="mb-5">
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              {t.traitsLabel} <span className="font-normal text-gray-400">({t.traitsOptional})</span>
+              {t.traitsLabel} <span className="font-normal text-gray-400">({t.traitsOptional}, max. {MAX_STRENGTHS})</span>
             </label>
             <div className="flex flex-wrap gap-2">
               {(defaultStrengths[language as Language] || defaultStrengths.en).map((trait) => (
                 <button
                   key={trait}
                   onClick={() => toggleTrait(trait)}
+                  disabled={traitsAtLimit && !characterData.traits.includes(trait)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                     characterData.traits.includes(trait)
                       ? 'bg-indigo-500 text-white shadow-md'
+                      : traitsAtLimit
+                      ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed'
                       : 'bg-white border border-gray-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
                   }`}
                 >

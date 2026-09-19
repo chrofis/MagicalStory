@@ -64,6 +64,7 @@ export interface TranslationStrings {
   strengths: string;
   weaknesses: string;
   selectAtLeast: string;
+  selectAtMost: string;
   selected: string;
   addCustomStrengths: string;
   addCustomWeaknesses: string;
@@ -240,6 +241,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     strengths: 'Strengths',
     weaknesses: 'Weaknesses',
     selectAtLeast: 'Select at least',
+    selectAtMost: 'at most',
     selected: 'Selected',
     addCustomStrengths: 'Add custom strengths',
     addCustomWeaknesses: 'Add custom weaknesses',
@@ -414,6 +416,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     strengths: 'Stärken',
     weaknesses: 'Schwächen',
     selectAtLeast: 'Wähle mindestens',
+    selectAtMost: 'höchstens',
     selected: 'Ausgewählt',
     addCustomStrengths: 'Eigene Stärken hinzufügen',
     addCustomWeaknesses: 'Eigene Schwächen hinzufügen',
@@ -588,6 +591,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     strengths: 'Forces',
     weaknesses: 'Faiblesses',
     selectAtLeast: 'Sélectionnez au moins',
+    selectAtMost: 'au plus',
     selected: 'Sélectionné',
     addCustomStrengths: 'Ajouter des forces personnalisées',
     addCustomWeaknesses: 'Ajouter des faiblesses personnalisées',
@@ -762,6 +766,7 @@ export const translations: Record<'en' | 'de' | 'fr' | 'it', TranslationStrings>
     strengths: 'Punti di forza',
     weaknesses: 'Punti deboli',
     selectAtLeast: 'Seleziona almeno',
+    selectAtMost: 'al massimo',
     selected: 'Selezionato',
     addCustomStrengths: 'Aggiungi punti di forza personalizzati',
     addCustomWeaknesses: 'Aggiungi punti deboli personalizzati',
