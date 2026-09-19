@@ -38,6 +38,10 @@ waving at a bird, splashing, feeding, patting, pointing, naming, carrying, givin
 over and getting up again. Never anything that turns on working something out — reading, following
 clues, making a plan, solving a puzzle, or deciding for others.[[/premise]]
 
+[[premise:agency]]**The child does the doing.** A grown-up may be right beside them — carrying them, holding
+the thing out, steadying them — and the doing on the page is still the child's: they pat, splash, feed,
+point, carry, give. Never a page where a grown-up's hands do the only thing that happens.[[/premise:agency]]
+
 [[premise]]**No real-world errands alone.** No stations, tickets, traffic, shops or crowds the child gets
 through by themselves. Inside the story's own make-believe world they may sail, ride, fly or be
 carried anywhere at all.[[/premise]]

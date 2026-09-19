@@ -5483,7 +5483,7 @@ const AGE_BAND_TEMPLATE_KEYS = {
  *
  * Three premise spans are NAMED slots ([[premise:subject]], [[premise:agency]],
  * [[premise:resolution]]) and declared per band in BAND_PREMISE_SLOTS, so a band
- * that legitimately has no agency rule says so positively rather than silently.
+ * that legitimately owes no rule in a slot says so positively rather than silently.
  *
  * Views COMPOSE by allow-list rather than subtracting drops: a new role reaches
  * a narrow view only when someone adds it here.
@@ -5499,12 +5499,16 @@ const BAND_VIEW_KEEPS = {
 };
 
 /**
- * What each band must declare. 'none' is a POSITIVE declaration: the routine
- * band forbids the child working anything out, so it has no agency rule, and
- * that absence must never look like a missing tag.
+ * What each band must declare. 'none' stays available as a POSITIVE declaration
+ * for a band that legitimately owes no rule in a slot, so an absence never looks
+ * like a missing tag. Every band currently declares all three.
+ *
+ * `routine` declared agency: 'none' until 2026-09-19. Its agency rule is not the
+ * other bands' — it asks for no working-out, only that the doing on the page is
+ * the child's and not the grown-up's.
  */
 const BAND_PREMISE_SLOTS = {
-  routine: { subject: 'required', agency: 'none', resolution: 'required' },
+  routine: { subject: 'required', agency: 'required', resolution: 'required' },
   quest: { subject: 'required', agency: 'required', resolution: 'required' },
   tries: { subject: 'required', agency: 'required', resolution: 'required' },
   'fear-choice': { subject: 'required', agency: 'required', resolution: 'required' },
