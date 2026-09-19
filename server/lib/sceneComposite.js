@@ -859,14 +859,79 @@ async function cropSheetCellFixed(sheetBuf, cellIdx) {
     .toBuffer();
 }
 
+// A 2×4 character sheet is drawn on a UNIFORM grid: four columns of the same
+// width, one figure each. So a detected split whose columns are wildly uneven
+// is not an uneven sheet — it is a separator that missed its gutter and landed
+// inside a figure, and the cell either swallows a slice of the neighbour or
+// loses a slice of its own character.
+//
+// Measured on 119 stored staging sheets (all 1024×1024, nominal column 256px),
+// run through the deployed detector: 115 sit at a max column deviation of
+// 0-19.1% from nominal, then the distribution GAPS to 41.8%, 42.6%, 51.6%,
+// 56.2% — four sheets where a separator is plainly in the wrong place. The
+// worst of those four is the reference that shipped on all three covers of
+// job_1789759147125_p08djwhbl: Kiaan's columns came out [365, 164, 226, 269],
+// so his front cell was 365px of him PLUS a vertical slice of the boy in the
+// next column, and column 1 was the 164px remainder of that boy.
+//
+// 25% sits inside that gap: 1.3× above the widest deviation any good split
+// showed, 1.7× below the narrowest broken one. Rejecting is cheap — the fixed
+// width/4 grid is what every caller already falls back to when the analyzer is
+// down — so the bound leans towards rejecting a borderline split rather than
+// shipping a two-figure reference.
+const SHEET_COLUMN_WIDTH_TOLERANCE = 0.25;
+
+/**
+ * Does a detected column split look like a real grid? Pure — no image, no
+ * network — so the bound can be pinned by tests without an analyzer.
+ *
+ * @param {number[]} widths - detected column widths, left to right
+ * @param {Object} [opts]
+ * @param {number} [opts.cols=4] - how many columns the sheet is drawn on
+ * @param {number} [opts.tolerance=SHEET_COLUMN_WIDTH_TOLERANCE] - allowed
+ *   fractional deviation of any one column from the nominal width
+ * @returns {{ok: boolean, maxDeviation: number, reason?: string}}
+ */
+function judgeSheetColumnSplit(widths, opts = {}) {
+  const { cols = 4, tolerance = SHEET_COLUMN_WIDTH_TOLERANCE } = opts;
+  if (!Array.isArray(widths) || widths.length !== cols
+      || widths.some(w => !Number.isFinite(w) || w <= 0)) {
+    return {
+      ok: false,
+      maxDeviation: Infinity,
+      reason: `expected ${cols} positive column widths, got ${JSON.stringify(widths)}`,
+    };
+  }
+  // The columns tile the sheet, so their mean IS width/cols — one comparison
+  // answers both "does it deviate from its siblings" and "from the fixed grid".
+  const nominal = widths.reduce((a, b) => a + b, 0) / cols;
+  let maxDeviation = 0;
+  let worst = 0;
+  for (let i = 0; i < cols; i++) {
+    const dev = Math.abs(widths[i] - nominal) / nominal;
+    if (dev > maxDeviation) { maxDeviation = dev; worst = i; }
+  }
+  if (maxDeviation > tolerance) {
+    return {
+      ok: false,
+      maxDeviation,
+      reason: `column ${worst} is ${widths[worst]}px against a ${Math.round(nominal)}px nominal `
+        + `(${(maxDeviation * 100).toFixed(1)}% off, tolerance ${(tolerance * 100).toFixed(0)}%) `
+        + `— columns [${widths.join(', ')}]`,
+    };
+  }
+  return { ok: true, maxDeviation };
+}
+
 /**
  * Split a 2×4 sheet into 8 cells by EDGE DETECTION (Python /split-reference-sheet,
  * variance-based separator search), not fixed math. Returns an array of 8
  * PNG buffers in row-major order: cells[0..3] = top-row face cells,
  * cells[4..7] = bottom-row body cells. Cell index 1-8 maps to array index 0-7.
  *
- * On failure (Python service unreachable / errors), throws — caller falls
- * back to cropSheetCellFixed per-cell.
+ * Returns null when the detected columns fail the uniformity bound above —
+ * caller falls back to cropSheetCellFixed per-cell, same as it does when the
+ * service is unreachable (which throws).
  */
 async function splitSheetByEdgeDetection(sheetBuf) {
   const b64 = sheetBuf.toString('base64');
@@ -880,13 +945,32 @@ async function splitSheetByEdgeDetection(sheetBuf) {
   if (!data.success || !Array.isArray(data.cells)) {
     throw new Error(`split-reference-sheet bad response: ${data.error || JSON.stringify(data).slice(0,120)}`);
   }
-  return data.cells.map(b64png => b64png ? Buffer.from(b64png, 'base64') : null);
+  const cells = data.cells.map(b64png => b64png ? Buffer.from(b64png, 'base64') : null);
+
+  // Judge the CELLS that came back, not the separators the response reports:
+  // the crop is what a page actually gets, and it stays checkable if the
+  // response shape ever changes. Both rows share the column bounds, so the
+  // top row answers for all eight.
+  const COLS = 4;
+  const topRow = cells.slice(0, COLS);
+  if (topRow.length !== COLS || topRow.some(c => !c)) {
+    log.warn(`[SCENE COMPOSITE] edge-detection split returned ${topRow.filter(Boolean).length}/${COLS} top-row cells — falling back to the fixed ${COLS}-column grid`);
+    return null;
+  }
+  const widths = await Promise.all(topRow.map(async c => (await sharp(c).metadata()).width));
+  const verdict = judgeSheetColumnSplit(widths, { cols: COLS });
+  if (!verdict.ok) {
+    log.warn(`[SCENE COMPOSITE] edge-detection split REJECTED — ${verdict.reason}; falling back to the fixed ${COLS}-column grid`);
+    return null;
+  }
+  return cells;
 }
 
 /**
- * Get one cell from a sheet — uses edge detection when possible, falls back to
- * fixed math. The split result is memoised per sheetBuf so all 8 cells share a
- * single Python call.
+ * Get one cell from a sheet — uses edge detection when it produced a plausible
+ * grid, falls back to fixed math when it did not (or when the service is
+ * unreachable). The split result is memoised per sheetBuf so all 8 cells share
+ * a single Python call, and a rejected split is rejected once for all 8.
  */
 const _sheetSplitCache = new WeakMap();
 async function cropSheetCell(sheetBuf, cellIdx) {
@@ -4527,6 +4611,8 @@ module.exports = {
     sizeFigure,
     buildAgeTargets,
     cropSheetCell,
+    judgeSheetColumnSplit,
+    SHEET_COLUMN_WIDTH_TOLERANCE,
     removeBackground,
     platePlacementPrompt,
     judgePopulatedPlate,

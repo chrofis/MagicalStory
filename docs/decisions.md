@@ -46962,3 +46962,55 @@ the variant is drawn fresh or redressed, and identity drift decided it.
 `server/lib/coverIterate.js`, `server/lib/testlab.js`, `server/routes/regeneration.js`,
 `storyJobPipeline.js`, `tests/unit/wardrobe-state-avatar-variants.test.ts`
 **Status:** ✅ active
+
+
+---
+
+## 2026-09-19 — An edge-detected sheet split is only trusted while its columns stay within 25% of the fixed grid
+
+**Context.** A 2×4 character sheet is cut into eight cells by the analyzer's `/split-reference-sheet`
+(`_detect_separators`: pick the lowest-variance columns inside 0.15–0.85 of the width, at least 15% apart),
+with `cropSheetCellFixed`'s width/4 grid as the fallback. `cropSheetCell` only reached that fallback when the
+call THREW — a variance search that returns a confidently wrong answer never throws. On staging story
+`job_1789759147125_p08djwhbl` the true gutter between Kiaan's first two head-shots is **3px wide** (x=272–274,
+measured) between two saturated purple sweaters; a column inside figure 2 scored lower and was taken first at
+x=365, and the 15% min-spacing rule then blocked the real gutter 93px away. His columns came out
+`[365, 164, 226, 269]`. Column 0 is the cell every cover uses — covers hardcode `pose: 'front'` →
+`FACE_CELL.front=1` / `POSE_CELL.front=5` — so the front cover, the initial page and the back cover were all
+handed 365×1024px of Kiaan **plus a vertical slice of the boy beside him**: a second face, sweater, arm,
+trousers and shoe. His pages asked for other poses, landed in other columns, and were clean.
+
+**Decision.** `splitSheetByEdgeDetection` measures the four top-row cells it got back (both rows share the
+column bounds) and puts them through `judgeSheetColumnSplit` — a pure function, exported for tests. If any
+column deviates from the nominal width/4 by more than **`SHEET_COLUMN_WIDTH_TOLERANCE = 0.25`**, the whole
+detection is rejected: it returns `null`, the warning names the offending column and its width, and the
+existing fixed-grid fallback serves all eight cells. Because the columns tile the sheet their mean IS
+width/4, so the one comparison answers both "does this column disagree with its siblings" and "with the fixed
+grid". The bound sits on the JS side, in the path every cell consumer already goes through (covers, pages,
+the iterate path, the regeneration route), so it needs no analyzer deploy and no caller opts out.
+
+**Rationale — where 25% comes from.** 119 stored staging sheets (all 1024×1024, nominal column 256px) were
+re-run through the deployed detector, extracted verbatim from `photo_analyzer.py`. Max column deviation from
+nominal: **115 sheets between 0% and 19.1%**, then the distribution **gaps** to **41.8, 42.6, 51.6, 56.2%** —
+four sheets, 3.4%, each with a separator plainly inside a figure. 25% sits in that gap: **1.3× above** the
+worst deviation any good split showed and **1.7× below** the mildest broken one, so it is not tuned to the
+motivating sheet. It leans towards rejecting a borderline split on purpose, because rejecting is cheap — the
+fixed grid is what every caller already falls back to whenever the analyzer is down — while accepting costs a
+reference with two children in it. Verified on the four real sheets of the motivating story: Kiaan
+365×1024 → 256×1024 and a single figure; Levin (277), Julian (263) and Max (257) **byte-identical** to the
+references that shipped (mean |Δ| = 0, max |Δ| = 0 against the stored R2 artefacts).
+
+**Known cost of the fallback.** The fixed grid is uniform, the drawn figures are not perfectly centred in it:
+on Kiaan's sheet the true column-0 boundary is ≈273, so the 256px cut trims ~17px from the right edge of the
+head-shot's sleeve (the body row's gutter is 72px wide and untouched). A trimmed sleeve edge is the accepted
+price of not shipping a second child's face in the reference.
+
+**Not applied to `sheetGrid.js`.** `detectSheetGrid` answers a different question — it is count-free, its
+cells are legitimately unequal, and it already rejects slivers with `MIN_CELL_FRAC`. The uniformity bound
+here is only valid because a 2×4 character sheet is drawn on a grid that is MEANT to be uniform.
+`character2x4Sheet.js` uses the same endpoint but reads only `separators.horizontal[0]` (the head/body row
+divider) — a single separator has no siblings to be an outlier among, so it is unaffected.
+
+**Touched:** `server/lib/sceneComposite.js`, `tests/unit/sheet-column-split-bound.test.ts`,
+`tasks/bugs.json`
+**Status:** ✅ active
