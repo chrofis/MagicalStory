@@ -62,7 +62,7 @@ const LEVIN = 'A forest-green knitted pullover with a round neck and ribbed cuff
 // What p14-p18 must resolve to: the scarf clause gone, every other garment
 // intact — the mittens included, which the page ALSO declares off and which the
 // element's own words cannot single out (see the refusal test below).
-const LEVIN_WITHOUT_SCARF = 'A forest-green knitted pullover with a round neck and ribbed cuffs; worn over a white long-sleeve shirt whose cuffs show at the wrists; mid-blue denim jeans with a straight leg; brown lace-up ankle boots; red knitted mittens on both hands.';
+const LEVIN_WITHOUT_SCARF = 'A forest-green knitted pullover with a round neck and ribbed cuffs, worn over a white long-sleeve shirt whose cuffs show at the wrists; mid-blue denim jeans with a straight leg; brown lace-up ankle boots; red knitted mittens on both hands.';
 
 // The pages' own brief METADATA `wornItems[]` rows and `characters`, verbatim.
 const BOTH_OFF_PAGES = [
@@ -152,10 +152,13 @@ describe('an invented wornAs slot — job_1789681157795_wkt20ckod', () => {
     // Asked of the WHOLE contract, exactly as the resolver asks it: a term is
     // only evidence against every other clause of the same outfit.
     const clauses = splitClauses(LEVIN);
-    expect(clauses).toHaveLength(6);
+    // FIVE, not six (2026-09-19). ", worn over a white long-sleeve shirt" is a
+    // DEPENDENT of the pullover clause, not a clause of its own, so it stays
+    // inside it and the contract's own comma survives the rejoin verbatim.
+    expect(clauses).toHaveLength(5);
     expect(indexOfElementAmong(clauses, ART002)).toBe(-1);
-    expect(indexOfElementAmong(clauses, ART003)).toBe(4);
-    expect(clauses[4]).toContain('rust-orange wool scarf');
+    expect(indexOfElementAmong(clauses, ART003)).toBe(3);
+    expect(clauses[3]).toContain('rust-orange wool scarf');
   });
 
   it('SENTINEL — without the element the same call still answers unknown-slot', () => {

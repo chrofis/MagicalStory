@@ -645,8 +645,53 @@ const namesAGarment = (text) => ANY_GARMENT_RE.test(String(text || ''));
  *
  * Clause text is returned verbatim from the source, separators and all, so a
  * caller that drops one clause and rejoins the rest changes nothing else.
+ *
+ * A DEPENDENT SEGMENT IS NOT A CLAUSE, IT BELONGS TO THE ONE BEFORE IT
+ * (2026-09-19). Measured on staging job_1789759147125_p08djwhbl, Levin's
+ * contract reads "… a forest-green zip-up fleece jacket with a wide body and
+ * two front pockets, worn open in scenes where the jacket becomes the egg's
+ * bed; …". The second half of that comma pair carries a garment noun, so the
+ * comma rule above made it a top-level clause — and taking the jacket out left
+ * it standing in the outfit as a free-floating fragment, still talking about
+ * the garment that had just been removed, now dangling off the cap beside it.
+ *
+ * The test is SYNTACTIC and asks only how the segment OPENS: a top-level item
+ * of an outfit list is a noun phrase, and a segment that begins with a
+ * preposition or a past participle of wearing/attachment cannot head one. Nothing is read from what the segment MEANS. Such a segment is
+ * attached to the clause before it as a DEPENDENT: it stays in the clause text,
+ * so a caller that keeps the clause keeps it verbatim, and it leaves with the
+ * clause when the clause is removed.
+ *
+ * A dependent is excluded from the clause's HEAD, which is the only part any
+ * garment question is asked of — how many garments the clause names, which
+ * clause the declared element is, where the layering connective falls. That is
+ * the clause-ownership model: the head names the garment, the dependents
+ * describe it, and the two are removed together.
+ *
+ * The one thing a dependent may NOT do is bring a second garment with it. If a
+ * dependent names a garment noun its head does not, the caller refuses the
+ * strip rather than drop a garment nobody declared off — the same safety bias
+ * as everywhere else in this module, and the same closed vocabulary.
  */
 function splitClauses(description) {
+  return splitClausesDetailed(description).map(c => c.text);
+}
+
+/**
+ * The openers that make a segment DEPENDENT on the clause before it. Closed,
+ * and every member is a preposition or a participle — a word class that cannot
+ * be the head of the noun phrase an outfit list item is. Two kinds of word are
+ * deliberately absent: the list conjunctions ("and a rust-orange scarf" is the
+ * last ITEM of a list, not a tail on the one before it), and the participial
+ * ADJECTIVES that can premodify a noun ("matching brown boots").
+ */
+const DEPENDENT_OPENER_RE = /^\s*(?:with|without|over|under|beneath|underneath|in|on|at|worn|wearing|layered|tucked|wrapped|rolled|folded|fastened|buttoned|zipped|pulled|slung|draped|cut|trimmed|lined|paired|held|secured|finished|topped)\b/i;
+
+/**
+ * Clauses as {text, head}: `text` is the whole clause including its dependents,
+ * `head` is the part that names the garment. See splitClauses.
+ */
+function splitClausesDetailed(description) {
   const raw = String(description || '');
   if (!raw.trim()) return [];
 
@@ -672,17 +717,36 @@ function splitClauses(description) {
   for (const seg of segments) {
     if (!seg.text.trim()) continue;
     const garment = namesAGarment(seg.text);
-    if (current === null) { current = { text: seg.text, garment }; continue; }
+    if (current === null) { current = { text: seg.text, head: seg.text, garment }; continue; }
+    // A dependent opener never starts a clause, whatever it names.
+    if (DEPENDENT_OPENER_RE.test(seg.text)) {
+      current.text += seg.sepBefore + seg.text;
+      continue;
+    }
     if (seg.sepBefore === ';' || (current.garment && garment)) {
       clauses.push(current);
-      current = { text: seg.text, garment };
+      current = { text: seg.text, head: seg.text, garment };
     } else {
       current.text += seg.sepBefore + seg.text;
+      current.head += seg.sepBefore + seg.text;
       current.garment = current.garment || garment;
     }
   }
   if (current) clauses.push(current);
-  return clauses.map(c => c.text.trim()).filter(Boolean);
+  return clauses
+    .map(c => ({ text: c.text.trim(), head: c.head.trim() }))
+    .filter(c => c.text);
+}
+
+/**
+ * Does a clause's dependent tail bring a garment its head does not name? Then
+ * the two cannot be removed together — see splitClauses.
+ */
+function dependentCarriesOtherGarment(clause) {
+  if (!clause || clause.text === clause.head) return false;
+  const tail = clause.text.slice(clause.head.length);
+  const inHead = new Set(garmentNounsIn(clause.head, ALL_GARMENT_NOUNS).map(n => n.toLowerCase()));
+  return garmentNounsIn(tail, ALL_GARMENT_NOUNS).some(n => !inHead.has(n.toLowerCase()));
 }
 
 /** The layering connectives an outfit sentence uses to stack two garments. */
@@ -973,8 +1037,12 @@ function removeWornItemFromOutfit(description, slot, itemName = null, element = 
   // and `unknown-slot` is still the reason reported when identity declines, so
   // a slot outside WORN_SLOTS never becomes invisible.
   const nouns = SLOT_NOUNS[key] || null;
-  const clauses = splitClauses(raw);
-  const byElement = indexOfElementAmong(clauses, element);
+  const detailed = splitClausesDetailed(raw);
+  const clauses = detailed.map(c => c.text);
+  // Every garment question is asked of the HEADS; the clause text (head plus
+  // its dependents) is what is kept or dropped. See splitClauses.
+  const heads = detailed.map(c => c.head);
+  const byElement = indexOfElementAmong(heads, element);
   if (!nouns && byElement < 0) return { text: raw, removed: false, reason: 'unknown-slot' };
   if (clauses.length < 2) return { text: raw, removed: false, reason: 'single-clause-outfit' };
   // THE DECLARED ELEMENT PICKS ITS OWN CLAUSE (2026-09-18), ahead of the slot
@@ -989,7 +1057,7 @@ function removeWornItemFromOutfit(description, slot, itemName = null, element = 
   if (byElement >= 0) hits = [byElement];
   else {
     const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
-    hits = clauses.map((c, i) => (nounRe.test(c) ? i : -1)).filter(i => i >= 0);
+    hits = heads.map((c, i) => (nounRe.test(c) ? i : -1)).filter(i => i >= 0);
     // A slot can hold two garments at once — a hoodie over a t-shirt, a cape over
     // a jacket — and then the slot alone cannot say which clause the declaration
     // is about. The ELEMENT'S OWN NAME can. Narrow by the garment nouns the name
@@ -999,7 +1067,7 @@ function removeWornItemFromOutfit(description, slot, itemName = null, element = 
       const nameNouns = nouns.filter(n => new RegExp(`\\b${n}\\b`, 'i').test(String(itemName)));
       if (nameNouns.length > 0) {
         const nameRe = new RegExp(`\\b(?:${nameNouns.join('|')})\\b`, 'i');
-        const narrowed = hits.filter(i => nameRe.test(clauses[i]));
+        const narrowed = hits.filter(i => nameRe.test(heads[i]));
         if (narrowed.length === 1) hits = narrowed;
       }
     }
@@ -1012,9 +1080,23 @@ function removeWornItemFromOutfit(description, slot, itemName = null, element = 
   // — measured on staging job_1789348171785_9oxos7dwv p9/p13/p14, where a
   // whole-clause drop left the character with no top at all. Split the clause
   // on its layering connective and keep the part the declaration is NOT about.
-  const survivor = clauseRemainderWithoutItem(clauses[hits[0]], nouns, itemName, element);
+  const chosen = detailed[hits[0]];
+  // A dependent that brings a garment of its OWN is not a tail on the head, it
+  // is the other half of a layered clause ("… a duffle coat …, worn over a white
+  // long-sleeve top") — so the whole clause goes to the layer split, which is
+  // what that route has always been for. A dependent that brings no garment is
+  // the head's own trim or fit, and only the head is asked.
+  const layered = dependentCarriesOtherGarment(chosen);
+  const survivor = clauseRemainderWithoutItem(layered ? chosen.text : chosen.head, nouns, itemName, element);
   if (survivor === false) {
     return { text: raw, removed: false, reason: 'slot-clause-carries-another-garment' };
+  }
+  // A head that is layered WITHIN ITSELF keeps half of itself, and its trim
+  // dependents describe the half that is leaving as readily as the one that
+  // stays — which of the two owns them is declared nowhere. Refuse, rather than
+  // carry a fit phrase over onto a garment it was never written about.
+  if (!layered && survivor !== null && chosen.text !== chosen.head) {
+    return { text: raw, removed: false, reason: 'dependent-clause-ownership-unclear' };
   }
   const kept = clauses.map((c, i) => (i === hits[0] ? survivor : c)).filter(c => c !== null && c !== '');
   if (kept.length === 0) return { text: raw, removed: false, reason: 'would-empty-outfit' };
@@ -1110,7 +1192,7 @@ function applyWornItemsToOutfit(description, resolved, characterName) {
     // cannot run — but it is recorded, like every other skip, instead of
     // vanishing on a bare `continue`.
     if (!nouns) { swaps.push({ id: r.id, slot: r.slot, applied: false, reason: 'unknown-slot' }); continue; }
-    const clauses = splitClauses(text);
+    const clauses = splitClausesDetailed(text).map(c => c.head);
     const nounRe = new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i');
     const hits = clauses.filter(c => nounRe.test(c));
     if (hits.length !== 1) continue; // no clause, or an ambiguous slot — leave it
@@ -1292,6 +1374,7 @@ module.exports = {
   wornItemLook,
   carryForwardWornItems,
   splitClauses,
+  splitClausesDetailed,
   buildWornStateLines,
   buildWornStateBlock,
   removeWornItemFromOutfit,
