@@ -2618,6 +2618,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // ONE entry-page contract for the same two bible-authoring sites — see
     // ELEMENT_ENTRY_PAGE_RULE.
     ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
+    TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     // ONE shot vocabulary for every stage that writes or reads a `shot` — the
     // beats planner produces it, planCounters counts it, and the image prompt
     // defines it. See server/lib/shotVocabulary.js.
@@ -2872,6 +2873,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     SEASON: pageSeasonLabel(options.story, `scene-expansion P${pageNumber}`),
     // ONE counting rule for both Art Director templates — see COUNTING_RULE.
     COUNTING_RULE,
+    // 8f, filled here too: the per-page template DECLARES {TRUE_RELATIVE_SIZE}
+    // and fillTemplate drops a declared placeholder nobody supplies, silently.
+    TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     // ONE cast contract and ONE multi-picture prop contract, shared with the
     // scene review — see PLAN_LINE_CAST_RULE / MULTI_PICTURE_PROP_RULE.
     PLAN_LINE_CAST: PLAN_LINE_CAST_RULE,
@@ -7545,6 +7549,34 @@ const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask f
  * entry claimed pages 7, 10 and 13. The reader meets it for the first time on a
  * page that does not draw it.
  */
+/**
+ * TRUE RELATIVE SIZE — and the one exception the rule used to contradict.
+ *
+ * 8f asks every page citing an element beside a figure to state that element's
+ * size as a RATIO against the figure. Its worked example was "the creature
+ * stands three times the height of the character beside it" — which is exactly
+ * what the creature-tone rule forbids for two of its three bands:
+ *   cute (ages <=4)    "never as a multiple of a child and never with the child
+ *                       dwarfed beside it"
+ *   not-menacing (5-6) "state its size in metres, not as a multiple of a child"
+ *   formidable (7+)    "its size may be stated against a child"
+ *
+ * So on any creature page of a book for a reader of six or under, the Art
+ * Director was handed a rule and its own example pointing one way and a band
+ * rule pointing the other. The example is the offending part: a ratio against a
+ * child is precisely how a creature is made to loom over one, which is the thing
+ * the bands exist to prevent.
+ *
+ * Measured on job_1789759147125_p08djwhbl (age 5, not-menacing): this did NOT
+ * explain the rule being widely ignored — creature pages carried a size anchor
+ * on 2 of 8, non-creature pages on 0 of 7, so 8f is unheeded across the board
+ * and that is its own finding. The contradiction is real on its own terms.
+ *
+ * ONE constant: the rule was hand-copied, byte-identical, into both Art Director
+ * templates.
+ */
+const TRUE_RELATIVE_SIZE_RULE = "A vessel, building, vehicle or creature holds its real size against the figures near it — a person reaches about to a boat's rail, a doorway lintel or a wheel hub, never eye-level with a masthead, a rooftop or a chimney. Every page that cites an element and holds a figure too names that element’s size as a ratio against a figure in the prose: \"the mast rises five times her height\", \"the door stands twice as tall as the person in front of it\". An adjective is not a ratio — massive, tiny, huge, enormous carry no scale into the picture. A CREATURE is the exception: its size is stated the way the creature rule above states it — in metres or against a familiar room for a young reader, against a figure only where that rule allows it — because a ratio against a child is what makes a creature loom over one. Two entries of one kind that differ in size each carry their own ratio on a page holding both. A creature or a secondary character keeps the size its entry’s `scaleClass` band states on every page it appears on, whatever the shot, and is measured against nothing at all on a page where it is alone. When an entry states its height against another named figure, write that relation into the prose on every page the two share.";
+
 const ELEMENT_ENTRY_PAGE_RULE = "An element's `pages` always includes the page the story first brings it in \u2014 handed over, found, taken out, put on \u2014 even when that page's plan line is about something else. That is the page the reader learns what it looks like on.";
 
 /**
@@ -9190,6 +9222,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       SCALE_CLASS_SPEC,
       // ...and the same entry-page contract, for the same reason.
       ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
+      TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
     });
   }
 
@@ -9695,6 +9728,7 @@ module.exports = {
   // bookAudit.js) read the same string, never a copy of it.
   TEXT_NOT_A_CHECKLIST_RULE,
   ELEMENT_ENTRY_PAGE_RULE,
+  TRUE_RELATIVE_SIZE_RULE,
   NO_CHARACTER_MARKING_RULE,
   HANDS_HOLD_ONLY_NAMED_RULE,
   PAGE_OPENING_VARIETY_RULE,

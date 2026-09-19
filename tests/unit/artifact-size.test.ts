@@ -8,10 +8,13 @@ const { buildArtifactDescription, parseVisualBible, SCALE_CLASS_SPEC } = require
 const { buildTextFromJson } = require('../../server/lib/sceneMetadata');
 // @ts-ignore
 const PB = require('../../server/lib/promptBuilders');
+const { TRUE_RELATIVE_SIZE_RULE } = require('../../server/lib/promptBuilders');
+/** The template with its shared constants resolved — what the model actually reads. */
+const withRules = (t: string) => t.replace('{TRUE_RELATIVE_SIZE}', TRUE_RELATIVE_SIZE_RULE);
 
 const NL = String.fromCharCode(10);
 const PROMPTS = path.join(__dirname, '..', '..', 'prompts');
-const read = (f: string) => fs.readFileSync(path.join(PROMPTS, f), 'utf-8');
+const read = (f: string) => withRules(fs.readFileSync(path.join(PROMPTS, f), 'utf-8'));
 
 /** The page prompt a one-artifact bible produces, with that artifact cited. */
 const buildPagePrompt = (vb: any) => {

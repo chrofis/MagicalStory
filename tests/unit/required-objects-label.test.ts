@@ -27,6 +27,9 @@ import { describe, it, expect } from 'vitest';
 
 // @ts-expect-error - JS module without types
 import { buildImagePrompt, sanitizeVbIdsInPrompt } from '../../server/lib/promptBuilders.js';
+const { TRUE_RELATIVE_SIZE_RULE } = require('../../server/lib/promptBuilders');
+/** The template with its shared constants resolved — what the model actually reads. */
+const withRules = (t: string) => t.replace('{TRUE_RELATIVE_SIZE}', TRUE_RELATIVE_SIZE_RULE);
 
 const ART001 = {
   id: 'ART001',
@@ -237,7 +240,7 @@ describe('the Art Director is told a creature holds its size (D11)', () => {
   const path = require('path');
   for (const f of ['prompts/scene-expansion.txt', 'prompts/scene-expansion-all.txt']) {
     it(`${f} rule 8f covers creatures, not only vessels and buildings`, () => {
-      const t = fs.readFileSync(path.join(process.cwd(), f), 'utf8');
+      const t = withRules(fs.readFileSync(path.join(process.cwd(), f), 'utf8'));
       expect(t).toMatch(/A vessel, building, vehicle or creature holds its real size/);
       // 2026-09-15: rekeyed onto the scaleClass band when the free-text
       // `size` field was retired. The obligation is unchanged — a creature
@@ -252,7 +255,7 @@ describe('the Art Director is told a creature holds its size (D11)', () => {
       // (promptBuilders: "the prose already carries them inline"), so the AD's
       // prose is the only route for that relation - and p12 drew both guards
       // the same size.
-      const t = fs.readFileSync(path.join(process.cwd(), f), 'utf8');
+      const t = withRules(fs.readFileSync(path.join(process.cwd(), f), 'utf8'));
       expect(t).toMatch(/When an entry states its height against another named figure, write that relation into the prose on every page the two share/);
     });
   }
