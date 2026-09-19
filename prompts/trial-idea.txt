@@ -1,4 +1,4 @@
-Write ONLY a three-sentence story idea. Nothing else. No title, no scene breakdown, no details.
+Write a three-sentence story idea and then its check block. Nothing else. No title, no scene breakdown, no details.
 
 {TITLE_LINE}
 Character: {CHARACTER}. {CATEGORY_CONTEXT}
@@ -18,11 +18,7 @@ Center the idea on the main character. Keep the cast minimal — add another per
 
 Name each thing plainly, with no ornamental adjective on a place, a creature or an object.
 
-What gets in the way is an outside event that leaves the main character no way through but the hard
-thing this story was asked for — never a different difficulty put in its place, and never named
-outright. The event is what makes that hard thing unavoidable, and slot 2 is the main character
-doing it; an event that merely happens alongside it is a fault. The setting is where that struggle
-happens, not scenery around it.
+{COMMISSION_RULE}
 
-{TITLE_RULE}Respond with ONLY three sentences, one per slot: (1) what the main character wants, and what gets in the way; (2) what they do about that same obstacle; (3) how it turns out. An idea that stops on the problem, or leaves a slot unwritten, is a fault. Maximum 50 words. Plain text, no markdown, no labels.
+{TITLE_RULE}The idea is three sentences, one per slot: (1) what the main character wants, and what gets in the way; (2) what they do about that same obstacle; (3) how it turns out. An idea that stops on the problem, or leaves a slot unwritten, is a fault. Maximum 50 words. Plain text, no markdown, no labels.
 {LANG_INSTRUCTION} Write EVERYTHING in that language.

@@ -2189,6 +2189,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme}, Language: ${language}`);
 
     const { callTextModelStreaming } = require('../lib/textModels');
+    const { stripIdeaSelfCheck, parseIdeaSelfCheck, buildIdeaRerunPrompt } = require('../lib/trialIdeaCheck');
     const { getLanguageInstruction } = require('../lib/languages');
     const modelToUse = 'claude-sonnet';
 
@@ -2312,59 +2313,54 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);
 
-    // Track state for both stories
-    let fullResponse1 = '';
-    let fullResponse2 = '';
-    let lastStory1Length = 0;
-    let lastStory2Length = 0;
-    let story1Started = false;
-    let story2Started = false;
-
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 (800 max tokens — three-sentence idea)
-    const streamStory1 = callTextModelStreaming(prompt1Local, null, (delta, fullText) => {
-      fullResponse1 = fullText;
-      if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
-        res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
-        lastStory1Length = fullText.length;
-        if (!story1Started) {
-          log.debug('  Story 1 streaming started');
-          story1Started = true;
+    // The card certifies itself IN THIS CALL — no second judge call, because a
+    // judge taxes the ~85% of trials whose cards are already right in order to
+    // fix the rest (owner, 2026-09-19). A passing card costs one extra output
+    // line and nothing else; only a card that failed its own check reruns.
+    const runIdeaCard = (slot, basePrompt) => {
+      let full = '';
+      let lastLen = 0;
+      let started = false;
+      const emit = (text, isFinal) => {
+        const payload = isFinal ? { [slot]: text, isFinal: true } : { [slot]: text };
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      };
+      // The check block is never shown: strip it from every streamed fragment.
+      const onDelta = (delta, fullText) => {
+        full = fullText;
+        const visible = stripIdeaSelfCheck(fullText);
+        if (visible.length > 30 && visible.length > lastLen + 30) {
+          emit(visible);
+          lastLen = visible.length;
+          if (!started) { log.debug(`  ${slot} streaming started`); started = true; }
         }
-      }
-    }, modelToUse).then(() => {
-      const finalContent = fullResponse1.trim();
-      if (finalContent) {
-        res.write(`data: ${JSON.stringify({ story1: finalContent, isFinal: true })}\n\n`);
-        log.debug(`  Story 1 final (${finalContent.length} chars)`);
-      }
-    }).catch(err => {
-      log.error('  Story 1 generation failed:', err.message);
-      res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
-    });
+      };
+      return callTextModelStreaming(basePrompt, null, onDelta, modelToUse).then(async () => {
+        // Throws on a malformed block — an unparseable card is a broken
+        // contract, not a passing card. No fallback to shipping it unchecked.
+        let parsed = parseIdeaSelfCheck(full);
+        if (!parsed.ok) {
+          log.warn(`  ${slot} failed its own check (${parsed.failure}) — one rerun`);
+          const rerun = await callTextModelStreaming(buildIdeaRerunPrompt(basePrompt, parsed), null, null, modelToUse);
+          // Exactly ONE rerun: whatever comes back is the final answer.
+          const reparsed = parseIdeaSelfCheck(String(rerun.text || ''));
+          log.info(`  ${slot} rerun ${reparsed.ok ? 'passed' : `still failing (${reparsed.failure})`}`);
+          parsed = reparsed;
+        }
+        if (parsed.idea) {
+          emit(parsed.idea, true);
+          log.debug(`  ${slot} final (${parsed.idea.length} chars)`);
+        }
+      }).catch(err => {
+        log.error(`  ${slot} generation failed:`, err.message);
+        res.write(`data: ${JSON.stringify({ error: `Failed to generate ${slot === 'story1' ? 'first' : 'second'} story idea` })}\n\n`);
+      });
+    };
 
-    // Stream Story 2 (800 max tokens — three-sentence idea)
-    const streamStory2 = callTextModelStreaming(prompt2, null, (delta, fullText) => {
-      fullResponse2 = fullText;
-      if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
-        res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
-        lastStory2Length = fullText.length;
-        if (!story2Started) {
-          log.debug('  Story 2 streaming started');
-          story2Started = true;
-        }
-      }
-    }, modelToUse).then(() => {
-      const finalContent = fullResponse2.trim();
-      if (finalContent) {
-        res.write(`data: ${JSON.stringify({ story2: finalContent, isFinal: true })}\n\n`);
-        log.debug(`  Story 2 final (${finalContent.length} chars)`);
-      }
-    }).catch(err => {
-      log.error('  Story 2 generation failed:', err.message);
-      res.write(`data: ${JSON.stringify({ error: 'Failed to generate second story idea' })}\n\n`);
-    });
+    const streamStory1 = runIdeaCard('story1', prompt1Local);
+    const streamStory2 = runIdeaCard('story2', prompt2);
 
     // Wait for both to complete
     await Promise.all([streamStory1, streamStory2]);

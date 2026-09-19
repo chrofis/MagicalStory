@@ -66,6 +66,76 @@ evidence it flags the wrong pages. Owner decision pending.
 
 ---
 
+## 2026-09-19 — The trial idea CERTIFIES ITSELF in the same call: it quotes its own slot-2 act, and only a card that cannot pays for a rerun
+
+**Context.** Nine rounds of prompt tuning on `prompts/trial-idea.txt` plateaued. Round 9 (28 cards
+over the 14 fixed cells): the outside event forces the commissioned skill on 22/28, and on **2 of 14
+cells BOTH cards miss the topic** — `waiting-turn` (both cards are courage stories; waiting never
+happens) and `going-outside` (both are fetch-the-thing stories). A visitor picks a topic and is
+offered two stories that are not about it, on ~14% of trials. Root cause: **nothing on the trial path
+ever checked a returned idea against the commissioned topic** (`skipQualityEval: true`,
+`enableFullRepair: false`), so the prompt was the only defence and prompt-only is exhausted (rounds
+6-9 flat).
+
+**Rejected: a separate judge call.** The first design was a cheap per-pair judge after the two cards
+come back, retrying the failing card. The owner rejected it on latency: *"this adds time, actually we
+can not do it … the 85 % that are good can not get slower."* A judge taxes 100% of trials with an
+extra round-trip to fix ~15%, and the idea step is on the visitor's critical path (trial budget
+108-196s). Do not re-propose it.
+
+**Decision.** The check rides in the SAME call that writes the idea, and it is **enumerable, never a
+verdict**. A model that wrote the wrong card will rubber-stamp the wrong card, so it is never asked
+*"is this right?"*. It is asked to COPY, from the card it just wrote:
+
+```
+CHECK
+EVENT: <the words of sentence 1 that are the outside event>
+ACT:   <the words of sentence 2 in which the main character does the hard thing this story was
+        asked for — or NONE if sentence 2 has no such words>
+```
+
+This is the invented-cast-total pattern (`project_invented_cast_enumeration`): a quotable span is
+always self-certifiable. A card with no slot-2 act has to write `NONE`, which is
+self-identification without an opinion.
+
+**JS never reads the idea's meaning.** `parseIdeaSelfCheck` checks only that the quoted spans are
+really spans of the card's own slots — `ACT` inside sentence 2, `EVENT` inside sentence 1, compared
+after case/quote/trailing-punctuation normalisation. No German text is pattern-matched; the
+classification is entirely the prompt's. Failure codes are structural (`no-act`, `act-not-quoted`,
+`act-not-in-slot-2`, `no-event`, `event-not-quoted`, `event-not-in-slot-1`).
+
+**One rule, one constant.** `COMMISSIONED_ACT_PHRASE` ("the hard thing this story was asked for") is
+a single JS string used to build BOTH the obstacle rule the generator is given
+(`TRIAL_IDEA_COMMISSION_RULE`, moved verbatim out of the template into `{COMMISSION_RULE}`) and the
+self-check that answers it (`TRIAL_IDEA_SELF_CHECK_RULE`, appended last to both arms). The
+generator's rule and the critic's rule cannot drift into two hand-kept copies; a unit test pins that
+the phrase occurs exactly twice in every built prompt.
+
+**Paths and costs.**
+- **Passing card (the ~85%):** one model call, exactly as before. The only added cost is ~25 output
+  tokens for the CHECK block. No extra call, no extra prompt, no extra round-trip.
+- **Failing card:** exactly ONE rerun of the same prompt with the rejected card and its own stated
+  reason fed back (`buildIdeaRerunPrompt`). Whatever that returns is the final answer — no loop.
+- **Malformed block:** `parseIdeaSelfCheck` THROWS. There is no fallback that ships an unchecked
+  card; the route's existing per-card error path reports the failure.
+- The block is stripped from every streamed SSE fragment (`stripIdeaSelfCheck`), including a
+  half-streamed `CHECK` marker, so no fragment of it reaches the UI.
+
+**Sibling paths.** `trial-idea-prompt-mirror` (`server/routes/trial.js` ↔ `server/lib/testlab.js`).
+The prompt reaches both through the shared `buildTrialIdeaPrompts`, needing no copy. The Lab's
+variety stage DID need wiring: every card now ends with a CHECK block, which left in would feed the
+premise-grouping word frequencies. It now strips the block and RECORDS the verdict per arm
+(`pairs[].selfCheck`), and deliberately does **not** rerun — that stage measures the raw draw, and a
+stage that reran would stop measuring what the prompt produces.
+
+**Touched:** `server/lib/trialIdeaCheck.js` (new), `prompts/trial-idea.txt`,
+`server/lib/promptBuilders.js` (`buildTrialIdeaPrompts`), `server/routes/trial.js` (`runIdeaCard`),
+`server/lib/testlab.js` (`runTrialIdeaVarietyStage`), `tests/unit/trial-idea-self-check.test.ts`,
+`docs/decisions.md`.
+**Status:** 🟡 active, NOT yet measured — staging only. The round-10 measurement (both-cards-miss
+2/14 → ?, event-forces-the-skill 22/28 → ?, rubber-stamp rate, rerun improvement rate, added
+latency on the passing path) is appended to this entry when it runs.
+
 ## 2026-09-19 — The obstacle is the outside event that FORCES the commissioned skill, not the skill itself — and the metric that measured it was wrong
 
 **Context.** Two live instructions on the trial idea path contradicted each other for roughly half

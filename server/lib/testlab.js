@@ -8677,6 +8677,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { buildTrialIdeaPrompts, getTeachingGuide } = require('./promptBuilders');
+  const { parseIdeaSelfCheck, stripIdeaSelfCheck } = require('./trialIdeaCheck');
   const { buildSeasonInstruction } = require('./season');
   const { getLanguageInstruction } = require('./languages');
   const { callTextModelStreaming } = require('./textModels');
@@ -8784,11 +8785,29 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
       callTextModelStreaming(drawPrompts.fantasy, null, null, model, { usageLabel: 'testlab_trial_idea_variety' }).catch(err => ({ error: err.message })),
     ]);
     for (const r of [localRes, fantasyRes]) if (!r.error) usage.push({ cost: costOf(r), modelId: r.modelId, usage: r.usage });
+    // Every card now ends with its own CHECK block (server/lib/trialIdeaCheck.js).
+    // It is not part of the idea: left in, it would feed the premise-grouping
+    // word frequencies. This stage measures the RAW draw, so it strips and
+    // RECORDS the verdict and does not rerun — the rerun is the /try route's
+    // job, and a stage that reran would stop measuring what the prompt produces.
+    const readCard = (r) => {
+      if (r.error) return { text: null, selfCheck: null };
+      const raw = String(r.text || '');
+      try {
+        const parsed = parseIdeaSelfCheck(raw);
+        return { text: parsed.idea, selfCheck: { ok: parsed.ok, failure: parsed.failure, event: parsed.event, act: parsed.act } };
+      } catch (err) {
+        return { text: stripIdeaSelfCheck(raw) || null, selfCheck: { ok: false, failure: 'malformed', error: err.message } };
+      }
+    };
+    const localCard = readCard(localRes);
+    const fantasyCard = readCard(fantasyRes);
     pairs.push({
       draw: i,
       axes: { local: drawPrompts.axes.local.want, fantasy: drawPrompts.axes.fantasy.want },
-      local: localRes.error ? null : String(localRes.text || '').trim(),
-      fantasy: fantasyRes.error ? null : String(fantasyRes.text || '').trim(),
+      local: localCard.text,
+      fantasy: fantasyCard.text,
+      selfCheck: { local: localCard.selfCheck, fantasy: fantasyCard.selfCheck },
       errors: [localRes.error, fantasyRes.error].filter(Boolean),
     });
   }

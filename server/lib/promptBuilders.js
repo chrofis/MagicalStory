@@ -9175,6 +9175,8 @@ function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious 
 // ============================================================================
 
 
+const { TRIAL_IDEA_COMMISSION_RULE, TRIAL_IDEA_SELF_CHECK_RULE } = require('./trialIdeaCheck');
+
 /**
  * Costume instructions for the trial idea generator.
  *
@@ -9340,6 +9342,10 @@ function buildTrialIdeaPrompts({
     AGE_MODE: buildAgeModeSection({ characters }, { bandView }),
     COSTUME_RULE: costumeRule,
     ANIMAL_FATE: ANIMAL_FATE_RULE,
+    // The obstacle rule and the self-check that answers it are ONE constant
+    // pair in server/lib/trialIdeaCheck.js — the generator's rule and the
+    // check's wording cannot drift into two hand-kept copies.
+    COMMISSION_RULE: TRIAL_IDEA_COMMISSION_RULE,
   });
 
   const townClause = townName ? `in ${townName}` : `in the child's own town`;
@@ -9353,9 +9359,13 @@ function buildTrialIdeaPrompts({
   const fantasyWorld = buildFantasyWorldSentence(storyTheme);
   const fantasyIdea = `\nSet this idea in a make-believe world.${fantasyWorld ? ` ${fantasyWorld}` : ''} It opens where the child really is — ${fantasyOpening} — and the make-believe follows from that; the world it enters has no real place names.`;
 
+  // The self-check is the LAST thing either arm reads: the card has to point at
+  // the span of its own slot 2 that does the commissioned act, so a card that
+  // cannot has said so without ever being asked for an opinion.
+  const check = `\n\n${TRIAL_IDEA_SELF_CHECK_RULE}`;
   return {
-    local: base('premise', axes.local) + localIdea,
-    fantasy: base('premise-open', axes.fantasy) + fantasyIdea,
+    local: base('premise', axes.local) + localIdea + check,
+    fantasy: base('premise-open', axes.fantasy) + fantasyIdea + check,
     axes,
   };
 }
