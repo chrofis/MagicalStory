@@ -48140,79 +48140,138 @@ contradict one, never work through a whole list") and is untouched.
 **Status:** ✅ active
 
 
-## 2026-09-19 — Cross-page object SCALE is checked once, at the book audit, and it FLAGS a human rather than firing a repair
+## 2026-09-19 — Object SCALE is ONE MORE QUESTION in the book audit's existing call, and it flags a human rather than firing a repair
 
 **Context:** A recurring prop's drawn size drifts page to page (the worked case:
 a dragon egg authored "about as big as a human head", rendered football-sized on
 two pages and fist-sized on another), and nothing in the pipeline can see it.
 Every per-page judge reads ONE image against ONE brief, so both the too-big page
-and the too-small page score clean. Scale is only visible ACROSS the book. The
-owner's ruling: *"You should add this check to the reviewer at the end — the one
-that reviews the entire story with text and images."* That is the final book
-audit (`server/lib/bookAudit.js`), which already holds every page's words beside
-its shipped picture.
+and the too-small page score clean. Size is only visible when several pages are
+read together. The owner's ruling: *"You should add this check to the reviewer at
+the end — the one that reviews the entire story with text and images."* That is
+the final book audit (`server/lib/bookAudit.js`).
 
-**Decision:** A cross-page object-scale pass inside the book audit.
-1. Scope: Visual Bible entries in `artifacts` / `vehicles` / `animals` that a
-   page's brief CITES in `objects[]`. Requiring a cited id IS the generic gate —
-   an entry marked `generic: true` is dropped at parse time with no id
-   (`visualBible.js`, `isGenericEntry`), so everyday clutter cannot be cited.
-   Characters, clothing and locations are excluded by collection. An object on
-   fewer than **4** audited pages is skipped (no meaningful average to depart
-   from) and says so.
-2. Question: **outliers only** — "which pages show the object significantly
-   LARGER than the average across this set, which significantly SMALLER; say
-   nothing about pages near the average; an empty list is allowed." Per-page
-   numeric estimates are explicitly forbidden in the prompt.
-3. **Three calls, each with its own shuffled page order; a page is reported
-   only if every successful call named it.** Fewer than three usable replies →
-   one retry round → the object is recorded through the shared `notEvaluated`
-   machinery (`object_scale` / `insufficient_scale_reads`), never as clean and
-   never from a partial set.
-4. The result lands in its own `objectScale` field on the audit result and is
-   deliberately kept OUT of `byRoute`, which the corrective rounds consume.
-   **Nothing is repainted.** No scored type was added; no scoring changed.
+**Decision:** The book audit runs as it always has and answers one MORE question
+in the same reply: for each qualifying prop, is it rendered significantly larger
+or smaller on some of the pages in front of the reviewer than on the rest.
+- **No additional API call, no re-read, no shuffling, no quorum, no retry
+  round.** The first implementation of this (commit `547590578`) ran three
+  shuffled calls per prop and reported only the intersection; the owner rejected
+  it — *"this is just a test or in the story we will run three times?? Not
+  acceptable. One run where we ask this."* — and was right: the three-call
+  intersect was a RESEARCH method for establishing whether the signal was real,
+  wrongly promoted to production behaviour. It is deleted.
+- Scope: Visual Bible entries in `artifacts` / `vehicles` / `animals` that a
+  page's brief CITES in `objects[]`. Requiring a cited id IS the generic gate —
+  an entry marked `generic: true` is dropped at parse time with no id
+  (`visualBible.js`, `isGenericEntry`), so everyday clutter cannot be cited.
+  Characters, clothing and locations are excluded by collection. An object on
+  fewer than **4** audited pages is skipped (nothing to compare against) and
+  says so.
+- Wording kept verbatim from the measurement: outliers only ("which pages are
+  significantly LARGER / SMALLER than the rest"), never a per-page ratio; an
+  explicit ban on per-page numeric estimates; explicit permission to answer
+  "SCALE: none".
+- A reply carrying neither a `SCALE[...]` line nor an explicit `SCALE: none` is
+  recorded through the shared `notEvaluated` machinery (`object_scale` /
+  `no_scale_answer`) — a missing answer, never a clean one.
+- The result lands in its own `objectScale` field and is deliberately kept OUT
+  of `byRoute`, which the corrective rounds consume. **Nothing is repainted.**
+  No scored type was added; no scoring changed.
 
-**Rationale:** Measured on `job_1789759147125_p08djwhbl`, CHF ~1.9 total.
-- **Per-page ratios do not work.** Three separate tests; ceiling ~4/6 on
-  DIRECTION alone, mean error 0.30–0.67. And the batched per-page verdicts are
-  ORDER-DEPENDENT: reshuffling the page order flipped **5 of 9** verdicts on
+**Rationale:** Measured on `job_1789759147125_p08djwhbl`, CHF ~1.9.
+- **Per-page ratios do not work** and are not asked for: three separate tests,
+  ceiling ~4/6 on DIRECTION alone, mean error 0.30–0.67, and the batched
+  per-page verdicts are order-dependent (reshuffling flipped 5 of 9 verdicts on
   byte-identical images, and the judge's chosen reference page moved with
-  position. Reproduced on a second story.
-- **The outlier question works — at the intersection, on the larger side.**
-  Four orders run; the intersection across the three that answered was exactly
-  the true outliers (**p3, p5**) with **zero false positives**, regardless of
-  position. Every SINGLE run's list carried false positives (p7, p2, p4 — all
-  within ±11% of the mean), so the intersection is the result and no single
-  call ever is. This is the same confirm-and-intersect discipline the style
-  audit's `CONFIRMATION_FLAG_RATIO` enforces (Lab 985–987, memory
-  `grid_judge_collapse`): a batched VLM verdict an independent sample does not
-  reproduce is not evidence.
-- **The smaller side is weaker and the finding says so.** p9, a true small
-  outlier, was named twice with a false positive attached and then dropped
-  entirely in the fourth order. The finding text names the larger side as the
-  measured-reliable one and the smaller side as "a pointer, not a verdict", so
-  a reader does not weigh them equally.
+  position; reproduced on a second story).
+- **The outlier phrasing is what produced a stable signal** — the true outliers
+  (p3, p5) were named in every order tried — so that phrasing is what shipped.
+- **ACCURACY COST, ACCEPTED AND STATED PLAINLY: a single read carries 2–3 false
+  positives per run** (p7, p2, p4 — all within ±11% of the mean). Running three
+  shuffled reads and intersecting them removed those completely; with one read
+  they come back. That is the right trade **because this finding flags for a
+  human and never triggers a paid repair — a false positive costs a glance**,
+  where tripling the final reviewer's calls for one question among many costs
+  every story. The finding text itself says so ("One read, so expect the odd
+  page named that is really within a tenth of the others; check by eye").
+- **The SMALLER side is the weaker direction** (a true small outlier was dropped
+  by a reordering), and the finding text says that too.
 - **1 run in 4 returned nothing**, truncating on its own reasoning after
   ignoring the "no per-page numbers" instruction and enumerating estimates.
-  That is why the instruction is explicit in the prompt and why a non-answer is
-  a MISSING read rather than an empty one: counting it as empty would silently
-  collapse an intersection.
+  That is why the ban is explicit and why a non-answer is recorded as missing.
 - **Why it flags instead of repairing.** Shrinking the prop was measured to
   strand the hands off it (page 5's whole moment) and never reached the target
   size anyway; the reference-cell area lever is dead (SETTLED.md, 2026-09-19 —
   25× cell area bought 0–18% where +90% is needed); and the `scaleClass` text
   layer is correct and also does not move the pixels. With no lever that works,
-  an automatic repair could only make pages worse. A human sees the finding.
+  an automatic repair could only make pages worse.
 
-**Cost shape:** three cheap vision calls per audited object, capped at
-`MAX_OBJECTS = 2` per book; objects past the cap are recorded as
-`object_budget_exhausted` rather than dropped in silence.
+**Cost:** zero additional calls. The question is extra prompt text and a few
+lines of extra output inside calls the audit already makes.
 
-**Touched:** `server/lib/objectScaleAudit.js` (new — selection, seeded shuffle,
-reply parsing, intersection, finding text), `server/lib/bookAudit.js`
-(`splitBookAuditTemplate`, `judgeParts`, `auditObjectScale`, the `objectScale`
-result field), `prompts/book-audit.txt` (the `===OBJECT-SCALE PASS===` section),
+**Touched:** `server/lib/objectScaleAudit.js` (selection, question builder,
+answer parsing, finding text), `server/lib/bookAudit.js`
+(`OBJECT_SCALE_QUESTION` in `judgeChunk`, `collectObjectScale`, the
+`objectScale` result field), `prompts/book-audit.txt`,
 `tests/unit/book-audit-object-scale.test.ts`, `docs/image-routing.md`.
+
+**Status:** ✅ active (supersedes the three-call intersect design described in
+the first version of this entry, which never ran on a story)
+
+---
+
+## 2026-09-19 — The plan check was never useless: its findings were being thrown away by a parser stricter than its own contract
+
+**Context.** Reviewing staging `job_1789759147125_p08djwhbl` showed `modelFindings: []`
+from an eleven-check, 13,590-char plan review against a plan whose page 5 breaks four of
+the planner's own rules. The obvious reading — "this checker is not worth its tokens" —
+was wrong, and the measurement is why.
+
+**Measured across all 32 stored staging beats runs.** Every run from **2026-09-14 01:09
+CH onward recorded zero model findings — six consecutive books** — while the code
+counters kept finding 2-6 faults each time. Every run before that boundary had findings,
+rising 9 → 41 (mean ~18). That is a cliff with a date, not a capability limit.
+
+Four things were constant across the cliff, each checked rather than assumed: the model
+(`openai/gpt-5.6-luna-pro` on both sides, from the stored `model` field), the prompt's
+OUTPUT FORMAT section (byte-identical between the last non-zero and first zero run),
+the output ceiling (128k), and `parsePlanCheck` itself (untouched since 2026-09-05).
+
+So the stored prompt of the zero run was **replayed** against the same model at
+temperature 0 — one call, $0.0295, 20,164 output tokens. It returned 18 ROSTER lines, 6
+OBSTACLES lines and **22 findings**. `parsePlanCheck` returned **0**.
+
+**Root cause.** `prompts/plan-check.txt` states the contract as *"Each line begins with
+the number of the check it answers, then names the page and what is wrong"* — a number,
+no separator. `parsePlanCheck` filtered on `/^\d+[.)]\s+/`, requiring a `.` or `)`. The
+model obeyed the prompt literally (`9 Page 17 shows the shell cracking…`) and every
+finding failed the filter. The roster and obstacle blocks have their own parsers and kept
+working, which is why `cast` stayed populated and the failure read as "the model found
+nothing". Nothing logged, because an empty findings list is indistinguishable from a
+clean plan.
+
+**Decision.** The parser accepts the contract as written: a 1-2 digit check number
+followed by a separator **or** whitespace. 22 of 22 findings recover, across 8 of the 11
+checks, with ROSTER/OBSTACLES still parsing into their own shapes and `NONE` still
+meaning none.
+
+The prompt was **not** tightened to demand punctuation. A parser stricter than the
+contract it cites is the defect; demanding punctuation would only move the breakage to
+the next formatting drift.
+
+**Impact.** Six books were divided with the plan review contributing nothing. The
+re-plan ranks on findings, so the only faults those books could act on were the counters'
+— which check none of: emotional highlights, entrances, the wanted picture per act, the
+instant, peopleless pages, plants and payoffs, the last page, deed-and-effect, two
+heights, obstacle attribution.
+
+**Two lessons worth keeping.** An empty findings list is the one result that most needs
+its evidence, and it was the one carrying none — which is what
+`beatsReviewReport.checkReply` (added earlier today) now fixes. And a "the model is bad
+at this" verdict is worth exactly one replay before it is believed.
+
+**Touched:** `server/lib/promptBuilders.js` (`parsePlanCheck`), `tasks/bugs.json`,
+`tests/unit/plan-check-finding-separator.test.ts`.
 
 **Status:** ✅ active

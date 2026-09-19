@@ -7455,7 +7455,7 @@ const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `lo
  */
 const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `expression`, and a rewrite carries it through. A page whose beat is a character sensing something — listening, feeling, watching, smelling — states that in the eyes and mouth as much as in the pose.";
 
-const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both state the character is WITHOUT it and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once.";
+const GARMENT_REMOVED_RULE = "When the page takes a normally-worn item off — coat off, cape down, hat in hand — the prose and `sceneIntent` both state the character is WITHOUT it and name where it now lies or is held, and the item gets an `interactions[]` entry for that place plus a `wornItems` row with `state: \"off\"` and that place as its `location`. The avatar reference wears the full outfit, so without that statement the item is painted on the character and on the ground at once. An `off` row also carries `redressNote`, the wardrobe instruction for redrawing that character's reference sheet without the item: name the garments that stay by colour plus garment noun only — never the outfit contract's own words for their fabric, cut or weave, which make a renderer repaint a garment it was told to leave alone; state which item is off and that nothing takes its place; and describe in full whatever the removal leaves outermost there, because that one has to be drawn. Wardrobe only — no cells, no layout, no art style, no reference image. The same item off the same character reads the same on every page.";
 
 const WORN_ON_OTHER_RULE = "When the page has a character other than the item's owner wearing it, the row is `state: \"worn\"` plus `wearer` naming that character — not `off`. The prose puts the item on the wearer and on nobody else; the owner's description does not mention it.";
 
@@ -8042,14 +8042,26 @@ function parsePlanCheck(raw) {
   // "Each line begins with the number of the check it answers"). It is kept, not
   // discarded: the re-plan ranks Q4/Q8 above the rest, and reading a finding's
   // prose to work out which question produced it is what this codebase forbids.
+  //
+  // THE SEPARATOR IS OPTIONAL, because the contract above does not ask for one.
+  // This matcher required `.` or `)` after the number and so silently threw away
+  // every finding a reply that obeyed the prompt literally produced. Measured
+  // 2026-09-19 over 32 stored staging runs: every run from 2026-09-14 01:09
+  // onward recorded `modelFindings: []` — six in a row — while the counters kept
+  // finding 2-6 faults each time. Replaying the stored prompt of
+  // job_1789759147125_p08djwhbl against the same model at temperature 0 returned
+  // 18 ROSTER lines, 6 OBSTACLES lines and 22 findings, every one of them shaped
+  // `9 Page 17 shows the shell cracking…` — no punctuation, all 22 discarded.
+  //
+  // The model was never the problem, and a prompt that demanded punctuation
+  // would only move the breakage to the next formatting drift. A parser is
+  // wrong when it is stricter than the contract it cites.
   return text
     .split('\n')
     .map(l => l.trim())
-    .filter(l => /^\d+[.)]\s+/.test(l))
-    .map((l) => {
-      const m = l.match(/^(\d+)[.)]\s*(.*)$/);
-      return { check: parseInt(m[1], 10), text: m[2].trim() };
-    })
+    .map(l => l.match(/^(\d{1,2})(?:[.):–—-]|\s)\s*(.*)$/))
+    .filter(Boolean)
+    .map(m => ({ check: parseInt(m[1], 10), text: m[2].trim() }))
     .filter(f => f.text);
 }
 
