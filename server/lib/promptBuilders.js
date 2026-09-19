@@ -8724,6 +8724,27 @@ function buildVbLocationLines(loc) {
 // `retryNote` (optional): one generic sentence injected when a previous writer
 // attempt fell short of the landmark guideline — see the landmark check in
 // storyJobPipeline.js. Never story-specific.
+// ONE to TWO sentences of Wikipedia extract, never the whole article (owner,
+// 2026-09-19). The stored extract is a full lead paragraph and every one of the
+// ~20 offered landmarks carried it verbatim: the Zurich James Joyce Foundation
+// alone spent 958 chars explaining its archival significance to a prompt whose
+// job is to plan a story for a five-year-old. The prompt needs what the place
+// IS; the rest is the article's, not the story's.
+const LANDMARK_DESCRIPTION_MAX = 260;
+function shortLandmarkDescription(extract) {
+  const text = String(extract || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  if (text.length <= LANDMARK_DESCRIPTION_MAX) return text;
+  // Cut on a sentence end inside the budget, so the entry never ends mid-clause.
+  // A full stop after an initial or an abbreviation is not a sentence end, so
+  // require a following space and a capital or end-of-window.
+  const window = text.slice(0, LANDMARK_DESCRIPTION_MAX + 1);
+  const ends = [...window.matchAll(/[.!?](?=\s+[A-ZÄÖÜ]|\s*$)/g)].map(m => m.index + 1);
+  const cut = ends.length ? ends[ends.length - 1] : -1;
+  if (cut > 0) return window.slice(0, cut).trim();
+  return window.slice(0, LANDMARK_DESCRIPTION_MAX).replace(/\s+\S*$/, '').trim() + '…';
+}
+
 function buildAvailableLandmarksSection(landmarks, retryNote = '') {
   if (!landmarks || landmarks.length === 0) {
     return '';
@@ -8740,7 +8761,12 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '') {
   const photoLine = (l) => {
     const variants = Array.isArray(l.photoVariants) ? l.photoVariants : [];
     const clauses = variants
-      .map(v => `(${v.kind || v.vantage || 'exterior'}) ${String(v.description || '').replace(/^\[[^\]]*\]\s*/, '').trim() || 'reference photo'}`)
+      // A variant with no stored description said "(medium) reference photo" —
+      // a clause that tells the model nothing about what the photo shows, which
+      // is the only reason this line exists. Drop it instead.
+      .map(v => ({ kind: v.kind || v.vantage || 'exterior', d: String(v.description || '').replace(/^\[[^\]]*\]\s*/, '').trim() }))
+      .filter(v => v.d)
+      .map(v => `(${v.kind}) ${v.d}`)
       .map(c => c.length > 110 ? c.slice(0, 107).replace(/\s+\S*$/, '') + '…' : c);
     return clauses.length ? `\n  PHOTOS: ${clauses.join('; ')}` : '';
   };
@@ -8748,7 +8774,7 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '') {
     .map(l => {
       let entry = `- ${l.name}`;
       if (l.type) entry += ` [${l.type}]`;
-      const description = l.wikipediaExtract || l.wikipedia_extract;
+      const description = shortLandmarkDescription(l.wikipediaExtract || l.wikipedia_extract);
       if (description) entry += `\n  DESCRIPTION: ${description}`;
       entry += photoLine(l);
       return entry;

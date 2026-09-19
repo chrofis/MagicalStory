@@ -2699,6 +2699,17 @@ const PREMISE_GENERIC_WORDS = new Set([
   'kirche', 'eglise', 'chiesa', 'church', 'kloster', 'abbaye', 'abbazia', 'abbey', 'kapelle', 'chapelle',
   'museum', 'musee', 'museo', 'turm', 'tour', 'torre', 'tower', 'see', 'lac', 'lago', 'lake',
   'brucke', 'pont', 'ponte', 'bridge',
+  // Settlement and urban-fabric words. They are the FINAL token of a great many
+  // index names ("Staatsarchiv Basel-Stadt", "Aventicum, römische Stadt -
+  // Avenches, mittelalterlich-neuzeitliche Stadt"), and the relaxed
+  // final-token rule below then pins those rows to any premise that says
+  // "Stadt" — which nearly every city premise does. Measured on staging
+  // job_1789759147125_p08djwhbl: a Zürich story was handed Avenches (VD) and
+  // Basel as its first two offered landmarks because its premise wrote "über
+  // den Dächern der Stadt". A settlement word never distinguishes a place.
+  'stadt', 'altstadt', 'ville', 'citta', 'city', 'town', 'dorf', 'village', 'paese',
+  'platz', 'place', 'piazza', 'square', 'strasse', 'rue', 'via', 'gasse',
+  'haus', 'maison', 'casa', 'house', 'garten', 'jardin', 'giardino', 'garden', 'park', 'parc',
   // articles / prepositions inside French, German and Italian names
   'de', 'du', 'des', 'la', 'le', 'les', 'der', 'die', 'das', 'den', 'dem', 'von', 'vom',
   'zu', 'zum', 'zur', 'am', 'im', 'an', 'in', 'di', 'del', 'della', 'il', 'of', 'the',
@@ -4188,7 +4199,7 @@ async function resolveAvailableLandmarks(location, opts = {}) {
     // The city's own name tokens never count as a premise mention — with the
     // relaxed single-token match every "<City> <thing>" row would match any
     // premise that names the city (all of them do).
-    const pinned = await premiseNamedLandmarks(premiseText, premiseWords(location.city));
+    const pinned = await premiseNamedLandmarks(premiseText, premiseWords(location.city), location);
     if (pinned.length) {
       const ids = new Set(pinned.map(p => p.landmarkIndexId));
       landmarks = [...pinned, ...landmarks.filter(l => !ids.has(l.landmarkIndexId))];
@@ -4202,9 +4213,17 @@ async function resolveAvailableLandmarks(location, opts = {}) {
 // story_score first, at most 3. The SQL is a cheap accent-folded, word-bounded
 // prefilter — any premise word occurring in the name — and the pure helper
 // applies the full rule on what comes back, so the rule lives in one place.
-async function premiseNamedLandmarks(premiseText, excludeWords = null) {
+async function premiseNamedLandmarks(premiseText, excludeWords = null, location = null) {
   const pool = getPool();
   if (!pool) return [];
+  // The pin is a REORDERING of what this town offers, never a doorway out of
+  // it. Until this filter existed the query ran across the whole index, so a
+  // name match anywhere in Switzerland could be pinned FIRST — the strongest
+  // position in the offered list — into a story set 130 km away. A landmark
+  // outside the story's own town is not a landmark of the story's world.
+  const townFilter = location?.city
+    ? `AND (${TOWN_MATCHES_SQL.replace(/\$1/g, '$2')})`
+    : '';
   const excluded = new Set(excludeWords || []);
   // Only tokens the decision rule can accept (PREMISE_MIN_TOKEN_CHARS+) go into
   // the SQL prefilter: shorter premise words ("im", "Wald") match hundreds of
@@ -4219,8 +4238,9 @@ async function premiseNamedLandmarks(premiseText, excludeWords = null) {
        AND ${JUDGED_USABLE_SQL}
        AND ${LANDMARK_CLASS_SQL} > 0
        AND ${NORM_SQL('name')} ~ ('\\m(' || $1 || ')\\M')
+       ${townFilter}
      ORDER BY story_score DESC NULLS LAST, name ASC
-     LIMIT 50`, [words.join('|')]);
+     LIMIT 50`, townFilter ? [words.join('|'), normalizeForCompare(location.city)] : [words.join('|')]);
   const matched = rows.filter(r => premiseMentionsLandmark(r.name, premiseText, excluded)).slice(0, 3);
   const bestSlot = await bestPhotoSlots(matched.map(l => l.id));
   return matched.map(l => servedLandmark(l, bestSlot.get(l.id)));

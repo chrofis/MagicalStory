@@ -8165,7 +8165,11 @@ async function _processStoryJobImpl(jobId) {
     if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
       const { resolveAvailableLandmarks } = require('./server/lib/landmarkPhotos');
       const landmarks = await resolveAvailableLandmarks(inputData.userLocation, {
-        limit: 30, discoverOnMiss: false, language: inputData.language, shuffle: true,
+        // 20, the same number the ideas route offers (owner, 2026-09-19). The
+        // pipeline asked for 30 and the arc prompt then carried 15.5k chars of
+        // landmark listing — 41% of everything the arc creator read, most of it
+        // guild houses and archives no children's story reaches for.
+        limit: 20, discoverOnMiss: false, language: inputData.language, shuffle: true,
         // A landmark the family names in their idea is pinned first (after the
         // shuffle), so the writer's top-3 opens on it.
         premiseText: [inputData.storyDetails, inputData.title].filter(Boolean).join('\n'),
