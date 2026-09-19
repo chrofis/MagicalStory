@@ -1708,3 +1708,66 @@ guard is already lost in. Rationale + the full measurement: `docs/decisions.md` 
 - [ ] Decide the guard once the ten above are triaged: warn, throw, or a static push-time check over `fillTemplate(PROMPT_TEMPLATES.x, {…})` call sites. Owner's call (prompt-vs-code rule) → `server/services/prompts.js` `fillTemplate`
 - [ ] **The Test Lab's clothing replay is broken: `checkScenes` is called without `visualBible` and without `page.wornItems`, so it sees no `clothing` pool and reports EVERY linked garment as missing.** `testlab.js:7228` and `:7342`. Production (`beatsPipeline.js:2375`) passes both. Any Lab measurement of clothing findings is therefore measuring a different function than prod runs — a `lab-vs-prod-eval` divergence of exactly the kind the sibling registry exists to catch, and it would silently invalidate a clothing A/B. Found 2026-09-19 while fixing the undeclared-garment gap; not touched → `server/lib/testlab.js:7228`, `:7342`
 - [ ] **Non-wardrobe props are being declared in `wornItems[]` and inflate every garment count.** Measured 2026-09-19 over 126 stored staging stories: of 74 raw owner-in-cast-with-no-row pairs, **29 were rows the Art Director wrote against a soft toy (`ART001 "Doudou Souris"`) and two treasure maps** — not garments. The real wardrobe population was 45. Any sweep counting `wornItems` rows without gating on a derivable outfit slot will over-report by ~40%. Decide whether the AD should be told `wornItems` is wardrobe-only, or whether held props legitimately belong there and the counters should gate → `prompts/scene-expansion-all.txt`, `server/lib/wornItems.js`
+
+### 2026-09-19 — from the book-audit route/cover/checklist measurement (task #50 + #54)
+
+Measured over the 13 staging stories carrying a stored book audit (23 rounds, 527 IMG faults)
+and, page by page against the pixels, over `job_1789759147125_p08djwhbl` (18 faults). The one
+CODE half — the audit's TEXT fault lines were counted and then thrown away — is fixed; the
+three below are prompt/classification questions and are the owner's call.
+
+- [ ] **The TEXT route is real but structurally unreachable: no stage can act on it.** 527 IMG
+      against 1 TEXT over 23 rounds. The parser is NOT at fault (one regex, both routes, pinned
+      in `tests/unit/final-book-audit-round.test.ts`), and the lines are now stored. What remains
+      is placement: the pipeline's only prose-editing stage, `joinTextRefinement`, runs at
+      `storyJobPipeline.js:5957`, BEFORE `runUnifiedRepairPipeline` at `:6505` which owns the
+      audit — so a TEXT fault is raised after its fixer has finished. Either the route is
+      evidence-only (say so in the prompt and stop asking the judge to weigh a fix nobody can
+      apply), or the audit's TEXT faults need a corrective prose round after it. Owner's call
+      → `server/lib/repairPipeline.js:2026`, `storyJobPipeline.js:5957`
+- [ ] **Five of the six audit questions put the PICTURE in the dock and treat the words as
+      given, so IMG is the only answer the framing leaves.** CONTRADICTION, EMOTION, CHANGE and
+      FUTURE all ask whether the picture matches the words; only TOGETHER is symmetric. Faults
+      the run itself shows could go either way — a cobbled alley where the text says steep
+      stairs, wooden shutters where the text says an iron roller shutter — were all routed IMG.
+      If TEXT is to be a live route, a question has to be able to reach it. Owner's call; a
+      prompt change → `prompts/book-audit.txt:9-15`
+- [ ] **Cover pages are audited with the narrative-continuity questions, and question 6 (FUTURE)
+      misfires on them by construction.** Covers enter as `text: ''` (`storyJobPipeline.js:6031`)
+      with page numbers -1/-2/-3, so questions 1, 2 and 4 cannot fire at all and 6 compares the
+      cover art against LATER pages' text — which is what a cover shows by definition. Measured:
+      8 of 527 faults land on covers (1.5%), and 7 of the 8 are that misfire ("the picture shows
+      a boy already holding the egg, which the text on page 2 establishes as being found", filed
+      twice on one book). The 8th is a genuine catch of a different kind — a cover object drawn
+      in a colour the text contradicts — so deleting covers from the audit loses something real.
+      Options: drop covers; keep them with their own short question set (does the cover's cast,
+      place and named object match the book's own declarations?); or exempt covers from Q6 only.
+      **Note for whoever decides:** `BACKLOG.md:1012` (M4/2026-09-13) records the owner declining
+      a cover backstop partly on the statement that covers are "excluded from the book-audit
+      backstop (`bookAudit.js:221-223`)". That is wrong — covers have been read since at least
+      2026-09-06, and those line numbers pointed at the TEXT-route comment in `parseRoutes`
+      → `prompts/book-audit.txt:15`, `storyJobPipeline.js:6031`
+- [ ] **`{TEXT_NOT_A_CHECKLIST}` reaches the book-audit prompt and the judge does not obey it.**
+      Verified the rule was in the prompt that ran (`587d8d755` committed 19:19 CH, the audit ran
+      22:23 CH, and the constant's text is present in that story's own stored scene prompts and
+      absent from the previous story's). Of 18 faults, **11 are false (61%)** and **6 breach the
+      rule's exact sentence** — "an action the text names and the frame does not show is not a
+      fault: not at any severity": hands not stretched out, wings not spread, a mouth not open,
+      a cap not yet set down, leaves not yet blown away, a boy crying rather than blowing. This
+      is the same class `BACKLOG.md:843` (2026-08-26) opened as "the picture shows the moment
+      slightly before/after the words" and it has not improved. The remaining 5 false ones are
+      the 2 cover misfires, 1 miscount (a legitimately-cast dog read against "all four"), and 2
+      aesthetic over-reaches on an object's colour/material that the text does not contradict.
+      The 7 true faults are all positive incompatibilities — wrong object, wrong place, wrong
+      mood, a garment worn that the text removed. That discriminator (does the picture show a
+      state that cannot coexist with the page's words at ANY instant of the page?) is the
+      candidate prompt fix, and it is the owner's call → `prompts/book-audit.txt:7`,
+      `server/lib/promptBuilders.js:7782` (`textNotAChecklistRule`)
+
+- [ ] **Nothing enforces a SPREAD of camera positions — only their total absence.** `SHOT_NO_CAMERA_POSITION`
+  fires when a book declares zero positions (owner's decision, 2026-09-19); a book with one
+  `high-angle` page and seventeen eye-level pages passes. Baseline before the fix was 0.4% of 1,504
+  stored `shot` values carrying any position at all, so the floor was the urgent half — but no
+  counter yet asks for a minimum count or a ceiling on consecutive eye-level pages. Decide whether a
+  spread rule is wanted before reading the next run's variety as evidence.
+  → `server/lib/planCounters.js` (`SHOT_NO_CAMERA_POSITION`), `docs/decisions.md` "The shot field has two axes"

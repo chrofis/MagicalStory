@@ -191,3 +191,64 @@ describe('audit-admitted pages are exempt from the round cap', () => {
       .toEqual(cap(ranked, { round: 2, totalPages: 18 }).admitted);
   });
 });
+
+/**
+ * THE TEXT ROUTE IS STORED, NOT JUST COUNTED.
+ *
+ * book-audit.txt asks the judge to route each fault by its fix: FAULT[IMG] when
+ * a different image would fix it, FAULT[TEXT] when different prose would.
+ * Measured 2026-09-19 over the 13 staging stories carrying a stored audit (23
+ * rounds): 527 faults routed IMG against exactly ONE routed TEXT.
+ *
+ * Diagnosing that needed three things separated, and only two could be:
+ *   - the PARSER routes TEXT correctly (pinned below — one regex, both routes,
+ *     severity optional, leading whitespace tolerated). It is not the fault.
+ *   - the round record stored `imgFaults` and a TEXT *count*, and dropped the
+ *     TEXT lines on the floor. The one TEXT fault ever routed could not be read
+ *     back, so a broken route could not be told from a pointless one. That is
+ *     what this pins.
+ *   - whether the judge SHOULD route more faults TEXT is a question about what
+ *     the prompt asks, and belongs to the owner. Nothing here pins wording.
+ *
+ * No repair consumes a TEXT fault and none is expected to: the pipeline's only
+ * prose-editing stage (joinTextRefinement) runs BEFORE the repair pipeline that
+ * owns this audit, so a TEXT route arrives after its fixer is gone. These lines
+ * are evidence, not a work queue.
+ */
+describe('book-audit TEXT route', () => {
+  const src = fs.readFileSync(path.join(process.cwd(), 'server/lib/repairPipeline.js'), 'utf8');
+  // @ts-ignore — CommonJS lib
+  const { parseRoutes } = require('../../server/lib/bookAudit.js');
+
+  it('stores the TEXT fault LINES, not only their count', () => {
+    expect(src).toContain('textFaults: audit.byRoute.TEXT');
+    expect(src).toContain('imgFaults: audit.byRoute.IMG');
+  });
+
+  it('the parser routes TEXT and IMG through the same path — neither is dropped', () => {
+    const r = parseRoutes([
+      'FAULT[IMG][MAJOR]: p3 — an image fix.',
+      'FAULT[TEXT][MAJOR]: p4 — a prose fix.',
+    ].join('\n'));
+    expect(r.IMG).toHaveLength(1);
+    expect(r.TEXT).toHaveLength(1);
+    expect(r.TEXT[0].page).toBe(4);
+    expect(r.TEXT[0].severity).toBe('MAJOR');
+    expect(r.TEXT[0].detail).toBe('a prose fix.');
+  });
+
+  it('a TEXT fault survives the same shapes an IMG fault does', () => {
+    // Indented (the judge nests a fault under the page it reasoned about),
+    // severity-less (pre-severity stored reports), and cover-page negatives.
+    const r = parseRoutes([
+      '  FAULT[TEXT][CRITICAL]: p-1 — indented, on a cover page.',
+      'FAULT[TEXT]: p7 — no severity bracket.',
+    ].join('\n'));
+    expect(r.TEXT.map((f: any) => f.page)).toEqual([-1, 7]);
+    expect(r.TEXT.map((f: any) => f.severity)).toEqual(['CRITICAL', null]);
+  });
+
+  it('counts and lines agree — byRouteCounts is derived from the same arrays', () => {
+    expect(src).toContain('byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length }');
+  });
+});

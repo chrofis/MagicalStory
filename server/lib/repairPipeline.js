@@ -2022,8 +2022,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             faults: audit.faults,
             byRouteCounts: { IMG: audit.byRoute.IMG.length, TEXT: audit.byRoute.TEXT.length },
             // IMG faults verbatim — the evidence for what the next round was
-            // told. TEXT faults are the final audit's business.
+            // told.
             imgFaults: audit.byRoute.IMG,
+            // TEXT faults verbatim. NOTHING REPAIRS THEM, and that is not what
+            // this field is for: the only prose-editing stage in the pipeline
+            // (joinTextRefinement) has already run by the time this audit
+            // happens, so a TEXT route arrives after its fixer has gone home.
+            // Storing the count alone made the route unauditable — measured
+            // 2026-09-19 over 13 staging stories / 23 rounds: 527 IMG against
+            // ONE TEXT, and the single TEXT line could not be read back to tell
+            // a broken route from a pointless one. The lines are evidence; keep
+            // them next to the IMG lines they were routed against.
+            textFaults: audit.byRoute.TEXT,
             pagesRead: audit.pagesRead,
             pagesSkipped: audit.pagesSkipped,
           });
