@@ -928,6 +928,10 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
   // two evaluators run independently and Sonnet's compliance check often finds
   // different defects than Gemini's quality eval.
   let fixableIssues = [];
+  // Findings the landmark guard suppresses below. RECORDING ONLY — like
+  // `notEvaluated`, this never joins `fixableIssues` and never reaches the
+  // score, the deductions or any issue count (2026-09-19).
+  let suppressedIssues = [];
   if (Array.isArray(complianceResult.fixable_issues)) {
     fixableIssues = complianceResult.fixable_issues
       .filter(i => i.description)
@@ -982,6 +986,9 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // against a repaired-and-wrong v1's 83 precisely because of this finding).
     const guarded = filterProtectedRemovals(fixableIssues, landmarkProtection, { pageNumber: pageContext || null, label: '[THREE-STAGE]' });
     fixableIssues = guarded.kept;
+    // The guard suppresses the DEDUCTION, not the RECORD: the dropped findings
+    // survive here, marked, so stored data shows what the judge actually said.
+    suppressedIssues = guarded.suppressed;
   }
 
   // THE SCORE IS THE DEFECTS (owner, 2026-08-08). Same 0-10 rubric as the
@@ -1007,6 +1014,8 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     notEvaluated: notEvaluated.list(),
     issuesSummary,
     fixableIssues,
+    // Landmark-guard casualties. Recording only, zero points — see above.
+    suppressedIssues,
     visionInventory: visionText,
     complianceResult,
     usage: {
@@ -1193,7 +1202,15 @@ function buildExpectedCastBlock({
     // Noah] and Lira (pages [3,5,9]) was in the prose and the image prompt.
     // Requires the caller to say which page this is; without it, nothing.
     if (pageNumber !== null && pageNumber !== undefined && Number.isFinite(Number(pageNumber))) {
-      for (const e of sh.buildSecondaryExpectedForPage(visualBible, pageNumber, [...names])) add(e.name, vbKind(e.name));
+      // `includeAnimals` (2026-09-19): a named creature the brief stages on this
+      // page is EXPECTED CAST, so an absent one is a legitimate finding and a
+      // drawn one is not a surplus figure. It reaches the roster the same way a
+      // secondary character does — through this one builder, via its own
+      // `pages[]` declaration. `nonHumanNames` below (vbNonHumanNames pools
+      // `vb.animals`) keeps it out of the people-vs-people arithmetic, and no
+      // creature is ever identity-matched against a reference photo it does not
+      // have: the photo-backed cast is `sceneCharacters` and nothing else.
+      for (const e of sh.buildSecondaryExpectedForPage(visualBible, pageNumber, [...names], { includeAnimals: true })) add(e.name, vbKind(e.name));
     }
     // A FIGURE FILED AS AN OBJECT IS STILL A FIGURE (2026-09-12). The Art
     // Director puts animals and secondary characters in `objects[]` by id, and

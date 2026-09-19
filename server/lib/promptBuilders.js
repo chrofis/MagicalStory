@@ -669,13 +669,14 @@ function buildCastIdentityDescription(char, clothingText = '') {
  * `includeAnimals` (2026-09-19) — SAME OPT-IN AS
  * `buildSecondaryCharacterDescriptions`, for the same reason and with the same
  * default. `vb.animals` entries carry `pages[]` exactly as secondaries do, and
- * this function never read that pool: a named creature the brief stages on a
- * page was absent from the judge's EXPECTED CAST, so the judge reported it and
- * the finding named someone the roster had never heard of. Measured over 127
- * staging stories: of 40 `missing_character` findings naming an off-roster
- * subject, 11 resolve to a `vb.animals` entry and 10 of those declare the very
- * page the finding was filed on — the dog "Nia", the dragon "Feurio", the grey
- * tomcat, a crayfish, a fairy.
+ * this function never read that pool. Measured by replaying the real roster
+ * builder over 1,392 stored staging pages: 68 of them (4.9%) gain at least one
+ * creature and none loses a name — the pages where a creature's `pages[]` is
+ * its ONLY declaration, so neither `collectSceneObjectFigureNames` (needs the
+ * VB id in `objects[]`) nor `buildSecondaryExpectedCharacters` (needs the name
+ * in the scene's own lists) could reach it. On those pages the judge was never
+ * told the creature was staged: an absent one could not be reported and a drawn
+ * one could read as a surplus figure.
  *
  * IT STAYS OFF BY DEFAULT because the OTHER caller is the DETECTOR roster
  * (storyJobPipeline), and the owner's 2026-08-19 ruling holds there: DINO
@@ -7631,9 +7632,9 @@ const DECLARED_TRAIT_VERBATIM_RULE = "A trait CHARACTER DETAILS states — hair 
  */
 const ONE_INSTANT_RULE = "The prose never asks the picture to show how many times something happened, what just finished, or what comes next — no \"again\", \"for the third time\", \"already\", no object both mid-motion and in its ended state. Write the single visible instant.";
 
-const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
+const GAZE_TARGET_RULE = "Name at most one gaze target, and compose the frame so that target is the dominant element — large, central, or nearest the camera. Every other figure looks at that same target or at the page's action. Two named characters facing each other are the one exception — a standoff, an exchange, a conversation — and there each looks at the other; that pair is a single relationship, not two targets, and nobody else in the frame looks anywhere but at them or at the action. A gaze aimed at anything smaller or further off than the frame's dominant element lands on the dominant element instead. Never write a gaze to the viewer.";
 
-const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, `camera`, or `away`. It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
+const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `looksAt`: another character's name, a Visual Bible id, or `away`. There is no value for the viewer: a figure never meets the reader's eye. It is the eyes only; hands live in `interactions[]`, and a character holding a thing does not look at it unless the plan line says so. When the plan line stages two named characters facing each other, in a standoff, an exchange or a conversation, each one's `looksAt` is the other — unless the plan line gives one of them a different gaze (\"looks up at it\", \"stares at the chest\"), in which case that one looks where the plan says and the other looks at them. On different levels the lower one looks up, the upper one looks down. The prose clause says the same thing the field says. A secondary character (a CHR id in `objects[]`) has no `characters[]` row: its gaze is a `watching` interaction whose `object` is what it looks at, and its prose clause says the same.";
 
 /**
  * ONE contract for the `expression` field, at every site that writes a brief.

@@ -752,6 +752,13 @@ function _buildBreakdownFromEvalResult(evalResult, entityResult) {
   const threeStage = evalResult?.threeStageResult ? {
     score: typeof evalResult.threeStageResult.score === 'number' ? evalResult.threeStageResult.score : 0,
     issues: Array.isArray(evalResult.threeStageResult.fixableIssues) ? evalResult.threeStageResult.fixableIssues : [],
+    // Findings the landmark guard suppressed (2026-09-19). A SIBLING of
+    // `issues`, never a member of it: nothing that scores, counts issues or
+    // decides a redo reads this key, so the page's arithmetic is byte-identical
+    // to before it existed. It is here so stored data stops hiding that the
+    // judge said something — previously the drop was total and left no trace.
+    suppressedIssues: Array.isArray(evalResult.threeStageResult.suppressedIssues)
+      ? evalResult.threeStageResult.suppressedIssues : [],
   } : null;
   const entity = entityResult ? {
     penalty: Number(entityResult.penalty) || 0,

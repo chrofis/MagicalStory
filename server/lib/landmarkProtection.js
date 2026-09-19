@@ -232,6 +232,34 @@ function landmarkSubject(issue) {
 }
 
 /**
+ * THE ONE SPELLING of the suppression reason. Stored on every suppressed
+ * finding and read by anything that wants to tell "the guard ate this" from
+ * "the judge never said it".
+ */
+const SUPPRESSED_REASON = 'landmark_protected';
+
+/**
+ * Stamp a finding as suppressed WITHOUT mutating the original — the caller
+ * still hands the untouched object to the logger, and a shared object that
+ * appears in two stored arrays with two meanings is the drift this avoids.
+ *
+ * `suppressedBy` records WHICH of the guard's two rules fired, so a later
+ * reader can separate a judge-declared landmark finding from one the
+ * pre-2026-09-18 type fallback caught.
+ *
+ * @param {object} issue
+ * @param {'landmark'|'other'|'undeclared'} subject
+ * @returns {object}
+ */
+function markSuppressed(issue, subject) {
+  return {
+    ...issue,
+    suppressed: SUPPRESSED_REASON,
+    suppressedBy: subject === 'landmark' ? `${LANDMARK_ELEMENT_FIELD}=true` : 'type=object_presence (subject undeclared)',
+  };
+}
+
+/**
  * HARD GUARD. Drop removal-shaped fixes aimed AT the landmark on a protected
  * page.
  *
@@ -266,12 +294,22 @@ function landmarkSubject(issue) {
  *
  * @param {Array} issues
  * @param {ReturnType<typeof computeLandmarkProtection>} protection
+ * THE DROP SUPPRESSES THE DEDUCTION, IT DOES NOT ERASE THE RECORD (2026-09-19).
+ * Until now the removal was total: a dropped finding left no trace anywhere in
+ * stored data, so a page that had been judged with 8 findings stored 6 and
+ * nothing said the other two ever existed (staging job_1789759147125_p08djwhbl
+ * p1, v0 8→6 including a CRITICAL, v1 4→3). The third return value
+ * `suppressed` carries those same findings back, each stamped
+ * `suppressed: '${SUPPRESSED_REASON}'`, for callers that want to STORE them.
+ * It is a recording channel only — exactly like `notEvaluated` — and is never
+ * merged into `kept`, so no score, no deduction and no issue count moves.
+ *
  * @param {{pageNumber?: number|string|null, label?: string, quiet?: boolean}} [ctx]
- * @returns {{kept: Array, dropped: Array}}
+ * @returns {{kept: Array, dropped: Array, suppressed: Array}}
  */
 function filterProtectedRemovals(issues, protection, ctx = {}) {
   const list = Array.isArray(issues) ? issues : [];
-  if (!protection?.protect || list.length === 0) return { kept: list, dropped: [] };
+  if (!protection?.protect || list.length === 0) return { kept: list, dropped: [], suppressed: [] };
   const kept = [];
   const dropped = [];
   const undeclared = [];
@@ -298,7 +336,12 @@ function filterProtectedRemovals(issues, protection, ctx = {}) {
       log.warn(`🏛️  [LANDMARK-GUARD] ${where}${page}: ${undeclared.length} removal-shaped finding(s) carried no \`${LANDMARK_ELEMENT_FIELD}\` — the judge that emitted them is not declaring the subject, so this page fell back to the pre-2026-09-18 type rule. Types: ${[...new Set(undeclared.map(i => String(i?.type || 'unknown')))].join(', ')}`);
     }
   }
-  return { kept, dropped: dropped.map(d => d.issue) };
+  return {
+    kept,
+    dropped: dropped.map(d => d.issue),
+    // The record, not the deduction. Same findings, marked, in drop order.
+    suppressed: dropped.map(d => markSuppressed(d.issue, d.subject)),
+  };
 }
 
 /**
@@ -338,6 +381,8 @@ module.exports = {
   // existing tests use this one.
   buildLandmarkComplianceBlock,
   landmarkSubject,
+  SUPPRESSED_REASON,
+  markSuppressed,
   isRemovalShapedFix,
   filterProtectedRemovals,
   seedPreserveWithLandmarks,

@@ -50320,3 +50320,107 @@ to the prompt, and a ceiling is the owner's call.
 deductions and asks the illustrator for nothing, pinned by a test so a later
 generator↔critic sweep does not sync a no-op into it.
 **Status:** ✅ active — staging, not master.
+
+---
+
+## 2026-09-19 — The landmark guard suppresses the DEDUCTION, not the RECORD: a guarded finding survives into stored data, marked, worth zero
+
+**Context:** `filterProtectedRemovals` (`server/lib/landmarkProtection.js`) drops
+removal-shaped findings aimed at a real landmark on a present-day page, so an
+unmasked whole-frame edit cannot erase the place the page depicts. That part is
+correct and unchanged. What was wrong is that the drop was TOTAL: the finding
+left no trace anywhere, so stored data silently disagreed with itself and nobody
+could tell a guarded page from a clean one.
+
+**Measured** on staging `job_1789759147125_p08djwhbl` page 1, by replaying the
+stored rows: v0's `complianceResult.fixable_issues` holds 8 entries while
+`scoreBreakdown.threeStage.issues` holds 6 — the two missing are exactly the two
+`landmark_element: true` ones, one of them a CRITICAL. v1 drops 1 of 4 the same
+way. The judge's own output was the only witness that the guard had fired, and
+nothing downstream reads it.
+
+**Decision:** `filterProtectedRemovals` gains a THIRD return value, `suppressed`
+— the same findings, each stamped `suppressed: 'landmark_protected'` plus
+`suppressedBy` naming which of the guard's two rules fired (the declared
+`landmark_element=true`, or the pre-2026-09-18 `object_presence` type fallback).
+The three-stage evaluator carries it as `suppressedIssues`, and `applyScore`
+stores it as `scoreBreakdown.threeStage.suppressedIssues`.
+
+**Rationale:** It is a SIBLING of `issues`, never a member of it — the same
+recording-only shape `notEvaluated` already uses on the same return object.
+That is what makes the change provably free: `kept` is byte-identical to before,
+so deductions, `hasCatastrophic`, `shouldRedo`, `findBadPages`' `issueThreshold`
+count and the consolidator all see exactly what they saw yesterday, and a
+suppressed CRITICAL cannot push a page over a count threshold. Merging the
+marked findings back into `issues` and teaching every consumer to skip them was
+the alternative; it touches five readers (one of them `repairPipeline.js`, owned
+by another change in flight) to buy nothing the sibling field does not.
+No text matching anywhere — the guard still triggers on the judge's declared
+`landmark_element` field and on the `fix` edit instruction, exactly as before.
+
+**Touched:** `server/lib/landmarkProtection.js`, `server/lib/evalPipeline.js`,
+`server/lib/scoring.js`, `tests/unit/landmark-suppressed-record.test.ts`
+**Status:** ✅ active
+
+---
+
+## 2026-09-19 — A named creature that declares a page is EXPECTED CAST: the animal pool reaches the judge's roster through the roster builder that already exists
+
+**Context:** `missing_character` findings name characters outside the page
+roster in 206 cases across 47 of 127 staging stories, and the dominant
+sub-class is animals and creatures. `sceneCharacters` cannot carry them — that
+is the PHOTO cast (`getCharactersInScene`). The judge's roster is
+`buildExpectedCastBlock`, which is authoritative for MEMBERSHIP and already
+enriches from the Visual Bible three ways. One of the three,
+`buildSecondaryExpectedForPage`, reads an entry's own `pages[]` declaration —
+the strongest signal there is about who was staged on a page — and it read
+`vb.secondaryCharacters` ONLY. `vb.animals` entries carry `pages[]` in exactly
+the same shape and were never looked at.
+
+**Measured** by replaying the REAL roster builder over 1,392 stored staging
+pages (127 stories), before vs after: **68 pages (4.9%) gain at least one
+creature on the judge's roster, and no page loses a name** — "Nia" the dog on
+eight pages of one story, "Fauchi", "Nebel", "Grosser Rabe"/"Kleiner Rabe",
+"Beni". Those are pages where the creature's `pages[]` declaration is its ONLY
+declaration: the scene metadata's `characters` list does not name it and
+`objects[]` does not file its VB id, so neither of the other two enrichment
+paths could reach it.
+
+**What this does NOT fix, measured the same way.** The 206 off-roster
+`missing_character` cases were counted against a NARROW proxy for the roster.
+Against the real one, 127 staging stories hold 85 distinct `missing_character`
+subjects, **16 of them off-roster — and all 16 name a figure that is in no
+Visual Bible pool at all**, so this change moves exactly 0 of them. The named
+creature examples (the dog "Nia" on `job_1789348171785_9oxos7dwv` p17, the
+dragon on `job_1789083667794_17lz946ik`, the grey tomcat on
+`job_1789163494908_kc2joi4ax` p15/p16) were ALREADY on the roster before this
+change, via the `includeAnimals` opt-in added to
+`buildSecondaryExpectedCharacters` on 2026-09-10 and
+`collectSceneObjectFigureNames` added 2026-09-12; the stored findings that name
+them are from runs on the older code. The remaining 16 are a judge naming a
+figure the Visual Bible never contained — a different defect, not addressed
+here and not yet triaged.
+
+**Decision:** `buildSecondaryExpectedForPage` takes the SAME `includeAnimals`
+opt-in its sibling `buildSecondaryCharacterDescriptions` already has, with the
+same default (off), and the evaluator roster opts in. Its description builder
+also reads the fields an animal entry actually carries (`species`, `coloring`,
+`features`) — without them a creature with no prose `description` was dropped
+by the existing `if (!desc) continue`, which would have left the gap half-open.
+
+**Rationale:** ONE ROSTER. This is an extension of the enrichment that is
+already there, not a second builder — the owner's no-fallbacks rule and the
+2026-09-13 "one roster" ruling both forbid a parallel path. It stays OFF by
+default because the other caller is the DETECTOR roster (`storyJobPipeline`),
+where the owner's 2026-08-19 ruling holds: GroundingDINO detects `person`, so
+an animal on a detector roster is a guaranteed missing person. Nothing
+identity-matches a creature against a reference photo it does not have: the
+photo-backed cast is `sceneCharacters` and nothing else, `vbNonHumanNames`
+already pools `vb.animals` so the new entries land in `nonHumanNames` and stay
+out of the people-vs-people arithmetic, and `charRepairTarget` does not pass
+`pageNumber`, so this branch never runs on the repair path at all.
+
+**Touched:** `server/lib/promptBuilders.js`, `server/lib/evalPipeline.js`,
+`tests/unit/creature-declares-page-roster.test.ts`
+**Status:** ✅ active
+
