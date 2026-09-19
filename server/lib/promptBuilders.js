@@ -5941,7 +5941,15 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
     ? `Main characters: ${mains.map(c => `${c.name}${c.age ? ` (${c.age})` : ''}`).join(' and ')} — at most two carry a book. They share the challenges, the ending belongs to them, and ONE of them carries the visible change.`
     : `Main character: ${mainName} — carries the challenges and the one visible change; the ending belongs to them.`;
   const levelDifficulty = simplest
-    ? 'Simplest level: every challenge is one a small child solves by trying, asking or noticing. Nothing frightening beyond a moment.'
+    // NO PERIL CLAUSE HERE. This line said "Nothing frightening beyond a moment"
+    // and so made a third, tighter claim about fear than the two rules that own
+    // it: the journey band's "Humour and mild peril — a chase, a close call, a
+    // night out in the cold are fine", and the telling rules' ceiling
+    // ("Frightening is the right level", no death, nobody monstrous). A night
+    // out in the cold was simultaneously explicitly fine and over the cap. Per
+    // the comment below, this line governs how hard the CHALLENGES are; how
+    // frightening the book may get is the telling rules' single answer.
+    ? 'Simplest level: every challenge is one a small child solves by trying, asking or noticing.'
     : 'The reading level allows real difficulty: a setback that lasts, a choice with a cost, a darker middle — still resolved.';
   // The band rule rides ALONGSIDE the reading-level line rather than replacing
   // it: length governs how hard the sentences are, the band governs what shape

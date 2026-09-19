@@ -47404,3 +47404,39 @@ only demoted below the exact answer when one exists.
 line), `tests/unit/arc-reader-age-agreement.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — Peril has ONE ceiling: the telling rules. The reading-level line governs challenges, not fear
+
+**Context.** The arc-create prompt set the peril level three times, three ways:
+
+- STORY SHAPE (`levelDifficulty`, chosen on reading level): *"Nothing frightening beyond
+  a moment."*
+- `prompts/age-band-journey.txt`: *"**Humour and mild peril.** A chase, a close call, a
+  night out in the cold are fine."*
+- RULES OF THE TELLING: *"Frightening is the right level"* — plus no death, nobody
+  monstrous, everyone reunited.
+
+A night out in the cold was explicitly fine and over the cap in the same prompt.
+
+**Decision.** The peril clause is cut from the reading-level line. That line keeps what
+it actually owns — how hard the CHALLENGES are ("every challenge is one a small child
+solves by trying, asking or noticing") — and the telling rules remain the single
+statement of how frightening a book may get.
+
+**Rationale.** The band-vs-reading-level pair is deliberate and documented in the code
+("length governs how hard the sentences are, the band governs what shape the resolution
+takes"). Fear level belongs to neither: it is a product-wide ceiling, which is why the
+telling rules state it and why `story-arc-review.txt` Q12 and the idea generators quote
+the same sentence. The reading-level line was making a fourth, tighter claim inside a
+system that already had one answer, and its clause was strictly redundant with the
+ceiling when it did not contradict the band.
+
+Generator and critic stay in sync: the surviving sentence is the one
+`prompts/story-arc-review.txt` already audits against.
+
+**Touched:** `server/lib/promptBuilders.js` (`levelDifficulty`),
+`tests/unit/arc-peril-single-ceiling.test.ts`.
+
+**Status:** ✅ active
