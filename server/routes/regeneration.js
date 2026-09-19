@@ -713,6 +713,10 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
       await sav.applyStoryCellRefs(referencePhotos, storyData.characterAvatars || null, metaChars, {
         closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+        // Wardrobe state — the regeneration entry point must pick the same
+        // sheet generation did, or a regenerated page paints the garment back
+        // on while the brief still says it is off.
+        wornResolved: sav.wornResolvedForPage(visualBible, sceneMetadata, metaChars, pageNumber),
       });
     }
     const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];
@@ -1245,7 +1249,10 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
       // Shared resolver — beats metadata carries `perspective` prose, not
       // `pose`; the inline copy here served threeQuarter to every declared
       // back-view figure.
-      const { resolveCellPose, resolveSheetForRef } = require('../lib/storyAvatars');
+      const { resolveCellPose, resolveSheetForRef, wornResolvedForPage } = require('../lib/storyAvatars');
+      // Wardrobe state — same sheet choice as generation and as the other two
+      // repair entry points; never a fourth inline copy of the lookup.
+      const wornResolved = wornResolvedForPage(visualBible, sceneMetadata, metaChars, pageNumber);
       const poseByName = new Map();
       for (const sc of metaChars) {
         const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
@@ -1257,8 +1264,8 @@ router.post('/:id/test-models/:pageNum', authenticateToken, async (req, res) => 
         if (!charName) continue;
         const story = storyData.characterAvatars[charName];
         if (!story) continue;
-        // Shared resolver (slot mapping + loud costumed fallback).
-        const resolved = resolveSheetForRef(story, ref);
+        // Shared resolver (slot mapping + wardrobe state + loud costumed fallback).
+        const resolved = resolveSheetForRef(story, ref, { wornResolved });
         if (!resolved) continue;
         const { uri: sheetUri, slotKey } = resolved;
         const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', flip: false, depth: 'foreground' };
@@ -2058,6 +2065,7 @@ router.post('/:id/style-lab/:pageNum', authenticateToken, async (req, res) => {
         const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || chars || [];
         await sav.applyStoryCellRefs(characterPhotos, storyData.characterAvatars || null, metaChars, {
           closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+          wornResolved: sav.wornResolvedForPage(visualBible, sceneMetadata, metaChars, pageNumber),
         });
       }
       landmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata, { pageNumber }) : [];

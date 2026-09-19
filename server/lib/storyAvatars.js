@@ -90,6 +90,21 @@ function projectStoryCharacterAvatars(characters, artStyle) {
       entry[`styled-${clothing}`] = url;
     }
 
+    // WARDROBE-STATE VARIANTS. `styled-standard--off:CLO001+CLO002` — the same
+    // character, in the same outfit, with the garments that page takes off
+    // structurally absent. Projected by the SAME `styled-` rule as the base
+    // categories so nothing downstream needs a second shape; only
+    // resolveSheetForRef knows the suffix means anything.
+    const { isOffCategory, parseOffCategory } = require('./wardrobeVariants');
+    for (const key of Object.keys(styled)) {
+      if (!isOffCategory(key)) continue;
+      const parsed = parseOffCategory(key);
+      if (!parsed || !['standard', 'winter', 'summer'].includes(parsed.baseCategory)) continue;
+      const url = extractUrl(styled[key]);
+      if (!url) continue;
+      entry[`styled-${key}`] = url;
+    }
+
     if (Object.keys(entry).length > 0) {
       out[char.name] = entry;
     }
@@ -186,16 +201,45 @@ function resolveCellPose(sc) {
  *
  * @param {Object} story - one character's entry from story.data.characterAvatars
  * @param {Object} ref - reference photo ({ name, clothingCategory, ... })
+ * @param {Object} [opts]
+ * @param {Array} [opts.wornResolved] - this page's resolved worn rows
+ *   (wornItems.resolveWornItemsForPage). When the page takes clothing OFF this
+ *   character and a matching `--off:` sheet exists, that sheet is served
+ *   instead of the base one — the reference then AGREES with the brief instead
+ *   of contradicting it. No match falls back to the base sheet, loudly.
  * @returns {{uri: string, slotKey: string}|null} null when
  *   the character has nothing usable stored.
  */
-function resolveSheetForRef(story, ref) {
+function resolveSheetForRef(story, ref, opts = {}) {
   if (!story || !ref) return null;
   const clothingRaw = String(ref.clothingCategory || '').toLowerCase();
   let slotKey;
   if (clothingRaw.startsWith('costumed')) slotKey = 'costumed';
   else if (['standard', 'winter', 'summer'].includes(clothingRaw)) slotKey = `styled-${clothingRaw}`;
   else slotKey = 'costumed';
+
+  // WARDROBE STATE. Same substitution mechanism as the costumed-vs-standard
+  // swap: the character's cell is cropped from a DIFFERENT stored sheet, never
+  // from an extra reference slot, so this costs nothing against the model's
+  // reference cap.
+  const { offIdsForCharacter, buildOffSlotKey } = require('./wardrobeVariants');
+  const offIds = Array.isArray(ref.wornOffIds) && ref.wornOffIds.length > 0
+    ? ref.wornOffIds
+    : offIdsForCharacter(ref.name, opts.wornResolved);
+  if (offIds.length > 0 && slotKey.startsWith('styled-')) {
+    const offKey = buildOffSlotKey(slotKey, offIds);
+    if (story[offKey]) {
+      ref.clothingCategory = `${clothingRaw}${offKey.slice(offKey.indexOf('--off:'))}`;
+      ref.wornOffIds = offIds;
+      return { uri: story[offKey], slotKey: offKey };
+    }
+    // NEVER SILENT — same contract as the costumed fallback below. The page is
+    // about to be sent a picture of the character WEARING something the brief
+    // says is off; the only remaining instruction is the wornItems text line,
+    // and whoever reads this log needs to know that is all there was.
+    log.warn(`👕 [STORY-CELLS] ${ref.name || '?'}: page takes ${offIds.join('+')} off but no "${offKey}" sheet exists (slots: ${Object.keys(story).join(', ')}) — serving the WORN sheet; only the "leave it off" text line carries the instruction`);
+    ref.wornStateFallback = { offIds, wanted: offKey };
+  }
 
   let uri = story[slotKey];
   // NEVER swap clothing silently. Falling back to the costumed sheet while
@@ -214,12 +258,37 @@ function resolveSheetForRef(story, ref) {
   return { uri, slotKey };
 }
 
+/**
+ * The page's resolved worn rows, for the cell-crop sites.
+ *
+ * Every crop site needs the same answer and none of them may compute it its own
+ * way — the fourth inline copy is exactly what resolveSheetForRef's header
+ * forbids. Returns [] whenever the page has no bible or no metadata, which is
+ * the same as "nothing is declared off", i.e. today's behaviour.
+ */
+function wornResolvedForPage(visualBible, sceneMetadata, sceneCharacters, pageNumber = null) {
+  if (!visualBible || !sceneMetadata) return [];
+  try {
+    const { resolveWornItemsForPage } = require('./wornItems');
+    const cast = sceneMetadata.characters
+      || sceneMetadata.fullData?.characters
+      || sceneCharacters
+      || [];
+    return resolveWornItemsForPage(visualBible, cast, sceneMetadata, { pageNumber });
+  } catch (err) {
+    log.warn(`[CELL REFS] worn-state resolution failed for page ${pageNumber ?? '?'}: ${err.message} — cells come from the base sheet`);
+    return [];
+  }
+}
+
 async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneCharacters, opts = {}) {
   if (!Array.isArray(referencePhotos) || referencePhotos.length === 0) return referencePhotos;
   if (!storyCharacterAvatars || typeof storyCharacterAvatars !== 'object') return referencePhotos;
   // opts.closeUp: the page's shot is a close-up — send face cell + head of the
   // costumed body cell (headwear survives) instead of the full-body stack. A
   // full-body ref pulls the render toward full-figure poses on close-up pages.
+  // opts.wornResolved: this page's resolved worn rows, forwarded verbatim to
+  // resolveSheetForRef so the wardrobe-state variant is chosen in ONE place.
   const closeUp = opts.closeUp === true;
   const { cropAvatarCell } = require('./sceneComposite');
 
@@ -242,7 +311,7 @@ async function applyStoryCellRefs(referencePhotos, storyCharacterAvatars, sceneC
       log.warn(`[CELL REFS] ${charName}: no story sheet available yet (have: ${Object.keys(storyCharacterAvatars).join(', ') || 'none'}) — sending the FULL reference image instead of a pose cell`);
       continue;
     }
-    const resolved = resolveSheetForRef(story, ref);
+    const resolved = resolveSheetForRef(story, ref, { wornResolved: opts.wornResolved });
     if (!resolved) {
       log.warn(`[CELL REFS] ${charName}: no usable sheet for clothing "${ref.clothingCategory || 'none'}" (slots: ${Object.keys(story).join(', ')}) — sending the FULL reference image instead of a pose cell`);
       continue;
@@ -436,6 +505,7 @@ module.exports = {
   projectStoryCharacterAvatars,
   projectStoryCostumeDescriptions,
   applyStoryCellRefs,
+  wornResolvedForPage,
   resolveCellPose,
   resolveSheetForRef,
   appendStoryHistory,

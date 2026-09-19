@@ -1745,8 +1745,130 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
   };
 }
 
+/**
+ * WARDROBE-STATE VARIANT — the approved sheet, redressed.
+ *
+ * Takes the character's ALREADY-APPROVED styled 2×4 sheet and edits the named
+ * garments off it. The input is the approved sheet and not the photos, and that
+ * is the whole design (owner, 2026-09-19): two independent photo→sheet runs
+ * disagree on hair, build and base-layer shade, so a jacket coming off would
+ * read as the CHARACTER changing — a worse failure than the one being fixed.
+ * Identity is fixed by construction here; only the wardrobe varies. Same shape
+ * as the costumed-vs-standard sheet swap the pipeline already ships.
+ *
+ * Mechanically this is Pass 2's machinery (one provider edit on a whole sheet,
+ * best-of-N) with a different instruction, so it inherits the aspect handling
+ * and the crop suppression the sheet grid needs. The STYLE ANCHOR is never
+ * attached: the input is already in the story's style, and the anchor's own
+ * figures are a known contaminant.
+ *
+ * The gate is evaluateSheetSplit, not the Pass-2 style judge: a style judge
+ * asked whether an already-styled sheet "had the style applied" answers with an
+ * echo verdict and rejects every redress. What actually matters here is that
+ * the layout survived, the face is still the same person, and the outfit now
+ * matches the stripped contract — which is exactly what the split evaluator
+ * scores, with the base sheet's own head row as the identity reference.
+ *
+ * Returns null when every attempt is rejected. The caller then stores no
+ * variant, and the page falls back to the worn sheet plus the "leave it off"
+ * text line — today's behaviour, never worse.
+ *
+ * @param {string} baseSheetImageData - the approved styled 2×4 sheet
+ * @param {Object} opts
+ * @param {string} opts.characterName
+ * @param {string} opts.resolvedOutfit - the contract with the garment clauses removed
+ * @param {Array<string>} opts.removedItems - the garment names being taken off
+ * @returns {Promise<{imageData, verdict, attempts, prompt}|null>}
+ */
+async function redressSheetVariant(baseSheetImageData, opts = {}) {
+  const {
+    characterName = 'character', characterAge = null, facePhoto = null,
+    resolvedOutfit = '', removedItems = [], usageTracker = null, skipQualityEval = false,
+    backendOverride = null,
+  } = opts;
+  if (!baseSheetImageData) return null;
+
+  const items = (Array.isArray(removedItems) ? removedItems : []).map(s => String(s || '').trim()).filter(Boolean);
+  if (items.length === 0) return null;
+  const removalLine = items.length === 1
+    ? `Remove the ${items[0]} from the character in every cell.`
+    : `Remove these from the character in every cell: ${items.join('; ')}.`;
+  const prompt = `Edit Image 1 — a 2×4 character reference sheet (8 cells).
+${removalLine}
+What was underneath is now visible: ${resolvedOutfit}
+Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style, same colours for every garment that stays.
+Do not add a replacement garment, and do not place the removed item anywhere in the sheet.`;
+
+  const totalAttempts = 1 + MAX_SHEET_RETRIES;
+  const attempts = [];
+  let best = null;
+  const rank = (v) => (typeof v === 'number' ? v : -1);
+
+  for (let attempt = 1; attempt <= totalAttempts; attempt++) {
+    log.info(`[WARDROBE-VARIANT] ${characterName} redress attempt ${attempt}/${totalAttempts} (off: ${items.join(', ')})`);
+    let result;
+    try {
+      // No style anchor: the input sheet already carries the story's style.
+      result = await styleTransferGenerate(prompt, baseSheetImageData, backendOverride, null);
+    } catch (err) {
+      log.warn(`[WARDROBE-VARIANT] ${characterName} redress attempt ${attempt} threw: ${err.message}${attempt < totalAttempts ? ' — retrying' : ''}`);
+      attempts.push({ attempt, stage: 'gen-error', score: 0, reason: err.message });
+      continue;
+    }
+    if (usageTracker && result.usage) {
+      const { MODEL_PRICING } = require('../config/models');
+      usageTracker(result.provider || 'grok', {
+        ...result.usage,
+        cost: result.usage.cost ?? MODEL_PRICING[result.modelId]?.perImage ?? 0.02,
+      }, 'character_2x4_wardrobe_variant', result.modelId);
+    }
+    if (!result?.imageData) {
+      attempts.push({ attempt, stage: 'no-image', score: 0, reason: 'provider returned no image' });
+      continue;
+    }
+
+    if (skipQualityEval || !process.env.GEMINI_API_KEY) {
+      // Nothing can judge it; one roll, shipped, and said so.
+      log.warn(`[WARDROBE-VARIANT] ${characterName} redress shipped UNSCORED (${skipQualityEval ? 'eval skipped by caller' : 'no GEMINI_API_KEY'})`);
+      return { imageData: result.imageData, verdict: null, attempts, prompt };
+    }
+
+    let verdict = null;
+    try {
+      const split = await evaluateSheetSplit(result.imageData, {
+        facePhoto,
+        // The base sheet IS the identity reference — the variant must match the
+        // sheet it was redressed from, not a photo taken years earlier.
+        standardAvatar: baseSheetImageData,
+        costumeDescription: resolvedOutfit,
+        usageTracker,
+        declaredAge: characterAge,
+      });
+      verdict = split.verdict;
+    } catch (err) {
+      log.warn(`[WARDROBE-VARIANT] ${characterName} redress eval threw: ${err.message} — attempt kept but unscored`);
+      attempts.push({ attempt, stage: 'eval-error', score: null, reason: err.message, imageData: result.imageData });
+      if (!best) best = { imageData: result.imageData, verdict: null, score: null };
+      continue;
+    }
+    attempts.push({ attempt, stage: 'judged', score: verdict.finalScore, valid: verdict.valid, reason: (verdict.failureReasons || []).join('; ') || null });
+    if (!best || rank(verdict.finalScore) > rank(best.score)) {
+      best = { imageData: result.imageData, verdict, score: verdict.finalScore };
+    }
+    if (verdict.valid) {
+      log.info(`[WARDROBE-VARIANT] ${characterName} redress accepted (score=${verdict.finalScore}/10)`);
+      return { imageData: result.imageData, verdict, attempts, prompt };
+    }
+  }
+
+  const why = (best?.verdict?.failureReasons || []).join('; ') || 'no attempt produced a usable sheet';
+  log.error(`[WARDROBE-VARIANT] ${characterName} redress REJECTED after ${attempts.length} attempt(s) (best=${best?.score ?? 'unscored'}/10: ${why}) — no variant stored; the page keeps the worn sheet + the "leave it off" line`);
+  return null;
+}
+
 module.exports = {
   generateCharacter2x4Sheet,
+  redressSheetVariant,
   // Exported for tests: the declared-age proportion block must reach the prompt.
   declaredAgeBlock,
   buildPrompt,

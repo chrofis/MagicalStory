@@ -275,7 +275,14 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
   // the key. Phase 5/6 — costumed subtype keying is gone. One costume per
   // character per story → bare 'costumed' is enough; the subtype lives on
   // clothingRequirements / visualBible.costumes.
-  const keyCategory = normalizeClothingCategory(clothingCategory);
+  // A wardrobe-state variant is its OWN sheet, so its state suffix survives the
+  // collapse — normalizing it away would make every off-variant share the base
+  // sheet's cache entry and the second one would silently serve the first.
+  const { parseOffCategory, buildOffCategory } = require('./wardrobeVariants');
+  const off = parseOffCategory(clothingCategory);
+  const keyCategory = off
+    ? buildOffCategory(normalizeClothingCategory(off.baseCategory), off.offIds)
+    : normalizeClothingCategory(clothingCategory);
   const name = String(characterName || '').trim().toLowerCase();
   return `${getCacheScope()}${name}_${keyCategory}_${artStyle}`;
 }
@@ -1904,10 +1911,104 @@ function _seedStandardFromPreview(characterName, artStyle, previewAvatarDataUrl)
   styledAvatarCache.set(cacheKey, previewAvatarDataUrl);
 }
 
+/**
+ * WARDROBE-STATE VARIANT SHEETS — one extra sheet per derived requirement row.
+ *
+ * Deliberately NOT a branch inside prepareStyledAvatars. That function resolves
+ * a SOURCE avatar (photo, R2 bytes, costumed base) and runs the two-pass
+ * photo→sheet builder; a variant shares none of that. Its source is the
+ * character's already-approved styled sheet, its generator is one edit on that
+ * sheet, and its identity is fixed by construction rather than judged against a
+ * photo. Threading it through the other function would have meant a `baseCategory`
+ * fork in every one of that loop's branches.
+ *
+ * ORDERING IS THE CALLER'S JOB: the base sheets must already exist. The pipeline
+ * chains this onto the in-flight styling promise, so it always runs after them.
+ *
+ * @param {Array<Object>} characters - inputData.characters
+ * @param {string} artStyle
+ * @param {Array<Object>} variantRequirements - rows from
+ *   wardrobeVariants.deriveWardrobeVariantRequirements
+ * @returns {Promise<number>} how many variant sheets were actually stored
+ */
+async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequirements, { addUsage = null, skipQualityEval = false, backendOverride = null } = {}) {
+  const rows = Array.isArray(variantRequirements) ? variantRequirements : [];
+  if (rows.length === 0) return 0;
+
+  const { parseOffCategory } = require('./wardrobeVariants');
+  const { redressSheetVariant } = require('./character2x4Sheet');
+  const { buildCastIndex, resolveEntity } = require('./castResolver');
+  const castIdx = buildCastIndex({ characters: characters || [] }, null);
+
+  const jobs = [];
+  for (const row of rows) {
+    const charName = (row.characterNames || [])[0];
+    const off = parseOffCategory(row.clothingCategory);
+    if (!charName || !off) continue;
+    const resolvedEntity = resolveEntity(charName, castIdx);
+    const char = (resolvedEntity && resolvedEntity.kind === 'cast') ? resolvedEntity.entry : null;
+    if (!char) {
+      log.warn(`👕 [WARDROBE-VARIANT] "${charName}" is not in the commissioned cast — no variant sheet`);
+      continue;
+    }
+    const cacheKey = getAvatarCacheKey(charName, row.clothingCategory, artStyle);
+    if (styledAvatarCache.has(cacheKey) && !guaranteeSeededKeys.has(cacheKey)) {
+      rememberStyledAvatarOnCharacter(char, artStyle, row.clothingCategory, styledAvatarCache.get(cacheKey));
+      continue;
+    }
+    // THE APPROVED SHEET IS THE INPUT — never the photos (owner, 2026-09-19).
+    // No base sheet means no variant: falling back to a photo→sheet build here
+    // would produce a second, independently-drawn character.
+    const baseSheetRaw = char.avatars?.styledAvatars?.[artStyle]?.[off.baseCategory] || null;
+    const baseSheet = await photoAsDataUri(baseSheetRaw, `${charName} ${off.baseCategory} sheet`);
+    if (!baseSheet) {
+      log.warn(`👕 [WARDROBE-VARIANT] ${charName}: no approved "${off.baseCategory}" sheet to redress — no variant (the page keeps the worn sheet + the "leave it off" line)`);
+      continue;
+    }
+    const facePhoto = await photoAsDataUri(getFacePhoto(char), `${charName} face photo`);
+    jobs.push({ charName, char, row, off, cacheKey, baseSheet, facePhoto });
+  }
+
+  if (jobs.length === 0) return 0;
+  log.info(`👕 [WARDROBE-VARIANT] redressing ${jobs.length} approved sheet(s) in PARALLEL: ${jobs.map(j => `${j.charName}/${j.row.clothingCategory}`).join(', ')}`);
+
+  const results = await Promise.all(jobs.map(async (j) => {
+    try {
+      const out = await redressSheetVariant(j.baseSheet, {
+        characterName: j.charName,
+        characterAge: j.char?.age,
+        facePhoto: j.facePhoto,
+        resolvedOutfit: j.row.clothingDescription || '',
+        removedItems: j.row.removedItemNames || j.off.offIds,
+        usageTracker: addUsage,
+        skipQualityEval,
+        backendOverride,
+      });
+      return { j, out };
+    } catch (err) {
+      log.error(`👕 [WARDROBE-VARIANT] ${j.charName}/${j.row.clothingCategory} threw: ${err.message} — no variant stored`);
+      return { j, out: null };
+    }
+  }));
+
+  let stored = 0;
+  for (const { j, out } of results) {
+    if (!out?.imageData) continue;
+    const compressed = await compressImageToJPEG(out.imageData, 85, 1024);
+    styledAvatarCache.set(j.cacheKey, compressed);
+    guaranteeSeededKeys.delete(j.cacheKey);
+    rememberStyledAvatarOnCharacter(j.char, artStyle, j.row.clothingCategory, compressed);
+    stored++;
+  }
+  log.info(`👕 [WARDROBE-VARIANT] ${stored}/${jobs.length} variant sheet(s) stored`);
+  return stored;
+}
+
 module.exports = {
   // Core functions
   getOrCreateStyledAvatar,
   prepareStyledAvatars,
+  prepareWardrobeVariantAvatars,
   convertAvatarToStyle,
 
   // Apply styled avatars to photo arrays

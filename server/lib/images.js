@@ -4379,7 +4379,20 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // Pose + depth resolution is shared with applyStoryCellRefs — beats
     // metadata carries `perspective` prose, not `pose`, and the inline copy
     // here served threeQuarter to every declared back-view figure.
-    const { resolveCellPose, resolveSheetForRef } = require('./storyAvatars');
+    const { resolveCellPose, resolveSheetForRef, wornResolvedForPage } = require('./storyAvatars');
+    // WARDROBE STATE ON A REWRITTEN PAGE. scene-iteration.txt emits no
+    // `wornItems`, so the rewrite's own metadata says nothing about what this
+    // page takes off — the carry-forward is the ONLY thing that keeps an
+    // iterated page on its off-variant sheet, exactly as it keeps the page's
+    // "is NOT wearing this" prompt line (see iterateSceneMetadata below, same
+    // rule, same helper).
+    const { carryForwardWornItems } = require('./wornItems');
+    const wornResolved = wornResolvedForPage(
+      storyData?.visualBible || null,
+      { ...(newSceneMetadata || {}), wornItems: carryForwardWornItems(newSceneMetadata, parentSceneMetadata || {}) },
+      metaChars,
+      pageNumber
+    );
     const poseByName = new Map();
     for (const sc of metaChars) {
       const nm = (typeof sc === 'string' ? sc : sc?.name) || '';
@@ -4391,10 +4404,10 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
       if (!charName) continue;
       const story = storyData.characterAvatars[charName];
       if (!story) continue;
-      // Shared resolver: slot mapping, the loud costumed fallback (which also
-      // corrects ref.clothingCategory) lives in storyAvatars.js. The inline
-      // copy here fell back silently.
-      const resolved = resolveSheetForRef(story, ref);
+      // Shared resolver: slot mapping, the wardrobe-state variant, and the loud
+      // costumed fallback (which also corrects ref.clothingCategory) all live in
+      // storyAvatars.js. The inline copy here fell back silently.
+      const resolved = resolveSheetForRef(story, ref, { wornResolved });
       if (!resolved) continue;
       const { uri: sheetUri, slotKey } = resolved;
       const pf = poseByName.get(charName.toLowerCase()) || { pose: 'threeQuarter', depth: 'foreground' };

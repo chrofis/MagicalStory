@@ -1384,7 +1384,23 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     if (!rawCharClothing) {
       log.warn(`⚠️ [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: no perCharClothing entry — resolved "${clothingCategory}" from pageClothing`);
     }
-    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, clothingCategory);
+    // WARDROBE STATE — the third repair entry point gets the same sheet the
+    // page was generated against. Without it a character repair repaints the
+    // garment the brief took off straight back onto the body, because the only
+    // reference it holds shows it worn.
+    const wardrobeLookupCategory = (() => {
+      try {
+        const { wornResolvedForPage } = require('./storyAvatars');
+        const { offIdsForCharacter, buildOffCategory } = require('./wardrobeVariants');
+        const worn = wornResolvedForPage(storyData?.visualBible || null, img.sceneMetadata, img.sceneCharacters, pageNumber);
+        const offIds = offIdsForCharacter(charName, worn);
+        return offIds.length > 0 ? buildOffCategory(clothingCategory, offIds) : clothingCategory;
+      } catch (err) {
+        log.warn(`👕 [UNIFIED PIPELINE] Char-fix ${charName} p${pageNumber}: wardrobe-state lookup failed (${err.message}) — using the base sheet`);
+        return clothingCategory;
+      }
+    })();
+    const styledAvatar = await getStyledAvatarForClothing(character, artStyle, wardrobeLookupCategory);
     let avatarPhoto = styledAvatar || getFacePhoto(character);
     let avatarPhotoType = styledAvatar
       ? (clothingCategory.startsWith('costumed') ? `costumed-${clothingCategory.split(':')[1] || 'default'}` : `styled-${clothingCategory}`)

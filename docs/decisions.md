@@ -46888,3 +46888,77 @@ capture), `client/src/pages/StoryWizard.tsx` (version-switch copies a prompt onl
 string), `client/src/types/story.ts` (`ImageVersion.prompt: string | null`),
 `tests/unit/version-prompt-is-own-render.test.ts`.
 **Status:** ✅ active.
+
+---
+
+## 2026-09-19 — A garment coming off gets an avatar SHEET, not just a sentence: per-state wardrobe variants
+
+**Context.** Staging `job_1789759147125_p08djwhbl` (18 pages) flips three garments: Levin's green fleece
+(off on 9 pages), his red cap (off on 2), Julian's rust scarf (off on 1). `data.characterAvatars` held
+exactly ONE sheet per character (`styled-standard`), so on every jacket-off page the only reference the
+image model received showed Levin WEARING the fleece, alongside a `WORN ITEMS` text line asking for its
+removal. The render put the jacket on his body anyway. The briefs were coherent and the `wornItems[]`
+declarations were correct — this is a reference-authority fault, not a continuity-data fault, and no amount
+of prompt wording fixes a picture that says the opposite.
+
+**Decision.** A character gets one EXTRA 2×4 sheet per **observed distinct off-set**, keyed
+`styled-<category>--off:<CLOxxx>` (union key `--off:CLO001+CLO002` when a page takes two of that
+character's garments off at once). Never the power set — only sets a page actually declares.
+
+1. **Derivation** (`server/lib/wardrobeVariants.js`) runs ONCE, on the all-pages Art Director output, at
+   the point `expandedScenes` resolves in `storyJobPipeline.js`. It rides neither avatar hook: the early
+   `onClothingRequirements` kickoff fires at the story-bible stage, before any scene brief exists, so the
+   flip data is not there; and `onWardrobeCorrected` fires only when the wardrobe check actually rewrote a
+   clause, which most stories never do. The plan's suggestion to ride that second hook was wrong and is
+   corrected here.
+2. **The off-sheet is the APPROVED BASE SHEET, REDRESSED — never a second build from photos.**
+   `character2x4Sheet.redressSheetVariant` takes the character's already-approved styled sheet as the input
+   to one provider edit that removes the named garments. Two independent photo→sheet runs disagree on hair,
+   build and base-layer shade, so a jacket coming off would read as the CHARACTER changing — a worse failure
+   than the one being fixed. Identity is fixed by construction; only wardrobe varies. Same shape as the
+   costumed-vs-standard sheet swap already shipping. No base sheet ⇒ no variant, never a photo fallback.
+   Its gate is `evaluateSheetSplit` (layout + identity vs the base sheet's own head row + outfit vs the
+   stripped contract), not the Pass-2 style judge, which would answer "style not applied" for an input that
+   is already styled and reject every redress.
+3. **The off-sheet's outfit is the canonical contract with the clause structurally deleted** by the existing
+   `resolveOutfitForPage` / `removeWornItemFromOutfit` stripper. No layer is invented and nothing is
+   re-prompted. A strip the stripper cannot make unambiguously produces NO variant.
+4. **No invented base layer (hard rule).** If deleting the garment would leave a body-covering slot with
+   nothing named — `outer layer` and `top` require a `top`, `bottom` requires a `bottom` — the variant is
+   REFUSED with a loud log and the page keeps today's behaviour. Headwear, accessories, belt/waist and
+   footwear require nothing beneath: a bare head, no scarf, no belt and bare feet are states a picture can
+   show without inventing a garment. (The plan named p11 of the motivating story as this case; measured, it
+   is not — the story-level contract that the derivation strips DOES name the white cotton shirt. The rule
+   is kept because the hazard is real, not because that page triggers it.)
+5. **Resolution is a SUBSTITUTION, never an extra reference.** `resolveSheetForRef` crops the character's
+   cell from the `--off:` sheet instead of the base one, so the model's reference cap is untouched. All
+   three cell-crop sites and all three repair entry points route through it (or, for the character-row
+   lookup, through `getStyledAvatarForClothing`, made state-aware the same way). A missing variant falls
+   back to the worn sheet LOUDLY and stamps `ref.wornStateFallback` — the same honesty contract the costumed
+   fallback carries; it is never silent.
+6. **The text line stays.** `buildWornStateLines`' "leave it off even if the attached reference shows it
+   worn" is the only instruction on the fallback path, which is live on every story that gets no variant.
+7. **COVERS ALWAYS TAKE THE WORN (BASE) SHEET.** `compositeCastBuilder` resolves a cover cast by the page's
+   plain clothing category, so a `--off:` key can never be chosen for a cover, and `coverIterate` passes no
+   worn rows. Stated rather than left to the shape of the data: a cover is the book's cover, not a page
+   carrying one page's garment state, and no page's `wornItems` could decide it.
+
+**Scope.** Clothing only — held artifacts (the egg) and their state tracking are OUT; rows that map to no
+outfit slot contribute no off-set. The trial path is OUT: a trial has no Art Director brief to declare a
+flip in. The Test Lab needs no new key — its default path replays the page's stored `referencePhotos`, which
+already carry whatever cell production cropped, so Lab == production by construction.
+
+**Cost.** One redress is 1-2 provider edits plus one sheet eval, ~$0.02-$0.06 per variant — cheaper than the
+plan's estimate, which assumed a full two-pass build. The motivating story asks for 3 variants.
+
+**Rationale over the alternatives.** A base-layer sheet plus per-garment cells was rejected: it needs a
+garment plate per item and a composite step per page, and the pipeline has no place to put either. Fixing
+only the declarations was rejected: the declarations were already correct. The remaining choice was whether
+the variant is drawn fresh or redressed, and identity drift decided it.
+
+**Touched:** `server/lib/wardrobeVariants.js` (new), `server/lib/character2x4Sheet.js`,
+`server/lib/styledAvatars.js`, `server/lib/storyAvatars.js`, `server/lib/entityConsistency.js`,
+`server/lib/repairPipeline.js`, `server/lib/images.js`, `server/lib/compositeCastBuilder.js`,
+`server/lib/coverIterate.js`, `server/lib/testlab.js`, `server/routes/regeneration.js`,
+`storyJobPipeline.js`, `tests/unit/wardrobe-state-avatar-variants.test.ts`
+**Status:** ✅ active

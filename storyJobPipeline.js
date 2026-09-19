@@ -3513,6 +3513,59 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       };
     });
 
+    // WARDROBE-STATE AVATAR VARIANTS (owner ruling 2026-09-19).
+    //
+    // This is the earliest point the flip data exists. The avatar kickoff fires
+    // at the story-bible stage, long before any scene brief, so `wornItems[]` —
+    // the per-page declaration of which garment comes OFF — is simply not
+    // available there; and `onWardrobeCorrected` only fires when the wardrobe
+    // check actually rewrote a clause, which most stories never do. So the
+    // derivation rides neither hook: it runs here, once, on the all-pages Art
+    // Director output, and chains onto the in-flight styling promise so the
+    // base sheets it redresses are finished first.
+    //
+    // Covers are deliberately NOT included: compositeCastBuilder resolves a
+    // cover cast by the page's plain clothing category, so a cover always takes
+    // the worn (base) sheet. A cover is the book's cover, not a page with a
+    // per-page garment state. See docs/decisions.md.
+    // Trials are out of scope — a trial has no Art Director brief to declare a
+    // flip in, and `inputData.trialMode` skips avatar styling here anyway.
+    if (!inputData.trialMode && !skipImages) {
+      const { deriveWardrobeVariantRequirements } = require('./server/lib/wardrobeVariants');
+      const vbForVariants = visualBible || streamingVisualBible;
+      let variantRows = [];
+      try {
+        const scenesForVariants = expandedScenes.map(scene => ({
+          pageNumber: scene.pageNumber,
+          sceneMetadata: extractSceneMetadata(scene.sceneDescription),
+        }));
+        variantRows = deriveWardrobeVariantRequirements({
+          visualBible: vbForVariants,
+          scenes: scenesForVariants,
+          clothingRequirements: streamingClothingRequirements,
+          characters: inputData.characters || [],
+        }).requirements;
+      } catch (err) {
+        log.warn(`👕 [WARDROBE-VARIANT] derivation failed: ${err.message} — every page keeps the worn sheet + the "leave it off" line`);
+      }
+      if (variantRows.length > 0) {
+        const prior = streamingAvatarStylingPromise || Promise.resolve();
+        streamingAvatarStylingPromise = (async () => {
+          try { await prior; } catch { /* the kickoff owns its own failure */ }
+          try {
+            const { prepareWardrobeVariantAvatars } = require('./server/lib/styledAvatars');
+            await prepareWardrobeVariantAvatars(inputData.characters || [], artStyle, variantRows, {
+              addUsage,
+              skipQualityEval: false,
+              backendOverride: modelOverrides.storyAvatarModel || null,
+            });
+          } catch (error) {
+            log.warn(`👕 [WARDROBE-VARIANT] variant rendering failed: ${error.message} — every page keeps the worn sheet + the "leave it off" line`);
+          }
+        })();
+      }
+    }
+
     // Batch-translate scene summaries to story language (separate from scene expansion)
     // One cheap Haiku call with all summaries — ~1-2s, ~$0.001
     if (lang !== 'en') {
@@ -4282,6 +4335,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const metaChars = sceneMetadata?.fullData?.characters || sceneMetadata?.characters || sceneCharacters || [];
           await sav.applyStoryCellRefs(pagePhotos, storyAvatars, metaChars, {
             closeUp: sceneMetadata?.fullData?.shot === 'close-up',
+            // Wardrobe state: a page that takes a garment OFF gets the cell
+            // cropped from the `--off:` sheet when one exists, so the attached
+            // reference agrees with the brief instead of contradicting it.
+            wornResolved: sav.wornResolvedForPage(streamingVisualBible, sceneMetadata, metaChars, pageNum),
           });
         }
         // over-the-shoulder: drop refs ONLY for background-depth characters.

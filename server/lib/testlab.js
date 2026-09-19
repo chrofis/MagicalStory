@@ -559,6 +559,13 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
   // 'costumedHead' rebuilds from the costumed avatar sheet: face cell
   // (identity) + the head region of the costumed body cell (headwear), so
   // hats and bandanas survive the crop.
+  // WARDROBE STATE AND THE LAB (2026-09-19). The default Lab path REPLAYS the
+  // page's stored `referencePhotos`, which already carry whatever cell
+  // production cropped — the `--off:` variant included — so the Lab measures the
+  // same sheet production rendered against, by construction. The two knobs below
+  // deliberately resolve a sheet themselves and are costumed-only experiments;
+  // neither consults a `styled-` key, so neither can pick a wardrobe-state
+  // variant, and that is the intent rather than an oversight.
   if (params.refCrop === 'costumedHead') {
     // Same code path as production close-up pages (cropAvatarCell headOnly).
     const { cropAvatarCell } = require('./sceneComposite');

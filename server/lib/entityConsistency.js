@@ -494,6 +494,13 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory,
   // exact-key lookup below silently cascades into the standard-avatar
   // fallbacks (repairs then repaint the story outfit into standard).
   const requestedCategory = clothingCategory;
+  // WARDROBE STATE (2026-09-19). `standard--off:CLO002` names the character in
+  // the same outfit with the garments this page takes off structurally absent.
+  // The suffix is split off BEFORE normalization (which would collapse it away)
+  // and the exact sheet is tried first at the standard-category lookup below.
+  const { parseOffCategory } = require('./wardrobeVariants');
+  const wardrobeState = parseOffCategory(clothingCategory);
+  if (wardrobeState) clothingCategory = wardrobeState.baseCategory;
   clothingCategory = normalizeClothingCategory(clothingCategory);
   if (clothingCategory !== String(requestedCategory || '').trim()) {
     log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: normalized clothing category "${requestedCategory}" → "${clothingCategory}"`);
@@ -592,6 +599,20 @@ async function getStyledAvatarForClothing(character, artStyle, clothingCategory,
       log.warn(`⚠️ [AVATAR-LOOKUP] ${charName}: wanted ${clothingCategory} but no costumed avatars exist — sending standard (output will show standard clothing)`);
       return r;
     }
+  }
+
+  // Wardrobe-state variant first — the sheet WITHOUT the garment this page
+  // takes off. Absent one, the base sheet is used and says so: it still WEARS
+  // the garment the brief removed, and only the prompt's "leave it off" line
+  // stands between that and a repair painting it back on.
+  if (wardrobeState) {
+    const variantKey = `${clothingCategory}${require('./wardrobeVariants').OFF_MARK}${wardrobeState.offIds.join('+')}`;
+    const variant = await resolveStyled(styledForArt[variantKey]);
+    if (variant) {
+      log.debug(`👕 [AVATAR-LOOKUP] ${charName}: wardrobe-state sheet [${artStyle}][${variantKey}]`);
+      return variant;
+    }
+    log.warn(`👕 [AVATAR-LOOKUP] ${charName}: no "${variantKey}" sheet — using the "${clothingCategory}" sheet, which still WEARS ${wardrobeState.offIds.join('+')}`);
   }
 
   // Handle standard categories (standard, winter, summer)

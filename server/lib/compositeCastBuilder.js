@@ -289,6 +289,13 @@ async function buildCompositeCast(pageData, inputData, deps = {}) {
       if (costumeKey) {
         storySlot = entry.costumed || null;
       } else {
+        // COVERS ALWAYS TAKE THE WORN (BASE) SHEET — owner ruling 2026-09-19.
+        // `clothing` here is a plain category, never a `--off:` key, so a
+        // wardrobe-state variant can never be picked for a cover. That is the
+        // intent, stated rather than left to the shape of the data: a cover is
+        // the book's cover, not a page carrying one page's garment state, and
+        // there is no page whose wornItems could decide it. See
+        // docs/decisions.md and server/lib/wardrobeVariants.js.
         storySlot = entry[`styled-${clothing}`] || entry.costumed || null;
       }
     }

@@ -1039,6 +1039,9 @@ async function iterateCover(coverKey, storyData, options = {}) {
   {
     const sav = require('./storyAvatars');
     const fakeMeta = (coverCharacterPhotos || []).map(p => ({ name: p.name, pose: 'front', flip: false }));
+    // No `wornResolved`: covers always take the worn (base) sheet — the same
+    // ruling compositeCastBuilder states (2026-09-19). A cover has no page whose
+    // declared wornItems could pick a wardrobe-state variant.
     await sav.applyStoryCellRefs(coverCharacterPhotos, storyData.characterAvatars || null, fakeMeta);
   }
 
