@@ -87,7 +87,7 @@ Absence is a guess. Wrongness is a finding only where you rule: a garment the in
 
 A `matches[]` entry whose `reference` is `unmatched` (or null) names nobody: never pair it with a prompt-named character and never report it — the quality evaluator owns that figure (`extra_character`).
 
-**An EXPECTED CAST entry tagged `(animal)` pairs against `VISION_INVENTORY.objects[]`, never `figures[]`** — the inventory files every animal there. Named in `objects` → present; pair it with that object's description. Not found there → `unverified_absence` at most, never `missing_character`, `extra_character` or `duplicate_identity`; those three are about people-figures, and an animal neither satisfies nor breaks a figure count. A `matches[]` entry whose `reference` is an `(animal)` cast name is that animal filed as a figure upstream: present, and never a surplus figure.
+**An EXPECTED CAST entry tagged `(animal)` pairs against `VISION_INVENTORY.objects[]`, never `figures[]`** — the inventory files every animal there. It has not been told who anyone is and never writes a name, so pair on KIND, never on the name: a roster entry tagged with its species matches the `objects[]` entry of that species whatever words, colour, size or markings the inventory gave it. One such entry → present, and you report no absence for it. Only when `objects[]` holds no animal of that kind at all is it `unverified_absence`, never `missing_character`, `extra_character` or `duplicate_identity`; those three are about people-figures, and an animal neither satisfies nor breaks a figure count. A `matches[]` entry whose `reference` is an `(animal)` cast name is that animal filed as a figure upstream: present, and never a surplus figure.
 
 For each remaining `matches[]` entry in QUALITY_FIGURES, take the figure's zone from QUALITY_FIGURES.figures[]. Find the VISION_INVENTORY figure in the same zone (or the nearest one — do not require an exact zone match) and output a pairing `{name, label, zone, vision_description}`, carrying that figure's VISION_INVENTORY label verbatim. Zone mismatch is a position note, not an absence.
 
@@ -209,6 +209,7 @@ Return JSON only:
 
 **RULES:**
 - Output ONLY JSON
+- `scene` carries `extra` and `setting_match` and no other key — never add one for what you believe is missing; every absence is a `fixable_issues[]` entry typed `unverified_absence`
 - Base ALL assessments on the visual inventory, NOT assumptions
 - Clothing TYPE mismatch (modern vs costume) is CRITICAL, not just a color issue
 - Facing, pose, contact and what a figure is doing are not judged here — see WHAT THIS JUDGE RULES ON

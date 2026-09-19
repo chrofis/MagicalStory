@@ -1,0 +1,2043 @@
+{
+  "storyId": "job_1789759147125_p08djwhbl",
+  "visualBible": {
+    "animals": [
+      {
+        "id": "ANI001",
+        "name": "Nia",
+        "pages": [
+          3,
+          5,
+          8,
+          13,
+          18
+        ],
+        "species": "terrier mix dog",
+        "coloring": "tan and white, soft fluffy coat",
+        "features": "floppy ears, a short wagging tail, wearing a simple red nylon collar",
+        "cellGates": [
+          {
+            "at": "2026-09-18T19:59:06.888Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "ANI001",
+            "reason": "The illustration is a watercolor painting of a tan and white terrier mix dog wearing a red collar, matching the description and art style.",
+            "rerendered": false
+          }
+        ],
+        "scaleClass": "knee-high",
+        "description": "terrier mix dog. stands knee-high to an adult. tan and white, soft fluffy coat. floppy ears, a short wagging tail, wearing a simple red nylon collar",
+        "appearsInPages": [
+          3,
+          5,
+          8,
+          13,
+          18
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/vb/ANI001.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      },
+      {
+        "id": "ANI002",
+        "name": "Raven",
+        "pages": [
+          8,
+          11,
+          13,
+          15,
+          18
+        ],
+        "species": "common raven",
+        "coloring": "solid black feathers with a soft blue sheen",
+        "features": "large rounded friendly eyes, a thick but blunted beak, smooth plumage, plump chest",
+        "cellGates": [
+          {
+            "at": "2026-09-18T19:59:07.913Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "ANI002",
+            "reason": "The image depicts a raven that matches the description in color, size, and features, rendered in a watercolor style with visible brushstrokes.",
+            "rerendered": false
+          }
+        ],
+        "scaleClass": "melon-sized",
+        "description": "common raven. about as big as a human head, like a lantern or a football. solid black feathers with a soft blue sheen. large rounded friendly eyes, a thick but blunted beak, smooth plumage, plump chest",
+        "appearsInPages": [
+          8,
+          11,
+          13,
+          15,
+          18
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/vb/ANI002.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      },
+      {
+        "id": "ANI003",
+        "name": "Fünkli",
+        "pages": [
+          18
+        ],
+        "species": "dragon",
+        "coloring": "pale green with yellow belly scales",
+        "features": "rounded cute forms, large round warm brown friendly eyes, smiling mouth with no teeth, a pair of short blunt bumps on the head, a small thick tail",
+        "scaleClass": "palm-sized",
+        "description": "dragon. small enough to close one hand around. pale green with yellow belly scales. rounded cute forms, large round warm brown friendly eyes, smiling mouth with no teeth, a pair of short blunt bumps on the head, a small thick tail",
+        "appearsInPages": [
+          18
+        ]
+      }
+    ],
+    "clothing": [
+      {
+        "id": "CLO001",
+        "name": "red wool cap",
+        "label": "red cap",
+        "pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          18
+        ],
+        "wornBy": "Levin",
+        "howWorn": "pulled snugly over the head",
+        "scaleClass": null,
+        "description": "a chunky-knit red wool pull-on cap with a folded ribbed cuff",
+        "appearsInPages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          18
+        ]
+      },
+      {
+        "id": "CLO002",
+        "name": "green fleece jacket",
+        "label": "green fleece",
+        "pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ],
+        "wornBy": "Levin",
+        "howWorn": "worn as an outer layer",
+        "scaleClass": null,
+        "description": "a forest-green zip-up fleece jacket with a wide body and two front pockets",
+        "appearsInPages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ]
+      },
+      {
+        "id": "CLO003",
+        "name": "rust wool scarf",
+        "label": "rust scarf",
+        "pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "wornBy": "Julian",
+        "howWorn": "wrapped once around the neck and tucked in at the front",
+        "scaleClass": null,
+        "description": "a long chunky rust-orange wool rectangular scarf in a plain knit",
+        "appearsInPages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      }
+    ],
+    "vehicles": [],
+    "artifacts": [
+      {
+        "id": "ART001",
+        "name": "large egg",
+        "type": "egg",
+        "label": "dragon egg",
+        "pages": [
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9,
+          14,
+          16
+        ],
+        "states": [
+          {
+            "id": "ART001.1",
+            "held": null,
+            "name": "unaltered",
+            "delta": "smooth, greyish-white oval shell",
+            "pages": [
+              2,
+              3,
+              4,
+              5,
+              7,
+              8,
+              9,
+              14,
+              16
+            ],
+            "referenceImageUrl": null,
+            "referenceImageData": null
+          }
+        ],
+        "cellGates": [
+          {
+            "at": "2026-09-18T19:59:05.882Z",
+            "ok": false,
+            "gate": "element_cell",
+            "cellId": "ART001",
+            "reason": "The egg is described as being the size of a football, but the image depicts a small egg, and the shell texture is not smooth and heavy as described.",
+            "recheckOk": false,
+            "rerendered": true,
+            "recheckReason": "The egg is described as being the size of a football, but the illustration depicts a normal-sized egg."
+          }
+        ],
+        "scaleClass": "melon-sized",
+        "description": "a perfectly oval egg, roughly the size of a football, with a smooth heavy shell",
+        "appearsInPages": [
+          2,
+          3,
+          4,
+          5,
+          7,
+          8,
+          9,
+          14,
+          16
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/vb/ART001.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      }
+    ],
+    "locations": [
+      {
+        "id": "LOC001",
+        "name": "Lindenhof square",
+        "label": "Lindenhof",
+        "pages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          18
+        ],
+        "colors": "yellow, orange, grey, brown",
+        "setting": "outdoor, park square",
+        "features": "large mature linden trees with thick exposed roots, grey gravel pathways, fallen autumn leaves, stone retaining walls",
+        "vantages": [
+          {
+            "id": "LOC001.1",
+            "name": "Under the big linden",
+            "shot": "medium",
+            "pages": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6
+            ],
+            "description": "The base of a massive linden tree dominates the frame, its thick woody roots breaking through the pale grey gravel. Bright yellow and red autumn leaves cover the ground, catching the soft afternoon sunlight.",
+            "emptyScenePrompt": "A medium view of a park ground in autumn, focusing on the thick, twisting roots of a massive linden tree pushing through pale grey gravel. A thick blanket of bright yellow and red autumn leaves covers the stones, lit by soft afternoon sunlight filtering from the upper left."
+          },
+          {
+            "id": "LOC001.2",
+            "name": "Plaza path",
+            "shot": "wide",
+            "pages": [
+              7
+            ],
+            "description": "A wide grey gravel path running under the canopy of mature linden trees, bordered by low stone walls. Red and yellow autumn leaves drift across the flat expanse under the afternoon sky.",
+            "emptyScenePrompt": "A wide view of a flat park plaza surfaced with pale grey gravel, stretching back under the canopy of massive, bare linden branches. Low stone walls border the edges, and scattered red and yellow autumn leaves lie across the ground under clear afternoon light."
+          },
+          {
+            "id": "LOC001.3",
+            "name": "Dusk at the linden",
+            "shot": "ultra-wide",
+            "pages": [
+              18
+            ],
+            "description": "The broad gravel plaza of the Lindenhof under a dusky autumn sky, the massive linden tree rising against the fading light. A nest sits high in the bare branches, surrounded by swirling dry leaves.",
+            "emptyScenePrompt": "An ultra-wide view of a broad park plaza at dusk, surfaced in pale gravel, with a massive linden tree rising in the center against a deep purple and orange autumn sky. A dark nest sits among the high bare branches, with dry yellow leaves clinging to the surrounding twigs."
+          }
+        ],
+        "scaleClass": "landmark",
+        "description": "outdoor, park square. Colors: yellow, orange, grey, brown. large mature linden trees with thick exposed roots, grey gravel pathways, fallen autumn leaves, stone retaining walls. Signature: massive ancient linden tree trunks rising from the gravel",
+        "photoSource": "wikimedia",
+        "landmarkQuery": "Lindenhof (Zürcher Hügelzug)",
+        "photoVariants": [
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/248/d6f46ee63c42.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/d/dd/Chess_in_Lindenhof_park_2.JPG",
+            "attribution": "Ximeg, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+            "variantNumber": 1,
+            "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/debug/p1/landmark-0.jpg"
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/248/c8dfc9d8da3e.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/3/36/Ansicht_von_der_ETH_Z%C3%BCrich_auf_den_Lindenhof_2011-08-06.jpg",
+            "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[distant, green, day] Aerial urban cityscape of Zurich showing historic districts, modern high-rises, and surrounding Alpine foothills.",
+            "variantNumber": 2,
+            "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/debug/p7/landmark-0.jpg"
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/248/a6fca970dbb3.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/27/Fraum%C3%BCnster_-_Zunfthaus_zur_Meisen_-_Lindenhof_-_M%C3%BCnsterbr%C3%BCcke_-_Limmat_-_Quaibr%C3%BCcke_2011-03-23_15-06-28_ShiftN.jpg",
+            "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[whole, green, day] Waterfront promenade with historic buildings, moored boats, and riverside architecture. Fraumünster and other period structures visible along water.",
+            "variantNumber": 3,
+            "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/debug/p18/landmark-0.jpg"
+          }
+        ],
+        "appearsInPages": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          18
+        ],
+        "isRealLandmark": true,
+        "swissLandmarkId": 210,
+        "photoAttribution": "Ximeg, CC BY-SA 3.0, via Wikimedia Commons",
+        "photoFetchStatus": "pending_lazy",
+        "signatureElement": "massive ancient linden tree trunks rising from the gravel",
+        "isSwissPreIndexed": true,
+        "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/248/d6f46ee63c42.jpg",
+        "extractedDescription": "[whole, autumn, day] Town square with large mature trees providing canopy, featuring outdoor chess playing area with figures. Historic buildings frame the perimeter.",
+        "firstAppearanceAnalyzed": true
+      },
+      {
+        "id": "LOC002",
+        "name": "Lindenhofbrunnen",
+        "label": "Lindenhof fountain",
+        "pages": [
+          8
+        ],
+        "colors": "grey, stone, bronze",
+        "setting": "outdoor, plaza",
+        "features": "stone monument fountain, classical statue on a pedestal, running water, mature trees surrounding",
+        "scaleClass": "landmark",
+        "description": "outdoor, plaza. Colors: grey, stone, bronze. stone monument fountain, classical statue on a pedestal, running water, mature trees surrounding. Signature: stone pillar topped with a bronze figure",
+        "photoSource": "wikimedia",
+        "landmarkQuery": "Lindenhofbrunnen",
+        "photoVariants": [
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/250/1b7bb2021281.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e3/Z%C3%BCrich_-_Lindenhof_-_Brunnen_-_Pumpstation_IMG_1815.JPG",
+            "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[whole, bare, day] Stone monument fountain featuring classical statue on pedestal base with neoclassical small building structure. Winter/spring season with bare trees.",
+            "variantNumber": 1,
+            "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/debug/p8/landmark-0.jpg"
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/250/20f7b253f63f.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/4/40/Z%C3%BCrich_-_Lindenhof_2011-08-01.jpg",
+            "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[whole, green, dusk] Same fountain monument from different angle with green foliage visible in background, buildings and landscape backdrop.",
+            "variantNumber": 2
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/250/c9b395fedf51.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Brunnen_Lindenhof.jpg",
+            "attribution": "sidonius 12:56, 4 June 2006 (UTC), CC BY-SA 2.5, via Wikimedia Commons",
+            "description": "[whole, green, day] Fountain monument with classical statue mounted on stone base, surrounded by mature trees and public square seating. People and buildings visible nearby.",
+            "variantNumber": 3
+          }
+        ],
+        "appearsInPages": [
+          8
+        ],
+        "isRealLandmark": true,
+        "swissLandmarkId": 212,
+        "emptyScenePrompt": "A wide view of a grey stone fountain in a park plaza, featuring a classical bronze statue mounted on a tall stone pedestal base. The fountain basin sits on pale gravel, surrounded by mature trees shedding yellow autumn leaves into the sharp wind.",
+        "photoAttribution": "sidonius 12:56, 4 June 2006 (UTC), CC BY-SA 2.5, via Wikimedia Commons",
+        "photoFetchStatus": "pending_lazy",
+        "signatureElement": "stone pillar topped with a bronze figure",
+        "isSwissPreIndexed": true,
+        "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/250/c9b395fedf51.jpg",
+        "extractedDescription": "[whole, green, day] Fountain monument with classical statue mounted on stone base, surrounded by mature trees and public square seating. People and buildings visible nearby.",
+        "firstAppearanceAnalyzed": true
+      },
+      {
+        "id": "LOC003",
+        "name": "steep lane stairs",
+        "label": "Altstadt stairs",
+        "pages": [
+          10
+        ],
+        "colors": "grey, brown, dark green",
+        "setting": "outdoor, urban alley",
+        "features": "steep stone steps descending into a narrow alley, wet cobblestones, high walls on both sides",
+        "scaleClass": "landmark",
+        "description": "outdoor, urban alley. Colors: grey, brown, dark green. steep stone steps descending into a narrow alley, wet cobblestones, high walls on both sides. Signature: narrow damp stone staircase descending between historical buildings",
+        "photoSource": "wikimedia",
+        "landmarkQuery": "Altstadt von Zürich",
+        "photoVariants": [
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/257/8c0df6e6c831.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Z%C3%BCrich%2C_Augustinergasse_%28165458493%29.jpg",
+            "attribution": "Photo by SebbsterSWITZERLAND, Wikimedia Commons",
+            "description": "[entrance, green, day] Narrow Altstadt street with multi-story painted buildings in pastel colors: pink, cream, and yellow facades with shuttered windows.",
+            "variantNumber": 1
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/257/03181396f47f.jpg",
+            "kind": "view-from",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e1/A_beautiful_picture_of_the_Fraum%C3%BCnster_in_the_city_of_Z%C3%BCrich%2C_Switzerland.jpg",
+            "attribution": "SebbsterSWITZERLAND, CC BY-SA 4.0, via Wikimedia Commons",
+            "description": "[distant, autumn, day] Elevated view of Fraumünster church tower surrounded by lakeside cityscape with moored boats; autumn foliage visible.",
+            "variantNumber": 2
+          }
+        ],
+        "appearsInPages": [
+          10
+        ],
+        "isRealLandmark": true,
+        "swissLandmarkId": 219,
+        "emptyScenePrompt": "A medium view from the top of a steep, narrow stone staircase descending away into a dark, shadowed alley between high medieval walls. The grey stone steps are wet and covered in plastered red and yellow autumn leaves, with cold late-afternoon light cutting across the top landing.",
+        "photoAttribution": "Photo by SebbsterSWITZERLAND, Wikimedia Commons",
+        "photoFetchStatus": "pending_lazy",
+        "signatureElement": "narrow damp stone staircase descending between historical buildings",
+        "isSwissPreIndexed": true,
+        "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/257/8c0df6e6c831.jpg",
+        "extractedDescription": "[entrance, green, day] Narrow Altstadt street with multi-story painted buildings in pastel colors: pink, cream, and yellow facades with shuttered windows.",
+        "firstAppearanceAnalyzed": true
+      },
+      {
+        "id": "LOC004",
+        "name": "Altstadt skyline",
+        "label": "Grossmunster horizon",
+        "pages": [
+          11
+        ],
+        "colors": "orange, pink, grey, red",
+        "setting": "outdoor, cityscape",
+        "features": "overlapping medieval tiled roofs, narrow paths below, twin stone towers on the horizon",
+        "scaleClass": "landmark",
+        "description": "outdoor, cityscape. Colors: orange, pink, grey, red. overlapping medieval tiled roofs, narrow paths below, twin stone towers on the horizon. Signature: twin domed stone towers rising above the distant roofs",
+        "photoSource": "wikimedia",
+        "landmarkQuery": "Grossmünster",
+        "photoVariants": [
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/3224/a7fb35fe1fa0.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/59/Z%C3%BCrich_-_Grossm%C3%BCnster_IMG_0237.jpg",
+            "attribution": "Wikimedia Commons",
+            "description": "[tower, green, day] Twin cream-colored church towers with pyramidal cupolas topped by Swiss flags and cross finials.",
+            "variantNumber": 1,
+            "cachedPhotoData": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/debug/p11/landmark-0.jpg"
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/3224/c26a8e2723ac.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f1/Grossm%C3%BCnster_-_Limmatquai_-_M%C3%BCnsterhof-W%C3%BChre_2011-08-01_16-17-18.jpg",
+            "attribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+            "description": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+            "variantNumber": 2
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/3224/8cc0842d48db.jpg",
+            "kind": "exterior",
+            "vantage": "exterior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/7c/Grossmunster_Zuerich.jpg",
+            "attribution": "Robert Scarth, CC BY-SA 2.0, via Wikimedia Commons",
+            "description": "[tower, green, day] Pair of stone church towers with distinctive architectural details, contemporary structures flanking at right.",
+            "variantNumber": 3
+          },
+          {
+            "url": "https://images.magicalstory.ch/landmarks/index/3224/40ce152dcc80.jpg",
+            "kind": "interior",
+            "vantage": "interior",
+            "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/1e/7424_-_Z%C3%BCrich_-_Grossm%C3%BCnster_Charlemagne.JPG",
+            "attribution": "Andrew Bossi, CC BY-SA 2.5, via Wikimedia Commons",
+            "description": "[interior, unclear, day] Interior nave with stone columns supporting ornate gilded ceiling; stone statue of Charlemagne above altar.",
+            "variantNumber": 4
+          }
+        ],
+        "appearsInPages": [
+          11
+        ],
+        "isRealLandmark": true,
+        "swissLandmarkId": 2384,
+        "emptyScenePrompt": "An ultra-wide view looking out over sloping medieval rooftops with red and brown tiles, dipping down to a narrow cobblestone path crossing the lower foreground. In the far background, the iconic twin stone towers of a cathedral rise against a pale, fading pink and orange autumn sky, the last sunlight leaving the roof peaks.",
+        "photoAttribution": "Roland zh, CC BY-SA 3.0, via Wikimedia Commons",
+        "photoFetchStatus": "pending_lazy",
+        "signatureElement": "twin domed stone towers rising above the distant roofs",
+        "isSwissPreIndexed": true,
+        "referencePhotoUrl": "https://images.magicalstory.ch/landmarks/index/3224/c26a8e2723ac.jpg",
+        "extractedDescription": "[tower, green, day] Twin stone towers with ornamental cupolas and Swiss flags, viewed across waterfront from lower elevation.",
+        "firstAppearanceAnalyzed": true
+      },
+      {
+        "id": "LOC005",
+        "name": "narrow lane",
+        "label": "bakery lane",
+        "pages": [
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "colors": "grey, tan, white",
+        "setting": "outdoor, street",
+        "features": "cobblestone street, cream plaster walls, iron window shutters, a low cellar window well with a metal grate",
+        "vantages": [
+          {
+            "id": "LOC005.1",
+            "name": "Bakery shutter",
+            "shot": "close-up",
+            "pages": [
+              12
+            ],
+            "description": "A close view of a cream-colored plaster wall with a large wooden window, half covered by a descending grey iron shutter. The cobblestone street sits just below the sill.",
+            "emptyScenePrompt": "A close-up view of a cream-colored exterior building wall holding a large wooden window, mostly obscured by a heavy grey iron shutter pulled halfway down. Dry autumn leaves blow past the smooth stone sill."
+          },
+          {
+            "id": "LOC005.2",
+            "name": "Cellar window",
+            "shot": "medium",
+            "pages": [
+              13,
+              15,
+              16
+            ],
+            "description": "The base of a cream plaster building meeting a grey cobblestone lane. A small, arched cellar window sits in a stone recess right at street level.",
+            "emptyScenePrompt": "A medium view of a narrow alley floor where grey cobblestones meet the stone foundation of a cream-colored building. A small, dark arched cellar window sits in a shallow stone well right at street level, with drifts of dry yellow autumn leaves gathered in the recess."
+          },
+          {
+            "id": "LOC005.3",
+            "name": "Lane floor",
+            "shot": "close-up",
+            "pages": [
+              14
+            ],
+            "description": "The cold grey cobblestones of the narrow lane, viewed close to the ground, scattered with dry leaves against the building's stone base.",
+            "emptyScenePrompt": "A close-up view of cold grey cobblestones forming an alley floor, meeting the rough stone base of a wall. A scattering of dry red and yellow autumn leaves rests on the flat stones in the cool, shadowed evening light."
+          }
+        ],
+        "cellGates": [
+          {
+            "at": "2026-09-18T19:59:09.071Z",
+            "ok": true,
+            "gate": "element_cell",
+            "cellId": "LOC005",
+            "reason": "The image depicts a charming cobblestone street with cream plaster walls and a cellar window, fitting the description of a bakery lane in a traditional watercolor style.",
+            "rerendered": false
+          }
+        ],
+        "scaleClass": "house-height",
+        "description": "outdoor, street. Colors: grey, tan, white. cobblestone street, cream plaster walls, iron window shutters, a low cellar window well with a metal grate. Signature: low cellar window set into the stone foundation just above the street level",
+        "landmarkQuery": null,
+        "appearsInPages": [
+          12,
+          13,
+          14,
+          15,
+          16
+        ],
+        "isRealLandmark": false,
+        "signatureElement": "low cellar window set into the stone foundation just above the street level",
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/vb/LOC005.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      }
+    ],
+    "genericObjects": [],
+    "mainCharacters": [
+      {
+        "id": 1786902471660,
+        "age": "5",
+        "name": "Levin",
+        "gender": "male",
+        "physical": {
+          "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+          "hair": "light blonde, wavy, short, tousled",
+          "build": "average",
+          "other": "none",
+          "glasses": "none",
+          "eyeColor": "green",
+          "skinTone": "light",
+          "hairColor": "light blonde",
+          "facialHair": "none",
+          "apparentAge": "preschooler",
+          "eyeColorHex": "#6A7B54",
+          "skinToneHex": "#F0D2BC",
+          "hairColorHex": "#D4B27C",
+          "detailedHairAnalysis": {
+            "type": "wavy",
+            "density": "full",
+            "parting": "none",
+            "styling": "tousled",
+            "texture": "fine",
+            "lengthTop": "short",
+            "bangsEndAt": "no bangs",
+            "salonLevel": 8,
+            "lengthSides": "same as top",
+            "baseColorHex": "#E8C690",
+            "highlightsHex": "none"
+          }
+        },
+        "referenceOutfit": null,
+        "generatedOutfits": {}
+      },
+      {
+        "id": 1786902747333,
+        "age": "3",
+        "name": "Julian",
+        "gender": "male",
+        "physical": {
+          "face": "rounded jawline, neutral chin, straight nose with rounded tip, medium cheekbones, medium lips",
+          "hair": "light blonde, curly, ear-length",
+          "build": "average",
+          "other": "none",
+          "glasses": "none",
+          "eyeColor": "blue",
+          "skinTone": "light",
+          "hairColor": "light blonde",
+          "facialHair": "none",
+          "apparentAge": "toddler",
+          "eyeColorHex": "#6F9ECF",
+          "skinToneHex": "#E8BEAC",
+          "hairColorHex": "#DDC29E",
+          "detailedHairAnalysis": {
+            "type": "curly",
+            "parting": "none",
+            "styling": "natural",
+            "texture": "medium",
+            "lengthTop": "ear-length",
+            "bangsEndAt": "no bangs",
+            "lengthSides": "same as top",
+            "baseColorHex": "#DDC29E",
+            "highlightsHex": "none"
+          }
+        },
+        "referenceOutfit": null,
+        "generatedOutfits": {}
+      },
+      {
+        "id": 1786904058132,
+        "age": "3",
+        "name": "Max",
+        "gender": "male",
+        "physical": {
+          "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+          "hair": "light brown, curly, short",
+          "build": "average",
+          "other": "none",
+          "glasses": "none",
+          "eyeColor": "brown",
+          "skinTone": "light",
+          "hairColor": "light brown",
+          "facialHair": "none",
+          "apparentAge": "preschooler",
+          "eyeColorHex": "#6B4423",
+          "skinToneHex": "#E8BEAC",
+          "hairColorHex": "#B58C5A",
+          "detailedHairAnalysis": {
+            "type": "curly",
+            "density": "full",
+            "parting": "none",
+            "styling": "natural",
+            "texture": "medium",
+            "lengthTop": "short",
+            "bangsEndAt": "no bangs",
+            "salonLevel": 6,
+            "lengthSides": "short",
+            "baseColorHex": "#A07E5B",
+            "highlightsHex": "none"
+          }
+        },
+        "referenceOutfit": null,
+        "generatedOutfits": {}
+      },
+      {
+        "id": 1786904387136,
+        "age": "3",
+        "name": "Kiaan",
+        "gender": "male",
+        "physical": {
+          "face": "soft jawline, neutral chin, concave nose with rounded tip, medium cheekbones, medium lips",
+          "hair": "dark brown, straight, short, bangs at eyebrows",
+          "build": "average",
+          "other": "none",
+          "glasses": "none",
+          "eyeColor": "brown",
+          "skinTone": "light",
+          "hairColor": "dark brown",
+          "facialHair": "none",
+          "apparentAge": "preschooler",
+          "eyeColorHex": "#4A2C1F",
+          "skinToneHex": "#E8BEAC",
+          "hairColorHex": "#3A251C",
+          "detailedHairAnalysis": {
+            "type": "straight",
+            "density": "full",
+            "parting": "none",
+            "styling": "natural",
+            "texture": "medium",
+            "lengthTop": "short",
+            "bangsEndAt": "at eyebrows",
+            "salonLevel": 4,
+            "lengthSides": "short",
+            "baseColorHex": "#5C4131",
+            "highlightsHex": "none"
+          }
+        },
+        "referenceOutfit": null,
+        "generatedOutfits": {}
+      }
+    ],
+    "secondaryCharacters": [
+      {
+        "id": "CHR001",
+        "age": 45,
+        "face": "brown eyes, rounded cheeks, faint laugh lines",
+        "hair": "brown, straight, pulled back into a tight bun",
+        "name": "Baker",
+        "peer": "no",
+        "build": "a woman, sturdy build, broad shoulders",
+        "pages": [
+          12
+        ],
+        "clothing": "a white canvas apron tied at the waist over a pale yellow long-sleeved cotton blouse, grey wool trousers, and brown leather shoes",
+        "cellGates": [
+          {
+            "at": "2026-09-18T19:58:47.037Z",
+            "ok": true,
+            "gate": "character_cell",
+            "cellId": "CHR001",
+            "reason": "The watercolor painting accurately depicts a 45-year-old woman with a sturdy build, matching the description of her clothing, apron, and hair, all rendered in the specified traditional watercolor style.",
+            "rerendered": false
+          }
+        ],
+        "scaleClass": "adult-height",
+        "description": "45. a woman, sturdy build, broad shoulders. hair: brown, straight, pulled back into a tight bun. brown eyes, rounded cheeks, faint laugh lines. Signature: white canvas apron dusted with flour. Clothing: a white canvas apron tied at the waist over a pale yellow long-sleeved cotton blouse, grey wool trousers, and brown leather shoes",
+        "signatureLook": "white canvas apron dusted with flour",
+        "appearsInPages": [
+          12
+        ],
+        "referenceImageUrl": "https://images-staging.magicalstory.ch/stories/job_1789759147125_p08djwhbl/vb/CHR001.jpg",
+        "referenceImageData": null,
+        "referenceImageGenerated": true
+      }
+    ]
+  },
+  "pages": [
+    {
+      "pageNumber": 1,
+      "prompt": "**THIS IMAGE DEPICTS:** Levin crouches on the gravel and draws a dragon shape with his finger. Bright autumn afternoon sunlight warms the park. The mood is calm and focused.\n\nGenerate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.\n\nWhen the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.\n\nAGE & PROPORTIONS (render each character at their real age, regardless of the action described):\n- Levin: preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly taller than a toddler and smaller than a kindergarten child\n\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n- Levin IS wearing this on this page: red wool cap — a chunky-knit red wool pull-on cap with a folded ribbed cuff. Draw it on Levin even if the attached reference shows Levin without it.\n- Levin IS wearing this on this page: green fleece jacket — a forest-green zip-up fleece jacket with a wide body and two front pockets. Draw it on Levin even if the attached reference shows Levin without it.\n\nLevin—a preschool-age boy roughly four-and-a-half heads tall, with wavy short light blonde hair, green eyes, wearing a chunky-knit red wool pull-on cap, a forest-green zip-up fleece jacket, a long-sleeved white cotton shirt, straight-leg dark navy corduroy trousers, and lace-up brown leather ankle boots—crouches in the right foreground facing left, dragging his right index finger through the pale grey gravel of the Lindenhof. Bright afternoon autumn sunlight warms the large linden tree roots rising around him, as he carefully traces the curved shape of a dragon into the small stones. Red and yellow dry leaves are scattered thickly across the ground under his knees and around his boots. The medium shot focuses closely on his focused work, the broad roots forming a quiet, natural barrier behind him.\n**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **red cap** (clothing) (worn by Levin) — worn on Levin, not a separate free-standing copy\n* **green fleece** (clothing) (worn by Levin) — worn on Levin, not a separate free-standing copy\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.\n\n**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.\n\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\n\n**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.\n\n**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.\n\n**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.\n\n**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.\n\n**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.\n\n**SHOT:** The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot. A medium shot keeps each figure whole inside the frame. A wide shot shows the full setting. An ultra-wide shot shows the whole setting from a distance, the figures small within it and both ends of any separation visible.\n\nEXACT POSES:\n- Levin: traces a line in the gravel\n\nEXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n- Levin: brows slightly lowered in concentration, mouth closed in a quiet line; eyes turned away from everyone in the frame",
+      "sceneCharacters": [
+        {
+          "id": 1786902471660,
+          "name": "Levin",
+          "age": "5",
+          "gender": "male"
+        }
+      ],
+      "sceneMetadata": {
+        "era": "present day",
+        "aboard": null,
+        "objects": [
+          "LOC001.1",
+          "CLO001",
+          "CLO002"
+        ],
+        "setting": null,
+        "clothing": null,
+        "fullData": {
+          "shot": "medium",
+          "objects": [
+            "LOC001.1",
+            "CLO001",
+            "CLO002"
+          ],
+          "setting": null,
+          "wornItems": [
+            {
+              "id": "CLO001",
+              "owner": "Levin",
+              "state": "worn",
+              "wearer": null,
+              "location": null
+            },
+            {
+              "id": "CLO002",
+              "owner": "Levin",
+              "state": "worn",
+              "wearer": null,
+              "location": null
+            }
+          ],
+          "background": null,
+          "characters": [
+            {
+              "name": "Levin",
+              "depth": "foreground",
+              "looksAt": "away",
+              "clothing": "standard",
+              "position": "right foreground",
+              "expression": "brows slightly lowered in concentration, mouth closed in a quiet line"
+            }
+          ],
+          "sceneIntent": "Levin crouches on the gravel and draws a dragon shape with his finger. Bright autumn afternoon sunlight warms the park. The mood is calm and focused.",
+          "imageSummary": "Levin—a preschool-age boy roughly four-and-a-half heads tall, with wavy short light blonde hair, green eyes, wearing a chunky-knit red wool pull-on cap, a forest-green zip-up fleece jacket, a long-sleeved white cotton shirt, straight-leg dark navy corduroy trousers, and lace-up brown leather ankle boots—crouches in the right foreground facing left, dragging his right index finger through the pale grey gravel of the Lindenhof. Bright afternoon autumn sunlight warms the large linden tree roots rising around him, as he carefully traces the curved shape of a dragon into the small stones. Red and yellow dry leaves are scattered thickly across the ground under his knees and around his boots. The medium shot focuses closely on his focused work, the broad roots forming a quiet, natural barrier behind him.",
+          "interactions": [
+            {
+              "hands": true,
+              "where": "traces a line in the gravel",
+              "action": "drawing",
+              "object": "the gravel",
+              "priority": "essential",
+              "character": "Levin",
+              "storyRelevant": true
+            }
+          ],
+          "crowdExpected": false
+        },
+        "thinking": null,
+        "wornItems": [
+          {
+            "id": "CLO001",
+            "owner": "Levin",
+            "state": "worn",
+            "wearer": null,
+            "location": null
+          },
+          {
+            "id": "CLO002",
+            "owner": "Levin",
+            "state": "worn",
+            "wearer": null,
+            "location": null
+          }
+        ],
+        "background": null,
+        "characters": [
+          "Levin"
+        ],
+        "sceneIntent": "Levin crouches on the gravel and draws a dragon shape with his finger. Bright autumn afternoon sunlight warms the park. The mood is calm and focused.",
+        "imageSummary": "Levin—a preschool-age boy roughly four-and-a-half heads tall, with wavy short light blonde hair, green eyes, wearing a chunky-knit red wool pull-on cap, a forest-green zip-up fleece jacket, a long-sleeved white cotton shirt, straight-leg dark navy corduroy trousers, and lace-up brown leather ankle boots—crouches in the right foreground facing left, dragging his right index finger through the pale grey gravel of the Lindenhof. Bright afternoon autumn sunlight warms the large linden tree roots rising around him, as he carefully traces the curved shape of a dragon into the small stones. Red and yellow dry leaves are scattered thickly across the ground under his knees and around his boots. The medium shot focuses closely on his focused work, the broad roots forming a quiet, natural barrier behind him.",
+        "interactions": [
+          {
+            "hands": true,
+            "where": "traces a line in the gravel",
+            "action": "drawing",
+            "object": "the gravel",
+            "priority": "essential",
+            "character": "Levin",
+            "storyRelevant": true
+          }
+        ],
+        "isJsonFormat": true,
+        "landmarkView": "exterior",
+        "textPosition": null,
+        "crowdExpected": false,
+        "isProseFormat": true,
+        "framingPattern": null,
+        "reuseEmptyScene": null,
+        "sceneComplexity": "simple",
+        "emptyScenePrompt": null,
+        "landmarkVariants": {
+          "LOC001": 1
+        },
+        "characterClothing": {
+          "Levin": "standard"
+        },
+        "translatedSummary": null,
+        "characterPositions": {
+          "Levin": "right foreground"
+        },
+        "textZoneDescription": null,
+        "characterPerspectives": {
+          "Levin": {
+            "depth": "foreground"
+          }
+        }
+      },
+      "threeStageResult": {
+        "verdict": "HARD_FAIL",
+        "fixableIssues": [
+          {
+            "fix": "Replace blue jeans with straight-leg dark navy corduroy trousers on the crouching boy in right foreground",
+            "type": "clothing",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Levin",
+            "description": "Levin wears blue jeans instead of specified dark navy corduroy trousers",
+            "landmark_element": false
+          },
+          {
+            "fix": "Replace spiral etched in pavement with loose pale grey gravel; show Levin’s right index finger actively tracing a curved dragon shape through the stones",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "CRITICAL",
+            "character": "Levin",
+            "description": "Levin interacts with a pre-etched spiral on paved ground instead of drawing a dragon shape in loose gravel",
+            "landmark_element": false
+          },
+          {
+            "fix": "Remove all non-Levin human figures from scene to match solitary focus of prompt",
+            "type": "duplicate_identity",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MODERATE",
+            "character": null,
+            "description": "Extra background figures present: man leaning on stone wall (left-midground) and two adults sitting on bench (right-midground). Prompt describes only Levin in a calm, focused solo moment.",
+            "landmark_element": false
+          }
+        ],
+        "complianceResult": {
+          "scene": {
+            "extra": [
+              "man in dark jacket (left-midground)",
+              "two adults on bench (right-midground)"
+            ],
+            "missing": [
+              "Levin is expected alone but extra background figures present"
+            ],
+            "all_present": false,
+            "setting_match": true
+          },
+          "verdict": "HARD_FAIL",
+          "fixable_issues": [
+            {
+              "fix": "Replace blue jeans with straight-leg dark navy corduroy trousers on the crouching boy in right foreground",
+              "type": "clothing",
+              "severity": "MAJOR",
+              "character": "Levin",
+              "description": "Levin wears blue jeans instead of specified dark navy corduroy trousers",
+              "landmark_element": false
+            },
+            {
+              "fix": "Replace spiral etched in pavement with loose pale grey gravel; show Levin’s right index finger actively tracing a curved dragon shape through the stones",
+              "type": "action_interaction",
+              "severity": "CRITICAL",
+              "character": "Levin",
+              "description": "Levin interacts with a pre-etched spiral on paved ground instead of drawing a dragon shape in loose gravel",
+              "landmark_element": false
+            },
+            {
+              "fix": "Remove all non-Levin human figures from scene to match solitary focus of prompt",
+              "type": "duplicate_identity",
+              "severity": "MODERATE",
+              "character": null,
+              "description": "Extra background figures present: man leaning on stone wall (left-midground) and two adults sitting on bench (right-midground). Prompt describes only Levin in a calm, focused solo moment.",
+              "landmark_element": false
+            },
+            {
+              "fix": "Replace paved ground with pale grey loose gravel covering the area around Levin’s hands and knees",
+              "type": "object_presence",
+              "severity": "CRITICAL",
+              "character": null,
+              "description": "Ground surface rendered as paved stone with etched spiral, but prompt specifies gravel at Lindenhof where Levin draws freely",
+              "landmark_element": true
+            }
+          ],
+          "issues_summary": "Levin wears incorrect trousers (jeans vs corduroy); scene includes unauthorized extra characters; main action fundamentally misrendered — dragon-drawing in gravel replaced by pointing at fixed spiral on pavement",
+          "main_action_check": {
+            "issue": "wrong_action: declared interaction is drawing a dragon in loose gravel; inventory describes pointing at a pre-etched spiral on paved ground — different surface, different object, contradicts main action",
+            "match": false,
+            "severity": "CRITICAL",
+            "prompt_action": "Levin crouches on the gravel and draws a dragon shape with his finger",
+            "inventory_action": "crouching, right hand extended pointing at a spiral drawn in the pavement",
+            "story_text_action": "Levin draws a dragon: head, wings, long tail"
+          },
+          "character_compliance": [
+            {
+              "name": "Levin",
+              "label": "the young boy in green",
+              "severity": "MAJOR",
+              "facing_issue": "facing right per inventory but prompt specifies facing left — however, left/right is mirror-equivalent and not a real defect",
+              "facing_match": false,
+              "clothing_issue": "wearing blue jeans instead of dark navy corduroy trousers; jacket possibly correct type but lower garment mismatched",
+              "clothing_match": false
+            }
+          ],
+          "interaction_compliance": [
+            {
+              "match": false,
+              "actual": "pointing at a spiral drawn in pavement",
+              "object": "gravel/dragon shape",
+              "expected": "tracing a dragon shape in gravel with finger",
+              "severity": "CRITICAL",
+              "character": "Levin"
+            }
+          ]
+        },
+        "visionInventory": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"label\": \"the young boy in green\",\n      \"zone\": \"center-foreground\",\n      \"facing\": \"right\",\n      \"hair\": \"blonde, curly, short\",\n      \"clothing\": \"green zip-up jacket over a white shirt, blue jeans, brown lace-up shoes\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"red knitted beanie\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"crouching, both feet on the ground, right hand extended and pointing at a spiral drawn in the pavement, left hand resting on left knee\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"focused, mouth slightly open, eyes looking down at the spiral\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 4,\n      \"standing_surface\": \"paved ground with autumn leaves\",\n      \"body_bbox\": [\n        0.357,\n        0.096,\n        0.938,\n        0.85\n      ],\n      \"face_bbox\": [\n        0.432,\n        0.27,\n        0.657,\n        0.416\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"shortest\"\n    },\n    {\n      \"id\": 2,\n      \"label\": \"the man in dark jacket\",\n      \"zone\": \"left-midground\",\n      \"facing\": \"left\",\n      \"hair\": \"dark, short\",\n      \"clothing\": \"dark jacket, blue jeans\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"cannot tell at this size\",\n      \"worn_carried\": \"black bag slung across body\",\n      \"action\": \"standing, leaning against a low stone wall, left foot forward, hands in pockets\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"cannot tell at this size\",\n      \"age_group\": \"adult\",\n      \"apparent_age\": 30,\n      \"standing_surface\": \"paved ground\",\n      \"body_bbox\": [\n        0.065,\n        0.239,\n        0.122,\n        0.399\n      ],\n      \"face_bbox\": null,\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"frame\",\n      \"height_rank\": \"middle\"\n    },\n    {\n      \"id\": 3,\n      \"label\": \"the person in dark clothing\",\n      \"zone\": \"right-midground\",\n      \"facing\": \"toward another figure's label\",\n      \"hair\": \"dark, short\",\n      \"clothing\": \"dark coat, dark pants\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"cannot tell at this size\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"sitting on a bench, legs crossed, hands resting on lap\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"cannot tell at this size\",\n      \"age_group\": \"adult\",\n      \"apparent_age\": 40,\n      \"standing_surface\": \"bench\",\n      \"body_bbox\": [\n        0.901,\n        0.31,\n        0.943,\n        0.377\n      ],\n      \"face_bbox\": null,\n      \"same_ground_plane\": false,\n      \"clipped_by\": \"frame\",\n      \"height_rank\": \"equal to the person in brown\"\n    },\n    {\n      \"id\": 4,\n      \"label\": \"the person in brown\",\n      \"zone\": \"right-midground\",\n      \"facing\": \"toward another figure's label\",\n      \"hair\": \"light, short\",\n      \"clothing\": \"brown coat, dark pants\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"cannot tell at this size\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"sitting on a bench, legs apart, hands resting on lap\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"cannot tell at this size\",\n      \"age_group\": \"adult\",\n      \"apparent_age\": 40,\n      \"standing_surface\": \"bench\",\n      \"body_bbox\": [\n        0.925,\n        0.31,\n        0.972,\n        0.377\n      ],\n      \"face_bbox\": null,\n      \"same_ground_plane\": false,\n      \"clipped_by\": \"frame\",\n      \"height_rank\": \"equal to the person in dark clothing\"\n    }\n  ],\n  \"interactions\": [],\n  \"objects\": [\n    {\n      \"what\": \"a large tree\",\n      \"colour\": \"gray-brown bark, thick roots\",\n      \"material\": \"wood\",\n      \"position\": \"center-foreground\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than the boy\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"a spiral pattern\",\n      \"colour\": \"gray, lighter than surrounding pavement\",\n      \"material\": \"etched or worn into stone\",\n      \"position\": \"center-foreground, on the pavement\",\n      \"grounded\": true,\n      \"relative_size\": \"smaller than the boy's hand\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"fallen leaves\",\n      \"colour\": \"red, orange, yellow, brown\",\n      \"material\": \"dried foliage\",\n      \"position\": \"scattered across the ground throughout the scene\",\n      \"grounded\": true,\n      \"relative_size\": \"smaller than the boy's hand\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"a stone wall\",\n      \"colour\": \"gray, weathered\",\n      \"material\": \"stone\",\n      \"position\": \"left-midground\",\n      \"grounded\": true,\n      \"relative_size\": \"reaches to the man's waist\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"a bench\",\n      \"colour\": \"gray metal frame, wooden seat\",\n      \"material\": \"metal and wood\",\n      \"position\": \"right-midground\",\n      \"grounded\": true,\n      \"relative_size\": \"seats two people\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"buildings\",\n      \"colour\": \"white walls, dark roofs, blue shutters\",\n      \"material\": \"plaster, tile, wood\",\n      \"position\": \"background\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than the tree\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"a church steeple\",\n      \"colour\": \"white base, dark gray spire\",\n      \"material\": \"stone\",\n      \"position\": \"center-background\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than the buildings\",\n      \"complete\": true\n    }\n  ],\n  \"setting\": {\n    \"indoor_outdoor\": \"outdoor\",\n    \"elements\": \"autumn park or town square, paved ground, large tree, scattered leaves, stone wall, bench, buildings with shutters, church steeple\",\n    \"lighting\": \"soft daylight from above and slightly to the left, warm tones in sky and foliage\",\n    \"camera\": \"eye-level, wide shot\"\n  },\n  \"lettering\": [],\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  }\n}"
+      }
+    },
+    {
+      "pageNumber": 3,
+      "prompt": "**THIS IMAGE DEPICTS:** Max and Kiaan stand on the far side of the thick linden roots, looking down at the large egg nestled there. Nia the dog sits quietly beside Max.\n\n\n\n**HEIGHT ORDER (shortest to tallest):** Max (shortest) -> Kiaan (slightly taller)\n\nAGE & PROPORTIONS:\n- Max, Kiaan: preschool-age proportions about 4.5 heads tall, large head relative to body, soft rounded features, clearly taller than a toddler and smaller than a kindergarten child\n\n\nMax—shortest preschooler, curly short light brown hair, brown eyes, wearing a burnt-orange quilted hooded gilet over a grey shirt, blue denim jeans, white sneakers—stands in the left foreground facing right, looking down past the thick linden trunk. Beside his white canvas sneakers sits Nia, a knee-high tan and white fluffy terrier mix, floppy ears, red collar, nose pointed at the root gap. Kiaan—preschooler of similar height, short straight dark brown hair with bangs, brown eyes, purple crew-neck wool sweater, rolled brown chinos, dark grey sneakers—stands in the right foreground facing left, leaning forward over the thick wood to stare down. Wedged between the roots below them rests the melon-sized smooth greyish-white egg.\n\n**Composition:**\n- Each character does a specific action and faces that target—not the camera—unless the scene declares a facing, which always wins. When the target is in the background and no facing is declared, the character faces away. Companions sharing a movement or destination all face the same way.\n- A standing character stands on visible standable ground—never on or over water, never in the air—unless the scene description has them swim, float, or fly. Outside a close-up, each standing figure is drawn complete down to both feet, placed on the surface the scene names for that figure. A lower body may be hidden by an object in front, never by the figure ending.\n- A vessel, building or vehicle keeps its true size against figures near it. A held or carried object keeps the size stated for it against the hand or body holding it.\n\nGenerate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.\n\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n- BLUE frame = Max\n- RED frame = Kiaan\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n\n\n**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **dragon egg** (object) — about as big as a human head, like a lantern or a football — smooth, greyish-white oval shell\n* **Nia** (animal) — stands knee-high to an adult\nThe attached reference images include rough images of: dragon egg; Nia — match each one's look at the size and placement the scene description gives it.\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.\n\n**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.\n\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\n\n**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.\n\n**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.\n\n**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.\n\n**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.\n\n**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.\n\n**SHOT:** The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot. A medium shot keeps each figure whole inside the frame. A wide shot shows the full setting. An ultra-wide shot shows the whole setting from a distance, the figures small within it and both ends of any separation visible.\n\nEXACT POSES:\n- Kiaan: leans both hands against the linden trunk\n- Max: looks down at the egg — the dragon egg: about as big as a human head, like a lantern or a football\n- Nia: points her nose at the egg\n\nEXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n- Max: eyes wide with curiosity, mouth in a small rounded O; eyes on dragon egg\n- Kiaan: brows pulled together in focus, mouth pressed in a tight line; eyes on dragon egg",
+      "sceneCharacters": [
+        {
+          "id": 1786904058132,
+          "name": "Max",
+          "age": "3",
+          "gender": "male"
+        },
+        {
+          "id": 1786904387136,
+          "name": "Kiaan",
+          "age": "3",
+          "gender": "male"
+        }
+      ],
+      "sceneMetadata": {
+        "era": "present day",
+        "aboard": null,
+        "objects": [
+          "LOC001.1",
+          "ART001",
+          "ANI001"
+        ],
+        "setting": null,
+        "clothing": null,
+        "fullData": {
+          "shot": "medium",
+          "objects": [
+            "LOC001.1",
+            "ART001",
+            "ANI001"
+          ],
+          "setting": null,
+          "wornItems": [],
+          "background": null,
+          "characters": [
+            {
+              "name": "Max",
+              "depth": "foreground",
+              "looksAt": "ART001",
+              "clothing": "standard",
+              "position": "left foreground",
+              "expression": "eyes wide with curiosity, mouth in a small rounded O"
+            },
+            {
+              "name": "Kiaan",
+              "depth": "foreground",
+              "looksAt": "ART001",
+              "clothing": "standard",
+              "position": "right foreground",
+              "expression": "brows pulled together in focus, mouth pressed in a tight line"
+            }
+          ],
+          "sceneIntent": "Max and Kiaan stand on the far side of the thick linden roots, looking down at the large egg nestled there. Nia the dog sits quietly beside Max. The warm afternoon light fills the park.",
+          "imageSummary": "Max—the shortest preschooler in the group, with curly short light brown hair, brown eyes, wearing a burnt-orange quilted hooded gilet over a grey shirt, blue denim jeans, and white sneakers—stands in the left foreground facing right, looking down past the thick linden trunk. Beside his white canvas sneakers sits Nia, a knee-high tan and white fluffy terrier mix with floppy ears and a red collar, her nose pointed straight at the root gap. Kiaan—a preschooler of similar height to Max, with short straight dark brown hair with bangs, brown eyes, wearing a purple crew-neck wool sweater, rolled brown chinos, and dark grey sneakers—stands in the right foreground facing left, leaning heavily forward over the thick wood to stare down. Wedged tightly between the roots below them rests the melon-sized smooth greyish-white egg, illuminated by a shaft of yellow autumn light.",
+          "interactions": [
+            {
+              "where": "looks down at the egg",
+              "action": "standing",
+              "object": "ART001",
+              "priority": "low",
+              "character": "Max",
+              "storyRelevant": false
+            },
+            {
+              "hands": true,
+              "where": "leans both hands against the linden trunk",
+              "action": "leaning",
+              "object": "the linden trunk",
+              "priority": "normal",
+              "character": "Kiaan",
+              "storyRelevant": false
+            },
+            {
+              "where": "points her nose at the egg",
+              "action": "watching",
+              "object": "ART001",
+              "priority": "low",
+              "character": "ANI001",
+              "storyRelevant": false
+            }
+          ],
+          "crowdExpected": false
+        },
+        "thinking": null,
+        "wornItems": [],
+        "background": null,
+        "characters": [
+          "Max",
+          "Kiaan"
+        ],
+        "sceneIntent": "Max and Kiaan stand on the far side of the thick linden roots, looking down at the large egg nestled there. Nia the dog sits quietly beside Max. The warm afternoon light fills the park.",
+        "imageSummary": "Max—the shortest preschooler in the group, with curly short light brown hair, brown eyes, wearing a burnt-orange quilted hooded gilet over a grey shirt, blue denim jeans, and white sneakers—stands in the left foreground facing right, looking down past the thick linden trunk. Beside his white canvas sneakers sits Nia, a knee-high tan and white fluffy terrier mix with floppy ears and a red collar, her nose pointed straight at the root gap. Kiaan—a preschooler of similar height to Max, with short straight dark brown hair with bangs, brown eyes, wearing a purple crew-neck wool sweater, rolled brown chinos, and dark grey sneakers—stands in the right foreground facing left, leaning heavily forward over the thick wood to stare down. Wedged tightly between the roots below them rests the melon-sized smooth greyish-white egg, illuminated by a shaft of yellow autumn light.",
+        "interactions": [
+          {
+            "where": "looks down at the egg",
+            "action": "standing",
+            "object": "ART001",
+            "priority": "low",
+            "character": "Max",
+            "storyRelevant": false
+          },
+          {
+            "hands": true,
+            "where": "leans both hands against the linden trunk",
+            "action": "leaning",
+            "object": "the linden trunk",
+            "priority": "normal",
+            "character": "Kiaan",
+            "storyRelevant": false
+          },
+          {
+            "where": "points her nose at the egg",
+            "action": "watching",
+            "object": "ART001",
+            "priority": "low",
+            "character": "ANI001",
+            "storyRelevant": false
+          }
+        ],
+        "isJsonFormat": true,
+        "landmarkView": "exterior",
+        "textPosition": null,
+        "crowdExpected": false,
+        "isProseFormat": true,
+        "framingPattern": null,
+        "reuseEmptyScene": null,
+        "sceneComplexity": "simple",
+        "emptyScenePrompt": null,
+        "landmarkVariants": {
+          "LOC001": 1
+        },
+        "characterClothing": {
+          "Max": "standard",
+          "Kiaan": "standard"
+        },
+        "translatedSummary": null,
+        "characterPositions": {
+          "Max": "left foreground",
+          "Kiaan": "right foreground"
+        },
+        "textZoneDescription": null,
+        "characterPerspectives": {
+          "Max": {
+            "depth": "foreground"
+          },
+          "Kiaan": {
+            "depth": "foreground"
+          }
+        }
+      },
+      "threeStageResult": {
+        "verdict": "HARD_FAIL",
+        "fixableIssues": [
+          {
+            "fix": "Replace tree stump and chess pieces with thick linden roots and reposition Kiaan’s hands on the roots while directing his gaze to the egg",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "CRITICAL",
+            "character": "Kiaan",
+            "description": "Kiaan places hands on a tree stump with chess pieces instead of leaning over linden roots to look at the egg",
+            "landmark_element": false
+          },
+          {
+            "fix": "Adjust Max’s gaze direction to look down at the egg between the roots, not at Nia",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Max",
+            "description": "Max looks at the dog instead of looking down at the egg as declared",
+            "landmark_element": false
+          },
+          {
+            "fix": "Remove chess pieces and tree stump; ensure only linden roots and the melon-sized smooth greyish-white egg are present in the root gap",
+            "type": "object_presence",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "CRITICAL",
+            "character": "scene",
+            "description": "Unrequested chess pieces appear on a stump where the prompt specifies only linden roots and a greyish-white egg",
+            "landmark_element": false
+          }
+        ],
+        "complianceResult": {
+          "scene": {
+            "extra": [],
+            "missing": [
+              "Nia (animal) not found in VISION_INVENTORY.figures but appears in objects; however, QUALITY_FIGURES includes Nia as figure 2 in left-midground, while VISION_INVENTORY places dog in center-foreground — zone mismatch but presence confirmed via object listing"
+            ],
+            "all_present": false,
+            "setting_match": true
+          },
+          "verdict": "HARD_FAIL",
+          "fixable_issues": [
+            {
+              "fix": "Replace tree stump and chess pieces with thick linden roots and reposition Kiaan’s hands on the roots while directing his gaze to the egg",
+              "type": "action_interaction",
+              "severity": "CRITICAL",
+              "character": "Kiaan",
+              "description": "Kiaan places hands on a tree stump with chess pieces instead of leaning over linden roots to look at the egg",
+              "landmark_element": false
+            },
+            {
+              "fix": "Adjust Max’s gaze direction to look down at the egg between the roots, not at Nia",
+              "type": "action_interaction",
+              "severity": "MAJOR",
+              "character": "Max",
+              "description": "Max looks at the dog instead of looking down at the egg as declared",
+              "landmark_element": false
+            },
+            {
+              "fix": "Remove chess pieces and tree stump; ensure only linden roots and the melon-sized smooth greyish-white egg are present in the root gap",
+              "type": "object_presence",
+              "severity": "CRITICAL",
+              "character": "scene",
+              "description": "Unrequested chess pieces appear on a stump where the prompt specifies only linden roots and a greyish-white egg",
+              "landmark_element": false
+            }
+          ],
+          "issues_summary": "Kiaan interacts with a tree stump and chess pieces instead of the linden trunk and egg; Max looks at the dog rather than the egg; main narrative action contradicted by visual inventory",
+          "main_action_check": {
+            "issue": "wrong_action: prompt and story require focus on the egg; inventory shows focus on dog and chess pieces",
+            "match": false,
+            "severity": "CRITICAL",
+            "prompt_action": "Max and Kiaan stand on the far side of the thick linden roots, looking down at the large egg nestled there. Nia the dog sits quietly beside Max.",
+            "inventory_action": "Children look at each other and at a dog; Kiaan looks at chess pieces on a stump, not at an egg; Max looks at the dog, not the egg",
+            "story_text_action": "«Nia hat das hier zuerst gerochen», sagte der Bub. Ein zweiter Bub kam mit ihm. Er beugte sich über die dicke Wurzel und schaute das Ei genau an."
+          },
+          "character_compliance": [
+            {
+              "name": "Max",
+              "label": "the young child in orange vest",
+              "severity": "PASS",
+              "facing_issue": "",
+              "facing_match": true,
+              "clothing_issue": "",
+              "clothing_match": true
+            },
+            {
+              "name": "Kiaan",
+              "label": "the young child in purple sweater",
+              "severity": "PASS",
+              "facing_issue": "",
+              "facing_match": true,
+              "clothing_issue": "",
+              "clothing_match": true
+            }
+          ],
+          "interaction_compliance": [
+            {
+              "match": false,
+              "actual": "eyes looking down toward the dog, not directly at the egg",
+              "object": "dragon egg",
+              "expected": "looking down at the egg",
+              "severity": "MAJOR",
+              "character": "Max"
+            },
+            {
+              "match": false,
+              "actual": "leaning forward with hands placed on a large tree stump",
+              "object": "linden trunk",
+              "expected": "leans both hands against the linden trunk",
+              "severity": "CRITICAL",
+              "character": "Kiaan"
+            },
+            {
+              "match": true,
+              "actual": "dog present in center-foreground with nose pointed down; egg also present nearby, so action is plausible",
+              "object": "dragon egg",
+              "expected": "points her nose at the egg",
+              "severity": "PASS",
+              "character": "Nia"
+            }
+          ]
+        },
+        "visionInventory": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"label\": \"the young child in orange vest\",\n      \"zone\": \"left-foreground\",\n      \"facing\": \"right\",\n      \"hair\": \"curly brown, short\",\n      \"clothing\": \"orange quilted vest over a light grey long-sleeved shirt, blue jeans, white sneakers\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"standing, both feet on the ground covered with autumn leaves and tree roots, arms slightly bent at sides, hands open and resting near thighs\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"mouth slightly open, eyes looking down toward the dog\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 2,\n      \"standing_surface\": \"ground with autumn leaves and exposed tree roots\",\n      \"body_bbox\": [\n        0.034,\n        0.068,\n        0.345,\n        0.84\n      ],\n      \"face_bbox\": [\n        0.157,\n        0.07,\n        0.328,\n        0.278\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"tallest\"\n    },\n    {\n      \"id\": 2,\n      \"label\": \"the young child in purple sweater\",\n      \"zone\": \"right-foreground\",\n      \"facing\": \"left\",\n      \"hair\": \"dark brown, short, straight\",\n      \"clothing\": \"purple long-sleeved sweater, brown pants, dark blue shoes\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"standing, both feet on the ground covered with autumn leaves and tree roots, leaning forward with hands placed on a large tree stump\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"eyes looking down at the chess pieces on the stump, mouth closed, slight frown\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 2,\n      \"standing_surface\": \"ground with autumn leaves and exposed tree roots\",\n      \"body_bbox\": [\n        0.607,\n        0.194,\n        0.948,\n        0.848\n      ],\n      \"face_bbox\": [\n        0.653,\n        0.208,\n        0.806,\n        0.39\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"shortest\"\n    }\n  ],\n  \"interactions\": [\n    {\n      \"from\": \"the young child in orange vest\",\n      \"to\": \"the young child in purple sweater\",\n      \"observed\": \"faces him and looks toward him\"\n    },\n    {\n      \"from\": \"the young child in purple sweater\",\n      \"to\": \"the young child in orange vest\",\n      \"observed\": \"faces him and looks toward him\"\n    },\n    {\n      \"from\": \"the young child in orange vest\",\n      \"to\": \"the small dog\",\n      \"observed\": \"looks at it\"\n    },\n    {\n      \"from\": \"the small dog\",\n      \"to\": \"the young child in orange vest\",\n      \"observed\": \"looks at him\"\n    }\n  ],\n  \"objects\": [\n    {\n      \"what\": \"a small dog\",\n      \"colour\": \"light brown and white fur, darker ears\",\n      \"material\": \"fur\",\n      \"position\": \"center-foreground\",\n      \"grounded\": true,\n      \"relative_size\": \"about half the height of the children\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"a large grey egg-shaped object\",\n      \"colour\": \"grey, smooth surface\",\n      \"material\": \"stone or metal\",\n      \"position\": \"center-foreground, nestled among tree roots\",\n      \"grounded\": true,\n      \"relative_size\": \"about the size of a child's torso\"\n    },\n    {\n      \"what\": \"a tree stump with exposed roots\",\n      \"colour\": \"brown, rough texture\",\n      \"material\": \"wood\",\n      \"position\": \"center-foreground\",\n      \"grounded\": true,\n      \"relative_size\": \"larger than the children's heads\"\n    },\n    {\n      \"what\": \"chess pieces\",\n      \"colour\": \"black and tan\",\n      \"material\": \"wood or plastic\",\n      \"position\": \"on top of the tree stump\",\n      \"grounded\": true,\n      \"relative_size\": \"small, about the size of a child's hand\"\n    },\n    {\n      \"what\": \"autumn leaves\",\n      \"colour\": \"orange, yellow, brown\",\n      \"material\": \"dried foliage\",\n      \"position\": \"covering the ground throughout the foreground\",\n      \"grounded\": true,\n      \"relative_size\": \"small, scattered across the scene\"\n    },\n    {\n      \"what\": \"buildings\",\n      \"colour\": \"white walls, grey roofs, blue shutters\",\n      \"material\": \"stone or stucco\",\n      \"position\": \"background\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than the children\"\n    },\n    {\n      \"what\": \"tree with autumn foliage\",\n      \"colour\": \"orange and brown leaves\",\n      \"material\": \"wood and leaves\",\n      \"position\": \"right-background\",\n      \"grounded\": true,\n      \"relative_size\": \"tall, extending above the buildings\"\n    },\n    {\n      \"what\": \"church steeple\",\n      \"colour\": \"white tower, black pointed roof\",\n      \"material\": \"stone\",\n      \"position\": \"center-background\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than the surrounding buildings\"\n    }\n  ],\n  \"setting\": {\n    \"indoor_outdoor\": \"outdoor\",\n    \"elements\": \"autumn park or village square with fallen leaves, tree stump, chess set, stone buildings, church steeple, trees with orange foliage\",\n    \"lighting\": \"soft, diffused daylight from above, warm highlights on clouds and leaves\",\n    \"camera\": \"eye-level, wide shot capturing foreground and background\"\n  },\n  \"lettering\": [],\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  }\n}"
+      }
+    },
+    {
+      "pageNumber": 4,
+      "prompt": "**THIS IMAGE DEPICTS:** Levin leans close to whisper a secret into Julian's ear, cupping his hand. Julian turns toward Levin, shouting the words aloud with an excited expression. The mood is eager and conspiratorial.\n\nGenerate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.\n\nWhen the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.\n\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n- BLUE frame = Levin\n- RED frame = Julian\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n- Levin IS wearing this on this page: red wool cap — a chunky-knit red wool pull-on cap with a folded ribbed cuff. Draw it on Levin even if the attached reference shows Levin without it.\n- Levin IS wearing this on this page: green fleece jacket — a forest-green zip-up fleece jacket with a wide body and two front pockets. Draw it on Levin even if the attached reference shows Levin without it.\n- Julian IS wearing this on this page: rust wool scarf — a long chunky rust-orange wool rectangular scarf in a plain knit. Draw it on Julian even if the attached reference shows Julian without it.\n\nLevin—wearing his chunky red wool cap, green fleece, white shirt, navy trousers, and brown boots—leans in tightly from the left foreground, cupping his left hand beside his mouth as he presses close to Julian's ear. Julian—in his sky-blue pullover, rust scarf, grey dungarees, white socks, and yellow boots—stands in the right foreground, turned toward Levin, his blue eyes bright and his mouth opened wide in a loud, joyous shout. The smooth greyish-white oval egg sits in the lower center foreground between them, catching the golden autumn light. The tight frame excludes the other boys, focusing entirely on Levin sharing the secret and Julian declaring it, with the blurred rough grey bark of the linden tree filling the background.\n**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **dragon egg** (object) — about as big as a human head, like a lantern or a football — smooth, greyish-white oval shell\n* **red cap** (clothing) (worn by Levin) — worn on Levin, not a separate free-standing copy\n* **green fleece** (clothing) (worn by Levin) — worn on Levin, not a separate free-standing copy\n* **rust scarf** (clothing) (worn by Julian) — worn on Julian, not a separate free-standing copy\nThe attached reference images include a rough image of dragon egg — match its look at the size and placement the scene description gives it.\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.\n\n**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.\n\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\n\n**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.\n\n**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.\n\n**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.\n\n**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.\n\n**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.\n\n**SHOT:** The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot. A medium shot keeps each figure whole inside the frame. A wide shot shows the full setting. An ultra-wide shot shows the whole setting from a distance, the figures small within it and both ends of any separation visible.\n\nEXACT POSES:\n- Levin: cups his hand near Julian's ear\n- Julian: stands over the egg — the dragon egg: about as big as a human head, like a lantern or a football\n\nEXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n- Levin: eyes narrowed slightly in a shy, urgent look, mouth forming a whisper; eyes on Julian\n- Julian: eyes bright and wide, mouth open wide in a loud shout; eyes on Levin",
+      "sceneCharacters": [
+        {
+          "id": 1786902471660,
+          "name": "Levin",
+          "age": "5",
+          "gender": "male"
+        },
+        {
+          "id": 1786902747333,
+          "name": "Julian",
+          "age": "3",
+          "gender": "male"
+        }
+      ],
+      "sceneMetadata": {
+        "era": "present day",
+        "aboard": null,
+        "objects": [
+          "LOC001.1",
+          "ART001",
+          "CLO001",
+          "CLO002",
+          "CLO003"
+        ],
+        "setting": null,
+        "clothing": null,
+        "fullData": {
+          "shot": "close-up",
+          "objects": [
+            "LOC001.1",
+            "ART001",
+            "CLO001",
+            "CLO002",
+            "CLO003"
+          ],
+          "setting": null,
+          "wornItems": [
+            {
+              "id": "CLO001",
+              "owner": "Levin",
+              "state": "worn",
+              "wearer": null,
+              "location": null
+            },
+            {
+              "id": "CLO002",
+              "owner": "Levin",
+              "state": "worn",
+              "wearer": null,
+              "location": null
+            },
+            {
+              "id": "CLO003",
+              "owner": "Julian",
+              "state": "worn",
+              "wearer": null,
+              "location": null
+            }
+          ],
+          "background": null,
+          "characters": [
+            {
+              "name": "Levin",
+              "depth": "foreground",
+              "looksAt": "Julian",
+              "clothing": "standard",
+              "position": "left foreground",
+              "expression": "eyes narrowed slightly in a shy, urgent look, mouth forming a whisper"
+            },
+            {
+              "name": "Julian",
+              "depth": "foreground",
+              "looksAt": "Levin",
+              "clothing": "standard",
+              "position": "right foreground",
+              "expression": "eyes bright and wide, mouth open wide in a loud shout"
+            }
+          ],
+          "sceneIntent": "Levin leans close to whisper a secret into Julian's ear, cupping his hand. Julian turns toward Levin, shouting the words aloud with an excited expression. The mood is eager and conspiratorial.",
+          "imageSummary": "Levin—wearing his chunky red wool cap, green fleece, white shirt, navy trousers, and brown boots—leans in tightly from the left foreground, cupping his left hand beside his mouth as he presses close to Julian's ear. Julian—in his sky-blue pullover, rust scarf, grey dungarees, white socks, and yellow boots—stands in the right foreground, turned toward Levin, his blue eyes bright and his mouth opened wide in a loud, joyous shout. The smooth greyish-white oval egg sits in the lower center foreground between them, catching the golden autumn light. The tight frame excludes the other boys, focusing entirely on Levin sharing the secret and Julian declaring it, with the blurred rough grey bark of the linden tree filling the background.",
+          "interactions": [
+            {
+              "hands": true,
+              "where": "cups his hand near Julian's ear",
+              "action": "whispering",
+              "object": "Julian",
+              "priority": "essential",
+              "character": "Levin",
+              "storyRelevant": true
+            },
+            {
+              "where": "stands over the egg",
+              "action": "standing",
+              "object": "ART001",
+              "priority": "low",
+              "character": "Julian",
+              "storyRelevant": false
+            }
+          ],
+          "crowdExpected": false
+        },
+        "thinking": null,
+        "wornItems": [
+          {
+            "id": "CLO001",
+            "owner": "Levin",
+            "state": "worn",
+            "wearer": null,
+            "location": null
+          },
+          {
+            "id": "CLO002",
+            "owner": "Levin",
+            "state": "worn",
+            "wearer": null,
+            "location": null
+          },
+          {
+            "id": "CLO003",
+            "owner": "Julian",
+            "state": "worn",
+            "wearer": null,
+            "location": null
+          }
+        ],
+        "background": null,
+        "characters": [
+          "Levin",
+          "Julian"
+        ],
+        "sceneIntent": "Levin leans close to whisper a secret into Julian's ear, cupping his hand. Julian turns toward Levin, shouting the words aloud with an excited expression. The mood is eager and conspiratorial.",
+        "imageSummary": "Levin—wearing his chunky red wool cap, green fleece, white shirt, navy trousers, and brown boots—leans in tightly from the left foreground, cupping his left hand beside his mouth as he presses close to Julian's ear. Julian—in his sky-blue pullover, rust scarf, grey dungarees, white socks, and yellow boots—stands in the right foreground, turned toward Levin, his blue eyes bright and his mouth opened wide in a loud, joyous shout. The smooth greyish-white oval egg sits in the lower center foreground between them, catching the golden autumn light. The tight frame excludes the other boys, focusing entirely on Levin sharing the secret and Julian declaring it, with the blurred rough grey bark of the linden tree filling the background.",
+        "interactions": [
+          {
+            "hands": true,
+            "where": "cups his hand near Julian's ear",
+            "action": "whispering",
+            "object": "Julian",
+            "priority": "essential",
+            "character": "Levin",
+            "storyRelevant": true
+          },
+          {
+            "where": "stands over the egg",
+            "action": "standing",
+            "object": "ART001",
+            "priority": "low",
+            "character": "Julian",
+            "storyRelevant": false
+          }
+        ],
+        "isJsonFormat": true,
+        "landmarkView": "exterior",
+        "textPosition": null,
+        "crowdExpected": false,
+        "isProseFormat": true,
+        "framingPattern": null,
+        "reuseEmptyScene": null,
+        "sceneComplexity": "simple",
+        "emptyScenePrompt": null,
+        "landmarkVariants": {
+          "LOC001": 1
+        },
+        "characterClothing": {
+          "Levin": "standard",
+          "Julian": "standard"
+        },
+        "translatedSummary": null,
+        "characterPositions": {
+          "Levin": "left foreground",
+          "Julian": "right foreground"
+        },
+        "textZoneDescription": null,
+        "characterPerspectives": {
+          "Levin": {
+            "depth": "foreground"
+          },
+          "Julian": {
+            "depth": "foreground"
+          }
+        }
+      },
+      "threeStageResult": {
+        "verdict": "PASS",
+        "fixableIssues": [],
+        "complianceResult": {
+          "scene": {
+            "extra": [],
+            "missing": [],
+            "all_present": true,
+            "setting_match": true
+          },
+          "verdict": "PASS",
+          "fixable_issues": [],
+          "issues_summary": "",
+          "main_action_check": {
+            "issue": null,
+            "match": true,
+            "severity": "PASS",
+            "prompt_action": "Levin leans close to whisper a secret into Julian's ear, cupping his hand. Julian turns toward Levin, shouting the words aloud with an excited expression.",
+            "inventory_action": "Levin leans close with right hand covering mouth as if whispering; Julian looks back with open-mouthed expression and eyes wide",
+            "story_text_action": "Levin flüsterte ihm alles ins Ohr. Julian riss den Mund auf. «Das Ei muss warm bleiben!», rief er laut."
+          },
+          "character_compliance": [
+            {
+              "name": "Levin",
+              "label": "the young child in green",
+              "severity": "PASS",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": null,
+              "clothing_match": true
+            },
+            {
+              "name": "Julian",
+              "label": "the young child in blue",
+              "severity": "PASS",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": null,
+              "clothing_match": true
+            }
+          ],
+          "interaction_compliance": [
+            {
+              "match": true,
+              "actual": "right hand raised to mouth, leaning close to Julian",
+              "object": "Julian's ear",
+              "expected": "cups hand near Julian's ear while whispering",
+              "severity": "PASS",
+              "character": "Levin"
+            },
+            {
+              "match": true,
+              "actual": "standing near center-foreground egg, feet on same ground plane",
+              "object": "dragon egg",
+              "expected": "stands over the egg",
+              "severity": "PASS",
+              "character": "Julian"
+            }
+          ]
+        },
+        "visionInventory": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"label\": \"the young child in green\",\n      \"zone\": \"left-foreground\",\n      \"facing\": \"toward another figure's label\",\n      \"hair\": \"curly, light brown, shoulder-length\",\n      \"clothing\": \"green jacket, white shirt, dark blue pants, brown shoes\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"red knitted cap with brim\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"standing, both feet on the ground covered with leaves, right hand raised to mouth, left hand resting on a large egg-shaped object\",\n      \"items_held\": {\n        \"left\": \"a large egg-shaped object\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"mouth open, eyes looking toward the other child\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 3,\n      \"standing_surface\": \"ground covered with autumn leaves\",\n      \"body_bbox\": [\n        0.08,\n        0.045,\n        0.542,\n        0.962\n      ],\n      \"face_bbox\": [\n        0.335,\n        0.16,\n        0.522,\n        0.36\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"equal to another label\"\n    },\n    {\n      \"id\": 2,\n      \"label\": \"the young child in blue\",\n      \"zone\": \"right-foreground\",\n      \"facing\": \"toward another figure's label\",\n      \"hair\": \"curly, light brown, short\",\n      \"clothing\": \"blue long-sleeved shirt, dark blue overalls, white socks, yellow shoes\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"orange scarf wrapped around neck\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"none visible\",\n      \"action\": \"standing, both feet on the ground covered with leaves, hands at sides\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"mouth wide open, eyes wide and looking up toward the other child\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 2,\n      \"standing_surface\": \"ground covered with autumn leaves\",\n      \"body_bbox\": [\n        0.495,\n        0.09,\n        0.898,\n        0.978\n      ],\n      \"face_bbox\": [\n        0.528,\n        0.155,\n        0.735,\n        0.385\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"equal to another label\"\n    }\n  ],\n  \"interactions\": [\n    {\n      \"from\": \"the young child in green\",\n      \"to\": \"the young child in blue\",\n      \"observed\": \"faces and leans close to, right hand covering mouth as if whispering, while the other child looks back with an open-mouthed expression\"\n    }\n  ],\n  \"objects\": [\n    {\n      \"what\": \"a large egg-shaped object\",\n      \"colour\": \"beige with brown speckles\",\n      \"material\": \"appears smooth and hard, possibly stone or shell\",\n      \"position\": \"center-foreground, between the two children\",\n      \"grounded\": true,\n      \"relative_size\": \"larger than either child's head, about half the height of each child\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"tree trunk\",\n      \"colour\": \"gray-brown with green moss patches\",\n      \"material\": \"bark\",\n      \"position\": \"center-background, behind the children\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than both children\",\n      \"complete\": true\n    }\n  ],\n  \"setting\": {\n    \"indoor_outdoor\": \"outdoor\",\n    \"elements\": \"autumn forest floor covered with yellow-orange leaves, large tree trunk, distant trees with yellow foliage\",\n    \"lighting\": \"soft, diffused daylight from above, casting gentle shadows\",\n    \"camera\": \"eye-level, medium shot\"\n  },\n  \"lettering\": [],\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  }\n}"
+      }
+    },
+    {
+      "pageNumber": 8,
+      "prompt": "**THIS IMAGE DEPICTS:** The group stops near the stone fountain in a strong wind as a raven swoops down and snatches the dry leaves from the open jacket, exposing the egg.\n\nGenerate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.\n\nREFERENCE CARD COLOURS (each character's reference card has a coloured frame — match each person to their card):\n- GREEN frame = Levin\n- RED frame = Julian\n- PURPLE frame = Max\n- BLUE frame = Kiaan\nThe frame colours are identifiers ONLY. Never paint a coloured frame, border, or these colours onto any character, clothing, prop, or surface in the scene.\n\n**WORN ITEMS ON THIS PAGE (the attached references are not authoritative for these):**\n- Levin IS wearing this on this page: red wool cap — a chunky-knit red wool pull-on cap with a folded ribbed cuff. Draw it on Levin even if the attached reference shows Levin without it.\n- Levin is NOT wearing this on this page: green fleece jacket — a forest-green zip-up fleece jacket with a wide body and two front pockets. Leave it off Levin even if the attached reference shows it worn — held open in his hands.\n- Julian IS wearing this on this page: rust wool scarf — a long chunky rust-orange wool rectangular scarf in a plain knit. Draw it on Julian even if the attached reference shows Julian without it.\n\nAt the grey stone fountain, the four boys stop mid-stride in the sharp autumn wind while the raven strikes. Levin, in his red cap, white shirt, navy trousers, and brown boots, holds the open green fleece jacket out like a sagging cradle with both hands; inside it the greyish-white egg lies bare. Julian, in his sky-blue pullover, rust scarf, grey dungarees, and yellow boots, stands just behind Levin watching, while Kiaan, in his purple sweater, brown chinos, and dark grey sneakers, and Max, in his orange gilet over a grey shirt, blue jeans, and white sneakers, crowd close with Nia the terrier mix beside Max. The plump black raven flares its wings over the jacket, its blunted beak clamped around a large clump of dry yellow leaves, tugging them free as the wind whips more leaves across the gravel.\n**REQUIRED OBJECTS IN THIS SCENE (each appears exactly as the scene description places it):**\n* **dragon egg** (object) — about as big as a human head, like a lantern or a football — smooth, greyish-white oval shell\n* **Nia** (animal) — stands knee-high to an adult\n* **Raven** (animal) — about as big as a human head, like a lantern or a football\n* **red cap** (clothing) (worn by Levin) — worn on Levin, not a separate free-standing copy\n* **green fleece** (clothing) — held open in his hands\n* **rust scarf** (clothing) (worn by Julian) — worn on Julian, not a separate free-standing copy\nThe attached reference images include rough images of: dragon egg; Nia; Raven — match each one's look at the size and placement the scene description gives it.\nA state that divides, opens or breaks an object does not multiply its markings: a device, emblem or pattern on the surface is one marking, and the split runs through it — each part shows only its share.\n\n**SEASON:** Autumn. Foliage, ground cover, sky and daylight colour are autumn's throughout the book — identical from page to page for the same place, and matching autumn even when a reference photo was taken in another season. Indoor frames and the page's own time of day are unaffected.\n\n**ART STYLE:** A bold, expressive traditional watercolor painting: prominent visible brushstrokes, strong wet-on-wet washes bleeding together, pigment pooling and granulating, rough cold-press paper texture throughout, edges dissolving into the paper. Paint-dominant: no hard outlines, no ink or pencil lines. Characters stay fully opaque, never see-through. Warm, not overly vibrant. Painted by hand, never captured by a camera: no bokeh, no lens flare, no photographic grain, no skin pores, no camera-real fabric; depth from atmospheric haze, not optical blur; visible brushwork on every surface, faces included. No sharp photoreal rendering; a photograph with a painterly filter is still a photograph. Faces: loose washes with visible brushstroke texture. Each character keeps their real age — babies, children, teenagers, adults and grandparents each look it.\n\n**REQUIRED CAST:** Every character named in the reference list is in the frame, exactly one of each, and no one else is added. A character the scene description gives no action to is still drawn, placed where the moment puts them and doing something consistent with it.\n\n**DEPTH AND SIZE:** Depth is distance from the camera, not size: `foreground` is nearest and most prominent, low in the frame; `midground` sits in the middle band, further back; `background` is furthest and smallest. The same element is drawn larger in the foreground than it would be deeper in the frame — but a size stated for an element always wins over its depth: a small object in the foreground is drawn close and sharp at its true size against the figures near it, never enlarged to fill the lower half. An element with no stated size that is genuinely large — a vessel, a building, a vehicle, a big animal — does dominate the foreground.\n\n**COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.\n\n**NO MARKS ON A CHARACTER:** No arrow, symbol, logo, badge, decal, sticker or coloured graphic is painted onto a character's skin, hair, face or clothing. A garment's own pattern and any emblem the Visual Bible states for that character are the only exceptions; nothing is added to mark, label or point at a figure, least of all on the back of a head.\n\n**HANDS:** A character's hands hold only what the scene names for that character. Never substitute an unnamed prop for a named one, and never fill an empty hand with an invented object — a hand with nothing assigned to it rests or gestures, and never joins a contact the scene gives to another part of that character's body.\n\n**SHOT:** The scene description declares the shot. A close-up ends at the waist: legs, knees and feet lie below the bottom frame edge and cannot appear — never widen a close-up into a full-figure or establishing shot. A medium shot keeps each figure whole inside the frame. A wide shot shows the full setting. An ultra-wide shot shows the whole setting from a distance, the figures small within it and both ends of any separation visible.\n\nEXACT POSES:\n- Raven: tears the dry leaf bedding from the open jacket held open by Levin — green fleece\n- Levin, Julian, Kiaan, Max: looking off into the scene, not at the viewer\n\nEXPRESSIONS AND EYES (each face shows exactly this — no default smiles; each pair of eyes on exactly what is named):\n- Levin: eyes wide in shock, mouth open in alarm; eyes on Raven\n- Julian: brows pulled up in fear, lips parted; eyes on Raven\n- Kiaan: eyes squeezed narrow against the wind, mouth tense; eyes on Raven\n- Max: jaw dropped, eyes wide; eyes on Raven",
+      "sceneCharacters": [
+        {
+          "id": 1786902471660,
+          "name": "Levin",
+          "age": "5",
+          "gender": "male"
+        },
+        {
+          "id": 1786902747333,
+          "name": "Julian",
+          "age": "3",
+          "gender": "male"
+        },
+        {
+          "id": 1786904058132,
+          "name": "Max",
+          "age": "3",
+          "gender": "male"
+        },
+        {
+          "id": 1786904387136,
+          "name": "Kiaan",
+          "age": "3",
+          "gender": "male"
+        }
+      ],
+      "sceneMetadata": {
+        "era": "present day",
+        "aboard": null,
+        "objects": [
+          "LOC002",
+          "ART001",
+          "ANI001",
+          "ANI002",
+          "CLO001",
+          "CLO002",
+          "CLO003"
+        ],
+        "setting": null,
+        "clothing": null,
+        "fullData": {
+          "shot": "wide",
+          "objects": [
+            "LOC002",
+            "ART001",
+            "ANI001",
+            "ANI002",
+            "CLO001",
+            "CLO002",
+            "CLO003"
+          ],
+          "setting": null,
+          "wornItems": [
+            {
+              "id": "CLO001",
+              "owner": "Levin",
+              "state": "worn",
+              "wearer": null,
+              "location": null
+            },
+            {
+              "id": "CLO002",
+              "owner": "Levin",
+              "state": "off",
+              "wearer": null,
+              "location": "held open in his hands"
+            },
+            {
+              "id": "CLO003",
+              "owner": "Julian",
+              "state": "worn",
+              "wearer": null,
+              "location": null
+            }
+          ],
+          "background": null,
+          "characters": [
+            {
+              "name": "Levin",
+              "depth": "foreground",
+              "looksAt": "ANI002",
+              "clothing": "standard",
+              "position": "center foreground",
+              "expression": "eyes wide in shock, mouth open in alarm",
+              "perspective": "facing right"
+            },
+            {
+              "name": "Julian",
+              "depth": "midground",
+              "looksAt": "ANI002",
+              "clothing": "standard",
+              "position": "left midground",
+              "expression": "brows pulled up in fear, lips parted",
+              "perspective": "facing right"
+            },
+            {
+              "name": "Kiaan",
+              "depth": "midground",
+              "looksAt": "ANI002",
+              "clothing": "standard",
+              "position": "center midground",
+              "expression": "eyes squeezed narrow against the wind, mouth tense",
+              "perspective": "facing right"
+            },
+            {
+              "name": "Max",
+              "depth": "midground",
+              "looksAt": "ANI002",
+              "clothing": "standard",
+              "position": "right midground",
+              "expression": "jaw dropped, eyes wide",
+              "perspective": "facing right"
+            }
+          ],
+          "sceneIntent": "The group stops near the stone fountain in a strong wind as a raven swoops down and snatches the dry leaves from the open jacket, exposing the egg.",
+          "imageSummary": "At the grey stone fountain, the four boys stop mid-stride in the sharp autumn wind while the raven strikes. Levin, in his red cap, white shirt, navy trousers, and brown boots, holds the open green fleece jacket out like a sagging cradle with both hands; inside it the greyish-white egg lies bare. Julian, in his sky-blue pullover, rust scarf, grey dungarees, and yellow boots, stands just behind Levin watching, while Kiaan, in his purple sweater, brown chinos, and dark grey sneakers, and Max, in his orange gilet over a grey shirt, blue jeans, and white sneakers, crowd close with Nia the terrier mix beside Max. The plump black raven flares its wings over the jacket, its blunted beak clamped around a large clump of dry yellow leaves, tugging them free as the wind whips more leaves across the gravel.",
+          "interactions": [
+            {
+              "where": "tears the dry leaf bedding from the open jacket held open by Levin",
+              "action": "snatching",
+              "object": "CLO002",
+              "priority": "essential",
+              "character": "ANI002",
+              "storyRelevant": true
+            }
+          ],
+          "crowdExpected": false
+        },
+        "thinking": null,
+        "wornItems": [
+          {
+            "id": "CLO001",
+            "owner": "Levin",
+            "state": "worn",
+            "wearer": null,
+            "location": null
+          },
+          {
+            "id": "CLO002",
+            "owner": "Levin",
+            "state": "off",
+            "wearer": null,
+            "location": "held open in his hands"
+          },
+          {
+            "id": "CLO003",
+            "owner": "Julian",
+            "state": "worn",
+            "wearer": null,
+            "location": null
+          }
+        ],
+        "background": null,
+        "characters": [
+          "Levin",
+          "Julian",
+          "Kiaan",
+          "Max"
+        ],
+        "sceneIntent": "The group stops near the stone fountain in a strong wind as a raven swoops down and snatches the dry leaves from the open jacket, exposing the egg.",
+        "imageSummary": "At the grey stone fountain, the four boys stop mid-stride in the sharp autumn wind while the raven strikes. Levin, in his red cap, white shirt, navy trousers, and brown boots, holds the open green fleece jacket out like a sagging cradle with both hands; inside it the greyish-white egg lies bare. Julian, in his sky-blue pullover, rust scarf, grey dungarees, and yellow boots, stands just behind Levin watching, while Kiaan, in his purple sweater, brown chinos, and dark grey sneakers, and Max, in his orange gilet over a grey shirt, blue jeans, and white sneakers, crowd close with Nia the terrier mix beside Max. The plump black raven flares its wings over the jacket, its blunted beak clamped around a large clump of dry yellow leaves, tugging them free as the wind whips more leaves across the gravel.",
+        "interactions": [
+          {
+            "where": "tears the dry leaf bedding from the open jacket held open by Levin",
+            "action": "snatching",
+            "object": "CLO002",
+            "priority": "essential",
+            "character": "ANI002",
+            "storyRelevant": true
+          }
+        ],
+        "isJsonFormat": true,
+        "landmarkView": "exterior",
+        "textPosition": null,
+        "crowdExpected": false,
+        "isProseFormat": true,
+        "framingPattern": null,
+        "reuseEmptyScene": null,
+        "sceneComplexity": "simple",
+        "emptyScenePrompt": null,
+        "landmarkVariants": null,
+        "characterClothing": {
+          "Max": "standard",
+          "Kiaan": "standard",
+          "Levin": "standard",
+          "Julian": "standard"
+        },
+        "translatedSummary": null,
+        "characterPositions": {
+          "Max": "right midground",
+          "Kiaan": "center midground",
+          "Levin": "center foreground",
+          "Julian": "left midground"
+        },
+        "textZoneDescription": null,
+        "characterPerspectives": {
+          "Max": {
+            "depth": "midground",
+            "perspective": "facing right"
+          },
+          "Kiaan": {
+            "depth": "midground",
+            "perspective": "facing right"
+          },
+          "Levin": {
+            "depth": "foreground",
+            "perspective": "facing right"
+          },
+          "Julian": {
+            "depth": "midground",
+            "perspective": "facing right"
+          }
+        }
+      },
+      "threeStageResult": {
+        "verdict": "HARD_FAIL",
+        "fixableIssues": [
+          {
+            "fix": "Replace camouflage green jacket with solid forest-green fleece; change blue jeans to navy corduroy trousers",
+            "type": "clothing",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Levin",
+            "description": "Green zip-up jacket rendered with camouflage pattern instead of solid forest-green; navy trousers rendered as blue jeans",
+            "landmark_element": false
+          },
+          {
+            "fix": "Replace denim overalls with grey corduroy dungarees; ensure sky-blue pullover is visible above dungarees",
+            "type": "clothing",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Julian",
+            "description": "Wearing denim overalls and blue long-sleeved shirt instead of grey corduroy dungarees and sky-blue pullover",
+            "landmark_element": false
+          },
+          {
+            "fix": "Change white shirt to grey cotton shirt under orange gilet",
+            "type": "garment_colour",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MODERATE",
+            "character": "Max",
+            "description": "White long-sleeved shirt under orange vest instead of grey cotton shirt",
+            "landmark_element": false
+          },
+          {
+            "fix": "Replace dark blue sneakers with dark grey lace-up leather sneakers",
+            "type": "garment_colour",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MODERATE",
+            "character": "Kiaan",
+            "description": "Dark blue sneakers instead of dark grey lace-up leather sneakers",
+            "landmark_element": false
+          },
+          {
+            "fix": "Re-render raven in mid-swoop motion with wings flared, beak clamped on clump of dry yellow leaves being tugged from jacket",
+            "type": "action_interaction",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "CRITICAL",
+            "character": "Raven",
+            "description": "Raven rendered as perched black crow pecking rather than swooping down to snatch leaves",
+            "landmark_element": false
+          },
+          {
+            "fix": "Add light brown curly-furred terrier mix dog standing beside Max (figure 3) in right-midground",
+            "type": "unverified_absence",
+            "source": "three-stage",
+            "sources": [
+              "compliance"
+            ],
+            "severity": "MAJOR",
+            "character": "Nia",
+            "description": "Nia the terrier mix dog absent from scene despite being declared in prompt and matches[]",
+            "landmark_element": false
+          }
+        ],
+        "complianceResult": {
+          "scene": {
+            "extra": [],
+            "missing": [
+              "Nia (animal, terrier mix dog)",
+              "raven"
+            ],
+            "all_present": false,
+            "setting_match": true
+          },
+          "verdict": "HARD_FAIL",
+          "fixable_issues": [
+            {
+              "fix": "Replace camouflage green jacket with solid forest-green fleece; change blue jeans to navy corduroy trousers",
+              "type": "clothing",
+              "severity": "MAJOR",
+              "character": "Levin",
+              "description": "Green zip-up jacket rendered with camouflage pattern instead of solid forest-green; navy trousers rendered as blue jeans",
+              "landmark_element": false
+            },
+            {
+              "fix": "Replace denim overalls with grey corduroy dungarees; ensure sky-blue pullover is visible above dungarees",
+              "type": "clothing",
+              "severity": "MAJOR",
+              "character": "Julian",
+              "description": "Wearing denim overalls and blue long-sleeved shirt instead of grey corduroy dungarees and sky-blue pullover",
+              "landmark_element": false
+            },
+            {
+              "fix": "Change white shirt to grey cotton shirt under orange gilet",
+              "type": "garment_colour",
+              "severity": "MODERATE",
+              "character": "Max",
+              "description": "White long-sleeved shirt under orange vest instead of grey cotton shirt",
+              "landmark_element": false
+            },
+            {
+              "fix": "Replace dark blue sneakers with dark grey lace-up leather sneakers",
+              "type": "garment_colour",
+              "severity": "MODERATE",
+              "character": "Kiaan",
+              "description": "Dark blue sneakers instead of dark grey lace-up leather sneakers",
+              "landmark_element": false
+            },
+            {
+              "fix": "Re-render raven in mid-swoop motion with wings flared, beak clamped on clump of dry yellow leaves being tugged from jacket",
+              "type": "action_interaction",
+              "severity": "CRITICAL",
+              "character": "Raven",
+              "description": "Raven rendered as perched black crow pecking rather than swooping down to snatch leaves",
+              "landmark_element": false
+            },
+            {
+              "fix": "Add light brown curly-furred terrier mix dog standing beside Max (figure 3) in right-midground",
+              "type": "unverified_absence",
+              "severity": "MAJOR",
+              "character": "Nia",
+              "description": "Nia the terrier mix dog absent from scene despite being declared in prompt and matches[]",
+              "landmark_element": false
+            }
+          ],
+          "issues_summary": "Raven misrendered as perched crow instead of swooping; Nia the dog missing; multiple clothing mismatches including wrong garment types and colors",
+          "main_action_check": {
+            "issue": "",
+            "match": true,
+            "severity": "NONE",
+            "prompt_action": "The group stops near the stone fountain in a strong wind as a raven swoops down and snatches the dry leaves from the open jacket, exposing the egg.",
+            "inventory_action": "Black crow perched on jacket pecking at leaves inside; round grey object present in jacket",
+            "story_text_action": "Ein schwarzer Rabe ... zog ein dickes Büschel Blätter aus der Jacke ... Nun lag das Ei ohne Blätter in der Jacke."
+          },
+          "character_compliance": [
+            {
+              "name": "Levin",
+              "label": "the young boy in green",
+              "severity": "MAJOR",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": "green jacket described as camouflage pattern instead of solid forest-green fleece; blue pants instead of navy trousers",
+              "clothing_match": false
+            },
+            {
+              "name": "Julian",
+              "label": "the child in blue overalls",
+              "severity": "MAJOR",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": "wearing denim overalls instead of grey corduroy dungarees; no sky-blue pullover visible under overalls",
+              "clothing_match": false
+            },
+            {
+              "name": "Max",
+              "label": "the child in orange vest",
+              "severity": "MODERATE",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": "wearing white long-sleeved shirt under vest instead of grey cotton shirt",
+              "clothing_match": false
+            },
+            {
+              "name": "Kiaan",
+              "label": "the child in purple sweater",
+              "severity": "MODERATE",
+              "facing_issue": null,
+              "facing_match": true,
+              "clothing_issue": "dark blue sneakers instead of dark grey lace-up leather sneakers; brown pants match",
+              "clothing_match": false
+            }
+          ],
+          "interaction_compliance": [
+            {
+              "match": true,
+              "actual": "holds open green jacket with round grey object and leaves, black crow pecking at leaves inside",
+              "object": "green fleece jacket with egg and leaves",
+              "expected": "holding open jacket exposing egg while raven snatches dry leaves",
+              "severity": "NONE",
+              "character": "Levin"
+            },
+            {
+              "match": false,
+              "actual": "black crow perched on jacket pecking at leaves",
+              "object": "dry leaves",
+              "expected": "raven swoops down and snatches dry leaves from open jacket",
+              "severity": "CRITICAL",
+              "character": "Raven"
+            }
+          ]
+        },
+        "visionInventory": "{\n  \"figures\": [\n    {\n      \"id\": 1,\n      \"label\": \"the young boy in green\",\n      \"zone\": \"left-foreground\",\n      \"facing\": \"right\",\n      \"hair\": \"curly, light brown\",\n      \"clothing\": \"green zip-up jacket with camouflage pattern, white t-shirt, blue jeans, brown lace-up shoes\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"red cap\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"nothing\",\n      \"action\": \"standing, both feet on cobblestones, left hand gripping the edge of the jacket's front, right hand holding a round grey object and touching the inside of the jacket\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"a round grey object\"\n      },\n      \"expression\": \"mouth slightly open, eyes focused forward\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 3,\n      \"standing_surface\": \"cobblestones\",\n      \"body_bbox\": [\n        0.059,\n        0.24,\n        0.445,\n        0.998\n      ],\n      \"face_bbox\": [\n        0.117,\n        0.335,\n        0.296,\n        0.452\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"tallest\"\n    },\n    {\n      \"id\": 2,\n      \"label\": \"the child in blue overalls\",\n      \"zone\": \"center-foreground\",\n      \"facing\": \"toward viewer\",\n      \"hair\": \"curly, light brown\",\n      \"clothing\": \"blue long-sleeved shirt under denim overalls, yellow boots\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"orange scarf around neck\",\n      \"action\": \"standing, both feet on cobblestones, arms at sides\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"eyes wide, mouth slightly open, eyebrows raised\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 3,\n      \"standing_surface\": \"cobblestones\",\n      \"body_bbox\": [\n        0.459,\n        0.302,\n        0.649,\n        0.848\n      ],\n      \"face_bbox\": [\n        0.511,\n        0.332,\n        0.612,\n        0.425\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"middle\"\n    },\n    {\n      \"id\": 3,\n      \"label\": \"the child in orange vest\",\n      \"zone\": \"right-foreground\",\n      \"facing\": \"toward viewer\",\n      \"hair\": \"curly, light brown\",\n      \"clothing\": \"white long-sleeved shirt under orange quilted vest, blue jeans, white sneakers\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"nothing\",\n      \"action\": \"standing, both feet on cobblestones, arms slightly bent at sides\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"mouth open in an 'O' shape, eyes wide\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 3,\n      \"standing_surface\": \"cobblestones\",\n      \"body_bbox\": [\n        0.642,\n        0.335,\n        0.822,\n        0.828\n      ],\n      \"face_bbox\": [\n        0.697,\n        0.355,\n        0.791,\n        0.455\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"shortest\"\n    },\n    {\n      \"id\": 4,\n      \"label\": \"the child in purple sweater\",\n      \"zone\": \"right-foreground\",\n      \"facing\": \"toward viewer\",\n      \"hair\": \"short, dark brown\",\n      \"clothing\": \"purple long-sleeved sweater, brown pants, dark blue sneakers\",\n      \"eyewear\": \"none visible\",\n      \"headwear\": \"none visible\",\n      \"facial_hair\": \"none visible\",\n      \"worn_carried\": \"nothing\",\n      \"action\": \"standing, both feet on cobblestones, arms at sides\",\n      \"items_held\": {\n        \"left\": \"nothing\",\n        \"right\": \"nothing\"\n      },\n      \"expression\": \"mouth open, eyes squinting slightly, brows furrowed\",\n      \"age_group\": \"child\",\n      \"apparent_age\": 3,\n      \"standing_surface\": \"cobblestones\",\n      \"body_bbox\": [\n        0.798,\n        0.31,\n        1,\n        0.917\n      ],\n      \"face_bbox\": [\n        0.835,\n        0.335,\n        0.938,\n        0.44\n      ],\n      \"same_ground_plane\": true,\n      \"clipped_by\": \"none\",\n      \"height_rank\": \"equal to the child in orange vest\"\n    }\n  ],\n  \"interactions\": [\n    {\n      \"from\": \"the young boy in green\",\n      \"to\": \"the black crow\",\n      \"observed\": \"holds open the jacket, revealing autumn leaves and a round object, while the crow pecks at the leaves inside\"\n    },\n    {\n      \"from\": \"the child in blue overalls\",\n      \"to\": \"the young boy in green\",\n      \"observed\": \"faces him and looks toward the crow and the open jacket\"\n    },\n    {\n      \"from\": \"the child in orange vest\",\n      \"to\": \"the young boy in green\",\n      \"observed\": \"faces him and looks toward the crow and the open jacket\"\n    },\n    {\n      \"from\": \"the child in purple sweater\",\n      \"to\": \"the young boy in green\",\n      \"observed\": \"faces him and looks toward the crow and the open jacket\"\n    },\n    {\n      \"from\": \"the black crow\",\n      \"to\": \"the young boy in green\",\n      \"observed\": \"perched on the boy's jacket, pecking at the leaves inside\"\n    },\n    {\n      \"from\": \"the small dog\",\n      \"to\": \"the child in purple sweater\",\n      \"observed\": \"stands beside him, facing forward, with its head turned slightly toward the boy\"\n    }\n  ],\n  \"objects\": [\n    {\n      \"what\": \"a black crow\",\n      \"colour\": \"black\",\n      \"material\": \"feathers\",\n      \"position\": \"center-foreground\",\n      \"grounded\": false,\n      \"relative_size\": \"about half the height of a child\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"a small dog\",\n      \"colour\": \"light brown, curly fur\",\n      \"material\": \"fur\",\n      \"position\": \"right-foreground\",\n      \"grounded\": true,\n      \"relative_size\": \"reaches mid-thigh of the children\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"a large round grey object\",\n      \"colour\": \"grey, smooth surface\",\n      \"material\": \"stone or metal\",\n      \"position\": \"inside the young boy in green's jacket\",\n      \"grounded\": false,\n      \"relative_size\": \"about the size of a large egg or small ball\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"autumn leaves\",\n      \"colour\": \"yellow-orange\",\n      \"material\": \"leaf\",\n      \"position\": \"inside the young boy in green's jacket and scattered on ground\",\n      \"grounded\": true,\n      \"relative_size\": \"small, individual leaves\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"statue on column\",\n      \"colour\": \"dark green, stone-like\",\n      \"material\": \"stone or bronze\",\n      \"position\": \"center-background\",\n      \"grounded\": true,\n      \"relative_size\": \"taller than the children\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"small building with conical roof\",\n      \"colour\": \"brown, tan walls, dark roof\",\n      \"material\": \"brick or stone\",\n      \"position\": \"right-midground\",\n      \"grounded\": true,\n      \"relative_size\": \"about two stories tall, smaller than the statue\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"trees with autumn foliage\",\n      \"colour\": \"yellow-orange leaves, brown trunks\",\n      \"material\": \"wood and leaves\",\n      \"position\": \"left-background and right-background\",\n      \"grounded\": true,\n      \"relative_size\": \"tall, reaching above the children\",\n      \"complete\": true\n    },\n    {\n      \"what\": \"cobblestone pavement\",\n      \"colour\": \"grey, irregular stones\",\n      \"material\": \"stone\",\n      \"position\": \"foreground and midground\",\n      \"grounded\": true,\n      \"relative_size\": \"covers the ground beneath the children\",\n      \"complete\": true\n    }\n  ],\n  \"setting\": {\n    \"indoor_outdoor\": \"outdoor\",\n    \"elements\": \"cobblestone path, autumn trees, distant town with buildings, statue on column, small building with conical roof, falling leaves\",\n    \"lighting\": \"soft daylight from above, slightly diffused by clouds\",\n    \"camera\": \"eye-level, wide-angle view capturing the group and background\"\n  },\n  \"lettering\": [],\n  \"rendering\": {\n    \"extra_limbs\": false,\n    \"physics_ok\": true,\n    \"composite_seam\": false,\n    \"issues\": []\n  }\n}"
+      }
+    }
+  ]
+}
