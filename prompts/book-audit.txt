@@ -14,19 +14,8 @@ For every page, answer six questions:
 5. CHANGE: could a five-year-old looking at the pictures alone say what changed since the previous page?
 6. FUTURE: does the picture show a state a later page's text still establishes — a thing already freed, opened, reached or arrived? A small moment offset inside this page's own words is not a fault.
 
-Answer the five questions for every page, but do not write the answers down. Output only the faults they found.
+Answer these questions for every page, but do not write the answers down. Output only the faults they found.
 
 Route every fault by its fix and weigh it. Write "FAULT[IMG][<WEIGHT>]: p<N> — <one sentence>" when a different image would fix it, and "FAULT[TEXT][<WEIGHT>]: p<N> — <one sentence>" when different prose would fix it. <WEIGHT> is one of: MINOR — a small detail is off and a listener would not notice; MAJOR — a described action, object or feeling is contradicted or wrongly shown, and a listener notices. Words describing what the picture simply does not show are not a fault; CRITICAL — the picture makes the words impossible, and a listener is confused; CATASTROPHIC — the page tells a different story: wrong characters, wrong place, or the opposite event. One line per fault, starting at the left margin. State each fault once — a finding you doubt is omitted. After the list write one line: "FAULTS: <count>".
 
-===OBJECT-SCALE PASS===
-Below are the pictures of every page on which one recurring object appears, in no particular order. That object is: {OBJECT_LABEL}.
-
-Each picture is preceded by its page marker. Judge only how large the object is DRAWN relative to the people and the surroundings in that same picture. Its colour, its position, its markings and what is happening in the story are all outside this pass.
-
-Form an impression of the object's typical size across the whole set. Then name only the pages that depart from it:
-LARGER: p<N>, p<N>
-SMALLER: p<N>, p<N>
-
-LARGER lists the pages where the object is drawn clearly larger than that typical size, SMALLER the pages where it is drawn clearly smaller. Say nothing about a page that sits near the typical size. Either list may be empty — write "LARGER: none" or "SMALLER: none". A set with no departures is a normal result.
-
-Do not estimate a size, a ratio, a percentage, a measurement or a comparison object for any page, and do not write a page-by-page list. Output the two lines and nothing else.
+{OBJECT_SCALE_QUESTION}
