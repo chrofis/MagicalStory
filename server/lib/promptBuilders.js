@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, SHOT_DEFINITIONS } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -665,20 +665,46 @@ function buildCastIdentityDescription(char, clothingText = '') {
  * (sceneCharacters, outlineCharacters and characterClothing all said just
  * [Emma, Noah] while the PROSE and the image prompt both named her). Her own
  * declaration is authoritative and needs no inference.
+ *
+ * `includeAnimals` (2026-09-19) — SAME OPT-IN AS
+ * `buildSecondaryCharacterDescriptions`, for the same reason and with the same
+ * default. `vb.animals` entries carry `pages[]` exactly as secondaries do, and
+ * this function never read that pool: a named creature the brief stages on a
+ * page was absent from the judge's EXPECTED CAST, so the judge reported it and
+ * the finding named someone the roster had never heard of. Measured over 127
+ * staging stories: of 40 `missing_character` findings naming an off-roster
+ * subject, 11 resolve to a `vb.animals` entry and 10 of those declare the very
+ * page the finding was filed on — the dog "Nia", the dragon "Feurio", the grey
+ * tomcat, a crayfish, a fairy.
+ *
+ * IT STAYS OFF BY DEFAULT because the OTHER caller is the DETECTOR roster
+ * (storyJobPipeline), and the owner's 2026-08-19 ruling holds there: DINO
+ * detects `person`, so an animal on a detector roster is a guaranteed missing
+ * person. Only the evaluator roster opts in — one function, one pool, two
+ * callers with different needs, never a second builder.
  */
-function buildSecondaryExpectedForPage(visualBible, pageNumber, knownNames = []) {
+function buildSecondaryExpectedForPage(visualBible, pageNumber, knownNames = [], opts = {}) {
   const vb = visualBible || {};
-  const list = Array.isArray(vb.secondaryCharacters)
-    ? vb.secondaryCharacters
-    : Object.values(vb.secondaryCharacters || {});
+  const { includeAnimals = false } = opts || {};
+  const pool = (v) => (Array.isArray(v) ? v : Object.values(v || {}));
+  const list = [
+    ...pool(vb.secondaryCharacters),
+    ...(includeAnimals ? pool(vb.animals) : []),
+  ];
   const known = new Set((knownNames || []).map(n => String(n).toLowerCase()));
   const out = [];
   for (const e of list) {
     if (!e || !e.name || known.has(String(e.name).toLowerCase())) continue;
     const pages = e.pages || e.appearsInPages;
     if (!Array.isArray(pages) || !pages.map(Number).includes(Number(pageNumber))) continue;
+    // An animal has no `hair`/`face`/`clothing`; `species`, `coloring` and
+    // `features` are the fields its VB entry actually carries, and without them
+    // the `if (!desc) continue` below would silently drop every creature that
+    // has no prose `description` — the gap this change exists to close.
     const desc = e.description
-      || [e.age, e.build, e.hair && `hair: ${e.hair}`, e.face, e.signatureLook, e.clothing && `Wearing: ${e.clothing}`]
+      || [e.age, e.build, e.species, e.coloring, e.features,
+          e.hair && `hair: ${e.hair}`, e.face, e.signatureLook,
+          e.clothing && `Wearing: ${e.clothing}`]
         .filter(Boolean).join('. ');
     if (!desc) continue;
     out.push({ name: e.name, description: desc });
@@ -2578,6 +2604,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
@@ -2595,6 +2622,11 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // beats planner produces it, planCounters counts it, and the image prompt
     // defines it. See server/lib/shotVocabulary.js.
     SHOT_ENUM,
+    // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
+    // list of distances, and where the camera stands is no longer the vantage's
+    // business but the shot word's own.
+    DISTANCE_SHOTS: DISTANCE_SHOTS.map(x => '`' + x + '`').join(', '),
+    SHOT_POSITIONS,
   });
   return applyTextZoneGate(filledAll, textZoneRulesActive(inputData));
 }
@@ -2864,6 +2896,7 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
@@ -2878,6 +2911,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // beats planner produces it, planCounters counts it, and the image prompt
     // defines it. See server/lib/shotVocabulary.js.
     SHOT_ENUM,
+    // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
+    // list of distances, and where the camera stands is no longer the vantage's
+    // business but the shot word's own.
+    DISTANCE_SHOTS: DISTANCE_SHOTS.map(x => '`' + x + '`').join(', '),
+    SHOT_POSITIONS,
   });
   // Text-zone rule family, same gate as the all-pages builder. A cover call
   // (pageNumber <= 0) never gets it; a page call follows the story's layout,
@@ -3297,6 +3335,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     LOOKS_AT_FIELD: LOOKS_AT_FIELD_RULE,
     EXPRESSION_FIELD: EXPRESSION_FIELD_RULE,
     GARMENT_REMOVED: GARMENT_REMOVED_RULE,
+    WORN_ITEMS_ROW: WORN_ITEMS_ROW_RULE,
     WORN_ON_OTHER: WORN_ON_OTHER_RULE,
     NEVER_NAME_ABSENT: ABSENT_THING_RULE,
     SCENE_INTENT_FIELD: SCENE_INTENT_FIELD_RULE,
@@ -3319,6 +3358,11 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       COUNTING_RULE,
       VB_ELEMENT_BUDGET,
       SHOT_ENUM,
+      // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
+      // list of distances, and where the camera stands is no longer the vantage's
+      // business but the shot word's own.
+      DISTANCE_SHOTS: DISTANCE_SHOTS.map(x => '`' + x + '`').join(', '),
+      SHOT_POSITIONS,
       CREATURE_TONE: buildCreatureToneSection(options.story || { characters }),
       // A rewrite authors a whole new setting paragraph and `emptyScenePrompt`,
       // so a season it is never told is a season it can contradict. Callers
@@ -6509,6 +6553,15 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // EXISTING peopleless page earns its place, so it is structurally unable to
   // notice that the book has none.
   'NO_PEOPLELESS_PAGE',
+  // NOT HERE, DELIBERATELY: SHOT_NO_CAMERA_POSITION (owner, 2026-09-19). Camera
+  // position became expressible on a page only today, and the measured baseline
+  // is that every stored book is eye level on every page — 6 of 1,504 stored
+  // shot values carry a position at all. As a must-fix it would spend a re-plan
+  // round on every book in flight until the planner adapts, which is a cost paid
+  // per story for a preference. It reports as "also noted", like the other shot
+  // counters, whose own header calls shot distribution "a preference next to
+  // these". Revisit when stored plans show the planner reaching for a position
+  // unprompted, so the finding is the exception rather than the rule.
 ]);
 
 /**
@@ -7577,6 +7630,28 @@ const LOOKS_AT_FIELD_RULE = "Every foreground or midground character carries `lo
  * stated at all.
  */
 const EXPRESSION_FIELD_RULE = "Every foreground or midground character carries `expression`, and a rewrite carries it through. A page whose beat is a character sensing something — listening, feeling, watching, smelling — states that in the eyes and mouth as much as in the pose.";
+
+/**
+ * ONE `wornItems[]` contract for all FOUR page-brief authoring sites
+ * (2026-09-19). The sentence lived as four hand-copies — both Art Director
+ * templates and both iterate templates — and had already drifted into two
+ * wordings; this is the class of copy the sibling registry exists to kill.
+ *
+ * THE SCOPE WIDENED WITH IT. The old wording asked for a row only for an
+ * element "whose entry has a `wornAs` link", and the writer emits that link on
+ * 9 of 482 clothing/artifact/vehicle entries. Every other tracked garment was
+ * OUTSIDE the rule, so a page that left one out broke nothing — while
+ * downstream the omission silently resolved to WORN and the attached reference
+ * wore it. The Art Director was already declaring rows for unlinked garments
+ * voluntarily on ten pages of a story and then skipping one; the rule now says
+ * what it was already trying to do, and `clothingCheck`'s `removal_unstated`
+ * reports the gap on exactly the same population.
+ *
+ * The closing line replaces "Omit a row and the item is drawn on the character
+ * by default", which documented the silent default as if it were a feature and
+ * gave the author a reason to leave rows out.
+ */
+const WORN_ITEMS_ROW_RULE = "one row for every Visual Bible element that is a garment of a character on this page, whether or not the page mentions it: any element with a `wornAs` link, and any `clothing` or `artifacts` element whose `wornBy` names a character or whose `type` is an outfit slot. `{id, owner, state, location, wearer, redressNote}`: `owner` is the `wornAs` owner or the `wornBy` character, `state` is `\"worn\"` or `\"off\"`, and `off` requires both `location`, a short phrase naming where it now lies or who holds it, and `redressNote`, the wardrobe instruction of the garment-removal rule. `wearer` is set only when another character on this page wears the item instead of its owner, and then `state` is `\"worn\"`. The prose must agree with the row. A garment given a row on one page and left out on another has no state on that page, and that is reported back as a fault.";
 
 /**
  * SAY WHAT IS THERE, NOT WHAT IS GONE (2026-09-19).
@@ -9610,6 +9685,7 @@ module.exports = {
   LOOKS_AT_FIELD_RULE,
   EXPRESSION_FIELD_RULE,
   GARMENT_REMOVED_RULE,
+  WORN_ITEMS_ROW_RULE,
   WORN_ON_OTHER_RULE,
   ABSENT_THING_RULE,
   SCENE_INTENT_FIELD_RULE,

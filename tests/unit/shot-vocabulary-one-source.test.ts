@@ -59,9 +59,13 @@ describe('one shot vocabulary, injected — never hand-typed', () => {
   it('C4 names the real four and points its angle axis at the vantage', () => {
     const t = String(PROMPT_TEMPLATES.sceneExpansionAll);
     const c4 = t.split('\n').find(l => l.startsWith('C4.')) || '';
-    expect(c4).toContain('{SHOT_ENUM}');
-    expect(c4).not.toContain('aerial');
-    expect(c4).toContain('camera angle (the vantage they cite)');
+    // C4 names the two axes separately: the eight-word SHOT_ENUM is not a list
+    // of distances, and where the camera stands is the shot word's own business
+    // now, not the vantage's.
+    expect(c4).toContain('{DISTANCE_SHOTS}');
+    expect(c4).toContain('{SHOT_POSITIONS}');
+    expect(c4).not.toContain('{SHOT_ENUM}');
+    expect(c4).not.toContain('the vantage they cite');
   });
 
 

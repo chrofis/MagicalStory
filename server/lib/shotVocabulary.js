@@ -82,7 +82,17 @@ const SHOTS = [
     id: 'low-angle',
     axis: 'position',
     match: /\b(?:low[-\s]?angle|worm'?s[-\s]?eye|from[-\s]below|wide[-\s]?low)\b/i,
-    definition: "A low-angle shot looks up at the subject from below — a worm's-eye view, the sky or ceiling behind them, the subject taller than the camera.",
+    // THE ONE GUARD ON A CAMERA POSITION (2026-09-19). A low angle makes its
+    // subject tower, which is the whole point of the shot and exactly wrong
+    // pointed at a grown-up or a creature standing over a small child. The
+    // creature-tone bands already forbid a creature "leaning or towering over a
+    // child" (ages <=4) and require it "framed at the child's eye level" (5-6),
+    // but they constrain the CREATURE'S ENTRY, not the page's camera — so
+    // without this the formidable band (7+), which explicitly licenses looming,
+    // could be handed a low-angle page and nothing would join the two. The guard
+    // lives on the word itself so it reaches the planner, both Art Director
+    // templates, both iterate templates and the illustrator from one place.
+    definition: "A low-angle shot looks up at the subject from below — a worm's-eye view, the sky or ceiling behind them, the subject taller than the camera. Look up at a thing, a height, a tree or a sky; never up at a grown-up or a creature standing over a child.",
   },
   {
     id: 'aerial',
