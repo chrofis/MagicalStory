@@ -188,6 +188,36 @@ function extractJsonFromText(text) {
  */
 const { parseWornItems } = require('./wornItems');
 
+/**
+ * HOW POPULATED IS THIS PAGE — THREE STATES, NOT TWO (2026-09-19).
+ *
+ * `crowdExpected` (2026-09-13) was a boolean: a crowd is required, or the page
+ * holds its listed cast and nobody else. Real settings have a third state. A
+ * city square, a park, a quay legitimately contains distant people who are not
+ * the cast and are not a crowd scene — and the Art Director's own prose was
+ * asserting "No other people are present" about a public plaza, which is what
+ * the presence arithmetic then held the picture to. Measured: 4 CRITICALs on
+ * job_1789759147125_p08djwhbl, 4 on job_1789506283204_3kxqshifx, 9 on
+ * job_1789420511893_zly5rcdej, every one of them correct background life.
+ *
+ *   'cast_only' — the listed figures and nobody else (the old `false`)
+ *   'ambient'   — distant background people belong here; they are not cast
+ *   'crowd'     — the page is WRITTEN around a crowd (the old `true`)
+ *
+ * The legacy boolean still parses in both directions, so stored rows and any
+ * brief that predates the field keep their exact behaviour: `true` → 'crowd',
+ * anything else → 'cast_only'. `crowdExpected` continues to be published
+ * alongside, derived, for every consumer that only asks the old question.
+ */
+const POPULATION_LEVELS = ['cast_only', 'ambient', 'crowd'];
+
+function normalisePopulation(raw, legacyCrowdExpected) {
+  const v = String(raw || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (POPULATION_LEVELS.includes(v)) return v;
+  return legacyCrowdExpected === true ? 'crowd' : 'cast_only';
+}
+
+
 function sanitizeInteractions(rawInteractions) {
   if (!Array.isArray(rawInteractions)) return [];
   // Composite-character syntax: "Manuel + Roger" means both characters jointly
@@ -900,7 +930,8 @@ function extractSceneMetadata(sceneDescription) {
         wornItems,
         imageSummary: prose,
         shot: metadata.shot || null,
-        crowdExpected: metadata.crowdExpected === true,
+        population: normalisePopulation(metadata.population, metadata.crowdExpected),
+        crowdExpected: normalisePopulation(metadata.population, metadata.crowdExpected) === 'crowd',
         setting: metadata.setting || null,
         // time/weather passthroughs removed 2026-08-11: written for months,
         // read by nothing (metadata-migration audit).
@@ -938,7 +969,8 @@ function extractSceneMetadata(sceneDescription) {
       // (evalPipeline.derivePresenceFinding) skips its surplus branch when set.
       // Strictly `=== true`: absent, null and every stored row that predates
       // the field read as "no crowd", which is the pre-existing behaviour.
-      crowdExpected: metadata.crowdExpected === true,
+      population: normalisePopulation(metadata.population, metadata.crowdExpected),
+      crowdExpected: normalisePopulation(metadata.population, metadata.crowdExpected) === 'crowd',
       emptyScenePrompt: metadata.emptyScenePrompt || null,
       reuseEmptyScene: metadata.reuseEmptyScene ?? null,
       textPosition: metadata.textPosition || null,
@@ -1099,7 +1131,8 @@ function extractSceneMetadata(sceneDescription) {
       // the plate render the surfaces around the camera, not the element's exterior.
       aboard: parsedData.aboard || null,
       // See the crowdExpected note in the prose-format branch above.
-      crowdExpected: parsedData.crowdExpected === true,
+      population: normalisePopulation(parsedData.population, parsedData.crowdExpected),
+      crowdExpected: normalisePopulation(parsedData.population, parsedData.crowdExpected) === 'crowd',
       emptyScenePrompt: parsedData.emptyScenePrompt || null,
       // Whether the existing empty scene background can be reused (iteration only)
       reuseEmptyScene: parsedData.reuseEmptyScene ?? null,
@@ -1185,13 +1218,14 @@ function extractSceneMetadata(sceneDescription) {
         wornItems: [],
         objects: [],
         interactions: null,
-        fullData: { characters: [], objects: [], interactions: [], imageSummary: prose, crowdExpected: false },
+        fullData: { characters: [], objects: [], interactions: [], imageSummary: prose, population: 'cast_only', crowdExpected: false },
         thinking: null,
         translatedSummary: null,
         imageSummary: prose,
         landmarkVariants: null,
         setting: null,
         sceneComplexity: 'simple',
+        population: 'cast_only',
         crowdExpected: false,
         emptyScenePrompt: null,
         reuseEmptyScene: null,
@@ -2381,6 +2415,8 @@ function describeDegradedSceneMetadata(sceneMetadata) {
 }
 
 module.exports = {
+  POPULATION_LEVELS,
+  normalisePopulation,
   extractJsonFromText,
   sanitizeInteractions,
   parseProseMetadataFormat,

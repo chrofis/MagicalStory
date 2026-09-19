@@ -4441,6 +4441,15 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
     // Same class as era/textZoneDescription: scene-iteration.txt does not emit
     // the crowd flag, so a repaired page would lose it and its background
     // extras would come back as a derived extra_character.
+    // Three states since 2026-09-19 — `population` carries forward for the same
+    // reason, and `crowdExpected` stays derived from it so old readers agree.
+    population: (() => {
+      const { normalisePopulation } = require('./sceneMetadata');
+      const raw = newSceneMetadata?.population || savedMeta.population || savedMeta.fullData?.population || null;
+      const legacy = newSceneMetadata?.crowdExpected === true
+        || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true;
+      return normalisePopulation(raw, legacy);
+    })(),
     crowdExpected: newSceneMetadata?.crowdExpected === true
       || savedMeta.crowdExpected === true || savedMeta.fullData?.crowdExpected === true,
     // Same class again: scene-iteration.txt does not emit `wornItems`, and the

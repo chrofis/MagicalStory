@@ -42,15 +42,26 @@ describe('Art Director template parity', () => {
     });
   }
 
-  it('crowdExpected is declared and ruled in both templates', () => {
+  // `crowdExpected` became the three-state `population` on 2026-09-19 — a
+  // public square holds people who are neither cast nor a crowd, and the
+  // boolean had no way to say so. The parity requirement is unchanged: the
+  // field and its rule must exist in BOTH templates or the fallback path
+  // silently reads the page as cast-only.
+  it('population is declared and ruled in both templates, with all three values', () => {
     for (const file of [PER_PAGE, ALL_PAGES]) {
       const text = fs.readFileSync(file, 'utf8');
-      expect(metadataKeys(file), path.basename(file)).toContain('crowdExpected');
-      // A rule line, not just the schema example: the consumer reads === true.
+      expect(metadataKeys(file), path.basename(file)).toContain('population');
+      // A rule line, not just the schema example.
       expect(
-        /^- `crowdExpected`/m.test(text),
-        `${path.basename(file)} states a crowdExpected rule`
+        /^- `population`/m.test(text),
+        `${path.basename(file)} states a population rule`
       ).toBe(true);
+      for (const value of ['"crowd"', '"ambient"', '"cast_only"']) {
+        expect(text.includes(value), `${path.basename(file)} names ${value}`).toBe(true);
+      }
+      // The prose must never assert a populated place is empty — that claim is
+      // what the judge was holding correct pictures to.
+      expect(text).toContain('no other people are present');
     }
   });
 });

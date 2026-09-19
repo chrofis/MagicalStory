@@ -57,10 +57,11 @@ describe('buildExpectedCastBlock — the secondary that declares this page', () 
 
   it('an undeclared cast stays undeclared regardless of the new inputs', () => {
     const r = buildExpectedCastBlock({ sceneCharacters: null, visualBible: VB, pageNumber: 3 });
-    // `crowdExpected` (2026-09-13) rides on every roster; an undeclared one
-    // carries the safe default, because absent must always mean "no crowd".
-    // `nonHumanNames` likewise — an undeclared roster names nobody, human or not.
-    expect(r).toEqual({ block: '', names: [], count: 0, declared: false, crowdExpected: false, nonHumanNames: [] });
+    // `population` (2026-09-19, replacing the `crowdExpected` boolean) rides on
+    // every roster; an undeclared one carries the safe default, because absent
+    // must always mean "cast only, no crowd". `nonHumanNames` likewise — an
+    // undeclared roster names nobody, human or not.
+    expect(r).toEqual({ block: '', names: [], count: 0, declared: false, population: 'cast_only', crowdExpected: false, nonHumanNames: [] });
   });
 });
 

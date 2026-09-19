@@ -1140,13 +1140,18 @@ function buildExpectedCastBlock({
   // roster was supplied — and keeps the blank block.
   const castDeclared = Array.isArray(sceneCharacters);
   for (const c of (castDeclared ? sceneCharacters : [])) add(typeof c === 'string' ? c : c?.name);
-  if (!castDeclared) return { block: '', names: [], count: 0, declared: false, crowdExpected: false, nonHumanNames: [] };
+  if (!castDeclared) return { block: '', names: [], count: 0, declared: false, population: 'cast_only', crowdExpected: false, nonHumanNames: [] };
 
   const sh = getStoryHelpers();
   // CROWD FLAG (2026-09-13). Carried on the roster so the presence derivation
   // can skip its surplus branch on a page the brief wrote as populated —
   // arithmetic has no equivalent of the evaluator's N-09. Never inferred from
   // prose: either the brief set the flag or this page has no crowd.
+  // POPULATION, THREE STATES (2026-09-19). 'crowd' skips the surplus branch
+  // outright, as the boolean always did; 'ambient' lets the arithmetic subtract
+  // background-scale figures before comparing. Never inferred from prose: the
+  // brief declares it, or the page is read as 'cast_only'.
+  let population = 'cast_only';
   let crowdExpected = false;
   try {
     // THE HINT IS NOT ALWAYS THE BRIEF (2026-09-12). The repair pipeline hands
@@ -1158,7 +1163,11 @@ function buildExpectedCastBlock({
     // cites as CHR001). The parsed metadata is passed in where the caller
     // holds it; parsing a hint stays the fallback.
     const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
-    crowdExpected = sceneMeta?.crowdExpected === true || sceneMeta?.fullData?.crowdExpected === true;
+    const { normalisePopulation } = require('./sceneMetadata');
+    const rawPop = sceneMeta?.population || sceneMeta?.fullData?.population || null;
+    const legacyCrowd = sceneMeta?.crowdExpected === true || sceneMeta?.fullData?.crowdExpected === true;
+    population = normalisePopulation(rawPop, legacyCrowd);
+    crowdExpected = population === 'crowd';
     for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, extraNames, includeAnimals: true })) add(e.name, vbKind(e.name));
     // A SECONDARY THAT DECLARES THIS PAGE IS ON THIS PAGE (2026-09-13). The
     // detector-side roster in storyJobPipeline has always read the VB
@@ -1228,6 +1237,15 @@ function buildExpectedCastBlock({
     // has to read as a roster of zero rather than as a missing roster.
     ? 'EXPECTED CAST (0): none — this frame was written with no people and no animals in it'
     : `EXPECTED CAST (${names.length}): ${labels.join(', ')}`];
+  // THE JUDGE IS TOLD WHAT THE GENERATOR WAS TOLD (2026-09-19). D-04b/N-09 used
+  // to ask the evaluator to work out for itself whether the USER_PROMPT called
+  // for a populated setting. The Art Director already decided that, per page —
+  // so the decision is handed over rather than guessed at a second time.
+  lines.push(population === 'crowd'
+    ? 'SETTING POPULATION: crowd — this page is written around unnamed background people; they are not surplus cast.'
+    : population === 'ambient'
+      ? 'SETTING POPULATION: ambient — this is a public setting and distant background people belong in it. They are not EXPECTED CAST and are never a surplus figure. Only a figure at the same scale as the cast can be one.'
+      : 'SETTING POPULATION: cast-only — this page holds the EXPECTED CAST and no other people.');
   const det = Number(detectedFigureCount);
   if (detectedFigureCount !== null && detectedFigureCount !== undefined && Number.isFinite(det)) {
     lines.push(`Detector figure count (GroundingDINO): ${det}`);
@@ -1244,7 +1262,7 @@ function buildExpectedCastBlock({
   const nonHumanNames = names.filter(n =>
     nonHumanSet.has(canonicalName(n)) || isNonHuman(resolveEntity(n, idx, { pageLabel })));
   if (pageLabel) flushResolverStats(idx, log, pageLabel);
-  return { block: lines.join('\n'), names, count: names.length, declared: true, crowdExpected, nonHumanNames };
+  return { block: lines.join('\n'), names, count: names.length, declared: true, population, crowdExpected, nonHumanNames };
 }
 
 /**
@@ -1428,11 +1446,15 @@ function supersedePresenceFindings(threeStageResult) {
  * @param {object} args
  * @param {Array} args.figures - the evaluator's `figures[]`
  * @param {Array} args.matches - the evaluator's `matches[]`, one per figure
- * @param {{names: string[], count: number, declared: boolean, crowdExpected: boolean,
+ * @param {{names: string[], count: number, declared: boolean, population: string, crowdExpected: boolean,
  *          nonHumanNames: string[]}} args.cast
  *        the roster from buildExpectedCastBlock. `nonHumanNames` are the entries
  *        a "person" detector can never satisfy (the VB's `animals` pool);
  *        every count below is taken with those removed from BOTH sides.
+ * @param {Array|null} args.detectorFigures - the detector's own figures, with boxes.
+ *        Read ONLY on a page the brief declared `population: "ambient"`, to drop
+ *        background-scale figures from the surplus comparison by geometry. Absent,
+ *        an ambient page declines rather than guessing.
  * @param {number|null} args.detectedFigureCount - countRealFigures(detector figures),
  *        with the figures the detector itself named as non-human removed — a
  *        PEOPLE count, because that is what the derivation compares against
@@ -1457,7 +1479,7 @@ function presenceCounterName(presence, spoke) {
   return spoke ? `presence_${presence?.outcome}${reason}` : `presence_declined${reason}`;
 }
 
-function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, referenceNames, castIndex = null } = {}) {
+function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, detectorFigures = null, referenceNames, castIndex = null } = {}) {
   // RESOLVE (castIndex, when the caller has one) + COMPARE (everything else:
   // both sides of every name test below are strings this same run produced).
   const { canonicalName, resolveEntity, isNonHuman } = getCastResolver();
@@ -1551,7 +1573,31 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
   if (det > castCount) {
     // N-09 in arithmetic form. A page the brief wrote as populated has unnamed
     // background people on purpose; the surplus is the crowd, not a defect.
-    if (cast.crowdExpected === true) return decline('crowd_expected');
+    if (cast.population === 'crowd' || cast.crowdExpected === true) return decline('crowd_expected');
+    // AMBIENT IS NOT A CROWD, AND IT IS NOT CAST EITHER (2026-09-19). On a page
+    // the Art Director declared `population: "ambient"` — a square, a park, a
+    // quay — distant background people belong in the frame. They are dropped
+    // from the count by SCALE (bboxDetection.countAmbientFigures: geometry
+    // only, never a label or a description), and whatever surplus remains is
+    // still a real surplus. That is what keeps the uncommissioned cast-scale
+    // figure catchable: job_1789420511893_zly5rcdej p16's fourth child is 1.8x
+    // the smallest genuine cast figure and survives the filter.
+    //
+    // Without the detector's figures there is no geometry to measure, so the
+    // page is treated like a crowd page and nothing is derived — a declined
+    // outcome, never a CRITICAL guessed at. The evaluator's own D-04b still
+    // stands there, reading the same SETTING POPULATION line.
+    let ambientDropped = 0;
+    if (cast.population === 'ambient') {
+      const bbox = require('./bboxDetection');
+      // GEOMETRY, NOT JUST AN ARRAY. The detector's VLM fallback returns figures
+      // with a label and no box; measuring size over those is blind, not
+      // conservative, so the page declines rather than billing a CRITICAL the
+      // filter never had a chance to clear.
+      if (!bbox.hasAmbientGeometry(detectorFigures)) return decline('ambient_without_geometry');
+      ambientDropped = bbox.countAmbientFigures(detectorFigures);
+      if (det - ambientDropped <= castCount) return decline('ambient_background');
+    }
     const fig = unmatchedFigures[0];
     const figId = fig && (fig.figure ?? fig.id);
     return {
@@ -1560,8 +1606,11 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, re
       finding: mark({
         type: 'extra_character',
         character: figId !== undefined && figId !== null ? `figure ${figId}` : null,
-        description: `${det} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
-          + ` — ${det - castCount} more figure(s) than the page was written to hold.`,
+        // On a cast-only page this is the sentence it has always been. Only an
+        // ambient page, where background life was subtracted, says so.
+        description: `${det - ambientDropped}${ambientDropped ? ' cast-scale' : ''} person-figure(s) are in the frame for an EXPECTED CAST of ${castCount} person(s)`
+          + ` — ${det - ambientDropped - castCount} more figure(s) than the page was written to hold.`
+          + (ambientDropped ? ` (${ambientDropped} distant background figure(s) belong to the setting and were not counted.)` : ''),
         fix: "Redraw this figure as the EXPECTED CAST entry it should be, matching that entry's reference and CLOTHING CONTRACT.",
       }),
     };
@@ -2825,6 +2874,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       {
         const presence = derivePresenceFinding({
           figures, matches, cast: expectedCast, detectedFigureCount: detectedPeopleCount,
+          // Geometry for the ambient-background filter; only read on a page the
+          // brief declared `population: "ambient"`.
+          detectorFigures: Array.isArray(evalOptions.detectedFigures) ? evalOptions.detectedFigures : null,
           referenceNames: attachedReferenceNames,
           castIndex: castIdx,
         });

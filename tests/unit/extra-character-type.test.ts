@@ -24,9 +24,14 @@ const visualBible = {
   artifacts: [{ id: 'ART001', name: 'kite' }],
 };
 
+// Every roster block now states how populated the page's setting is, so the
+// judge reads the Art Director's own decision instead of re-deriving it from
+// the prompt (2026-09-19). Absent, the page is cast-only.
+const CAST_ONLY_LINE = '\nSETTING POPULATION: cast-only — this page holds the EXPECTED CAST and no other people.';
+
 describe('buildExpectedCastBlock — page roster', () => {
   it('is blank when the caller knows NO cast (null), so the evaluator does not judge the count', () => {
-    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0, declared: false, crowdExpected: false, nonHumanNames: [] });
+    expect(buildExpectedCastBlock({ sceneCharacters: null })).toEqual({ block: '', names: [], count: 0, declared: false, population: 'cast_only', crowdExpected: false, nonHumanNames: [] });
     expect(buildExpectedCastBlock({}).block).toBe('');
   });
 
@@ -57,7 +62,7 @@ describe('buildExpectedCastBlock — page roster', () => {
     expect(r.declared).toBe(true);
     expect(r.count).toBe(0);
     expect(r.names).toEqual([]);
-    expect(r.block).toBe('EXPECTED CAST (0): none — this frame was written with no people and no animals in it');
+    expect(r.block).toBe('EXPECTED CAST (0): none — this frame was written with no people and no animals in it' + CAST_ONLY_LINE);
   });
 
   it('a declared-empty page still picks up the VB creature its metadata names', () => {
@@ -68,7 +73,7 @@ describe('buildExpectedCastBlock — page roster', () => {
     const r = buildExpectedCastBlock({ sceneCharacters: [], sceneHint, visualBible, evaluationType: 'scene' });
     expect(r.declared).toBe(true);
     expect(r.names).toEqual(['ANI001']);
-    expect(r.block).toBe('EXPECTED CAST (1): ANI001 (animal, dog)');
+    expect(r.block).toBe('EXPECTED CAST (1): ANI001 (animal, dog)' + CAST_ONLY_LINE);
   });
 
   it('lists sceneCharacters plus the VB secondary AND animal the page metadata names, with the count', () => {
@@ -77,14 +82,14 @@ describe('buildExpectedCastBlock — page roster', () => {
     const r = buildExpectedCastBlock({ sceneCharacters: boys, sceneHint, visualBible, evaluationType: 'scene' });
     expect(r.names).toEqual(['Aaron', 'Ben', 'Carl', 'Dan', 'CHR001', 'ANI001']);
     expect(r.count).toBe(6);
-    expect(r.block).toBe('EXPECTED CAST (6): Aaron, Ben, Carl, Dan, CHR001 (secondary character), ANI001 (animal, dog)');
+    expect(r.block).toBe('EXPECTED CAST (6): Aaron, Ben, Carl, Dan, CHR001 (secondary character), ANI001 (animal, dog)' + CAST_ONLY_LINE);
   });
 
   it('appends the detector figure count when one is supplied, and not otherwise', () => {
     const withDet = buildExpectedCastBlock({ sceneCharacters: boys, detectedFigureCount: 5 });
-    expect(withDet.block).toBe('EXPECTED CAST (4): Aaron, Ben, Carl, Dan\nDetector figure count (GroundingDINO): 5');
+    expect(withDet.block).toBe('EXPECTED CAST (4): Aaron, Ben, Carl, Dan' + CAST_ONLY_LINE + '\nDetector figure count (GroundingDINO): 5');
     expect(buildExpectedCastBlock({ sceneCharacters: boys, detectedFigureCount: null }).block)
-      .toBe('EXPECTED CAST (4): Aaron, Ben, Carl, Dan');
+      .toBe('EXPECTED CAST (4): Aaron, Ben, Carl, Dan' + CAST_ONLY_LINE);
   });
 
   // COUNT PEOPLE AGAINST PEOPLE (owner, 2026-08-18). The roster the EVALUATOR
@@ -125,7 +130,7 @@ describe('buildExpectedCastBlock — cover roster', () => {
     const r = buildExpectedCastBlock({ sceneCharacters: boys, sceneHint: desc, visualBible, evaluationType: 'cover' });
     expect(r.names).toEqual(['Aaron', 'Ben', 'Carl', 'Dan', 'Nia']);
     expect(r.count).toBe(5);
-    expect(r.block).toBe('EXPECTED CAST (5): Aaron, Ben, Carl, Dan, Nia (animal, dog)');
+    expect(r.block).toBe('EXPECTED CAST (5): Aaron, Ben, Carl, Dan, Nia (animal, dog)' + CAST_ONLY_LINE);
   });
 
   it('does not add a VB entity the cover description never names', () => {
@@ -515,8 +520,11 @@ describe('extra_character — prompt vocabulary', () => {
     expect(t).toMatch(/D-04b `extra_character` → CRITICAL/);
     expect(t).toContain('{EXPECTED_CAST}');
     expect(t).toMatch(/`reference` is an EXPECTED CAST name .* or the literal `unmatched`/);
-    // N-09 is scoped to a populated setting the prompt itself calls for.
-    expect(t).toMatch(/N-09 Crowd extras\.\*\* Extra background figures ONLY when the USER_PROMPT itself calls for a populated setting/);
+    // N-09 reads the SETTING POPULATION line the Art Director's own `population`
+    // field produces — it never re-decides from the prompt (2026-09-19).
+    expect(t).toMatch(/N-09 Background people\.\*\* The `SETTING POPULATION` line in EXPECTED CAST decides this/);
+    expect(t).toContain('On `ambient`, distant background people belong to the setting and are never extras');
+    expect(t).toMatch(/D-04b `extra_character` → CRITICAL\.\*\* A person or animal figure that matches no EXPECTED CAST entry and that N-09 does not excuse/);
   });
 
   it('D-04b never instructs a removal (owner, 2026-09-13)', () => {

@@ -48509,3 +48509,97 @@ dropped by both stages or honoured twice.
 `scripts/admin/sibling-registry.json`, `tests/unit/arc-hint-handoff.test.ts`.
 
 **Status:** ✅ active
+
+## 2026-09-19 — A public setting has three population states, not two: `crowdExpected` becomes `population` (cast_only / ambient / crowd)
+
+**Context:** Ambient background people in a public setting were scored against
+the EXPECTED CAST and produced false `extra_character` CRITICALs on correct
+pictures. Measured on staging, every one authored by the code arithmetic
+(`derivePresenceFinding`, stamped `presence-arithmetic`), never by the quality
+judge — which had emitted only MODERATE `duplicate_identity` for the same
+figures:
+
+- `job_1789759147125_p08djwhbl` p2 scored **−17** for "5 person-figures for an
+  EXPECTED CAST of 2". The extras are distant park-goers on the Lindenhof —
+  a man by the wall, two adults on a bench, figures at the chess board. The
+  picture was inspected and is correct.
+- `job_1789506283204_3kxqshifx` p8 / p11 / p13 — the same square, the same
+  distant adults, 4 CRITICALs.
+- `job_1789420511893_zly5rcdej` — 9 of that class on a harbour crowd. That
+  story predates the 2026-09-15 `crowdExpected` template fix, so its briefs
+  carry `false` on all 16 pages while 11 of them describe a crowd.
+
+Three faults compounded, and all three were confirmed from stored data before
+anything was changed: (a) the Art Director asserts "no other people are
+present" about a public plaza, and that claim is what the judge holds the
+picture to; (b) `crowdExpected` was BINARY — a square, a park or a quay is
+neither "crowd required" nor "cast and nobody else", and there was no value for
+it; (c) the arithmetic counted distant figures at 0.23–1.93% of frame against a
+cast at 19–43%. `isMicroFigure` (2026-09-13) does not reach them: it requires
+no face AND no facePoint AND no samPoints AND area < 1%, and these figures carry
+a face box.
+
+**Decision:** `crowdExpected` is replaced by a three-state `population` on the
+page brief — `"cast_only"` (a private room, a forest clearing), `"ambient"`
+(a public place that simply has people in it), `"crowd"` (the page is written
+around unnamed background people). The legacy boolean still parses in both
+directions (`normalisePopulation`), so every stored row and every pre-existing
+brief keeps its exact behaviour, and `crowdExpected` continues to be published
+alongside, derived, for readers that only ask the old question.
+
+The presence arithmetic then behaves per state. `crowd` declines outright, as
+the boolean always did. `ambient` subtracts background-scale figures before
+comparing, and whatever surplus remains is still billed. `cast_only` is
+unchanged. "Background-scale" is decided by GEOMETRY ONLY — two caps that must
+both hold: an absolute ceiling of 2.5% of frame (the largest false positive
+measured 1.93%), and a relative ceiling of a quarter of the smallest
+high-confidence figure in the same frame. No label, description or finding text
+is ever read (CLAUDE.md: classification belongs to the prompt).
+
+The generator moved with the critic. The Art Director declares `population` in
+both templates and is forbidden from writing "no other people are present"
+about an ambient or crowd setting; `buildExpectedCastBlock` prints a
+`SETTING POPULATION` line into the roster, and N-09 / D-04b in
+`image-evaluation.txt` now READ that line instead of re-deriving the answer from
+the USER_PROMPT. `image-semantic.txt` and `image-prompt-compliance.txt` read it
+too, `image-generation.txt`'s REQUIRED CAST no longer forbids the background
+people the brief itself places, and both iterate templates keep them through a
+rewrite.
+
+**Rationale:** The relative cap is what makes this safe rather than merely
+permissive. `job_1789420511893_zly5rcdej` p16 carries a genuinely
+uncommissioned cast-scale child on the quay at 5.45% of frame against a cast
+whose smallest member is 3.10% — 1.8× the smallest cast figure. An absolute
+cap alone would still clear him on a page whose cast happens to be small; the
+relative cap drops that page's ceiling to 0.78% and he survives the filter.
+The separation is ~10× on every page measured, not a tuned margin.
+
+An ambient page with no usable geometry DECLINES rather than billing the
+CRITICAL: the detector has a VLM fallback whose figures carry a label and no
+box (p3/p4 of the harbour story: every figure box-less), and a size test over
+those is blind, not conservative.
+
+**Validation (free — no image generation, no paid call):** the derivation was
+replayed over the stored `bboxDetection.figures` of all 13 pages that carried a
+stored `extra_character`. All 12 false positives disappear (the 4 Lindenhof
+pages via `ambient_background`, the 8 harbour pages via `crowd_expected`);
+p16's genuine surplus still fires. Pinned by
+`tests/unit/ambient-background-people.test.ts`, whose fixtures are verbatim
+stored figures.
+
+**Touched:** `server/lib/bboxDetection.js` (`figureFrameArea`,
+`ambientAreaCeiling`, `isAmbientFigure`, `hasAmbientGeometry`,
+`countAmbientFigures`), `server/lib/sceneMetadata.js` (`normalisePopulation`,
+`POPULATION_LEVELS`), `server/lib/evalPipeline.js` (`buildExpectedCastBlock`,
+`derivePresenceFinding` + its call site), `server/lib/images.js`
+(`iterateSceneMetadata` carry-forward), `prompts/scene-expansion.txt`,
+`prompts/scene-expansion-all.txt`, `prompts/image-evaluation.txt`,
+`prompts/image-semantic.txt`, `prompts/image-prompt-compliance.txt`,
+`prompts/image-generation.txt`, `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`,
+`tests/unit/ambient-background-people.test.ts`,
+`tests/unit/extra-character-type.test.ts`, `tests/unit/one-roster.test.ts`,
+`tests/unit/scene-expansion-template-parity.test.ts`,
+`tests/unit/ad-iterate-parity.test.ts`.
+
+**Status:** ✅ active

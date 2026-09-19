@@ -2256,6 +2256,102 @@ function countRealFigures(figures) {
   return figures.filter(f => !isMicroFigure(f)).length;
 }
 
+/**
+ * AMBIENT BACKGROUND LIFE IS NOT CAST (2026-09-19).
+ *
+ * `isMicroFigure` above prunes sub-1% faceless smudges. It is not enough. A
+ * public setting — a city square, a park, a quay — legitimately holds distant
+ * people who are not the cast and are not a "crowd scene" either, and they are
+ * BIGGER than a smudge: they carry a face box and a couple of SAM points. The
+ * presence arithmetic counted them against the EXPECTED CAST and billed a
+ * CRITICAL `extra_character` on correct pictures.
+ *
+ * Measured over the three stories that motivated this (staging):
+ *   job_1789759147125_p08djwhbl p2  — cast 0.1937 / 0.2046, six park-goers
+ *                                     0.0023-0.0193 (score -17)
+ *   job_1789506283204_3kxqshifx p8  — cast 0.1911, five 0.0033-0.0119
+ *                             p11 — cast 0.2566, three 0.0110-0.0148
+ *                             p13 — cast 0.1771 / 0.1867, four 0.0034-0.0097
+ * and the case that must KEEP firing:
+ *   job_1789420511893_zly5rcdej p16 — cast 0.0310 / 0.0317 / 0.0712, and a
+ *                                     fourth, uncommissioned, cast-scale child
+ *                                     in the foreground at 0.0545.
+ *
+ * So the predicate is two caps, both of which must hold:
+ *   - an ABSOLUTE ceiling. The largest false positive measured 1.93% of frame;
+ *     2.5% leaves ~30% headroom and sits 2.2x below p16's genuine extra.
+ *   - a RELATIVE ceiling against the smallest CAST-SCALE figure in the same
+ *     frame (a quarter of it). This is what keeps p16 honest: its cast is
+ *     small, so its ceiling drops to 0.78% and the fourth child is nowhere
+ *     near ambient. A page whose cast fills the frame keeps the absolute cap.
+ *
+ * Cast scale is read off the detector's own `confidence: 'high'` figures —
+ * those are the ones it matched to a described roster entry. With none, only
+ * the absolute cap applies.
+ *
+ * Geometry only. This never reads a label, a description or a finding's prose
+ * (CLAUDE.md: classification is the prompt's job). It answers "how big is this
+ * figure", nothing else, and it filters FOR COUNTING — never mutates.
+ */
+const AMBIENT_AREA_CEILING = 0.025;
+const AMBIENT_CAST_SCALE_RATIO = 0.25;
+
+/** Normalised area of a figure's box, or null when it has no usable 0-1 box. */
+function figureFrameArea(figure) {
+  if (!figure || typeof figure !== 'object') return null;
+  const box = figure.gdinoBox || figure.box;
+  if (!Array.isArray(box) || box.length < 4) return null;
+  const [x1, y1, x2, y2] = box.map(Number);
+  if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+  // Normalised coordinates only — a pixel-space box would read as an enormous
+  // area. Failing to null is the safe direction: nothing is called ambient.
+  if (Math.max(x1, y1, x2, y2) > 1.0001) return null;
+  return Math.abs(x2 - x1) * Math.abs(y2 - y1);
+}
+
+/** The ambient ceiling for one frame, given every figure the detector returned. */
+function ambientAreaCeiling(figures) {
+  const castAreas = (Array.isArray(figures) ? figures : [])
+    .filter(f => f?.confidence === 'high')
+    .map(figureFrameArea)
+    .filter(a => typeof a === 'number' && a > 0);
+  if (castAreas.length === 0) return AMBIENT_AREA_CEILING;
+  return Math.min(AMBIENT_AREA_CEILING, Math.min(...castAreas) * AMBIENT_CAST_SCALE_RATIO);
+}
+
+/** True when this figure is background life at this frame's scale. */
+function isAmbientFigure(figure, ceiling = AMBIENT_AREA_CEILING) {
+  const area = figureFrameArea(figure);
+  if (area === null) return false;
+  return area < ceiling;
+}
+
+/**
+ * Is there enough geometry on this page to tell ambient life from cast at all?
+ *
+ * The detector has a VLM fallback whose figures carry a label and no box
+ * (job_1789420511893_zly5rcdej p3/p4: every figure box-less). A size test over
+ * those is not conservative, it is BLIND — it would call nothing ambient and
+ * bill the CRITICAL anyway. So the presence arithmetic asks this first and
+ * declines instead of guessing. One box is enough: a box-less figure alongside
+ * boxed ones is simply never called ambient.
+ */
+function hasAmbientGeometry(figures) {
+  if (!Array.isArray(figures)) return false;
+  return figures.some(f => !isMicroFigure(f) && figureFrameArea(f) !== null);
+}
+
+/**
+ * How many of the detector's real figures are ambient background life.
+ * Read by the presence arithmetic ONLY on a page the Art Director declared
+ * `population: "ambient"` — on a cast-only page every figure counts.
+ */
+function countAmbientFigures(figures) {
+  if (!Array.isArray(figures)) return 0;
+  const ceiling = ambientAreaCeiling(figures);
+  return figures.filter(f => !isMicroFigure(f) && isAmbientFigure(f, ceiling)).length;
+}
+
 module.exports = {
   parseVisualBibleObjects,
   resolveExpectedObjectLabels,
@@ -2271,6 +2367,11 @@ module.exports = {
   detectAllBoundingBoxes,
   isMicroFigure,
   countRealFigures,
+  figureFrameArea,
+  ambientAreaCeiling,
+  isAmbientFigure,
+  hasAmbientGeometry,
+  countAmbientFigures,
   vbNonHumanNames,
   // _detectAllBoundingBoxesImpl deliberately NOT exported — the stamping
   // wrapper above is the only entry (sourceImageFp invariant, 2026-07-19).

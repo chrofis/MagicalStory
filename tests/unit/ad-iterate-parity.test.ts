@@ -208,7 +208,7 @@ function declaredFields(text: string): Set<string> {
  */
 const CARRIED_IN_CODE: Record<string, string> = {
   era: 'the anachronism guard reads the story era, not the round',
-  crowdExpected: 'a repaired page must not lose its crowd flag and take a derived extra_character',
+  population: 'a repaired page must not lose how populated its setting is and take a derived extra_character',
   aboard: 'the camera-aboard element is the page composition, decided once',
   textPosition: 'locked at first generation; iteratePageCore passes textPositionOverride',
   textZoneDescription: 'the text-zone surface is the page layout, decided once',

@@ -147,7 +147,7 @@ Then a single-line JSON object:
     {"name": "CharacterB", "clothing": "costumed", "position": "center background", "perspective": "back view, head turned toward right shoulder", "depth": "background", "looksAt": "ART001", "expression": "one eye and cheek visible, calm, faint smile"}
   ],
   "shot": "medium",
-  "crowdExpected": false,
+  "population": "cast_only",
   "aboard": "VEH001",
   "landmarkView": "exterior",
   "era": "present day",
@@ -182,7 +182,11 @@ Then a single-line JSON object:
 - `looksAt` on every foreground/midground character: another character's name, a Visual Bible id (`ART001`, `CHR001`), `camera`, or `away`. Eyes only — see rule 8j. Never the object a character merely holds.
 - `era` is the story's time period in 2-4 words (medieval, 1920s, present day). It feeds the anachronism guard — omit only if the story has no defined era.
 - `shot` is the page's camera framing: {SHOT_ENUM}. Decide it once — the scene prose and the metadata use this same framing, and it is a framing the plate of the vantage this page cites can hold. Omitting it makes the plate default to a wide shot.
-- `crowdExpected` is `true` only when the page is written to hold unnamed background people beyond its listed cast — a crowd, a market, a busy street, a gathering, a body of troops. A page whose prose names its figures and nobody else is `false`. Omit it and the page is read as `false`.
+- `population` says how populated the page's setting is, in one of three values, and it is about the SETTING, not about who matters to the story.
+  - `"crowd"` — the page is written around unnamed background people: a market, a busy street, a gathering, a body of troops.
+  - `"ambient"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.
+  - `"cast_only"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.
+  Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them ("a few distant passers-by cross the far side of the square"), and keep them unnamed, distant and small.
 - `landmarkView` is how the page sees a real landmark, when one is cited: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
 - A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping, or feet-on-ground contact, and nothing placed behind the character. The outfit list still names all garments including footwear. A beat that needs below-waist action is a `medium` shot, not a close-up.
 - Only add `depth` when the character is in the background (default is foreground/midground).
