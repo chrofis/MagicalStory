@@ -81,3 +81,63 @@ describe('duplicate_object — prompt vocabulary', () => {
     expect(t).toMatch(/`duplicate_object`[^\n]*keeps its own type when merging/);
   });
 });
+
+/**
+ * WHICH JUDGES MAY EMIT IT (2026-09-19).
+ *
+ * `duplicate_object` was priced and bucketed on 2026-09-06 but reached exactly
+ * one of the four judges. The two that saw a duplicated garment on staging
+ * job_1789759147125_p08djwhbl (pages 7, 11, 14 — one worn on the body and a
+ * second copy held or lying apart) had no legal type for it and filed it as
+ * `clothing`: wrong class, wrong bucket, wrong repair. A judge with no legal
+ * way to be right is a different failure from a judge being wrong.
+ *
+ * The membership is the contract, so both halves are pinned — the judge that
+ * gained it, and the two that are deliberately without it.
+ */
+describe('duplicate_object — which judges carry the type', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  it('the semantic judge carries it in its closed type list', () => {
+    // Semantic sees the picture and owns depiction, so it gets the type.
+    // Asserted on the BUILT prompt: the closed list routes the repair, and a
+    // type absent from the string the model receives can never be emitted.
+    const { buildSemanticPrompt } = require_('../../server/lib/sceneValidator');
+    const built = String(buildSemanticPrompt(PROMPT_TEMPLATES.imageSemantic, {
+      storyText: 'The child carried the lantern down the path.',
+      sceneHint: 'A child walks a path at dusk carrying a lantern.',
+      imagePrompt: 'A child walks a path at dusk carrying a lantern.',
+      interactionsBlock: '(none declared)',
+      elementsBlock: 'ART001 — lantern',
+      evalContext: { artStyle: 'watercolor' },
+    }));
+    expect(built).toContain('`duplicate_object`');
+    expect(built).toContain('type: duplicate_object');
+    expect(built).not.toMatch(/\{[A-Z][A-Z0-9_]*\}/);
+  });
+
+  it('the entity-consistency judge does NOT — it cannot see a duplicate', () => {
+    // It compares ONE cropped cutout of ONE entity per page; a second copy
+    // standing apart from the figure is cut away with the background, so the
+    // type would only let it guess a class from evidence it never receives.
+    const t = String(PROMPT_TEMPLATES.entityConsistencyCheck || '');
+    expect(t, 'entity-consistency template must load').toBeTruthy();
+    expect(t).not.toContain('duplicate_object');
+  });
+
+  it('the blind prompt-compliance judge does NOT — it never sees the image', () => {
+    // Its remit was narrowed on 2026-09-19 to stop it ruling on depiction, and
+    // it is off in production (docs/SETTLED.md). A depiction type here would
+    // reverse that.
+    const t = String(PROMPT_TEMPLATES.imagePromptCompliance || '');
+    expect(t, 'prompt-compliance template must load').toBeTruthy();
+    expect(t).not.toContain('duplicate_object');
+  });
+
+  it('the illustrator was already told to draw one of each named object', () => {
+    // The generator half of the generator-vs-critic pair: a rule a judge may
+    // deduct for is a rule the generator was given.
+    const t = String(PROMPT_TEMPLATES.imageGeneration || '');
+    expect(t).toContain('Draw exactly one of each named object.');
+  });
+});

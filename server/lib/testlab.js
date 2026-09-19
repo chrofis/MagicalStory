@@ -9337,7 +9337,7 @@ async function runBeatsReplanStage(target, { params = {} }) {
   const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
 
   // ── the plan check ────────────────────────────────────────────────────────
-  const checkPrompt = buildPlanCheckPrompt(storyData, standing, approvedArc, pagePlan, []);
+  const checkPrompt = buildPlanCheckPrompt(storyData, standing, approvedArc, pagePlan);
   if (!checkPrompt) throw new Error('plan-check template unavailable');
   let t = Date.now();
   const checkRes = await callTextModelStreaming(checkPrompt, null, null, checkModel, {

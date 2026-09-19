@@ -8108,14 +8108,30 @@ function critiqueMaxSeverity(critique) {
  * images"). Everything countable is counted in code (server/lib/planCounters.js);
  * this ONE cheap call answers the three questions arithmetic cannot, and it
  * outputs numbered findings only — never a beat, never a rewrite.
+ *
+ * THE CHECKER IS NOT SHOWN THE COUNTER FINDINGS, AND CANNOT BE (2026-09-11).
+ *
+ * It was, until `df1eb1ff3` inverted the order. Before that the counters ran
+ * first and their lines rode in under an `# ALREADY COUNTED` heading; that
+ * commit deleted `isThingMarked` — the grammar heuristic that decided from the
+ * prose whether a capitalised name was a person — and made THIS call answer the
+ * question instead, as a ROSTER. The counters now do arithmetic ON that roster,
+ * so they run AFTER this prompt is built and there is nothing to show it. The
+ * `{COUNTER_FINDINGS}` placeholder went out of `plan-check.txt` in the same
+ * commit and `# THE ROSTER` took its place.
+ *
+ * What survived the inversion was a fifth parameter and a `COUNTER_FINDINGS:`
+ * fill for a key no template declares — and `fillTemplate` drops an undeclared
+ * key SILENTLY, so both call sites had been passing `[]` into a hole. Removed
+ * here so the signature states the contract: this prompt's inputs are the arc
+ * and the page plan, and the counting happens downstream of its answer.
  */
-function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counterFindings = '') {
+function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '') {
   const template = PROMPT_TEMPLATES.planCheck;
   if (!template) {
     log.error('[PROMPT] planCheck template not loaded — plan check unavailable');
     return null;
   }
-  const counted = (Array.isArray(counterFindings) ? counterFindings.join('\n') : String(counterFindings || '')).trim();
   return fillTemplate(template, {
     DEED_AND_EFFECT_DEF,
     TWO_HEIGHTS_DEF,
@@ -8130,7 +8146,6 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '', counter
     // re-plan left only the page list.
     PAGE_PLAN: String(pagePlan || '').trim() || planBlocks(beats) || '(the planner emitted no page plan)',
     FINAL_ARC: String(arc || '').trim() || '(no arc was recorded)',
-    COUNTER_FINDINGS: counted || '(the counters found nothing)',
   });
 }
 

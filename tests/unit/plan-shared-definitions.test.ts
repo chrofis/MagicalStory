@@ -10,7 +10,7 @@ const input = () => ({
 const planner = () => pb.buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
 const checker = () => pb.buildPlanCheckPrompt(
   input(), [{ pageNumber: 1, planLine: 'medium — Levin — he waits — nothing' }],
-  '1. A story.', 'Page 1: medium — Levin — he waits — nothing', []);
+  '1. A story.', 'Page 1: medium — Levin — he waits — nothing');
 
 /**
  * story-beats.txt states each page rule as an imperative and plan-check.txt

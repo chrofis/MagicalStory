@@ -656,7 +656,7 @@ describe('the generator is told exactly what the review enforces', () => {
   it('the critic declares the obstacle evidence the review reads', () => {
     const prompt = PB.buildPlanCheckPrompt(inputData, [
       { pageNumber: 1, planLine: 'wide — Mara — she walks on — she is further along' },
-    ], 'an arc', PLAN, '');
+    ], 'an arc', PLAN);
     expect(prompt).toContain('OBSTACLES <page>:');
     // The generator half of the same pair: the page names that character.
     const beats = PB.buildBeatsPrompt(inputData, 4, { finalArc: 'a line' });

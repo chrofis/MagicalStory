@@ -46,7 +46,7 @@ describe('check 3 counts the cast a covers field expands', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
   it('tells the checker to count covers, not the who column alone', () => {
-    const p = buildPlanCheckPrompt(input(), [{ pageNumber: 1, planLine: 'medium — Levin — he waits — nothing' }], '1. A story.', 'Page 1: medium — Levin — he waits — nothing', []);
+    const p = buildPlanCheckPrompt(input(), [{ pageNumber: 1, planLine: 'medium — Levin — he waits — nothing' }], '1. A story.', 'Page 1: medium — Levin — he waits — nothing');
     expect(p).toContain("counting the names that page's ROSTER line expands under `covers`");
     expect(p).toContain('never the who column alone');
   });

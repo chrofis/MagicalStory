@@ -23,7 +23,7 @@
 import { describe, it, beforeAll, expect } from 'vitest';
 
 const PB = require('../../server/lib/promptBuilders');
-const { loadPromptTemplates } = require('../../server/services/prompts');
+const { loadPromptTemplates, PROMPT_TEMPLATES: TEMPLATES } = require('../../server/services/prompts');
 
 const CHARACTERS = [
   { id: 'c1', name: 'Mara', age: 7, gender: 'female' },
@@ -75,7 +75,7 @@ describe('the plan check asks every question it says it asks', () => {
 
   beforeAll(async () => {
     await loadPromptTemplates();
-    prompt = PB.buildPlanCheckPrompt(inputData, BEATS, ARC, PAGE_PLAN, '');
+    prompt = PB.buildPlanCheckPrompt(inputData, BEATS, ARC, PAGE_PLAN);
     expect(prompt, 'the plan check template must load').toBeTruthy();
   });
 
@@ -107,6 +107,36 @@ describe('the plan check asks every question it says it asks', () => {
   it('carries its inputs — the arc and the page plan both arrive', () => {
     expect(prompt).toContain(ARC);
     expect(prompt).toContain('he pulls the rope taut');
+  });
+});
+
+/**
+ * The counter findings are NOT an input to this prompt and cannot be
+ * (2026-09-11, df1eb1ff3): the counters do arithmetic on the ROSTER this call
+ * returns, so they run after it. A fifth argument and a `COUNTER_FINDINGS:`
+ * fill outlived that inversion for eight days, filling a key no template
+ * declares — which `fillTemplate` drops without a word.
+ *
+ * Pinned as CONTRACT, not wording: the template declares no counter
+ * placeholder, and no counter text reaches the model however it is passed.
+ */
+describe('the plan check is never handed the counter findings', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  it('the template declares no counter placeholder', () => {
+    const t = String(TEMPLATES.planCheck || '');
+    expect(t).toBeTruthy();
+    expect(t).not.toContain('{COUNTER_FINDINGS}');
+  });
+
+  it('a caller that passes counter lines anyway cannot smuggle them in', () => {
+    // Belt and braces: extra arguments are legal JavaScript, so the guarantee
+    // has to be that the built string carries none of it.
+    const smuggled = 'MAIN_UNDER_HALF: the main character is in frame on 3 of 18 pages';
+    const prompt = (PB.buildPlanCheckPrompt as any)(inputData, BEATS, ARC, PAGE_PLAN, [smuggled]);
+    expect(prompt).not.toContain(smuggled);
+    expect(prompt).not.toContain('MAIN_UNDER_HALF');
+    expect(prompt).not.toMatch(/\{[A-Z_]{3,}\}/);
   });
 });
 

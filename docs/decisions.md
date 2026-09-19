@@ -49885,3 +49885,110 @@ of the owner's original ask and is not done here.
 `tests/unit/gap-action-framing.test.ts`, `tests/unit/shot-vocabulary-one-source.test.ts`.
 
 **Status:** ✅ active
+
+## The plan checker is not shown the counter findings, and cannot be — the dead `COUNTER_FINDINGS` fill is removed (2026-09-19)
+
+**Context:** `buildPlanCheckPrompt` took a fifth argument, `counterFindings`, and
+filled a `COUNTER_FINDINGS` key. `prompts/plan-check.txt` declares no such
+placeholder, and `fillTemplate` drops an undeclared key silently — so the value
+went nowhere and nothing said so. Both call sites (`beatsPipeline.js` production,
+`testlab.js` Lab mirror) were passing `[]` into that hole.
+
+**Was it an omission or deliberate?** Deliberate, with git evidence on both sides.
+`b736f0ff7` (2026-09-01) shipped the pair working: `runPlanCounters` ran FIRST,
+`counters.lines` was passed in, and plan-check.txt carried `{COUNTER_FINDINGS}`
+under an `# ALREADY COUNTED` heading ("Counters have measured the division; these
+are their results, for reference"). `df1eb1ff3` (2026-09-11) inverted the order —
+it deleted `isThingMarked`, the grammar heuristic that decided from plan-line prose
+whether a capitalised name was a person, and made the plan-check call answer that
+question as a ROSTER instead. The counters now do arithmetic ON that roster, so
+they run AFTER the prompt is built. In the same commit the placeholder was replaced
+by `# THE ROSTER`. What the commit did not remove was the parameter and the fill.
+
+**Decision:** Remove the parameter and the `COUNTER_FINDINGS:` fill. The checker's
+inputs are the arc and the page plan; the counting happens downstream of its answer,
+and the signature now says so. Both call sites drop the `[]`. A test pins the
+contract behaviourally — the template declares no counter placeholder, and counter
+text passed as an extra argument does not reach the built string.
+
+**Rationale:** The alternative — adding the placeholder back — is not available:
+the data does not exist at the moment the prompt is built. Keeping the fill kept a
+parameter that reads as a live input and would invite exactly that wrong fix.
+
+**The general guard, and why it is NOT built.** `fillTemplate` already warns on the
+reverse direction (a placeholder the caller did not fill) and `assertNoPlaceholders`
+throws on it at the model-call boundary. Nothing guards a FILLED key the template
+does not declare. Measured before deciding, by static scan of every
+`fillTemplate(…, {…})` call site in the repo: **10 live templates are filled with at
+least one key they do not declare, ~20 keys in total** — `planCheck`
+(`COUNTER_FINDINGS`, this entry), `sceneExpansion` (9: `SCENE_SUMMARY`,
+`SCENE_CONTEXT`, `CHARACTERS`, `LANGUAGE_NAME`, `LANGUAGE_INSTRUCTION`,
+`LANGUAGE_NOTE`, `CORRECTION_NOTES`, `MAX_CHARACTERS_PER_SCENE`,
+`SCALE_CLASS_SPEC`), `sceneExpansionAll` (`MAX_CHARACTERS_PER_SCENE`), `storyBeats`
+(`WANTED_PICTURE_DEF`), `storyTrial` (`LANGUAGE_NOTE`), `trialIdea` (`TITLE`),
+`sheet2x4StyleEval` (`REQUESTED_OUTFIT`), `characterRepairBodyBlended`
+(`identityName`, `appearanceContext`), `characterRepairInpaint` (`identityName`),
+`vbLabelRepair` (`STORY_LANGUAGE`). So a **throw** breaks ten production paths on
+day one, and a **warn** adds ~20 lines per run to a log where the existing
+warn-then-strip guard is already documented as "one line among thousands". Neither
+ships here. The ten are logged as findings in `tasks/BACKLOG.md` — each is either a
+dead fill like this one or a live silent drop, and they have to be triaged
+individually before any guard can be armed without noise or breakage.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildPlanCheckPrompt`),
+`server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`tests/unit/plan-check-question-count.test.ts` and four other suites whose call
+sites dropped the vestigial argument.
+
+**Status:** ✅ active
+
+
+## `duplicate_object` reaches the semantic judge; the entity and compliance judges stay without it (2026-09-19)
+
+**Context:** `duplicate_object` has been a priced, bucketed, consolidator-known type
+since 2026-09-06 (image-evaluation D-32, MAJOR ceiling in `scoring.js`, its own bucket
+in `evalBuckets.js`) — but it was written into exactly one of the four judge prompts.
+The five-site registration checklist for a new scored type covers vocabulary, scoring
+table, bucket, consolidator and `subType` survival; all five were done. What it does
+not cover is the reverse direction: **which judges get the vocabulary.** Measured on
+staging `job_1789759147125_p08djwhbl`, pages 7, 11 and 14 render the same garment
+twice in one frame — worn on the body and a second copy held or lying apart. The
+judges that saw it had no legal type for it and filed it as `clothing`: wrong class,
+wrong bucket, wrong repair route. That is a judge with no legal way to be right,
+which is a different failure from a judge being wrong.
+
+**Decision (owner-approved):** add the type to `prompts/image-semantic.txt` only.
+Four edits, because a type in a closed list that the prompt's own ignore rules cancel
+is still dead: the STEP 3 check, the `SEVERITIES` line, the entry in the closed type
+list, and a carve-out in the two places the prompt tells the judge that extra objects
+are never issues. The definition and its exclusions are D-32's, kept word for word —
+a prop the scene has ONE of rendered twice or more; skip a stated count or plural;
+skip generic set dressing.
+
+**`prompts/entity-consistency-check.txt` — NO.** It is architecturally blind to the
+defect. It compares one cropped cutout of one entity per page, and the prompt states
+that whatever stood apart from the figure "was cut away with the background". A second
+copy of a garment lying elsewhere in the frame is exactly what the crop removes, and
+for an object entity a within-page duplicate still yields one crop, not two. Its remit
+is cross-page drift, not within-frame duplication. Giving it the type would let it
+guess the class from evidence it never receives — and it would collide with
+`clothing_inconsistent`, which it owns natively, in a way its Type Tie-Break cannot
+resolve.
+
+**`prompts/image-prompt-compliance.txt` — NO.** It never sees the image, it is off in
+production (`promptComplianceJudge` defaults false, `c1c119ad8`), and its remit was
+narrowed on 2026-09-19 specifically to stop it ruling on depiction. A depiction type
+here reverses that same-day decision.
+
+**Generator side:** already covered. `prompts/image-generation.txt` line 3 carries
+"Draw exactly one of each named object." — the illustrator was told before the judge
+could deduct for it, which is the generator-vs-critic contract for the
+`page-image-generator-vs-critics` sibling set. No generator edit was needed; a test
+pins that the line is still there.
+
+**Not touched:** `server/lib/scoring.js`. The MAJOR ceiling is already correct and
+the severity the semantic judge is told to tag matches it.
+
+**Touched:** `prompts/image-semantic.txt`, `tests/unit/duplicate-object-type.test.ts`.
+
+**Status:** ✅ active

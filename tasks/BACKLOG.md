@@ -1679,3 +1679,28 @@ owner calls the shipped changes opened.
 - [ ] **`page_quality` double-counts stage 1 and mis-prices stage 2 as Gemini.** `evaluateImageQuality` rolls `threeStage_input_tokens` (which already contains stage 1) **and** `p1_*` (stage 1 again) into its returned `usage.input_tokens`, and `images.js` / `repairPipeline.js` record that rollup under `page_quality` at the `gemini_quality` price. So every cost report has overstated `page_quality` and the true three-stage share was split across two buckets. Unquantifiable from stored data — the rollup `usage` object is not persisted on stored versions (`usage.threeStage_*` / `usage.p1_*` are null on all 72 nodes of `job_1789759147125_p08djwhbl`). Found while measuring the saving; not fixed → `server/lib/evalPipeline.js` (the two `input_tokens:` rollups), `server/lib/images.js`, `server/lib/repairPipeline.js`
 - [ ] **The Lab's `eval_variance` report will show the compliance judge as perfectly stable and perfectly clean.** `pointsBy('compliance')` → 0, `bySource.compliance = { pointRange: 0, detectionFlips: 0, severityFlips: 0 }` — a measurement tool reporting a false clean for a judge that did not run. The page-level `notEvaluated` record travels with the result but the report does not read it → `server/lib/testlab.js` (~`:1010-1024`, `:1153-1158`)
 - [ ] **Nothing in the client knows about `notEvaluated`.** Zero references in `client/src/`; the dev panel's Stage-1/Stage-2 blocks simply do not render when `threeStageResult` is null, which looks identical to a page nobody scrolled to. With the judge off by default there is no affordance anywhere in the UI saying so → `client/src/components/generation/story/ImageHistoryModal.tsx`, `client/src/types/story.ts`
+
+## 2026-09-19 — `fillTemplate` fills keys no template declares (found while fixing the plan-check `COUNTER_FINDINGS` drop)
+
+`fillTemplate` drops an undeclared key **silently**. The reverse direction is guarded
+(`fillTemplate` warns on an unfilled placeholder, `assertNoPlaceholders` throws at the
+model-call boundary); this direction is not. A static scan of every
+`fillTemplate(…, {…})` call site found **10 live templates filled with at least one key
+they do not declare**. Each is either a dead fill (the value is computed and thrown away)
+or a live silent drop (an input the model was meant to have and never gets) — they have to
+be triaged one by one before a `fillTemplate` warn-or-throw guard can be armed, because a
+throw breaks all ten and a warn adds ~20 lines per run to a log the existing warn-then-strip
+guard is already lost in. Rationale + the full measurement: `docs/decisions.md` →
+"The plan checker is not shown the counter findings" (2026-09-19).
+
+- [x] (2026-09-19) `planCheck` ← `COUNTER_FINDINGS` — CLOSED: deliberate removal on 2026-09-11 left the fill behind; parameter and fill deleted → `server/lib/promptBuilders.js` `buildPlanCheckPrompt`
+- [ ] `sceneExpansion` ← 9 undeclared keys (`SCENE_SUMMARY`, `SCENE_CONTEXT`, `CHARACTERS`, `LANGUAGE_NAME`, `LANGUAGE_INSTRUCTION`, `LANGUAGE_NOTE`, `CORRECTION_NOTES`, `MAX_CHARACTERS_PER_SCENE`, `SCALE_CLASS_SPEC`). The per-page Art Director fallback; the all-pages sibling declares some of these, so check which are dead and which are drift → `server/lib/promptBuilders.js:2799`, `prompts/scene-expansion.txt`
+- [ ] `sceneExpansionAll` ← `MAX_CHARACTERS_PER_SCENE`. The cast cap is computed and not shown to the Art Director on the live beats path — check whether the cap reaches it by another route before deleting the fill → `server/lib/promptBuilders.js:2523`, `prompts/scene-expansion-all.txt`
+- [ ] `storyBeats` ← `WANTED_PICTURE_DEF`. The planner/checker shared-definition test asserts the planner asks the question in its own words, so this fill is probably dead — confirm and delete → `server/lib/promptBuilders.js:6888`, `prompts/story-beats.txt`
+- [ ] `storyTrial` ← `LANGUAGE_NOTE` → `server/lib/promptBuilders.js:9060`, `prompts/story-trial.txt`
+- [ ] `trialIdea` ← `TITLE` (two call sites: the builder and its manual render harness) → `server/lib/promptBuilders.js:9428`, `tests/manual/render-trial-idea-prompt.js`, `prompts/trial-idea.txt`
+- [ ] `sheet2x4StyleEval` ← `REQUESTED_OUTFIT`. Same key, same judge family as the 2026-09-14 bug where a heads branch shipped the literal `{REQUESTED_OUTFIT}` to a judge — check whether the style eval is meant to see the outfit → `server/lib/character2x4Sheet.js:1214`, `prompts/sheet-2x4-style-eval.txt`
+- [ ] `characterRepairBodyBlended` ← `identityName`, `appearanceContext`. `charName` is declared and carries the same value as `identityName`, so that one is an alias; `appearanceContext` is a genuine drop — the blended body repair prompt never receives the figure's appearance → `server/lib/faceRepair.js:715`, `prompts/character-repair-body-blended.txt`
+- [ ] `characterRepairInpaint` ← `identityName` (alias of the declared `charName`) → `server/lib/faceRepair.js:728`, `prompts/character-repair-inpaint.txt`
+- [ ] `vbLabelRepair` ← `STORY_LANGUAGE`. The label repair is asked to rewrite labels without being told the story's language → `server/lib/beatsPipeline.js:551`, `prompts/vb-label-repair.txt`
+- [ ] Decide the guard once the ten above are triaged: warn, throw, or a static push-time check over `fillTemplate(PROMPT_TEMPLATES.x, {…})` call sites. Owner's call (prompt-vs-code rule) → `server/services/prompts.js` `fillTemplate`

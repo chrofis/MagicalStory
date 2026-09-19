@@ -1271,7 +1271,9 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     let reply = '';
     let rosterLines = [];
     try {
-      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, []);
+      // No counter findings ride in: they do not exist yet. See the builder's
+      // header — the counters read this call's ROSTER, so they run below.
+      prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText);
       if (!prompt) throw new Error('plan-check template unavailable');
       const res = await textModels.callTextModelStreaming(prompt, null, onChunk, planCheckModel, {
         usageLabel: label,

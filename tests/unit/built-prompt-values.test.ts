@@ -195,8 +195,8 @@ const CASES: Case[] = [
   {
     name: 'buildPlanCheckPrompt (the beats layer’s only model check)',
     probe: PLAN_LINE,
-    build: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, '', ''),
-    blind: () => PB.buildPlanCheckPrompt(inputData, [{ pageNumber: 1, planLine: 'close — she walks home' }], ARC_LINE, '', ''),
+    build: () => PB.buildPlanCheckPrompt(inputData, BEATS, ARC_LINE, ''),
+    blind: () => PB.buildPlanCheckPrompt(inputData, [{ pageNumber: 1, planLine: 'close — she walks home' }], ARC_LINE, ''),
   },
   {
     name: 'buildArcCreatePrompt (the arc machine)',
