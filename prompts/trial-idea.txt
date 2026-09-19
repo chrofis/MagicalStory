@@ -12,6 +12,8 @@ The season only limits what could plausibly happen. It gets no words in the idea
 
 Center the idea on the main character. Keep the cast minimal — add another person only when the story needs one.{COSTUME_RULE}
 
+{ANIMAL_FATE}
+
 {VARIETY_AXIS}
 
 Name each thing plainly, with no ornamental adjective on a place, a creature or an object.

@@ -197,3 +197,24 @@ describe('the variety axis varies across draws', () => {
     expect(text.split(/\s+/).length).toBeLessThan(30);
   });
 });
+
+// An animal-fate rule reaches the two places a story's EVENTS are decided: both
+// trial idea arms, and {TELLING_RULES} for the arc authors. Pins the REACH, not
+// the wording — a round-6 card had a creature go still and a meal follow in the
+// same sentence, with no rule in the system objecting.
+describe('the animal-fate rule reaches both idea arms and the arc authors', () => {
+  it('is one constant, filled into both arms at every band', () => {
+    for (const age of [2, 8]) {
+      const { local, fantasy } = pb.buildTrialIdeaPrompts(args(age));
+      for (const prompt of [local, fantasy]) {
+        expect(prompt).toContain(pb.ANIMAL_FATE_RULE);
+        expect(prompt).not.toMatch(/\{ANIMAL_FATE\}/);
+      }
+    }
+  });
+
+  it('rides {TELLING_RULES} too, so the arc authors are not a hand-kept copy', () => {
+    const telling = pb.buildTellingRulesSection({ characters: chars(8) });
+    expect(telling).toContain(pb.ANIMAL_FATE_RULE);
+  });
+});

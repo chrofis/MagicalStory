@@ -7420,6 +7420,20 @@ const SCENE_INTENT_FIELD_RULE = "2-3 present-tense sentences naming the single m
  */
 const TEXT_NOT_A_CHECKLIST_RULE = "A page's text may name several characters and several actions; its picture stages one moment — the one its brief names. A character or an action the text names and the frame does not show is not a fault: not at any severity, and not as support for another finding. Where the whole book is in view, one absence is a fault: a character the story gives a moment of their own — an obstacle they raise, a turn they cause — that no page's plan line stages. Charge that one to the plan, never to a picture.";
 
+/**
+ * What may become of an animal a character cares about. ONE constant, two
+ * consumers: the trial idea template (both arms, via {ANIMAL_FATE}) and
+ * {TELLING_RULES} for the arc authors — the two places a story's EVENTS are
+ * decided. The trial prose writer reaches it through the idea it is handed, and
+ * the beats writer through the arc, so neither needs a copy.
+ *
+ * Distinct from the peril rule, which caps the MAGNITUDE of what threatens the
+ * cast; it says nothing about what becomes of a creature nobody is threatened
+ * by. A round-6 trial card had a creature go still, be lifted out in triumph
+ * and a meal follow in the same sentence, and no rule in the system objected.
+ */
+const ANIMAL_FATE_RULE = "An animal or creature a character cares about is never still, hurt, dead or eaten; it is alive and moving when the story leaves it. No meal follows a creature in the same breath.";
+
 const RISK_FRAMING_RULE = '- Where a child does something with real physical risk, the risk is present in the telling: someone is careful, names it aloud, or the child feels it — and the close does not treat it as nothing. An adult who permits it still says what to watch for.';
 
 /**
@@ -7511,6 +7525,7 @@ function buildTellingRulesSection(inputData = {}) {
     ...(simple ? [] : ['- A rival\'s thread ends with the rival present — arriving too late, seeing what they lost, paying; a defeat only reported is an open thread. Between their first and last appearance the rival appears at least once more.']),
     '- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level; a refusal, a loss, a delay or a broken promise carries the peril instead. Nobody looks monstrous, no familiar character turns frightening, and anyone separated or lost is reunited.',
     RISK_FRAMING_RULE,
+    `- ${ANIMAL_FATE_RULE}`,
     '- The story ends with the children safe and together, one of them feeling something a child can name. A container or reveal the story promises opens before the end, and a story that enters through a doorway, portal or frame returns through it.',
     '- The ending is the page the child remembers: one emotion or one image that stays — never bookkeeping, never a stated moral. Settle debts and props before the final page; the last page belongs to the feeling.',
     '- Close every thread: a question raised is answered, and anything that resolves the conflict has an origin — an earlier setup, an in-world rule, a legend. A character singled out — the only one who can help, waited for, chosen — has a stated reason.',
@@ -9044,6 +9059,7 @@ function buildTrialIdeaPrompts({
     LANG_INSTRUCTION: langInstruction,
     AGE_MODE: buildAgeModeSection({ characters }, { bandView }),
     COSTUME_RULE: costumeRule,
+    ANIMAL_FATE: ANIMAL_FATE_RULE,
   });
 
   const townClause = townName ? `in ${townName}` : `in the child's own town`;
@@ -9159,6 +9175,7 @@ module.exports = {
   buildArcBudgetSection,
   buildTellingRulesSection,
   RISK_FRAMING_RULE,
+  ANIMAL_FATE_RULE,
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
   MULTI_PICTURE_PROP_RULE,
