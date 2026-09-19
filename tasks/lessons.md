@@ -917,3 +917,17 @@ at the pixels. A text naming something is not a promise; the brief and the plan 
 an observation, never a finding.
 
 - **A green unit suite is not validation** (2026-09-19). Run the cheapest rung that exercises the changed path against real data before pushing: stored replay (free) -> Lab stage (cents) -> 4-page smoke -> showcase. Under ~CHF 0.50 and a few minutes is not optional. "Not validated, and why" is an acceptable report; silence is not. A cross-page scale check was written, unit-tested, documented and shipped without ever running once against a real story — which is how a 3-call research protocol survived into production unnoticed.
+
+### 2026-09-19: `git log -1` then `git commit --amend` is a race in a shared tree
+
+- **Context**: adding a `Siblings-Checked:` vouch to my own just-made commit.
+- **Mistake**: `git log -1 --pretty=%B > msg && git commit --amend -F msg`. Between the
+  two, a parallel session committed. The amend rewrote THEIR commit, replacing its SHA
+  and appending my vouch line to their message. Their tree was untouched, but their
+  commit was silently reauthored (98226ffd8 → c03c6dd43).
+- **Correction**: restored their message byte-for-byte from the reflog and added my
+  vouch as a separate `--allow-empty` commit naming my SHA — the form the sibling gate
+  explicitly supports ("without rewriting history").
+- **Rule**: in this tree, **never `--amend`**. HEAD is not yours between two commands.
+  Add a follow-up commit instead, and address it by SHA. If an amend is truly needed,
+  verify `git rev-parse HEAD` equals the SHA you intend *in the same command* as the amend.
