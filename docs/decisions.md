@@ -88,6 +88,60 @@ need a second noun phrase per theme; left as an open observation.
 `tests/unit/theme-play-sentence.test.ts` (7 contract tests).
 **Status:** ✅ active — local commit only, not pushed.
 
+### Verification — round 8 vs round 7 (appended after the fix was measured)
+
+The entry above was written before validation. Round 8 ran on staging at deployed SHA `54759057`,
+and **one rater recounted BOTH rounds in a single pass** per the 2026-09-16 methodology entry.
+Alignment check: the recount reproduced round 7's word counts exactly (67.2 / 93 / 26) and landed
+on the same means on both axes (3.61 / 3.07). That rater applies a STRICTER rule for "card 2 is a
+real elsewhere" than the round-7 session — 6 round-7 failures rather than 3 — and applied the same
+strict rule to both rounds, so the R7 column below is the **recount**, not the earlier published
+figure.
+
+| Measurement | R7 | R8 |
+|---|---|---|
+| Card 2 is a genuine invented elsewhere | 8/14 | 10/14 |
+| — place themes | 6/6 | 6/6 |
+| — role themes | 2/8 | 4/8 |
+| Arm duplication by shape (same + near) | 12/14 | 13/14 |
+| Words mean / max / over-50 | 67.2 / 93 / 26 | 66.3 / 92 / 25 |
+| Non-resolving | 0/28 | 0/28 |
+| Animal still/hurt/dead/eaten | 1 clear + 1 borderline | 0 clear + 1 borderline |
+| Obstacle IS the commissioned challenge | 23/28 | 20/28 |
+| Attempt addresses that obstacle | 28/28 | 27/28 |
+| Setting load-bearing | 27/28 | 26/28 |
+| Challenge named outright | 0/28 | 0/28 |
+| Non-child resolves | 2/28 | 1/28 |
+| Broken German | 2 + 1 typo | 2 |
+| Overall child / parent | 3.61 / 3.07 | 3.82 / 3.21 |
+
+**Verdict: the fix is real, correctly scoped, and partial.**
+
+- **Place themes were never the problem** (6/6 in both rounds) and the new wording did not disturb
+  them. That is the scoping check passing.
+- **Role themes went 2/8 → 4/8.** Two cells cleared outright, and they are exactly the ones the fix
+  targets: a chestnut crown in a real play group became an invented kingdom; a map drawn at a table
+  became an invented island with tides and a sandbank.
+- **Residual pattern, recorded precisely:** the model treats the role's **PROPS** (helmet, hose,
+  wand, magnifier) as sufficient make-believe and keeps the action in the room those props are in.
+  One card names an invented knightly realm and then freezes at the darkness *under the big table*;
+  another names an invented town and then knocks over a drawing on a real drawing table. The world
+  sentence is obeyed at the level of the noun and abandoned at the level of the scene.
+
+**Arm duplication — CLOSED as a question, with the cause located.** It did not move (12/14 → 13/14,
+inside one rater's boundary). The cause is **proven, not inferred**: both arms derive the obstacle
+and the resolution from the SAME commissioned life-skill challenge and the SAME teaching guide, so
+changing the world changes the nouns and leaves the skeleton. Clearest evidence: one cell's two
+cards are the identical card — task interrupted by a toilet urge, full routine, task completed —
+with a glitter cup swapped for a unicorn crown.
+
+The want-axis fix (`d348b5b4f`) and this fantasy-world fix (`baee905b2`) **both addressed layers
+above this one**. Both were real defects and both stand; neither was ever going to move duplication,
+because duplication lives below them. The only remaining lever is **varying the obstacle or the
+resolution per arm** — which means touching the shared teaching guide, the thing that makes a
+life-skill story teach its skill. That is **high-risk and NOT recommended without an explicit owner
+decision.**
+
 
 ## 2026-09-19 — The central-object coverage rule is REVERTED: it fires on the lost-object stories it was meant to protect, and it reads an object out of a column of characters
 
@@ -48275,3 +48329,29 @@ at this" verdict is worth exactly one replay before it is believed.
 `tests/unit/plan-check-finding-separator.test.ts`.
 
 **Status:** ✅ active
+
+
+## 2026-09-19 — OPEN OBSERVATIONS: two text-fault classes a syntax proofreader passes, plus a self-resolving obstacle
+
+**Context.** The round-8 trial-idea recount (see the verification block on the "A ROLE is not a
+WORLD" entry above) surfaced two fault classes not previously recorded here. Both are invisible to
+a check that looks for malformed German, because in both the German is well-formed. Recorded as
+observations awaiting a decision — **no rule, prompt or code has been changed for either.**
+
+**1. Meaning inversion.** One card wrote *"und weicht keiner Frage aus"* — literally *dodges no
+question* — where the sense required was that the character IS evasive. Grammatically clean,
+semantically reversed. This is a different class from the broken-syntax faults already tracked: any
+German check oriented at malformed syntax passes it, because there is nothing malformed to find.
+
+**2. The theme dropped inside its own cell.** A dinosaur-theme cell produced a card with no
+dinosaur; a mermaid-theme cell produced a frog at a well and no mermaid. The theme reaches the
+prompt correctly — verified in the built prompt, not assumed — so this is not a plumbing fault. The
+model simply does not use the theme it was given.
+
+**Smaller observation — an obstacle that resolves itself.** One card had a dog block the path and
+then simply trot away, so the child's attempt never addressed it. That single card produced **both**
+of round 8's outliers on those axes: its one attempt-does-not-address-obstacle miss (27/28) and its
+one non-child-resolves case (1/28).
+
+**Touched:** nothing — documentation only.
+**Status:** 🟡 open observations, awaiting an owner decision.
