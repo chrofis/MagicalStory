@@ -1377,38 +1377,30 @@ function resolveOutfitForPage(description, resolvedWorn, characterName) {
  * bug on scene hints.
  *
  * Only the named character's own items are considered, so the cast never has
- * to be plumbed to the call site. `sceneMetadatas` (plural) is for a contract
- * that spans several pages — the entity-consistency grid judges one
- * character×clothing group across every page it appears on, and a single
- * expected-clothing string cannot say "off on p12 only". There the union is
- * taken: an item off on ANY page of the group is not demanded on the grid,
- * because a demanded-but-absent garment costs a paid repair round while a
- * silent one costs nothing.
+ * to be plumbed to the call site. ONE PAGE, ONE STATE: the multi-page union
+ * this used to offer (`sceneMetadatas`) is DELETED (2026-09-19). Its only
+ * caller was the entity-consistency grid, which now groups its cells BY
+ * wardrobe state, so every grid is homogeneous and a union would be a strictly
+ * weaker answer to a question nobody asks. Measured harm before the split:
+ * a garment off on one page was dropped from the expected clothing of all 17
+ * appearances, costing two spurious MAJORs on the pages that wore it correctly
+ * and leaving eight pages unjudged (staging job_1789759147125_p08djwhbl).
  *
  * Returns the text unchanged whenever anything is missing or the strip is not
  * structurally unambiguous — see removeWornItemFromOutfit.
  */
-function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sceneMetadata = null, sceneMetadatas = null, pageNumber = null } = {}) {
+function resolveGeneratedOutfit(outfitText, ownerName, { visualBible = null, sceneMetadata = null, pageNumber = null } = {}) {
   const text = String(outfitText || '');
-  if (!text.trim() || !ownerName || !visualBible) return text;
-  const metas = Array.isArray(sceneMetadatas) ? sceneMetadatas : (sceneMetadata ? [sceneMetadata] : []);
-  if (metas.length === 0) return text;
+  if (!text.trim() || !ownerName || !visualBible || !sceneMetadata) return text;
   const seen = new Set();
   const off = [];
   const worn = [];
-  for (const meta of metas) {
-    if (!meta) continue;
-    // castComplete: false — this walks ONE character, so every genuine handover
-    // to another cast member would otherwise be logged as an off-cast coercion.
-    for (const r of resolveWornItemsForPage(visualBible, [ownerName], meta, { pageNumber: pageNumber || undefined, castComplete: false })) {
-      if (seen.has(r.id)) continue;
-      if (isOffForCharacter(r, ownerName)) { seen.add(r.id); off.push(r); continue; }
-      // A `worn` row that contradicts the contract is resolved only for a
-      // SINGLE page. Across a multi-page group (the entity grid) an item worn
-      // on some pages would otherwise be written into the expected clothing of
-      // all of them — the union rule below goes the other way on purpose.
-      if (metas.length === 1 && r.state === 'worn') { seen.add(r.id); worn.push(r); }
-    }
+  // castComplete: false — this walks ONE character, so every genuine handover
+  // to another cast member would otherwise be logged as an off-cast coercion.
+  for (const r of resolveWornItemsForPage(visualBible, [ownerName], sceneMetadata, { pageNumber: pageNumber || undefined, castComplete: false })) {
+    if (seen.has(r.id)) continue;
+    if (isOffForCharacter(r, ownerName)) { seen.add(r.id); off.push(r); continue; }
+    if (r.state === 'worn') { seen.add(r.id); worn.push(r); }
   }
   if (off.length === 0 && worn.length === 0) return text;
   const { text: resolved } = resolveOutfitForPage(text, [...off, ...worn], ownerName);

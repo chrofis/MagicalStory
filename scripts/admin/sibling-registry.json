@@ -287,6 +287,19 @@
       "severity": "block"
     },
     {
+      "id": "entity-grid-generator-vs-critic",
+      "axis": "generator-vs-critic",
+      "reason": "A page can declare one of a character's garments OFF. image-generation.txt states the removal to the illustrator and wardrobeVariants.js decides which reference sheet that page is drawn from; entity-consistency-check.txt is the grid judge that then reads the result. Before the wardrobe-state split (2026-09-19) the judge was never told a state existed, so it read the garment off the reference cell and reported it missing from every page that correctly did without it. A rule about what a removal means belongs on both sides: the generator half says take it off, the critic half says its absence is not a finding.",
+      "generators": [
+        "prompts/image-generation.txt",
+        "server/lib/wardrobeVariants.js"
+      ],
+      "critics": [
+        "prompts/entity-consistency-check.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "job-liveness-heartbeat-vs-watchdog",
       "axis": "heartbeat writer vs watchdog reader",
       "reason": "server/lib/jobHeartbeat.js writes story_jobs.updated_at and server/routes/jobs.js is the only reader that kills a job for a stale one (two detectors, poll-time and stale-sweep); a change to when or whether the worker heartbeats, or to the timeout that reads it, is meaningless unless both sides move together.",

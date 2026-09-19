@@ -78,12 +78,15 @@ describe('resolveGeneratedOutfit — the judge is handed the generator\'s outfit
     })).toBe(SARAH_OUTFIT);
   });
 
-  it('a multi-page grid contract drops an item off on ANY of its pages', () => {
+  it('there is no multi-page union any more — a grid is one wardrobe state', () => {
+    // Deleted 2026-09-19: the entity grid groups its cells by wardrobe state,
+    // so "off on ANY page" is no longer a question anyone asks. The old plural
+    // key is not an input; the outfit comes back untouched.
     const contract = resolveGeneratedOutfit(SARAH_OUTFIT, 'Sarah', {
       visualBible: BIBLE,
       sceneMetadatas: [pageMeta('worn'), pageMeta('off'), pageMeta('worn')],
-    });
-    expect(contract).not.toMatch(/sash/i);
+    } as any);
+    expect(contract).toBe(SARAH_OUTFIT);
   });
 
   it('missing bible or metadata leaves the outfit untouched', () => {

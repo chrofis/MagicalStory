@@ -91,10 +91,14 @@ describe('the page has ONE resolved outfit', () => {
     expect(prompt).not.toMatch(/tricorn/i);
   });
 
-  it('a multi-page group takes the OFF union only — no worn swap across pages', () => {
+  it('the multi-page union is GONE — one page, one state', () => {
+    // The entity grid groups its cells by wardrobe state now, so every grid is
+    // homogeneous and the union has no caller. An option object carrying only
+    // the old plural key resolves nothing at all.
     const other = { ...metadata, wornItems: [] };
-    const union = resolveGeneratedOutfit(EMMA, 'Emma', { visualBible, sceneMetadatas: [metadata, other] });
-    expect(union).toBe(EMMA);
+    expect(resolveGeneratedOutfit(EMMA, 'Emma', { visualBible, sceneMetadatas: [metadata, other] } as any)).toBe(EMMA);
+    expect(fs.readFileSync(path.join(__dirname, '../../server/lib/wornItems.js'), 'utf8'))
+      .not.toMatch(/sceneMetadatas\s*=/);
   });
 });
 
@@ -118,7 +122,9 @@ describe('every page-path consumer routes through the one resolver', () => {
     expect(src('server/lib/entityConsistency.js')).toMatch(/resolveGeneratedOutfit\(\s*\n\s*buildClothingDescription\(character, clothingCategory, artStyle, storyData\.clothingRequirements\)/);
   });
 
-  it('the entity-consistency grid (multi-page union)', () => {
-    expect(src('server/lib/entityConsistency.js')).toMatch(/sceneMetadatas: groupWornMetas/);
+  it('the entity-consistency grid groups by wardrobe state instead of unioning', () => {
+    const s = src('server/lib/entityConsistency.js');
+    expect(s).not.toMatch(/sceneMetadatas/);
+    expect(s).toMatch(/buildOffCategory\(normalizeClothingCategory\(app\.clothing\), app\.offIds\)/);
   });
 });

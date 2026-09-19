@@ -450,16 +450,33 @@ const MAX_APPEARANCE_CELLS = 5;
 const { normalizeClothingCategory, resolveCharacterReqs } = require('./clothingCategories');
 
 /**
- * Group appearances by clothing category
+ * Group appearances by clothing category AND wardrobe state.
  *
- * @param {Array} appearances - Array of appearance objects with clothing field
- * @returns {Map<string, Array>} Map of clothingCategory -> appearances
+ * The key is `buildOffCategory(category, offIds)` — `standard`,
+ * `standard--off:CLO002`, `standard--off:CLO001+CLO002` are distinct groups.
+ *
+ * WHY THE STATE IS PART OF THE KEY (2026-09-19, staging
+ * job_1789759147125_p08djwhbl). Keyed on the bare category, a character whose
+ * jacket comes off halfway through the story lands jacket-on and jacket-off
+ * pages in ONE grid, against ONE reference cell that can only be in one of the
+ * two states. The judge then reads the garment off cell R and reports it
+ * "entirely missing" from the cells that correctly do not wear it — a MAJOR per
+ * off-page, and the wardrobe-variant feature makes it worse, because the off
+ * pages now render the removal correctly and confidently.
+ *
+ * A group produced here is homogeneous: every cell shares one declared wardrobe
+ * state, so ONE expected-clothing text and ONE reference sheet describe all of
+ * them. Appearances with no off-state key exactly as before.
+ *
+ * @param {Array} appearances - Array of appearance objects with clothing + offIds
+ * @returns {Map<string, Array>} Map of clothingCategory(+state) -> appearances
  */
 function groupAppearancesByClothing(appearances) {
+  const { buildOffCategory } = require('./wardrobeVariants');
   const groups = new Map();
 
   for (const app of appearances) {
-    const clothing = normalizeClothingCategory(app.clothing);
+    const clothing = buildOffCategory(normalizeClothingCategory(app.clothing), app.offIds);
     if (!groups.has(clothing)) {
       groups.set(clothing, []);
     }
@@ -467,6 +484,118 @@ function groupAppearancesByClothing(appearances) {
   }
 
   return groups;
+}
+
+/**
+ * Does this character have the styled sheet for exactly this wardrobe state?
+ *
+ * A `--off:` group has no business being judged against the sheet that still
+ * WEARS the garment — that is the fault this whole split exists to close, and
+ * re-entering it through a substitute reference would be a fallback. Callers
+ * skip the wardrobe half instead and say why.
+ */
+function hasWardrobeVariantSheet(character, artStyle, clothingCategory) {
+  const { parseOffCategory, OFF_MARK } = require('./wardrobeVariants');
+  const state = parseOffCategory(clothingCategory);
+  if (!state) return true; // not a wardrobe-state group — nothing to look for
+  const key = `${normalizeClothingCategory(state.baseCategory)}${OFF_MARK}${state.offIds.join('+')}`;
+  return !!character?.avatars?.styledAvatars?.[artStyle]?.[key];
+}
+
+/**
+ * Plan the grids for ONE character: which cells are judged for identity, which
+ * for wardrobe, and which are not judged at all.
+ *
+ * TWO AXES, TWO GROUPINGS (owner 2026-08-24 / 2026-08-27, docs/decisions.md —
+ * head grid = identity, body grid = wardrobe, one image per call):
+ *  - WARDROBE is judged per wardrobe state. Each state has its own reference
+ *    sheet and its own expected clothing.
+ *  - IDENTITY is state-independent. Taking a jacket off does not change a face,
+ *    and splitting a 17-cell identity corpus into four 4-cell ones would weaken
+ *    every one of them and multiply the calls. Identity is judged over the BASE
+ *    category, off-suffix ignored.
+ *
+ * A base category with exactly one state needs no split at all: one task carries
+ * both halves, exactly as before this existed. That is the whole of a story with
+ * no off-declarations.
+ *
+ * @param {Array} appearances - every appearance of this character
+ * @param {Map<string, Array>} byClothing - groupAppearancesByClothing output
+ * @param {object} opts
+ * @param {number} opts.minAppearances - floor for an ordinary group
+ * @param {(category: string) => boolean} opts.hasOffSheet - state sheet exists?
+ * @returns {{tasks: Array, skipped: Array}}
+ */
+function planEntityGridTasks(appearances, byClothing, { minAppearances = MIN_APPEARANCES, hasOffSheet = () => true } = {}) {
+  const { parseOffCategory } = require('./wardrobeVariants');
+  const tasks = [];
+  const skipped = [];
+
+  // base category -> the state keys observed under it, in first-seen order
+  const byBase = new Map();
+  for (const key of byClothing.keys()) {
+    const base = parseOffCategory(key)?.baseCategory || key;
+    if (!byBase.has(base)) byBase.set(base, []);
+    byBase.get(base).push(key);
+  }
+
+  const floorFor = (base, offIds) => (
+    // A single-page off-group is exactly the page the variant sheet was built
+    // for: judging it is the point. Same treatment `costumed` already gets.
+    (offIds.length > 0 || base.startsWith('costumed:')) ? 1 : minAppearances
+  );
+
+  for (const [base, keys] of byBase) {
+    const emit = (task) => {
+      if (task.appearances.length < task.minRequired) {
+        skipped.push({ reportKey: task.reportKey, reason: 'too-few-appearances',
+          count: task.appearances.length, minRequired: task.minRequired });
+        return;
+      }
+      tasks.push(task);
+    };
+
+    if (keys.length === 1) {
+      const key = keys[0];
+      const offIds = parseOffCategory(key)?.offIds || [];
+      // NO FALLBACK to the worn sheet: without the state's own sheet the
+      // wardrobe half is unjudgeable, and identity carries the cells alone.
+      const wardrobeOk = offIds.length === 0 || hasOffSheet(key);
+      if (!wardrobeOk) skipped.push({ reportKey: key, reason: 'no-wardrobe-variant-sheet', offIds, wardrobeOnly: true });
+      emit({
+        mode: wardrobeOk ? 'both' : 'identity',
+        reportKey: key, clothingCategory: key, baseCategory: base, offIds,
+        appearances: byClothing.get(key), minRequired: floorFor(base, offIds),
+        ...(wardrobeOk ? {} : { notEvaluated: 'no-wardrobe-variant-sheet' }),
+      });
+      continue;
+    }
+
+    // One identity corpus over the base category, in the character's own
+    // appearance order (page order, covers last) — never the concatenation of
+    // the state groups, which scrambles it.
+    const identityApps = appearances.filter(a => normalizeClothingCategory(a.clothing) === base);
+    emit({
+      mode: 'identity', reportKey: `${base}--identity`, clothingCategory: base,
+      baseCategory: base, offIds: [], appearances: identityApps,
+      minRequired: floorFor(base, []),
+    });
+
+    for (const key of keys) {
+      const offIds = parseOffCategory(key)?.offIds || [];
+      if (offIds.length > 0 && !hasOffSheet(key)) {
+        skipped.push({ reportKey: key, reason: 'no-wardrobe-variant-sheet', offIds, wardrobeOnly: true,
+          pages: byClothing.get(key).map(a => a.pageNumber) });
+        continue;
+      }
+      emit({
+        mode: 'wardrobe', reportKey: key, clothingCategory: key, baseCategory: base, offIds,
+        appearances: byClothing.get(key), minRequired: floorFor(base, offIds),
+      });
+    }
+  }
+
+  return { tasks, skipped };
 }
 
 /**
@@ -807,20 +936,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     // artStyle = ...` line above it.
     const artStyle = storyData.artStyle || 'pixar';
 
-    // PER-PAGE WORN STATE. A page's brief can declare one of a character's
-    // garments OFF (`wornItems[]`); the generator strips it out of the outfit
-    // the image model was given, so the grid judge must not go on demanding
-    // it. Parsed once here, consumed by `expectedClothing` below through the
-    // generator's own stripper (wornItems.resolveGeneratedOutfit).
-    const wornMetaByPage = new Map();
-    for (const sd of sceneDescriptions) {
-      const desc = sd && (sd.description || sd.sceneDescription);
-      if (!desc || sd.pageNumber == null) continue;
-      try {
-        const meta = extractSceneMetadata(desc);
-        if (meta) wornMetaByPage.set(sd.pageNumber, meta);
-      } catch { /* unparsable brief → no worn state, unchanged behaviour */ }
-    }
+    // PER-PAGE WORN STATE is stamped on each appearance at collection time
+    // (`offIds` / `offItemNames`, collectEntityAppearances) and keys the grid
+    // groups, so there is no second per-page parse and no cross-page union
+    // here any more.
 
     // Story-invented characters are checked too, when they appear more than
     // once. They are not in `characters` (the photo-backed roster) but they do
@@ -904,16 +1023,44 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         const byClothing = character.__vbSecondary
           ? new Map([['visual-bible', appearances]])
           : groupAppearancesByClothing(appearances);
-        log.info(`🔍 [ENTITY-CHECK] ${charName}: ${appearances.length} appearances, ${byClothing.size} clothing categories: ${[...byClothing.keys()].join(', ')}`);
+        log.info(`🔍 [ENTITY-CHECK] ${charName}: ${appearances.length} appearances, ${byClothing.size} clothing groups: ${[...byClothing.keys()].join(', ')}`);
 
-        for (const [clothingCategory, groupAppearances] of byClothing) {
-          const isCostumed = clothingCategory.startsWith('costumed:');
-          const minRequired = isCostumed ? 1 : minAppearances;
-          if (groupAppearances.length < minRequired) {
-            log.verbose(`[ENTITY-CHECK] Skipping ${charName} (${clothingCategory}): only ${groupAppearances.length} appearances (need ${minRequired})`);
-            continue;
+        const plan = planEntityGridTasks(appearances, byClothing, {
+          minAppearances,
+          hasOffSheet: (category) => hasWardrobeVariantSheet(character, artStyle, category),
+        });
+        for (const s of plan.skipped) {
+          if (s.reason === 'no-wardrobe-variant-sheet') {
+            // LOUD ABSENCE, never a substitute reference. The Art Director wrote
+            // no redress instruction for this off-set, so no `--off:` sheet was
+            // built; judging these cells against the sheet that still wears the
+            // garment is the fault this split closes. Identity still covers them
+            // through the unsplit head grid.
+            log.error(`👕 [ENTITY-CHECK] ${charName} (${s.reportKey}): no wardrobe-state sheet for off:${(s.offIds || []).join('+')} `
+              + `— WARDROBE NOT JUDGED on page(s) ${(s.pages || []).join(', ') || 'in this group'}; identity is judged over the base category.`);
+            report.characters[charName].byClothing[s.reportKey] = {
+              evaluated: false, notEvaluated: 'no-wardrobe-variant-sheet',
+              offIds: s.offIds || [], consistent: null, score: null, issues: [],
+              summary: 'Wardrobe not judged: no styled sheet exists for this wardrobe state.',
+              appearances: (byClothing.get(s.reportKey) || []).map(a => ({ pageNumber: a.pageNumber })),
+            };
+          } else {
+            log.verbose(`[ENTITY-CHECK] Skipping ${charName} (${s.reportKey}): only ${s.count} appearances (need ${s.minRequired})`);
           }
-          tasks.push({ character, charName, clothingCategory, groupAppearances, minRequired });
+        }
+        for (const t of plan.tasks) {
+          tasks.push({
+            character, charName,
+            clothingCategory: t.reportKey,
+            baseCategory: t.baseCategory,
+            offIds: t.offIds,
+            mode: t.mode,
+            groupAppearances: t.appearances,
+            minRequired: t.minRequired,
+          });
+          if (t.mode !== 'both') {
+            log.info(`🔍 [ENTITY-CHECK] ${charName}: ${t.mode}-only grid "${t.reportKey}" (${t.appearances.length} cells)`);
+          }
         }
       }
 
@@ -922,7 +1069,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
       // Phase 2: Run all tasks in parallel
       const results = await Promise.all(tasks.map(task => entityLimit(async () => {
         await heartbeat();  // bump updated_at so the heartbeat watcher sees progress
-        const { character, charName, clothingCategory, groupAppearances, minRequired } = task;
+        const { character, charName, clothingCategory, baseCategory, offIds = [], mode = 'both', groupAppearances, minRequired } = task;
         try {
           log.info(`🔍 [ENTITY-CHECK] Checking ${charName} (${clothingCategory}): ${groupAppearances.length} appearances`);
 
@@ -937,28 +1084,38 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           // expected text. It has no styled avatar and no clothingRequirements
           // row, and asking for either would log an error and compare against
           // nothing.
+          // The reference sheet is resolved from the group's OWN key, so a
+          // `--off:` group gets the sheet in its own wardrobe state (the
+          // variant lookup lives in getStyledAvatarForClothing). An
+          // identity-only grid asks for the base category: identity is the same
+          // face in every state, and the base sheet is the one that exists.
           const refAvatar = character.__vbSecondary
             ? (character.__vbReferenceUrl || null)
-            : await getStyledAvatarForClothing(character, artStyle, clothingCategory);
+            : await getStyledAvatarForClothing(character, artStyle, mode === 'identity' ? baseCategory : clothingCategory);
           // Expected clothing as TEXT from this story's clothingRequirements.
           // The grid prompt judges clothing against this description, not against
           // the reference avatar's pixels — style transfer can mutate the avatar's
           // outfit, and avatars.clothing can be stale across stories.
-          // The grid spans every page of this character×clothing group, so the
-          // worn state is the UNION over those pages: a garment declared off on
-          // any of them is dropped from the expected text rather than demanded
-          // on all of them. One resolver, shared with the generator's strip.
-          const groupWornMetas = [...new Set(groupAppearances.map(a => a.pageNumber))]
-            .map(pn => wornMetaByPage.get(pn) || null).filter(Boolean);
+          // Every cell of this group shares ONE declared wardrobe state, so the
+          // expected text is the story's outfit contract for the base category,
+          // plus that state named POSITIVELY (removedGarments below). The union
+          // strip that used to stand here is DELETED, not adjusted: on staging
+          // job_1789759147125_p08djwhbl it dropped a garment declared off on one
+          // page from the expected text of all 17, so the cap worn correctly on
+          // 15 pages read as "unexpected" (2 spurious MAJORs) and the jacket went
+          // unjudged on the 8 pages it was correctly worn — while the false
+          // "jacket missing" fault fired anyway, because the judge reinstated the
+          // expectation from reference cell R. Homogeneous groups need no union.
           const expectedClothing = character.__vbSecondary
             ? character.__vbDescription
-            : require('./wornItems').resolveGeneratedOutfit(
-              buildClothingDescription(
-                character, clothingCategory, artStyle, storyData.clothingRequirements || null
-              ),
-              charName,
-              { visualBible: storyData.visualBible || storyData.wornItemsVisualBible || null, sceneMetadatas: groupWornMetas }
+            : buildClothingDescription(
+              character, baseCategory, artStyle, storyData.clothingRequirements || null
             );
+          // The garments this group's pages deliberately take off, by their own
+          // Visual-Bible names — stated to the judge, never silently omitted.
+          const removedGarments = offIds.length > 0
+            ? [...new Set(groupAppearances.flatMap(a => a.offItemNames || []))]
+            : [];
           const gridLabel = `${charName} (${clothingCategory})`;
 
           // Split crops into batches for multiple 3x3 grids (8 crops + 1 ref per grid)
@@ -1015,7 +1172,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             // The entity check costs ~$0.006 for a whole book; the second call
             // is a rounding error against a garment defect reaching print.
             const baseInfo = {
-              entityType: 'character', entityName: charName, clothingCategory,
+              // The judge is told the CATEGORY, never the internal state key —
+              // the state itself is said in words (removedGarments).
+              entityType: 'character', entityName: charName, clothingCategory: baseCategory || clothingCategory,
+              removedGarments,
               expectedClothing, referencePhoto: refAvatar, cellCount: batchCrops.length,
             };
             const runPass = (buffer, focus) => evaluateEntityConsistency(
@@ -1025,33 +1185,39 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             if (gridsOnly) {
               evalResult = { consistent: true, score: null, issues: [], summary: 'grids-only (no eval)' };
             } else if (headGrid?.buffer) {
+              // `mode` selects the HALVES, never the images: identity always
+              // reads the head grid alone and wardrobe the body grid alone
+              // (owner, 2026-08-27). A wardrobe-state split runs the wardrobe
+              // half per state and the identity half once over the base
+              // category, so one of the two is absent here by plan.
               const [identity, wardrobe] = await Promise.all([
-                runPass(headGrid.buffer, 'identity'),
-                runPass(gridResult.buffer, 'clothing'),
+                mode === 'wardrobe' ? null : runPass(headGrid.buffer, 'identity'),
+                mode === 'identity' ? null : runPass(gridResult.buffer, 'clothing'),
               ]);
+              const halves = [identity, wardrobe].filter(Boolean);
               // A pass that FAILED must not be read as a clean half — keep
               // evalFailed sticky so the report still fails closed.
-              const scores = [identity, wardrobe]
+              const scores = halves
                 .filter(r => !r.evalFailed && typeof r.score === 'number')
                 .map(r => r.score);
               evalResult = {
-                consistent: !!identity.consistent && !!wardrobe.consistent,
-                evalFailed: !!identity.evalFailed || !!wardrobe.evalFailed,
+                consistent: halves.every(r => !!r.consistent),
+                evalFailed: halves.some(r => !!r.evalFailed),
                 score: scores.length ? Math.min(...scores) : 0,
-                issues: [...(identity.issues || []), ...(wardrobe.issues || [])],
-                garmentColourMismatches: [
-                  ...(identity.garmentColourMismatches || []),
-                  ...(wardrobe.garmentColourMismatches || []),
-                ],
-                summary: [identity.summary, wardrobe.summary].filter(Boolean).join(' | '),
-                rawResponse: [identity.rawResponse, wardrobe.rawResponse].filter(Boolean).join('\n---\n'),
-                usage: [identity.usage, wardrobe.usage].filter(Boolean),
+                issues: halves.flatMap(r => r.issues || []),
+                garmentColourMismatches: halves.flatMap(r => r.garmentColourMismatches || []),
+                summary: halves.map(r => r.summary).filter(Boolean).join(' | '),
+                rawResponse: halves.map(r => r.rawResponse).filter(Boolean).join('\n---\n'),
+                usage: halves.map(r => r.usage).filter(Boolean),
               };
             } else {
               // No head grid built — the body grid alone answers both halves,
-              // which is the configuration clothing already worked in.
+              // which is the configuration clothing already worked in. A
+              // single-half task keeps its focus so it still asks one question.
               evalResult = await evaluateEntityConsistency(
-                gridResult.buffer, gridResult.manifest, baseInfo, null);
+                gridResult.buffer, gridResult.manifest,
+                mode === 'both' ? baseInfo : { ...baseInfo, focus: mode === 'identity' ? 'identity' : 'clothing' },
+                null);
             }
 
             gridResults.push({ gridResult, headGrid, evalResult, batchCrops });
@@ -1175,6 +1341,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           appearances: groupAppearances.map(a => ({
             pageNumber: a.pageNumber, faceBox: a.faceBox || null,
             bodyBox: a.bodyBox || null, clothing: a.clothing || clothingCategory,
+            ...(a.offIds?.length ? { offIds: a.offIds } : {}),
           })),
           // O7: raw output persisted for successful evals too (was error-only)
           ...(evalResult.rawResponse && { rawResponse: evalResult.rawResponse }),
@@ -1644,6 +1811,27 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Per-char clothing: ${JSON.stringify(characterClothing)}`);
     }
 
+    // PER-PAGE WARDROBE STATE. The page's brief can declare a character's
+    // garment OFF; that state is part of the grid key (groupAppearancesByClothing),
+    // so it is stamped on the appearance here — ONE derivation, the same
+    // `offIdsForCharacter` the avatar and repair paths call.
+    let pageWornResolved = [];
+    if (visualBible) {
+      const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+      const desc = sceneDesc && (sceneDesc.description || sceneDesc.sceneDescription);
+      if (desc) {
+        try {
+          const meta = extractSceneMetadata(desc);
+          if (meta) {
+            pageWornResolved = require('./wornItems')
+              .resolveWornItemsForPage(visualBible, meta.characters || [], meta, { pageNumber }) || [];
+          }
+        } catch (err) {
+          log.warn(`⚠️ [ENTITY-COLLECT] Page ${pageNumber}: worn-item resolution failed (${err.message}) — no wardrobe state stamped on this page's crops`);
+        }
+      }
+    }
+
     // Get figures from bbox detection - now includes direct character identification via figure.name
     let figures = bboxDetection?.figures || [];
 
@@ -1877,6 +2065,13 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           continue;
         }
         const clothing = normalizeClothingCategory(rawClothing);
+        const { offIdsForCharacter } = require('./wardrobeVariants');
+        const { isOffForCharacter } = require('./wornItems');
+        const offIds = offIdsForCharacter(charName, pageWornResolved);
+        // The garments' own declared names, for the judge's clothing context.
+        const offItemNames = offIds.length === 0 ? [] : pageWornResolved
+          .filter(r => offIds.includes(String(r.id).toUpperCase()) && isOffForCharacter(r, charName))
+          .map(r => String(r.name || r.id));
         // Determine confidence based on how we matched
         // COMPARE: stored figure name vs stored character name.
         const confidence = canonicalName(matchingFigure.name) === canonicalName(charName)
@@ -1905,6 +2100,11 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
           position: matchingFigure.position,
           label: matchingFigure.label,
           clothing,
+          // The wardrobe state this page declares for THIS character — part of
+          // the grid key, so jacket-on and jacket-off cells never share a grid
+          // or a reference sheet.
+          offIds,
+          ...(offItemNames.length > 0 && { offItemNames }),
           confidence,
           // Stamp which bytes these boxes belong to — char repair verifies
           // this before applying a stored appearance box to a page image
@@ -2531,7 +2731,7 @@ async function createEntityHeadGrid(crops, entityName, referencePhoto = null) {
  */
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headGridBuffer = null) {
   const { entityType, entityName, referencePhoto, cellCount, clothingCategory, expectedClothing,
-          primaryIsHeadGrid = false, focus = null } = entityInfo;
+          removedGarments = [], primaryIsHeadGrid = false, focus = null } = entityInfo;
 
   // Build prompt from template
   const promptTemplate = PROMPT_TEMPLATES.entityConsistencyCheck;
@@ -2595,6 +2795,14 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo, headG
     }
     if (expectedClothing) {
       lines.push(`Expected clothing for these cells: ${expectedClothing}`);
+      // POSITIVE, never a silent omission (2026-09-19). Deleting the garment
+      // from the expected text left the judge to read it off cell R and
+      // reinstate the expectation it had been stripped of — measured.
+      if (removedGarments.length > 0) {
+        lines.push(`On these pages the character has deliberately removed: ${removedGarments.join('; ')}. `
+          + 'Every cell in this grid shares that one wardrobe state. Those garments are absent by intent — their absence is never a finding, '
+          + 'and a cell that still wears one contradicts the state.');
+      }
       lines.push('Judge clothing against this description; flag cells whose outfit contradicts it or differs from the other cells.');
     } else {
       lines.push(`All cells should show the character in ${clothingCategory} attire; flag outfits that differ between cells.`);
@@ -3426,6 +3634,8 @@ module.exports = {
   mergeCascadeFacesWithGemini,
   normalizeClothingCategory,
   groupAppearancesByClothing,
+  planEntityGridTasks,
+  hasWardrobeVariantSheet,
   collectEntityAppearances,
   collectObjectAppearances,
   extractEntityCrops,
