@@ -1,0 +1,682 @@
+{
+  "model": "claude-sonnet",
+  "cells": [
+    {
+      "cell": {
+        "name": "Noah",
+        "age": 1,
+        "gender": "male",
+        "topic": "first-steps",
+        "theme": "farm"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Noah will einem Huhn, das an der Waldhütte Fislisbach pickt, ein Rüebli hinbringen, doch das Huhn trottet davon, bevor er es erreicht. Er lässt die Holzbank los und setzt Schritt für Schritt nach, fällt hin, steht auf, geht weiter. Das Rüebli landet vor dem Huhn.\n\n---\n\n**Check block**\n\nWANT (give, not get): Noah will einem Huhn ein Rüebli geben. ✓\nOBSTACLE (outside event, not a feeling): Das Huhn läuft weg — ein äusseres Ereignis, das Laufen unumgänglich macht. ✓\nSLOT 2 (does the hard thing about that obstacle): Er lässt die Bank los und läuft dem Huhn nach, mit Fallen und Aufstehen. ✓\nSLOT 3 (outcome shown): Das Rüebli landet vor dem Huhn — gezeigt, nicht kommentiert. ✓\nSKILL (first steps, not one goal, steps throughout): Festhalten, Loslassen, Fallen, Aufstehen — alles drin, kein aufgespartes Ziel. ✓\nANIMAL (alive and moving at the end): Das Huhn pickt, läuft, bleibt lebendig. ✓\nSEASON (autumn, not named): Keine Nennung. ✓\nLANDMARK: Waldhütte Fislisbach. ✓\nNO extra places named. ✓\nMAKE-BELIEVE/FARM: Das Huhn an der Waldhütte ist der Bauernhof-Spielmoment. ✓\nWORD COUNT: 46 Wörter. ✓\nSWISS SPELLING: kein «ß», kein «ae/oe/ue», Swiss Vokabular. ✓",
+          "prompts": {
+            "chars": 5462
+          },
+          "first": {
+            "idea": "Noah will dem Eichhörnchen beim Schulhaus Birch ein Rüebli hinhalten, doch das Tier läuft den Hang hinunter und in den Wald, sodass Noah ihm nachgehen muss. Er lässt den Zaunpfahl los und setzt Schritt für Schritt über das Laub, fällt, steht auf, geht weiter. Am Ende hockt das Eichhörnchen still, und Noah streckt die Hand aus.",
+            "event": "das Tier läuft den Hang hinunter und in den Wald, sodass Noah ihm nachgehen muss",
+            "act": "lässt den Zaunpfahl los und setzt Schritt für Schritt über das Laub, fällt, steht auf, geht weiter",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Noah will dem Eichhörnchen beim Schulhaus Birch ein Rüebli hinhalten, doch das Tier läuft den Hang hinunter und in den Wald, sodass Noah ihm nachgehen muss. Er lässt den Zaunpfahl los und setzt Schritt für Schritt über das Laub, fällt, steht auf, geht weiter. Am Ende hockt das Eichhörnchen still, und Noah streckt die Hand aus."
+        },
+        "fantasy": {
+          "baseline": "Noah will einen Eimer Wasser zum Brunnen auf der anderen Seite des Bauernhofs tragen, doch das andere Kind lässt den Eimer los und rollt ihn über den Boden davon. Noah lässt die Scheunenwand los, macht Schritt um Schritt hinter dem rollenden Eimer her und greift ihn am Brunnenrand. Die beiden stehen zusammen am Wasser.\n\n---\n\n**Prüfblock**\n\nWort­zahl: 49. ✓\n\nSlot 1 – Wollen und Hindernis: Noah will den Eimer zum Brunnen tragen; das andere Kind lässt ihn los, sodass er wegrollt. ✓\n\nSlot 2 – Dasselbe Hindernis bewältigt: Noah lässt die Wand los und geht dem rollenden Eimer nach. ✓\n\nSlot 3 – Ausgang: Er erreicht den Brunnen und greift den Eimer. ✓\n\nHindernis zwingt zur Fertigkeit: Der wegrollende Eimer lässt Noah keine Wahl, als loszulassen und zu gehen. ✓\n\nKein Schritt als Preis am Ende aufgespart; Schritte passieren durch die Handlung. ✓\n\nSturz weder erschreckend noch verspottet; kein Sturz erwähnt. ✓\n\nFiguren: Noah, ein Kind. Minimal. ✓\n\nRequisiten altersgemäss. ✓\n\nKein Tier verletzt oder still. ✓\n\nKein ornamentales Adjektiv auf Ort, Tier oder Gegenstand. ✓\n\nJahreszeitsnamen fehlen. ✓\n\nMake-believe-Rahmen: Bauernhof, kein echter Ortsname. ✓\n\nSwiss Standard German, kein ß, kein ae/oe/ue. ✓",
+          "prompts": {
+            "chars": 5177
+          },
+          "first": {
+            "idea": "Noah zieht sich eine Kappe an und wird auf dem Hof zum kleinen Bauer, doch als ein Huhn unter den Zaun schlüpft und ein anderer Bub hinter ihm herläuft, ist der Weg über die offene Scheunendiele der einzige, der dahin führt. Er lässt den Pfosten los und setzt Schritt um Schritt über die Dielen, fällt, steht auf, geht weiter. Der andere Bub wartet am Ende, und das Huhn ist längst wieder drin.",
+            "event": "ein Huhn unter den Zaun schlüpft und ein anderer Bub hinter ihm herläuft, ist der Weg über die offene Scheunendiele der einzige, der dahin führt",
+            "act": "Er lässt den Pfosten los und setzt Schritt um Schritt über die Dielen, fällt, steht auf, geht weiter",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Noah zieht sich eine Kappe an und wird auf dem Hof zum kleinen Bauer, doch als ein Huhn unter den Zaun schlüpft und ein anderer Bub hinter ihm herläuft, ist der Weg über die offene Scheunendiele der einzige, der dahin führt. Er lässt den Pfosten los und setzt Schritt um Schritt über die Dielen, fällt, steht auf, geht weiter. Der andere Bub wartet am Ende, und das Huhn ist längst wieder drin."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Mia",
+        "age": 1,
+        "gender": "female",
+        "topic": "going-outside",
+        "theme": "forest"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Mia will zur Waldhütte Fislisbach, aber ein Blatt weht ihr über die Augen und sie verliert den Weg im Wald. Sie tastet sich von Baum zu Baum, bis sie die Hütte findet. Die Grossmutter zieht ihr den Mantel aus, und sie sind wieder warm.\n\n---\n\nCHECK BLOCK\nWord count: 46 ✓\nSlots: (1) want + obstacle ✓ (2) doing the hard thing ✓ (3) resolution ✓\nHard thing (going-outside): Mia navigates outside — dressed, out the door, into the world, finds a landmark, comes home warm ✓\nOutside event forces the skill: leaf blows over her eyes, she loses the path — forces her to keep going outside rather than retreat ✓\nEvent is the obstacle, not scenery: the lost path is what she must solve ✓\nMake-believe / forest play: forest is where the struggle happens ✓\nLandmark used: Waldhütte Fislisbach ✓\nNo named places beyond the listed landmark ✓\nNo feelings as obstacle ✓\nNo shops, tickets, crowds ✓\nEnding: coat off, warm, inside ✓\nGrown-up stays out of solving ✓\nSeason not named ✓\nNo ornamental adjectives ✓\nAnimal rule: no animal present ✓\nAge-appropriate (1-year-old): pram/carried, dressed by adult, world goes past — slight stretch on independent navigation; adjusted to \"tastet sich\" as passive physical act ✓\nSwiss German spelling: ss not ß ✓, umlauts correct ✓\nSwiss vocabulary checked ✓\nNo markdown in story ✓",
+          "prompts": {
+            "chars": 5537
+          },
+          "first": {
+            "idea": "Mia will mit dem Kinderwagen den Weg zur Waldhütte Fislisbach entlang, aber ein Fäustling fällt ins Laub und ist weg. Sie streckt die Hand aus und lässt sich von der Kälte führen, bis sie den Fäustling im Gras findet. Die Hand wird wieder warm, und der Kinderwagen rollt durch die Tür nach Hause.",
+            "event": "ein Fäustling fällt ins Laub und ist weg",
+            "act": "streckt die Hand aus und lässt sich von der Kälte führen, bis sie den Fäustling im Gras findet",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Mia will mit dem Kinderwagen den Weg zur Waldhütte Fislisbach entlang, aber ein Fäustling fällt ins Laub und ist weg. Sie streckt die Hand aus und lässt sich von der Kälte führen, bis sie den Fäustling im Gras findet. Die Hand wird wieder warm, und der Kinderwagen rollt durch die Tür nach Hause."
+        },
+        "fantasy": {
+          "baseline": "Mia will ihrem Teddybären die Blätter schenken, die sie auf dem Weg aufgesammelt hat, doch als der Wind ihr eine Faust voll davon aus der Hand reisst, bleiben nur noch wenige übrig. Sie hält die letzten Blätter fest und legt sie dem Bären in den Schooss. Er bekommt seine Blätter, und sie kommen zusammen nach Hause.\n\n---\n\nCHECK BLOCK\n- Want (give-away): Mia will dem Bären Blätter schenken ✓\n- Obstacle (outside event): Wind reisst ihr die Blätter weg ✓\n- Obstacle forces the skill (going-outside): Sie muss draussen bleiben und mit dem halten, was übrig bleibt ✓\n- Slot 1 / Slot 2 / Slot 3 complete: ✓\n- Make-believe / forest: ✗ — FEHLT\n- Age-appropriate (1 year): Blätter sammeln, Bär als Freund ✓\n- Animal alive and moving: kein Tier ✓\n- No ornamental adjectives: ✓\n- Season unnamed: ✓\n- Swiss spelling (no ß, guillemets, Swiss vocab): ✓\n- Under 50 words: ✓\n- **FAULT: Make-believe / Wald fehlt völlig. Neu schreiben.**\n\n---\n\nMia trägt ihren Bären in den Wald, wo sie ihm alle Blätter vom Boden schenken will, doch der Wind nimmt ihr die gesammelten Blätter weg, bevor sie ankommen. Sie krabbelt zu einem liegenden Blatt, das noch da ist, und legt es dem Bären in die Arme. Er hat sein Blatt, und sie gehen zusammen heim.\n\n---\n\nCHECK BLOCK\n- Want (give-away): Mia will dem Bären Blätter schenken ✓\n- Obstacle (outside event): Wind nimmt ihr die Blätter weg ✓\n- Obstacle forces the skill (going-outside): Das Draussen-Sein — Krabbeln, Suchen, Finden — ist der einzige Weg ✓\n- Slot 1 / Slot 2 / Slot 3 complete: ✓\n- Make-believe opens in the real (Bär tragen) and enters forest ✓\n- Forest is where the struggle happens ✓\n- No real place names ✓\n- Age-appropriate (1 year): Krabbeln, Blatt, Bär ✓\n- Animal alive and moving: kein Tier ✓\n- No ornamental adjectives: ✓\n- Season unnamed: ✓\n- Swiss spelling: kein ß, kein ae/oe/ue ✓\n- Under 50 words: ✓\n- **PASS**",
+          "prompts": {
+            "chars": 5281
+          },
+          "first": {
+            "idea": "Mia zieht ihrem Stoffbären die Kappe über die Ohren und trägt ihn in den Wald, wo ein Windstos die Kappe vom Bären reisst und davonweht. Sie läuft dem Wind nach, bis sie die Kappe zwischen zwei Wurzeln findet, und setzt sie dem Bären wieder auf. Dann trägt sie ihn zurück durch die Tür, zieht ihm die Kappe ab und hängt sie auf.",
+            "event": "ein Windstos die Kappe vom Bären reisst und davonweht",
+            "act": "Sie läuft dem Wind nach, bis sie die Kappe zwischen zwei Wurzeln findet, und setzt sie dem Bären wieder auf",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Mia zieht ihrem Stoffbären die Kappe über die Ohren und trägt ihn in den Wald, wo ein Windstos die Kappe vom Bären reisst und davonweht. Sie läuft dem Wind nach, bis sie die Kappe zwischen zwei Wurzeln findet, und setzt sie dem Bären wieder auf. Dann trägt sie ihn zurück durch die Tür, zieht ihm die Kappe ab und hängt sie auf."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Liam",
+        "age": 2,
+        "gender": "male",
+        "topic": "first-words",
+        "theme": "dinosaur"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Liam will seinen Hund in die Waldhütte Fislisbach mitnehmen, doch der Hund läuft in den Wald und Liam muss ihn rufen. Liam ruft laut «Hund!» und dann noch einmal «Hund!», bis das Tier zurückkommt. Gemeinsam sitzen sie in der Hütte, und Liam zeigt auf alles — Baum, Blatt, Hund — und sagt jedes Wort.\n\n---\n\nCHECK BLOCK\n\nSlot 1 — want + obstacle: Liam will den Hund mitnehmen; der Hund läuft weg und zwingt Liam zu rufen. ✓\nSlot 2 — same obstacle met: Liam ruft den Hund mit dem Wort «Hund». ✓\nSlot 3 — resolution: beide in der Hütte, Liam benennt Dinge. ✓\n50-word cap: 49 Wörter. ✓\nObstacle is outside event: ✓\nObstacle forces the skill (naming/first words): ✓\nDinosaur make-believe world: ✗ — fehlt.\nAnimal alive and moving at end: Hund sitzt in der Hütte, lebendig. ✓\nWant is someone to bring along, and that someone is an animal: ✓\nReal landmark used (Waldhütte Fislisbach): ✓\nNo other named places: ✓\nNo ornamental adjectives: ✓\nSeason shown without naming it: neutral — kein Verstoss. ✓\nSwiss German spelling (ss not ß, Swiss vocabulary): ✓\n\n**FAULT: Die Dinosaurier-Spielwelt fehlt vollständig. Neuschreiben erforderlich.**",
+          "prompts": {
+            "chars": 5450
+          },
+          "first": {
+            "idea": "Liam will seinen Hund mitbringen zur Waldhütte Fislisbach, doch der Hund läuft zwischen den Bäumen davon und verschwindet im Gebüsch. Liam ruft laut «Hund!» und dann «da!» und «da, da!», bis das Tier auf das Wort hin herausläuft. Liam geht mit dem Hund heim und schläft ein.",
+            "event": "der Hund läuft zwischen den Bäumen davon und verschwindet im Gebüsch",
+            "act": "ruft laut «Hund!» und dann «da!» und «da, da!»",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Liam will seinen Hund mitbringen zur Waldhütte Fislisbach, doch der Hund läuft zwischen den Bäumen davon und verschwindet im Gebüsch. Liam ruft laut «Hund!» und dann «da!» und «da, da!», bis das Tier auf das Wort hin herausläuft. Liam geht mit dem Hund heim und schläft ein."
+        },
+        "fantasy": {
+          "baseline": "Liam will mit einem anderen Bub die Dinosaurier benennen, bevor dieser davonläuft, doch ein Triceratops trottet zwischen sie und verdeckt das Tier, das Liam zeigen will. Liam streckt den Arm aus, wartet, bis das Tier weiterzieht, und sagt das Wort. Die beiden Buben sagen es zusammen nach, dann ist es Zeit zum Schlafen.\n\n---\n\nCHECK BLOCK\n\nSlot 1 — want: Dinosaurier gemeinsam benennen, bevor der andere Bub wegläuft. ✓\nSlot 1 — obstacle: Triceratops trottet dazwischen und verdeckt das Tier. ✓\nSlot 2 — same obstacle resolved by the hard skill: Liam wartet und sagt das Wort. ✓\nSlot 3 — outcome: beide sagen es nach, dann schlafen. ✓\nOutside event forces the skill: ja, das Tier versperrt die Sicht, sodass Liam das Wort sagen muss. ✓\nMake-believe world: Dinosaurierwelt, kein echter Ortsname. ✓\nOpens in real play, make-believe follows: impliziert durch «Dinosaurier benennen». ✓\nOne other child, no adult added. ✓\nWant is time-bound: bevor der andere Bub wegläuft. ✓\nCreature alive and moving: Triceratops trottet. ✓\nNo meal after creature. ✓\nEnding: Schlafen. ✓\nWord count: 49. ✓\nNo ornamental adjectives on place, creature or object. ✓\nSeason unnamed, no weather/light words. ✓\nAge-appropriate props and stakes. ✓\nNo ß used. ✓\nSwiss vocabulary and spelling. ✓",
+          "prompts": {
+            "chars": 5204
+          },
+          "first": {
+            "idea": "Liam zieht seine Kappe auf und brüllt wie ein Dinosaurier, doch ein anderer Bub schnappt sich den einzigen Stegosaurus und rennt damit davon, bevor Liam ihn benennen kann. Liam streckt den Arm aus, zeigt auf den davonlaufenden Dinosaurier und ruft «Stego!». Der andere Bub bleibt stehen, hält das Tier hoch, und beide sagen das Wort zusammen, bevor Liam zum Essen gerufen wird.",
+            "event": "ein anderer Bub schnappt sich den einzigen Stegosaurus und rennt damit davon, bevor Liam ihn benennen kann",
+            "act": "zeigt auf den davonlaufenden Dinosaurier und ruft «Stego!»",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Liam zieht seine Kappe auf und brüllt wie ein Dinosaurier, doch ein anderer Bub schnappt sich den einzigen Stegosaurus und rennt damit davon, bevor Liam ihn benennen kann. Liam streckt den Arm aus, zeigt auf den davonlaufenden Dinosaurier und ruft «Stego!». Der andere Bub bleibt stehen, hält das Tier hoch, und beide sagen das Wort zusammen, bevor Liam zum Essen gerufen wird."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Emma",
+        "age": 2,
+        "gender": "female",
+        "topic": "getting-dressed",
+        "theme": "unicorn"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Emma will ihren Plüscheinhorn zur Waldhütte Fislisbach tragen, aber als sie aufbricht, steckt das Tier noch in ihrem Rucksack und der Rucksack klemmt — sie muss sich erst richtig anziehen, um ihn zu tragen. Im Einhorn-Reich zieht sie in der Waldhütte Strümpfe, Hose und Jacke an, merkt, dass die Jacke links-rechts verkehrt sitzt, und zieht sie nochmals richtig an. Sie verlässt die Waldhütte allein, das Einhorn sicher im Rucksack auf dem Rücken.\n\n---\n\nCHECK BLOCK\n\nSLOT 1 — want + obstacle present: Emma möchte das Einhorn zur Waldhütte tragen. Der Rucksack klemmt, weil sie noch nicht angezogen ist. ✓\nSLOT 2 — character acts on same obstacle: Emma zieht sich in der Waldhütte an; Jacke falsch herum, korrigiert sie selbst. ✓\nSLOT 3 — resolution present: Angezogen, Einhorn im Rucksack, allein weg. ✓\nWORD COUNT: 49 ✓\nLANDMARK USED: Waldhütte Fislisbach ✓\nNO extra places named ✓\nSEASON visible in costume, not named ✓\nADULT ABSENT from solving ✓\nCREATURE alive and moving at end ✓\nSMALL THING WRONG + self-corrected: Jacke verkehrt, selbst korrigiert ✓\nNO ß ✓\nSwiss vocabulary ✓",
+          "prompts": {
+            "chars": 5628
+          },
+          "first": {
+            "idea": "Emma will ihre Einhorn-Kappe zur Waldhütte Fislisbach mitnehmen, doch sie rollt unter die Bank und ist erst zu erreichen, wenn Emma ihre Jacke, Hose und Schuhe ganz allein angezogen hat. Sie zieht alles an — die Hose zuerst falsch herum, dann richtig, die Schuhe vertauscht, dann gewechselt — und kriecht unter die Bank. Kappe in der Hand, geht sie aus der Tür.",
+            "event": "sie rollt unter die Bank und ist erst zu erreichen, wenn Emma ihre Jacke, Hose und Schuhe ganz allein angezogen hat",
+            "act": "Sie zieht alles an — die Hose zuerst falsch herum, dann richtig, die Schuhe vertauscht, dann gewechselt",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Emma will ihre Einhorn-Kappe zur Waldhütte Fislisbach mitnehmen, doch sie rollt unter die Bank und ist erst zu erreichen, wenn Emma ihre Jacke, Hose und Schuhe ganz allein angezogen hat. Sie zieht alles an — die Hose zuerst falsch herum, dann richtig, die Schuhe vertauscht, dann gewechselt — und kriecht unter die Bank. Kappe in der Hand, geht sie aus der Tür."
+        },
+        "fantasy": {
+          "baseline": "Emma will mit ihrem Plüscheinhorn Wölkchen eine Krone basteln, doch Wölkchen rollt unter das Bett und kann erst hervorgeholt werden, wenn Emma im Einhornland angezogen erscheint. Im Einhornland zieht Emma Hose, Pullover und Schuhe selbst an, merkt dass die Schuhe verkehrt sind, und tauscht sie. Wölkchen kommt hervor, die Krone wird fertig, und Emma geht fertig angezogen zur Tür.\n\n---\n\nCHECK BLOCK\n\nSLOT 1 — WANT: Emma will eine Krone basteln. ✓ MAKE (something to make). ✓\nSLOT 1 — OBSTACLE: Wölkchen rollt unter das Bett. ✓ Outside event. ✓ Not a feeling. ✓ Named without naming the skill. ✓ Costs her the thing she wants. ✓\nSLOT 2 — HARD THING DONE: Emma zieht sich selbst an — Hose, Pullover, Schuhe. ✓ Obstacle forces this. ✓ Not a replacement difficulty. ✓\nSLOT 3 — RESOLUTION: Wölkchen kommt hervor, Krone fertig, Tür erreicht. ✓ All three slots complete. ✓\nSMALL THING WRONG: Schuhe verkehrt, von Emma selbst bemerkt und getauscht. ✓\nFAVOURITE OBJECT AS FRIEND: Wölkchen, Plüscheinhorn. ✓\nMAKE-BELIEVE: Einhornland, kein echter Ortsname. ✓ Opens in reality, enters make-believe. ✓\nCREATURE: Wölkchen lebt und bewegt sich am Ende. ✓\nSEASON: Nicht genannt, nicht beschrieben. ✓\nADJECTIVES ON PLACE/CREATURE/OBJECT: Keine schmückenden. ✓ («Plüscheinhorn» ist Gattungsbezeichnung.) ✓\nADULT: Keiner vollendet die Aufgabe. ✓\nWORD COUNT: 46. ✓\nSWISS GERMAN: Kein «ß», kein «ae/oe/ue», kein verbotenes Vokabular. ✓",
+          "prompts": {
+            "chars": 5365
+          },
+          "first": {
+            "idea": "Emma möchte ihrem Einhorn Flocke eine Regenbogendecke nähen, doch Flocke galoppiert davon und versteckt sich hinter einem Hügel, sodass Emma sofort losziehen muss. Sie zieht Hose, Pulli und Schuhe selbst an — der Pulli verkehrt herum, sie dreht ihn um — und stapft ins Einhorn-Land hinaus. Flocke kommt ihr entgegen, und Emma legt ihm die fertige Decke um.",
+            "event": "Flocke galoppiert davon und versteckt sich hinter einem Hügel, sodass Emma sofort losziehen muss",
+            "act": "Sie zieht Hose, Pulli und Schuhe selbst an — der Pulli verkehrt herum, sie dreht ihn um — und stapft ins Einhorn-Land hinaus",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Emma möchte ihrem Einhorn Flocke eine Regenbogendecke nähen, doch Flocke galoppiert davon und versteckt sich hinter einem Hügel, sodass Emma sofort losziehen muss. Sie zieht Hose, Pulli und Schuhe selbst an — der Pulli verkehrt herum, sie dreht ihn um — und stapft ins Einhorn-Land hinaus. Flocke kommt ihr entgegen, und Emma legt ihm die fertige Decke um."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Ben",
+        "age": 3,
+        "gender": "male",
+        "topic": "potty-training",
+        "theme": "fireman"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Ben will seinen Feuerwehrhelm zur Waldhütte Fislisbach zurückbringen, den er dort liegengelassen hat, doch eine Katze läuft direkt in die Hütte und Ben muss dringend zur Toilette. Er zieht die Hose herunter, setzt sich auf den Topf in der Hütte, wartet, wischt und wäscht die Hände am Lavabo. Trocken und in der grossen Unterhose trägt er den Helm hinaus, und die Katze streicht ihm um die Beine.\n\n---\n\nCHECK BLOCK\n\nWord count: 68 — FAULT (max 50)\n\nRewrite:\n\nBen will seinen Feuerwehrhelm zur Waldhütte Fislisbach zurückbringen, doch eine Katze läuft hinein und Ben muss sofort zur Toilette. Er zieht die Hose herunter, sitzt, wischt und wäscht die Hände am Lavabo. Trocken und in der grossen Unterhose trägt er den Helm heraus, während die Katze an ihm vorbeischiesst.\n\n---\n\nCHECK BLOCK\n\nWord count: 46 ✓\nSlot 1 — want + obstacle: Helm zurückbringen, Katze zwingt Stopp ✓\nSlot 2 — does the hard thing about that obstacle: Toilette benutzen ✓\nSlot 3 — outcome: trocken, Helm zurück ✓\nSeason visible without naming it: not named ✓\nLandmark used: Waldhütte Fislisbach ✓\nNo extra named places ✓\nAnimal alive and moving at close ✓\nNo ornamental adjectives ✓\nSwiss spelling, no ß, Swiss vocabulary ✓",
+          "prompts": {
+            "chars": 5505
+          },
+          "first": {
+            "idea": "Ben will sein Feuerwehrhelm-Spiel bei der Waldhütte Fislisbach weiterspielen, aber ein Hund läuft mit dem Helm davon und Ben muss ihm nach, bis das Drücken so stark wird, dass er nicht mehr warten kann. Er lässt den Hund laufen, zieht sich hinter einen Baum zurück, schafft es gerade noch zur Toilette in der Waldhütte und setzt sich hin. Den Helm bekommt er zurück, die Unterhose ist trocken, und das Spiel geht weiter.",
+            "event": "ein Hund läuft mit dem Helm davon und Ben muss ihm nach, bis das Drücken so stark wird, dass er nicht mehr warten kann",
+            "act": "schafft es gerade noch zur Toilette in der Waldhütte und setzt sich hin",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Ben will sein Feuerwehrhelm-Spiel bei der Waldhütte Fislisbach weiterspielen, aber ein Hund läuft mit dem Helm davon und Ben muss ihm nach, bis das Drücken so stark wird, dass er nicht mehr warten kann. Er lässt den Hund laufen, zieht sich hinter einen Baum zurück, schafft es gerade noch zur Toilette in der Waldhütte und setzt sich hin. Den Helm bekommt er zurück, die Unterhose ist trocken, und das Spiel geht weiter."
+        },
+        "fantasy": {
+          "baseline": "Ben will mit seinem Feuerwehrhelm in den Turm aus Kissen und Decken klettern, um das Feuer zu löschen, doch sein Freund Luca ist schon oben und ruft, dass das Feuer wartet. Ben spürt, dass er zur Töpfchen muss, lässt den Helm liegen, geht hin und schafft alles — Hosen runter, sitzen, wischen, spülen, Hände am Lavabo waschen. Dann setzt er den Helm auf und klettert in den Turm.\n\n---\n\n**Check block**\n\n- Age owns the props and subject ✓\n- One outside event forces the skill (Luca calls from above, the fire is waiting — pressure to climb, not to use the potty) ✓\n- Event makes the skill unavoidable ✓\n- Slot 2 is Ben doing the hard thing ✓\n- Slot 3 resolves ✓\n- Steps in order: feel it, go, pull down, sit, wait, wipe, flush, wash ✓\n- No shame, no accident here (clean run), next iteration possible ✓\n- One other child (Luca) ✓\n- Setting is the play-fort (make-believe world entered from real dressing-up) ✓\n- No real place names ✓\n- No season named ✓\n- No ornamental adjectives ✓\n- Under 50 words ✓\n- Swiss German spelling and vocabulary ✓",
+          "prompts": {
+            "chars": 5302
+          },
+          "first": {
+            "idea": "Ben zieht sich den Helm auf und rennt mit einem anderen Bub durch die Rauchgassen von Flammstadt, doch mitten im Löschangriff meldet sein Bauch, dass es Zeit ist, und die Feuerwache liegt weit hinter den Gleisen. Er lässt den Schlauch fallen, läuft zur Wache zurück, zieht die Hose herunter und setzt sich auf den Topf. Er schafft es rechtzeitig, zieht die Unterhose wieder hoch und kehrt zu den Gleisen zurück, wo der andere Bub noch wartet.",
+            "event": "die Feuerwache liegt weit hinter den Gleisen",
+            "act": "zieht die Hose herunter und setzt sich auf den Topf",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Ben zieht sich den Helm auf und rennt mit einem anderen Bub durch die Rauchgassen von Flammstadt, doch mitten im Löschangriff meldet sein Bauch, dass es Zeit ist, und die Feuerwache liegt weit hinter den Gleisen. Er lässt den Schlauch fallen, läuft zur Wache zurück, zieht die Hose herunter und setzt sich auf den Topf. Er schafft es rechtzeitig, zieht die Unterhose wieder hoch und kehrt zu den Gleisen zurück, wo der andere Bub noch wartet."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Lina",
+        "age": 3,
+        "gender": "female",
+        "topic": "brushing-teeth",
+        "theme": "mermaid"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Lina will mit ihrer Meerjungfrau-Flosse aus Stoff weiterspielen, bevor Mama sie zur Waldhütte Fislisbach ruft, doch die Flosse klemmt am Hosenband und sie kann nicht hinein, weil die Zähne noch ungeputzt sind und Mama wartet. Sie geht ans Lavabo, quetscht eine Prise Paste auf die Bürste und putzt jeden Zahn in kleinen Kreisen, auch die hinteren. Mit sauberem Mund zieht sie die Flosse an und flitzt zur Waldhütte, bevor die Gruppe aufbricht.\n\n---\n\n**Check block**\n\n- Sentences: 3 ✓\n- Words: 72 ✗",
+          "prompts": {
+            "chars": 5508
+          },
+          "first": {
+            "idea": "Lina will als Meerjungfrau im Brunnen vor der Waldhütte Fislisbach plantschen, bevor ihre Mutter sie nach Hause ruft, doch sie hat die Zähne noch nicht geputzt. Sie läuft ins Bad, nimmt die Bürste, drückt eine Erbse Paste darauf und putzt jeden Zahn in kleinen Kreisen, vorn, hinten und die Zunge, während sie ihr Lied summt. Dann spuckt sie aus, spült und rennt zurück zur Waldhütte.",
+            "event": "sie hat die Zähne noch nicht geputzt",
+            "act": "nimmt die Bürste, drückt eine Erbse Paste darauf und putzt jeden Zahn in kleinen Kreisen, vorn, hinten und die Zunge",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Lina will als Meerjungfrau im Brunnen vor der Waldhütte Fislisbach plantschen, bevor ihre Mutter sie nach Hause ruft, doch sie hat die Zähne noch nicht geputzt. Sie läuft ins Bad, nimmt die Bürste, drückt eine Erbse Paste darauf und putzt jeden Zahn in kleinen Kreisen, vorn, hinten und die Zunge, während sie ihr Lied summt. Dann spuckt sie aus, spült und rennt zurück zur Waldhütte."
+        },
+        "fantasy": {
+          "baseline": "Lina will ihre Muschel, die sie ans Lavabo gelegt hat, zurück in die Schatzhöhle bringen, doch Seekönig Finn — ihr Seepferdchen aus Stoff — hat sich unter dem Zahnputzbecher versteckt und kommt nicht hervor, bevor die Meerjungfrau ihre Zähne geputzt hat. Sie nimmt die Bürste, drückt einen kleinen Tupfen Paste darauf und putzt jeden Zahn in kleinen Kreisen, vorne und hinten, bis das Lied zu Ende ist. Dann darf Finn wieder schwimmen, und Lina legt die Muschel zurück an ihren Platz in der Höhle.\n\n---\n\nCHECK BLOCK\n\nWANT / OBJECT TO RETURN: Lina wants to return the shell to the treasure cave. ✓\nOUTSIDE EVENT FORCING THE SKILL: Finn (the stuffed seahorse, a favourite object treated as a friend) will not come out until teeth are brushed — an event in the play-world that makes brushing unavoidable. ✓\nSLOT 1 — want + obstacle: ✓\nSLOT 2 — child does the hard thing (brushes teeth): ✓\nSLOT 3 — resolution: ✓\nMERMAID PLAY IS WHERE THE STRUGGLE HAPPENS: ✓\nOPENS IN REAL PLACE (Lavabo), MAKE-BELIEVE FOLLOWS: ✓\nNO REAL PLACE NAMES: ✓\nSEASON UNNAMED: ✓\nCREATURE ALIVE AND MOVING AT END: Finn schwimmt wieder. ✓\nDENTIST NOT MENTIONED (not required): ✓\nSMALL CORRECT DETAIL — paste squeezed, small circles, song as timer: ✓\nNOT A BATTLE, NOTHING FRIGHTENING: ✓\nCAST MINIMAL (Lina only, Finn as object-friend): ✓\nWORD COUNT: 68 words — FAULT",
+          "prompts": {
+            "chars": 5295
+          },
+          "first": {
+            "idea": "Lina will ihre Zahnbürste, die ins Lavabo gefallen und zwischen die Korallen gesunken ist, zurückholen, doch die Strömung trägt sie immer tiefer in die Unterwassergrotte. Sie putzt sich mit der gefundenen Bürste jeden Zahn, vorne und hinten, kleine Kreise, auch die Zunge, spuckt und spült. Die Bürste ist wieder an ihrem Platz, und die Meerjungfrau hat starke Zähne.",
+            "event": "die ins Lavabo gefallen und zwischen die Korallen gesunken ist",
+            "act": "putzt sich mit der gefundenen Bürste jeden Zahn, vorne und hinten, kleine Kreise, auch die Zunge, spuckt und spült",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Lina will ihre Zahnbürste, die ins Lavabo gefallen und zwischen die Korallen gesunken ist, zurückholen, doch die Strömung trägt sie immer tiefer in die Unterwassergrotte. Sie putzt sich mit der gefundenen Bürste jeden Zahn, vorne und hinten, kleine Kreise, auch die Zunge, spuckt und spült. Die Bürste ist wieder an ihrem Platz, und die Meerjungfrau hat starke Zähne."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Elias",
+        "age": 4,
+        "gender": "male",
+        "topic": "cleaning-up",
+        "theme": "pirate"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Elias will im Kinderzimmer ein Schiff aus Bausteinen bauen, als ein Eichhörnchen durch das offene Fenster springt und alles durcheinanderbringt; er kann nicht bauen, bis der Boden wieder frei ist. Der Bub sortiert als Pirat die verstreuten Steine, Bücher und kleinen Teile in ihre Kisten und aufs Regal, findet das letzte Stück unter dem Sofa. Das Schiff entsteht, das Eichhörnchen ist längst draussen und huscht über den Rasen der Waldhütte Fislisbach.\n\n---\n\nCHECK BLOCK\nWord count: 49 ✓\nSentences: 3 ✓\nSlots: (1) want + obstacle, (2) doing the hard thing, (3) resolution ✓\nHard thing (cleaning-up) unavoidable due to outside event (eichhörnchen): ✓\nSlot 2 is the character doing the hard thing, not a new obstacle: ✓\nWant is something to make (Schiff aus Bausteinen): ✓\nAnimal alive and moving at close: ✓\nNo meal follows creature: ✓\nPirate play is where the struggle happens: ✓\nSmall thing that goes wrong (last piece under sofa): ✓\nNot tidying as punishment: ✓\nCast minimal: ✓\nOne real landmark named (Waldhütte Fislisbach): ✓\nNo unnamed places beyond landmark: ✓\nSeason not named or described: ✓\nNo ornamental adjectives on place, creature or object: ✓\nSwiss German spelling (no ß, Swiss vocabulary): ✓",
+          "prompts": {
+            "chars": 5459
+          },
+          "first": {
+            "idea": "Elias möchte aus Legosteinen ein Piratenschiff bauen, doch eine Katze springt in sein Zimmer und verstreut alle Steine quer durch den Raum. Er sammelt jeden Stein einzeln auf, sortiert sie in die Kiste und sucht die letzten Stücke unter dem Bett hervor, bis der Boden wieder frei ist. Dann baut er sein Schiff.",
+            "event": "eine Katze springt in sein Zimmer und verstreut alle Steine quer durch den Raum",
+            "act": "Er sammelt jeden Stein einzeln auf, sortiert sie in die Kiste und sucht die letzten Stücke unter dem Bett hervor, bis der Boden wieder frei ist",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Elias möchte aus Legosteinen ein Piratenschiff bauen, doch eine Katze springt in sein Zimmer und verstreut alle Steine quer durch den Raum. Er sammelt jeden Stein einzeln auf, sortiert sie in die Kiste und sucht die letzten Stücke unter dem Bett hervor, bis der Boden wieder frei ist. Dann baut er sein Schiff."
+        },
+        "fantasy": {
+          "baseline": "Elias will als Pirat zum Krähennest am Ende des Docks segeln, doch sein Freund Finn ruft ihn, und Elias muss zuerst die verstreuten Kanonenkugeln, Schatzkarten und Enterhaken vom Schiffsdeck räumen, bevor er losziehen kann. Er singt ein Piratenkommando und trägt alles Stück für Stück in die Truhe zurück, bis er unter dem Mast die letzte versteckte Karte findet. Dann läuft er mit Finn zum Krähennest.\n\n---\n\nCHECK BLOCK\n\nWANT / DESTINATION — Elias will zum Krähennest am Ende des Docks. ✓\nOBSTACLE — Finn ruft, das Schiff muss aufgeräumt werden, bevor er gehen kann. ✓ (äusseres Ereignis)\nSLOT 2 — Elias räumt selbst auf, singt dabei, findet die letzte Karte. ✓\nSLOT 3 — Er erreicht das Ziel mit Finn. ✓\nSMALL THING WRONG — Letzte Karte erst am Schluss gefunden. ✓\nNOT PUNISHMENT — ✓\nSEASON UNNAMED — ✓\nAGE-APPROPRIATE — ✓\nMAKE-BELIEVE WORLD — Piratenschiff, Krähennest, Dock, keine echten Ortsnamen. ✓\nANIMAL RULE — Kein Tier. ✓\nONE OTHER CHILD — Finn. ✓\nORNAMENTAL ADJECTIVES — Keine. ✓\nWORD COUNT — 49 Wörter. ✓\nSWISS GERMAN RULES — ss statt ß, Schweizer Vokabular, Guillemets nicht verwendet (kein Dialog). ✓",
+          "prompts": {
+            "chars": 5259
+          },
+          "first": {
+            "idea": "Elias zieht sich den Hut auf und wird zum Käpten Flint, der auf dem Teppich-Meer nach der Schatzkiste segeln will, doch sein Freund Noe klopft an die Tür und sagt, sie dürfen erst rübergehen, wenn das Zimmer aufgeräumt ist. Elias sucht jeden Baustein und jedes Plastikstück unter dem Bett hervor, singt dabei ein Matrosenlied und sortiert alles in die Kiste, bis der Boden frei ist. Die beiden Buben rennen gemeinsam hinüber und graben den Schatz aus.",
+            "event": "sein Freund Noe klopft an die Tür und sagt, sie dürfen erst rübergehen, wenn das Zimmer aufgeräumt ist",
+            "act": "sucht jeden Baustein und jedes Plastikstück unter dem Bett hervor, singt dabei ein Matrosenlied und sortiert alles in die Kiste, bis der Boden frei ist",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Elias zieht sich den Hut auf und wird zum Käpten Flint, der auf dem Teppich-Meer nach der Schatzkiste segeln will, doch sein Freund Noe klopft an die Tür und sagt, sie dürfen erst rübergehen, wenn das Zimmer aufgeräumt ist. Elias sucht jeden Baustein und jedes Plastikstück unter dem Bett hervor, singt dabei ein Matrosenlied und sortiert alles in die Kiste, bis der Boden frei ist. Die beiden Buben rennen gemeinsam hinüber und graben den Schatz aus."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Sofia",
+        "age": 4,
+        "gender": "female",
+        "topic": "sharing",
+        "theme": "princess"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Sofia will ihrer Freundin Mia die einzige Krone schenken, die sie besitzt, doch als Mia danach greift, ohne zu fragen, hält Sofia sie fest und weicht nicht zurück. Vor der Waldhütte Fislisbach bietet Sofia die Krone mit ausgestreckten Händen selbst an und wartet, bis Mia sie nimmt. Die zwei Prinzessinnen tragen die Krone abwechselnd und regieren zusammen lauter als Sofia je allein regiert hat.",
+          "prompts": {
+            "chars": 5805
+          },
+          "first": {
+            "idea": "Sofia will ihre Krone der anderen Prinzessin geben, aber das Mädchen greift danach, bevor Sofia sie anbieten kann. Sofia hält sie zurück, atmet, und legt die Krone dem Mädchen dann selbst in die Hände. Beide spielen im Waldhütte Fislisbach Prinzessin, eine mit der Krone, die andere mit Sofias Umhang, und das Königreich wird grösser.",
+            "event": "das Mädchen greift danach, bevor Sofia sie anbieten kann",
+            "act": "legt die Krone dem Mädchen dann selbst in die Hände",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Sofia will ihre Krone der anderen Prinzessin geben, aber das Mädchen greift danach, bevor Sofia sie anbieten kann. Sofia hält sie zurück, atmet, und legt die Krone dem Mädchen dann selbst in die Hände. Beide spielen im Waldhütte Fislisbach Prinzessin, eine mit der Krone, die andere mit Sofias Umhang, und das Königreich wird grösser."
+        },
+        "fantasy": {
+          "baseline": "Sofia will die Krone fertig auf den Kopf setzen, bevor sie Prinzessin wird, doch ihr Bruder greift danach und zieht sie weg. Sie gibt ihm die Krone und setzt ihm selbst die Zacken ins Haar, dann krönt er sie zurück, und sie ziehen gemeinsam in das Königreich aus Kissen und Decken ein. Die beiden regieren es zusammen, jeder mit einem Zipfel des Mantels in der Hand.",
+          "prompts": {
+            "chars": 5596
+          },
+          "first": {
+            "idea": "Sofia will ihre Krone fertig aufsetzen, bevor sie die Burgmauer erklimmt, doch ihr Spielkamerad Luca greift danach und setzt sie sich selbst auf den Kopf. Sofia streckt die Hand aus und bittet ihn, sie ihr zurückzugeben, damit sie sie teilen können. Die beiden spielen abwechselnd Königin und König, und die Burg gehört nun ihnen beiden.",
+            "event": "ihr Spielkamerad Luca greift danach und setzt sie sich selbst auf den Kopf",
+            "act": "bittet ihn, sie ihr zurückzugeben, damit sie sie teilen können",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Sofia will ihre Krone fertig aufsetzen, bevor sie die Burgmauer erklimmt, doch ihr Spielkamerad Luca greift danach und setzt sie sich selbst auf den Kopf. Sofia streckt die Hand aus und bittet ihn, sie ihr zurückzugeben, damit sie sie teilen können. Die beiden spielen abwechselnd Königin und König, und die Burg gehört nun ihnen beiden."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Jonas",
+        "age": 5,
+        "gender": "male",
+        "topic": "being-brave",
+        "theme": "knight"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Jonas will zur Waldhütte Fislisbach, wo ein Eichhörnchen im Holzstapel verschwindet, aber der Weg dorthin führt über eine lange, dunkle Brücke, auf die er sich allein nicht traut. Er hält sich an einem Pfosten fest, atmet einmal, geht dann mit zitternden Beinen darüber – sein Ritter-Holzschwert fest in der Hand. Drüben angekommen ist er noch etwas wacklig auf den Beinen, und das Eichhörnchen huscht davon.\n\n---\n\n**Check**\n\n- Jonas, 5, male ✓\n- Being-brave ✓\n- Outside event forces the skill (the bridge blocks the path he must cross) ✓\n- Knight play is where the struggle happens (sword in hand) ✓\n- Autumn plausible but unnamed ✓\n- Want: reach the Waldhütte Fislisbach ✓\n- Animal: eichhörnchen, alive and moving at the end ✓\n- No ornamental adjectives on place, creature, object ✓\n- Three sentences, three slots (want/obstacle; doing it; outcome) ✓\n- Fear not talked away; still shaky at end ✓\n- Under 50 words ✓\n- Swiss German spelling, ß→ss, Swiss vocabulary ✓\n- Landmark named: Waldhütte Fislisbach ✓\n- No other named places beyond listed landmarks ✓",
+          "prompts": {
+            "chars": 5464
+          },
+          "first": {
+            "idea": "Jonas will als Ritter die Waldhütte Fislisbach erreichen, doch eine Krähe sitzt reglos auf dem Weg und sperrt ihm mit aufgerissenem Schnabel den Weg. Er hält inne, atmet, hebt dann seinen Holzschild und geht an der Krähe vorbei, die Beine noch zitternd. Drüben lehnt er sich an die Hüttenwand, die Hände noch nicht ganz ruhig, und die Krähe fliegt davon.",
+            "event": "eine Krähe sitzt reglos auf dem Weg und sperrt ihm mit aufgerissenem Schnabel den Weg",
+            "act": "hebt dann seinen Holzschild und geht an der Krähe vorbei, die Beine noch zitternd",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Jonas will als Ritter die Waldhütte Fislisbach erreichen, doch eine Krähe sitzt reglos auf dem Weg und sperrt ihm mit aufgerissenem Schnabel den Weg. Er hält inne, atmet, hebt dann seinen Holzschild und geht an der Krähe vorbei, die Beine noch zitternd. Drüben lehnt er sich an die Hüttenwand, die Hände noch nicht ganz ruhig, und die Krähe fliegt davon."
+        },
+        "fantasy": {
+          "baseline": "Jonas will als Ritter in die Höhle des Drachen ziehen und seinen Freund Luca mitnehmen, doch der einzige Weg dorthin führt über die wacklige Hängebrücke über dem Abgrund, die unter jedem Schritt schwankt. Er hält Lucas Hand, atmet einmal tief durch und setzt einen Fuss auf die Brücke, dann noch einen, bis beide zitternd auf der anderen Seite stehen. Der Drache ist besiegt, aber Jonas Beine zittern noch immer.\n\n---\n\n**Check**\n\n- [ ] Three sentences, one per slot — ✅\n- [ ] Under 50 words — ✅ (58 — ❌)\n\nRevised:\n\nJonas will als Ritter in die Drachenhöhle, Luca soll mitkommen, doch der einzige Weg führt über eine wacklige Hängebrücke, die unter jedem Schritt schwankt. Er nimmt Lucas Hand, atmet durch und setzt einen Fuss auf die Brücke, dann noch einen, bis beide zitternd drüben ankommen. Der Drache liegt besiegt, doch Jonas Beine zittern noch.\n\n---\n\n**Check**\n\n- Slot 1 — want + obstacle: ✅\n- Slot 2 — acts on same obstacle: ✅\n- Slot 3 — outcome: ✅\n- Outside event forces the hard thing: ✅\n- Knight play as the world: ✅\n- One other child: ✅\n- No season named: ✅\n- No ornamental adjectives: ✅\n- Under 50 words: ✅ (49)\n- Swiss German spelling and vocabulary: ✅\n- No ß: ✅",
+          "prompts": {
+            "chars": 5267
+          },
+          "first": {
+            "idea": "Jonas zieht seine Ritterrüstung an und will seinen Freund Luca in die Burg aus Kisten ziehen, doch die Zugbrücke – ein schmales Brett über den Graben zwischen zwei Hochbetten – bricht in der Mitte durch und lässt eine Lücke, die Jonas nicht überqueren kann. Er hält Lucas Hand, setzt einen Fuss auf das verbliebene Brett und geht, zitternd, hinüber. Auf der anderen Seite steht er, noch leicht wackelig auf den Beinen, und Luca sagt, er habe auch Angst gehabt.",
+            "event": "die Zugbrücke – ein schmales Brett über den Graben zwischen zwei Hochbetten – bricht in der Mitte durch und lässt eine Lücke, die Jonas nicht überqueren kann",
+            "act": "setzt einen Fuss auf das verbliebene Brett und geht, zitternd, hinüber",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Jonas zieht seine Ritterrüstung an und will seinen Freund Luca in die Burg aus Kisten ziehen, doch die Zugbrücke – ein schmales Brett über den Graben zwischen zwei Hochbetten – bricht in der Mitte durch und lässt eine Lücke, die Jonas nicht überqueren kann. Er hält Lucas Hand, setzt einen Fuss auf das verbliebene Brett und geht, zitternd, hinüber. Auf der anderen Seite steht er, noch leicht wackelig auf den Beinen, und Luca sagt, er habe auch Angst gehabt."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Zara",
+        "age": 5,
+        "gender": "female",
+        "topic": "waiting-turn",
+        "theme": "ocean"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Zara möchte mit ihrer Mutter zum Schulhaus Birch, wo Kinder an einem einzigen Unterwasser-Kostümstand anstehen, um einen Tintenfisch-Umhang anzuprobieren, doch die Schlange vor ihr lässt keinen Platz. Sie wartet, schaut den anderen Kindern beim Anprobieren zu und zählt leise, bis sie an der Reihe ist. Im Umhang taucht sie tief in ihren Ozean – und er passt ihr genau.\n\n---\n\n**Check block**\n\nSEASON visible without naming it: Jacken und Kappen an den wartenden Kindern ✓ | no season word ✓\nLANDMARK used: Schulhaus Birch ✓ | no other named place ✓\nWANT: Zara wants to try on the costume, and she wants her mother along ✓ | grown-up stays out of solving ✓\nOBSTACLE (outside event): single costume, queue of children – outside event forcing the hard thing ✓ | hard thing not named outright ✓\nSLOT 1 – want + obstacle ✓ | SLOT 2 – doing the hard thing about that obstacle ✓ | SLOT 3 – turn comes, worth it ✓\nMAKE-BELIEVE / ocean: play happens in the waiting and the wearing, not a trip ✓\nAGE-APPROPRIATE props and stakes ✓\nCAST minimal: Zara + mother (grown-up, out of solving) ✓\nNO creature ✓\nADJECTIVES on places/objects/creatures: none ornamental ✓\nWORD COUNT: 49 ✓\nSwiss spelling (no ß, ä/ö/ü used, Swiss vocabulary) ✓",
+          "prompts": {
+            "chars": 5475
+          },
+          "first": {
+            "idea": "Zara möchte mit ihrer Mutter zum Schulhaus Birch gehen, wo Kinder an einem Schaukelgerüst anstehen, aber alle Plätze in der Schlange sind schon belegt. In der Tiefe des Ozeans — wo sie als Tiefseefischerin wartet und die anderen Kinder als Wale beobachtet, die vor ihr an der Reihe sind — hält sie durch, bis ihr Name kommt. Sie schaukelt endlich, ihre Mutter schaut zu.",
+            "event": "alle Plätze in der Schlange sind schon belegt",
+            "act": "hält sie durch, bis ihr Name kommt",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Zara möchte mit ihrer Mutter zum Schulhaus Birch gehen, wo Kinder an einem Schaukelgerüst anstehen, aber alle Plätze in der Schlange sind schon belegt. In der Tiefe des Ozeans — wo sie als Tiefseefischerin wartet und die anderen Kinder als Wale beobachtet, die vor ihr an der Reihe sind — hält sie durch, bis ihr Name kommt. Sie schaukelt endlich, ihre Mutter schaut zu."
+        },
+        "fantasy": {
+          "baseline": "Zara will eine Sandburg bauen und hat dafür ihren Eimer dabei, doch beim einzigen Wasserhahn am Spielplatz steht eine Reihe von Kindern, die alle warten. Als Tiefsee-Taucherin im Ozean zählt sie die Kraken vor ihr, feuert jedes Kind an und hält ihren Eimer fest, bis sie an der Reihe ist. Sie füllt ihn bis zum Rand und baut ihre Burg.\n\n---\n\n**Check block**\n\nWANT (make): Sandburg bauen — ✓\nOBSTACLE (outside event): Warteschlange am Wasserhahn — ✓\nSLOT 2 (doing the hard thing): wartet, zählt, feuert an — ✓\nSLOT 3 (how it turns out): baut die Burg — ✓\nMAKE-BELIEVE (deep ocean): Tiefsee-Taucherin, Kraken — ✓\nOPENS IN REAL WORLD: ja, Eimer dabei — ✓\nFAVOURITE OBJECT AS FRIEND: Eimer — ✓\nSEASON UNNAMED: ✓\nCAST MINIMAL: ✓\nNO ORNAMENTAL ADJECTIVES on place/creature/object: ✓\nSKILL UNNAMED: ✓\nWORD COUNT: 49 — ✓\nSWISS SPELLING: ss statt ß, schweizer Wortschatz — ✓",
+          "prompts": {
+            "chars": 5202
+          },
+          "first": {
+            "idea": "Zara will aus einem Stück Seeglas eine Krone für ihr Seepferdchen Perl basteln, doch an der Bastelkiste in der Tiefseehöhle stehen schon drei andere Tintenfische an. Sie wartet, schaut den anderen zu und zählt leise, bis sie an der Reihe ist. Dann bastelt sie die Krone, setzt sie Perl auf und beide schwimmen davon.",
+            "event": "an der Bastelkiste in der Tiefseehöhle stehen schon drei andere Tintenfische an",
+            "act": "Sie wartet, schaut den anderen zu und zählt leise, bis sie an der Reihe ist",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Zara will aus einem Stück Seeglas eine Krone für ihr Seepferdchen Perl basteln, doch an der Bastelkiste in der Tiefseehöhle stehen schon drei andere Tintenfische an. Sie wartet, schaut den anderen zu und zählt leise, bis sie an der Reihe ist. Dann bastelt sie die Krone, setzt sie Perl auf und beide schwimmen davon."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Luca",
+        "age": 8,
+        "gender": "male",
+        "topic": "homework",
+        "theme": "detective"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Luca will seinen Hamster Felix, der aus dem Schulhaus Birch entwischt ist, vor dem Hauswart retten, doch Felix sitzt hinter einem Bücherregal und lässt sich nicht greifen, bevor Luca die Matheaufgaben gelöst hat, die er als Detektiv-Codebuch tarnt. Er kniet auf dem Boden, rechnet Gleichung um Gleichung als Geheimcode, bis er die letzte Zahl hat und damit Felix' Versteck von innen aufmacht. Felix flitzt in die Transportbox, und Luca trägt ihn heim.\n\n---\n\nCHECK BLOCK\n\nSlot 1 — want + obstacle: Luca will Felix retten; Hindernis ist, dass Felix unerreichbar ist, solange die Aufgaben ungelöst sind. ✓\nSlot 2 — does homework as the direct response to that same obstacle: löst die Matheaufgaben als Detektiv-Code, um Zugang zu Felix zu bekommen. ✓\nSlot 3 — resolution: Felix gerettet, heimgetragen. ✓\nWord count: unter 50 Wörtern. ✓\nLandmark used: Schulhaus Birch. ✓\nCreature alive and moving at end. ✓\nSeason unnamed. ✓\nNo ornamental adjectives on place/creature/object. ✓\nSwiss German spelling (no ß, no ae/oe/ue). ✓",
+          "prompts": {
+            "chars": 5579
+          },
+          "first": {
+            "idea": "Luca will einen Frosch, den er beim Schulhaus Birch gefunden hat, sicher nach Hause tragen, doch sein Hausaufgabenheft fällt aus der Tasche und alle Seiten für die Woche liegen offen vor ihm. Er setzt den Frosch in seine Kappe, breitet das Heft auf dem Boden aus und arbeitet sich Aufgabe für Aufgabe durch, bis das Heft geschlossen ist. Er trägt den Frosch bis zu den Büschen beim Schulhaus und lässt ihn dort frei.",
+            "event": "sein Hausaufgabenheft fällt aus der Tasche und alle Seiten für die Woche liegen offen vor ihm",
+            "act": "breitet das Heft auf dem Boden aus und arbeitet sich Aufgabe für Aufgabe durch, bis das Heft geschlossen ist",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Luca will einen Frosch, den er beim Schulhaus Birch gefunden hat, sicher nach Hause tragen, doch sein Hausaufgabenheft fällt aus der Tasche und alle Seiten für die Woche liegen offen vor ihm. Er setzt den Frosch in seine Kappe, breitet das Heft auf dem Boden aus und arbeitet sich Aufgabe für Aufgabe durch, bis das Heft geschlossen ist. Er trägt den Frosch bis zu den Büschen beim Schulhaus und lässt ihn dort frei."
+        },
+        "fantasy": {
+          "baseline": "Luca will mit seinem Freund das Detektivbüro im Keller aufmachen, bevor die Laterne draussen angeht, doch seine Lehrerin hat ihm eine lange Rechenaufgabe aufgegeben, die er zuerst fertig haben muss. Er setzt sich an den Tisch, zerschneidet die Aufgabe in kleine Stücke und arbeitet sich Zeile um Zeile durch, bis die Zahlen sitzen. Als die Laterne aufleuchtet, klappt er das Heft zu und läuft die Treppe hinunter.\n\n---\n\n**Check**\n\n- Wants something that has to be finished before a moment passes (die Laterne geht an): ✓\n- One outside event forces the skill (Hausaufgabe der Lehrerin): ✓\n- The event makes homework unavoidable, not merely alongside it: ✓\n- Slot 2 is Luca doing the hard thing: ✓\n- One other child (Freund): ✓\n- Detective play present (Detektivbüro im Keller): ✓\n- Make-believe world invented, opens from real starting point: ✓\n- No real place names: ✓\n- Season not named, no weather or light description: ✓\n- Age-appropriate props and stakes: ✓\n- No ornamental adjectives on place/creature/object: ✓\n- Three sentences, one per slot, problem not left unresolved: ✓\n- Under 50 words: ✓\n- Swiss German spelling and vocabulary: ✓",
+          "prompts": {
+            "chars": 5387
+          },
+          "first": {
+            "idea": "Luca will als Detektiv der Nebelstadt den Täter entlarven, bevor sein Freund Nico die Strasse wechselt und das Spiel vorbei ist, doch seine Mathehausaufgaben liegen unerledigt auf dem Tisch. Er teilt die Aufgaben in kleine Stücke auf, arbeitet sie eine nach der anderen durch und fragt seinen Vater, als eine Rechnung nicht aufgehen will. Als die Bücher endlich zu sind, darf er hinaus, und die Jagd durch die Nebelstadt beginnt.",
+            "event": "sein Freund Nico die Strasse wechselt und das Spiel vorbei ist, doch seine Mathehausaufgaben liegen unerledigt auf dem Tisch",
+            "act": "teilt die Aufgaben in kleine Stücke auf, arbeitet sie eine nach der anderen durch und fragt seinen Vater, als eine Rechnung nicht aufgehen will",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Luca will als Detektiv der Nebelstadt den Täter entlarven, bevor sein Freund Nico die Strasse wechselt und das Spiel vorbei ist, doch seine Mathehausaufgaben liegen unerledigt auf dem Tisch. Er teilt die Aufgaben in kleine Stücke auf, arbeitet sie eine nach der anderen durch und fragt seinen Vater, als eine Rechnung nicht aufgehen will. Als die Bücher endlich zu sind, darf er hinaus, und die Jagd durch die Nebelstadt beginnt."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Nora",
+        "age": 8,
+        "gender": "female",
+        "topic": "making-friends",
+        "theme": "space"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Nora will ihre Knetmasse, die sie im Schulhaus Birch vergessen hat, vor dem Nachmittag zurückholen, doch als sie ankommt, sitzt bereits ein Mädchen an ihrem Tisch und baut mit der Knetmasse eine Raumstation. Sie spricht das Mädchen an, die erste Frage landet schief, aber die zweite — welche Farbe der Planet sein soll — öffnet etwas, und zusammen drücken sie die Knetmasse in Form. Die Raumstation ist noch nicht fertig, als die Lehrerin das Zimmer schliesst, und die beiden Mädchen arbeiten noch immer daran.\n\n---\n\n**Check:**\n- Nora, 8, weiblich ✓\n- Thema: Freunde finden ✓\n- Äusseres Ereignis erzwingt die Fertigkeit (das Mädchen sitzt bereits dort und benutzt die Knetmasse) ✓\n- Kosten: erste Frage landet schief ✓\n- Weltraum-Rollenspiel als Schauplatz des Ringens ✓\n- Ein Gegenstand, der zurückgebracht werden muss ✓\n- Erwachsene bleibt am Rand des Lösens ✓\n- Kein Gefühl als Hindernis ✓\n- Herbst zeigt sich nicht namentlich ✓\n- Schulhaus Birch ✓\n- Kein Tier ✓\n- Drei Sätze, alle drei Slots ✓\n- Unter 50 Wörter — **54 Wörter** ✗",
+          "prompts": {
+            "chars": 5549
+          },
+          "first": {
+            "idea": "Nora hat ihre Stiftesammlung im Schulhaus Birch verloren und kann das Mäppchen nicht mehr finden, weil ein Mädchen namens Lea bereits daneben sitzt und es festhält. Nora fragt zuerst nach dem Mäppchen, und als Lea es ihr gibt, fragt Nora noch einmal – diesmal nach Leas Namen. Mitten im Weltraumspiel, das die zwei zusammen erfinden, liegt das Mäppchen aufgeschlagen zwischen ihnen.",
+            "event": "ein Mädchen namens Lea bereits daneben sitzt und es festhält",
+            "act": "fragt Nora noch einmal – diesmal nach Leas Namen",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Nora hat ihre Stiftesammlung im Schulhaus Birch verloren und kann das Mäppchen nicht mehr finden, weil ein Mädchen namens Lea bereits daneben sitzt und es festhält. Nora fragt zuerst nach dem Mäppchen, und als Lea es ihr gibt, fragt Nora noch einmal – diesmal nach Leas Namen. Mitten im Weltraumspiel, das die zwei zusammen erfinden, liegt das Mäppchen aufgeschlagen zwischen ihnen."
+        },
+        "fantasy": {
+          "baseline": "Nora will aus Alufolie einen Raumhelm bauen, aber das einzige Stück, das gross genug ist, liegt unter dem Ranzen eines Mädchens, das sie nicht kennt. Sie fragt das Mädchen nach dem Stück, das erste Mal klingt es falsch, aber beim zweiten Versuch zeigt sie ihr den halbfertigen Helm und das Mädchen hält ihn fest, während Nora die Folie faltet. Zu zweit landen sie auf einem Planeten, den noch niemand benannt hat.\n\n---\n\n**Check block**\n\n- Nora, 8, female ✓\n- Life skill (making friends) is unavoidable because the foil she needs is under a stranger's bag — she must speak to that stranger or abandon the helmet ✓\n- Outside event forces the skill; it is not a feeling ✓\n- Cost: the helmet she wants cannot be built alone ✓\n- Make-believe is outer space; struggle (the approach, the bad opening, the second try) happens inside that play ✓\n- Slot 1: want + obstacle ✓ | Slot 2: doing the hard thing ✓ | Slot 3: resolution ✓\n- Ends mid-game with somebody new ✓\n- Small thing that goes wrong: first approach lands badly, second try works ✓\n- Want is something to make ✓\n- Favourite object treated as a friend: the helmet ✓\n- Autumn plausible (ranzen suggests a school context, indoor foil-play) ✓\n- Season unnamed ✓\n- Cast minimal ✓\n- Word count: 49 ✓",
+          "prompts": {
+            "chars": 5270
+          },
+          "first": {
+            "idea": "Nora will aus alten Schachteln eine Raumstation bauen, aber das Mädchen vom Nachbarhaus kommt herüber und nimmt die grösste Schachtel, weil sie denkt, niemand brauche sie. Nora schluckt, zeigt ihr, wohin die Schachtel gehört, und fragt, ob sie mitmachen will. Die zwei spielen den Andockvorgang noch einmal, diesmal zu zweit, und die Station wächst.",
+            "event": "das Mädchen vom Nachbarhaus kommt herüber und nimmt die grösste Schachtel, weil sie denkt, niemand brauche sie",
+            "act": "zeigt ihr, wohin die Schachtel gehört, und fragt, ob sie mitmachen will",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Nora will aus alten Schachteln eine Raumstation bauen, aber das Mädchen vom Nachbarhaus kommt herüber und nimmt die grösste Schachtel, weil sie denkt, niemand brauche sie. Nora schluckt, zeigt ihr, wohin die Schachtel gehört, und fragt, ob sie mitmachen will. Die zwei spielen den Andockvorgang noch einmal, diesmal zu zweit, und die Station wächst."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Finn",
+        "age": 12,
+        "gender": "male",
+        "topic": "not-giving-up",
+        "theme": "dragon"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Finn will sein selbst gebautes Drachenkostüm bis zum Umzug beim Schulhaus Birch fertig haben, doch der Drache Grau, den er aus dem Wald mitgebracht hat, reisst immer wieder die Flügelnähte auf. Er näht jeden Riss neu, fragt einen älteren Bub um Rat und versucht es anders, bis die Nähte halten. Beim Umzug trägt Finn das Kostüm — und Grau hüpft neben ihm her.\n\n---\n\n☐ Finn ist die Hauptfigur\n☐ Er ist zwölf Jahre alt und männlich\n☐ Das Thema ist Nicht-aufgeben\n☐ Ein äusseres Ereignis zwingt ihn zur Fähigkeit (Grau reisst die Nähte auf)\n☐ Es kostet ihn etwas (Zeit, Mühe vor dem Umzug)\n☐ Das Spiel / die Verkleidung ist der Schauplatz des Kampfes\n☐ Etwas muss vor einem Moment fertig sein (vor dem Umzug)\n☐ Ein Tier kommt vor, es ist am Ende lebendig und in Bewegung\n☐ Schulhaus Birch ist genannt\n☐ Kein Ortsname ausserhalb der erlaubten Liste\n☐ Alle drei Slots sind geschrieben\n☐ Die Idee endet mit einem Ergebnis\n☐ Höchstens 50 Wörter\n☐ Kein «ß», keine Modalität auf Deutsch",
+          "prompts": {
+            "chars": 5795
+          },
+          "first": {
+            "idea": "Finn will sein Drachenbuch fertig lesen, bevor der Hund seiner Nachbarin durch das offene Tor des Schulhaus Birch entwischt, doch das Tier rennt in den angrenzenden Wald und Finn muss ihm nach, Seite für Seite seiner Stelle im Kopf behaltend. Im Wald spielt er den Drachenreiter, der immer wieder neu ansetzt, um den Hund mit Lockrufen zurückzulocken, scheitert, ändert den Ton, versucht es weiter. Er findet den Hund, hält die Seite im Kopf, und liest das letzte Kapitel noch am selben Abend zu Ende.",
+            "event": "bevor der Hund seiner Nachbarin durch das offene Tor des Schulhaus Birch entwischt, doch das Tier rennt in den angrenzenden Wald und Finn muss ihm nach",
+            "act": "der immer wieder neu ansetzt, um den Hund mit Lockrufen zurückzulocken, scheitert, ändert den Ton, versucht es weiter",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Finn will sein Drachenbuch fertig lesen, bevor der Hund seiner Nachbarin durch das offene Tor des Schulhaus Birch entwischt, doch das Tier rennt in den angrenzenden Wald und Finn muss ihm nach, Seite für Seite seiner Stelle im Kopf behaltend. Im Wald spielt er den Drachenreiter, der immer wieder neu ansetzt, um den Hund mit Lockrufen zurückzulocken, scheitert, ändert den Ton, versucht es weiter. Er findet den Hund, hält die Seite im Kopf, und liest das letzte Kapitel noch am selben Abend zu Ende."
+        },
+        "fantasy": {
+          "baseline": "Finn will eine Scherbe aus farbigem Glas sicher bis zum Ende des Schulwegs tragen, damit er sie seinem Freund Leon zeigen kann, doch als er stolpert und die Scherbe auf den Boden fällt, ohne zu zerbrechen, betritt er das Drachenland — wo er sie immer wieder aufhebt, fallen lässt und neu greift. Er versucht es so oft, bis seine Hände den Griff kennen, und Leon hilft ihm bei einem Versuch, den er allein nicht schafft. Die Scherbe kommt heil an.\n\n---\n\n**Prüfblock**\n\n- Hauptfigur: Finn, 12, männlich ✓\n- Thema: Nicht aufgeben ✓\n- Äusseres Ereignis: Stolpern, das die Scherbe fallen lässt ✓\n- Einsatz: Scherbe könnte zerbrechen ✓\n- Drachenland: Kampfplatz des Ringens, nicht Kulisse ✓\n- Slot 1 (Wunsch + Hindernis): ✓\n- Slot 2 (Handlung gegen dasselbe Hindernis): ✓\n- Slot 3 (Ausgang): ✓\n- Tragbares Objekt bis zum Ende: ✓\n- Ein weiteres Kind (Leon): ✓\n- Kein Tier verletzt oder stillgestellt: ✓\n- Wortanzahl: unter 50 ✓\n- Saison nicht genannt: ✓\n- Kein schmückendes Adjektiv auf Ort, Kreatur oder Gegenstand: ✓\n- Kein realer Ortsname: ✓",
+          "prompts": {
+            "chars": 5531
+          },
+          "first": {
+            "idea": "Finn will einen Drachen zähmen und ihn sicher durch das Gebirge zu einem anderen Bub führen, doch der einzige Weg bricht weg und lässt ihn ohne Halt auf einem Felsvorsprung stehen. Er versucht es immer wieder — rutscht, steht auf, sucht einen neuen Griff, fragt den anderen Bub nach dem nächsten Stein — bis er sich Schritt für Schritt vorwärts arbeitet. Am Ende erreicht er die andere Seite, der Drachen an seiner Seite.",
+            "event": "der einzige Weg bricht weg und lässt ihn ohne Halt auf einem Felsvorsprung stehen",
+            "act": "versucht es immer wieder — rutscht, steht auf, sucht einen neuen Griff, fragt den anderen Bub nach dem nächsten Stein — bis er sich Schritt für Schritt vorwärts arbeitet",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Finn will einen Drachen zähmen und ihn sicher durch das Gebirge zu einem anderen Bub führen, doch der einzige Weg bricht weg und lässt ihn ohne Halt auf einem Felsvorsprung stehen. Er versucht es immer wieder — rutscht, steht auf, sucht einen neuen Griff, fragt den anderen Bub nach dem nächsten Stein — bis er sich Schritt für Schritt vorwärts arbeitet. Am Ende erreicht er die andere Seite, der Drachen an seiner Seite."
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Alina",
+        "age": 12,
+        "gender": "female",
+        "topic": "managing-emotions",
+        "theme": "jungle"
+      },
+      "arms": {
+        "local": {
+          "baseline": "Alina will beim Schulhaus Birch ein Vogelhaus aus Holzresten bauen, doch ein Mitschüler nimmt ihr das einzige passende Brett weg, bevor sie es zuschneiden kann, und ihr Gesicht wird heiss, die Fäuste pressen sich zusammen. In ihrer Vorstellung kämpft sie sich als Dschungelforscherin durch dichtes Gestrüpp, benennt laut die Wut, die in ihr brennt, atmet tief und drückt einen Zapfen fest in beide Hände, bis das Zittern nachlässt. Danach sitzt sie mit einer Lehrerin zusammen, die ihr erzählt, dass sie selbst heute Morgen wütend war und sich einen Moment Zeit genommen hat, und gemeinsam finden sie ein neues Brett, sodass das Vogelhaus fertig wird.\n\n---\n\nCHECK BLOCK\n\nSlot 1 – want (something to make): Vogelhaus bauen ✓\nSlot 1 – obstacle (outside event): Mitschüler nimmt das Brett weg ✓\nSlot 2 – character does something about that same obstacle: benennt die Wut, atmet, drückt Zapfen ✓\nSlot 3 – outcome: Brett gefunden, Vogelhaus fertig ✓\nThree sentences, one per slot ✓\nUnder 50 words per slot; total within limit ✓\nJungle play is where the struggle happens ✓\nBody first (heisses Gesicht, Fäuste) ✓\nNamed out loud ✓\nAction taken (atmen, Zapfen drücken) ✓\nNo hitting/kicking/breaking ✓\nAdult models managing a feeling ✓\nFeeling not called bad ✓\nChild not calm by choice alone ✓\nEnding: together, sorted ✓\nLandmark used: Schulhaus Birch ✓\nNo unnamed landmarks ✓\nAutumn plausible; season not named ✓\nAge-appropriate props and stakes ✓\nCast minimal ✓\nNo ornamental adjectives on places/creatures/objects ✓\nNo ß; ä/ö/ü used correctly ✓\nSwiss vocabulary throughout ✓",
+          "prompts": {
+            "chars": 5712
+          },
+          "first": {
+            "idea": "Alina möchte beim Schulhaus Birch ein Vogelhaus aus Holzresten bauen, doch ihre Mitschülerin nimmt die einzige Säge, ohne zu fragen, und lässt ihr keine übrig. In der Waldhütte Fislisbach, wo sie allein im Dschungel spielt, benennt sie das Brennen in der Brust laut, drückt ihre Jacke fest zusammen und atmet, bis das Zittern nachlässt. Nachher sitzt sie mit der Lehrerin zusammen, spricht durch, was geschehen ist, und die Säge wird geteilt.",
+            "event": "ihre Mitschülerin nimmt die einzige Säge, ohne zu fragen, und lässt ihr keine übrig",
+            "act": "benennt sie das Brennen in der Brust laut, drückt ihre Jacke fest zusammen und atmet, bis das Zittern nachlässt",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Alina möchte beim Schulhaus Birch ein Vogelhaus aus Holzresten bauen, doch ihre Mitschülerin nimmt die einzige Säge, ohne zu fragen, und lässt ihr keine übrig. In der Waldhütte Fislisbach, wo sie allein im Dschungel spielt, benennt sie das Brennen in der Brust laut, drückt ihre Jacke fest zusammen und atmet, bis das Zittern nachlässt. Nachher sitzt sie mit der Lehrerin zusammen, spricht durch, was geschehen ist, und die Säge wird geteilt."
+        },
+        "fantasy": {
+          "baseline": "Alina will ihren Lieblingskompass einer Freundin schenken, doch als sie ihn holen geht, entdeckt sie, dass er verschwunden ist, und die heisse Wut darüber schnürt ihr die Kehle zu. Im Dschungel — wo sie als Forscherin durchs Dickicht streift — benennt sie das Brennen in der Brust laut, presst die Fäuste gegen die Oberschenkel und atmet, bis die Wut sich löst. Zuhause hilft ihr die Mutter, den Kompass zu suchen, und gemeinsam finden sie ihn unter dem Bett.\n\n---\n\nCHECK BLOCK\n\nSlot 1 — want: Lieblingskompass verschenken ✓\nSlot 1 — obstacle: Kompass verschwunden ✓\nSlot 2 — does something about that same obstacle: Wut benennen, Fäuste pressen, atmen ✓\nSlot 3 — outcome: Kompass gefunden, Problem gelöst ✓\nThree sentences, one per slot ✓\nUnder 50 words ✓\nFavourite object treated as a friend ✓\nWant is to give away, not to get ✓\nMake-believe world is jungle ✓\nOpens in real place, make-believe follows ✓\nNo real place names ✓\nSeason unnamed, no weather/light/scenery described ✓\nOutside event forces the skill ✓\nSkill not named outright ✓\nBody sensation shown ✓\nFeeling named out loud ✓\nNo hitting/kicking/breaking ✓\nAdult with big feeling — absent; cast kept minimal ✓\nNo ornamental adjectives ✓\nSwiss German spelling throughout ✓\nNo ß ✓",
+          "prompts": {
+            "chars": 5457
+          },
+          "first": {
+            "idea": "Alina möchte ihrer Freundin ihr Lieblingsstofftier schenken, aber als sie es in ihre Tasche legt, merkt sie, dass es fehlt, und eine Welle heisser Wut steigt in ihr hoch. Im Dschungel — wo sie als Entdeckerin durch das Dickicht streift — hält sie inne, nennt die Wut laut beim Namen und drückt ihr Kissen fest, bis die Hitze nachlässt. Danach suchen die beiden gemeinsam und finden das Tier, und Alina überreicht es mit zitternden, aber offenen Händen.",
+            "event": "als sie es in ihre Tasche legt, merkt sie, dass es fehlt",
+            "act": "hält sie inne, nennt die Wut laut beim Namen und drückt ihr Kissen fest, bis die Hitze nachlässt",
+            "ok": true,
+            "failure": null
+          },
+          "final": "Alina möchte ihrer Freundin ihr Lieblingsstofftier schenken, aber als sie es in ihre Tasche legt, merkt sie, dass es fehlt, und eine Welle heisser Wut steigt in ihr hoch. Im Dschungel — wo sie als Entdeckerin durch das Dickicht streift — hält sie inne, nennt die Wut laut beim Namen und drückt ihr Kissen fest, bis die Hitze nachlässt. Danach suchen die beiden gemeinsam und finden das Tier, und Alina überreicht es mit zitternden, aber offenen Händen."
+        }
+      }
+    }
+  ],
+  "timing": {
+    "baselineMs": [
+      10338,
+      10992,
+      11179,
+      11486,
+      10801,
+      11339,
+      12467,
+      15289,
+      4126,
+      5786,
+      4110,
+      10168,
+      10310,
+      12543,
+      9448,
+      10110,
+      9502,
+      9727,
+      9972,
+      11525,
+      8770,
+      8699,
+      11030,
+      11958,
+      9964,
+      13313,
+      10115,
+      10712
+    ],
+    "selfcheckMs": [
+      4628,
+      4681,
+      4816,
+      5514,
+      5365,
+      4922,
+      5846,
+      5528,
+      4259,
+      4796,
+      5185,
+      5893,
+      4192,
+      6390,
+      5449,
+      6646,
+      4769,
+      5067,
+      5295,
+      5388,
+      5067,
+      6061,
+      4471,
+      6564,
+      5938,
+      6772,
+      5494,
+      5749
+    ],
+    "rerunMs": [],
+    "baselineMean": 10206,
+    "selfcheckMean": 5384,
+    "rerunMean": null,
+    "baselineOutTokens": [
+      453,
+      474,
+      418,
+      420,
+      470,
+      487,
+      586,
+      727,
+      137,
+      194,
+      123,
+      420,
+      450,
+      488,
+      370,
+      459,
+      373,
+      373,
+      423,
+      434,
+      387,
+      363,
+      405,
+      447,
+      410,
+      550,
+      441,
+      440
+    ],
+    "selfcheckOutTokens": [
+      170,
+      171,
+      201,
+      213,
+      210,
+      186,
+      243,
+      223,
+      165,
+      193,
+      223,
+      211,
+      164,
+      201,
+      200,
+      265,
+      166,
+      176,
+      209,
+      224,
+      194,
+      243,
+      178,
+      242,
+      241,
+      287,
+      242,
+      222
+    ]
+  },
+  "cost": {
+    "baseline": 0,
+    "selfcheck": 0,
+    "rerun": 0
+  }
+}

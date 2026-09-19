@@ -1,0 +1,382 @@
+{
+  "cells": [
+    {
+      "cell": {
+        "name": "Noah",
+        "age": 1,
+        "gender": "male",
+        "topic": "first-steps",
+        "theme": "farm"
+      },
+      "arms": {
+        "local": {
+          "idea": "Noah möchte einem Huhn auf dem Bauernhof (in seinem Spiel, das er neben der Waldhütte Fislisbach spielt) ein Rüebli hinlegen, doch das Huhn stakst davon, bevor er es erreicht. Er lässt den Tisch los und setzt Schritt um Schritt dem Huhn nach, fällt, steht auf, geht weiter. Das Rüebli liegt vor dem Huhn, und Noah sitzt daneben.",
+          "usage": {
+            "input_tokens": 1379,
+            "output_tokens": 129,
+            "elapsed_ms": 4260
+          }
+        },
+        "fantasy": {
+          "idea": "Noah zieht sich eine Kappe auf und will über die Tiele zur Schachtel mit dem Spielzeug-Bauernhof krabbeln, doch ein anderer Bub hat die Tiele mit Bausteinen vollgestellt. Noah lässt die Wand los, tritt auf dem Bauernhof-Strohboden von Gatter zu Gatter, bis ein Huhn wegläuft und er ihm zwei schrittweise Schritte hinterhersetzt. Er landet auf dem Hosenboden, rappelt sich hoch, und die Schachtel ist in Reichweite.",
+          "usage": {
+            "input_tokens": 1301,
+            "output_tokens": 152,
+            "elapsed_ms": 4618
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Mia",
+        "age": 1,
+        "gender": "female",
+        "topic": "going-outside",
+        "theme": "forest"
+      },
+      "arms": {
+        "local": {
+          "idea": "Mia möchte zur Waldhütte Fislisbach, doch ihr Fäustling fällt vom Pram und liegt auf dem Weg. Im Wald tut sie so, als sei sie eine Bärin, die ihr Junges sucht, und kriecht durch das Laub, bis sie den Fäustling findet. Die Hütte ist erreicht, dann geht es heim, Mantel aus, warm.",
+          "usage": {
+            "input_tokens": 1405,
+            "output_tokens": 113,
+            "elapsed_ms": 3696
+          }
+        },
+        "fantasy": {
+          "idea": "Mia möchte ihrem Teddybär einen Zapfen schenken, aber beim Anziehen fällt ihr Handschuh in den Laubhaufen und verschwindet darin. Sie wühlt mit der blossen Hand im Laub, bis sie den Handschuh findet, und nimmt dann den Zapfen mit. Der Teddy bekommt seinen Zapfen, und Mia kommt warm wieder nach Hause.",
+          "usage": {
+            "input_tokens": 1333,
+            "output_tokens": 112,
+            "elapsed_ms": 3603
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Liam",
+        "age": 2,
+        "gender": "male",
+        "topic": "first-words",
+        "theme": "dinosaur"
+      },
+      "arms": {
+        "local": {
+          "idea": "Liam will seinen Dinosaurier mit in die Waldhütte Fislisbach nehmen, doch das Tier verschwindet im Laub und ein anderes Kind hebt es auf, ohne es zurückzugeben. Liam zeigt auf den Dinosaurier und sagt laut ein Wort — falsch, aber nah dran — bis das Kind versteht und ihn zurückgibt. Die beiden spielen noch ein Weilchen, dann geht Liam heim zum Schlafen.",
+          "usage": {
+            "input_tokens": 1371,
+            "output_tokens": 127,
+            "elapsed_ms": 4080
+          }
+        },
+        "fantasy": {
+          "idea": "Liam will den Dinosaurier-Bub aus Blättern zusammensetzen, bevor ein anderer Bub ihn wegträgt, doch als er auf das erste Stück zeigen will, kommt kein Wort heraus. Er zeigt auf das Blatt und sagt «Blatt», dann auf den Schwanz und sagt «Schwanz», Stück für Stück, bis die Figur fertig ist. Der andere Bub lacht und sagt das Wort zurück.",
+          "usage": {
+            "input_tokens": 1303,
+            "output_tokens": 128,
+            "elapsed_ms": 4168
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Emma",
+        "age": 2,
+        "gender": "female",
+        "topic": "getting-dressed",
+        "theme": "unicorn"
+      },
+      "arms": {
+        "local": {
+          "idea": "Emma möchte ihren Einhorn-Umhang zur Waldhütte Fislisbach tragen, doch die Schnalle ist zu, und ohne ihn kommt sie nicht als Einhorn an. In der Einhorn-Welt kämpft sie mit Knöpfen und verkehrten Schuhen, bis alles sitzt. Angezogen und allein tritt sie durch die Tür.",
+          "usage": {
+            "input_tokens": 1414,
+            "output_tokens": 104,
+            "elapsed_ms": 3253
+          }
+        },
+        "fantasy": {
+          "idea": "Emma möchte für ihr Stofftier eine Decke nähen, doch das Einhorn, mit dem sie spielt, galoppiert plötzlich davon und versteckt sich hinter einem Hügel, wo Emma allein hinmuss. Emma zieht im Einhorn-Land ihren Pullover selbst an, merkt, dass er verkehrt herum sitzt, und dreht ihn richtig, damit sie das Einhorn findet. Sie bringt das Einhorn heim und näht die Decke fertig.",
+          "usage": {
+            "input_tokens": 1339,
+            "output_tokens": 132,
+            "elapsed_ms": 3938
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Ben",
+        "age": 3,
+        "gender": "male",
+        "topic": "potty-training",
+        "theme": "fireman"
+      },
+      "arms": {
+        "local": {
+          "idea": "Ben will seinen Feuerwehrhelm zurück auf den Haken hängen, wo er hingehört, aber eine Katze hat ihn in der Waldhütte Fislisbach unters Regal gestossen, und genau da spürt Ben, dass er dringend auf den Topf muss. Er hockt hin, zieht die Hose herunter und wartet – es klappt – wischt sich ab, zieht alles hoch und wäscht die Hände am Lavabo. Dann hängt er den Helm wieder auf den Haken, und die Katze schnuppert daran, während Ben im trockenen Unterhosen-Stolz weiterspielt.",
+          "usage": {
+            "input_tokens": 1386,
+            "output_tokens": 177,
+            "elapsed_ms": 5099
+          }
+        },
+        "fantasy": {
+          "idea": "Ben will als Feuerwehrmann durch den Schlauch kriechen, um die andere Seite des Turms zu erreichen, doch ein anderer Bub blockiert den Eingang mit einem Eimer. Ben lässt den Schlauch los, läuft zum Töpfchen, zieht die Hose herunter, setzt sich hin, wischt sich ab, spült und wäscht die Hände am Lavabo. Er kommt zurück, kriecht durch den Schlauch und erreicht den Turm in seiner trockenen Unterhose.",
+          "usage": {
+            "input_tokens": 1326,
+            "output_tokens": 146,
+            "elapsed_ms": 4542
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Lina",
+        "age": 3,
+        "gender": "female",
+        "topic": "brushing-teeth",
+        "theme": "mermaid"
+      },
+      "arms": {
+        "local": {
+          "idea": "Lina will als Meerjungfrau in der Waldhütte Fislisbach ein Lied zu Ende singen, bevor Mama die Kerze ausbläst, doch die Zahnbürste liegt noch trocken im Becher. Sie bürste jeden Zahn — vorne, hinten, auch den hintersten — und spucke aus, während das Lied im Kopf weiterläuft. Dann singt sie den letzten Teil, und Mama lässt die Kerze brennen.",
+          "usage": {
+            "input_tokens": 1388,
+            "output_tokens": 133,
+            "elapsed_ms": 4064
+          }
+        },
+        "fantasy": {
+          "idea": "Lina legt ihre Muschel ans Lavabo, damit die Meerjungfrau sie nach dem Tauchen wieder findet, doch eine Welle aus dem Becken spült sie hinter den Spiegel, wo Lina nicht hinkommt ohne zuerst den Zauberstab der Meereskönigin zu benutzen — und der steckt im Zahnputzbecher. Sie bürstet jeden Zahn mit kleinen Kreisen, spuckt, spült, stellt den Becher hin und holt den Zauberstab heraus. Die Muschel liegt wieder am Rand, die Meerjungfrau kann weiter tauchen, und Linas Zähne sind sauber.",
+          "usage": {
+            "input_tokens": 1328,
+            "output_tokens": 184,
+            "elapsed_ms": 5923
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Elias",
+        "age": 4,
+        "gender": "male",
+        "topic": "cleaning-up",
+        "theme": "pirate"
+      },
+      "arms": {
+        "local": {
+          "idea": "Elias will ein Piratenschiff aus Kissen und Decken bauen, doch eine Katze springt mitten ins Zimmer und wirft alle Teile durcheinander, sodass er zuerst aufräumen muss, bevor er weiterbauen kann. Er sortiert Kissen um Kissen zurück und sucht das letzte Deckenstück unter dem Bett, während die Katze zuschaut. Am Ende steht sein Schiff bei der Waldhütte Fislisbach im Zimmer, fertig gebaut.",
+          "usage": {
+            "input_tokens": 1366,
+            "output_tokens": 137,
+            "elapsed_ms": 4217
+          }
+        },
+        "fantasy": {
+          "idea": "Elias will mit seinem Freund Leon zur Schatzhöhle am Ende der Klippe segeln, doch das Piratenschiff liegt unter einem Meer aus Holzklötzen, Seilen und Karten, und Leons Vater kommt in einer Stunde. Elias sammelt Klötze in die Truhe, rollt die Seilen zusammen und kriecht unter das Bett, bis er die letzte Karte findet. Die beiden Buben segeln ab, bevor die Stunde um ist.",
+          "usage": {
+            "input_tokens": 1309,
+            "output_tokens": 136,
+            "elapsed_ms": 4694
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Sofia",
+        "age": 4,
+        "gender": "female",
+        "topic": "sharing",
+        "theme": "princess"
+      },
+      "arms": {
+        "local": {
+          "idea": "Sofia will ihrer Freundin Lena die Prinzessinnenkrone schenken, aber als Lena sie sich bei der Waldhütte Fislisbach einfach aufsetzt, ohne zu fragen, zieht Sofia sie zurück. Weil nun keine von beiden die Krone hat, bietet Sofia sie Lena an und behält sich das Zepter. Die zwei spielen weiter, und das Königreich wird grösser als zuvor.",
+          "usage": {
+            "input_tokens": 1442,
+            "output_tokens": 115,
+            "elapsed_ms": 3812
+          }
+        },
+        "fantasy": {
+          "idea": "Sofia will ihre Krone aufsetzen und das Spiel beenden, bevor die Glocken des Schlosses aufhören zu läuten, doch ihre Mitspielerin greift die Krone und setzt sie sich selbst auf den Kopf. Sofia nimmt die Krone zurück, hält sie einen Moment fest, und reicht sie dann hinüber mit dem Angebot, abwechselnd Königin zu sein. Am Ende tragen sie die Krone je eine Runde und regieren das Königreich gemeinsam, während Sofia ihr Zepter für sich behält.",
+          "usage": {
+            "input_tokens": 1378,
+            "output_tokens": 147,
+            "elapsed_ms": 4730
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Jonas",
+        "age": 5,
+        "gender": "male",
+        "topic": "being-brave",
+        "theme": "knight"
+      },
+      "arms": {
+        "local": {
+          "idea": "Jonas will seine Ritterburg im Wald hinter der Waldhütte Fislisbach bauen, doch ein Eichhörnchen springt auf seinen Steinhaufen und verschwindet in einem Erdloch — und er muss seinen Arm hineinstrecken, um seinen einzigen Baustein zurückzuholen. Er hält kurz inne, atmet, schiebt dann die Hand langsam in die Dunkelheit, zittert dabei, und zieht den Stein heraus. Das Eichhörnchen huscht davon, und Jonas steht auf, die Hand noch leicht bebend, den Stein fest in der Faust.",
+          "usage": {
+            "input_tokens": 1366,
+            "output_tokens": 167,
+            "elapsed_ms": 4765
+          }
+        },
+        "fantasy": {
+          "idea": "Jonas will seinen Freund Luca als Ritter-Knappe mitnehmen in das Königreich hinter dem Garten, doch der Drache – ein grosser Hund vom Nachbarn – steht genau im Durchgang und Jonas bleibt mit seinem Holzschwert in der Hand stehen. Er atmet, bittet Luca, seine Hand zu halten, und geht dann doch einen Schritt durch den Durchgang. Jonas steht auf der anderen Seite, noch zitternd, Schwert noch fest umklammert, und Luca sagt, er habe auch Angst gehabt.",
+          "usage": {
+            "input_tokens": 1309,
+            "output_tokens": 157,
+            "elapsed_ms": 4541
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Zara",
+        "age": 5,
+        "gender": "female",
+        "topic": "waiting-turn",
+        "theme": "ocean"
+      },
+      "arms": {
+        "local": {
+          "idea": "Zara will mit ihrer Mama zur Waldhütte Fislisbach, wo Kinder auf einer Rutschbahn anstehen, doch weil so viele Kinder vor ihr sind, muss sie warten, bis sie an der Reihe ist. Im Warten taucht sie in ihrer Vorstellung in die Tiefsee, wo ein Tintenfisch auch auf seine Höhle wartet, bis ein anderer herauszieht — und sie hält durch. Als Zara endlich rutscht, jubelt sie laut.",
+          "usage": {
+            "input_tokens": 1375,
+            "output_tokens": 138,
+            "elapsed_ms": 4677
+          }
+        },
+        "fantasy": {
+          "idea": "Zara will aus Muscheln und Tang eine Krone basteln, aber an der Bastelkiste in der Krippe stehen schon vier Kinder, und es gibt nur eine Schere. Sie taucht als Tiefseetaucherin in eine Unterwasserhöhle, wo ein Tintenfisch namens Perle auf sie wartet, und zählt die Runden, die die anderen Kinder drehen, bis sie an der Reihe ist. Als Zara die Schere endlich in der Hand hält, trägt sie ihre fertige Meeresköniginnen-Krone nach Hause.",
+          "usage": {
+            "input_tokens": 1298,
+            "output_tokens": 160,
+            "elapsed_ms": 5150
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Luca",
+        "age": 8,
+        "gender": "male",
+        "topic": "homework",
+        "theme": "detective"
+      },
+      "arms": {
+        "local": {
+          "idea": "Luca will einen Igel, den er beim Schulhaus Birch gefunden hat, sicher nach Hause tragen, doch sein Schulranzen ist voll mit Aufgabenheften, die er noch nicht erledigt hat, und seine Mutter lässt ihn den Igel erst behalten, wenn alles fertig ist. Als Detektiv untersucht er jeden Auftrag wie einen Fall, schneidet die Rechenreihe in kleine Beweise auf und fragt seinen Bruder, als ein Schritt nicht aufgeht. Der Igel wartet in einer Schachtel, die Hefte sind zu, und Luca trägt ihn hinaus in den Garten.",
+          "usage": {
+            "input_tokens": 1399,
+            "output_tokens": 175,
+            "elapsed_ms": 5071
+          }
+        },
+        "fantasy": {
+          "idea": "Luca will mit seinem Freund Leon den Detektiv spielen, bevor Leon um fünf Uhr abgeholt wird, doch der Lehrer hat an diesem Tag eine lange Rechenaufgabe aufgegeben, die zuerst fertig sein muss. Als Detektiv Luca im erfundenen Hafenviertel Spuren verfolgt, rechnet der echte Luca am Tisch Aufgabe für Aufgabe durch, fragt seinen Vater bei einer Stelle, die nicht geht, und macht danach weiter. Leon kommt, Luca klappt das Heft zu, und die beiden laufen hinaus.",
+          "usage": {
+            "input_tokens": 1341,
+            "output_tokens": 164,
+            "elapsed_ms": 4940
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Nora",
+        "age": 8,
+        "gender": "female",
+        "topic": "making-friends",
+        "theme": "space"
+      },
+      "arms": {
+        "local": {
+          "idea": "Nora hat im Schulhaus Birch einen Raumhelm aus Papier gebastelt und ihn auf der Bank liegen lassen; als sie zurückkommt, trägt ihn ein Mädchen, das sie nicht kennt. Nora fragt nach dem Helm, das Mädchen gibt ihn zurück, aber Nora fragt auch nach dem Namen – und dann spielen die zwei zusammen Mondstation. Der Helm gehört Nora, das Mädchen hat ein Raumschiff aus Stöcken gebaut, und das Spiel läuft noch.",
+          "usage": {
+            "input_tokens": 1386,
+            "output_tokens": 145,
+            "elapsed_ms": 4305
+          }
+        },
+        "fantasy": {
+          "idea": "Nora will aus Alufolie einen Raumhelm basteln, aber sie hat keine Schere und der einzige Bub in der Nähe hat die einzige. Sie fragt ihn, ob sie die Schere kurz benutzen darf, und die zwei bauen zusammen eine Raumstation. Mitten im Spiel sind sie noch dabei, die Antenne zu befestigen.",
+          "usage": {
+            "input_tokens": 1306,
+            "output_tokens": 102,
+            "elapsed_ms": 3791
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Finn",
+        "age": 12,
+        "gender": "male",
+        "topic": "not-giving-up",
+        "theme": "dragon"
+      },
+      "arms": {
+        "local": {
+          "idea": "Finn will sein selbst gebautes Drachenmodell beim Schulfest im Schulhaus Birch zeigen, doch der Drache bricht kurz vorher auseinander und er muss ihn ohne Leim neu zusammenfügen. Er versucht es mit Schnur, scheitert dreimal, fragt einen Mitschüler um Hilfe und versucht es ein viertes Mal mit einer anderen Knotentechnik. Der Drache hält, ein Eichhörnchen läuft über den Tisch, und Finn trägt das Modell in den Saal.",
+          "usage": {
+            "input_tokens": 1436,
+            "output_tokens": 152,
+            "elapsed_ms": 4541
+          }
+        },
+        "fantasy": {
+          "idea": "Finn will einen Drachen zähmen und dessen Ei heil zu einer Höhle tragen, doch das Ei ist rissig und er muss es in jedem Versuch anders halten, weil er immer wieder stolpert. Er probiert es mit seinem Freund Luca dutzende Male, schneidet den Weg in kleine Abschnitte und fragt Luca, wo er die Hände anders legen soll. Beim letzten Versuch erreichen sie die Höhle, das Ei liegt ganz darin, und der Drache dreht sich um.",
+          "usage": {
+            "input_tokens": 1365,
+            "output_tokens": 147,
+            "elapsed_ms": 4845
+          }
+        }
+      }
+    },
+    {
+      "cell": {
+        "name": "Alina",
+        "age": 12,
+        "gender": "female",
+        "topic": "managing-emotions",
+        "theme": "jungle"
+      },
+      "arms": {
+        "local": {
+          "idea": "Alina möchte beim Schulhaus Birch ein Modell aus Fundholz bauen, doch ihre Lehrerin erklärt, dass das Material bereits für ein anderes Projekt vergeben wurde. In der Waldhütte Fislisbach verwandelt sie das Holz im Spiel in einen Dschungel, spürt die Enge in der Brust, atmet tief durch und presst die Hände gegen ihre Knie, bis die Wut loslässt. Danach setzt sich die Lehrerin neben sie und gemeinsam suchen sie neues Material, sodass das Modell doch noch entsteht.",
+          "usage": {
+            "input_tokens": 1429,
+            "output_tokens": 164,
+            "elapsed_ms": 4523
+          }
+        },
+        "fantasy": {
+          "idea": "Alina möchte ihrer Lehrpuppe eine selbst gebastelte Krone schenken, doch beim Spielen im Dschungel — wo sie als Entdeckerin durch Ranken aus Wollschnüren stapft — fällt die Krone auseinander und lässt sich nicht mehr flicken. In der Dschungelstille spürt sie die Hitze im Gesicht, nennt die Wut beim Namen und drückt ein Kissen fest, bis die Hände aufhören zu zittern. Danach sitzt ihre Mutter neben ihr, zeigt ihr, wie sie selbst tief atmet, wenn etwas schiefläuft, und gemeinsam kleben sie die Krone neu zusammen.",
+          "usage": {
+            "input_tokens": 1357,
+            "output_tokens": 189,
+            "elapsed_ms": 6460
+          }
+        }
+      }
+    }
+  ]
+}

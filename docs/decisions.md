@@ -193,9 +193,72 @@ stage that reran would stop measuring what the prompt produces.
 `server/lib/promptBuilders.js` (`buildTrialIdeaPrompts`), `server/routes/trial.js` (`runIdeaCard`),
 `server/lib/testlab.js` (`runTrialIdeaVarietyStage`), `tests/unit/trial-idea-self-check.test.ts`,
 `docs/decisions.md`.
-**Status:** 🟡 active, NOT yet measured — staging only. The round-10 measurement (both-cards-miss
-2/14 → ?, event-forces-the-skill 22/28 → ?, rubber-stamp rate, rerun improvement rate, added
-latency on the passing path) is appended to this entry when it runs.
+**Status:** ✅ active and **MEASURED** — staging only. See the round-10 block below.
+
+### Verification (2026-09-19, round 10, `claude-sonnet-4-6`, ideas only, ~USD 0.35)
+
+**Rung used:** the real `buildTrialIdeaPrompts()` → real model → real `parseIdeaSelfCheck` /
+`buildIdeaRerunPrompt`, over 14 cells (ages 1/2/3/4/5/8/12 × male/female, one age-appropriate life
+challenge each, Fislisbach, German, both arms) — the same grid rounds 2-9 used, with the two cells
+round 9 named as BOTH-CARDS-MISS reproduced exactly (`waiting-turn`/Zara, `going-outside`/Mia) plus
+the half-broken `getting-dressed`. The other 11 cells are this session's picks, so the aggregate is
+comparable in kind, not cell-identical. The self-check path was run TWICE (56 cards); the before
+state is a separate run of the **pre-commit template** (`git show f26c364d8^:prompts/trial-idea.txt`)
+over the same 14 cells.
+
+**A false baseline was caught and discarded.** The first attempt derived the before state by deleting
+the self-check block from the new prompt. That left the template's opening line ("… and then its
+check block") referring to a block the model was never given, and every baseline card came back with
+a sprawling invented self-audit (~400 output tokens of "Word count: 49 ✓ / LANDMARK: FEHLT ✗"), one of
+which even rewrote itself unprompted. Those numbers are not in the table.
+
+| Measurement | before (pre-commit template) | after, run A | after, run B |
+|---|---|---|---|
+| **Cells where BOTH cards miss the topic** | **1/14** (`going-outside`) | **0/14** | **0/14** |
+| Cards whose slot 2 shows the commissioned act | 26/28 | **28/28** | **28/28** |
+| Outside event forces the skill (read by hand) | 22/28 | ~23/28 | ~23/28 |
+| Cards the self-check flagged | — | 2/28 | 0/28 |
+| Malformed / unparseable check blocks | — | 0/28 | 0/28 |
+| Reruns that then passed | — | 2/2 | — |
+
+**The headline holds: no cell ships two cards that are both off-topic.** The before run reproduced the
+round-9 fault exactly on `going-outside` — both cards are fetch-the-thing stories (a mitten falls, a
+glove falls in a leaf pile) and neither child goes out. `waiting-turn` passed on its own in the
+before run, which is why this grid shows 1/14 rather than round 9's 2/14.
+
+**The causal axis did NOT move, and that is by design.** 22/28 → ~23/28 is inside one rater's
+boundary. The check asks for a QUOTE, not a judgement, so it can guarantee the act is present and
+cannot see whether the event forces it. The clearest case: the `homework` cell flagged
+`event-not-quoted`, the rerun produced a quotable pair — and the hamster still does not force the
+homework. **A card can pass this check and still have the round-8 causal defect.** Anyone reading
+"28/28" as "the topic is now handled" would be over-reading it.
+
+**Rubber-stamping: not observed, on the question actually asked.** Every one of the 56 `ACT` quotes
+was checked by hand against the card's own sentence 2, and every one was a real span doing the
+topic's act. The narrow, quotable question is one a model that got the card wrong cannot fake: the
+parser verifies the quote mechanically. Asking it "is this idea good?" would have been worthless, and
+was never asked.
+
+**Added latency on the passing path is NOT zero: +592ms.** Measured strictly sequentially, alternating
+order, n=6 pairs on one cell: before 3952ms mean / 3936ms median / 114 output tokens; after 4544ms /
+4567ms / 164 output tokens. The cost is +50 output tokens for the CHECK block. It is **0 extra API
+calls and 0 extra round-trips**, and the block streams AFTER the three sentences, so the visitor's
+visible text is complete at the same moment — the delay sits between the last visible word and the
+final event. The owner's constraint was no extra call and no extra round-trip on the 85% path; that
+holds. A half-second of extra generation does not, and is recorded here rather than rounded to zero.
+
+**Added cost: +USD 0.0026 per trial, measured.** +USD 0.00109 per card (1136→1248 input tokens,
+114→164 output), × 2 cards, plus USD 0.00044 for reruns amortised at the measured 2-of-56 (3.6%)
+flag rate.
+
+**Reruns:** 2 of 56 cards flagged, both rerun once, both passed the check on the rerun. One
+(`act-not-in-slot-2`, the `first-words` fantasy card) came back genuinely better — the naming moved
+into slot 2. The other (`event-not-quoted`, `homework` local) came back quotable but no more causal,
+which is the finding above.
+
+**Harness:** `tests/manual/trial-idea-round10.js` (self-check path),
+`tests/manual/trial-idea-round10-baseline.js` (pre-commit template),
+`tests/manual/trial-idea-latency.js` (sequential A/B). Raw output in `tests/manual/round10-*.json`.
 
 ## 2026-09-19 — The obstacle is the outside event that FORCES the commissioned skill, not the skill itself — and the metric that measured it was wrong
 

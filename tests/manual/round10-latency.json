@@ -1,0 +1,99 @@
+{
+  "n": 6,
+  "baseline": {
+    "meanMs": 3952,
+    "medianMs": 3936,
+    "meanOut": 114
+  },
+  "selfcheck": {
+    "meanMs": 4544,
+    "medianMs": 4567,
+    "meanOut": 164
+  },
+  "rows": [
+    {
+      "pair": 0,
+      "kind": "baseline",
+      "ms": 3936,
+      "out": 119,
+      "in": 1133
+    },
+    {
+      "pair": 0,
+      "kind": "selfcheck",
+      "ms": 4234,
+      "out": 156,
+      "in": 1251
+    },
+    {
+      "pair": 1,
+      "kind": "selfcheck",
+      "ms": 4825,
+      "out": 187,
+      "in": 1247
+    },
+    {
+      "pair": 1,
+      "kind": "baseline",
+      "ms": 3783,
+      "out": 110,
+      "in": 1136
+    },
+    {
+      "pair": 2,
+      "kind": "baseline",
+      "ms": 4400,
+      "out": 102,
+      "in": 1136
+    },
+    {
+      "pair": 2,
+      "kind": "selfcheck",
+      "ms": 4268,
+      "out": 158,
+      "in": 1249
+    },
+    {
+      "pair": 3,
+      "kind": "selfcheck",
+      "ms": 4946,
+      "out": 194,
+      "in": 1246
+    },
+    {
+      "pair": 3,
+      "kind": "baseline",
+      "ms": 4466,
+      "out": 143,
+      "in": 1138
+    },
+    {
+      "pair": 4,
+      "kind": "baseline",
+      "ms": 3675,
+      "out": 120,
+      "in": 1134
+    },
+    {
+      "pair": 4,
+      "kind": "selfcheck",
+      "ms": 4567,
+      "out": 124,
+      "in": 1246
+    },
+    {
+      "pair": 5,
+      "kind": "selfcheck",
+      "ms": 4422,
+      "out": 164,
+      "in": 1249
+    },
+    {
+      "pair": 5,
+      "kind": "baseline",
+      "ms": 3454,
+      "out": 89,
+      "in": 1136
+    }
+  ]
+}
