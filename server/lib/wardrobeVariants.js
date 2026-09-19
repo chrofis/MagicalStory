@@ -11,13 +11,15 @@
  *
  * WHAT THIS IS NOT. It does not infer a state from prose, and it does not
  * invent a garment. The off-set comes from the Art Director's own declared
- * `wornItems[]` rows (via wornItems.resolveWornItemsForPage) and the off-sheet's
- * outfit is the canonical contract with that garment's clause STRUCTURALLY
- * deleted by the existing stripper (wornItems.resolveOutfitForPage). If the
- * strip cannot be made unambiguously, or if deleting the garment would leave a
- * body slot with nothing named in it, NO variant is produced — the page keeps
- * today's behaviour (base sheet + the "leave it off" line), which is the worse
- * of two known outcomes but never a worse one than today.
+ * `wornItems[]` rows (via wornItems.resolveWornItemsForPage), and the wardrobe
+ * instruction the off-sheet is drawn from is the Art Director's own
+ * `redressNote` on that row — the stage that already holds the outfit contract,
+ * the garment, the slot and the exact off-combination writes it (owner,
+ * 2026-09-19: "The AD should create the full prompt that is needed to strip the
+ * avatar later"). There is NO second, code-side way to word one. An off-set the
+ * Art Director left unwritten produces NO variant and says so loudly; the page
+ * then keeps the pre-feature behaviour — the worn sheet plus the existing "is
+ * NOT wearing" text line — which is an absence, not a fallback implementation.
  *
  * ONE VARIANT PER OBSERVED DISTINCT OFF-SET, never the power set. A page with
  * two of a character's garments off at once keys the UNION.
@@ -29,8 +31,7 @@
 
 const { log } = require('../utils/logger');
 const {
-  WORN_SLOTS, SLOT_NOUNS,
-  resolveWornItemsForPage, isOffForCharacter, resolveOutfitForPage, sameName,
+  WORN_SLOTS, resolveWornItemsForPage, isOffForCharacter, sameName,
 } = require('./wornItems');
 
 /**
@@ -96,55 +97,6 @@ function offIdsForCharacter(characterName, wornResolved) {
 }
 
 /**
- * WHICH SLOTS MUST STILL BE NAMED AFTER THE STRIP — the no-invented-layer rule.
- *
- * Taking an outer layer off exposes whatever is under it. If the contract does
- * not NAME what is under it, the sheet generator invents one, and it may invent
- * a different one for each variant — so the character's base-layer shade would
- * change when a jacket comes off, which is precisely the "the character changed"
- * failure this whole design exists to avoid.
- *
- * Only the body-covering slots are listed. A bare head, a missing scarf, no
- * belt and bare feet are all states a picture can show without inventing
- * anything, so removing a hat, a scarf, a belt or a boot needs nothing beneath.
- * Removing the only `top` is listed because a bare torso is not what any of
- * these briefs mean.
- */
-const COVER_REQUIRED_BY_SLOT = {
-  'outer layer': 'top',
-  top: 'top',
-  bottom: 'bottom',
-};
-
-/** Does `text` name a garment belonging to `slot`, through the closed vocabulary? */
-function namesSlotGarment(text, slot) {
-  const nouns = SLOT_NOUNS[slot];
-  if (!nouns) return false;
-  return new RegExp(`\\b(?:${nouns.join('|')})\\b`, 'i').test(String(text || ''));
-}
-
-/**
- * Would this strip leave a body slot with nothing named in it?
- * @returns {{ok: true}|{ok: false, slot: string, needs: string}}
- */
-function baseLayerHolds(strippedText, removedSlots) {
-  for (const slot of (removedSlots || [])) {
-    const needs = COVER_REQUIRED_BY_SLOT[String(slot || '').trim().toLowerCase()];
-    if (!needs) continue;
-    if (!namesSlotGarment(strippedText, needs)) return { ok: false, slot, needs };
-  }
-  return { ok: true };
-}
-
-/** The story-level outfit contract for one character + category, or null. */
-function contractOutfitFor(clothingRequirements, characterName, baseCategory) {
-  const { resolveCharacterReqs } = require('./clothingCategories');
-  const charReqs = resolveCharacterReqs(clothingRequirements, characterName);
-  const desc = charReqs?.[baseCategory]?.description;
-  return (typeof desc === 'string' && desc.trim()) ? desc.trim() : null;
-}
-
-/**
  * The non-costumed category a character's story actually uses.
  *
  * Costumed characters get no off-variant: the costume IS the outfit, it is
@@ -161,6 +113,56 @@ function baseCategoryFor(clothingRequirements, characterName) {
     if (charReqs[cat]?.used === true) return cat;
   }
   return null;
+}
+
+/**
+ * The Art Director's authored wardrobe instruction for one page's off-rows.
+ *
+ * One page may take two garments off at once; the AD writes the instruction
+ * covering that page's whole change, so the rows of one page carry the SAME
+ * text. Take the first non-blank, in the rows' own (id-sorted) order.
+ */
+function authoredNoteFrom(rows) {
+  for (const r of (rows || [])) {
+    const note = String((r && r.redressNote) || '').trim();
+    if (note) return note;
+  }
+  return null;
+}
+
+/** Whitespace-, case- and punctuation-insensitive — two wordings or one? */
+function noteFingerprint(note) {
+  return String(note || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * PICK ONE AUTHORED INSTRUCTION PER OFF-SET — lowest page number wins.
+ *
+ * A variant is keyed by the off-SET, not by the page, so several pages author
+ * the same instruction. The rule is the first page in ascending page order that
+ * authored a non-blank one; a page with no readable number sorts last, and the
+ * declaration order among equals breaks the remaining tie. Never "last writer
+ * wins" by iteration accident.
+ *
+ * Material disagreement is LOUD and does not change the pick: the sheet that
+ * gets built is one sheet, and which page's words built it is exactly what the
+ * owner needs to see when the pages do not say the same thing.
+ */
+function pickAuthoredNote(notes, where) {
+  const list = (notes || []).filter(n => n && String(n.note || '').trim());
+  if (list.length === 0) return null;
+  const rank = (p) => (Number.isFinite(Number(p)) ? Number(p) : Number.MAX_SAFE_INTEGER);
+  const sorted = list
+    .map((n, i) => ({ ...n, i }))
+    .sort((a, b) => (rank(a.pageNumber) - rank(b.pageNumber)) || (a.i - b.i));
+  const chosen = sorted[0];
+  const prints = new Set(sorted.map(n => noteFingerprint(n.note)));
+  if (prints.size > 1) {
+    log.warn(`👕 [WARDROBE-VARIANT] ${where}: ${prints.size} materially different wardrobe instructions authored for ONE off-set `
+      + `(pages ${sorted.map(n => n.pageNumber).join(', ')}) — taking page ${chosen.pageNumber}'s, the lowest page number that authored one. `
+      + `The others: ${sorted.slice(1).map(n => `p${n.pageNumber}: "${n.note}"`).join(' | ')}`);
+  }
+  return chosen.note;
 }
 
 /**
@@ -211,20 +213,31 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       const offIds = offIdsForCharacter(name, resolved);
       if (offIds.length === 0) continue;
       const key = `${String(name).trim().toLowerCase()}|${offIds.join('+')}`;
+      const rows = resolved.filter(r => offIds.includes(String(r.id).toUpperCase()) && isOffForCharacter(r, name));
+      // The Art Director authors the wardrobe half of the redress instruction
+      // on the ROW, so one off-set observed on seven pages arrives seven times,
+      // worded seven slightly different ways. Collect them all here; the pick
+      // is made once, deterministically, below.
+      const note = authoredNoteFrom(rows);
       const existing = observed.get(key);
-      if (existing) { existing.pages.push(pageNumber); continue; }
+      if (existing) {
+        existing.pages.push(pageNumber);
+        if (note) existing.notes.push({ pageNumber, note });
+        continue;
+      }
       observed.set(key, {
         name,
         offIds,
         // The resolved rows for exactly these ids, as this page stated them —
         // what the stripper needs, and nothing more.
-        rows: resolved.filter(r => offIds.includes(String(r.id).toUpperCase()) && isOffForCharacter(r, name)),
+        rows,
         pages: [pageNumber],
+        notes: note ? [{ pageNumber, note }] : [],
       });
     }
   }
 
-  for (const { name, offIds, rows, pages } of observed.values()) {
+  for (const { name, offIds, rows, pages, notes } of observed.values()) {
     const where = `${name} off:${offIds.join('+')} (page${pages.length > 1 ? 's' : ''} ${pages.join(', ')})`;
     const baseCategory = baseCategoryFor(clothingRequirements, name);
     if (!baseCategory) {
@@ -232,31 +245,20 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       refusals.push({ name, offIds, pages, reason: 'no-plain-category' });
       continue;
     }
-    const contract = contractOutfitFor(clothingRequirements, name, baseCategory);
-    if (!contract) {
-      log.warn(`👕 [WARDROBE-VARIANT] ${where}: no ${baseCategory} outfit contract to strip — no variant`);
-      refusals.push({ name, offIds, pages, reason: 'no-contract' });
-      continue;
-    }
-
-    const { text, removals } = resolveOutfitForPage(contract, rows, name);
-    const unremoved = (removals || []).filter(r => !r.removed);
-    if (unremoved.length > 0) {
-      // The whole point of the variant is a sheet WITHOUT the garment. If the
-      // stripper could not take the clause out, the sheet would be drawn
-      // wearing it and would be an identical, paid copy of the base sheet.
-      log.warn(`👕 [WARDROBE-VARIANT] ${where}: the ${unremoved.map(r => `${r.id} (${r.slot}: ${r.reason})`).join(', ')} clause could not be removed structurally — no variant`);
-      refusals.push({ name, offIds, pages, reason: 'strip-failed', detail: unremoved });
-      continue;
-    }
-
-    const removedSlots = (removals || []).map(r => r.slot);
-    const holds = baseLayerHolds(text, removedSlots);
-    if (!holds.ok) {
-      // THE HARD RULE. Loud, because it means the vaguest contract keeps the
-      // worst behaviour and the owner asked to see exactly that.
-      log.error(`👕 [WARDROBE-VARIANT] ${where}: removing the "${holds.slot}" garment leaves no ${holds.needs} named in the contract — REFUSING to generate a variant rather than let the sheet invent a base layer. The page keeps the base sheet + the "leave it off" line.`);
-      refusals.push({ name, offIds, pages, reason: 'unnamed-base-layer', slot: holds.slot, needs: holds.needs });
+    // THE AUTHORED INSTRUCTION IS THE ONLY SOURCE (owner, 2026-09-19). There is
+    // no second, code-side way to word a redress: a mechanical stripper existed
+    // here and was deleted, because the weaker implementation hid the stronger
+    // one's failures — a page whose Art Director wrote nothing shipped a quietly
+    // worse sheet instead of showing the gap. Without an authored instruction NO
+    // VARIANT IS BUILT. That is not a fallback path: the page simply keeps the
+    // pre-feature behaviour, the worn sheet plus the existing "is NOT wearing"
+    // text line. Every story stored before the field existed lands here, by
+    // design and on the record.
+    const redressNote = pickAuthoredNote(notes, where);
+    if (!redressNote) {
+      log.error(`👕 [WARDROBE-VARIANT] ${where}: the Art Director authored no \`redressNote\` for this off-set — NO variant sheet. `
+        + `The page keeps the worn sheet + the "is NOT wearing" line. Nothing else writes this instruction.`);
+      refusals.push({ name, offIds, pages, reason: 'no-authored-instruction' });
       continue;
     }
 
@@ -266,11 +268,12 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
       characterNames: [name],
       offIds,
       baseCategory,
-      clothingDescription: text,
-      // The garments' own declared NAMES, for the redress instruction. The ids
-      // mean nothing to an image model, and nothing here is invented: these are
-      // the Visual Bible entries' own names, as the resolver read them.
+      // The garments' own declared NAMES — for the logs, and nothing is
+      // invented: these are the Visual Bible entries' own names.
       removedItemNames: rows.map(r => String(r.name || r.id)),
+      // The Art Director's wardrobe instruction: the redress prompt's whole
+      // wardrobe half, and the clothing contract the sheet is judged against.
+      redressNote,
       pages,
     });
     log.info(`👕 [WARDROBE-VARIANT] ${where}: variant requested as "${buildOffCategory(baseCategory, offIds)}"`);
@@ -281,15 +284,14 @@ function deriveWardrobeVariantRequirements({ visualBible, scenes, clothingRequir
 
 module.exports = {
   OFF_MARK,
+  pickAuthoredNote,
+  authoredNoteFrom,
   normalizeOffIds,
   buildOffCategory,
   parseOffCategory,
   isOffCategory,
   buildOffSlotKey,
   offIdsForCharacter,
-  baseLayerHolds,
   baseCategoryFor,
-  contractOutfitFor,
   deriveWardrobeVariantRequirements,
-  COVER_REQUIRED_BY_SLOT,
 };

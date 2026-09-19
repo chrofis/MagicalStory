@@ -1776,76 +1776,65 @@ async function runStyleTransferPass({ pass1ImageData, facePhoto, artStyle, chara
  * @param {string} baseSheetImageData - the approved styled 2×4 sheet
  * @param {Object} opts
  * @param {string} opts.characterName
- * @param {string} opts.resolvedOutfit - the contract with the garment clauses removed
- * @param {Array<string>} opts.removedItems - the garment names being taken off
+ * @param {Array<string>} opts.removedItems - the garment names being taken off (logging only)
+ * @param {string} opts.authoredWardrobe - the Art Director's wardrobe instruction; required
  * @returns {Promise<{imageData, verdict, attempts, prompt}|null>}
  */
 /**
- * The redress instruction: keep everything in the picture, change one thing.
+ * THE REDRESS PROMPT = the Art Director's wardrobe half + this sheet-mechanics
+ * scaffold. Nothing here words a wardrobe.
  *
- * NAME THE STAYING GARMENTS, DO NOT DESCRIBE THEM (owner, 2026-09-19). The
- * first version of this prompt repeated the full contract text for every
- * garment that stays, and the provider repainted those garments to match the
- * WORDS rather than leave the picture alone — Levin's variant came back with a
- * knitted cap because the contract said "chunky-knit" where the sheet shows
- * smooth flat weave, and with corduroy wales where the sheet shows denim seams.
- * That is cross-page wardrobe drift inside one story, which is the exact
- * failure this whole feature exists to prevent. So a staying garment is named
- * by a short label — colour plus garment noun, derived structurally from its
- * clause head by `shortGarmentLabel` — and the attached sheet is named as the
- * authority for how it looks. No adjective of the contract's reaches the
- * provider for a garment it is not being asked to change.
+ * Owner, 2026-09-19: "The AD should create the full prompt that is needed to
+ * strip the avatar later." The Art Director holds the outfit contract, the
+ * garment, the slot, the page and the exact off-combination, so it writes which
+ * garments stay (named briefly — colour plus garment noun, never the contract's
+ * own fabric/cut adjectives, which measurably made the provider repaint a
+ * garment it was told to leave alone), which comes off, and what the removal
+ * leaves outermost (described in full: it has to be DRAWN, and in the
+ * turned-away cells the sheet has never shown it).
  *
- * The ONE garment that does change is described in full: the under-layer the
- * removal exposes has to be DRAWN, and in the turned-away cells the sheet has
- * never shown it. `headIsUnderLayer` picks that clause out syntactically; when
- * no clause declares itself an under-layer, every garment is short-labelled and
- * the line is omitted rather than guessed at.
+ * This function owns only what is identical for every character in every story:
+ * that the image is a 2×4 of 8 cells, that Image 1 — not the words — is the
+ * authority for how a kept garment looks, the front-vs-back drawing
+ * instruction, and the identity invariants. The Art Director is told none of
+ * that and must not write it.
  *
- * LEAD WITH WHAT IS WORN (owner, 2026-09-19) — the removal stays second,
- * because the provider anchors on what it is asked to draw and tends to keep a
- * garment it is only asked to take away.
- *
- * And nothing is "revealed" in a cell that faces away: the front and side cells
- * already show the under-layer at the chest opening, while the rear cells show
- * only the removed garment's back panel, so there the back of the under-layer
- * has to be drawn, not uncovered.
+ * THERE IS NO DERIVATION (owner, 2026-09-19). A mechanical stripper used to
+ * word this half from the contract and was DELETED, not demoted: two
+ * implementations of one instruction drift, and the weaker one hides the
+ * stronger one's failures — a page whose brief authored nothing shipped a
+ * quietly worse sheet instead of showing the gap. Called without an authored
+ * half this throws; the caller then builds no variant at all, and the page
+ * keeps the pre-feature behaviour (the worn sheet plus the "is NOT wearing"
+ * text line). An absent sheet is not a fallback implementation.
  */
-function buildRedressPrompt(resolvedOutfit, removedItems) {
-  const { splitClausesDetailed, shortGarmentLabel, headIsUnderLayer } = require('./wornItems');
-  const items = (removedItems || []).map(s => String(s || '').trim()).filter(Boolean);
-  const clauses = splitClausesDetailed(resolvedOutfit);
-  const exposed = clauses.find(c => headIsUnderLayer(c.head)) || null;
-  const staying = clauses.filter(c => c !== exposed).map(c => shortGarmentLabel(c.head).label).filter(Boolean);
-
-  const keepLine = staying.length
-    ? `Keep what the character already wears exactly as Image 1 draws it — ${staying.join(', ')}. Image 1 is the only authority for their colour, cut, fabric and weave: copy them, do not redraw them from words.`
-    : 'Keep what the character already wears exactly as Image 1 draws it — Image 1 is the only authority for colour, cut, fabric and weave.';
-  const removalLine = items.length === 1
-    ? `One thing changes. The ${items[0]} is off: not on the character, no replacement garment in its place, and nowhere else in the sheet.`
-    : `These change. Off — ${items.join('; ')}: not on the character, no replacement garment in their place, and nowhere else in the sheet.`;
-  const exposedLine = exposed
-    ? `\nWith that gone the garment under it is the outer one there, so draw it in full: ${exposed.text.replace(/[.;]\s*$/, '')}.`
-    : '';
-
+function buildRedressPrompt(authoredWardrobe) {
+  const wardrobeHalf = String(authoredWardrobe || '').trim();
+  if (!wardrobeHalf) {
+    throw new Error('[WARDROBE-VARIANT] no authored wardrobe instruction — nothing else writes one');
+  }
   return `Edit Image 1 — a 2×4 character reference sheet (8 cells).
-${keepLine}
-Draw each of those garments right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
-${removalLine}${exposedLine}
+${wardrobeHalf}
+Image 1 is the only authority for how anything the character keeps on looks — its colour, cut, fabric and weave: copy them, do not redraw them from words.
+Draw every garment right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
 Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style.`;
 }
 
 async function redressSheetVariant(baseSheetImageData, opts = {}) {
   const {
     characterName = 'character', characterAge = null, facePhoto = null,
-    resolvedOutfit = '', removedItems = [], usageTracker = null, skipQualityEval = false,
-    backendOverride = null,
+    removedItems = [], usageTracker = null, skipQualityEval = false,
+    backendOverride = null, authoredWardrobe = null,
   } = opts;
   if (!baseSheetImageData) return null;
 
   const items = (Array.isArray(removedItems) ? removedItems : []).map(s => String(s || '').trim()).filter(Boolean);
-  if (items.length === 0) return null;
-  const prompt = buildRedressPrompt(resolvedOutfit, items);
+  const wardrobeHalf = String(authoredWardrobe || '').trim();
+  if (!wardrobeHalf) {
+    log.error(`[WARDROBE-VARIANT] ${characterName}: no authored wardrobe instruction (off: ${items.join(', ') || 'unknown'}) — NO variant sheet. Nothing else writes this instruction.`);
+    return null;
+  }
+  const prompt = buildRedressPrompt(wardrobeHalf);
 
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
@@ -1888,7 +1877,7 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
         // The base sheet IS the identity reference — the variant must match the
         // sheet it was redressed from, not a photo taken years earlier.
         standardAvatar: baseSheetImageData,
-        costumeDescription: resolvedOutfit,
+        costumeDescription: wardrobeHalf,
         usageTracker,
         declaredAge: characterAge,
       });

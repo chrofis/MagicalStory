@@ -1978,8 +1978,11 @@ async function prepareWardrobeVariantAvatars(characters, artStyle, variantRequir
         characterName: j.charName,
         characterAge: j.char?.age,
         facePhoto: j.facePhoto,
-        resolvedOutfit: j.row.clothingDescription || '',
         removedItems: j.row.removedItemNames || j.off.offIds,
+        // The Art Director's wardrobe instruction for this off-set. The ONLY
+        // source: no authored text, no variant sheet — the derivation refuses
+        // the row before it ever reaches here.
+        authoredWardrobe: j.row.redressNote,
         usageTracker: addUsage,
         skipQualityEval,
         backendOverride,

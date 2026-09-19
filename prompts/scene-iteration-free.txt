@@ -263,7 +263,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "action": "watching", "storyRelevant": true}
   ],
   "wornItems": [
-    {"id": "ART003", "owner": "CharacterA", "state": "off", "location": "lies folded on the bench beside her"}
+    {"id": "ART003", "owner": "CharacterA", "state": "off", "location": "lies folded on the bench beside her", "redressNote": "<which garments stay, named by colour + noun only; which item is off, with nothing in its place; and the garment the removal leaves outermost, described in full>"}
   ],
 <!-- TEXT_OVERLAY_BEGIN -->
   "textPosition": "top-right",
@@ -291,7 +291,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 - `landmarkView`: how the page sees a real landmark, when one is cited: `exterior`, `distant`, `close`, `interior`, `view-from`, or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; omitting it attaches none.
 
-- `wornItems[]`: one row per Visual Bible element with a `wornAs` link whose owner is on this page, whether or not the prose mentions it. `{id, owner, state, location, wearer}`; `state` is `"worn"` or `"off"`, and `off` requires `location`. Omit a row and the item is drawn on the character by default.
+- `wornItems[]`: one row per Visual Bible element with a `wornAs` link whose owner is on this page, whether or not the prose mentions it. `{id, owner, state, location, wearer, redressNote}`; `state` is `"worn"` or `"off"`, and `off` requires both `location` and `redressNote`, the wardrobe instruction above. Omit a row and the item is drawn on the character by default.
 
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`, `depth` and `looksAt`; for foreground/midground characters add `expression`. `depth` is `foreground`, `midground` or `background` — distance from the camera, never elevation and never a size.
   - `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when the VISUAL LANGUAGE rule allows it.

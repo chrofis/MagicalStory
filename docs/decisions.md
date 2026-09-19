@@ -47758,6 +47758,107 @@ under-layer rendered as a collared shirt) can change on the ONE garment that is 
 **Touched:** `server/lib/character2x4Sheet.js` (`buildRedressPrompt`, `redressSheetVariant`),
 `server/lib/wornItems.js` (`BASE_COLOURS`, `shortGarmentLabel`, `UNDER_LAYER_RE`, `headIsUnderLayer`),
 `tests/unit/redress-prompt-scoping.test.ts`.
+**Status:** 🟡 SUPERSEDED in its MECHANISM, kept in its RULE — see "The Art Director authors the
+wardrobe half of the redress instruction" (2026-09-19, below). The rule survives intact and is now
+written into the four brief-authoring templates as an instruction to the Art Director: staying
+garments named by colour + noun with no contract adjective, the changed garment described in full.
+What is gone is the code that DERIVED that wording: `shortGarmentLabel`, `BASE_COLOURS`,
+`UNDER_LAYER_RE`, `headIsUnderLayer` and `tests/unit/redress-prompt-scoping.test.ts` are deleted.
+
+
+---
+
+## 2026-09-19 — The Art Director authors the wardrobe half of the redress instruction; code owns only the sheet-mechanics scaffold
+
+**Context.** A wardrobe-state variant sheet (the entry above, "A garment coming off gets an avatar
+SHEET") is produced by editing a character's approved 2×4 sheet with a redress instruction. That
+instruction was assembled in code by `buildRedressPrompt` out of mechanically stripped fragments: the
+story outfit contract with the garment's clause structurally deleted (`resolveOutfitForPage`), the
+staying clauses reduced to short labels (`shortGarmentLabel`), and the exposed under-layer picked out
+syntactically (`headIsUnderLayer`). Every one of those is a guess at English made from a contract
+string. The stage that actually KNOWS the answer — which garments stay, which comes off, what the
+removal exposes — is the Art Director: it already holds the resolved outfit text per character
+(`CHARACTER_DESCRIPTIONS`), the garment, the slot, the page and the exact off-combination, and it is
+the stage that DECLARES the removal in the first place.
+
+**Decision.** Owner, 2026-09-19: *"The AD should create the full prompt that is needed to strip the
+avatar later."* The split is:
+
+- **The Art Director authors the WARDROBE half**, in prose, on the `wornItems[]` row itself — a new
+  `redressNote` field, required on every `state: "off"` row. It names the garments that stay by
+  colour + garment noun only (never the contract's own fabric/cut adjectives — those measurably made
+  the provider repaint garments it was told to leave alone), states which item is off and that
+  nothing takes its place, and describes in full whatever the removal leaves outermost, because that
+  one has to be drawn and the turned-away cells have never shown it. It writes wardrobe only: no
+  cells, no layout, no art style, no reference image.
+- **Code owns the INVARIANT SCAFFOLD** — that the image is a 2×4 of 8 cells, that Image 1 and not the
+  words is the authority for how a kept garment looks, the front-vs-back drawing instruction, and the
+  identity invariants (same character/face/hair/body/poses/cell layout/art style). These are sheet
+  mechanics, identical for every character in every story, and the Art Director is told none of them.
+
+**THERE IS NO FALLBACK.** The mechanical derivation was DELETED, not demoted (owner, 2026-09-19:
+replacing a mechanism means deleting it — two implementations of one instruction drift, and the
+weaker one hides the stronger one's failures, so the new path stays broken because the old one
+quietly covers for it). `buildRedressPrompt` now takes exactly one argument, the authored half, and
+THROWS without it. An off-set the Art Director left unwritten produces **no variant sheet at all**,
+logged at ERROR with the character, the off-set key and the page numbers. Be precise about what that
+means: the page then keeps the pre-feature behaviour — the existing worn sheet plus the existing "is
+NOT wearing" text line. That is an ABSENCE, not a second implementation. Not generating a variant is
+not a fallback; running a second stripping implementation would be.
+
+**Stored stories have no authored instruction and never will.** Every story generated before this
+change lands on the refusal path: no variant sheet, an ERROR line saying why. That is the accepted
+consequence of having one implementation, not a gap to engineer around.
+
+**One instruction per off-set, deterministically.** A variant is keyed by the off-SET, not by the
+page, so in the motivating story seven pages declare Levin's `{CLO002}` off and each authors its own
+wording. `pickAuthoredNote` (`server/lib/wardrobeVariants.js`) takes **the first page in ascending
+page order that authored a non-blank instruction**; a page with no readable number sorts last and
+declaration order breaks the remaining tie. Never "last writer wins" by iteration accident. When the
+pages disagree materially — compared on a whitespace-, case- and punctuation-insensitive fingerprint,
+so two spellings of the same sentence are one — it WARNS with the off-set key, every page number and
+every rejected wording, and does not change the pick: one sheet gets built, and which page's words
+built it is exactly what needs to be visible.
+
+**Carried across a rewrite.** `carryForwardWornItems` merges per id: a rewrite still owns the STATE,
+but a rewritten row that omits `redressNote` inherits the saved one. Same class of loss as the fields
+in `iteratePageCore` — a rewrite that drops a field deletes it for the rest of that page's life.
+
+**The four brief-authoring sites.** The contract is one JS constant, `GARMENT_REMOVED_RULE`
+(`server/lib/promptBuilders.js`), filled at all four sites that author a page brief, plus the
+`wornItems[]` field spec and JSON example in each of the four templates: `scene-expansion-all.txt`,
+`scene-expansion.txt`, `scene-iteration.txt`, `scene-iteration-free.txt` (registered sibling sets
+`art-director-templates` and `art-director-vs-iterate`).
+
+**Verified live** on the motivating story's page 6 (staging `job_1789759147125_p08djwhbl`, read-only
+DB pull, one real `gemini-3.1-pro` scene-expansion call, $0.0787): the Art Director emitted
+`{"id": "CLO002", "owner": "Levin", "state": "off", "location": "lies spread open flat on the
+ground", "redressNote": "The character keeps the red cap, the navy trousers and the brown boots
+exactly as the sheet draws them. The green jacket is off, with nothing in its place. The long-sleeved
+white cotton shirt is now the outer garment on the torso."}` — the rule obeyed on all three counts.
+That run also showed the template's JSON example being copied nearly verbatim, so the example was
+replaced with an archetypal placeholder afterwards; the genericised example has NOT been re-measured
+live.
+
+**NOT changed, and deliberately so.** `resolveOutfitForPage` / `removeWornItemFromOutfit` and the
+clause model under them stay — they have five other runtime consumers that ask a DIFFERENT question
+("what is this character wearing on this page") for every character on every page, off-set or not,
+and that also perform the handover SWAP: `promptBuilders.js` (the image prompt's outfit text),
+`evalPipeline.js` (the eval clothing contract), `entityConsistency.js` (two sites), `repairPipeline.js`
+and `routes/regeneration.js`. Collapsing those onto authored text as well would require the Art
+Director to author a per-character, per-page outfit string for every page — a new whole-brief field,
+not this one — and is recorded as a constraint, not done here. See `tasks/BACKLOG.md`.
+
+**Touched:** `server/lib/wornItems.js` (`parseWornItems`, `resolveWornItemsForPage` both sources,
+`carryForwardWornItems`; deleted `BASE_COLOURS`, `COLOUR_WORD_RE`, `shortGarmentLabel`,
+`UNDER_LAYER_RE`, `headIsUnderLayer`), `server/lib/wardrobeVariants.js` (`pickAuthoredNote`,
+`authoredNoteFrom`; deleted the strip, `contractOutfitFor`, `baseLayerHolds`,
+`COVER_REQUIRED_BY_SLOT`, `namesSlotGarment`), `server/lib/character2x4Sheet.js`
+(`buildRedressPrompt`, `redressSheetVariant`), `server/lib/styledAvatars.js`
+(`prepareWardrobeVariantAvatars`), `server/lib/promptBuilders.js` (`GARMENT_REMOVED_RULE`), the four
+brief-authoring templates, `tests/unit/redress-authored-by-art-director.test.ts`,
+`tests/unit/wardrobe-state-avatar-variants.test.ts`; deleted
+`tests/unit/redress-prompt-scoping.test.ts`.
 **Status:** ✅ active
 
 

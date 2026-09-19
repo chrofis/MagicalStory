@@ -145,7 +145,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
     {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "action": "watching", "storyRelevant": true, "priority": "essential"}
   ],
   "wornItems": [
-    {"id": "ART003", "owner": "CharacterA", "state": "off", "location": "lies folded on the bench beside her"}
+    {"id": "ART003", "owner": "CharacterA", "state": "off", "location": "lies folded on the bench beside her", "redressNote": "<which garments stay, named by colour + noun only; which item is off, with nothing in its place; and the garment the removal leaves outermost, described in full>"}
   ],
   "reuseEmptyScene": true,
   "emptyScenePrompt": "A snowy town plaza stretches beneath a winter afternoon sky with golden-hour light. The ancient clock tower rises in the background, its blue face visible against grey clouds. Light snow falls on the cobblestone square. Medium wide shot, slightly low angle. Open foreground space for composited characters.",
@@ -158,7 +158,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 - `sceneIntent`: {SCENE_INTENT_FIELD} It goes at the very top of the rendered image prompt as the **THIS IMAGE DEPICTS:** anchor — the image model weights it heavily.
 - `shot`: the page's camera framing: {SHOT_ENUM}. Decide it once — the prose, the `emptyScenePrompt` and this field use the same framing. Omitting it makes the background plate default to a wide shot.
 - `landmarkView`: how the page sees a real landmark, when one is cited: `exterior`, `distant`, `close`, `interior`, `view-from`, or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; omitting it attaches none.
-- `wornItems[]`: one row per Visual Bible element with a `wornAs` link whose owner is on this page, whether or not the prose mentions it. `{id, owner, state, location, wearer}`; `state` is `"worn"` or `"off"`, and `off` requires `location`. Omit a row and the item is drawn on the character by default.
+- `wornItems[]`: one row per Visual Bible element with a `wornAs` link whose owner is on this page, whether or not the prose mentions it. `{id, owner, state, location, wearer, redressNote}`; `state` is `"worn"` or `"off"`, and `off` requires both `location` and `redressNote`, the wardrobe instruction above. Omit a row and the item is drawn on the character by default.
 - `diagnosis[]`: one entry per evaluator finding or preview mismatch. Each entry names the root cause in one short sentence — not the symptom. Empty array if there were no findings.
 - `previewMismatches[]`: array of `"Intent: X. Preview: Y."` strings. Empty array if preview matched intent.
 - `issues[]`, `corrections[]`: short bullets. Empty arrays if none.

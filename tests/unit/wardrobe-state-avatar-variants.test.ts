@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
  */
 const {
   buildOffCategory, parseOffCategory, buildOffSlotKey, offIdsForCharacter,
-  baseLayerHolds, deriveWardrobeVariantRequirements,
+  deriveWardrobeVariantRequirements,
 } = require('../../server/lib/wardrobeVariants');
 const { projectStoryCharacterAvatars, resolveSheetForRef } = require('../../server/lib/storyAvatars');
 const { carryForwardWornItems, resolveWornItemsForPage } = require('../../server/lib/wornItems');
@@ -38,8 +38,12 @@ const CAST = [{ name: 'Levin' }, { name: 'Julian' }];
 
 const page = (pageNumber: number, characters: string[], wornItems: any[]) =>
   ({ pageNumber, sceneMetadata: { characters, wornItems } });
-const off = (id: string, owner: string, location = 'on the ground') =>
-  ({ id, owner, state: 'off', wearer: null, location });
+// An `off` row carries the Art Director's own wardrobe instruction. Without it
+// there is no variant at all — nothing in code words one.
+const NOTE = (id: string) => `The character keeps everything else exactly as the sheet draws it. `
+  + `${id} is off, with nothing in its place. The long-sleeved white cotton shirt is the outer garment on the torso.`;
+const off = (id: string, owner: string, location = 'on the ground', redressNote: any = NOTE(id)) =>
+  ({ id, owner, state: 'off', wearer: null, location, redressNote });
 const worn = (id: string, owner: string) => ({ id, owner, state: 'worn', wearer: null, location: null });
 
 describe('the key algebra is order-independent and reversible', () => {
@@ -96,13 +100,11 @@ describe('derivation — one row per OBSERVED distinct off-set', () => {
       .toEqual(['Julian:standard--off:CLO009']);
   });
 
-  it("the variant's outfit is the contract with the clause deleted — nothing invented", () => {
+  it("the variant carries the Art Director's authored instruction and no derived outfit", () => {
     const row = requirements.find(r => r.clothingCategory === 'standard--off:CLO002');
-    expect(row.clothingDescription).not.toMatch(/fleece/i);
-    // The layer underneath is still NAMED, and every untouched clause survives.
-    expect(row.clothingDescription).toMatch(/white cotton shirt/i);
-    expect(row.clothingDescription).toMatch(/red wool cap/i);
-    expect(row.clothingDescription).toMatch(/ankle boots/i);
+    expect(row.redressNote).toBe(NOTE('CLO002'));
+    // Nothing re-words the wardrobe in code, so no stripped contract is carried.
+    expect(row.clothingDescription).toBeUndefined();
   });
 
   it('a story where nothing comes off asks for no variants at all', () => {
@@ -115,29 +117,33 @@ describe('derivation — one row per OBSERVED distinct off-set', () => {
   });
 });
 
-describe('no invented layer — the refusal', () => {
-  it('removing an outer layer with no top named underneath yields NO requirement row', () => {
-    const bare = {
-      Levin: { standard: { used: true, description: 'A forest-green zip-up fleece jacket; dark navy corduroy trousers; brown leather ankle boots.' }, costumed: { used: false } },
-    };
+describe('no authored instruction, no variant — and never a derived one', () => {
+  it('refuses the off-set loudly instead of wording the wardrobe itself', () => {
     const { requirements, refusals } = deriveWardrobeVariantRequirements({
       visualBible: VB,
-      scenes: [page(11, ['Levin'], [off('CLO002', 'Levin')])],
-      clothingRequirements: bare, characters: [{ name: 'Levin' }],
+      scenes: [page(11, ['Levin'], [off('CLO002', 'Levin', 'on the ground', null)])],
+      clothingRequirements: REQS, characters: [{ name: 'Levin' }],
     });
     expect(requirements).toEqual([]);
-    expect(refusals[0].reason).toBe('unnamed-base-layer');
+    expect(refusals[0].reason).toBe('no-authored-instruction');
+    expect(refusals[0].pages).toEqual([11]);
   });
 
-  it('a hat needs nothing underneath — a bare head is not an invented garment', () => {
-    expect(baseLayerHolds('a grey sweater; black jeans.', ['headwear']).ok).toBe(true);
-    expect(baseLayerHolds('a grey sweater; black jeans.', ['accessories']).ok).toBe(true);
+  it('a blank instruction is the same as none', () => {
+    const { requirements, refusals } = deriveWardrobeVariantRequirements({
+      visualBible: VB,
+      scenes: [page(11, ['Levin'], [off('CLO002', 'Levin', 'on the ground', '   ')])],
+      clothingRequirements: REQS, characters: [{ name: 'Levin' }],
+    });
+    expect(requirements).toEqual([]);
+    expect(refusals[0].reason).toBe('no-authored-instruction');
   });
 
-  it('a removed torso layer needs a top, a removed bottom needs a bottom', () => {
-    expect(baseLayerHolds('black jeans; red shoes.', ['outer layer']).ok).toBe(false);
-    expect(baseLayerHolds('a grey sweater; red shoes.', ['bottom']).ok).toBe(false);
-    expect(baseLayerHolds('a grey sweater; black jeans.', ['outer layer']).ok).toBe(true);
+  it('the derivation reaches for no stripping machinery at all', () => {
+    const src = require('fs').readFileSync('server/lib/wardrobeVariants.js', 'utf8');
+    for (const gone of ['resolveOutfitForPage', 'removeWornItemFromOutfit', 'baseLayerHolds', 'contractOutfitFor']) {
+      expect(src).not.toContain(gone);
+    }
   });
 });
 
