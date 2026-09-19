@@ -46624,3 +46624,68 @@ plus the analysis built on it.
 **Touched:** `docs/decisions.md` only (methodology; no code, prompt or test change).
 **Status:** ✅ active — applies to any future trial-idea or wizard-idea experiment, including the two
 unrun Lab stages `trial_idea_variety` and `trial_challenge_draw`.
+
+
+## 2026-09-19 — The three slots are bound to their inputs, one sentence does one job, and age 0-1 gets an agency rule
+
+**Context.** The 2026-09-16 three-slot contract took non-resolving premises from 13/28 to 0/28 and
+is not weakened here. Round 5's five worst cards (all 3/3) fail on CONTENT, not structure, and four
+of them name the three faults fixed below:
+- age 4, mermaid, `waiting-turn`: the obstacle became fear of a dark cave — the commissioned life
+  challenge was SUBSTITUTED, not dramatised.
+- age 2, unicorn, `potty-training`, 65 words: slot 2 is an imagined hunt with no bearing on needing
+  the toilet. That digression IS the over-length.
+- age 3, dinosaur, `getting-dressed`, 63 words: the setting is wallpaper — clothing mechanics with a
+  creature standing nearby.
+- age 1, forest, `going-outside`: an adult's hand performs the only action on the card. The `routine`
+  band (age 0-1) was the only band with no agency rule.
+
+**Decision — three owner-approved changes.**
+1. **Each slot is bound to its input** (`prompts/trial-idea.txt`). A new paragraph: what gets in the
+   way is the difficulty the story was asked for, *reaching the main character as a concrete
+   situation* — never a different difficulty put in its place, and never named outright — and the
+   setting is where that struggle happens, not scenery around it. The closing contract's slot 2
+   changes from "what they do about **it**" (an unenforced pronoun) to "what they do about **that
+   same obstacle**".
+   The tension this wording is built against is real: demanding the topic be stated literally would
+   produce "X waits their turn", a worse card than one where waiting arrives as an event. It is
+   resolved by separating WHICH difficulty from HOW it appears — identity of the obstacle is
+   mandatory, literal naming of it is forbidden in the same sentence. The strength that survives is
+   the one already measured: the challenge arrives as a real situation.
+2. **One sentence, one job** (`prompts/trial-idea.txt`). Each sentence does its own slot's work and
+   no other's — no detour, no second episode, nothing no slot asked for — with an explicit licence
+   that a sentence may be vivid, only not do another sentence's job. Targets the digressions
+   directly and is the likeliest single lever on the 65.4-word mean.
+3. **An agency rule for `routine` only** (`prompts/age-band-routine.txt`, new `[[premise:agency]]`
+   span). Deliberately narrow: a grown-up may be right beside the child, carrying, holding the thing
+   out, steadying — the doing on the page is still the child's, from the band's own enumerated list
+   (pat, splash, feed, point, carry, give) — never a page where a grown-up's hands do the only thing
+   that happens. It asks for no working-out, so the band's "Never anything that turns on working
+   something out" stands beside it unopposed; both were rendered together in the `premise` and
+   `premise-open` views and neither displaces the other. Adults are NOT banned from age-0-1 books: at
+   one year old an adult helping is realistic, and a toddler solving everything alone would be worse.
+   `BAND_PREMISE_SLOTS.routine` therefore moves `agency: 'none'` → `'required'`; `'none'` stays
+   available as a positive declaration for any future band that owes nothing in a slot.
+
+**This does NOT reverse either accepted cost of 2026-09-16.** The 50-word cap is unchanged and still
+unclamped and untruncated; the three slots are not loosened, and no arm contrast is bought back. #2
+tightens the shared skeleton further — the owner's acceptance of that skeleton is the reason it is
+allowed to, and the vivid-is-fine clause is what keeps it from costing voice. Neither number nor slot
+may be "fixed" by a later session without reversing an owner decision.
+
+**Verification (static, no paid calls).** `buildTrialIdeaPrompts` was built for both arms at ages 1,
+3, 8, 12 and 38: all ten prompts carry the binding paragraph, the one-sentence-one-job rule, the
+bound slot 2 and the unchanged "Maximum 50 words". The age-1 prompts carry the new agency rule in
+both arms (`premise` for local, `premise-open` for make-believe); no other age does. Unit suite:
+295 files / 3664 tests, all passing.
+
+**Sibling paths.** `prompts/trial-idea.txt` is one template read through `buildTrialIdeaPrompts` by
+both the `/try` route and the Lab idea stage, so no copy exists to keep in step; the
+`trial-idea-prompt-mirror` registry set covers the hand-assembled character/category text, which is
+untouched. The band file reaches all its parent templates through `applyBandView`; no registry set
+covers the age-band files and none is needed — there is no second copy.
+
+**Touched:** `prompts/trial-idea.txt`, `prompts/age-band-routine.txt`, `server/lib/promptBuilders.js`
+(`BAND_PREMISE_SLOTS` + its two doc comments), `docs/decisions.md`.
+**Status:** ✅ active, NOT yet measured — committed on `staging`, not pushed. The next idea round is
+what tests it, under the methodology entry of 2026-09-16 (structural counts, one rater, both rounds).
