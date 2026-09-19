@@ -6483,6 +6483,15 @@ const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
 const REPLAN_MUST_FIX_CODES = new Set([
   'NO_FOCAL_PAGE', 'UNDER_COVERED_CHARACTER', 'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE',
   'PEOPLELESS_ON_INTERACTION_PAGE',
+  // The planner is told "At least one page in the book earns this" and the
+  // counter reports when none does — but as an "also noted" line the re-plan was
+  // never obliged to spend a round on it, so on
+  // job_1789759147125_p08djwhbl it was raised in both rounds and shipped unfixed.
+  // A requirement nothing is obliged to answer is not a requirement (owner,
+  // 2026-09-19). The checker cannot substitute: plan-check Q6 asks whether an
+  // EXISTING peopleless page earns its place, so it is structurally unable to
+  // notice that the book has none.
+  'NO_PEOPLELESS_PAGE',
 ]);
 
 /**

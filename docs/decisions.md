@@ -48603,3 +48603,75 @@ stored figures.
 `tests/unit/ad-iterate-parity.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The 2026-09-13 cast-cap decision finally reaches the beats planner
+
+**Context.** On 2026-09-13 `CAST_OVER_3` was retired — *"one counter, one number, read
+from config"* — the ceiling went to 6, and the scene reviewer's twin check was reframed
+the same day from a hardcoded three to the configured cap as a composition
+recommendation. **The beats planner was not reframed with them.** For six days
+`story-beats.txt` said *"At most three named characters in frame… The book has at most
+one whole-cast page, holding up to {MAX_CHARACTERS_PER_SCENE}"* while the code enforced
+6 and nothing enforced the one-page budget at all.
+
+The consequence looked like a bug and was not one. Reviewing
+`job_1789759147125_p08djwhbl` I recorded "the three-named cast cap is broken on 3
+pages" — pages 5, 8 and 18 each carry five named characters. They are **under** the
+configured cap, the counter correctly stayed quiet, and the finding was measured against
+a prompt line the 09-13 decision had left behind.
+
+**Decision (owner, 2026-09-19).** Finish the 09-13 decision: the planner reads the cap
+too.
+
+> Two or three named characters carry a page best; {MAX_CHARACTERS_PER_SCENE} is the
+> ceiling the image model can hold, and a named animal that acts in the story counts as
+> one of them. A page that gathers the whole cast is wide or distant, all of them sharing
+> one simple action or seen from behind moving off — never a row of figures facing the
+> viewer. Add no unnamed figures…
+
+Only the COUNT moved. Every staging rule the old sentence carried — the named-animal
+clause, wide-or-distant, never-a-row, no-unnamed-figures — survives verbatim, pinned by
+a test. The once-per-book whole-cast budget is gone, which is what made three such pages
+a fault that nothing could enforce.
+
+**Separately, a real bug in the checker.** Plan-check Q3 read page 8 as **two** named
+characters: its own roster line said `people = Max, Nia; covers = Levin, Julian, Kiaan`,
+and the question counted the who column alone. Q3 now counts the names the page's ROSTER
+line expands under `covers`. This was worth fixing under either cap.
+
+**Touched:** `prompts/story-beats.txt`, `prompts/plan-check.txt`,
+`tests/unit/cast-cap-and-peopleless-page.test.ts`.
+
+**Status:** ✅ active — completes the 2026-09-13 entry above; supersedes nothing.
+
+---
+
+## 2026-09-19 — A requirement nothing is obliged to answer is not a requirement: NO_PEOPLELESS_PAGE is must-fix
+
+**Context.** `story-beats.txt` tells the planner *"At least one page in the book earns
+this"* of a page with no people in frame, and `planCounters` reports `NO_PEOPLELESS_PAGE`
+when none does. On `job_1789759147125_p08djwhbl` the counter fired in **both** rounds and
+the book shipped without one: page 11 was the intended answer and its instant puts *"the
+children small and fast on the path below"* in frame.
+
+It survived because the code was not in `REPLAN_MUST_FIX_CODES`, so `replanRank` returned
+`also` and the re-plan was never obliged to spend a round on it.
+
+The checker cannot substitute. Plan-check Q6 asks whether an **existing** peopleless page
+earns its place — it is structurally unable to notice that the book has none, which is
+why it reported nothing while the counter was right.
+
+**Decision (owner, 2026-09-19).** `NO_PEOPLELESS_PAGE` joins `REPLAN_MUST_FIX_CODES`. A
+re-plan now has to answer it. The alternative offered — dropping *"At least one page in
+the book earns this"* so the page is offered rather than required — was declined.
+
+**Rationale.** The generator carries the requirement and a counter measures it
+faithfully; leaving the finding unranked meant the pipeline stated a rule it never
+enforced, which is worse than either enforcing it or dropping it.
+
+**Touched:** `server/lib/promptBuilders.js` (`REPLAN_MUST_FIX_CODES`),
+`tests/unit/cast-cap-and-peopleless-page.test.ts`.
+
+**Status:** ✅ active
