@@ -31,7 +31,7 @@ const SEGMENT_SPLIT = /\s+[—–]\s+|\s+--\s+/;
  * stages can define. Anything unrecognised counts as 'other' and is reported
  * rather than silently folded into medium.
  */
-const { SHOT_PATTERNS } = require('./shotVocabulary');
+const { SHOT_PATTERNS, SHOT_AXIS } = require('./shotVocabulary');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -567,12 +567,34 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       'the plan line does not carry all four of shot, who, the instant, and what is true after');
   }
 
-  // 2. Shot distribution: about two close-ups and two ultra-wides, and never
-  //    only two shot types across the book.
+  // 2. Shot distribution: about two close-ups and two ultra-wides, never only
+  //    two camera DISTANCES across the book, and not every page at eye level.
+  //
+  //    The `shot` field carries two axes since 1b53f4d0f (2026-09-19) — four
+  //    words for how close the camera is, four for where it stands — and it is
+  //    one-of, so a page declaring `high-angle` has spent its word and states
+  //    no distance. Counting all eight together, as this block did when every
+  //    value was a distance, mis-reads the new ones in BOTH directions:
+  //    medium/wide/aerial would have passed SHOT_VARIETY on two distances, and
+  //    an angled page reads as "not a close-up" against the 2+2 floor although
+  //    it never had the chance to be one. Each counter is scoped to the axis it
+  //    is actually about, off the vocabulary's own `axis` — never a second list
+  //    of which words are angles.
   const shotCounts = rows.reduce((acc, r) => { acc[r.shot] = (acc[r.shot] || 0) + 1; return acc; }, {});
   const usedShots = Object.keys(shotCounts).filter(k => k !== 'other');
-  if (usedShots.length <= 2) {
-    add('SHOT_VARIETY', [], `the book uses only ${usedShots.length} shot type(s) (${usedShots.join(', ') || 'none recognised'}) across ${pageCount} pages`);
+  const onAxis = (axis) => rows.filter(r => SHOT_AXIS[r.shot] === axis);
+  const distancesUsed = usedShots.filter(k => SHOT_AXIS[k] === 'distance');
+  const angledPages = onAxis('position');
+  if (distancesUsed.length <= 2) {
+    add('SHOT_VARIETY', [], `the book uses only ${distancesUsed.length} camera distance(s) (${distancesUsed.join(', ') || 'none recognised'}) across ${pageCount} pages`);
+  }
+  // Every page drawn from eye level. The vocabulary offered no other option
+  // before 2026-09-19, so this is the state every stored book is in; the floor
+  // is ONE page, the minimum that makes the axis exist at all, and is not a
+  // taste call about how angled a book should be (owner decision pending).
+  if (angledPages.length === 0) {
+    add('SHOT_NO_CAMERA_POSITION', [],
+      `every page of the book is shot from eye level; no page declares a camera position (${Object.keys(SHOT_AXIS).filter(k => SHOT_AXIS[k] === 'position').join(', ')})`);
   }
   if ((shotCounts['close-up'] || 0) < 2) {
     add('SHOT_CLOSEUP_COUNT', rows.filter(r => r.shot === 'close-up').map(r => r.pageNumber),
@@ -757,6 +779,8 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       pageCount,
       shotCounts,
       shotTypesUsed: usedShots,
+      distancesUsed,
+      angledPages: angledPages.map(r => r.pageNumber),
       soloPages,
       peoplelessPages: emptyPages,
       // `covered` rides along only when the roster declared one, so a stored

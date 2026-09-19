@@ -49992,3 +49992,54 @@ the severity the semantic judge is told to tag matches it.
 **Touched:** `prompts/image-semantic.txt`, `tests/unit/duplicate-object-type.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The shot field has two axes, and each is asked for and counted on its own
+
+**Context.** `1b53f4d0f` widened `shot` from four words to eight the same day: four camera
+DISTANCES (`close-up`, `medium`, `wide`, `ultra-wide`) and four camera POSITIONS
+(`over-the-shoulder`, `high-angle`, `low-angle`, `aerial`). The vocabulary permitted an angle from
+that commit on, but nothing asked the planner for one and nothing counted one. Measured baseline
+over every stored `shot` value on staging — 1,504 values across 107 stories — medium 46.5%,
+wide 34.4%, close-up 13.0%, ultra-wide 3.8%, and **six values in total (0.4%) carrying any camera
+position at all**. Every page of every book was drawn at eye level.
+
+The widening also introduced a silent mis-read. `shot` is one-of: a page that declares `high-angle`
+has spent its word and states no distance. `SHOT_VARIETY` counted all eight words together, so a
+book of medium/wide/aerial would have passed a rule that is about camera distance while holding only
+two distances.
+
+**Decision.** Three things, one axis:
+1. Each entry in `shotVocabulary.js` declares `axis: 'distance' | 'position'`, guarded at require
+   time like `MATCH_ORDER` already is. `SHOT_AXIS`, `DISTANCE_SHOTS`, `POSITION_SHOTS` and
+   `SHOT_POSITIONS` are exported from it.
+2. `SHOT_VARIETY` counts DISTANCES, not words — the regression fix, which outranks the feature.
+   A new `SHOT_NO_CAMERA_POSITION` fires when **no** page in the book declares a position.
+3. The beats planner's existing PAGE PLAN item 5 and its "Rough distribution" line were extended —
+   not paralleled — to ask for a position where a page earns one. The planner is the only stage that
+   sees the whole book, so a spread can only be decided there. The list is filled from
+   `{SHOT_POSITIONS}` rather than hand-typed into the template.
+
+`SHOT_NO_CAMERA_POSITION` is deliberately **not** in `REPLAN_MUST_FIX_CODES`: a must-fix finding
+spends a re-plan round on every book that trips it, and every book stored today trips this one.
+Promoting it is an owner call. The floor is likewise **one** angled page — the minimum that makes
+the axis exist at all — not a quota; any number above one is a taste call and was not taken here.
+
+**Rationale.** The counters read the vocabulary's own `axis` rather than keeping a second list of
+which words are angles; a hand-kept mirror of that list is exactly the drift `shotVocabulary.js` was
+written to end. Scoping each counter to its axis is what lets one flat field carry two questions
+without either counter mis-reading the other's values.
+
+**Touched:** `server/lib/shotVocabulary.js`, `server/lib/planCounters.js`,
+`server/lib/promptBuilders.js` (`buildBeatsPrompt` fills `SHOT_POSITIONS`), `prompts/story-beats.txt`,
+`tests/unit/shot-camera-position.test.ts`, `tests/unit/plan-counters.test.ts`.
+
+**Open, for the owner:** whether a low-angle or worm's-eye page needs an age or menace guard near a
+small child. `CREATURE_TONE_LEVELS` in `promptBuilders.js` already forbids framing a creature
+"leaning or towering over a child" (`cute`, ages 0-4) and requires it "at the child's eye level
+rather than looming over them" (`not-menacing`, ages 5-6) — but those rules constrain the Visual
+Bible ENTRY, not the page's camera, and the `formidable` band (7+) explicitly allows "it may loom".
+Nothing anywhere constrains a `low-angle` page. Not decided here.
+
+**Status:** ✅ active (staging only — not pushed)

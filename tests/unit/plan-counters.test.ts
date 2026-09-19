@@ -614,7 +614,12 @@ describe('the roster decides, not the shape of the sentence (replaces the acts-l
     expect(cast.invented).toEqual(['Malva Grimm']);
     expect(cast.places).toEqual(['Grossmünster', 'Sturmfeder', 'Krummhafen']);
     const res = runPlanCounters({ roster: rosterFor(REAL, ['Grossmünster', 'Sturmfeder', 'Krummhafen']), pages: REAL, commissionedNames: COMMISSIONED, placeNames: places, declaredInvented: ['Malva Grimm'] });
+    // SHOT_NO_CAMERA_POSITION joined 2026-09-19: every one of this book's
+    // eighteen plan lines declares a camera DISTANCE, so the whole book is shot
+    // at eye level. That is true of every story stored before the vocabulary
+    // was widened — the shot field had no other word to take.
     expect(res.findings.map((f: any) => f.code)).toEqual([
+      'SHOT_NO_CAMERA_POSITION',
       'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE', 'UNDER_COVERED_CHARACTER', 'CONSECUTIVE_SAME_SHOT_CAST',
     ]);
   });

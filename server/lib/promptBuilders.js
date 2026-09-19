@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_DEFINITIONS } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, SHOT_DEFINITIONS } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -6893,6 +6893,10 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // that outranks a saved profile here is the ARC, never the commission.
     CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
     MAX_CHARACTERS_PER_SCENE: ctx.MAX_CHARACTERS_PER_SCENE,
+    // The camera positions, from the one vocabulary the counters read — the
+    // planner is the only stage that sees the whole book, so a spread of them
+    // can only be decided here. See server/lib/shotVocabulary.js.
+    SHOT_POSITIONS,
     PAGE_COUNT: pageCount,
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
