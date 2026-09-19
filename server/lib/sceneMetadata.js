@@ -66,19 +66,32 @@ function extractJsonFromText(text) {
     if (depth === 0) jsonToParse = withoutLast;
   }
 
-  // First, try to extract from ```json ... ``` code block
-  const codeBlockMatch = jsonToParse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (codeBlockMatch) {
+  // A ```json ... ``` code block is the usual carrier. But when the text
+  // ITSELF starts with `{`, that leading object is the payload and any fenced
+  // block further down is an appended section — the scene review appends a
+  // fenced `---VISUAL BIBLE---` block after the metadata object, and preferring
+  // it silently dropped the whole brief (cast, clothing, wornItems) for every
+  // page the review re-emitted a VB for. So the leading object wins, and the
+  // fenced block stays as a fallback for when the leading object won't parse.
+  const tryCodeBlock = () => {
+    const codeBlockMatch = jsonToParse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+    if (!codeBlockMatch) return null;
     let blockContent = codeBlockMatch[1].trim();
     // Also fix doubled braces inside code blocks
     while (blockContent.startsWith('{{') && blockContent.endsWith('}}')) {
       blockContent = blockContent.slice(1, -1);
     }
     try {
-      return JSON.parse(blockContent);
+      return { value: JSON.parse(blockContent) };
     } catch (e) {
       // Code block content wasn't valid JSON, continue
+      return null;
     }
+  };
+  const startsWithObject = jsonToParse.startsWith('{');
+  if (!startsWithObject) {
+    const fromBlock = tryCodeBlock();
+    if (fromBlock) return fromBlock.value;
   }
 
   // Try parsing the whole thing as JSON
@@ -140,6 +153,13 @@ function extractJsonFromText(text) {
         }
       }
     }
+  }
+
+  // The leading object didn't parse after all — now a fenced block further
+  // down is the best remaining candidate.
+  if (startsWithObject) {
+    const fromBlock = tryCodeBlock();
+    if (fromBlock) return fromBlock.value;
   }
 
   // Last resort: repair leading-zero number literals and retry once. Kept to
@@ -1155,13 +1175,14 @@ function extractSceneMetadata(sceneDescription) {
       // and every downstream judge then scores the picture against a brief
       // that was stripped before it was sent. Page 16 of
       // job_1789420511893_zly5rcdej took four CRITICAL findings this way.
-      log.error(`[SCENE META] DEGRADED PAGE — rendering on prose alone. Empty for this page: characters[] (no cast), clothing/characterClothing (no clothing contract), objects[] (no props), interactions, textPosition, setting, emptyScenePrompt. Image prompt, clothing check, held-objects check and semantic eval all run against a stripped brief.`);
+      log.error(`[SCENE META] DEGRADED PAGE — rendering on prose alone. Empty for this page: characters[] (no cast), clothing/characterClothing (no clothing contract), wornItems[] (no worn/handover state), objects[] (no props), interactions, textPosition, setting, emptyScenePrompt. Image prompt, clothing check, worn-state check, held-objects check and semantic eval all run against a stripped brief.`);
       return {
         characters: [],
         characterClothing: null,
         characterPositions: null,
         characterPerspectives: null,
         clothing: null,
+        wornItems: [],
         objects: [],
         interactions: null,
         fullData: { characters: [], objects: [], interactions: [], imageSummary: prose, crowdExpected: false },
@@ -2347,6 +2368,7 @@ function describeDegradedSceneMetadata(sceneMetadata) {
   const empty = [];
   if (!Array.isArray(sceneMetadata.characters) || sceneMetadata.characters.length === 0) empty.push('characters');
   if (!sceneMetadata.clothing && !sceneMetadata.characterClothing) empty.push('clothing');
+  if (!Array.isArray(sceneMetadata.wornItems) || sceneMetadata.wornItems.length === 0) empty.push('wornItems');
   if (!Array.isArray(sceneMetadata.objects) || sceneMetadata.objects.length === 0) empty.push('objects');
   if (!sceneMetadata.interactions) empty.push('interactions');
   if (!sceneMetadata.textPosition) empty.push('textPosition');

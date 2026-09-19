@@ -197,6 +197,7 @@ describe('the degraded-brief record', () => {
       isRecovered: true,
       characters: [{ name: 'Mara' }],
       clothing: 'standard',
+      wornItems: [{ id: 'CLO001', owner: 'Mara', state: 'worn' }],
       objects: ['LOC001'],
       interactions: [],
       textPosition: 'top-left',

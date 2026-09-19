@@ -403,7 +403,8 @@ Then a single-line JSON object:
   ],
   "wornItems": [
     {"id": "ART001", "owner": "CharacterA", "state": "worn"},
-    {"id": "ART003", "owner": "CharacterB", "state": "off", "location": "lies on the ground beside the ladder"}
+    {"id": "ART003", "owner": "CharacterB", "state": "off", "location": "lies on the ground beside the ladder"},
+    {"id": "ART005", "owner": "CharacterA", "state": "worn", "wearer": "CharacterB"}
   ]
 }
 ```
