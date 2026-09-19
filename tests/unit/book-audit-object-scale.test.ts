@@ -6,16 +6,23 @@ import path from 'node:path';
 const require_ = createRequire(import.meta.url);
 
 /**
- * Object size, asked as ONE MORE QUESTION inside the book audit's existing
- * call (owner's ruling 2026-09-19: "The reviewer runs once and answers many
- * questions; one explicit question is if the prop is too big or too small
- * compared to other pages").
+ * Object size, asked ONCE per story over every page the prop appears on.
  *
- * What these pin: no extra API call, the question reaches the BUILT prompt,
- * per-page numeric estimates are forbidden (ignoring that ban truncated a read
- * in testing), an empty answer is permitted, the >= 4-pages and bible-prop
- * scoping hold, a missing answer becomes `notEvaluated` rather than a clean
- * result, and the finding never enters the repair routing.
+ * The first shipped shape asked it inside the book audit's six-page chunks and
+ * MEASURED NOTHING: on job_1789759147125_p08djwhbl the egg's nine pages were
+ * split across three calls, so "larger than on the other pages" was only ever
+ * asked of a fragment — 0 of 3 true outliers, 2 false positives. The whole-book
+ * ask then scored 1 of 3 on the same story (the small outlier; both large ones
+ * missed), in its OWN call — an 18-page book makes 4 audit calls, not 3. These tests
+ * pin the fix: the question is built over the WHOLE book, it is sent in its own
+ * single call with the pages the prop is on, and it is no longer wired into the
+ * chunk prompt at all.
+ *
+ * They also keep pinning what the earlier measurement bought: per-page numeric
+ * estimates are forbidden (ignoring that ban truncated a read), an empty answer
+ * is permitted, the >= 4-pages and bible-prop scoping hold, a missing answer
+ * becomes `notEvaluated` rather than a clean result, and the finding never
+ * enters the repair routing.
  */
 
 const scale = require_('../../server/lib/objectScaleAudit.js');
@@ -81,10 +88,17 @@ describe('scoping — only bible props, only with enough pages to compare agains
 describe('the question — outliers only, no numbers, "none" allowed', () => {
   const candidates = [{ id: 'ART001', label: 'dragon egg', pages: [2, 3, 5, 9, 14] }];
 
-  it('names the object and the pages of THIS batch', () => {
-    const { text, asked } = scale.buildScaleQuestion(candidates, [2, 3, 4, 5, 6, 7]);
+  it('names the object and EVERY page it is on, because the whole book is asked at once', () => {
+    const { text, asked } = scale.buildScaleQuestion(candidates, [2, 3, 5, 9, 14]);
     expect(asked.map((a: any) => a.id)).toEqual(['ART001']);
+    expect(asked[0].batchPages).toEqual([2, 3, 5, 9, 14]);
     expect(text).toMatch(/dragon egg/);
+    expect(text).toMatch(/p2, p3, p5, p9, p14/);
+  });
+
+  it('only pages whose image the audit resolved are named', () => {
+    const { text, asked } = scale.buildScaleQuestion(candidates, [2, 3, 4, 5, 6, 7]);
+    expect(asked[0].batchPages).toEqual([2, 3, 5]);
     expect(text).toMatch(/p2, p3, p5/);
     expect(text).not.toMatch(/p9|p14/);
   });
@@ -132,16 +146,24 @@ describe('reading the answer out of the reviewer\'s ordinary reply', () => {
 });
 
 describe('the finding is honest about a single read, and never repairs', () => {
-  it('names the pages and warns that one read carries false positives', () => {
+  it('names the pages and carries the measured LOW CONFIDENCE, not a verdict', () => {
     const t = scale.buildScaleFinding('dragon egg', [3, 5], []);
     expect(t).toMatch(/p3, p5/);
-    expect(t).toMatch(/One read/i);
-    expect(t).toMatch(/check by eye/i);
+    expect(t).toMatch(/LOW CONFIDENCE/);
+    // The real-story validation: 1 of 3 true outliers, both LARGE ones missed,
+    // 2-3 false positives. The finding must carry that, not a rosier number.
+    expect(t).toMatch(/1 of 3 true outliers/);
+    expect(t).toMatch(/missed both pages where the object was drawn too LARGE/);
+    expect(t).toMatch(/go and look/i);
     expect(t).toMatch(/nothing is repainted/i);
   });
 
-  it('marks the smaller side as the weaker direction', () => {
-    expect(scale.buildScaleFinding('dragon egg', [], [9])).toMatch(/weaker/i);
+  it('labels the smaller side with its measured, mixed record', () => {
+    const t = scale.buildScaleFinding('dragon egg', [], [9]);
+    expect(t).toMatch(/weaker/i);
+    // Not a flat "this side is weak": on the validation story SMALLER was the
+    // only direction that hit anything at all.
+    expect(t).toMatch(/hit on the validation story/i);
   });
 
   it('no departures means no finding at all', () => {
@@ -194,45 +216,72 @@ describe('collecting the answer — a missing answer is notEvaluated', () => {
   });
 });
 
-describe('the BUILT prompt and the wiring — one call, no extra calls', () => {
+describe('the wiring — ONE complete ask, not one per chunk', () => {
   const template = fs.readFileSync(path.join(process.cwd(), 'prompts/book-audit.txt'), 'utf8');
   const { fillTemplate } = require_('../../server/services/prompts.js');
   const src = fs.readFileSync(path.join(process.cwd(), 'server/lib/bookAudit.js'), 'utf8');
+  const bookAudit = require_('../../server/lib/bookAudit.js');
 
-  it('the template carries the question placeholder and no separate pass', () => {
-    expect(template).toMatch(/\{OBJECT_SCALE_QUESTION\}/);
-    expect(template).not.toMatch(/===OBJECT-SCALE PASS===/);
-  });
-
-  it('the question reaches the built prompt through the real filler', () => {
-    const { text } = scale.buildScaleQuestion(
-      [{ id: 'ART001', label: 'dragon egg', pages: [2, 3, 5] }], [2, 3, 5]);
-    const built = fillTemplate(template, {
-      PAGE_LIST: '2, 3, 5',
-      TEXT_NOT_A_CHECKLIST: 'rule',
-      OBJECT_SCALE_QUESTION: text,
-    });
-    expect(built).toMatch(/ONE MORE QUESTION — OBJECT SIZE/);
-    expect(built).toMatch(/dragon egg/);
-    expect(built).toMatch(/Do not estimate a size, a ratio, a percentage/i);
-    expect(built).toMatch(/FAULT\[IMG\]/);          // the existing questions survive
-    expect(built).not.toMatch(/\{[A-Z_]+\}/);       // nothing left unfilled
-  });
-
-  it('an empty question leaves the reviewer\'s prompt as it was', () => {
-    const built = fillTemplate(template, {
-      PAGE_LIST: '1, 2',
-      TEXT_NOT_A_CHECKLIST: 'rule',
-      OBJECT_SCALE_QUESTION: '',
-    });
-    expect(built).not.toMatch(/OBJECT SIZE/);
+  it("the reader-eye template no longer carries the size question at all", () => {
+    expect(template).not.toMatch(/OBJECT_SCALE_QUESTION/);
+    expect(template).not.toMatch(/OBJECT SIZE/);
+    expect(src).not.toMatch(/OBJECT_SCALE_QUESTION/);
+    const built = fillTemplate(template, { PAGE_LIST: '1, 2', TEXT_NOT_A_CHECKLIST: 'rule' });
     expect(built).toMatch(/FAULT\[IMG\]/);
+    expect(built).not.toMatch(/\{[A-Z_]+\}/);
   });
 
-  it('the question rides in judgeChunk — there is no second call site', () => {
-    expect(src).toMatch(/OBJECT_SCALE_QUESTION: scaleQuestion/);
-    // Exactly one place sends a book-audit request per chunk.
+  it("the question is asked over the whole book in a single call, with only the prop pages", async () => {
+    const calls: any[] = [];
+    const parts = [1, 2, 3, 5, 9, 14].map(n => ({ pageNumber: n, part: { inline_data: { mime_type: 'image/jpeg', data: `img${n}` } } }));
+    const candidates = [{ id: 'ART001', label: 'dragon egg', pages: [2, 3, 5, 9, 14] }];
+    const mod = require_('../../server/lib/bookAudit.js');
+    // The real function, with the vendor dispatch swapped out.
+    const original = (globalThis as any).fetch;
+    (globalThis as any).fetch = async (_url: any, init: any) => {
+      calls.push(JSON.parse(init.body));
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ content: { parts: [{ text: 'SCALE[LARGER]: dragon egg — p3, p5' }] }, finishReason: 'STOP' }],
+          usageMetadata: {},
+        }),
+      } as any;
+    };
+    process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'test-key';
+    try {
+      const got = await mod.askObjectScale(candidates, parts, 'gemini-2.5-flash', null);
+      expect(calls.length).toBe(1);                       // ONE call, never per chunk
+      expect(got.pages).toEqual([2, 3, 5, 9, 14]);        // p1 has no prop — not sent
+      const sent = calls[0].contents[0].parts;
+      const question = sent[0].text;
+      expect(question).toMatch(/OBJECT SIZE/);
+      expect(question).toMatch(/p2, p3, p5, p9, p14/);
+      expect(question).toMatch(/Do not estimate a size, a ratio, a percentage/i);
+      expect(sent.filter((p: any) => p.inline_data).length).toBe(5);
+      expect(sent.map((p: any) => p.text).filter(Boolean).join(' ')).toMatch(/PAGE 2.*PAGE 14/s);
+      expect(got.raw).toMatch(/SCALE\[LARGER\]/);
+    } finally {
+      (globalThis as any).fetch = original;
+    }
+  });
+
+  it('nothing qualifying means no call is made at all', async () => {
+    const before = (globalThis as any).fetch;
+    let called = 0;
+    (globalThis as any).fetch = async () => { called++; throw new Error('should not be called'); };
+    try {
+      expect(await bookAudit.askObjectScale([], [{ pageNumber: 1, part: {} }], 'm', null)).toBeNull();
+      expect(called).toBe(0);
+    } finally {
+      (globalThis as any).fetch = before;
+    }
+  });
+
+  it('the chunk loop knows nothing about scale — the loop call takes no question', () => {
+    expect(src).toMatch(/await judgeChunk\(template, chunk, modelId, thinkingLevel\)/);
     expect(src.match(/await judgeChunk\(/g)?.length).toBe(1);
+    expect(src.match(/await askObjectScale\(/g)?.length).toBe(1);
     expect(src).not.toMatch(/intersectOutliers|shuffleWithSeed|MIN_ANSWERS|maxCalls/);
   });
 

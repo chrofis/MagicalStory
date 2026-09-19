@@ -116,14 +116,62 @@ the reviewer is ever actually asked.
 **Rationale.** The owner has ruled one call, once, and re-engineering back to three shuffled reads
 is explicitly out of scope. The honest record is that the accuracy cost documented in `4578a1540`
 was understated: it is not "2-3 false positives come back", it is "the true outliers are also lost".
-The finding is reported and the code is left alone pending an owner decision.
 
-**Touched:** nothing — this entry records a measurement. The code under test is
-`server/lib/objectScaleAudit.js`, `server/lib/bookAudit.js` (`collectObjectScale`, `CHUNK_PAGES`)
-and `prompts/book-audit.txt`.
+**What was then done about the structural half (same day).**
 
-**Status:** 🟡 conditional — the object-scale question ships as-is and flags a human; on this
-evidence it flags the wrong pages. Owner decision pending.
+1. *The free route was tested first and has no input.* The intended fix was arithmetic: every page
+   stores `bboxDetection` with the object grounding box and the figure boxes, so object height ÷
+   nearest-figure head height is computable in code and outliers become median ± threshold — free,
+   deterministic, order-independent. **There are no stored object boxes.**
+   `bboxDetection.objects` is `[]` on every page of `job_1789759147125_p08djwhbl` and of
+   `job_1789506283204_3kxqshifx`, and the diag says why: `{"skipped":"object grounding disabled"}`.
+   Object grounding is gated off by the owner since 2026-08-10 (`figureDetection.js`,
+   `GDINO_GROUND_OBJECTS`) because nothing consumed the boxes and each object cost a DINO forward
+   pass per page. A blob-wide search for any egg-labelled box in the story found zero. The ratio
+   route is therefore not buildable from stored data and was not built.
+
+2. *The chunking defect is fixed.* The question no longer rides in the six-page chunk prompt. It is
+   built ONCE over every page the audit resolved and sent in its own single call carrying only the
+   pages a candidate prop appears on (`askObjectScale`, bookAudit.js). Three partial asks became
+   one complete ask, so the owner's one-ask ruling holds. **This costs one MORE call, not fewer:**
+   the question used to ride inside the chunk calls for free, so an 18-page book now makes 4 audit
+   calls where it made 3. The call is cheap — images only, no page text, only the pages a candidate
+   prop is on: 3.7k input / 36 output tokens measured on this story.
+   `{OBJECT_SCALE_QUESTION}` is gone from `prompts/book-audit.txt`.
+
+3. *And the signal is only half there.* Validated against the same real story (truth by eye: egg
+   LARGER p3 1.69 / p5 1.83, SMALLER p9 0.65, borderline p8 0.88, the rest 0.94-1.32):
+   - earlier exploratory reads: whole book over all three props → `SCALE: none` for the egg plus a
+     raven; egg-only whole-book read → `SCALE[LARGER]: dragon egg — p16`, one of the *smallest*
+     pages. **0/3 both times.**
+   - **the shipped shape, one call, all three qualifying props, 13 pages** (`gemini-2.5-flash`,
+     3717 in / 36 out / 1673 thinking, ≈CHF 0.005): `SCALE[SMALLER]: dragon egg — p8, p9, p14, p16`
+     and `SCALE[SMALLER]: Raven — p11`. It named the true small outlier **p9** and the borderline
+     **p8**, and **missed both large outliers (p3, p5) entirely**. **Hits 1/3, false positives 2-3**
+     (p14 1.04, p16 0.94, and the raven, whose sizes were not measured).
+
+   So the chunking was a real defect and repairing it moved the result from 0/3 to 1/3 — but the
+   LARGER direction is invisible to `gemini-2.5-flash` at this phrasing even when every page the
+   prop appears on is in front of it. Note this inverts the wording-trial belief that SMALLER was
+   the weaker direction: on the real story SMALLER was the only direction that hit.
+
+**Decision on what ships.** The corrected structure ships (it is strictly better and cheaper than
+what it replaces) and the finding text now carries the measured result verbatim — `LOW CONFIDENCE:
+… named 1 of 3 true outliers, missed both pages where the object was drawn too LARGE … treat this
+as "go and look", not as a verdict`. Whether a check with this hit rate should exist at all is an OWNER decision, not one to
+take by deleting it; it is on `tasks/BACKLOG.md`. The question the owner is being asked is
+concrete: does a check that finds the small outlier, misses both large ones and names two or three
+clean pages earn one extra cheap vision call per story?
+
+**Touched:** `server/lib/bookAudit.js` (`askObjectScale`, the chunk loop, `judgeChunk`),
+`server/lib/objectScaleAudit.js` (`buildScaleQuestion` whole-book, `buildScaleFinding` honesty),
+`prompts/book-audit.txt` (placeholder removed), `tests/unit/book-audit-object-scale.test.ts`,
+`docs/image-routing.md`.
+
+**Status:** 🟡 conditional — the check ships, asks the right question once over the whole book, and
+on the one story it has been validated against it finds 1 of 3 true outliers (the small one), misses
+both large ones and names 2-3 clean pages, for one extra cheap call. Owner decision pending on
+whether to keep it.
 
 ---
 
@@ -48588,7 +48636,18 @@ contradict one, never work through a whole list") and is untouched.
 **Status:** ✅ active
 
 
-## 2026-09-19 — Object SCALE is ONE MORE QUESTION in the book audit's existing call, and it flags a human rather than firing a repair
+## 2026-09-19 — Object SCALE is ONE question asked ONCE over the whole book, and it flags a human rather than firing a repair
+
+> **SUPERSEDED IN PART, SAME DAY.** This entry described the question as riding
+> inside the book audit's six-page chunks. It no longer does: rebuilt per chunk,
+> it asked "larger than the other pages" of a FRAGMENT and measured nothing
+> (0 of 3 true outliers on the real story). It is now built once over the whole
+> book and sent in its own single call. That is one ask instead of three, but
+> one call MORE, since the chunk asks were free riders: 3 audit calls become 4. The measurement, the rejected free arithmetic route,
+> and the fact that the signal is STILL absent after the fix are in the entry
+> near the top of this file, "The shipped single-call object-scale question does
+> NOT carry the cross-page signal". Read that one for the accuracy; read this one
+> for the scoping, the wording and why it never repairs.
 
 **Context:** A recurring prop's drawn size drifts page to page (the worked case:
 a dragon egg authored "about as big as a human head", rendered football-sized on
@@ -48655,17 +48714,24 @@ or smaller on some of the pages in front of the reviewer than on the rest.
   layer is correct and also does not move the pixels. With no lever that works,
   an automatic repair could only make pages worse.
 
-**Cost:** zero additional calls. The question is extra prompt text and a few
-lines of extra output inside calls the audit already makes.
+**Cost:** ONE cheap vision call per story (≈CHF 0.005 measured: the question
+plus only the pages a qualifying prop appears on, no page text — 3717 input /
+36 output tokens on an 18-page book). It is one ASK where there used to be
+three partial ones, but it is one call MORE than before, because those three
+rode inside calls the audit already made: an 18-page book goes from 3 audit
+calls to 4.
 
 **Touched:** `server/lib/objectScaleAudit.js` (selection, question builder,
-answer parsing, finding text), `server/lib/bookAudit.js`
-(`OBJECT_SCALE_QUESTION` in `judgeChunk`, `collectObjectScale`, the
-`objectScale` result field), `prompts/book-audit.txt`,
-`tests/unit/book-audit-object-scale.test.ts`, `docs/image-routing.md`.
+answer parsing, finding text), `server/lib/bookAudit.js` (`askObjectScale`,
+`collectObjectScale`, the `objectScale` result field),
+`prompts/book-audit.txt`, `tests/unit/book-audit-object-scale.test.ts`,
+`docs/image-routing.md`.
 
-**Status:** ✅ active (supersedes the three-call intersect design described in
-the first version of this entry, which never ran on a story)
+**Status:** 🟡 conditional. The scoping, the wording, the notEvaluated handling
+and the never-repair ruling are all active. The ACCURACY claim in this entry is
+superseded: validated on a real story, the check named 1 of 3 true outliers and
+missed both pages where the prop was drawn too large. The "zero additional
+calls" claim is superseded too — it now costs one extra call.
 
 ---
 
