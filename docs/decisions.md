@@ -21,6 +21,61 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — Production style repair is OFF: the owner's cost call, made against the evidence
+
+**Context.** The Step-5 style audit in `runUnifiedRepairPipeline` has two halves. `checkStoryStyleConsistency`
+(`server/lib/styleConsistency.js`) DETECTS style outliers and writes a verdict plus the outlier list to
+`finalChecksReport.styleConsistency`. Below it, a flag-gated block repaints each outlier toward the dominant
+cluster via `planStyleRepair → repairPageStyle`, one paid image edit per outlier, each one accepted or
+discarded by its own comparative gate (`compareStyleProximity`). The repaint half has flipped three times:
+wired on 2026-07-31, disabled on 2026-08-09 ("in-place restyle is a no-op"), re-enabled the same day on a
+working prompt recipe, and the engine flipped gemini→grok on 2026-08-24. Both halves are on `SETTLED.md`.
+
+**Decision.** `MODEL_DEFAULTS.styleRepairProduction` default **true → false**. The repaints stop; **detection
+is untouched** — it sits above the flag and keeps recording the verdict and the outliers, so a drifting book
+is still measurable from stored evidence, it is simply no longer repainted. Per "behaviour is code, only
+secrets are env vars" the change is the CODE default; the env override survives, now as
+`STYLE_REPAIR_PRODUCTION=true` to re-arm without a deploy (the parse moved from
+`env ? env !== 'false' : true` to `env === 'true'`, the file's existing idiom for a default-off flag).
+No `.env` entry exists for it in this tree, so the code default is what runs locally.
+The Test Lab `style_repair` stage calls `repairPageStyle` directly and is **deliberately left ungated** —
+it is the Gemini-vs-Grok A/B harness and has to stay measurable with production repaints off.
+
+**Rationale — this is the owner's call on cost and simplicity, and the measurement disagreed with it.**
+Recording it honestly, because an entry that manufactures support for a decision is worse than no entry:
+
+- **The owner's reason:** style drift is no longer considered a problem worth paying to repaint now that
+  pages render on `grok-imagine-image-2.0`, and the repaints are unnecessary cost and one more moving part.
+- **The measured evidence points the other way.** Run 4, staging `job_1789759147125_p08djwhbl` (verified from
+  `story_jobs.result_data` on 2026-09-19, not from a log): style repair ran on **3 covers only** — pages −1,
+  −2, −3 — and on **none of the 18 pages**. It cost **$0.06 of a $7.24 story**. Its own gate went **3 for 3**:
+  page −1 `better:"after" passedGate:true kept`, page −2 `better:"after" passedGate:true kept`, page −3
+  `better:"same" passedGate:false rejected`. The gate is doing exactly what it was built to do, including
+  refusing the one repaint that changed nothing.
+- **And Grok 2 was still drifting.** All three covers were logged as **moderate** style outliers with the same
+  four differences, among them *"Faces are rendered smoothly, lacking the specified brushstroke texture"* —
+  i.e. the premise that 2.0 removed the drift is not what this story measured.
+
+So: a cheap mechanism, correctly gated, firing rarely, on a fault that was still present. The owner made the
+call with all of that in front of them. It is a judgement about whether the fault is worth paying for, not a
+finding that the mechanism failed. **Anyone re-reading this and concluding "the data says turn it back on"
+has not found new evidence — that argument was already made and overruled**; re-enabling is a SETTLED.md
+reversal and needs the full protocol.
+
+**What did NOT change.** Detection. The comparative gate and the rule that style repair is judged by
+`styleRepair.passedGate` and never by `finalScore` — that one is about reading stored evidence, applies to
+every style-repair version already in the database and to every Lab arm, is still true, and was raised as a
+false positive again today. The `styleRepairModel` = grok verdict, dormant in production but still live for
+the Lab.
+
+**Touched:** `server/config/models.js` (`styleRepairProduction` default false + env idiom),
+`server/lib/repairPipeline.js` (stale "default true" comment; the disabled-branch log no longer claims an env
+var is set and now says detection still ran), `server/lib/styleRepair.js` (module docblock),
+`docs/SETTLED.md` (both style-repair lines), `tests/unit/style-repair-production-off.test.ts` (new).
+**Verified:** the flag resolves `false` with no env, `true` under `STYLE_REPAIR_PRODUCTION=true`, `false`
+under `=false`; `check-settled` OK; the new unit test pins the gate and the detection placement.
+**Not run:** any story. No paid call was made for this change.
+
 ## 2026-09-18 — A brief correction is never refused for a finding it newly REPORTS
 
 **Context.** `judgeCorrection` (`server/lib/briefCorrection.js`) is the one verdict both brief

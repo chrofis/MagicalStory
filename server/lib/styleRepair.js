@@ -55,12 +55,16 @@
  * decides whether the repaint ships.
  * ============================================================================
  *
- * PRODUCTION WIRING: live since 2026-07-31 (owner directive) — the Step-5
- * style audit in runUnifiedRepairPipeline (images.js) calls
+ * PRODUCTION WIRING: wired 2026-07-31, and OFF since 2026-09-19 (owner
+ * directive — decisions.md "Production style repair is OFF"). The Step-5
+ * style audit in runUnifiedRepairPipeline (repairPipeline.js) calls
  * planStyleRepair → repairPageStyle for pages AND covers, gated by
  * MODEL_DEFAULTS.styleRepairProduction (env STYLE_REPAIR_PRODUCTION,
- * default true) with model per MODEL_DEFAULTS.styleRepairModel. The Test
- * Lab `style_repair` stage remains the Gemini-vs-Grok A/B harness.
+ * default FALSE; set it to 'true' to re-arm) with model per
+ * MODEL_DEFAULTS.styleRepairModel. The audit's DETECTION still runs — only
+ * the paid repaint below is off. The Test Lab `style_repair` stage calls
+ * this module directly and is deliberately NOT gated by the production flag:
+ * it is the Gemini-vs-Grok A/B harness and has to stay measurable.
  */
 
 const { log } = require('../utils/logger');

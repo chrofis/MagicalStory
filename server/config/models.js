@@ -774,25 +774,41 @@ const MODEL_DEFAULTS = {
 
 
   // ─── Style-repair production wiring (Pt 10, owner directive 2026-07-31) ──
-  // When true (default), the Step-5 style-consistency audit's outliers —
-  // pages AND covers — are repainted toward the dominant style cluster via
+  // When true, the Step-5 style-consistency audit's outliers — pages AND
+  // covers — are repainted toward the dominant style cluster via
   // server/lib/styleRepair.js (planStyleRepair → repairPageStyle), one
   // repaint attempt per outlier, gated by checkStyleMatch. The repainted
   // image is stored as a new version through the normal version plumbing.
-  // Env override: STYLE_REPAIR_PRODUCTION=false to fall back to
-  // detection-only. Model per styleRepairModel ('gemini' | 'grok').
-  // RE-ENABLED 2026-08-09 with a WORKING recipe (supersedes the 2026-08-09
-  // disable): repairPageStyle now sends a validated, character-focused,
-  // feature-preserving prompt RAW to the Gemini image edit (prompt-only, no
-  // style-reference image, temp 0.7, retry on safety no-image). Validated on
-  // p3/p10/initial page — photographic figures become watercolor while
-  // eyes/eyewear/identity are preserved (keeps glasses if present, never
-  // invents them). The engine choice in that entry (Gemini, because Grok
-  // no-opped on the pages measured then) is SUPERSEDED — see styleRepairModel
-  // below. A page the model refuses after retries keeps its original.
-  styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION
-    ? process.env.STYLE_REPAIR_PRODUCTION !== 'false'
-    : true,
+  // Model per styleRepairModel ('gemini' | 'grok').
+  //
+  // OFF BY DEFAULT since 2026-09-19 (owner directive — see decisions.md
+  // "Production style repair is OFF"). The owner's reason is cost and
+  // simplicity: style drift is no longer considered a problem worth paying
+  // to repaint now that pages render on grok-imagine-image-2.0. The call is
+  // the owner's, not the data's — the measured evidence pointed the other
+  // way (run 4, job_1789759147125_p08djwhbl: 3 cover repaints, $0.06 of a
+  // $7.24 story, gate 3-for-3, and all three covers still logged as moderate
+  // style outliers). Do not "restore" this default because that evidence
+  // looks favourable; reversing it is a SETTLED.md reversal.
+  //
+  // DETECTION IS NOT GATED BY THIS FLAG. checkStoryStyleConsistency runs
+  // above it in repairPipeline.js Step 5 and keeps writing the verdict and
+  // the outliers to finalChecksReport.styleConsistency — the book is still
+  // measured, it is just no longer repainted.
+  //
+  // Env override: STYLE_REPAIR_PRODUCTION=true re-arms the repaints without
+  // a deploy. Any other value (unset, 'false') leaves them off.
+  //
+  // History, still true if it is ever re-armed: the 2026-08-09 recipe —
+  // repairPageStyle sends a validated, character-focused, feature-preserving
+  // prompt RAW to the image edit (prompt-only, no style-reference image,
+  // temp 0.7, retry on safety no-image). Validated on p3/p10/initial page —
+  // photographic figures become watercolor while eyes/eyewear/identity are
+  // preserved (keeps glasses if present, never invents them). The engine
+  // choice in that entry (Gemini, because Grok no-opped on the pages measured
+  // then) is SUPERSEDED — see styleRepairModel below. A page the model
+  // refuses after retries keeps its original.
+  styleRepairProduction: process.env.STYLE_REPAIR_PRODUCTION === 'true',
   // GROK (owner, 2026-08-24) — reverses the 2026-08-09 (later) flip to Gemini.
   //
   // NEITHER MODEL IS RELIABLE HERE. Gemini sometimes restyles a page fine and

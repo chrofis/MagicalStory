@@ -3232,7 +3232,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       // toward the dominant cluster, one attempt per outlier, gated by
       // checkStyleMatch inside repairPageStyle. Flag-gated by
       // MODEL_DEFAULTS.styleRepairProduction (env STYLE_REPAIR_PRODUCTION,
-      // default true); model per MODEL_DEFAULTS.styleRepairModel.
+      // default FALSE since 2026-09-19 — owner directive, decisions.md
+      // "Production style repair is OFF"; STYLE_REPAIR_PRODUCTION=true
+      // re-arms it); model per MODEL_DEFAULTS.styleRepairModel.
+      // The DETECTION above is deliberately outside the flag: the verdict and
+      // the outliers still reach finalChecksReport.styleConsistency with the
+      // repaints off, so a drifting book is still measurable.
       // Absolute guard (2026-08-06): style-repair repaints outliers TOWARD the
       // dominant cluster. When the dominant cluster is itself off the
       // commissioned style, that drags the few correctly-styled pages into the
@@ -3454,7 +3459,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         log.info(`🎨 [UNIFIED PIPELINE] Step 5: ${styleConsistency.repairs.length} repaint(s) — ` +
           `kept ${tally.kept || 0}, rejected ${tally.rejected || 0} (${contentVetoes} for altering content), error ${tally.error || 0}`);
       } else if ((styleConsistency.outliers?.length || 0) > 0) {
-        log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair disabled (STYLE_REPAIR_PRODUCTION=false) — ${styleConsistency.outliers.length} outlier(s) surfaced only`);
+        log.info(`🎨 [UNIFIED PIPELINE] Step 5: style-repair OFF (styleRepairProduction=false; set STYLE_REPAIR_PRODUCTION=true to re-arm) — ${styleConsistency.outliers.length} outlier(s) detected and surfaced, none repainted`);
       }
     } else {
       log.info(`🎨 [UNIFIED PIPELINE] Step 5: skipped (need ≥2 images, got ${stylePages.length})`);
