@@ -21,6 +21,114 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — A creature a child cares about is alive when the story leaves it, and no meal follows it in the same breath
+
+**Context.** A round-6 trial idea card for a two-year-old (topic: first words, setting: ocean) had
+a creature the child cares for go still at the edge, be lifted out in triumph, and a meal follow in
+the same sentence. Three faults stack — the stillness, the triumph over it, and the food clause —
+and nothing in the system objected.
+
+Verified before writing the rule. The peril rule (“Nothing in the story or its pictures is
+dangerous enough that it could lead to death — for anyone”, 7 sites: generate-story-idea-single.txt
+x2, generate-story-ideas.txt x2, story-arc-review.txt, story-text-from-beats.txt, text-refine.txt
+and buildTellingRulesSection) is a ceiling on the MAGNITUDE of what threatens the CAST. It says
+nothing about what becomes of a creature nobody is threatened by. It also does not reach
+`prompts/trial-idea.txt` on any path — the trial idea template shares no rule block with the writer
+templates. `RISK_FRAMING_RULE` governs how a kept risk is TOLD, not an animal's fate. The only other
+animal clauses are positive ones (a travelling animal is named by the children who help it — the
+telling rules plus story-arc-review.txt check 12; the challenge catalogue's calm-it / feed-it /
+return-it entries) and the bands' **Food.** and **Ending.** craft lines, which govern what the CHILD
+eats. Nothing to duplicate or contradict.
+
+**Decision.** One constant, `ANIMAL_FATE_RULE` in `promptBuilders.js`, on the `RISK_FRAMING_RULE`
+precedent, with two consumers — both at the layer where a story's EVENTS are decided:
+
+> An animal or creature a character cares about is never still, hurt, dead or eaten; it is alive
+> and moving when the story leaves it. No meal follows a creature in the same breath.
+
+1. `prompts/trial-idea.txt` via a new `{ANIMAL_FATE}` placeholder, filled in the SHARED `base()` of
+   `buildTrialIdeaPrompts`, so **both** arms carry it. This is the defect site.
+2. `{TELLING_RULES}`, immediately after the peril and risk-framing rules, so `arc-create.txt` and
+   `arc-retell.txt` carry it on the full path.
+
+**Rationale.** The prose writers (`story-text-from-beats.txt`, `story-trial.txt`) get no copy and
+need none: the trial writer is handed the idea, the beats writer is handed the arc, so both reach
+the rule through their own upstream. A band file was rejected as the home — the rule is
+age-independent, and five hand-kept copies drift. The wording carries no species, no dish and
+nothing traceable to the card.
+
+**Touched:** `server/lib/promptBuilders.js` (`ANIMAL_FATE_RULE`, `buildTellingRulesSection`,
+`buildTrialIdeaPrompts`), `prompts/trial-idea.txt`, `tests/unit/trial-idea-variety.test.ts`.
+**Status:** ✅ active — staging only, commit `5a2dabe97`.
+
+---
+
+## 2026-09-19 — OPEN QUESTION: the two trial idea arms converge on one premise SHAPE, and lexical overlap cannot see it
+
+**Context.** The `/try` idea endpoint returns two cards per cell — an own-town card and a
+make-believe card — which by owner decision (2026-08-25) must differ in KIND, not merely in setting.
+Read by SHAPE rather than by words, round 6 (28 cards, 14 cells) gave **2 clear duplicates and 3
+near-duplicates out of 14**: a worn item falls and an adult's hand recovers it, on both arms; the
+same toy interrupted by the same bodily need, on both arms; a garment blocking movement, on both
+arms; an object plus an obstacle between the child and where it belongs, on both arms; another
+child as the obstacle, on both arms.
+
+**A Jaccard word-overlap check over the pairs returned 3-21% and flagged nothing.** The pairs differ
+in NOUNS while sharing shape, so a word-similarity metric is the wrong instrument — the same mistake
+the Lab's `groupIdeasBySubject` made, fixed in `8ad9c70ef`. Do not re-derive this with a lexical
+metric.
+
+**Cause — three findings, with evidence:**
+
+1. **The two arms draw ADJACENT entries from one shared cursor.** `nextIdeaVarietyAxis()`
+   (`promptBuilders.js`) increments one module-global `ideaAxisCursor`, and `buildTrialIdeaPrompts`
+   calls it twice in a row: `axes = { local: nextIdeaVarietyAxis(), fantasy: nextIdeaVarietyAxis() }`.
+   A cell therefore gets `i` and `i+1` of `IDEA_WANT_AXES`, never a distant pair. Four of that
+   list's seven entries are the SAME shape — move an object to where it belongs: *give away, not to
+   get* / *put back where it belongs* / *carried safely to the end* / *someone to bring along*.
+   Rendered live, cell 1 hands local *something the main character wants to give away, not to get*
+   and fantasy *something that has to be put back where it belongs*; cell 4 hands local *carried
+   safely to the end* and fantasy *give away, not to get*. Cells 1, 4 and 12 of the reported five
+   are exactly those collisions. The companion axis does NOT collide (list length 4, and the local
+   arm always draws an even index) — it is the want axis alone.
+2. **The band-view migration gave the fantasy arm the same premise rules as the local one.**
+   `BAND_VIEW_KEEPS` is `premise: ['premise', 'mechanics']` and `'premise-open': ['premise']`. Both
+   arms therefore receive every `[[premise]]` span of the band — subject, agency and resolution —
+   and differ only by the `[[mechanics]]` page arithmetic, which constrains length, not premise
+   shape. The `premise-open` view was widened from the old `tone` view precisely so the make-believe
+   arm would stop stopping on the problem (`fdc85a290`, `862432a85`). The comment at
+   `server/routes/trial.js:2292` still says “the make-believe arm only its tone” — stale since the
+   2026-09-16 rename.
+3. **The arms are structurally blind to each other.** Confirmed still true: `routes/trial.js` fires
+   `callTextModelStreaming(prompt1Local, ...)` and `callTextModelStreaming(prompt2, ...)` as two
+   independent streams with no shared context. No “make it different from the other card”
+   instruction is answerable.
+
+Everything else in the prompt is shared by construction: change A's obstacle-binding paragraph, the
+three-slot contract, the 50-word cap, the plain-naming rule, `AGE_OWNS_PROPS_RULE` and the topic
+window all come from the one `base()` fill.
+
+**Proposed fix (NOT implemented, owner's call).** Make the axes differ by SHAPE, not by list
+position, and leave every rule set alone:
+- Tag each `IDEA_WANT_AXES` entry with a shape class (transport / arrive / make / finish) and have
+  `buildTrialIdeaPrompts` draw the fantasy arm's axis from a DIFFERENT class than the local arm's,
+  rather than from the next slot. ~10 lines in one function, no prompt text touched, cheap to
+  measure in the Lab's variety stage.
+- Optionally a second, independent cursor per arm so the two are not phase-locked at all.
+
+**Trade-off, stated.** The obvious alternative — re-thinning the fantasy arm's rule set so the two
+arms differ by construction again — would **reintroduce the fault `fdc85a290` / `862432a85` and the
+band-view migration were built to fix** (the make-believe arm stopping on the problem), and would
+weaken the 2026-08-25 differ-in-KIND decision rather than serve it. The arms are meant to differ in
+kind; both arms are meant to be fully ruled. Only the axis draw can carry the difference.
+
+**Touched:** nothing — recorded as an open question. Reading: `server/lib/promptBuilders.js`
+(`nextIdeaVarietyAxis`, `IDEA_WANT_AXES`, `buildTrialIdeaPrompts`, `BAND_VIEW_KEEPS`),
+`server/routes/trial.js`.
+**Status:** 🟡 open — awaiting the owner.
+
+---
+
 ## 2026-09-19 — A taken thing the world hands straight back is a fault the arc must name, and the page plan must keep the story's one object in frame
 
 **Context.** Two findings from the same story, one about the arc and one about the page plan.
