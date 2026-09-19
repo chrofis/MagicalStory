@@ -2567,6 +2567,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
     REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    // Rule 11 in both Art Director templates — ONE constant, so the framing and
+    // the field that records it cannot drift apart.
+    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -2850,6 +2853,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     STAGED_PROP: STAGED_PROP_RULE,
     CONTACT_VERB: CONTACT_VERB_RULE,
     REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    // Rule 11 in both Art Director templates — ONE constant, so the framing and
+    // the field that records it cannot drift apart.
+    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -3280,6 +3286,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         STAGED_PROP: STAGED_PROP_RULE,
       CONTACT_VERB: CONTACT_VERB_RULE,
       REACHABLE_CONTACT: REACHABLE_CONTACT_RULE,
+    // Rule 11 in both Art Director templates — ONE constant, so the framing and
+    // the field that records it cannot drift apart.
+    GAP_ACTION_FRAMING: GAP_ACTION_FRAMING_RULE,
     // SEVEN page-brief contracts, one constant each, filled at all FOUR sites
     // that author a page brief — see ONE_INSTANT_RULE and the block around it.
     // Registered as sibling set art-director-vs-iterate.
@@ -7437,6 +7446,35 @@ const CONTACT_VERB_RULE = "An interaction's `where` opens with the verb the char
  * the position INTO the `where`, beside the contact, not merely into the
  * paragraph.
  */
+/**
+ * ONE FIGURE ACTING ON ANOTHER ACROSS A GAP — the camera carries the direction
+ * (owner, 2026-09-19).
+ *
+ * The problem this solves is a rendering failure, not a taste. When page A has
+ * one figure send something toward another — a ball, a snowball, a play arrow,
+ * a thrown cap, anything — the image model routinely draws both figures and
+ * NOT the line between them: nothing in the picture says who is aiming at whom.
+ *
+ * The rule this replaces made it worse. It forced `shot: ultra-wide` "so both
+ * endpoints fit visibly" and asked the prose to place each figure at the correct
+ * end of the frame — which leaves the direction entirely to the model's
+ * understanding of the sentence, the exact thing that fails, and makes both
+ * figures small while doing it.
+ *
+ * Over-the-shoulder removes the dependency. With the camera behind the actor,
+ * the aim line IS the camera axis: the geometry states the direction whether or
+ * not the model understood the verb. The actor's back fills a front corner, the
+ * target sits small and deep in the opposite corner, and the throw runs down the
+ * frame diagonal.
+ *
+ * The trigger is deliberately not about weapons. It was written in April 2026
+ * for "violence-adjacent scenes" and read that way ever since ("weapon drawn and
+ * aimed forward", "weapon aim line"), which is why it looked like dead violence
+ * text in a children's pipeline. What it is actually about is a SENT THING and
+ * a RECEIVER, and in this product that is a snowball far more often than a bow.
+ */
+const GAP_ACTION_FRAMING_RULE = "When the page has one figure act on another across a gap — sending, throwing, aiming, rolling or kicking something toward them, or calling or gesturing across to them — the page is framed one of two ways, and the prose says which. OVER THE SHOULDER (set `framingPattern` to `over-the-shoulder`): the acting figure's back fills one front corner, seen from behind, large and close; the receiving figure stands small and deep in the opposite back corner, about a tenth of the frame's height; the line of the throw, the call or the look runs down the diagonal between them. Take this one by default — the camera axis IS the line of the action, so the direction holds whether or not the picture understood the verb. ULTRA-WIDE (set `shot` to `ultra-wide`, and omit `framingPattern`): take it when the page needs both faces readable, which the over-the-shoulder framing spends on the actor's back. Then the gap itself must be written — how far apart they stand, measured against something in the frame — because a gap left to the words alone is drawn as two figures almost touching however many paces the sentence claims. Either way the interaction's `where` carries the separation phrase ('across the square', 'a few paces apart', 'down the lane'). What is never allowed is the flat middle: both figures the same size at opposite edges of an ordinary shot, which states neither the direction nor the distance.";
+
 const REACHABLE_CONTACT_RULE = "An object more than one character touches: ask first whether moving it would change what the page is about. If it would not — a thing held, carried, passed or examined — stage it where every one of them can reach it: out on open ground, at the mouth of a recess rather than down inside it, never enclosed by or sunk below something a named toucher would have to reach through, and the prose puts it in that same open spot. If it would — an object whose position is the point, blocking, wedged, stuck fast, buried, sealed in or out of reach — it stays exactly where the plan line and the page text put it, still held by whatever holds it there, and the composition gives way instead: fewer characters in contact at once, the rest in frame straining, bracing or watching; an angle that shows the object's position and the hands in one view; the touchers ranged along the side they can actually reach. On such a page every toucher's `where` names the object together with what holds it in place — that is naming the object, not pose detail. Either way each toucher's `where` names the object itself, never another character's hands or hold.";
 
 /**
@@ -9546,6 +9584,7 @@ module.exports = {
   STAGED_PROP_RULE,
   CONTACT_VERB_RULE,
   REACHABLE_CONTACT_RULE,
+  GAP_ACTION_FRAMING_RULE,
   DECLARED_TRAIT_VERBATIM_RULE,
   ONE_INSTANT_RULE,
   GAZE_TARGET_RULE,

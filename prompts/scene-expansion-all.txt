@@ -64,11 +64,7 @@
 10d. **A garment the page removes.** {GARMENT_REMOVED}
 
 10e. **A worn item on someone else.** {WORN_ON_OTHER}
-11. **Framing pattern.** When a page's plan line calls for one of these shots, compose the prose as:
-    - `solo-before`: close-up on the acting character, weapon drawn and aimed forward if applicable, gaze following the weapon's direction. No opponent or target in the frame.
-    - `solo-after`: close-up on the character after the moment, no opponent, strong emotion.
-    - `over-the-shoulder`: the acting character's back in one front corner (front-left or front-right), target small and soft in the opposite back corner (diagonal composition), 5–10% image height, weapon aim line runs diagonally from foreground to target.
-    - `side`: profile view, character's body axis perpendicular to the camera; the action's target/destination visible on one side of the frame.
+11. **One figure acting on another across a gap.** {GAP_ACTION_FRAMING}
 11b. **Camera-action consistency.** When a character moves INTO, descends INTO, climbs INTO, or steps THROUGH a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold), expand the prose so the camera sits OUTSIDE that space and the character is seen from `back view` or in profile — never facing the camera with the interior behind them. Name the camera POV in the prose ("camera positioned outside the cellar door looking past the threshold; steep stairs descend into the dark beyond").
 11c. **A close-up carries no environment.** A `close-up` brief describes only what that frame holds — the character, what their hands touch, the surface behind them. A long setting paragraph overrides the close-up tag and the wide shot is drawn instead; leave the setting to the vantage's plate, or make the page a `medium` shot.
 11d. **Aboard is not alongside.** When the camera is aboard a vessel or inside a structure, that vessel or structure is the ground the shot stands on — deck, railing, mast base, planking, walls, floor — and only those near surfaces are described. Its exterior (hull, figurehead, name, complete silhouette) never appears as an object in the frame, and no second copy of it stands in the background. Such a page cites a vantage whose plate is the view FROM that position — the planking, rail, mast base and the water or sky beyond, or the interior walls and floor — never the vessel or structure seen from outside. Set `aboard` to that element's id.
@@ -391,6 +387,7 @@ Then a single-line JSON object:
   "population": "cast_only",
   "aboard": "VEH001",
   "landmarkView": "exterior",
+  "framingPattern": "over-the-shoulder",
   "era": "present day",
   "objects": ["LOC001", "ART002"],
 <!-- TEXT_OVERLAY_BEGIN -->
@@ -428,6 +425,7 @@ Then a single-line JSON object:
   - `"ambient"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.
   - `"cast_only"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.
   Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them ("a few distant passers-by cross the far side of the square"), and keep them unnamed, distant and small.
+- `framingPattern` is `over-the-shoulder` on a page rule 11 frames that way, and is omitted on every other page. It is the one field that tells the renderer this page is shot from behind the acting figure, so a page framed over the shoulder in the prose and silent here is drawn flat.
 - `landmarkView` is how the page sees a real landmark, when one is cited: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
 - A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping, or feet-on-ground contact, and nothing placed behind the character. The outfit list still names all garments including footwear. A plan line that needs below-waist action is a `medium` shot, not a close-up.
 - Only add `depth` when the character is in the background (default is foreground/midground).
@@ -482,7 +480,7 @@ Pointing rule: no character points. Show which thing has their attention with ga
 
 {COUNTING_RULE}
 
-Distance rule: when the verb implies action across a gap ('shoots', 'aims at', 'throws at', 'calls to', 'gestures across'), `where` must include an explicit separation phrase ('across the room', 'a few paces apart', 'across the square', 'down the valley'). For these scenes `shot` MUST be `ultra-wide` so both endpoints fit visibly, and the prose must place each figure at the correct end of the frame.
+Distance rule: an action across a gap is framed by rule 11 and its `where` carries the separation phrase it names.
 
 <!-- TEXT_OVERLAY_BEGIN -->
 **`textPosition` / `textZoneDescription`**

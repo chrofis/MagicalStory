@@ -49415,3 +49415,69 @@ open backlog item owned by another session (`server/lib/wornItems.js`,
 `tests/unit/garment-removed-wording.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — A gap action is framed over-the-shoulder or ultra-wide, never flat — and the field that records it is finally emitted
+
+**Context.** Two rendering failures on the same kind of page: one figure sends something
+toward another — a ball, a snowball, a play arrow, a thrown cap.
+
+1. **The direction does not render.** The model draws both figures and not the line
+   between them; nothing in the picture says who is acting on whom.
+2. **The distance collapses.** Staged flat, two figures twenty metres apart are drawn
+   almost touching, however many paces the sentence claims.
+
+What the prompt did about it was make things worse on (1). The **Distance rule** — hand-copied
+into both Art Director templates — forced `shot: ultra-wide` *"so both endpoints fit
+visibly"* and asked the prose to place each figure at the correct end of the frame. That
+leaves the direction entirely to the model's reading of the verb, which is exactly the
+half that fails, and spends the frame making both figures small.
+
+Meanwhile **rule 11** already carried the answer and could not fire. Its
+`over-the-shoulder` entry describes precisely the right composition, but it was keyed to
+a `framingPattern` that no stage sets: **0 non-null across 139 stored staging stories**.
+Written 2026-04-19 as *"framingPattern for violence-adjacent scenes"*, it read as dead
+violence text (*"weapon drawn and aimed forward"*, *"weapon aim line"*) in a children's
+pipeline whose rule 12 forbids weapons touching a body — so the obvious move was to
+delete it. That would have been right on the evidence and **wrong on the intent**: the
+trigger was never really weapons, it is a SENT THING and a RECEIVER, which in this
+product is a snowball far more often than a bow.
+
+**Decision (owner, 2026-09-19).** One rule, `GAP_ACTION_FRAMING_RULE`, offering both
+framings because they answer different halves:
+
+- **over-the-shoulder — the default.** The actor's back fills a front corner; the
+  receiver stands small and deep in the opposite corner at about a tenth of frame height;
+  the line of the throw runs down the diagonal. The camera axis IS the line of the
+  action, so the direction holds whether or not the picture understood the verb.
+  Declared as `framingPattern: "over-the-shoulder"`.
+- **ultra-wide — the alternative**, when the page needs both faces readable, which the
+  over-the-shoulder framing spends on the actor's back. Then the gap must be written and
+  measured against something in the frame, for reason (2) above.
+- **Never the flat middle** — both figures the same size at opposite edges of an ordinary
+  shot states neither the direction nor the distance.
+
+**The field is now emitted, which is what makes the rest live.** `framingPattern` was
+already parsed (`sceneMetadata.js`, 3 sites), already consumed
+(`storyJobPipeline.js:4355` drops background reference photos on an over-the-shoulder
+page, because attaching a background character's portrait forces the renderer to upsize
+them past *"tiny in the distance"*) — and never produced, because no template gave the
+author a field to declare it in. All four brief-authoring templates now carry it: the two
+Art Director templates and, per the 2026-09-17 four-site contract, the two iterate
+templates. `ad-iterate-parity` caught that omission on the first run — a field the
+rewrite does not emit is a field one repair round deletes.
+
+One constant into both Art Director templates, replacing two hand-kept copies of the
+Distance rule.
+
+**Untested.** `docs/image-routing.md` has no verdict on framing a gap action and now
+carries this one, marked untested: the ref-drop this switches on has never executed, so
+its first real exercise should be watched.
+
+**Touched:** `server/lib/promptBuilders.js` (`GAP_ACTION_FRAMING_RULE`, 3 fill sites),
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`docs/image-routing.md`, `tests/unit/gap-action-framing.test.ts`.
+
+**Status:** 🟡 conditional — active, and unproven on a real render.
