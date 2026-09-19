@@ -6952,6 +6952,14 @@ const ACTION_SHAPE_STANDARD = {
 // Who the 1st-grade book is read aloud to. Derived from the band, not
 // hardcoded: the line said "3-5 year old" for every 1st-grade book, including
 // the age-1 and age-2 bands (measured 2026-09-07).
+//
+// The band is now only the FALLBACK. When the commission records an age, the
+// line names that age exactly — the same one `fillBandTokens` puts in the
+// MINI HERO'S JOURNEY header and the reader line, which is the oldest main
+// character (owner, 2026-09-19). Until this, one arc prompt could say "(age 5)",
+// "The child this book is for is five" and "read aloud to a 3-5 year old" in the
+// same breath, and then ask the creator to pitch the props at "someone that
+// age" without ever saying which age it meant.
 const READER_AGE_BY_BAND = {
   routine: 'a 1-2 year old',
   quest: 'a 2-3 year old',
@@ -6960,6 +6968,17 @@ const READER_AGE_BY_BAND = {
   journey: 'a 3-5 year old',
   standard: 'a 3-5 year old',
 };
+
+/**
+ * "a five-year-old", or the band's range when no age is recorded. ONE reader,
+ * named the same way everywhere in the prompt.
+ */
+function readerAgeLabel(inputData = {}, band = 'standard') {
+  const age = focusAge(inputData);
+  if (age === null) return READER_AGE_BY_BAND[band] || READER_AGE_BY_BAND.standard;
+  const word = ageWord(age);
+  return `${/^[aeiou]/i.test(word) ? 'an' : 'a'} ${word}-year-old`;
+}
 
 /**
  * The invented-named-figure allowance for a commission: the band (or reading
@@ -7023,7 +7042,7 @@ function buildArcBudgetSection(inputData, pageCount) {
     // which is how a length rule once deleted a story's causality (2026-09-07).
     '- One telling carries one thing the reader did not already know. Further facts arrive where they are needed — at the page that turns on them — or are found and shown rather than said.',
     actionsLine,
-    ...(lvl === '1st-grade' ? [`- This book is read aloud to ${READER_AGE_BY_BAND[band] || READER_AGE_BY_BAND.standard} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
+    ...(lvl === '1st-grade' ? [`- This book is read aloud to ${readerAgeLabel(inputData, band)} and must be simple to follow: one question open at a time, one thread, and every turn traceable to something already shown on the page.`] : []),
     `- Invented named figures: this book has room for ${allowance} beyond the commissioned cast; each one past that carries one line of justification on its own line before the numbered arc, never inside a numbered sentence.`,
     '- A figure counts when the story gives it a name and the commission did not: persons, animals and creatures alike, including one who appears on a single page, one who never speaks, and any adult who frames a scene — a parent, grandparent, teacher, shopkeeper or neighbour who sets a rule, waits, permits or welcomes. Standing in the background does not take a figure off the list.',
     '- Not counted: anyone the commission named, including any animal or companion it supplied; places, buildings, landmarks, rivers, mountains, vehicles and objects, however named; a group named collectively; a figure given no name and referred to only by what it is.',

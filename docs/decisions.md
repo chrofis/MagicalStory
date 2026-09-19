@@ -47371,3 +47371,36 @@ under-layer rendered as a collared shirt) can change on the ONE garment that is 
 `tests/unit/redress-prompt-scoping.test.ts`.
 **Status:** ✅ active
 
+
+---
+
+## 2026-09-19 — The arc prompt names ONE reader age: the oldest main character
+
+**Context.** The arc-create prompt for staging `job_1789759147125_p08djwhbl` stated the
+reader's age three different ways, over a cast aged 5, 3, 3, 3:
+
+- `# MINI HERO'S JOURNEY (age 5)` and *"The child this book is for is five"* — from
+  `fillBandTokens`, which uses `focusAge` (the oldest declared main);
+- *"This book is read aloud to a 3-5 year old"* — from `READER_AGE_BY_BAND`, a
+  band→label map that knows the band but not the child;
+- and then `AGE_OWNS_PROPS_RULE`: *"the objects the story turns on belong to the world
+  of someone **that age**"* — without ever saying which age it meant.
+
+A five-year-old's props and a three-year-old's are not the same set, so the rule had no
+referent.
+
+**Decision.** The age is the **oldest main character** (owner, 2026-09-19) — the child
+who carries the book; younger siblings come along. `focusAge` already resolved that way,
+so this aligns the one line that disagreed: `readerAgeLabel(inputData, band)` names the
+focus age ("a five-year-old", "an eight-year-old") and falls back to the band's range
+only when no age is recorded at all.
+
+**Rationale.** Three statements of one fact is three chances to disagree, and this set
+already did. The band map stays as the fallback because a commission with no recorded
+age still needs a listener named — that was the 2026-09-07 fix and it is not reversed,
+only demoted below the exact answer when one exists.
+
+**Touched:** `server/lib/promptBuilders.js` (`readerAgeLabel`, the 1st-grade budget
+line), `tests/unit/arc-reader-age-agreement.test.ts`.
+
+**Status:** ✅ active
