@@ -50120,3 +50120,80 @@ p18, p15 and p16 join them (4 of the 5-page allowance), and only p5/p13 — neit
 `tests/unit/repair-gate-cap.test.ts`, `scripts/analysis/replay-round1-badpages.js` (the replay),
 `tasks/bugs.json`.
 **Status:** ✅ active
+
+## 2026-09-19 — A garment seen from behind is not evidence of its type; the describer may abstain and the judges must
+
+**Context:**   Staging `job_1789207854566_l43qgl34w` p5 — five figures walking away
+down a street, every one `facing: "away from viewer"` — carried two CRITICAL
+`clothing` findings reading *"black skirt instead of black cropped wide-leg
+sailor trousers"* and a third for *"missing brown buckled boots"*. The shipped
+pixels (downloaded, cropped, viewed) show black cropped wide-leg trousers on
+both figures — the split between the legs is visible at the hem — over brown
+buckled boots. Removing the three moved the page **−20 → 35**.
+
+The owning layer was not the judge. Stage 1, the prompt-blind describer
+(`prompts/image-inventory-unified.txt`, `runVisualInventory`), wrote verbatim:
+
+| figure | `facing` | `clothing` |
+|---|---|---|
+| 3 | away from viewer | `red puffed-sleeve coat, black skirt, brown boots` |
+| 4 | away from viewer | `green long-sleeved shirt, black corset, black skirt, brown boots` |
+| 5 | left | `purple hooded cloak, dark grey or teal trousers, black boots` |
+
+The blind compliance judge reasons entirely over that prose, so it compared
+`skirt` to the contract's `trousers` faithfully. **The garment-type error was
+stage 1's.** Two of the judge's own faults rode along: it escalated to CRITICAL
+where its own rule already said MAJOR, and it reported boots missing that stage 1
+had reported present (`brown boots`, lacking only the word *buckled*).
+
+Why the existing rule was skipped: `image-prompt-compliance.txt` already listed
+*"cropped wide-leg trousers read as a skirt"* as not-modern-dress — but two
+sentences **after** the sentence awarding CRITICAL, reading as a qualifier on a
+verdict already reached, and gated on the judge recognising a garment noun. Same
+failure shape as the absence rule hoisted above STEP 1 on 2026-08-10.
+
+Scope, swept over 105 staging stories / 1211 pages (626 with a stored inventory),
+2026-07-31 → 2026-09-18: 199 of 1464 figures (13.6%) are back-turned; **59**
+garment findings sit on a page holding one, **11 of them CRITICAL — every
+CRITICAL from the blind compliance judge**. The two evaluators that SEE the image
+produced 18 such findings and **zero CRITICAL** (`image-evaluation.txt` already
+caps garment type at MAJOR via D-05); one of those 18 is a true instance of the
+class, a semantic MAJOR calling knee-length breeches *"a dark skirt-like
+garment"*.
+
+**Decision:**
+1. The describer may abstain. `clothing` had no abstention vocabulary at all
+   while `eyewear`, `headwear`, `facial_hair` and `worn_carried` each had one —
+   required to name a type, it guessed. It now writes the colour plus
+   `type not visible from this angle` where the angle hides the split between
+   the legs or a front fastening. Same shape as the existing `cannot tell at
+   this size`, not a parallel mechanism.
+2. The blind judge gates **before any severity**, on the inventory's own
+   machine-written `facing` value rather than on recognising a garment noun:
+   `away from viewer`, `left` or `right` → report no garment-type difference,
+   and none at all on an abstention. Colour still rules. An attribute of a named
+   garment the inventory did not itemise is undescribed, never missing.
+3. The two sighted judges carry the same rule (`N-17` in `image-evaluation.txt`,
+   a never-flag bullet in `image-semantic.txt`).
+
+**Rationale:** The fix belongs where the error is made. A severity ceiling could
+not do this — `clothing` must keep CRITICAL for a real costume failure, and the
+measured CRITICALs were indistinguishable from real ones by type alone. Gating on
+`facing` is mechanical: it needs no judgement from the model that just failed to
+exercise judgement. Note the compliance judge is OFF (`promptComplianceJudge`
+defaults false, 2026-09-19, docs/SETTLED.md) and this does **not** re-enable it or
+argue for re-enabling it — 11 of the 11 CRITICALs are that judge's, so the
+prompt-side change is dormant in production and live only in the Lab and behind
+`PROMPT_COMPLIANCE_JUDGE=true`; the stage-1 and sighted-judge halves are live now.
+
+**Not done, deliberately:** no code-side severity change. Classification belongs
+to the prompt, and a ceiling is the owner's call.
+
+**Touched:** `prompts/image-inventory-unified.txt`, `prompts/image-evaluation.txt`
+(schema sibling + N-17), `prompts/image-semantic.txt`,
+`prompts/image-prompt-compliance.txt` (hoist),
+`tests/unit/eval-garment-type-camera-angle.test.ts` (new, 9 assertions).
+`prompts/image-generation.txt` deliberately unchanged: the rule removes
+deductions and asks the illustrator for nothing, pinned by a test so a later
+generator↔critic sweep does not sync a no-op into it.
+**Status:** ✅ active — staging, not master.

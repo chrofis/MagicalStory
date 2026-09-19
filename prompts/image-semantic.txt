@@ -64,6 +64,7 @@ Only check these things (using SCENE_HINT + IMAGE_PROMPT as the source of truth)
 
 **Ignore everything else.** The image prompt contains detailed physical descriptions from reference photos — minor visual differences are expected. Specifically ignore:
 - Character identity, names, recognizability. A separate system with reference photos handles identity.
+- Garment TYPE on a figure seen from behind or at a steep angle: that view hides the split between the legs on a lower-body garment and the front fastening on an over-garment, so trousers read as a skirt and a sashed blouse as a coat or a cloak. Flag a type difference only where the frame shows the detail that decides it; colour is unaffected.
 - Exact colors of ANY element — clothing, objects, vehicles, hair. Only the broad category matters (modern vs medieval, red vs blue). Shade variants (lilac vs purple, crimson vs red, light-blue vs blue) never deduct.
 - Clothing details: patterns, fabric type, accessories (backpack present/absent), specific garment (hoodie vs sweatshirt).
 - Hair details: exact length, exact shade, ponytail vs loose, style.
