@@ -50,6 +50,26 @@
  *    borderline p8, and MISSED BOTH large outliers (p3, p5) entirely.
  *    1 of 3 hits, 2-3 false positives (p14, p16, the raven).
  *  - an earlier egg-only whole-book read named p16 alone — 0 of 3.
+ *  - ONE PROP PER CALL, over only that prop's own pages (measured 2026-09-19,
+ *    two runs, same model, temperature 0, same outlier wording — only the prop
+ *    count and the page set changed): the egg call returned
+ *    "SCALE[LARGER]: dragon egg — p4, p5" in BOTH runs, byte-identical. That is
+ *    1 of 3 hits (p5, the biggest outlier at 1.83) with one false positive
+ *    (p4, 1.22, inside the pack), p3 never named and p9 no longer named. The
+ *    all-props control on the same day returned the shipped answer both times
+ *    ("SMALLER: egg p8, p9, p14, p16"; "SMALLER: Raven p11" / "p11, p18"):
+ *    1 of 3 hits, 3 false positives. So the prop count DOES move the answer —
+ *    asking about one prop flips the judge from the SMALLER side to the LARGER
+ *    side and finds the largest outlier stably — but it does NOT recover the
+ *    {p3, p5} result, and it trades three false positives for one.
+ *  - WHAT THE EARLIER {p3, p5} SUCCESS ACTUALLY WAS: three runs in DIFFERENT
+ *    PAGE ORDERS, intersected. Each single run carried false positives
+ *    ([5,3,7], [3,5,4,2], [4,5,3]); only the intersection was clean. At
+ *    temperature 0 a repeat in the SAME order is deterministic, so repeats buy
+ *    nothing — the signal comes from shuffling, not from repeating. Recovering
+ *    {p3, p5} therefore costs three shuffled calls PER PROP, which the owner has
+ *    ruled too expensive. The question is closed: one call, of any shape, names
+ *    about one of three outliers and one to three innocent pages.
  * So the chunking was a real structural defect and is fixed here, and fixing it
  * moved the result from 0/3 to 1/3: the LARGER direction is still invisible to
  * the judge at this model and this phrasing. The finding text says so, nothing
