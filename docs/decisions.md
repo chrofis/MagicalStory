@@ -21,6 +21,97 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — The central-object coverage rule is REVERTED: it fires on the lost-object stories it was meant to protect, and it reads an object out of a column of characters
+
+**Context.** Earlier today `b1e298926` shipped two rules from one story. One was about the arc
+(the REPLACEABLE lens — *a cost the world undoes for free*); the other was about the page plan: the
+thing the story's problem belongs to stays in frame across the span between the page it enters and
+the page its problem is settled. That entry shipped on **structural evidence only** and named the
+Lab A/B as the thing that would settle it. The A/B has now run. **The arc half passed. The
+page-plan half fired on every story it was shown, including the controls.**
+
+**Evidence — Lab experiment 1332 (`beats_replan`, three stored stories, the new template live on
+staging).** Check 12 produced findings on **all three** books: the dragon book ×3 (the book the rule
+was written from — intended), the ship book ×1, and the mermaid book ×2. **The ship and the mermaid
+were controls. Both should have stayed silent.** A rule that fires on 3/3 books, two of them
+controls, is not a rule that catches a defect; it is a rule that describes ordinary picture-book
+structure as a defect.
+
+**Two independent defects, either one fatal.**
+
+**(a) It fires hardest on exactly the story shape it was supposed to protect.** The rule demands the
+object be in frame from "the page it enters" to "the page its problem is settled" — which, in a
+**lost-object** story, is precisely the stretch where the object is legitimately out of frame,
+because the object being gone IS the middle of the book. Verbatim from the run: *"The captain's cap
+enters on page 5 and its problem is settled on page 15; pages 8, 9, 10, 11, 12 and 13 do not carry
+it"*, and *"Doudou souris … The intervening pages whose who columns do not carry it are pages 4, 5,
+6, and 7"*. In both books the object is missing **because that is the plot**. The rule cannot tell
+"the story forgot its object" from "the story lost its object on purpose", and those two are the
+same string of absent pages.
+
+**(b) It sends the checker to the WHO COLUMN, which lists characters, to look for an object.** On
+the dragon book check 12 reported the egg absent from pages **3–15** — while the stored
+`visualBible` has ART001 on pages **[2, 3, 4, 5, 7, 8, 9, 14, 16]**. The finding is not merely
+over-strict, it is **false**: the checker was pointed at the wrong data. A plan line's who column is
+the cast of the page; an object is not a who. The roster the plan check itself builds separates
+PERSON from THING for exactly this reason, and the rule ignored that separation.
+
+**Decision — remove both halves of the page-plan rule; keep the arc rule untouched.**
+1. `prompts/plan-check.txt`: **check 12 is deleted**, and both header count words go back
+   **twelve → eleven** ("only on the eleven points below", "Answer only these eleven:"). The
+   template is now byte-identical to its pre-`b1e298926` state.
+2. `prompts/story-beats.txt`: the Requirements bullet beginning *"When the story's problem belongs
+   to one thing the cast carries, keeps, seeks or protects…"* is **deleted**. The bullet above it
+   ("The main character appears on most pages…") is untouched; that template is likewise
+   byte-identical to its pre-`b1e298926` state.
+3. **Kept, active, not touched:** the REPLACEABLE lens and the "ask all eight:" header in
+   `prompts/arc-panel.txt`; the *a cost the world undoes for free* fault shape the arc generators
+   are given (now one shared builder in `server/lib/promptBuilders.js`, not two hand-kept copies);
+   and the `arc-generator-vs-critic` set in `scripts/admin/sibling-registry.json`. That half was
+   Lab-tested and it passed.
+
+**Rationale.**
+
+*Why a revert rather than a tightening.* Both defects are in the rule's premise, not its thresholds.
+No threshold fixes (a): the lost-object story's legitimate absence run and the forgotten-object
+story's defective absence run are the same measurement. No rewording fixes (b): the who column does
+not contain objects, so a checker pointed at it cannot count them however the sentence is phrased.
+Loosening "more than two in a row" to three or four would only move the misfire, and the rule is
+live on staging misfiring on essentially every story now — the cost of leaving it up while a better
+version is designed is a stream of false findings in every plan check.
+
+*The matched removal keeps the sibling set satisfied.* `prompts/story-beats.txt` (generator) and
+`prompts/plan-check.txt` (critic) are the two members of `plan-generator-vs-critic`. The rule went
+in on both sides and comes out of both sides in one commit, so the generator is never scored against
+a rule it was not given — verified with `check-sibling-paths.js`, not assumed.
+
+**What a replacement would have to do, so nobody re-proposes this wording.** Three requirements,
+all three:
+1. **Key on something that actually tracks objects.** The who column is the cast. The plan check's
+   own ROSTER already splits PERSON from THING, and the visual bible carries per-element page lists
+   (the ART001 numbers above came from there) — a coverage rule reads one of those, never the who
+   column.
+2. **Exempt the stretch where the object's absence IS the beat.** The question worth asking is not
+   *"is the thing in frame?"* but *"does the story ACCOUNT for the thing?"* — a page that stages the
+   search, the loss, or the place it was last seen accounts for it while showing nothing of it. A
+   rule that cannot express that distinction will keep flagging lost-object books.
+3. **Be Lab-tested against at least one lost-object story before shipping** — the shape that broke
+   this one. Structural evidence (it builds, the counts are true, the suite is green) is not
+   evidence that a rule fires on the right books; that was the gap `b1e298926` shipped through, and
+   experiment 1332 is what closed it.
+
+**Touched:** `prompts/plan-check.txt` (check 12 removed, both count words twelve → eleven),
+`prompts/story-beats.txt` (Requirements bullet removed), `docs/decisions.md` (this entry, plus the
+partial-supersession Status on the `b1e298926` entry — its #42 arc half stays ✅ active, only its
+#53 page-plan half is 🗄 superseded).
+**Verified:** full `npx vitest run` green; `plan-check-question-count.test.ts` passes at eleven
+questions with both headers agreeing; `loadPromptTemplates()` loads every template and both edited
+ones build through `buildPlanCheckPrompt` / `buildBeatsPrompt` with no unfilled `{PLACEHOLDER}`;
+`check-settled.js`, `check-open-bugs.js`, `check-doc-coupling.js`, `check-sibling-paths.js` all exit 0.
+**Not run:** any story, any Lab stage, any model call — no paid call was made for this revert.
+**Status:** ✅ active — staging, not pushed. Reverts the page-plan half of `b1e298926` (entry below);
+that entry's arc half remains in force.
+
 ## 2026-09-19 — A creature a child cares about is alive when the story leaves it, and no meal follows it in the same breath
 
 **Context.** A round-6 trial idea card for a two-year-old (topic: first words, setting: ocean) had
@@ -248,11 +339,28 @@ so more page briefs will carry it, and that spends against **"Three Visual Bible
 strongest claim on one of the three slots. If the budget starts evicting secondary characters to make
 room, that is the trade landing, and it is a reason to revisit this rule — not a new bug.
 
-**Status: structural evidence only — NOT yet validated semantically.** What is verified at commit time
-is that the prompts build, the counts are true, the placeholders fill, and the suite is green. Whether
-the REPLACEABLE lens actually surfaces refundable-cost faults, and whether check 12 fires on the right
-books without over-firing, is a **Lab A/B being run separately by the main session**. No paid call was
-made for this commit. If the A/B says the lens over-fires, the entry to amend is this one.
+**Status: PARTIALLY SUPERSEDED the same day — the arc half stands, the page-plan half is reverted.**
+
+- **#42, the arc half — ✅ active.** Decision items **1 and 2** stand exactly as written: the
+  REPLACEABLE lens in `prompts/arc-panel.txt` (and its "ask all eight:" header), and the matching
+  *a cost the world undoes for free* fault shape the two arc generators are given. The Lab A/B
+  this entry promised **tested this half and it PASSED**. Nothing here is superseded.
+- **#53, the page-plan half — 🗄 superseded 2026-09-19 (same day)** by "The central-object coverage
+  rule is REVERTED: it fires on the lost-object stories it was meant to protect, and it reads an
+  object out of a column of characters" at the top of this file. Decision items **3 and 4** —
+  the `prompts/story-beats.txt` Requirements bullet and `prompts/plan-check.txt` check **12** with
+  its eleven → twelve count words — are **removed from both templates**; the plan check is back at
+  eleven questions. The measurement above (pages 2,3,4,5,7,8,9,14,16 present / 10,11,12,13,15 absent
+  on `job_1789759147125_p08djwhbl`) stands as written, and so does the *why a per-page rule was
+  rejected* reasoning; what changed is the verdict they were used to justify. Lab experiment
+  **1332** (`beats_replan`, three stored stories) fired the rule on **all three**, two of which
+  were controls that should have stayed silent.
+- **The "Known cost" paragraph above is void with the page-plan half.** No plan line now carries the
+  central object on the rule's account, so nothing spends against the three-VB-elements-per-page
+  budget on its behalf.
+
+What is verified at the original commit time remains true of the arc half: the prompts build, the
+counts are true, the placeholders fill, and the suite is green.
 
 **Touched:** `prompts/arc-panel.txt` (REPLACEABLE lens, six → eight), `prompts/arc-create.txt` +
 `prompts/arc-retell.txt` (the matching fault shape in both hand-maintained critique lists),
