@@ -1790,14 +1790,25 @@ async function redressSheetVariant(baseSheetImageData, opts = {}) {
 
   const items = (Array.isArray(removedItems) ? removedItems : []).map(s => String(s || '').trim()).filter(Boolean);
   if (items.length === 0) return null;
+  // LEAD WITH WHAT IS WORN (owner, 2026-09-19). The instruction states the
+  // variant's outfit POSITIVELY and puts the removal second: the provider
+  // anchors on what it is asked to draw and tends to keep a garment it is only
+  // asked to take away (memory `feedback_grok_pose_category_words`).
+  //
+  // And nothing is "revealed" in a cell that faces away. Measured on the real
+  // base sheet: the under-layer is already visible at the chest opening in the
+  // front and side cells, while the rear cells show only the removed garment's
+  // back panel — so in those the back of the under-layer has to be DRAWN, and a
+  // prompt that says it becomes visible is asking for something that is not
+  // there.
   const removalLine = items.length === 1
-    ? `Remove the ${items[0]} from the character in every cell.`
-    : `Remove these from the character in every cell: ${items.join('; ')}.`;
+    ? `The ${items[0]} is off:`
+    : `These are off — ${items.join('; ')}:`;
   const prompt = `Edit Image 1 — a 2×4 character reference sheet (8 cells).
-${removalLine}
-What was underneath is now visible: ${resolvedOutfit}
-Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style, same colours for every garment that stays.
-Do not add a replacement garment, and do not place the removed item anywhere in the sheet.`;
+In every cell the character wears exactly this, and no layer over it: ${resolvedOutfit}
+Draw each of those garments right round the body: in a cell facing the viewer its front, in a cell turned away its back — which this sheet has never shown, so draw it rather than uncover it.
+${removalLine} not on the character, no replacement garment in its place, and nowhere else in the sheet.
+Change nothing else. Same character, same face, same hair, same body, same poses, same cell layout, same art style, same colours for every garment that stays.`;
 
   const totalAttempts = 1 + MAX_SHEET_RETRIES;
   const attempts = [];
