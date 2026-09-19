@@ -47485,3 +47485,42 @@ makes the saved profile mean something for every consumer at once — arc, image
 `tests/unit/trait-cap-reaches-every-picker.test.ts`.
 
 **Status:** ✅ active
+
+## 2026-09-19 — The wardrobe-variant render is JOINED before the page crop, not left to narrative timing
+
+**Context.** The per-state variant feature (entry above) kicks its render off in Phase 4
+(`storyJobPipeline.js`, `prepareWardrobeVariantAvatars`) by REASSIGNING the rolling
+`streamingAvatarStylingPromise`. That chain already had three consumers — the trial page loop, the
+trial cover, and the pre-cover styling join — but all three sit EARLIER in the file than the
+reassignment, so nothing ever awaited the variant work. The page cell crop
+(`applyStoryCellRefs` inside `preparePageData`, Phase 5a) consumed the sheets regardless. Whether a
+page got its `--off:` sheet was decided by how long the unrelated narrative work in between
+(summary translation, lector/review) happened to take. When a crop won that race
+`resolveSheetForRef` found no `styled-…--off:` key, warned loudly, and served the WORN sheet —
+i.e. silently-correct-by-luck, degrading to pre-feature behaviour under load.
+
+**Decision.** Phase 5a awaits `streamingAvatarStylingPromise` once, immediately before
+`preparePageData` runs, using the same shape as the three existing joins (`if (…promise) await …`).
+The kickoff is NOT moved: variants still render alongside the narrative work. The await is a join,
+not a serialisation.
+
+**Rationale.** The chain is a rolling promise whose contract is "every consumer awaits whatever the
+chain holds at the moment it needs the sheets" — a fourth consumer appeared (the page crop) and
+simply did not honour it. Adding a second synchronisation mechanism (a separate variant promise, a
+polling wait, a readiness flag) would have given the same sheets two disciplines. The join is about
+**has it finished trying**, never **did it succeed**: the kickoff swallows a refusal, an eval
+rejection or a provider error into a warn, so a failed variant settles the chain promptly and the
+loud worn-sheet fallback in `resolveSheetForRef` stays exactly as designed — a failed variant costs
+pages nothing. The await is additionally wrapped in a try/catch so a rejection from any earlier link
+in the chain degrades to a warn rather than failing the job.
+
+**Other crop paths are unaffected.** `server/lib/images.js:4382` (iterate), `server/routes/
+regeneration.js:714` / `:1252` / `:2066`, and `server/lib/repairPipeline.js:1391` all crop from
+sheets already persisted in `story.data.characterAvatars` / the character rows, long after
+generation; none of them touches the in-flight promise, so none could race it. Confirmed by reading
+each call site, not assumed.
+
+**Touched:** `storyJobPipeline.js` (Phase 5a join),
+`tests/unit/wardrobe-variant-join-before-crop.test.ts`.
+
+**Status:** ✅ active

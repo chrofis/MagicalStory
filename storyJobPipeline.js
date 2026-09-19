@@ -4527,6 +4527,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
       };
 
+      // Join the avatar-styling chain before ANY page crops a cell from it.
+      // Same await discipline as the three earlier joins (trial page, trial
+      // cover, pre-cover styling): the promise is a rolling chain, and every
+      // consumer of the sheets awaits whatever the chain holds at the moment it
+      // needs them. The wardrobe-variant kickoff (Phase 4) REASSIGNS this
+      // variable after the last of those joins, so without this one the
+      // `--off:` sheets were consumed by `applyStoryCellRefs` below while they
+      // were still rendering — the crop found no `styled-…--off:` key, warned
+      // loudly, and served the WORN sheet (pre-feature behaviour). Only the
+      // narrative work between the kickoff and here (translation, lector)
+      // happened to buy enough time; nothing synchronised them.
+      //
+      // This is a join, not a move of the start point: variants still render
+      // alongside that narrative work. It never blocks on SUCCESS either — the
+      // kickoff swallows a refusal / eval rejection / provider error into a
+      // warn, so a failed variant settles the chain promptly and the loud
+      // worn-sheet fallback in resolveSheetForRef stays exactly as designed.
+      if (!skipImages && streamingAvatarStylingPromise) {
+        log.debug(`🎨 [UNIFIED] Phase 5a: waiting for avatar styling (incl. wardrobe variants) before page cell crops...`);
+        try {
+          await streamingAvatarStylingPromise;
+        } catch (error) {
+          log.warn(`🎨 [UNIFIED] avatar styling chain rejected: ${error.message} — pages fall back to the sheets that did land`);
+        }
+      }
+
       // Phase 5a: Prepare all page data
       log.info(`📸 [UNIFIED] Phase 5a: Preparing ${expandedScenes.length} pages for image generation...`);
       const pageDataArray = await Promise.all(
