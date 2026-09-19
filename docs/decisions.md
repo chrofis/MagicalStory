@@ -21,6 +21,94 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — An UNDECLARED garment state is REPORTED, not defaulted: the Art Director owes a row for every tracked garment, linked or not
+
+**Context:** `resolveWornItemsForPage` has two sources. Source 1 enumerates the
+Visual Bible entries the WRITER linked with `wornAs`, so a page missing a row
+for one of them comes back `defaulted: true, missing: true` and `clothingCheck`
+rule 3 reports it as `removal_unstated`. Source 2 enumerates THE ROWS THAT
+EXIST — rows the Art Director wrote against an unlinked id. No row, nothing to
+enumerate. So for a garment the writer never linked, a page with no row produced
+no resolved item, no prompt line, no log and no finding, while the outfit
+contract kept the garment and the attached reference wore it: the state resolved
+to WORN by silence. The rule the Art Director was given matched that hole — it
+asked for a row only for an element "whose entry has a `wornAs` link", and the
+writer emits that link on 9 of 482 clothing/artifact/vehicle entries. The Art
+Director was already declaring rows for unlinked garments voluntarily and then
+skipping one page.
+
+**Measured** by replaying `clothingCheck` over 126 stored staging stories
+(2026-07-19..2026-09-18) in the shape `beatsPipeline` calls it: 14 stories track
+a garment at all; across them 45 page/garment pairs have the owner in cast and
+no row. SIX were writer-linked and already reported; the other 39 produced
+nothing. The other 112 stories gain nothing. On `job_1789759147125_p08djwhbl`
+the consequence is in the data: p10 shipped v0 with no jacket and a v1 repair
+wearing it — one page, two states. Its p16 sits between two `off` pages and
+defaulted the cap back onto the character's head.
+
+**Decision:** two layers, because the generator and the critic have to say the
+same thing.
+
+- **PROMPT (the requirement).** The `wornItems[]` contract now asks for a row
+  for every Visual Bible element that is a garment of a character on this page
+  — any element with a `wornAs` link, and any `clothing` or `artifacts` element
+  whose `wornBy` names a character or whose `type` is an outfit slot. Its
+  closing line no longer reads "Omit a row and the item is drawn on the
+  character by default", which documented the silent default as a feature; it
+  says the omission has no state and is reported back. The sentence was four
+  hand-copies across both Art Director templates and both iterate templates, in
+  two already-drifted wordings, and is now ONE constant
+  (`WORN_ITEMS_ROW_RULE`) filled at all four sites and anchored in the sibling
+  registry (`art-director-vs-iterate`, `{WORN_ITEMS_ROW}`).
+- **CODE (detection only, no new classification).** `trackedWornGarments` reads
+  which garments the brief set tracks from the Art Director's OWN rows across
+  the whole story — declared `{id, owner}` fields plus the element's `wornBy`,
+  never prose — and `missingWornRows` names the pages whose cast holds the
+  owner and whose metadata has no row. `clothingCheck` emits the EXISTING
+  `removal_unstated` finding for them, with the same remedy text (now built in
+  one place for both paths) and the same severity. The population widens; the
+  classification does not.
+
+**Rationale / what was rejected:**
+- **A default was rejected outright.** Filling the gap with `worn` is the
+  silent degradation this exists to expose, and filling it with `off` would
+  delete a garment nobody took off. `resolveWornItemsForPage`'s output for an
+  undeclared page is deliberately unchanged — the page renders exactly as
+  before and the fault is on the record instead.
+- **UPSTREAM (make the writer emit `wornAs` for everything) was rejected.**
+  `wornAs` is not a label: it is the promise that the owner's avatar reference
+  carries the item, which `referenceCarriesItem` reads to DROP the item's
+  rendered plate and its REQUIRED OBJECTS line. Linking every garment would
+  change what is packed into every page call for every garment in every story,
+  which is a rendering change, not a detection fix, and is not verifiable
+  without paid runs. The writer's narrow link stays narrow.
+- **A new finding type was rejected.** A new scored type costs five sites
+  (vocabulary, scoring tables, evalBuckets, consolidator, subType) and this is
+  the same fault on a wider population, with the same remedy the reviewer
+  already acts on.
+- **An id with no derivable outfit slot is NOT tracked.** A row is not by itself
+  evidence that an element is clothing: over the stored staging stories the Art
+  Director wrote `wornItems` rows against a soft toy and two map props.
+  Demanding a wardrobe row for one would ask for a row source 2 then refuses to
+  act on, and would print "<a soft toy> is <the child>'s costume" at a reviewer.
+  That gate drops 29 of the 74 raw fires; the 45 that remain are all garments.
+- **A garment NO page declares stays rule 4's business** (`worn_link_missing`,
+  a Visual Bible fault, logged and not sent — the scene review cannot add a
+  field to the bible).
+
+**Touched files:** `server/lib/wornItems.js` (`trackedWornGarments`,
+`missingWornRows`), `server/lib/clothingCheck.js` (rule 3b, shared
+`removalUnstated` builder, `checkScenes` computes the tracked set once),
+`server/lib/promptBuilders.js` (`WORN_ITEMS_ROW_RULE` + three fill sites),
+`prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`scripts/admin/sibling-registry.json`,
+`tests/unit/worn-undeclared-unlinked.test.ts`,
+`tests/unit/ad-iterate-parity.test.ts`,
+`tests/unit/worn-handover-built-prompt.test.ts`.
+
+---
+
 ## 2026-09-19 — The page's population is READ OFF THE PLATE, not taken from the Art Director's declaration
 
 **Context.** `82794edbe` made `crowdExpected` a three-state `population` (`cast_only` / `ambient` /

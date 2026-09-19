@@ -225,7 +225,7 @@ An actor in the `character` slot is a name listed in `characters[]` or the id of
 
 **Coverage:** every foreground/midground character should appear in `interactions[]` exactly once. If a character has no real action, give them a `priority: "low"` entry (e.g. `{character, object: "the campfire", where: "watches the campfire", storyRelevant: false, priority: "low"}`) — without it the image model defaults to a camera-facing portrait. Background characters exempt.
 
-**`wornItems[]`** (required whenever it applies) — one row for every Visual Bible element whose entry has a `wornAs` link and whose owner is on this page, whether or not the page mentions it. `{id, owner, state, location, wearer, redressNote}`: `owner` is the `wornAs` owner, `state` is `"worn"` or `"off"`, and `off` requires both `location`, a short phrase naming where it now lies or who holds it, and `redressNote`, the wardrobe instruction of rule 10d. `wearer` is set only when another character on this page wears the item instead of its owner, and then `state` is `"worn"`. Rule 10d's prose must agree with the row. Omit a row and the item is drawn on the character by default.
+**`wornItems[]`** (required whenever it applies) — {WORN_ITEMS_ROW}
 
 A vehicle under way MUST have exactly one character actively operating it — declare that operation as an interaction for that character, `essential` when the operating is the page's beat and `low` otherwise.
 

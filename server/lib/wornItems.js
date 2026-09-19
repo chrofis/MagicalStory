@@ -516,6 +516,109 @@ function resolveWornItemsForPage(visualBible, cast, sceneMetadata, options = {})
 }
 
 /**
+ * WHICH garments this brief set tracks, and who owns each — from the Art
+ * Director's OWN rows (2026-09-19).
+ *
+ * THE HOLE THIS CLOSES. `resolveWornItemsForPage` has two sources, and neither
+ * can see an UNDECLARED state on an UNLINKED garment:
+ *   - source 1 enumerates the writer's `wornAs` entries, so a page missing a row
+ *     for one of them yields `defaulted: true, missing: true` and
+ *     `clothingCheck` rule 3 reports it;
+ *   - source 2 enumerates the ROWS THAT EXIST. No row, nothing to enumerate.
+ * So for a garment the writer never linked, a page with no row produced no
+ * resolved item, no prompt line, and no finding — while the item stayed in the
+ * outfit contract and the attached reference wore it. The state resolved to
+ * WORN by silence, which is the one thing this module refuses to do anywhere it
+ * can see (see parseWornItems: an unreadable state stays null rather than
+ * guessing).
+ *
+ * MEASURED by replaying `clothingCheck` over 126 stored staging stories
+ * (2026-07-19..2026-09-18) in the shape beatsPipeline calls it: 14 stories
+ * declare `wornItems` rows at all, and across them 45 page/garment pairs have
+ * the owner in cast and no row. SIX are writer-linked and were already
+ * reported; the other 39 produced nothing at all. The remaining 112 stories
+ * gain nothing. On `job_1789759147125_p08djwhbl` the consequence is in the
+ * data: p10 shipped v0 with no jacket and a v1 repair wearing it — a coin flip
+ * on one page.
+ *
+ * THE OWNER COMES FROM THE BRIEF SET, NOT FROM PROSE. A row the Art Director
+ * wrote on any page names `{id, owner}`; the Visual Bible entry may also name
+ * `wornBy`. Both are declared fields. Nothing here reads a sentence, and no
+ * vocabulary of English garment nouns is consulted — the question is never "is
+ * this a garment?" but "which garment did this brief set already say it
+ * tracks?". A garment NO page declares is outside this entirely: that is a
+ * Visual Bible fault and `worn_link_missing` owns it.
+ *
+ * Precedence between the two owner fields is the same as source 2's
+ * (`entry.wornBy || row.owner`) on purpose — one answer per file.
+ *
+ * @param {Object} visualBible
+ * @param {Array<Array>} pagesWornItems  each page's raw `wornItems` array
+ * @returns {Map<string, {id, name, owner, slot, entry, linked}>}
+ */
+function trackedWornGarments(visualBible, pagesWornItems) {
+  const linkedIds = new Set(wornAsEntries(visualBible).map(e => e.id));
+  const out = new Map();
+  for (const rows of (pagesWornItems || [])) {
+    for (const d of parseWornItems(rows)) {
+      if (out.has(d.id)) continue;
+      const found = findVbEntryById(visualBible, d.id);
+      const entry = found ? found.entry : null;
+      const owner = String((entry && entry.wornBy) || d.owner || '').trim();
+      if (!entry || !owner) continue;  // no element, or nothing names whose it is
+      // UNMAPPABLE IS NOT TRACKED. A row is not by itself evidence the element
+      // is clothing: over the stored staging stories the Art Director wrote
+      // `wornItems` rows against a soft toy and against two map props, and an
+      // element with no outfit slot is exactly what source 2 refuses to act on
+      // (it leaves the garment in the contract and logs an error on an `off`).
+      // Demanding a row for one would ask for a row the resolver then discards,
+      // and would print "<a soft toy> is <the child>'s costume" at a reviewer.
+      // Same slot question as source 2, in the same precedence — declared
+      // `type` first, the name regex only otherwise.
+      const slot = slotFromType(entry.type) || deriveSlotFromName(entry.name || entry.id);
+      if (!slot) continue;
+      out.set(d.id, {
+        id: d.id,
+        name: entry.name || entry.id,
+        owner,
+        slot,
+        entry,
+        linked: linkedIds.has(d.id),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Tracked garments whose owner is on THIS page and which this page declares no
+ * row for — the gap `resolveWornItemsForPage` structurally cannot see.
+ *
+ * Writer-LINKED ids are excluded: source 1 already resolves them with
+ * `missing: true` and rule 3 already reports them. Reporting them twice would
+ * double every existing finding.
+ *
+ * DETECTION ONLY. This returns nothing to the prompt, the packing or the outfit
+ * text: an undeclared state stays undeclared, and the page renders exactly as it
+ * does today. Inventing a `worn` row here would be the silent default this
+ * exists to expose, and inventing an `off` one would delete a garment nobody
+ * took off.
+ */
+function missingWornRows(tracked, cast, sceneMetadata) {
+  const castNames = (Array.isArray(cast) ? cast : [])
+    .map(c => (typeof c === 'string' ? c : c && c.name))
+    .filter(Boolean);
+  const declared = new Set(wornItemsFromMetadata(sceneMetadata).map(w => w.id));
+  const out = [];
+  for (const t of (tracked ? tracked.values() : [])) {
+    if (t.linked || declared.has(t.id)) continue;
+    if (!castNames.some(n => sameName(n, t.owner))) continue;
+    out.push(t);
+  }
+  return out;
+}
+
+/**
  * Does a reference already attached to this page's call show the item ON its
  * wearer? Everything that used to test `!handedOver` asks THIS instead.
  *
@@ -1448,6 +1551,8 @@ module.exports = {
   elementIdentityTerms,
   indexOfElementAmong,
   unlinkedWornCandidates,
+  trackedWornGarments,
+  missingWornRows,
   isOffForCharacter,
   referenceCarriesItem,
   resolveWearer,

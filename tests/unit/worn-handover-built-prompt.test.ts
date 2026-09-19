@@ -8,7 +8,19 @@ const { buildImagePrompt } = require_('../../server/lib/promptBuilders.js');
 const { loadPromptTemplates } = require_('../../server/services/prompts.js');
 
 const ROOT = path.resolve(__dirname, '../..');
-const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+const PB = require_('../../server/lib/promptBuilders.js');
+
+/**
+ * A template AS THE AUTHOR RECEIVES IT — with every `{TOKEN}` that names an
+ * exported `TOKEN_RULE` constant substituted. A shared rule lives in
+ * promptBuilders (one constant, four templates), so grepping the raw file for
+ * its words finds nothing while the built prompt carries every word of it. That
+ * substitution is exactly what these checks are about, so they read the
+ * resolved text. (`ad-iterate-parity` pins that the constants do reach all four
+ * BUILT prompts.)
+ */
+const read = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8')
+  .replace(/\{([A-Z][A-Z0-9_]*)\}/g, (m, token) => (typeof PB[`${token}_RULE`] === 'string' ? PB[`${token}_RULE`] : m));
 
 /**
  * A worn plot object that changed hands must reach the IMAGE PROMPT on the

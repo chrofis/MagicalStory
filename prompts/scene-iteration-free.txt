@@ -291,7 +291,7 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 - `landmarkView`: how the page sees a real landmark, when one is cited: `exterior`, `distant`, `close`, `interior`, `view-from`, or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; omitting it attaches none.
 
-- `wornItems[]`: one row per Visual Bible element with a `wornAs` link whose owner is on this page, whether or not the prose mentions it. `{id, owner, state, location, wearer, redressNote}`; `state` is `"worn"` or `"off"`, and `off` requires both `location` and `redressNote`, the wardrobe instruction above. Omit a row and the item is drawn on the character by default.
+- `wornItems[]`: {WORN_ITEMS_ROW}
 
 - `characters[]`: one entry per character. Always `name`, `clothing`, `position`, `depth` and `looksAt`; for foreground/midground characters add `expression`. `depth` is `foreground`, `midground` or `background` — distance from the camera, never elevation and never a size.
   - `position` is a short relational phrase matching the prose (`on the boat`, `behind the protagonist`, `in the foreground`, `at the doorway`). Use `left`/`right` only when the VISUAL LANGUAGE rule allows it.

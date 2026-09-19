@@ -19,7 +19,7 @@
  *   outfit_missing       the prose never names this character's outfit
  *   garment_colour_wrong the prose gives a character's garment a colour their
  *                        contract gives the SAME garment differently
- *   removal_unstated     a wornAs item whose owner is on the page has no
+ *   removal_unstated     a tracked garment whose owner is on the page has no
  *                        `wornItems` state (or an "off" state with no place)
  *   worn_link_missing    a Visual Bible element that is clearly a worn garment
  *                        carries no `wornAs` link, so nothing above can see it
@@ -36,7 +36,7 @@
 const { log } = require('../utils/logger');
 const { lookupByName } = require('./castResolver');
 const { resolveCharacterReqs } = require('./clothingCategories');
-const { resolveWornItemsForPage, unlinkedWornCandidates } = require('./wornItems');
+const { resolveWornItemsForPage, unlinkedWornCandidates, trackedWornGarments, missingWornRows } = require('./wornItems');
 
 // Slot labels the writer emits. A slot the character does not wear is OMITTED
 // (owner decision 2026-08-08) — `none` values are legacy and skipped below.
@@ -159,6 +159,23 @@ function slotStated(slotText, proseTokens) {
   if (t.length === 0) return true; // nothing identifying to look for
   const hits = t.filter(w => proseTokens.has(w)).length;
   return hits >= Math.min(2, t.length);
+}
+
+/**
+ * ONE removal_unstated finding, for both the linked and the unlinked path. The
+ * remedy text is the whole value of this finding — the scene review acts on it
+ * verbatim — so it is built in one place rather than copied per path.
+ */
+function removalUnstated(pageNumber, item, what) {
+  return {
+    pageNumber, type: 'removal_unstated', character: item.owner, slot: item.slot || null,
+    artifactId: item.id,
+    detail: `"${item.name}" is ${item.owner}'s ${item.slot || 'costume'} AND a Visual Bible element; this page ${what}. `
+      + `Add to this page's METADATA \`wornItems\`: {"id": "${item.id}", "owner": "${item.owner}", "state": "worn"} `
+      + `if ${item.owner} wears it here, {"id": "${item.id}", "owner": "${item.owner}", "state": "worn", "wearer": "<the character on this page who wears it>"} `
+      + `if someone else wears it here, or {"id": "${item.id}", "owner": "${item.owner}", "state": "off", "location": "<where it lies or who holds it>"} if nobody does. `
+      + `The prose must agree with whichever you choose.`,
+  };
 }
 
 /**
@@ -300,18 +317,24 @@ function checkPage(page, clothingRequirements, opts = {}) {
   // REQUIRED OBJECTS, clothing-text and prompt paths all branch on it.
   for (const r of wornRows) {
     if (!r.missing) continue;
-    const what = r.declared
-      ? `declares it "off" but names no place for it`
-      : `has no wornItems entry for it`;
-    findings.push({
-      pageNumber: page.pageNumber, type: 'removal_unstated', character: r.owner, slot: r.slot || null,
-      artifactId: r.id,
-      detail: `"${r.name}" is ${r.owner}'s ${r.slot || 'costume'} AND a Visual Bible element; this page ${what}. `
-        + `Add to this page's METADATA \`wornItems\`: {"id": "${r.id}", "owner": "${r.owner}", "state": "worn"} `
-        + `if ${r.owner} wears it here, {"id": "${r.id}", "owner": "${r.owner}", "state": "worn", "wearer": "<the character on this page who wears it>"} `
-        + `if someone else wears it here, or {"id": "${r.id}", "owner": "${r.owner}", "state": "off", "location": "<where it lies or who holds it>"} if nobody does. `
-        + `The prose must agree with whichever you choose.`,
-    });
+    findings.push(removalUnstated(page.pageNumber, r, r.declared
+      ? 'declares it "off" but names no place for it'
+      : 'has no wornItems entry for it'));
+  }
+
+  // 3b. The same fault on an UNLINKED garment (2026-09-19). `wornRows` above is
+  // resolveWornItemsForPage, whose two sources are the writer's `wornAs`
+  // entries and THE ROWS THIS PAGE DECLARES. An undeclared state on a garment
+  // the writer never linked is in neither: no row to enumerate, no link to
+  // default. It resolved to WORN by silence — the outfit contract kept the
+  // garment and the attached reference wore it — with no log and no finding,
+  // on 39 of the 45 measured page/garment gaps. See trackedWornGarments.
+  //
+  // Same TYPE, same remedy, same severity: the population widens, the
+  // classification does not. The garments are the ones this brief set already
+  // declares rows for, so a garment no page tracks stays rule 4's business.
+  for (const t of missingWornRows(opts.trackedWorn, cast, { wornItems: page.wornItems || [] })) {
+    findings.push(removalUnstated(page.pageNumber, t, 'has no wornItems entry for it'));
   }
 
   // 4. worn_link_missing — the element IS a garment and nothing links it to an
@@ -344,9 +367,15 @@ function checkPage(page, clothingRequirements, opts = {}) {
  */
 function checkScenes(pages, clothingRequirements, opts = {}) {
   const all = [];
+  // Which garments this brief set tracks, from every page's own rows — a
+  // per-page check cannot know that page 16 is the one page of eighteen that
+  // left a declared garment out. Computed once; see trackedWornGarments.
+  const vbForTracked = opts.visualBible || { artifacts: opts.artifacts || [], clothing: opts.clothing || [] };
+  const trackedWorn = trackedWornGarments(vbForTracked, (pages || []).map(p => (p && p.wornItems) || []));
+  const pageOpts = { ...opts, trackedWorn };
   for (const page of (pages || [])) {
     try {
-      all.push(...checkPage(page, clothingRequirements, opts));
+      all.push(...checkPage(page, clothingRequirements, pageOpts));
     } catch (err) {
       log.warn(`[CLOTHING-CHECK] page ${page?.pageNumber}: ${err.message}`);
     }
@@ -374,7 +403,10 @@ function checkScenes(pages, clothingRequirements, opts = {}) {
 //     block where rule 2 used to run. `[clothing_owner]` in scene-review.txt
 //     is the replacement.
 //   removal_unstated     — rare and unambiguous by construction (it needs a
-//     `wornAs` link, which only exists where the writer declared the duality).
+//     garment this brief set already declares a `wornItems` row for somewhere,
+//     or a `wornAs` link). MEASURED after the 2026-09-19 widening to unlinked
+//     garments: 45 fires over the 14 of 126 stored staging stories that track a
+//     garment at all, and 0 over the other 112.
 //     Since 2026-09-06 it is a MISSING-FIELD fault, so it is also mechanically
 //     verifiable after the rewrite and drives a targeted second round. SENT.
 //   outfit_missing       — 24% of pages in stories scoring <40 versus 21% in

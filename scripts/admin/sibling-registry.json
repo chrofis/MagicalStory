@@ -337,6 +337,7 @@
           "{LOOKS_AT_FIELD}",
           "{EXPRESSION_FIELD}",
           "{GARMENT_REMOVED}",
+          "{WORN_ITEMS_ROW}",
           "{WORN_ON_OTHER}",
           "{NEVER_NAME_ABSENT}",
           "{SCENE_INTENT_FIELD}",
