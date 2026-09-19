@@ -50043,3 +50043,43 @@ Bible ENTRY, not the page's camera, and the `formidable` band (7+) explicitly al
 Nothing anywhere constrains a `low-angle` page. Not decided here.
 
 **Status:** ✅ active (staging only — not pushed)
+
+---
+
+## 2026-09-19 — An Art Director rule id names one rule; the ORDER is deliberately left alone
+
+**Context.** The two Art Director templates carry 56 numbered per-page rules, and two of
+them shared the id **`8k`**: *"A face is a field"* (the `expression` field) and *"A
+creature in frame has a written face"*. Both templates, identically. A rule cannot be
+cited, and a finding cannot name a rule, when the id resolves to two different rules.
+
+The ids are also emitted out of order — `8, 8b, 8i, 8c, 8j, 8k, 8d, 8e, 8f, 8g, 8h, 8k`
+and `12, 12b, 12e, 12f, 12c, 12g, 12h, 12j, 12k, 12d`, with `scene-expansion.txt` placing
+bare `12` after `12d`.
+
+**Decision.** The second `8k` becomes `8l`. `8k` is cited nowhere, so the rename is free;
+`8l` reads as "after 8k", which `8a` would not.
+
+**The ORDER is left exactly as it is, and that is the substantive half of this entry.**
+Renumbering was measured before it was rejected. AD rule ids are load-bearing **outside**
+these two files:
+
+- `prompts/scene-review.txt:79` cites *"rule 7g"* — the critic naming a generator rule
+- `server/lib/promptBuilders.js:7585` cites *"rule 12b"*
+- fourteen intra-template references name `1b`, `3`, `7b`, `8d`, `8i`, `8j`, `10d`, `11`,
+  `11d`, `11e`, `12e`
+
+A sequential renumber breaks every one of them. And reordering is not free either: the
+order of rules is part of what the model reads, so moving thirty of them is a behaviour
+change with no measured benefit — the same reasoning that left the beats planner's 36
+rules unnumbered on 2026-09-19. Scrambled-but-stable ids cost a reader some patience;
+renumbered ids cost correctness.
+
+A test pins uniqueness, pins that both templates carry the SAME id set (they are the
+registered `art-director-templates` sibling pair), and pins that every id cited from
+outside still exists — so a future renumber has to notice what it would break.
+
+**Touched:** `prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`tests/unit/ad-rule-ids-unique.test.ts`.
+
+**Status:** ✅ active
