@@ -115,6 +115,7 @@ const {
   buildStoryTextFromBeatsPrompt,
   buildStoryBibleFromBeatsPrompt,
   parseRefinedText,
+  BRIEF_TRAILING_MARKERS,
   buildAvailableAvatarsForPrompt,
   extractSceneMetadata,
   stripTrailingSeparator,
@@ -2004,7 +2005,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           log.error(`🚨 [BEATS] All-pages attempt ${attempt}: response carries no ---VISUAL BIBLE--- section (${allRaw.length} chars)`);
         }
       }
-      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES');
+      const parsed = parseRefinedText(allRaw, beatPageNumbers, 'SCENES', BRIEF_TRAILING_MARKERS);
       // A PAGE IS NOT A BRIEF. parseRefinedText accepts any non-empty run of
       // text under a `## Page N` heading, so a page the reply cut mid-sentence
       // counted as delivered: no retry, no fallback, no warning — the generator
@@ -2433,7 +2434,12 @@ ${bibleBody}` : bibleBody;
         log.error(`❌ [BEATS] ${sceneReviewFailed}`);
         gl.warn('beats_scene_review_truncated', sceneReviewFailed, null, srRes.truncation);
       }
-      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES');
+      // BRIEF_TRAILING_MARKERS: the reply's optional ---VISUAL BIBLE---
+      // block follows the last page, and without a terminator it was appended
+      // to that page's brief and stored as part of it (p17 of
+      // job_1789759147125_p08djwhbl). The block itself is still read, from the
+      // RAW reply, by applyReviewBibleCorrections below.
+      const parsed = srTruncated ? { analysis: '', pages: [] } : parseRefinedText(srRes.text || '', expansions.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
       sceneReviewAnalysis = parsed.analysis || '';
       const byPage = new Map(parsed.pages.map(p => [p.pageNumber, p.text]));
       const changed = [];
@@ -2665,7 +2671,7 @@ ${bibleBody}` : bibleBody;
                 // A cut round is a failed round — the catch below keeps the
                 // briefs as they were and ships the pages flagged.
                 if (wrRes.truncation?.suspected) throw new Error(`reply ${textModels.describeTruncation(wrRes.truncation)}`);
-                const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES');
+                const wrParsed = parseRefinedText(wrRes.text || '', subset.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
                 const wrByPage = new Map(wrParsed.pages.map(pg => [pg.pageNumber, pg.text]));
                 for (const x of subset) {
                   const fixed = wrByPage.get(x.pageNumber);
@@ -3087,6 +3093,19 @@ ${bibleBody}` : bibleBody;
   if (visualBible) {
     const { applyBriefUsage } = require('./vbElementBudget');
     const usage = applyBriefUsage(visualBible, scenes);
+    // A BRIEF THAT COULD NOT BE READ IS NOT A BRIEF THAT ASKS FOR NOTHING.
+    // Those pages keep the bible's own assignment rather than withdrawing every
+    // element from it (applyBriefUsage header) — and they are named here, so the
+    // absence is in the log and the generation record instead of looking like a
+    // page the Art Director chose to leave bare. Outside the `applied` branch on
+    // purpose: an unread page is worth saying even when no entry changed.
+    if (usage.unreadPages && usage.unreadPages.length > 0) {
+      const pages = usage.unreadPages.join(', ');
+      log.error(`❌ [VB-USAGE] Page(s) ${pages}: the brief's METADATA could not be read, so nothing on them could be credited — those pages keep the Visual Bible's own page assignment instead of losing every element to an unreadable brief`);
+      gl.warn('vb_usage_brief_unread',
+        `Visual Bible usage could not be derived for page(s) ${pages} — their briefs have no readable METADATA, so the bible's assignment for them stands unverified`,
+        null, { unreadPages: usage.unreadPages });
+    }
     if (usage.applied) {
       const changed = usage.entries.filter(e => e.gained.length || e.lost.length);
       if (beatsReviewReport) beatsReviewReport.vbBriefUsage = usage;

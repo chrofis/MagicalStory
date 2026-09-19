@@ -221,3 +221,117 @@ describe('applyBriefUsage — bare citations and the states the book never reach
     expect(second.emptiedStates).toEqual([]);
   });
 });
+
+/**
+ * A BRIEF THAT COULD NOT BE READ IS NOT A BRIEF THAT ASKS FOR NOTHING.
+ *
+ * Staging job_1789759147125_p08djwhbl p17 — the page where the book's creature
+ * hatches. The scene review's trailing `---VISUAL BIBLE---` section was appended
+ * to that brief (the last page it rewrote), which destroyed the METADATA parse,
+ * so `extractSceneMetadata` returned the prose-only RECOVERY object: empty
+ * `objects[]`, empty `characters[]`, `isRecovered: true`. The rebuild read that
+ * as a page citing nothing and withdrew every element from it — ANI003
+ * ("Fünkli") ended at `appearsInPages: [18]`, so the hatching page's brief never
+ * asked for the creature, no reference cell was packed for it, and every judge
+ * scored the page against a brief with no creature in it.
+ *
+ * Silence from a check that COULD NOT RUN must never look like silence from a
+ * check that ran clean (server/lib/notEvaluated.js).
+ */
+describe('applyBriefUsage — a brief whose metadata could not be read', () => {
+  const hatchBible = (): any => ({
+    secondaryCharacters: [],
+    animals: [
+      { id: 'ANI003', name: 'the hatchling', appearsInPages: [17, 18], pages: [17, 18] },
+    ],
+    artifacts: [
+      { id: 'ART001', name: 'the large egg', appearsInPages: [16], pages: [16] },
+    ],
+    vehicles: [],
+    locations: [
+      { id: 'LOC005', name: 'the narrow lane', appearsInPages: [16, 17], pages: [16, 17] },
+    ],
+    clothing: [],
+  });
+  const find = (vb: any, id: string) =>
+    [...vb.animals, ...vb.artifacts, ...vb.locations].find((e: any) => e.id === id);
+
+  // p17's brief parses and names the creature; p16's does not.
+  const readable = [
+    { pageNumber: 16, metadata: { objects: ['LOC005', 'ART001'], characters: [] } },
+    { pageNumber: 17, metadata: { objects: ['LOC005', 'ANI003'], characters: [] } },
+    { pageNumber: 18, metadata: { objects: ['ANI003'], characters: [] } },
+  ];
+  // The exact shape extractSceneMetadata returns when the METADATA block failed.
+  const recovered = {
+    characters: [], objects: [], interactions: null, wornItems: [],
+    imageSummary: 'prose only', isJsonFormat: true, isProseFormat: true, isRecovered: true,
+  };
+
+  it('an element the brief names reaches that page — the hatching page keeps its creature', () => {
+    const vb = hatchBible();
+    const report = applyBriefUsage(vb, readable);
+    expect(find(vb, 'ANI003').appearsInPages).toEqual([17, 18]);
+    expect(report.unreadPages).toEqual([]);
+  });
+
+  it('does not withdraw the bible’s own claim on a page whose brief is the recovery object', () => {
+    const vb = hatchBible();
+    const report = applyBriefUsage(vb, [
+      readable[0],
+      { pageNumber: 17, metadata: recovered },
+      readable[2],
+    ]);
+    // p17 could not be read, so the bible's claim on p17 stands for every entry
+    // that held one — never an empty element list derived from a failed parse.
+    expect(find(vb, 'ANI003').appearsInPages).toEqual([17, 18]);
+    expect(find(vb, 'LOC005').appearsInPages).toEqual([16, 17]);
+    // p16 WAS read and cites no creature, so p16 is still correctly withheld.
+    expect(find(vb, 'ANI003').appearsInPages).not.toContain(16);
+    expect(report.unreadPages).toEqual([17]);
+  });
+
+  it('names the unread page in the report instead of reporting a clean rebuild', () => {
+    const vb = hatchBible();
+    const report = applyBriefUsage(vb, [
+      readable[0],
+      { pageNumber: 17, metadata: recovered },
+      readable[2],
+    ]);
+    expect(report.applied).toBe(true);
+    expect(report.unreadPages).toEqual([17]);
+    const ani = report.entries.find((e: any) => e.id === 'ANI003');
+    expect(ani.preserved).toEqual([17]);
+    expect(ani.lost).toEqual([]);
+  });
+
+  it('reports an unread page even when no brief at all could be read', () => {
+    const vb = hatchBible();
+    const snapshot = JSON.stringify(vb);
+    const report = applyBriefUsage(vb, [
+      { pageNumber: 16, metadata: recovered },
+      { pageNumber: 17, metadata: recovered },
+    ]);
+    expect(report.applied).toBe(false);
+    expect(report.unreadPages).toEqual([16, 17]);
+    expect(JSON.stringify(vb)).toBe(snapshot);
+  });
+
+  it('a brief carrying an appended Visual Bible section still yields its element list', () => {
+    const vb = hatchBible();
+    const brief = [
+      'The younger child fills the close-up frame, laughing.',
+      '',
+      '---METADATA---',
+      JSON.stringify({ characters: [{ name: 'the younger child' }], objects: ['LOC005', 'ANI003'] }),
+      '',
+      '---VISUAL BIBLE---',
+      '```json',
+      '{"vantages": [{"id": "LOC004.1", "emptyScenePrompt": "An ultra-wide view."}]}',
+      '```',
+    ].join('\n');
+    const report = applyBriefUsage(vb, [readable[0], { pageNumber: 17, brief }, readable[2]]);
+    expect(report.unreadPages).toEqual([]);
+    expect(find(vb, 'ANI003').appearsInPages).toEqual([17, 18]);
+  });
+});

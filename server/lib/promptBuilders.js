@@ -5252,6 +5252,34 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
 }
 
 /**
+ * A NAMED SECTION IS NEVER PART OF A PAGE BRIEF.
+ *
+ * Both replies that carry `## Page N` briefs also carry a `---VISUAL BIBLE---`
+ * section: the Art Director's all-pages expansion writes the bible BEFORE page
+ * 1, and the scene review may append the entries it corrected AFTER the last
+ * page (scene-expansion-all.txt / scene-review.txt output contracts).
+ * `parseRefinedText` runs the last `## Page N` to the end of the reply unless a
+ * caller names a terminator, so an appended section was glued onto the last
+ * brief and stored as part of it.
+ *
+ * Measured on staging job_1789759147125_p08djwhbl p17 — the hatching page, and
+ * the last page that review rewrote: its brief shipped with another page's
+ * vantage JSON attached, the METADATA parse was destroyed by the appended block
+ * (b5443396a), and the brief credited NOTHING to `applyBriefUsage`, so the
+ * book's central creature (ANI003) reached the Visual Bible for page 18 alone.
+ *
+ * ONE constant at every brief-parsing call site, not a literal per site: the
+ * all-pages expansion, the live review, its worn-state round and both Test Lab
+ * replays read the same reply shape, and a terminator added at one of them only
+ * leaves the others splicing the section back into a brief.
+ *
+ * Only `---VISUAL BIBLE---` is listed, never a blanket "any marker ends a page":
+ * a brief carries `---METADATA---` INSIDE it, so a general rule would cut the
+ * last brief's own metadata off.
+ */
+const BRIEF_TRAILING_MARKERS = ['VISUAL BIBLE'];
+
+/**
  * Parse a text-refinement response back into per-page text.
  * Tolerates the model echoing the ---STORY TEXT--- marker or omitting it.
  * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
@@ -9327,6 +9355,7 @@ module.exports = {
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,
   parseRefinedText,
+  BRIEF_TRAILING_MARKERS,
   buildStoryContextFields,
   buildRelationshipLines,
   buildBeatsPrompt,

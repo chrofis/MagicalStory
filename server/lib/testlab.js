@@ -4146,7 +4146,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     // story does, so passing it made the lab resolve outfits down a branch
     // production never takes — masking exactly the bug that shipped.
     if (params.perPageExpansion !== true) {
-      const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll } = require('./storyHelpers');
+      const { buildSceneExpansionAllPrompt, parseRefinedText: parseAll, BRIEF_TRAILING_MARKERS } = require('./storyHelpers');
       const allPrompt = buildSceneExpansionAllPrompt(
         { ...storyData, characters: storyData.characters || [], pageClothing: null },
         toExpand.map(b => ({ pageNumber: b.pageNumber, planLine: b.planLine })),
@@ -4171,7 +4171,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
             usageLabel: 'testlab_beats_scene_expansion_all',
             ...(params.sceneNoReasoning ? { reasoning: { enabled: false } } : {}),
           }),
-          parsePages: (res) => (parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES').pages || []),
+          parsePages: (res) => (parseAll(res.text || '', toExpand.map(b => b.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS).pages || []),
           costOf,
           // The bible this call AUTHORS, kept on the result. Without it the stage
           // measures page briefs written against a bible nobody can read back,
@@ -4285,7 +4285,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
     // DeepSeek can be compared as REVIEWER independently of who generated.
     const okScenes = sceneExpansions.filter(x => x.ok);
     if (params.reviewScenes !== false && okScenes.length > 0) {
-      const { buildSceneReviewPrompt, parseRefinedText } = require('./storyHelpers');
+      const { buildSceneReviewPrompt, parseRefinedText, BRIEF_TRAILING_MARKERS } = require('./storyHelpers');
       // Comma-separated list runs every model against ONE frozen set of briefs.
       // Scene expansion is non-deterministic, so two separate experiments give
       // the reviewers different inputs — measured on exp 357 vs 358, where the
@@ -4344,7 +4344,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
             // former 16000 cap silently truncated 6 of 8 reviews in the
             // 2026-09-10 AD redo (1107-1124) — no error, briefs kept as raw.
             const srRes = await callStream(srPrompt, null, null, srModel, { usageLabel: 'testlab_scene_review' });
-            const parsed = parseRefinedText(srRes.text || '', expectedPages, 'SCENES');
+            const parsed = parseRefinedText(srRes.text || '', expectedPages, 'SCENES', BRIEF_TRAILING_MARKERS);
             const outTok = srRes.usage?.output_tokens ?? null;
             const capInForce = TEXT_MODELS[srModel]?.maxOutputTokens ?? null;
             const verdict = assessSceneReview({
@@ -7177,7 +7177,7 @@ function parsePageBlocks(text) {
 async function runSceneReviewReplayStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
   await loadPromptTemplates();
-  const { buildSceneReviewPrompt, parseRefinedText, extractSceneMetadata, parseBeats } = require('./storyHelpers');
+  const { buildSceneReviewPrompt, parseRefinedText, BRIEF_TRAILING_MARKERS, extractSceneMetadata, parseBeats } = require('./storyHelpers');
   const { checkScenes, renderFindingsBlock } = require('./clothingCheck');
   const { callTextModelStreaming } = require('./textModels');
   const { MODEL_DEFAULTS, TEXT_MODELS, calculateTextCost } = require('../config/models');
@@ -7310,7 +7310,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
     if (!String(res.text || '').trim() || outTok === 0) {
       throw new Error(`reviewer ${model} returned an empty response (${outTok} output tokens, ${Math.round((res.usage?.elapsed_ms || 0) / 1000)}s) — provider failure, not a review`);
     }
-    const parsed = parseRefinedText(res.text || '', scenes.map(x => x.pageNumber), 'SCENES');
+    const parsed = parseRefinedText(res.text || '', scenes.map(x => x.pageNumber), 'SCENES', BRIEF_TRAILING_MARKERS);
     const byPage = new Map((parsed.pages || []).map(x => [x.pageNumber, x.text]));
 
     // Merge onto a COPY — the next model in the fan-out must see the same input.

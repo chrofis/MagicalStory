@@ -47791,3 +47791,100 @@ each call site, not assumed.
 `tests/unit/wardrobe-variant-join-before-crop.test.ts`.
 
 **Status:** ✅ active
+
+## 2026-09-19 — A brief that could not be READ withdraws nothing from the Visual Bible; a named section never rides inside a brief
+
+**Context.** Staging `job_1789759147125_p08djwhbl`, the dragon-hatching story. Two
+faults, one page, and they are the same defect seen at two stages.
+
+*What shipped:* `visualBible.animals` ANI003 ("Fünkli") = `pages [18]`. The creature
+HATCHES on page 17: the plan line stages it ("close-up — the hatched dragon … the
+jacket wrapped around them both"), the page text describes it, and p17's own brief
+names it — its `---METADATA---` reads `objects: ["LOC005.3","ANI003","CLO002"]` with
+an `essential` interaction on ANI003. The Visual Bible assigned that page NEITHER
+ANI003 nor ART001 ("large egg"). So the page prompt never asked for the book's
+central object, no reference cell was packed for it, and all three judges scored the
+page against a brief that does not mention it — the fault was invisible to the whole
+eval chain. The owner rates p17's render the worst in the book.
+
+*Why the brief lost its metadata:* p17 is the only one of the 18 stored briefs that
+carries a `---VISUAL BIBLE---` block after its metadata — `{"vantages":[{"id":
+"LOC004.1", …}]}`, page 11's vantage plate. `scene-review.txt`'s output contract is
+`---ANALYSIS---`, `---SCENES---` with one `## Page N` brief per rewritten page, then
+an OPTIONAL fenced `---VISUAL BIBLE---` block of the entries the reviewer corrected.
+`parseRefinedText` runs the last `## Page N` to the END of the reply unless the caller
+names a terminator — a deliberate opt-in, because a brief carries `---METADATA---`
+INSIDE it and a blanket "any marker ends a page" rule would cut the last brief's own
+metadata off. No caller named one. p17 was the last page that review rewrote, so the
+whole block was spliced onto its brief and stored there.
+
+*Why the loss was silent:* `extractSceneMetadata` does not return `null` for a
+`---METADATA---` block it failed to parse — it returns the prose-only RECOVERY object
+(`isRecovered: true`), whose `objects[]` and `characters[]` are empty because nothing
+was READ. `applyBriefUsage` skipped only a null metadata, so it read the recovery
+object as "this page cites nothing" and withdrew every element the bible had placed on
+p17. Nothing in the report, the log or the stored story distinguished that from a page
+the Art Director deliberately left bare.
+
+**Decision (two parts).**
+
+1. **A named section is never part of a page brief.** One constant,
+   `promptBuilders.BRIEF_TRAILING_MARKERS = ['VISUAL BIBLE']`, is passed at every call
+   site that parses a reply carrying `## Page N` briefs: the all-pages Art Director
+   expansion (`beatsPipeline.js:2008` — its template carries a Visual Bible section
+   too), the live scene review (`:2442`), its worn-state round (`:2674`), and all three
+   Test Lab replays (`testlab.js:4174`, `:4347`, `:7313`). Only `VISUAL BIBLE` is
+   listed; the opt-in stays opt-in, for the `---METADATA---` reason above. The block
+   itself is still read, from the RAW reply, by `applyReviewBibleCorrections` —
+   unchanged.
+
+2. **A page whose brief could not be read NEITHER CREDITS NOR WITHDRAWS.**
+   `applyBriefUsage` classifies a page as UNREAD when its metadata is null or carries
+   `isRecovered: true`, keeps the bible's own `appearsInPages` claim on those pages
+   (reported per entry as `preserved`), and returns them in `report.unreadPages`.
+   `beatsPipeline.js` logs an ERROR and `gl.warn('vb_usage_brief_unread')` naming the
+   pages — outside the `applied` branch, so an unread page is said even when no entry
+   changed.
+
+**Rationale.** Part 1 removes the cause: the reviewer's section can no longer reach a
+brief, at any of the six sites. Part 2 is what must hold when a brief is unreadable for
+some OTHER reason — a model emitting malformed JSON, a truncation, a format the parser
+has not met. The bible's own guess is then the only evidence in existence for that
+page, and withdrawing on the strength of a parse that did not happen is asserting a
+fact nobody measured. Preserving is not a repair: it cannot invent a claim the bible
+never made (on this story the bible-time guess for ANI003 was `[18]`, so the derivation
+fix ALONE does not recover p17 — it makes the gap loud, and part 1 is what recovers
+it). Same contract as `notEvaluated.js`: silence from a check that COULD NOT RUN must
+never look like silence from a check that ran clean.
+
+**Measured, before and after, re-deriving from the STORED briefs of that job:**
+
+| entry | before (as shipped) | after |
+|---|---|---|
+| ANI003 "Fünkli" | `[18]` | `[17,18]` |
+| ART001 "large egg" | `[2,3,4,5,7,8,9,14,16]` | `[2,3,4,5,7,8,9,14,16]` |
+| `unreadPages` | `[17]` | `[]` |
+
+**NOT changed, and deliberately: p1 and p6.** The audit that opened this read the plan
+lines for the word "dragon"/"egg" and expected ART001 on pages 1, 6, 17 and 18. p18 was
+already right (its brief cites ANI003, the creature, not the egg). p1's plan line
+stages a dragon SHAPE traced in gravel, not the artifact, and its brief correctly omits
+ART001. p6's plan line stages "shakes dry leaves into the spread lining of his jacket"
+and names the egg only as the jacket's PURPOSE ("the jacket becomes the egg's warm
+bed"); the brief stages the leaves. Both are the Art Director choosing which moment the
+picture holds — settled twice (`docs/SETTLED.md`: the picture stages the moment its
+brief names; the AD trims cast by design). Neither is a derivation fault, and neither
+is fixed here. Whether the AD should stage the egg on p6, whose page text has the child
+handling the shell, is a PROMPT question and the owner's call.
+
+**Touched:** `server/lib/promptBuilders.js` (`BRIEF_TRAILING_MARKERS`),
+`server/lib/storyHelpers.js` (facade re-export), `server/lib/beatsPipeline.js` (three
+call sites + the unread-page report), `server/lib/testlab.js` (three call sites),
+`server/lib/vbElementBudget.js` (`applyBriefUsage` unread handling),
+`tests/unit/scene-review-trailing-vb-section.test.ts`,
+`tests/unit/vb-brief-usage.test.ts`, `tasks/bugs.json`.
+
+**Status:** ✅ active. Completes the 2026-09-11 "Visual Bible page assignment comes from
+the FINAL scene briefs" decision — that entry made the briefs the source of truth and
+this one says what happens when a brief cannot be read. The parse half of the same
+story's p17 was fixed separately in `b5443396a`.

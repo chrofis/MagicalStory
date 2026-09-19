@@ -356,12 +356,32 @@ function castFields(metadata) {
 }
 
 function applyBriefUsage(visualBible, pagesWithMetadata = []) {
-  const report = { applied: false, pages: [], entries: [], changed: 0, emptied: [], emptiedStates: [], revived: [] };
+  const report = { applied: false, pages: [], entries: [], changed: 0, emptied: [], emptiedStates: [], revived: [], unreadPages: [] };
   if (!visualBible || typeof visualBible !== 'object') return report;
 
-  // Normalise the briefs to {pageNumber, metadata}; a page with no parseable
-  // metadata block contributes nothing but does not invalidate the rest.
+  // Normalise the briefs to {pageNumber, metadata}.
+  //
+  // A BRIEF THAT COULD NOT BE READ IS NOT A BRIEF THAT ASKS FOR NOTHING.
+  // Two shapes arrive here saying "no ids on this page" and they mean opposite
+  // things: a brief that parsed and cites none, and a brief whose METADATA
+  // block failed — `extractSceneMetadata` then returns the prose-only RECOVERY
+  // object (`isRecovered: true`, sceneMetadata.js), whose `objects[]` and
+  // `characters[]` are empty because nothing was read, not because nothing was
+  // asked for. Crediting the second as a citation-free page let one unreadable
+  // brief withdraw every element the bible had placed on that page, in silence.
+  // Measured on staging job_1789759147125_p08djwhbl p17 — the page where the
+  // book's creature hatches: its brief cited ANI003 and LOC005.3, the parse was
+  // destroyed by an appended Visual Bible section (b5443396a), and ANI003
+  // reached the bible for page 18 alone. The brief never asked for it, no
+  // reference cell was packed, and every judge scored the page against a brief
+  // with no creature in it.
+  //
+  // So an unread page NEITHER CREDITS NOR WITHDRAWS: the bible's own claim on
+  // it stands, and the page is named in `unreadPages` for the caller to report.
+  // Same contract as notEvaluated.js — "I could not check this" is part of the
+  // result, never a silent clean pass.
   const briefs = [];
+  const unread = new Set();
   for (const sd of (Array.isArray(pagesWithMetadata) ? pagesWithMetadata : [])) {
     if (!sd) continue;
     const pageNumber = Number(sd.pageNumber ?? sd.page);
@@ -370,10 +390,11 @@ function applyBriefUsage(visualBible, pagesWithMetadata = []) {
       || (sd.objects ? { objects: sd.objects, characters: sd.characters, interactions: sd.interactions } : null)
       || extractSceneMetadata(String(sd.brief || sd.sceneDescription || ''))
       || null;
-    if (!metadata) continue;
+    if (!metadata || metadata.isRecovered === true) { unread.add(pageNumber); continue; }
     briefs.push({ pageNumber, metadata });
   }
-  if (briefs.length === 0) return report; // no briefs yet — the guess stands
+  report.unreadPages = [...unread].sort((a, b) => a - b);
+  if (briefs.length === 0) return report; // no readable brief — the guess stands
 
   report.applied = true;
   report.pages = briefs.map(b => b.pageNumber).sort((a, b) => a - b);
@@ -413,7 +434,12 @@ function applyBriefUsage(visualBible, pagesWithMetadata = []) {
   const sorted = (set) => [...(set || [])].map(Number).filter(Number.isFinite).sort((a, b) => a - b);
   for (const [id, { entry, key }] of byId) {
     const oldPages = sorted(new Set(Array.isArray(entry.appearsInPages) ? entry.appearsInPages : []));
-    const newPages = sorted(pagesFor.get(id));
+    const credited = sorted(pagesFor.get(id));
+    // The bible's claim on an UNREAD page survives — see the header above. It
+    // rejoins `newPages`, so the sub-row routing below sends it back to the row
+    // the entry's own table authored for it, exactly as a bare citation would.
+    const preserved = oldPages.filter(p => unread.has(p) && !credited.includes(p));
+    const newPages = preserved.length ? sorted(new Set([...credited, ...preserved])) : credited;
     entry.appearsInPages = newPages;
     if (Array.isArray(entry.pages) || oldPages.length > 0) entry.pages = [...newPages];
 
@@ -473,7 +499,7 @@ function applyBriefUsage(visualBible, pagesWithMetadata = []) {
 
     const gained = newPages.filter(p => !oldPages.includes(p));
     const lost = oldPages.filter(p => !newPages.includes(p));
-    report.entries.push({ id, collection: key, name: String(entry.name || ''), oldPages, newPages, gained, lost });
+    report.entries.push({ id, collection: key, name: String(entry.name || ''), oldPages, newPages, gained, lost, preserved });
     if (gained.length || lost.length) report.changed++;
     if (oldPages.length > 0 && newPages.length === 0) report.emptied.push(id);
     if (oldPages.length === 0 && newPages.length > 0) report.revived.push(id);
