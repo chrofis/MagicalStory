@@ -5963,6 +5963,38 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       : '';
   const difficulty = [levelDifficulty, bandDifficulty].filter(Boolean).join('\n');
 
+  // ONE STATEMENT PER SHAPE RULE (owner, 2026-09-19).
+  //
+  // `bandDifficulty` above is a SHORTENED COPY of rules the band file states in
+  // full, and on the arc path both arrive in the same prompt. Measured on
+  // staging job_1789759147125_p08djwhbl:
+  //
+  //   STORY SHAPE   "A real low point before the end is required: the plan has
+  //                  failed and it looks like it will stay that way. The main
+  //                  character's own idea turns it — never luck, never a
+  //                  grown-up arriving to fix it."
+  //   age-band-journey.txt
+  //                 "**A real low point is required.** ... Do not soften it
+  //                  into a small setback and do not skip past it in a line."
+  //                 "**The hero's own idea turns it.** ... never a power handed
+  //                  over at the last moment."
+  //
+  // The band file is the richer statement, so the copy is what goes. The
+  // fear-choice band keeps ONE clause: "Nothing frightening beyond the fear the
+  // story is about" appears nowhere in age-band-fear-choice.txt, and the telling
+  // rules' ceiling ("Frightening is the right level") does not say it.
+  //
+  // ARC PATH ONLY. Every template carrying {STORY_SHAPE} also carries
+  // {AGE_MODE} — but storyScorecard.js pushes the band file only when `arc` is
+  // true, so a non-arc judge reading STORY SHAPE alone would be left with no
+  // low-point rule at all. Verified across ages 0-12, 17, 40, 68 and no age,
+  // both reading levels: on the arc path the band file always states the rule
+  // and is never empty.
+  const arcBandDifficulty = band === 'fear-choice'
+    ? 'Nothing frightening beyond the fear the story is about.'
+    : '';
+  const arcDifficulty = [levelDifficulty, arcBandDifficulty].filter(Boolean).join('\n');
+
   // Arc stage: the story, not the page allocation. The subject and cast are
   // already binding in the commission; the page budget belongs to the beats.
   if (arc) {
@@ -5973,9 +6005,9 @@ function buildStoryShapeSection(inputData, pageCount, { arc = false } = {}) {
       mainLine,
       `Build the story on ${challengeBudget} challenges.`,
       alongside,
-      difficulty,
+      arcDifficulty,
       CAUSAL_COHERENCE_RULE,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
   }
 
   // What the book is ABOUT has to be on the page. A dragon story for the
@@ -7540,6 +7572,71 @@ function buildTellingRulesSection(inputData = {}) {
   ].join('\n');
 }
 
+/**
+ * THE ARC CRITIQUE SPEC — ONE source, both arc templates (owner, 2026-09-19).
+ *
+ * It lived as a 3,145-char paragraph pasted into arc-create.txt and
+ * arc-retell.txt, already differing by the words " that remain". Two hand-kept
+ * copies of an evaluator spec is the drift the sibling gate exists to stop.
+ *
+ * Two structural faults went with the duplication, both measured on staging
+ * job_1789759147125_p08djwhbl:
+ *
+ *   1. It said "ten questions" and asked twelve, unnumbered, inside one
+ *      paragraph — so neither the model nor a reader could check coverage.
+ *   2. FIVE of them carried a mandatory MAJOR verdict (events, action load,
+ *      invented figures, central-figure thirds, commission honored) while the
+ *      output budget was "3 to 6 numbered faults". Four mechanical verdicts
+ *      firing left room for one narrative fault, which is the only thing this
+ *      stage exists to find. The counts now report in their own block and the
+ *      budget belongs to story faults alone.
+ *
+ * The per-page questions are GONE (owner, 2026-09-19): the arc is numbered
+ * SENTENCES with no page mapping, and prompts/plan-check.txt Q9 ("Deed and
+ * effect") already does per-page action load on the page plan, where pages
+ * exist.
+ *
+ * The "Premise figures:" / "Invented figures:" headings and their dash-line
+ * shape are a PARSER CONTRACT (parseFigureList / INVENTED_BLOCK_STOP). They
+ * keep their wording and their position ahead of everything else.
+ *
+ * @param {Object} opts
+ *   retell  the arc-retell variant — the same spec against a final arc, whose
+ *           faults are the ones that REMAIN after the re-telling.
+ */
+function arcCritiqueSpec({ retell = false } = {}) {
+  const remain = retell ? ' that remain' : '';
+  // The re-tell template declares "Premise figures:" and "Invented figures:" as
+  // its OWN top-level output bullets, ahead of "Fixing:" — so the spec must not
+  // ask for them a second time inside the critique.
+  const figureLists = retell ? [] : [
+    'The critique opens with these two lists, ahead of everything else and never numbered:',
+    `"Premise figures:" then one dash line per named figure the commission's own premise supplies that its character list does not — a sibling, a friend, a pet, a companion — "- <name> — <what it is in the story, three words>". These are commissioned, never invented: they belong on this list and never on the next one. Write the heading even when no figure is on the list.`,
+    '',
+    '"Invented figures:" then one dash line per figure, "- <name> — <what it is in the story, three words>", then one line "Allowed: <N>. Written: <M>." Write the heading and the two counts even when no figure is on the list.',
+    '',
+  ];
+  return [
+    ...figureLists,
+    '"Checks:" and these five lines, each ending in OK or a tag. They are counts and allowances, not story faults, and they never take a place in the numbered list below:',
+    '- Events: <N> against the stated budget. An event is a happening a child would retell on its own. More events than the budget is MAJOR: cut whole events, never compress them.',
+    '- Surplus facts: name any event in which one figure tells more than one thing the reader did not already know.',
+    '- Invented figures: <M> written against <N> allowed, by the counting rule in the budgets. A figure written past the allowance without its one-line cannot-work-without justification outside the numbered arc, or with that justification written inside a numbered sentence, is MAJOR.',
+    `- Central figure: does the commission's central figure act in each third of the story? A stretch where they are only carried, held or talked about is MAJOR.`,
+    '- Commission honored: are the central quest and the named elements delivered as commissioned? A goal inverted, a trigger dropped, a destination replaced is named here, and the next telling fixes it or justifies it in one line.',
+    '',
+    '"Questions:" and these six, numbered 1 to 6, answered as an eight-year-old listener:',
+    '1. Where does the story lose them — confusion, boredom, disbelief?',
+    '2. Does each thing follow from what came before?',
+    '3. Is there a question they need answered, with the outcome in doubt to the end?',
+    '4. Are the figures people a child likes, roots for, and can tell apart?',
+    '5. Where the commission states a theme, topic or life skill, is the story genuinely rich in its material — introduced where it first matters, not present in name only — does it drive the climax, and does the character who most needs it visibly act on it before the end, acted on and never stated as a moral?',
+    '6. Does every planted object or flaw pay off, and does every payoff trace to a plant — an orphan on either side is cut?',
+    '',
+    `"Faults:" and 3 to 6 numbered story-level faults${remain}; they usually look like: an event without a cause, a stake that cannot be lost or that never bites (announced but never felt), a cost the world undoes for free — a thing taken, blocked or used up whose replacement is lying all around and nothing closes that way, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids, an action that does not accomplish what the sentence claims it accomplishes, a mechanism that runs on rules instead of sight — a contraption needing more than one rule to understand, or a stated rule about what would happen that is never seen happening (a fault whenever a child cannot retell how it works in one sentence, or a single picture cannot show it working), a character who is anyone — nothing they do comes from who they are, an interaction no real person would have — a reaction the plot needs but the person would not give. The last three are MAJOR by default; a main cast of interchangeable figures is CRITICAL. Numeric precision and sourced measurements and times are not arc faults — later stages fix those; never list one. Tag every fault [CRITICAL] — the story is broken; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.`,
+  ].join('\n');
+}
+
 /** CREATE: the creator writes two arcs with self-critiques and commits to one. */
 function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
@@ -7556,6 +7653,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
     TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec(),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
@@ -7595,6 +7693,7 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     TELLING_RULES: buildTellingRulesSection(inputData),
     COMMITTED_ARC: String(committedBlock || '').trim(),
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
+    ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true }),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
@@ -8994,13 +9093,13 @@ function buildTrialIdeaCostumeInstructions(costume) {
  * measured the unrotated prompt collapsing to one premise 10 times out of 10.
  */
 const IDEA_WANT_AXES = [
-  'something the main character wants to give away, not to get',
-  'something that has to be put back where it belongs',
-  'somewhere the main character wants to reach',
-  'something that has to be finished before a moment passes',
-  'someone the main character wants to bring along',
-  'something the main character wants to make',
-  'something that has to be carried safely to the end',
+  { want: 'something the main character wants to give away, not to get', shape: 'deliver' },
+  { want: 'something that has to be put back where it belongs', shape: 'deliver' },
+  { want: 'somewhere the main character wants to reach', shape: 'arrive' },
+  { want: 'something that has to be finished before a moment passes', shape: 'finish' },
+  { want: 'someone the main character wants to bring along', shape: 'deliver' },
+  { want: 'something the main character wants to make', shape: 'make' },
+  { want: 'something that has to be carried safely to the end', shape: 'deliver' },
 ];
 const IDEA_COMPANION_AXES = [
   'an animal',
@@ -9009,12 +9108,77 @@ const IDEA_COMPANION_AXES = [
   'a favourite object treated as a friend',
 ];
 let ideaAxisCursor = 0;
+// A SECOND cursor, for the fantasy arm's want alone. With one cursor the two
+// arms drew adjacent entries (i and i+1), and four of the seven entries are the
+// same `deliver` shape, so a cell routinely handed both arms the same premise
+// shape in different nouns — 5 of 14 cells in round 6 (docs/decisions.md,
+// 2026-09-19). The two cursors advance at different rates, so the arms are not
+// phase-locked; both still walk the list in order, so nothing is starved.
+let ideaFantasyWantCursor = 0;
+let ideaFantasySubCursor = 0;
+
+function ideaAxisText(want, companion) {
+  return `This idea's want: ${want}. Whoever comes along: ${companion}.`;
+}
+
+function ideaAxisAt(i) {
+  const entry = IDEA_WANT_AXES[i % IDEA_WANT_AXES.length];
+  const companion = IDEA_COMPANION_AXES[i % IDEA_COMPANION_AXES.length];
+  return { want: entry.want, shape: entry.shape, companion, text: ideaAxisText(entry.want, companion) };
+}
 
 function nextIdeaVarietyAxis() {
-  const i = ideaAxisCursor++;
-  const want = IDEA_WANT_AXES[i % IDEA_WANT_AXES.length];
-  const companion = IDEA_COMPANION_AXES[i % IDEA_COMPANION_AXES.length];
-  return { want, companion, text: `This idea's want: ${want}. Whoever comes along: ${companion}.` };
+  return ideaAxisAt(ideaAxisCursor++);
+}
+
+/**
+ * One cell's two axes: the local arm walks the shared rotation, the fantasy arm
+ * draws a want of a DIFFERENT shape class from its own cursor.
+ *
+ * Coverage is preserved because neither arm samples randomly. The local arm and
+ * BOTH companions come off the shared cursor exactly as before, so the companion
+ * sequence is byte-identical to the old one (it never collided anyway — list
+ * length 4 against a cursor that advances twice per cell). The fantasy arm walks
+ * the same want list in order from its own cursor, and a collision does not
+ * consume its turn, so no entry is starved: measured over 140 cells every one of
+ * the seven reaches the fantasy arm, with zero shape collisions.
+ *
+ * Degenerate draw: three of the four shape classes have a single member
+ * (`arrive`, `finish`, `make`), so when the local arm draws `deliver` — four of
+ * seven entries — the fantasy arm must land on one of those three. That is the
+ * point, not a defect.
+ */
+function nextIdeaAxisPair() {
+  const local = nextIdeaVarietyAxis();
+  const fantasyCompanion = nextIdeaVarietyAxis().companion;
+
+  let entry = IDEA_WANT_AXES[ideaFantasyWantCursor % IDEA_WANT_AXES.length];
+  if (entry.shape === local.shape) {
+    // The fantasy cursor does NOT burn its turn on a collision — it stays put and
+    // meets a different local axis next cell (local advances 2 per cell, fantasy
+    // 1, so the phase between them turns over). The cell is served instead from a
+    // substitute rotation, scanning for the first entry of another shape.
+    entry = null;
+    for (let step = 0; step < IDEA_WANT_AXES.length; step++) {
+      const candidate = IDEA_WANT_AXES[ideaFantasySubCursor++ % IDEA_WANT_AXES.length];
+      if (candidate.shape !== local.shape) { entry = candidate; break; }
+    }
+    // Bounded: only reachable if every entry shared one shape, which no list
+    // should have. Falling back to the next slot is better than spinning.
+    if (!entry) entry = IDEA_WANT_AXES[ideaFantasySubCursor++ % IDEA_WANT_AXES.length];
+  } else {
+    ideaFantasyWantCursor++;
+  }
+
+  return {
+    local,
+    fantasy: {
+      want: entry.want,
+      shape: entry.shape,
+      companion: fantasyCompanion,
+      text: ideaAxisText(entry.want, fantasyCompanion),
+    },
+  };
 }
 
 /**
@@ -9045,7 +9209,7 @@ function buildTrialIdeaPrompts({
   if (!tpl || !String(tpl).trim()) throw new Error('trial-idea template unavailable');
   const { costumeRule, themeShows, fantasyOpening } = buildTrialIdeaCostumeInstructions(ideaCostume);
   const title = String(trialTitle || '').trim();
-  const axes = { local: nextIdeaVarietyAxis(), fantasy: nextIdeaVarietyAxis() };
+  const axes = nextIdeaAxisPair();
 
   const base = (bandView, axis) => fillTemplate(tpl, {
     SEASON: seasonInstruction,
@@ -9174,6 +9338,7 @@ module.exports = {
   buildArcHintsPrompt,
   buildArcBudgetSection,
   buildTellingRulesSection,
+  arcCritiqueSpec,
   RISK_FRAMING_RULE,
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
@@ -9260,6 +9425,8 @@ module.exports = {
   buildTrialIdeaPrompts,
   AGE_OWNS_PROPS_RULE,
   nextIdeaVarietyAxis,
+  nextIdeaAxisPair,
+  IDEA_WANT_AXES,
   applyBandView,
   BAND_VIEW_KEEPS,
   BAND_PREMISE_SLOTS,

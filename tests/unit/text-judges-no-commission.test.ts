@@ -38,7 +38,13 @@ describe('the late text judges never receive the pre-arc commission', () => {
   }
 
   it('the builders pass no STORY_BRIEF into either template', () => {
-    const src = readFileSync(path.join(here, '..', '..', 'server', 'lib', 'promptBuilders.js'), 'utf8');
+    // Normalise line endings first. core.autocrlf=true checks .js out as CRLF on
+    // Windows (.gitattributes pins eol=lf for *.txt and *.md only), so the
+    // newline-brace-newline scan below found nothing, sliced to the end of the
+    // file, and this test then read every builder in it. It passed only on an LF
+    // working tree.
+    const src = readFileSync(path.join(here, '..', '..', 'server', 'lib', 'promptBuilders.js'), 'utf8')
+      .split(String.fromCharCode(13) + String.fromCharCode(10)).join(String.fromCharCode(10));
     // Scope to the two builder bodies: STORY_BRIEF is legitimate elsewhere
     // (arc-create, arc-panel, the arc audit, the child critic, scene review…).
     for (const fn of ['function buildTextRefinePrompt', 'function buildTextAuditPrompt']) {

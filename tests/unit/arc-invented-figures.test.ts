@@ -141,10 +141,14 @@ describe('the list must not inflate critiqueMaxSeverity', () => {
   it('a NUMBERED list would have minted phantom MAJORs — the contract forbids it', () => {
     const numbered = 'Invented figures:\n1. Fenno — a young dragon\n2. Nolo — a mountain creature\n3. [MINOR] a blemish.';
     expect(critiqueMaxSeverity(numbered)).toBe('MAJOR');
-    for (const f of ['prompts/arc-create.txt', 'prompts/arc-retell.txt']) {
-      const t = fs.readFileSync(f, 'utf8');
-      expect(t).toMatch(/Invented figures:/);
-      expect(t).toMatch(/"- <name> — <what it is in the story, three words>"/);
+    // The contract is asserted on the BUILT prompt, not the raw template: since
+    // 2026-09-19 the create side's figure lists are filled from arcCritiqueSpec()
+    // rather than written into arc-create.txt, so reading the file tested where
+    // the words live instead of whether the model is told.
+    const { arcCritiqueSpec } = require('../../server/lib/promptBuilders');
+    for (const spec of [arcCritiqueSpec(), fs.readFileSync('prompts/arc-retell.txt', 'utf8')]) {
+      expect(spec).toMatch(/Invented figures:/);
+      expect(spec).toMatch(/"- <name> — <what it is in the story, three words>"/);
     }
   });
 });

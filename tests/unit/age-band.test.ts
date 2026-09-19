@@ -273,11 +273,17 @@ describe('buildStoryShapeSection', () => {
     expect(shape).toMatch(/A real low point before the end is required/);
   });
 
-  it('carries the band difficulty rule into the lean arc variant too', () => {
-    const arc = buildStoryShapeSection(
-      { characters: [char(1, 'A', 5, true)], mainCharacters: [1] }, 6, { arc: true });
-    expect(arc).toMatch(/A real low point before the end is required/);
+  it('does NOT restate the band rule in the lean arc variant — the band file states it in full', () => {
+    // Reversed 2026-09-19 (owner). On the arc path the age-band file is always
+    // in the same prompt and says it better ("Do not soften it into a small
+    // setback", "never a power handed over at the last moment"), so the short
+    // copy here was one rule stated twice. The NON-arc path keeps it, because
+    // storyScorecard.js pushes the band file only when arc is true.
+    const input = { characters: [char(1, 'A', 5, true)], mainCharacters: [1] };
+    const arc = buildStoryShapeSection(input, 6, { arc: true });
+    expect(arc).not.toMatch(/A real low point before the end is required/);
     expect(arc).not.toMatch(/Page budget/);
+    expect(buildStoryShapeSection(input, 6)).toMatch(/A real low point before the end is required/);
   });
 
   it('keeps age six and up on the full page-budget shape AND gives it the journey rule', () => {
