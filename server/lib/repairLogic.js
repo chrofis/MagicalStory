@@ -1216,5 +1216,44 @@ const SAFE_REPAIRABLE_TYPES = new Set([
   'viewer_address',
 ].filter(t => !NOT_INPAINTABLE_TYPES.has(t)));
 
+/**
+ * THE PRESERVE CHANNEL (2026-09-19). What must STILL BE TRUE after an inpaint
+ * edit, as opposed to what the edit DOES.
+ *
+ * Why it exists: every attempt to shrink an oversized prop stranded the
+ * characters' hands — the object retreated and the hands stayed where the
+ * larger object had been. Measured on job_1789759147125_p08djwhbl p5, the
+ * consolidator DRAFTED the combined instruction ("Redraw the egg at
+ * child's-head size and move all four boys' hands with it") and then collapsed
+ * it to "Resize the dragon egg to the size of a child's head", logging the
+ * dropped half as "a constraint, not an action". That collapse is CORRECT —
+ * an instruction full of non-actions makes the model change nothing. The
+ * missing piece was a separate channel for the constraint, and
+ * `scene_fix.preserve` already was one: produced by the consolidator, seeded
+ * with landmark names, sanitized — and never sent to the image model. This is
+ * the wire.
+ *
+ * Deliberately narrow: at most 3 short state clauses, appended as their own
+ * sentence AFTER the numbered actions, never merged into one.
+ *
+ * @param {string[]} preserve
+ * @returns {string} '' when there is nothing to preserve.
+ */
+const PRESERVE_MAX = 3;
+function buildPreserveClause(preserve) {
+  if (!Array.isArray(preserve)) return '';
+  const items = [];
+  for (const raw of preserve) {
+    if (typeof raw !== 'string') continue;
+    const t = raw.trim().replace(/[.;,\s]+$/, '');
+    if (!t) continue;
+    if (items.some(i => i.toLowerCase() === t.toLowerCase())) continue;
+    items.push(t);
+    if (items.length >= PRESERVE_MAX) break;
+  }
+  if (!items.length) return '';
+  return `\n\nStill true after the edit: ${items.join('; ')}.`;
+}
+
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings };
+  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

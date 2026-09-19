@@ -3064,6 +3064,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   //   of any character referenced in per_character_fixes (Grok now KNOWS who to fix).
   // - Else fall back to the legacy concat instruction.
   let editInstruction;
+  // What must still be TRUE after the edit (scene_fix.preserve), as opposed to
+  // what the edit DOES. Built in the plan branch, appended below.
+  // See repairLogic.buildPreserveClause for why this channel exists.
+  let preserveClause = '';
   let consolidatedPlan = null;
   const referenceImages = [];
   const referenceImageSources = [];
@@ -3173,6 +3177,19 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     editInstruction = items
       .map((it, i) => `${i + 1}. ${it.text}`)
       .join('\n');
+
+    // THE PRESERVE CHANNEL IS WIRED (2026-09-19). A size or position change
+    // strands whatever was touching the object unless the page's declared
+    // interaction travels with it. The consolidator has always written that
+    // clause into `scene_fix.preserve` (and the landmark guard seeds it) — and
+    // it died here: nothing ever read the field. Character names are stripped
+    // the same way the instructions are; Grok does not know them.
+    {
+      const { buildPreserveClause } = require('./repairLogic');
+      const cleaned = (consolidatedPlan.scene_fix?.preserve || [])
+        .map(item => (typeof item === 'string' ? stripNames(item, null) : ''));
+      preserveClause = buildPreserveClause(cleaned);
+    }
 
     // Note: avatars for per_character_fixes are NOT attached here. The figures
     // are already in the page image — Grok edits in place. Attaching the
@@ -3387,7 +3404,13 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
     editInstruction = sanitizeVbIdsInPrompt(editInstruction, visualBible, pageNumber);
   }
-  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${quietZoneSuffix}`;
+  // Same two guards the instruction body gets: entity-grid vocabulary and raw
+  // VB ids must not reach Grok through this channel either.
+  if (preserveClause) {
+    const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
+    preserveClause = sanitizeVbIdsInPrompt(sanitizeIssueForInpaint(preserveClause), visualBible, pageNumber);
+  }
+  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {

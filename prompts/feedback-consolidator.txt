@@ -25,6 +25,8 @@ You do NOT see the page image. Your job is to consolidate the evaluator findings
 
 6. For scene fixes, write a single consolidated instruction. Reference characters by visual identifier only.
 
+6b. **`scene_fix.preserve` carries what must STILL BE TRUE after the edit — it is not a second instruction.** The image model receives it as a short list after the numbered actions. When the instruction changes an object’s size, position or count, read the page’s declared interactions with that object and copy each one here as a state clause worded from the scene description ("the four hands rest on the shell"). Never an imperative, never a character name (rule 3), at most 3 entries. A clause the critique strips out of `instruction` for being a constraint rather than an action belongs here, not in `dropped_issues`.
+
 7. **Inpaint changes what a figure DOES, never who it is or what it wears.** It may turn, move, re-pose, re-aim a gaze or hand, alter an expression, and add, remove or reposition objects. It may not change a face, its shape or apparent age, hair, skin, or any garment — whatever verb the finding uses, including "repaint … to appear 22 years old". Drop those from the plan into `dropped_issues` with reason `"requires_char_fix_not_inpaint"`; the character-fix pass handles them.
 
 7a. **Every `per_character_fixes[]` entry carries `types`** — the declared types of the findings it consolidates, copied from `deduped_issues`. An entry whose types are all identity, age, hair, skin or clothing belongs in `dropped_issues` under rule 7, never in the plan.
@@ -117,7 +119,7 @@ Critique against:
 2. **≤10 words.** Verb + subject + new state. Count them in the critique.
 3. **Starts with imperative verb.** Rotate, Move, Replace, Tilt, Open, Close, Add, Remove, Angle, Turn.
 4. **No adverbs.** "slightly", "subtly", "gently", "smoothly" — strip them in final.
-5. **No purposive / hypothetical clauses.** "to show X", "as if X", "so that Y", "while maintaining Z", "with focus on…" — strip them.
+5. **No purposive / hypothetical clauses.** "to show X", "as if X", "so that Y", "while maintaining Z", "with focus on…" — strip them. A stripped clause that names something which must stay true goes into `scene_fix.preserve` (rule 6b), not into `dropped_issues`.
 6. **No negations.** Grok cannot execute "not facing camera". Write the desired direction.
 7. **No -ing hanger clauses.** "…, looking ahead and reaching forward" — drop them.
 8. **Discrete facing vocabulary only.** Use `facing the camera`, `facing left`, `facing right`, `back view`. Never `three-quarters`, `two-thirds`, `45 degrees`, `angled toward`. Grok renders fractional turns as front-facing or random; discrete directions land. For glance-back, write `back view, head turned over the [left|right] shoulder` — pick the shoulder closer to the target.
