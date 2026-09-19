@@ -915,3 +915,5 @@ all — each is normal, designed output, and each was filed as a defect on the s
 beat the story gives a figure, a contact the brief states, a plan line that stages them — and then look
 at the pixels. A text naming something is not a promise; the brief and the plan are. "X is missing" is
 an observation, never a finding.
+
+- **A green unit suite is not validation** (2026-09-19). Run the cheapest rung that exercises the changed path against real data before pushing: stored replay (free) -> Lab stage (cents) -> 4-page smoke -> showcase. Under ~CHF 0.50 and a few minutes is not optional. "Not validated, and why" is an acceptable report; silence is not. A cross-page scale check was written, unit-tested, documented and shipped without ever running once against a real story — which is how a 3-call research protocol survived into production unnoticed.
