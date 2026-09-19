@@ -37,6 +37,18 @@ const CHECKS = [
     verdict: 'Prompts use archetypes only, never test-story names (docs/SETTLED.md)',
   },
   {
+    // A VB cell's drawn AREA was measured inert for size (25x area bought 0-18%),
+    // decisions.md 2026-09-19. The reintroduction shape this catches is a PROMPT
+    // telling the model to read a reference cell's drawn size as the object's real
+    // size. Scoped to prompts/ deliberately: the Lab's geometry knobs
+    // (columnMaxFraction / vbColumnFraction / refScale, commit 7ec03fb1c) are
+    // legitimate and must not be flagged.
+    name: "A reference cell's drawn area is not the object's real-world size",
+    dirs: ['prompts'], ext: ['.txt'],
+    pattern: /(reference|vb|visual bible)[^.\n]{0,40}\b(cell|panel|tile)\b[^.\n]{0,60}\b(drawn|shown|rendered|sized|size|scale|bigger|larger)\b[^.\n]{0,60}\b(real[- ]?world|actual|true)\b/i,
+    verdict: "A VB cell's drawn AREA is not the size lever - measured and killed 2026-09-19 (docs/SETTLED.md)",
+  },
+  {
     name: 'Swiss orthography: ss, never eszett',
     dirs: ['prompts', path.join('client', 'src')], ext: ['.txt', '.ts', '.tsx', '.js', '.jsx', '.json'],
     pattern: /ß/,

@@ -46742,3 +46742,85 @@ that silently answers whichever one you assumed is how the two cases got conflat
 **Status:** ✅ active — committed on `staging`, not pushed. The trial funnel is unaffected by construction:
 `server/routes/trial.js` creates exactly one character with `relationships: {}` and renders through the same
 `buildRelationshipLines`.
+
+---
+
+## 2026-09-19 — A Visual Bible cell's drawn AREA does not set the object's size on the page — but a cramped cell does cost its identity
+
+**Context.** Scale has been the longest-running unexplained image fault in the pipeline. In staging
+`job_1789759147125_p08djwhbl` the dragon egg's Visual Bible entry says it is *"about as big as a human
+head, like a lantern or a football"*, that canonical scale phrase reached the page prompt intact (verified
+in the stored prompt, not inferred), and the egg still rendered grapefruit-sized. The obvious remaining
+suspect was geometry: in the reference grid the egg's cell is drawn far smaller than the full-height
+character card, so the model might be reading **drawn canvas area as real-world size**. An earlier story
+had the mirror case — a thumb-sized chestnut given its own full-size cell rendered football-sized. Both
+observations point the same way, and "just make the reference cell bigger" is the fix a session proposes
+within five minutes of seeing either page. It needed measuring once, properly, so it never gets proposed again.
+
+**Method.** Story `job_1789759147125_p08djwhbl`, page 7. The *stored production prompt* was replayed
+byte-identically (`diff` empty on every run), with the identical plate slot and identical 2-character slot
+(md5-identical inputs), and the character card drawn at the same size in both arms. Model
+`grok-imagine-image-2.0`. Everything ran through the **production code path** —
+`buildPageCompositeRefs` → `packReferences` → `generateImageOnly` → Grok edit — not a bespoke harness.
+**Exactly one variable: the egg cell's drawn width.** Run 1 used 1.65× linear / 2.7× area; runs 2–4 used
+the packer's maximum available spread, **133 px vs 665 px drawn = 5.0× linear / 25× area**. Measurement:
+egg width ÷ the height of the nearest standing child in the same render.
+
+| pair | small arm | big arm |
+|---|---|---|
+| 1 (2.7× area) | 0.116 | 0.124 |
+| 2 (25× area)  | 0.154 | 0.182 |
+| 3 (25× area)  | 0.174 | 0.176 |
+| 4 (25× area)  | 0.185 | 0.213 |
+
+**Decision 1 — SIZE: ❌ KILLED. Cell area is not the size lever. Do not re-run it.**
+The small arm's range (0.154–0.185) and the big arm's range (0.176–0.213) **overlap**; pair 3 is flat
+(0.174 vs 0.176). A **25× area change bought between 0% and 18%**, which is inside the run-to-run noise of
+the arm it was supposed to beat. For reference, a football held against a ~95 cm four-year-old is ≈ 0.23,
+so the egg needs roughly **+90%** — an order of magnitude more than the entire available geometry range
+delivers. There is no headroom left to buy: 665 px was the packer's maximum. Enlarging a reference cell
+to make an object render bigger is settled dead.
+
+**Decision 2 — IDENTITY / COLOUR: ✅ CONFIRMED, 3/3 vs 3/3. A cramped cell costs the object's identity.**
+Every small-cell arm rendered a **generic plain grey-white egg**. Every big-cell arm rendered the
+reference's **cream speckled egg**. Framing and zoom varied *within* both arms, so they are not arm-linked
+and are ruled out as the confound. This is almost certainly the mechanism behind that story's egg colour
+flip-flopping page to page — cream on p2/p4, grey on p3/p5/p8, white on p9/p16 — where the cell size the
+packer happened to allocate varied with how many other elements shared the sheet. **The cell has to be
+big enough to be READ; it just isn't a scale dial.**
+
+**Rationale / what this leaves.** Scale is now unexplained from two directions at once, and that is the
+useful part of the result. The `scaleClass` enum shipped 2026-09-15 works correctly at the **text** layer —
+canonical phrase in, raw token out, verified in stored prompts — and **does not move the pixels**. Cell
+geometry is now measured **inert** for size. So the words are right and the geometry is inert: neither
+of the two layers we control is where scale is decided. The **next untested candidate is the plate** — the
+only reference that carries real-world scale cues, which is exactly why `docs/image-routing.md` already
+routes structures to it. That means *painting the object's footprint into the empty scene*, rather than
+describing its size or sizing its cell. Untested, backlogged, **not** implied by this result.
+
+This also sits directly beside the owner's 2026-09-14 rejection of putting a scale referent (a silhouette,
+a coin, a hand) **inside** a VB cell, because whatever shares the cell leaks onto the page. Read the pair
+together: the cell's **contents** are rejected as a scale mechanism, and now the cell's **geometry** is too.
+
+**Cost.** $0.36 total, 8 renders. No production behaviour was changed by this experiment.
+
+**Apparatus and its limitation, stated honestly.** The Lab knobs that make a VB element's drawn cell area a
+movable variable were committed as `7ec03fb1c` on `staging` and were **not pushed** — `git push origin
+staging` was denied by the auto-mode classifier during the session — so the Test Lab could not host the run.
+All eight renders therefore ran **locally, through the production code path**, with the stored production
+prompt. That is weaker than a Lab experiment in one specific respect: there is **no experiment ID and no
+owner-visible run record** (see memory `feedback_experiments_in_lab_not_local`). It is stronger than a
+hand-rolled harness in the respect that matters for the verdict — the prompt and the reference packing are
+the production ones, byte-verified. Anyone re-opening this should re-run it as a Lab stage using
+`7ec03fb1c`'s knobs rather than re-deriving the measurement.
+
+**Evidence preserved at** `C:\Users\roger\MagicalStory\diagnostics\vb-cell-area-2026-09-19\` — all 8 renders,
+both reference grids, the per-arm sent references, the per-arm prompts, the egg crops used for the
+measurement, and a README indexing them. Kept on disk and gitignored (`/diagnostics/` in `.gitignore`);
+16 MB of binaries do not belong in the repo, and under memory `feedback_diagnostics_are_a_research_asset`
+they must not be deleted for storage cost either.
+
+**Touched files (documentation only — no production code):** `docs/decisions.md`, `docs/image-routing.md`,
+`docs/SETTLED.md`, `docs/image-generation-methods.html`, `tasks/BACKLOG.md`, `.gitignore`,
+`diagnostics/vb-cell-area-2026-09-19/README.md`.
+**Status:** ✅ settled — size verdict on `docs/SETTLED.md`, identity finding open on the backlog.
