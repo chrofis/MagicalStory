@@ -44,7 +44,7 @@ const { canonicalName } = require('./castResolver');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, TEXT_MODELS, GROK_VISION_FALLBACK } = require('../config/models');
 const { getCurrentLogger } = require('./generationLogger');
 const r2Lib = require('./r2');
-const { detectFiguresWithGroundingDino, attachSamMasksToFigures, _shortGarmentPhrase } = require('./figureDetection');
+const { detectFiguresWithGroundingDino, attachSamMasksToFigures, _shortGarmentPhrase, _gdinoDetect, _collectNmsBoxes, GDINO_PERSON_NMS_IOU } = require('./figureDetection');
 
 // bbox-refine-overlay.txt loaded exactly as images.js's LOCAL_PROMPTS did
 // (STR-6 mechanism) — moved here with its only consumer, the 2-pass refine.
@@ -2209,6 +2209,13 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
 }
 
 /**
+ * The area below which a faceless, point-less, low-confidence box is a smudge
+ * rather than a figure. Named because the PLATE rule below reuses the same
+ * floor — one number, two readers.
+ */
+const MICRO_AREA_FLOOR = 0.01;
+
+/**
  * A MICRO-FIGURE IS NOT A CAST MEMBER (2026-09-13).
  *
  * The expected-cast roster decides one CRITICAL presence finding per page by
@@ -2245,7 +2252,7 @@ function isMicroFigure(figure) {
   // area and never match, which is the safe direction to fail.
   if (Math.max(x1, y1, x2, y2) > 1.0001) return false;
   const area = Math.abs(x2 - x1) * Math.abs(y2 - y1);
-  return area < 0.01;
+  return area < MICRO_AREA_FLOOR;
 }
 
 /**
@@ -2352,6 +2359,104 @@ function countAmbientFigures(figures) {
   return figures.filter(f => !isMicroFigure(f) && isAmbientFigure(f, ceiling)).length;
 }
 
+/**
+ * THE PLATE IS EVIDENCE; THE ART DIRECTOR'S DECLARATION IS AN OPINION
+ * (owner, 2026-09-19).
+ *
+ * `population` is currently whatever the Art Director SAYS the setting holds,
+ * and that is precisely the input that got it wrong: the brief asserted "No
+ * other people or animals are present" about the Lindenhof — a public plaza —
+ * and the presence arithmetic held the picture to it.
+ *
+ * The empty-scene PLATE answers the same question with a picture. It is
+ * rendered before any cast is composited, so every person in it belongs to the
+ * SETTING by construction. Measured over the stored plates of the three
+ * stories the ambient rule was built on:
+ *   job_1789759147125_p08djwhbl — one vantage canvas serves p1-p6 and holds
+ *       ~8 people (chess players, figures on benches, someone walking); the
+ *       brief declared none. The p7 and p8 plates hold none and agree.
+ *   job_1789506283204_3kxqshifx — one canvas serves p1/p2/p3/p8/p11/p13 and
+ *       holds ~8 people; the brief's own setting prose says "no people".
+ *   job_1789420511893_zly5rcdej — the p3/p4 quay plate holds only sub-1%
+ *       specks and agrees; p16, the genuine uncommissioned-child page, has NO
+ *       stored plate at all, so the plate says nothing and the declaration
+ *       stands. That is what keeps the real defect firing.
+ *
+ * TWO DIRECTIONS, ONE OBSERVED. Every disagreement measured runs the same way:
+ * the Art Director UNDER-declares a populated place. So the plate may only
+ * RAISE the population, never lower it — an Art Director that wrote `crowd`
+ * keeps `crowd` even over an empty-looking plate, and a plate that shows
+ * nobody is silence, not a claim of emptiness (a plate can fail to render the
+ * passers-by the page is about).
+ *
+ * GEOMETRY ONLY, like every other rule in this file: this counts boxes and
+ * measures their area. It never reads a label, a description or a finding's
+ * prose.
+ */
+
+/**
+ * A plate needs this many real figures before it is read as a CROWD rather
+ * than as a populated setting. Deliberately high: a plaza with eight
+ * park-goers is ambient, not a crowd, and `crowd` is the state that switches
+ * the surplus check OFF entirely. A page genuinely written around a crowd is
+ * declared `crowd` by the Art Director and the merge below keeps it.
+ */
+const PLATE_CROWD_MIN = 12;
+
+/**
+ * What a plate's own person boxes say the setting holds.
+ *
+ * @param {Array|null} figures normalised-box figures from `detectPlatePopulation`
+ * @returns {'ambient'|'crowd'|null} null = the plate makes no claim (no
+ *          detection, or nobody in it)
+ */
+function platePopulationFromFigures(figures) {
+  if (!Array.isArray(figures)) return null;
+  const real = figures.filter(f => {
+    const area = figureFrameArea(f);
+    return area !== null && area >= MICRO_AREA_FLOOR;
+  }).length;
+  if (real === 0) return null;
+  return real >= PLATE_CROWD_MIN ? 'crowd' : 'ambient';
+}
+
+/**
+ * Run the EXISTING GroundingDINO person pass over one empty-scene plate.
+ *
+ * Reuse, not a new pass: `_gdinoDetect` is the same analyzer endpoint every
+ * page render already calls, it costs no vendor money (the Python analyzer is
+ * our own service), and one call serves every page sharing that vantage
+ * canvas. Failure is silence — a null answer leaves the Art Director's
+ * declaration exactly as it was.
+ *
+ * @returns {Promise<{population: 'ambient'|'crowd'|null, figureCount: number}|null>}
+ */
+async function detectPlatePopulation(plateImageData, pageLabel = '') {
+  try {
+    if (!plateImageData || typeof plateImageData !== 'string') return null;
+    const uri = plateImageData.startsWith('data:')
+      ? plateImageData
+      : `data:image/jpeg;base64,${r2Lib.stripDataUriPrefix(plateImageData)}`;
+    const det = await _gdinoDetect(uri, [{ name: 'person', text: 'person' }]);
+    if (!det || !Array.isArray(det.figures)) return null;
+    const W = Number(det.width), H = Number(det.height);
+    if (!Number.isFinite(W) || !Number.isFinite(H) || W <= 0 || H <= 0) return null;
+    // DINO answers in PIXELS; every area rule in this file is normalised.
+    const figures = _collectNmsBoxes(det.figures[0], GDINO_PERSON_NMS_IOU)
+      .map(p => ({ box: [p.box[0] / W, p.box[1] / H, p.box[2] / W, p.box[3] / H] }));
+    const population = platePopulationFromFigures(figures);
+    const figureCount = figures.filter(f => {
+      const a = figureFrameArea(f);
+      return a !== null && a >= MICRO_AREA_FLOOR;
+    }).length;
+    log.info(`👥 [PLATE-POP] ${pageLabel}plate holds ${figureCount} figure(s) → ${population || 'no claim'}`);
+    return { population, figureCount };
+  } catch (e) {
+    log.warn(`⚠️ [PLATE-POP] ${pageLabel}plate population failed: ${e.message}`);
+    return null;
+  }
+}
+
 module.exports = {
   parseVisualBibleObjects,
   resolveExpectedObjectLabels,
@@ -2372,6 +2477,10 @@ module.exports = {
   isAmbientFigure,
   hasAmbientGeometry,
   countAmbientFigures,
+  MICRO_AREA_FLOOR,
+  PLATE_CROWD_MIN,
+  platePopulationFromFigures,
+  detectPlatePopulation,
   vbNonHumanNames,
   // _detectAllBoundingBoxesImpl deliberately NOT exported — the stamping
   // wrapper above is the only entry (sourceImageFp invariant, 2026-07-19).

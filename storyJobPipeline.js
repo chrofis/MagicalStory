@@ -5270,6 +5270,48 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.info(`🎨 [UNIFIED] Phase 5a-pre: ${Object.keys(sceneBackgrounds).length}/${pageDataArray.length} empty scenes in ${bgElapsed}s`);
       }
 
+      // Phase 5a-pre-pop: READ THE POPULATION OFF THE PLATE, don't take the
+      // Art Director's word for it (owner, 2026-09-19).
+      //
+      // `population` decides whether the presence arithmetic bills an
+      // `extra_character` CRITICAL for background people, and the Art Director
+      // is exactly the input that got it wrong — it wrote "No other people or
+      // animals are present" about the Lindenhof, a public plaza. The plate is
+      // evidence instead of a declaration: it is rendered BEFORE any cast is
+      // composited, so everyone in it belongs to the setting.
+      //
+      // ONE DETECTION PER PLATE, not per page: a vantage canvas serves several
+      // pages and they share its answer. The pass reuses the GroundingDINO
+      // person call every page render already makes (our own analyzer service,
+      // no vendor cost). A plate that shows nobody, or a page with no plate at
+      // all, leaves the declaration untouched — which is why a genuinely
+      // uncommissioned figure on a plateless page still fires.
+      if (!runSinglePassScene) {
+        const { detectPlatePopulation } = require('./server/lib/bboxDetection');
+        const byPlate = new Map();   // plate identity -> [pageNumber]
+        for (const [pn, bg] of Object.entries(sceneBackgrounds)) {
+          const img = bg?.imageData;
+          if (!img || typeof img !== 'string') continue;
+          const key = bg.vantageId || `p${pn}`;
+          if (!byPlate.has(key)) byPlate.set(key, { imageData: img, pages: [] });
+          byPlate.get(key).pages.push(Number(pn));
+        }
+        const popStart = Date.now();
+        await Promise.all([...byPlate.entries()].map(async ([key, plate]) => {
+          const got = await detectPlatePopulation(plate.imageData, `${key} `);
+          if (!got?.population) return;
+          for (const pn of plate.pages) {
+            if (sceneBackgrounds[pn]) sceneBackgrounds[pn].platePopulation = got.population;
+            const pd = pageDataArray.find(x => Number(x.pageNumber) === pn);
+            if (pd?.sceneMetadata) pd.sceneMetadata.platePopulation = got.population;
+          }
+        }));
+        const overridden = Object.values(sceneBackgrounds).filter(b => b?.platePopulation).length;
+        if (byPlate.size) {
+          log.info(`👥 [PLATE-POP] ${byPlate.size} plate(s) read in ${((Date.now() - popStart) / 1000).toFixed(1)}s — ${overridden} page(s) carry a plate-derived population`);
+        }
+      }
+
       // Phase 5a-pre-grid: build each page's Visual Bible reference grid, NOW
       // that we know which pages actually got a background plate.
       //

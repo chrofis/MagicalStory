@@ -218,6 +218,34 @@ function normalisePopulation(raw, legacyCrowdExpected) {
 }
 
 
+/**
+ * THE PLATE WINS WHERE THEY DISAGREE (owner, 2026-09-19).
+ *
+ * The Art Director DECLARES a setting's population; the empty-scene plate SHOWS
+ * it. Where both speak, take the more populated of the two — the plate can only
+ * RAISE the state, never lower it, because the only disagreement direction ever
+ * measured is the Art Director under-declaring a public place (it asserted "No
+ * other people or animals are present" about the Lindenhof, whose own plate
+ * holds eight). A plate showing nobody is silence, not a claim of emptiness:
+ * a plate can simply fail to render the passers-by a page is written around,
+ * and a declared `crowd` must survive that.
+ *
+ * Pure, so the disagreement rate is measurable without a detector call.
+ *
+ * @param {string|null} declared   the Art Director's `population`
+ * @param {string|null} fromPlate  `platePopulationFromFigures`'s answer, or null
+ * @returns {{population: string, source: 'declared'|'plate', disagreed: boolean}}
+ */
+function resolvePopulation(declared, fromPlate) {
+  const d = normalisePopulation(declared, false);
+  const rank = (v) => POPULATION_LEVELS.indexOf(v);
+  if (!fromPlate || !POPULATION_LEVELS.includes(fromPlate) || rank(fromPlate) <= rank(d)) {
+    return { population: d, source: 'declared', disagreed: false };
+  }
+  return { population: fromPlate, source: 'plate', disagreed: true };
+}
+
+
 function sanitizeInteractions(rawInteractions) {
   if (!Array.isArray(rawInteractions)) return [];
   // Composite-character syntax: "Manuel + Roger" means both characters jointly
@@ -2417,6 +2445,7 @@ function describeDegradedSceneMetadata(sceneMetadata) {
 module.exports = {
   POPULATION_LEVELS,
   normalisePopulation,
+  resolvePopulation,
   extractJsonFromText,
   sanitizeInteractions,
   parseProseMetadataFormat,

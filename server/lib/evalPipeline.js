@@ -1163,10 +1163,26 @@ function buildExpectedCastBlock({
     // cites as CHR001). The parsed metadata is passed in where the caller
     // holds it; parsing a hint stays the fallback.
     const sceneMeta = sceneMetadata || sh.extractSceneMetadata(sceneHint || originalPrompt);
-    const { normalisePopulation } = require('./sceneMetadata');
+    const { normalisePopulation, resolvePopulation } = require('./sceneMetadata');
     const rawPop = sceneMeta?.population || sceneMeta?.fullData?.population || null;
     const legacyCrowd = sceneMeta?.crowdExpected === true || sceneMeta?.fullData?.crowdExpected === true;
-    population = normalisePopulation(rawPop, legacyCrowd);
+    const declaredPop = normalisePopulation(rawPop, legacyCrowd);
+    // THE PLATE IS THE SECOND WITNESS (owner, 2026-09-19). The empty-scene
+    // plate is rendered BEFORE any cast is composited, so the people in it
+    // belong to the setting by construction — evidence, where the Art
+    // Director's `population` is a declaration. Where they disagree the plate
+    // wins, and it can only raise the state (bboxDetection.detectPlatePopulation
+    // → sceneMetadata.resolvePopulation). A page with no plate keeps the
+    // declaration untouched, which is why the genuine uncommissioned-child
+    // page still fires.
+    const platePop = sceneMeta?.platePopulation || sceneMeta?.fullData?.platePopulation || null;
+    const resolved = resolvePopulation(declaredPop, platePop);
+    population = resolved.population;
+    // LOG THE DISAGREEMENT, so how often the Art Director is wrong about its
+    // own setting is a measured number rather than an impression.
+    if (resolved.disagreed) {
+      log.info(`👥 [PLATE-POP] ${pageLabel || 'page'}: brief declared "${declaredPop}", plate shows "${platePop}" — plate wins`);
+    }
     crowdExpected = population === 'crowd';
     for (const e of sh.buildSecondaryExpectedCharacters(visualBible, sceneMeta, [...names], { pageLabel, extraNames, includeAnimals: true })) add(e.name, vbKind(e.name));
     // A SECONDARY THAT DECLARES THIS PAGE IS ON THIS PAGE (2026-09-13). The

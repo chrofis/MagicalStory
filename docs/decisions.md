@@ -21,6 +21,67 @@ superseded and link forward.
 
 ---
 
+## 2026-09-19 — The page's population is READ OFF THE PLATE, not taken from the Art Director's declaration
+
+**Context.** `82794edbe` made `crowdExpected` a three-state `population` (`cast_only` / `ambient` /
+`crowd`) so a public square stops costing `extra_character` CRITICALs. It took that value from the
+Art Director's **declaration** — and the Art Director is precisely the input that got it wrong: the
+brief for the Lindenhof, a public plaza, asserts *"No other people or animals are present"*, and
+`job_1789506283204_3kxqshifx`'s own setting prose says *"no people"*.
+
+The empty-scene **plate** answers the same question with evidence. It is rendered BEFORE any cast is
+composited, so every person in it belongs to the setting by construction.
+
+**Decision.** After the plates are generated and before any presence arithmetic runs, one
+GroundingDINO `person` pass is made **per plate** (Phase 5a-pre-pop). Its answer is stored as
+`sceneMetadata.platePopulation`, and `buildExpectedCastBlock` merges it with the declaration through
+`resolvePopulation`:
+
+- the plate may only **raise** the state, never lower it;
+- a plate showing nobody is **silence**, not a claim of emptiness — a plate can simply fail to render
+  the passers-by a page is written around, and a declared `crowd` must survive that;
+- a page with **no plate** keeps the declaration untouched;
+- every disagreement is logged (`👥 [PLATE-POP] brief declared "X", plate shows "Y" — plate wins`).
+
+`crowd` is not lost: a plate with ≥ `PLATE_CROWD_MIN` (12) real figures reaches `crowd` on its own,
+and an Art Director that declared `crowd` keeps it regardless.
+
+**Rationale — the measurement.** The stored plates behind the pages the ambient rule was built on
+were pulled from staging `story_images` (`image_type = 'empty_scene'`) and looked at. Five distinct
+plates serve the 14 measured pages:
+
+| plate | pages served | plate shows | brief declared | verdict |
+|---|---|---|---|---|
+| `…p08djwhbl` vantage canvas | p1-p6 | ~8 people (chess players, two on a bench, a walker, a pair by the wall) | `cast_only` | **disagree** |
+| `…p08djwhbl` p7 | p7 | nobody | `cast_only` | agree |
+| `…p08djwhbl` p8 | p8 | nobody (a statue only) | `cast_only` | agree |
+| `…3kxqshifx` vantage canvas | p1,2,3,8,11,13 | ~8 people; brief prose says "no people" | `cast_only` | **disagree** |
+| `…zly5rcdej` p3/p4 quay | p3,p4 | sub-1% specks at the waterline only | `cast_only` | agree |
+| `…zly5rcdej` p16 | p16 | **no plate stored at all** | `cast_only` | plate silent |
+
+**2 of 5 plates disagree, and those 2 cover 12 of the 14 measured false-positive pages. Every
+disagreement runs the same direction: the Art Director UNDER-declares a populated place. Zero run
+the other way** — which is exactly why the plate may only raise. `…zly5rcdej` p16, the genuine
+uncommissioned-fourth-child page, has no plate, so nothing changes there and it still fires.
+
+**No new vendor call.** `_gdinoDetect` is the same analyzer endpoint every page render already
+calls; the analyzer is our own service, so the marginal cost is CPU, not money. One call per PLATE,
+not per page: a vantage canvas serves several pages and they share the answer (5 calls for the 14
+pages above instead of 14). Geometry only — boxes and their area, never a label or a finding's
+prose. Sub-`MICRO_AREA_FLOOR` (1% of frame) boxes are ignored, the same floor `isMicroFigure` uses,
+now a named constant shared by both readers.
+
+**Touched:** `server/lib/bboxDetection.js` (`MICRO_AREA_FLOOR`, `PLATE_CROWD_MIN`,
+`platePopulationFromFigures`, `detectPlatePopulation`), `server/lib/sceneMetadata.js`
+(`resolvePopulation`), `server/lib/evalPipeline.js` (`buildExpectedCastBlock` merge + disagreement
+log), `server/lib/images.js` (carry-forward through `iteratePageCore`, which a rewrite must not
+re-decide), `storyJobPipeline.js` (Phase 5a-pre-pop), `tests/unit/plate-population.test.ts`.
+
+**Status:** ✅ active. No prompt changed — the `SETTING POPULATION` line's wording is untouched;
+only the value fed into it is now evidence-backed, so the generator↔critic pair does not move.
+
+---
+
 ## 2026-09-19 — The shipped single-call object-scale question does NOT carry the cross-page signal (measured, reported, not re-engineered)
 
 **Context.** `4578a1540` demoted the object-scale audit from three shuffled reads + intersection
@@ -48941,5 +49002,116 @@ rules on it.
 (`buildStoryBriefBody`, `buildBeatsPrompt`),
 `tests/unit/invented-allowance-counts-the-book.test.ts`,
 `tests/unit/beats-premise-world-only.test.ts`.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-19 — The blind compliance judge is NARROWED to what a written inventory settles: it stops ruling on what is depicted
+
+**Context.** A finding-by-finding audit of 8 pages of the staging story
+`job_1789759147125_p08djwhbl`, with every finding ruled against the shipped pixels, found
+**46 findings / 528 points of which only 60 points (11.4%) were defensible**. The damage was
+not spread across the eval system — it sat in ONE judge:
+
+| bucket | sees the image? | findings | points | false | defensible |
+|---|---|---|---|---|---|
+| threeStage (`image-prompt-compliance.txt`) | **no** | 25 | **337 (64%)** | **16 of 24** | 8.6% |
+| entity (crops only) | partial | 10 | 36 | 7 | 5.6% |
+| visual (quality) | yes | 4 | 70 | 0 | 10% |
+| semantic | yes | 7 | 85 | 1 | 26% |
+
+The two judges that look at pixels produced ONE false finding out of eleven. The blind one
+produced sixteen, and all sixteen were rulings about **what is happening in the frame**:
+
+| type | points | verdict |
+|---|---|---|
+| `action_interaction` | 120 | 0 of 6 correctly priced |
+| `object_presence` | 40 | 3 of 3 FALSE |
+| absence family (`missing_element`, `missing_character`, `absent_cast_member`, `scene.missing`) | 50 | 0 of 4 correct |
+| `clothing_inconsistent` | 30 | 0 of 3 correct |
+
+The mechanism, worked through on page 1: stage 1's inventory recorded the ground as "paved",
+so stage 2 filed a 25-point CRITICAL that a child was scratching a **pre-etched** spiral into
+pavement. The semantic judge, which sees the image, wrote "pale grey gravel" and scored the
+page 100; zoomed inspection confirms loose grey chippings with a finger-ploughed furrow. A
+FINE page was driven to HARD_FAIL by a judge reasoning **correctly** from a false premise it
+had no way to check. That is the failure mode of the whole class, not a bad page.
+
+**Decision (owner-approved, 2026-09-19).** Narrow the judge's remit; do not distrust it
+wholesale. It keeps the countable contract checks the two-stage split exists for —
+**cast membership against EXPECTED CAST** (in the surplus direction, which the inventory can
+evidence), **expected ages**, **the CLOTHING CONTRACT** (which garment, which base colour),
+**rendered_text / lettering**, **character identity**, **landmark identity**, and the
+appearance and completeness of the figures the inventory describes. It stops ruling on
+`action_interaction`, `object_presence`, the absence family and `clothing_inconsistent`.
+
+**Rationale — why a scope statement and not just deletions.** A deleted rule leaves the model
+free to improvise the same finding under a neighbouring type; the repo has measured that
+shape before (`accessory` — "a prompt rule demonstrably lowers the ceiling without holding
+it"). So the template gained an explicit, positive **WHAT THIS JUDGE RULES ON** block at the
+top, governing every step, that states the remit AND names the barred types; the rules that
+produced the four families were then removed or rescoped so the instruction and the rule list
+agree. The closed `type` list now also *names* the barred codes as deliberately absent,
+because an omission alone reads as an oversight to the next model and the next session.
+
+**What moved, rule by rule** (all in `prompts/image-prompt-compliance.txt`):
+- New scope block after INPUTS; `main_action_check.story_text_action` reference dropped from
+  the STORY_TEXT block.
+- ABSENCE RULE: the `missing_character` exception is gone — every absence is
+  `unverified_absence` (ceiling MINOR, 2 pts) and nothing else. The "wrongness is a finding"
+  clause is scoped to garments, ages and lettering.
+- STEP 1: "the ONLY case for `missing_character`" removed.
+- STEP 1b: the requested-objects presence bullet and the `implausible_placement` bullet
+  removed; `duplicate_identity` relocated here from STEP 3.
+- STEP 2: the hand/limb-contact finding removed; the clothing bullet now names `clothing` /
+  `garment_colour` and bars `clothing_inconsistent`.
+- STEP 3 (INTERACTION CHECK) replaced by a block that prices nothing.
+- STEP 4: `wrong_action` / `implausible_placement` / missing-character / declared-interaction
+  entries removed from the severity tags; the **Object colour** rule (2026-08-20) retired.
+- OUTPUT: `main_action_check`, `interaction_compliance`, `scene.all_present` and
+  `scene.missing` removed from the schema — no JS has ever read them
+  (`evalPipeline.js` consumes `fixable_issues` only).
+- Closed type list: `action_interaction`, `missing_character`, `missing_element`,
+  `object_presence` and `object_count` removed and named as barred alongside
+  `implausible_placement`, `wrong_action` and `clothing_inconsistent`. `object_count` had no
+  producing rule and is the nearest neighbour to `object_presence`, so leaving it would have
+  been the improvisation surface this decision exists to close.
+
+**No blind spot is created.** Every dropped family is still owned by a judge that sees the
+picture: `action_interaction` by image-evaluation D-16/D-16b/D-17/D-18 and image-semantic's
+"Action physics & direction toward a NAMED target"; the absence family by image-semantic
+("Correct number of named characters — CRITICAL if a named character is missing", "Key
+objects present — MAJOR per missing key object") and image-evaluation D-19, plus the
+figure-count derivation in code; `clothing_inconsistent` natively by
+`entity-consistency-check.txt`, with image-evaluation D-05/D-05b/D-05d and image-semantic's
+broad-category check on the page itself. This also completes a direction code had already
+started: `supersedePresenceFindings` (evalPipeline.js, 2026-09-14) already deleted this
+judge's `missing_character` findings whenever the presence arithmetic had spoken.
+
+**The one place coverage thins — flagged, not hidden.** The retired **Object colour** rule was
+an owner-approved 2026-08-20 addition that closed a real gap (a central prop rendered in a
+completely different colour, no finding raised). With it gone, a one-page object whose colour
+contradicts the prompt is caught only by the entity judge's `color_change` against the
+element's reference cell — image-semantic explicitly ignores exact colours and
+image-evaluation has no object-colour code (D-20 is shape). It was retired anyway because it
+was measured 3 of 3 FALSE on this story, and because `object_presence` is exactly the ruling
+a text-only judge cannot make. If the Lab re-run shows colour errors slipping through, the
+right home for the check is a judge that sees the pixels, not this one.
+
+**Siblings.** `page-image-generator-vs-critics` [block] pairs `prompts/image-generation.txt`
+against the three critic templates, and the gate's own note says why: "a rule added to a judge
+is a rule the generator must be told — otherwise the page is penalised for something it was
+never asked to do." This change **removes** rules from a judge. The generator is not asked for
+anything new, the other two critics still judge the four families, and no page can now be
+penalised for something it was not asked to do — the gate's failure direction is the opposite
+one. Committed with a `Siblings-Checked:` line rather than a no-op generator edit.
+
+**Measurement is deliberately NOT in this entry.** The narrowing ships unmeasured by design:
+the main session re-runs the judge in the Test Lab against the same story and compares finding
+counts and points per bucket. Add the result here when it lands.
+
+**Touched:** `prompts/image-prompt-compliance.txt`,
+`tests/unit/compliance-judge-scope.test.ts`.
 
 **Status:** ✅ active
