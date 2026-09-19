@@ -2280,6 +2280,42 @@ ${bibleBody}` : bibleBody;
     expansions = expansions.concat(recovered).sort((a, b) => a.pageNumber - b.pageNumber);
   }
   meta.timings.sceneExpansionMs = Date.now() - t;
+
+  // THE PROMPT THAT WROTE THE BRIEFS (2026-09-19).
+  //
+  // `sceneReviewReport.prompt` is the REVIEWER's prompt. The Art Director's own
+  // — ~100k chars of rules, the Visual Bible spec, the cover spec and all 18
+  // plan lines — was stored nowhere, so recovering it for
+  // job_1789759147125_p08djwhbl meant a git worktree at the run's commit plus a
+  // rebuild from inputData + finalArc + pagePlan + clothingRequirements +
+  // characterAvatars. Worse, WHICH commit to rebuild at was only decidable by
+  // probing the stored review prompt for a constant a candidate commit had
+  // introduced. The beats planner got `plannerPrompt` the same day; this is the
+  // same gap one stage later.
+  //
+  // Rolled up by DISTINCT prompt rather than one copy per page: the all-pages
+  // call normally covers every page in one row, and a page that fell back to the
+  // per-page template keeps its own prompt in a row of its own. Storing it per
+  // page would mean eighteen copies of the same 100k string.
+  //
+  // Written HERE, not into sceneReviewReport: that object is assigned only
+  // inside the branch where the review template loaded, so a run that shipped
+  // briefs unreviewed — precisely the run worth inspecting — would carry no
+  // prompt at all.
+  const sceneExpansionReport = (() => {
+    const byPrompt = new Map();
+    for (const x of expansions) {
+      const key = `${x.modelId || ''}\u0000${x.prompt || ''}`;
+      if (!byPrompt.has(key)) byPrompt.set(key, { prompt: x.prompt || '', modelId: x.modelId || null, pages: [] });
+      byPrompt.get(key).pages.push(x.pageNumber);
+    }
+    return {
+      durationMs: meta.timings.sceneExpansionMs,
+      fallbackPages: missingBriefs.map(b => b.pageNumber),
+      prompts: [...byPrompt.values()].map(r => ({ ...r, pages: r.pages.sort((a, b) => a - b) })),
+    };
+  })();
+
   gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} in one call${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {
     pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
   });
@@ -3263,7 +3299,7 @@ ${bibleBody}` : bibleBody;
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneExpansionReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };

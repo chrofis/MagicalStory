@@ -4144,6 +4144,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const challengeDraw = beatsResult?.challengeDraw || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
+    // The prompt that WROTE the briefs, next to the one that reviewed them.
+    const sceneExpansionReport = beatsResult?.sceneExpansionReport || null;
     // The page-text writer's own call (beats mode). storyTextPrompts is the
     // EXISTING home for "the prompt that wrote the pages + its raw reply" and
     // the dev-mode "Full API Output (Story Text)" panel already renders it —
@@ -7252,6 +7254,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)
+      // The Art Director's own prompt(s), rolled up by distinct prompt with the
+      // pages each produced — so "what was this book's brief actually asked for"
+      // is a query, not a worktree rebuild at the run's commit.
+      sceneExpansionReport,
       sceneReviewReport, // per-page before/after from the scene review (beats mode)
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       analytics: {

@@ -49323,3 +49323,50 @@ outside (owner, 2026-09-19).
 may take a single slot.
 
 **Status:** 🟡 open question — no code change
+
+---
+
+## 2026-09-19 — The scene stage keeps the prompt that WROTE the briefs, not only the one that reviewed them
+
+**Context.** Reviewing the Art Director stage of staging `job_1789759147125_p08djwhbl` ran
+into the same blind spot the beats planner had that morning, one stage later.
+
+`sceneReviewReport.prompt` (71,728 chars on that story) is the **reviewer's** prompt —
+stored since 2026-08-09 so that *"it rewrote nothing"* could be diagnosed without the DB.
+The **Art Director's own** prompt — ~100,000 chars carrying 64 rules, the Visual Bible
+spec, the cover spec, the whole arc and all 18 plan lines — was stored nowhere.
+`briefsIn` carries `{brief, pageNumber}`; `sceneDescriptions` has no prompt field.
+
+Recovering it meant a `git worktree` at the run's commit plus a rebuild from
+`inputData` + `finalArc` + `pagePlan` + `clothingRequirements` + `characterAvatars`. And
+**which** commit to rebuild at was not knowable directly: no commit stamp is stored on a
+story, and `scene-expansion-all.txt` had changed four times since the run, one of them 39
+seconds after the job started. It was settled only by probing the stored REVIEW prompt
+for a constant `587d8d755` had introduced — present, so the container had that commit,
+so the AD (minutes earlier, same container) had it too.
+
+**Decision.** A new `sceneExpansionReport`, written where the expansions settle:
+
+```
+{ durationMs, fallbackPages: [...], prompts: [{ prompt, modelId, pages: [...] }] }
+```
+
+Two things about the shape:
+
+- **Rolled up by DISTINCT prompt**, not one copy per page. The all-pages call normally
+  covers every page in one row; a page that fell back to the per-page template keeps its
+  own prompt in a row of its own. Per-page storage would mean eighteen copies of the same
+  100k string. Provenance is model + text, so the same prompt from two models is two rows.
+- **Built OUTSIDE the scene-review branch.** `sceneReviewReport` is assigned only inside
+  the `else` where the review template loaded; a run that shipped briefs unreviewed — the
+  run most worth inspecting — would otherwise carry no prompt at all. A test pins the
+  ordering so it cannot drift back inside.
+
+**Rationale.** Same as `plannerPrompt` that morning: a stage's output is judged against
+its prompt, and a prompt nobody stored has to be archaeologically reconstructed before
+any question about the stage can be answered. Text only, no images.
+
+**Touched:** `server/lib/beatsPipeline.js`, `storyJobPipeline.js`,
+`tests/unit/scene-expansion-report.test.ts`.
+
+**Status:** ✅ active
