@@ -20,8 +20,5 @@ What gets in the way is the difficulty this story was asked for, reaching the ma
 concrete situation — never a different difficulty put in its place, and never named outright. The
 setting is where that struggle happens, not scenery around it.
 
-One sentence, one job. Each sentence does its own slot's work and no other's — no detour, no second
-episode, nothing no slot asked for. A sentence may be vivid; it may not do another sentence's job.
-
 {TITLE_RULE}Respond with ONLY three sentences, one per slot: (1) what the main character wants, and what gets in the way; (2) what they do about that same obstacle; (3) how it turns out. An idea that stops on the problem, or leaves a slot unwritten, is a fault. Maximum 50 words. Plain text, no markdown, no labels.
 {LANG_INSTRUCTION} Write EVERYTHING in that language.
