@@ -1053,6 +1053,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     pageLabel = '',                      // Grok packReferences pageLabel
     defaultModel,                        // eval path cover-aware; gen-only pageImage
     includeSceneBackgroundPart = false,  // gen-only adds a [Background] Gemini part
+    vbColumnFraction = null,             // Test Lab only: widen the VB element column
     maxRefSlots = null,                  // Test Lab only: raise packReferences/editWithGrok's
                                           // slot budget above the production default of 3
                                           // (xAI's edit cap is 5). null = production default.
@@ -1125,7 +1126,7 @@ async function _dispatchImageGeneration(prompt, characterPhotos = [], opts = {})
     try {
       const refImages = await packReferences(
         { visualBibleGrid, landmarkPhotos, characterPhotos, previousImage, sceneBackground, textAreaMask },
-        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}) }
+        { aspectRatio: grokAspect, pageLabel, padInputWithExtension: slot0IsScenePlate, ...(maxRefSlots ? { maxSlots: maxRefSlots } : {}), ...(vbColumnFraction ? { vbColumnFraction } : {}) }
       );
 
       let result;
@@ -1869,6 +1870,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     // Test Lab only: raise the Grok reference-slot budget above the production
     // default of 3 (xAI's edit cap is 5, re-verified 2026-09-02).
     maxRefSlots = null,
+    // Test Lab only: widen the VB element column (cell-geometry experiment).
+    vbColumnFraction = null,
   } = options;
 
   if (captureLabel) {
@@ -1927,6 +1930,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     defaultModel: MODEL_DEFAULTS.pageImage,
     includeSceneBackgroundPart: true,
     maxRefSlots,
+    vbColumnFraction,
   });
 
   // Strip a stray uniform frame the model painted despite the D-01 prompt ban

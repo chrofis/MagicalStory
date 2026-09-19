@@ -1217,6 +1217,8 @@ async function packReferences(refs = {}, options = {}) {
     // passes 4-5 to test whether an extra raw slot (e.g. one more character, or
     // a dedicated VB slot instead of a bundled row) beats the current packing.
     maxSlots = 3,
+    // TEST LAB ONLY: see composeCharWithVbRow's columnMaxFraction.
+    vbColumnFraction = null,
   } = options;
   const tag = pageLabel ? `[GROK P${pageLabel}]` : '[GROK]';
 
@@ -1379,7 +1381,7 @@ async function packReferences(refs = {}, options = {}) {
     let slotBuf = composed;
     let vbCount = 0;
     if (willAddVb) {
-      const rowResult = await composeCharWithVbRow(composed, rawVbElements, aspectRatio, { charsInSlot: group.length, tag });
+      const rowResult = await composeCharWithVbRow(composed, rawVbElements, aspectRatio, { charsInSlot: group.length, tag, columnMaxFraction: vbColumnFraction });
       slotBuf = rowResult.buffer;
       vbCount = rowResult.cellCount;
     }
@@ -1746,7 +1748,12 @@ async function packReferences(refs = {}, options = {}) {
  *   cellH: number, cardsW: number, floored: boolean}>}
  */
 async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '1:1', options = {}) {
-  const { tag = '[GROK]' } = options;
+  // columnMaxFraction: TEST LAB ONLY (2026-09-19 VB cell-geometry experiment).
+  // Widens the element column beyond VB_COLUMN_MAX_FRACTION so an element's
+  // DRAWN area can be varied while the character card, which is height-limited
+  // and narrower than either width, renders identically. Unset everywhere in
+  // production - the constant is the default and nothing else reads this.
+  const { tag = '[GROK]', columnMaxFraction = null } = options;
   const elements = capVbElements(vbElements, tag, 'column').filter(e => e && e.imageData);
   if (elements.length === 0) return { buffer: charBuffer, cellCount: 0 };
 
@@ -1767,8 +1774,10 @@ async function composeCharWithVbRow(charBuffer, vbElements = [], aspectRatio = '
   // the width, so we take VB_CELL_FLOOR_PX back from them rather than shipping
   // sliver cells - the column never exceeds VB_COLUMN_MAX_FRACTION of the slot.
   const naturalCardsW = Math.max(1, Math.round(H * (meta.width / meta.height)));
-  const maxColW = Math.max(1, Math.floor(W * VB_COLUMN_MAX_FRACTION));
+  const colFraction = (columnMaxFraction > 0 && columnMaxFraction < 1) ? columnMaxFraction : VB_COLUMN_MAX_FRACTION;
+  const maxColW = Math.max(1, Math.floor(W * colFraction));
   let colW = Math.min(maxColW, Math.max(0, W - naturalCardsW));
+  if (columnMaxFraction > 0 && columnMaxFraction < 1) colW = Math.min(maxColW, Math.max(colW, maxColW));
   if (colW < Math.min(VB_CELL_FLOOR_PX, maxColW)) colW = Math.min(VB_CELL_FLOOR_PX, maxColW);
   const cardsW = Math.max(1, W - colW);
 

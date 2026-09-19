@@ -591,6 +591,49 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     }
   }
 
+  // refScale (TEST LAB ONLY — the VB cell-geometry experiment, 2026-09-19).
+  // Varies how LARGE an element is DRAWN inside its reference cell relative to
+  // the character card beside it, and nothing else: same prompt, same cells,
+  // same contents. Nothing is added to a cell — padding is the cell's own
+  // background, so the settled "no scale referent inside a cell" rule holds.
+  //   elementIds + elementFrac: white-pad those elements' reference bytes by
+  //     1/elementFrac, so `fit: contain` draws the object that much smaller.
+  //   charFrac: white-pad each character reference VERTICALLY by 1/charFrac,
+  //     so the card's figure is drawn that much smaller (and the leftover
+  //     width hands the element column more room).
+  if (params.refScale && typeof params.refScale === 'object') {
+    const sharpLib = require('sharp');
+    const padTo = async (b64, wMul, hMul) => {
+      const buf = Buffer.from(String(b64).replace(/^data:image\/\w+;base64,/, ''), 'base64');
+      const m = await sharpLib(buf).metadata();
+      const W = Math.round(m.width * wMul);
+      const H = Math.round(m.height * hMul);
+      const out = await sharpLib({ create: { width: W, height: H, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+        .composite([{ input: buf, left: Math.round((W - m.width) / 2), top: Math.round((H - m.height) / 2) }])
+        .jpeg({ quality: 92 }).toBuffer();
+      return 'data:image/jpeg;base64,' + out.toString('base64');
+    };
+    const ef = Number(params.refScale.elementFrac);
+    const ids = (params.refScale.elementIds || []).map(x => String(x).toUpperCase());
+    if (ef > 0 && ef < 1 && ids.length && Array.isArray(visualBibleGrid?.rawElements)) {
+      for (const el of visualBibleGrid.rawElements) {
+        if (!ids.includes(String(el.id || '').toUpperCase()) || !el.imageData) continue;
+        el.imageData = await padTo(el.imageData, 1 / ef, 1 / ef);
+        log.info(`[TESTLAB] refScale: ${el.id} drawn at ${ef} of its cell`);
+      }
+    }
+    const cf = Number(params.refScale.charFrac);
+    if (cf > 0 && cf < 1) {
+      for (const ph of ctx.referencePhotos) {
+        const src = ph.photoUrl || ph.photoData;
+        if (!src) continue;
+        ph.photoUrl = await padTo(src, 1, 1 / cf);
+        ph.photoData = undefined;
+      }
+      log.info(`[TESTLAB] refScale: character cards drawn at ${cf} of their height`);
+    }
+  }
+
   const t0 = Date.now();
   const result = await generateImageOnly(prompt, ctx.referencePhotos, {
     aspectRatio: ctx.layout?.imageAspect || MODEL_DEFAULTS.pageAspect,
@@ -608,6 +651,11 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     // default of 3 (xAI's documented edit cap is 5, re-verified 2026-09-02) —
     // e.g. give each of 4 characters their own slot instead of pairing 2-per-slot.
     maxRefSlots: params.maxRefSlots || null,
+    // vbColumnFraction: the ONE variable of the 2026-09-19 cell-geometry
+    // experiment - how wide the VB element column is, i.e. how large an
+    // element is DRAWN. Character cards are height-limited and narrower than
+    // either column width, so they render identically in both arms.
+    vbColumnFraction: params.vbColumnFraction || null,
   });
   const elapsedMs = Date.now() - t0;
   if (!result?.imageData) throw new Error('Image generation returned no image');
@@ -656,7 +704,17 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
     scores?.final != null ? Math.round(scores.final) : null
   );
 
-  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined };
+  // saveRefs: store the reference slots the call actually carried, so a
+  // geometry experiment can be READ off the inputs instead of assumed.
+  const steps = [];
+  if (params.saveRefs && Array.isArray(result.packedRefs)) {
+    for (let i = 0; i < result.packedRefs.length; i++) {
+      const v = await saveTestVersion(ctx.storyId, 'tl_step', null, result.packedRefs[i], experimentId);
+      steps.push({ label: `reference slot ${i + 1}`, imageType: 'tl_step', versionIndex: v });
+    }
+  }
+
+  return { imageType: 'scene', versionIndex, promptUsed: prompt, modelId: result.modelId || null, elapsedMs, scores, artStyle: params.artStyleOverride || undefined, ...(steps.length ? { steps } : {}) };
 }
 
 async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = {} }) {
