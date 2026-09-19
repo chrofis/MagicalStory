@@ -1257,6 +1257,19 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     let obstacles = null;
     let checkModelId = null;
     let prompt = null;
+    // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
+    //
+    // `modelFindings: []` has two readings — the checker found nothing, or it
+    // answered badly — and until this was kept the row could not tell them
+    // apart. On staging job_1789759147125_p08djwhbl the eleven-check call
+    // returned zero findings against a plan that breaks four of the planner's
+    // own rules on page 5 alone, and the only reason we know the call arrived
+    // at all is that `cast` happens to be derived from its roster.
+    //
+    // Text only, no images, and the arc stage already keeps the creator's full
+    // reply (`arcReviewReport.create`) for exactly this reason.
+    let reply = '';
+    let rosterLines = [];
     try {
       prompt = buildPlanCheckPrompt(inputData, pages, approvedArc, planText, []);
       if (!prompt) throw new Error('plan-check template unavailable');
@@ -1266,9 +1279,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         ...(TEXT_MODELS[planCheckModel]?.provider === 'anthropic' ? {} : { temperature: 0 }),
       });
       checkModelId = res.modelId || planCheckModel;
+      reply = String(res.text || '');
       modelFindings = parsePlanCheck(res.text || '');
       roster = parsePlanCheckRoster(res.text || '');
       obstacles = parsePlanCheckObstacles(res.text || '');
+      // The roster AS PARSED, page by page. The raw reply above carries the
+      // same lines verbatim; this is the form every counter actually reasons
+      // on, so a reader can see what the arithmetic was given — including a
+      // `covers` that expanded nobody, which is how "all four boys" reached
+      // the cast count as two names on that same job.
+      rosterLines = [...roster.entries()]
+        .sort((a, b) => a[0] - b[0])
+        .map(([pageNumber, r]) => ({ pageNumber, people: r.people, things: r.things, covers: r.covers }));
     } catch (err) {
       // LOUD, NEVER FATAL. A lost plan check takes the ENTIRE counter layer
       // with it (the counters do arithmetic on its roster), so this is an
@@ -1297,7 +1319,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     gl.info(label, `Plan check by ${checkModelId || planCheckModel}: ${counters.lines.length} counter finding(s), ${modelFindings.length} model finding(s)`, null, {
       counterFindings: counters.lines, modelFindings, model: checkModelId, stats: counters.stats, cast: counters.cast,
     });
-    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles };
+    return { counters, modelFindings, findings: structured, lines: all, checkModelId, prompt, obstacles, reply, rosterLines };
   };
 
   // ONE shape for a recheck wherever it is recorded — the canonical `recheck`
@@ -1311,6 +1333,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // the log line both read, so the record is self-contained and no reader
     // re-derives it.
     lines: c.lines,
+    // Same evidence as the first check: an empty `modelFindings` on a RECHECK
+    // is the same two-way ambiguity, and a discarded round's record is where
+    // one would most want to see what the model actually said.
+    reply: c.reply || '',
+    rosterLines: c.rosterLines || [],
   } : null);
 
   t = Date.now();
@@ -1624,9 +1651,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
 
   {
     // Stored under the beatsReviewReport key on purpose: the persistence in
-    // storyJobPipeline, the dev-mode diff panels, and the cross-story challenge
-    // memory (which reads `data->'beatsReviewReport'->>'arc'`) all key off it.
-    // Renaming the key would silently empty a family's challenge history.
+    // storyJobPipeline, the dev-mode diff panels and the beats replay inputs
+    // (beatsReplayInputs.js reads `beatsReviewReport.arc` as the pre-2026-09
+    // fallback for the final arc) all key off it.
+    //
+    // The cross-story challenge memory no longer reads this key: since
+    // 2026-09-19 variety is a selection rule on the draw and reads
+    // `data->'challengeDrawIds'` instead (docs/decisions.md).
     // EVERY canonical field below describes the division that SHIPPED. A round
     // the loop threw away is kept verbatim under `discardedRounds` and nowhere
     // else, so the row and the log can no longer disagree with the book.
@@ -1668,6 +1699,18 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       declaredChanges: shipped.declaredChanges,
       changeRefusals: shipped.changeRefusals,
       prompt: check1.prompt || '',
+      // THE PROMPT THAT DIVIDED THE BOOK. `prompt` above is the CHECKER's; the
+      // planner's was stored nowhere, so answering "what was this division
+      // actually asked for" meant rebuilding buildBeatsPrompt in a worktree at
+      // the run's commit from inputData + finalArc + arcHints — which is a
+      // reconstruction, not the bytes sent. The arc stage has kept its
+      // creator prompt (`arcReviewReport.createPrompt`) since it was written.
+      plannerPrompt: planPrompt || '',
+      // The checker's reply verbatim, and the roster as the counters received
+      // it. See the comment in runCheck: `modelFindings: []` is otherwise
+      // unreadable.
+      checkReply: check1.reply || '',
+      rosterLines: check1.rosterLines || [],
       briefsIn: plan.pages.map(x => ({
         pageNumber: x.pageNumber,
         brief: `PLAN: ${x.planLine || ''}`,

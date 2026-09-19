@@ -47888,3 +47888,49 @@ call sites + the unread-page report), `server/lib/testlab.js` (three call sites)
 the FINAL scene briefs" decision — that entry made the briefs the source of truth and
 this one says what happens when a brief cannot be read. The parse half of the same
 story's p17 was fixed separately in `b5443396a`.
+
+---
+
+## 2026-09-19 — The beats report keeps the planner prompt and the checker's reply
+
+**Context.** Reviewing the beats stage of staging `job_1789759147125_p08djwhbl` ran into
+two blind spots in what the row stores.
+
+1. **`beatsReviewReport.prompt` is the CHECKER's prompt.** The planner's — the ~20k
+   chars of `story-beats.txt` that actually divided the book — was stored nowhere.
+   Answering "what was this division asked for" required a `git worktree` at the run's
+   commit and a rebuild of `buildBeatsPrompt` from `inputData` + `finalArc` +
+   `arcHints`, which is a reconstruction, not the bytes sent. The arc stage has kept
+   `arcReviewReport.createPrompt` since it was written.
+2. **The checker's reply was discarded after parsing.** That run recorded
+   `modelFindings: []` — zero findings from an eleven-check, 13,590-char call against a
+   plan whose page 5 breaks four of the planner's own rules (5 named characters against
+   a cap of 3; `medium` where the whole-cast exemption requires "wide or distant"; two
+   different simultaneous actions; four hands sharing a grip on one object). Every
+   finding that changed the book came from `planCounters`. Whether the model found
+   nothing or answered badly was not answerable from the row — it was inferrable only
+   because `cast` happens to be derived from its roster.
+
+**Decision.** `beatsReviewReport` gains three fields, and `recheckRecord` two — so a
+discarded round carries the same evidence as the shipped one:
+
+- `plannerPrompt` — the prompt that divided the book.
+- `checkReply` — the checker's reply verbatim.
+- `rosterLines` — the roster AS PARSED, page by page (`{pageNumber, people, things,
+  covers}`). The raw reply carries the same lines, but this is the form the counters
+  reason on, so a reader can see what the arithmetic was given — including a `covers`
+  that expanded nobody, which is how "all four boys" reached the cast count as two
+  names on this job.
+
+Text only, no images. Per `feedback_diagnostics_are_a_research_asset`, storage cost is
+not a reason to throw away the artefact a verdict was made from.
+
+**Rationale.** An empty findings list is the one result that most needs its evidence,
+and it is exactly the result that carried none. The fix is symmetry with the arc stage,
+which already stores both its prompt and its model's full text.
+
+**Touched:** `server/lib/beatsPipeline.js` (`runCheck` returns `reply`/`rosterLines`,
+`recheckRecord` and the canonical report store them, `plannerPrompt` added),
+`tests/unit/beats-report-keeps-its-evidence.test.ts`.
+
+**Status:** ✅ active
