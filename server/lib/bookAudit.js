@@ -18,16 +18,17 @@
  * explicitly, and a run that flags pages for being picture-heavy or word-heavy
  * is a failed prompt, not a finding.
  *
- * OBJECT SIZE is asked ONCE, over every page a recurring Visual Bible prop
- * appears on, in its OWN call (2026-09-19). A per-chunk ask saw only a six-page
- * fragment, and "larger than on the other pages" asked of a fragment is not the
- * question (measured: 0 of 3 true outliers, 2 false positives on
- * job_1789759147125_p08djwhbl; the whole-book ask finds 1 of 3). Folding it
- * back into the now-whole-book audit call was then built and measured, and
- * REVERTED: it cost the reader's-eye pass most of its findings (5 and 6 faults
- * against 16 without it, same story, same day). So an 18-page book makes TWO
- * audit calls — down from four. Its answer stays OUT of `byRoute` — it flags
- * for a human and fires no repair. See objectScaleAudit.js.
+ * OBJECT SIZE is asked in its OWN call, ONE CALL PER QUALIFYING PROP, over
+ * every page that prop appears on (2026-09-19). A per-chunk ask saw only a
+ * six-page fragment and measured nothing (0 of 3 true outliers); one call for
+ * ALL props named the story's egg on the wrong side of its real defect with
+ * three false positives; one call about ONE prop named the worst offender in
+ * both runs, byte-identical, with one mild false positive. Folding it into the
+ * reading call was also built, measured and REVERTED: it cost the reader's-eye
+ * pass most of its findings (5 and 6 faults against 16 without it, same story,
+ * same day). So the audit is one reading call plus one call per qualifying prop
+ * — on job_1789759147125_p08djwhbl, exactly one. Its answer stays OUT of
+ * `byRoute` — it flags for a human and fires no repair. See objectScaleAudit.js.
  *
  * Faults are ROUTED, not scored: FAULT[IMG] means a different image would fix
  * it, FAULT[TEXT] means different prose would. Nothing here repaints anything.
@@ -323,52 +324,58 @@ async function judgeGeminiParts(parts, modelId, thinkingLevel = null) {
 }
 
 /**
- * OBJECT SIZE — the one call, over every page the props appear on.
+ * OBJECT SIZE — ONE call per qualifying prop, over only that prop's pages.
  *
- * This is deliberately NOT part of the audit's chunk loop. The chunk loop
- * splits the book into six-page stretches, and a question rebuilt per chunk
- * asks "larger than on the other pages" of a fragment: the prop's nine pages
- * were asked about three times, four pages at a time, and the whole-book
- * question was never put once. One call, every page that carries a candidate
- * prop, in reading order.
+ * This is deliberately NOT part of the audit's reading call, and it is
+ * deliberately NOT one call for all the props at once. Both were measured on
+ * 2026-09-19 (objectScaleAudit.js header): folding it into the reading call
+ * cost the reading two thirds of its findings, and asking about every prop in
+ * one call named the book's egg SMALLER on the pages where it is genuinely
+ * smallest — the wrong side of the book's actual defect — with three false
+ * positives, where asking about that one prop alone named the boulder page in
+ * both runs, byte-identical.
  *
- * Only the pages a candidate appears on are sent — the rest tell the reviewer
- * nothing about that prop's size and cost tokens (measured on a 13-page ask:
- * 3.7k input, 36 output). No page TEXT is sent either:
+ * COST, SAID PLAINLY: one vision call per qualifying prop. Only the pages that
+ * prop appears on are sent — the rest tell the reviewer nothing about its size
+ * and cost tokens (~3.7k input / ~36 output per call). No page TEXT is sent:
  * this is an image-only question, and the words are what the audit already read.
  *
- * Returns null when nothing qualifies (no call is made) or the call failed.
+ * Returns [] when nothing qualifies (no call is made at all); one entry per
+ * prop asked about, with `raw: null` on a failed call.
  */
 async function askObjectScale(candidates, prepared, modelId, thinkingLevel) {
   const scaleLib = require('./objectScaleAudit');
-  const { text: question, asked } = scaleLib.buildScaleQuestion(
-    candidates, prepared.map(p => p.pageNumber));
-  if (!question || asked.length === 0) return null;
+  const runs = [];
+  for (const candidate of (candidates || [])) {
+    const { text: question, asked } = scaleLib.buildScaleQuestion(
+      candidate, prepared.map(p => p.pageNumber));
+    if (!question || !asked) continue;
 
-  const wanted = new Set();
-  for (const a of asked) for (const p of a.batchPages) wanted.add(Number(p));
-  const pages = prepared.filter(p => wanted.has(p.pageNumber));
+    const wanted = new Set(asked.batchPages.map(Number));
+    const pages = prepared.filter(p => wanted.has(p.pageNumber));
 
-  const parts = [{ text: question }];
-  for (const p of pages) {
-    parts.push({ text: `PAGE ${p.pageNumber}` });
-    parts.push(p.part);
+    const parts = [{ text: question }];
+    for (const p of pages) {
+      parts.push({ text: `PAGE ${p.pageNumber}` });
+      parts.push(p.part);
+    }
+    assertPromptFilled(parts, 'bookAudit.askObjectScale');
+    try {
+      const r = await judgeParts(parts, modelId, thinkingLevel);
+      runs.push({ raw: r.text, usage: r.usage, asked, pages: pages.map(p => p.pageNumber) });
+    } catch (err) {
+      log.warn(`⚠️ [BOOK-AUDIT] object-scale call for "${asked.label}" failed: ${err.message}`);
+      runs.push({ raw: null, usage: null, asked, pages: pages.map(p => p.pageNumber) });
+    }
   }
-  assertPromptFilled(parts, 'bookAudit.askObjectScale');
-  try {
-    const r = await judgeParts(parts, modelId, thinkingLevel);
-    return { raw: r.text, usage: r.usage, asked, pages: pages.map(p => p.pageNumber) };
-  } catch (err) {
-    log.warn(`⚠️ [BOOK-AUDIT] object-scale call failed: ${err.message}`);
-    return { raw: null, usage: null, asked, pages: pages.map(p => p.pageNumber) };
-  }
+  return runs;
 }
 
 /**
  * OBJECT SIZE — turn the scale reply into findings.
  *
- * `raws` is what askObjectScale returned: normally a single complete reply
- * covering every page the prop appears on.
+ * `raws` is what askObjectScale returned: ONE reply per prop asked about, each
+ * covering every page that prop appears on.
  *
  * REPORTED, NOT REPAIRED: the result lands in its own `objectScale` field and
  * is deliberately kept out of `byRoute`, which the corrective rounds consume.
@@ -547,33 +554,40 @@ async function auditStoryBook(storyData, opts = {}) {
     }
     if (raws.length === 0) throw new Error('every chunk failed');
 
-    // ONE complete ask, in its OWN call, over the whole book.
+    // ONE complete ask PER QUALIFYING PROP, each in its own call.
     //
-    // It is NOT folded into the audit call above, and that was measured rather
-    // than assumed (2026-09-19, job_1789759147125_p08djwhbl, gemini-2.5-flash,
-    // temp 0): with the size question appended to the single whole-book call
-    // the reader's-eye pass returned 5 and 6 faults on two runs, where the same
-    // call without it returned 16 on the same book the same day — it also
-    // thought less (7.0-7.7k vs 8.6k). The extra call is cheap (images only, no
-    // page text, only the pages a candidate prop is on); the attention it costs
-    // the reader's-eye pass is not.
+    // Neither the separation nor the one-prop-per-call split was assumed; both
+    // were measured on 2026-09-19 (job_1789759147125_p08djwhbl,
+    // gemini-2.5-flash, temp 0). Folding the size question into the whole-book
+    // reading call dropped that call to 5 and 6 faults on two runs where the
+    // same call without it returned 16 the same day. Asking about all props in
+    // ONE call named the egg SMALLER on the pages where it is genuinely
+    // smallest — the wrong side of the book's real defect — with three false
+    // positives; asking about that one prop alone named the boulder page in
+    // both runs, byte-identical, with one mild FP.
+    //
+    // So this costs one cheap call per qualifying prop (images only, no page
+    // text, only that prop's pages). On this story that is exactly one.
     let objectScale = null;
     if (objectScaleEnabled) {
-      const scaleRun = await askObjectScale(scaleCandidates, prepared, modelId, thinkingLevel);
-      if (scaleRun) {
-        for (const a of scaleRun.asked) if (!askedByObject.has(a.id)) askedByObject.set(a.id, a);
-        if (scaleRun.usage) {
-          usage.input_tokens += scaleRun.usage.input_tokens;
-          usage.output_tokens += scaleRun.usage.output_tokens;
-          usage.thinking_tokens += scaleRun.usage.thinking_tokens;
-          if (typeof scaleRun.usage.cost_usd === 'number') usage.cost_usd = (usage.cost_usd || 0) + scaleRun.usage.cost_usd;
+      const scaleRuns = await askObjectScale(scaleCandidates, prepared, modelId, thinkingLevel);
+      const pagesAsked = new Set();
+      for (const run of scaleRuns) {
+        if (!askedByObject.has(run.asked.id)) askedByObject.set(run.asked.id, run.asked);
+        for (const p of run.pages) pagesAsked.add(p);
+        if (run.usage) {
+          usage.input_tokens += run.usage.input_tokens;
+          usage.output_tokens += run.usage.output_tokens;
+          usage.thinking_tokens += run.usage.thinking_tokens;
+          if (typeof run.usage.cost_usd === 'number') usage.cost_usd = (usage.cost_usd || 0) + run.usage.cost_usd;
         }
       }
-      const scaleRaws = scaleRun && scaleRun.raw ? [scaleRun.raw] : [];
+      const scaleRaws = scaleRuns.map(r => r.raw).filter(Boolean);
       objectScale = {
         ...collectObjectScale(scaleRaws, askedByObject, notEvaluated),
-        pagesAsked: scaleRun ? scaleRun.pages : [],
-        raw: scaleRun ? scaleRun.raw : null,
+        calls: scaleRuns.length,
+        pagesAsked: [...pagesAsked].sort((a, b) => a - b),
+        raw: scaleRaws.join('\n') || null,
         notEvaluated: notEvaluated.list(),
       };
     }

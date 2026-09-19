@@ -142,7 +142,7 @@ rewritten to carry these numbers instead of the three false reasons), `server/li
 
 ---
 
-## 2026-09-19 — The shipped single-call object-scale question does NOT carry the cross-page signal (measured, reported, not re-engineered)
+## 2026-09-19 — Object-scale is asked ONE CALL PER QUALIFYING PROP, animals excluded (measured, validated, shipped)
 
 **Context.** `4578a1540` demoted the object-scale audit from three shuffled reads + intersection
 (a RESEARCH method) to ONE more question inside the book reviewer's existing call. That refactor
@@ -214,25 +214,60 @@ was understated: it is not "2-3 false positives come back", it is "the true outl
    prop appears on is in front of it. Note this inverts the wording-trial belief that SMALLER was
    the weaker direction: on the real story SMALLER was the only direction that hit.
 
-**Decision on what ships.** The corrected structure ships (it is strictly better and cheaper than
-what it replaces) and the finding text now carries the measured result verbatim — `LOW CONFIDENCE:
-… named 1 of 3 true outliers, missed both pages where the object was drawn too LARGE … treat this
-as "go and look", not as a verdict`. Whether a check with this hit rate should exist at all is an OWNER decision, not one to
-take by deleting it; it is on `tasks/BACKLOG.md`. The question the owner is being asked is
-concrete: does a check that finds the small outlier, misses both large ones and names two or three
-clean pages earn one extra cheap vision call per story? (Folding it back into the reading call to
-make it free was tried and measured — see the entry below — and it costs the reading most of its
-findings, so "free" is not on the menu.)
+**4. ONE CALL PER PROP, AND ANIMALS ARE NOT ASKED ABOUT (the shipped shape, owner-ruled).**
+The all-props-in-one-call ask was replaced after a two-runs-per-arm A/B on the same story, same
+model, temperature 0, changing only the prop count and the page set:
 
-**Touched:** `server/lib/bookAudit.js` (`askObjectScale`, the reading loop, `judgeChunk`),
-`server/lib/objectScaleAudit.js` (`buildScaleQuestion` whole-book, `buildScaleFinding` honesty),
-`prompts/book-audit.txt` (placeholder removed), `tests/unit/book-audit-object-scale.test.ts`,
-`docs/image-routing.md`.
+- **All props in one call (the previous ship):** `SCALE[SMALLER]: dragon egg — p8, p9, p14, p16`.
+  It names the egg SMALLER on the pages where it is genuinely smallest — the **wrong direction**
+  for a book whose visible defect is a giant egg — plus 3 false positives and a raven.
+- **One prop per call:** `SCALE[LARGER]: dragon egg — p4, p5`, **identical in both runs**. It
+  catches p5 (1.83, the boulder, the book's most visible defect) with one mild FP (p4 at 1.22,
+  essentially the book's own mean of ~1.19).
 
-**Status:** 🟡 conditional — the check ships, asks the right question once over the whole book, and
-on the one story it has been validated against it finds 1 of 3 true outliers (the small one), misses
-both large ones and names 2-3 clean pages, for one extra cheap call (the second of the story's two
-audit calls). Owner decision pending on whether to keep it.
+The owner ruled the one-prop arm ships: *"you could see it with that prompt… even if it is not
+identical each time, I think it could work."* **The bar was never perfect recall — this check flags
+a human and fires no repair**, so a false positive costs a glance and a hit is worth the call.
+
+**Two gates narrow which props qualify**, to control the call count and remove a class of finding
+that cannot be right:
+
+- **Not an animal.** On this story the dog correctly returned `SCALE: none`, but the raven returned
+  a finding that is **meaningless by nature**: a bird's apparent size changes with its wing spread,
+  and the same is true of any animal's pose. `SCALE_COLLECTIONS` is now `['artifacts', 'vehicles']`,
+  so the raven FP disappears **by construction, not by judgement**.
+- **Carries a declared size.** A prop with no `scaleClass` band and no stored pre-enum free-text
+  `size` has no authored size, so "drawn larger than it should be" has no referent — and asking
+  anyway costs a call. The gate reads `elementScaleNote()` (visualBible.js), the same one-source-of-
+  truth the image prompt uses, and records `no_declared_size` in `notEvaluated`.
+
+**THE COST, SAID PLAINLY: one vision call PER QUALIFYING PROP — not one per story, and not free.**
+On `job_1789759147125_p08djwhbl` the two gates reduce three candidates (egg, dog, raven) to **ONE
+call** (the egg), *verified by running the shipped selector against the stored story, not assumed*.
+A story with three declared-size artifacts or vehicles on ≥ 4 pages each would make three calls, at
+~2.6k input / ~28 output / ~2.3k thinking each (≈ CHF 0.005 per call on `gemini-2.5-flash`).
+
+**Validated against the real story in the shipped shape** (2 runs, byte-identical, total ≈ CHF 0.012):
+1 candidate, 1 call, 9 pages → `SCALE[LARGER]: dragon egg — p4, p5` **and**
+`SCALE[SMALLER]: dragon egg — p8, p16`. The SMALLER line is new relative to the measuring arm — the
+question was reworded to the singular ("One recurring object…") when it became a one-prop ask, and
+that recovered it. Against truth: **p5 (1.83) caught, p8 (0.88, the real borderline small page)
+caught, p3 (1.69) and p9 (0.65) missed, p4 (1.22) and p16 (0.94) named in error.** The finding text
+carries exactly that, so a reader knows the recall without opening this file: *"named the worst size
+outlier in the book and repeated that answer exactly, byte-identical, across two runs; it also named
+two pages that merely sit near the book's own average size, and it missed two milder outliers …
+treat this as 'go and look', not as a verdict, and do not read a quiet run as proof the object is
+consistent."*
+
+**Touched:** `server/lib/bookAudit.js` (`askObjectScale` now loops one call per prop; the caller
+accumulates usage and records `calls`), `server/lib/objectScaleAudit.js` (`SCALE_COLLECTIONS` minus
+animals, `no_declared_size` gate, singular one-prop `buildScaleQuestion`, honest `buildScaleFinding`),
+`tests/unit/book-audit-object-scale.test.ts`, `docs/image-routing.md`.
+
+**Status:** ✅ active. One call per qualifying prop (one on the validation story), animals excluded
+by construction, a declared size required, validated in the shipped shape against the real story.
+It flags a human and repairs nothing.
+
 
 ---
 

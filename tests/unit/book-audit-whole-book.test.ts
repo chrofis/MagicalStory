@@ -80,7 +80,9 @@ describe('the whole book goes in one call', () => {
 });
 
 describe('the object-size question keeps its own call — measured, not assumed', () => {
-  const visualBible = { artifacts: [{ id: 'ART001', label: 'dragon egg' }] };
+  // A declared size is required (and an animal is never asked about): the two
+  // gates that keep this to ONE call per story on the validation story.
+  const visualBible = { artifacts: [{ id: 'ART001', label: 'dragon egg', scaleClass: 'melon' }] };
   const propPages = [2, 3, 5, 9, 14];
   const scenes = propPages.map(n => ({ ...page(n), sceneMetadata: { objects: ['ART001'] } }));
 
@@ -110,6 +112,23 @@ describe('the object-size question keeps its own call — measured, not assumed'
     // Flagged, never repaired: the scale answer stays out of the repair routing.
     expect(result.byRoute.IMG.length).toBe(1);
     expect(result.byRoute.IMG[0].line).not.toMatch(/SCALE/);
+  });
+
+  it('a prop with no declared size costs no second call at all', async () => {
+    const { calls, result } = await withStubbedFetch('FAULTS: 0', () => bookAudit.auditStoryBook(
+      { id: 's1', visualBible: { artifacts: [{ id: 'ART001', label: 'dragon egg' }] }, sceneImages: scenes }, {}));
+    expect(calls.length).toBe(1);                       // the reading call only
+    expect(result.objectScale.calls).toBe(0);
+    expect(result.objectScale.notEvaluated.map((e: any) => e.reason)).toContain('no_declared_size');
+  });
+
+  it('an ANIMAL is never asked about — its drawn size moves with its pose', async () => {
+    const { calls, result } = await withStubbedFetch('FAULTS: 0', () => bookAudit.auditStoryBook(
+      { id: 's1', visualBible: { animals: [{ id: 'ANI001', label: 'Raven', scaleClass: 'melon' }] },
+        sceneImages: propPages.map(n => ({ ...page(n), sceneMetadata: { objects: ['ANI001'] } })) }, {}));
+    expect(calls.length).toBe(1);
+    expect(result.objectScale.calls).toBe(0);
+    expect(result.objectScale.objects).toEqual([]);
   });
 
   it('a scale reply with no answer is NOT EVALUATED, never clean', async () => {

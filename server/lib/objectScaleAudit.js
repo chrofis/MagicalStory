@@ -1,114 +1,108 @@
 /**
- * OBJECT SCALE — ONE call per story, over every page the prop appears on.
+ * OBJECT SCALE — ONE call per qualifying prop, over only the pages that prop
+ * appears on.
  *
- * A recurring prop (an egg, a vehicle, a creature) is drawn at a different
- * size from page to page, and nothing in the pipeline sees it: every per-page
- * judge reads ONE image against ONE brief, so a prop that is football-sized on
- * one page and fist-sized on another scores clean on both. Size is only
- * visible when the pages that carry the prop are read TOGETHER.
+ * A recurring prop (an egg, a vehicle) is drawn at a different size from page
+ * to page, and nothing in the pipeline sees it: every per-page judge reads ONE
+ * image against ONE brief, so a prop that is football-sized on one page and
+ * fist-sized on another scores clean on both. Size is only visible when the
+ * pages that carry the prop are read TOGETHER.
  *
- * WHY IT IS ONE WHOLE-BOOK ASK AND NOT A PER-CHUNK ONE (measured 2026-09-19):
- * the audit used to split the book into 6-page chunks, so a question rebuilt
- * per chunk asked "larger than on the OTHER pages" of a fragment. On
- * job_1789759147125_p08djwhbl the egg's 9 pages were split across three calls
- * and the whole-book question was never asked once: the run returned
- * "SCALE: none" twice and named an unrelated animal in the third chunk -
- * 0 of 3 true outliers, 2 false positives, with parsing and scoping working
- * perfectly. The measurement failed, not the plumbing.
+ * WHAT IT COSTS, SAID PLAINLY: one vision call PER QUALIFYING PROP. It is not
+ * free and it is not one call per story. A prop qualifies when it is cited by a
+ * brief on >= 4 audited pages, carries a declared size in the bible, and is not
+ * an animal (below). On job_1789759147125_p08djwhbl that is exactly ONE call
+ * (the dragon egg); a story with three declared-size artifacts or vehicles on
+ * >= 4 pages each makes three, at ~3.7k input / ~36 output tokens each
+ * (≈ CHF 0.005 per call on gemini-2.5-flash).
  *
- * WHY NOT ARITHMETIC FROM THE STORED BOXES (checked 2026-09-19 before any
- * code was written, because it would have been free): there are no stored
- * object boxes. `bboxDetection.objects` is EMPTY on every page of both
- * candidate stories — object grounding is gated OFF by the owner since
- * 2026-08-10 (figureDetection.js, `GDINO_GROUND_OBJECTS`) because no consumer
- * existed and each object cost a DINO forward pass per page. The ratio route
- * has no input, so it is not built.
+ * WHY ONE PROP PER CALL AND NOT ALL PROPS IN ONE (measured 2026-09-19, two runs
+ * per arm, same model, temperature 0, same wording — only the prop count and
+ * the page set changed, on job_1789759147125_p08djwhbl):
+ *  - truth by eye: the egg is clearly larger on p3 (1.69x) and p5 (1.83x) and
+ *    clearly smaller on p9 (0.65x), p8 (0.88) borderline, the rest 0.94-1.32.
+ *  - ONE PROP PER CALL (what ships): the measuring arm returned
+ *    "SCALE[LARGER]: dragon egg — p4, p5" in both runs, byte-identical. It
+ *    catches p5 — the boulder, the book's most visible size defect — with one
+ *    mild false positive (p4 at 1.22, essentially the book's own mean ~1.19).
+ *  - THE SHIPPED BUILDER, validated after the rewrite to a singular one-prop
+ *    question (2 runs, byte-identical, 2.6k in / 28 out / 2.3k thinking,
+ *    ≈ CHF 0.005 per run): "SCALE[LARGER]: dragon egg — p4, p5" AND
+ *    "SCALE[SMALLER]: dragon egg — p8, p16". The singular phrasing recovered a
+ *    SMALLER line the measuring arm did not produce: p8 (0.88) is the real
+ *    borderline small page, p16 (0.94) is not. Net on the shipped wording:
+ *    p5 caught, p8 caught, p3 and p9 missed, p4 and p16 named in error — and
+ *    it is stable run to run. The finding text carries exactly this.
+ *  - ALL PROPS IN ONE CALL (the previous shape): "SCALE[SMALLER]: dragon egg —
+ *    p8, p9, p14, p16" in both runs — it names the egg SMALLER on the pages
+ *    where it is genuinely smallest, i.e. the WRONG direction for a book whose
+ *    visible defect is a giant egg, plus three innocent pages, plus a raven.
+ * So the prop count moves the answer, and one-prop-per-call is strictly better:
+ * right direction, the worst offender named stably, one mild FP instead of
+ * three. That is the bar, because THIS CHECK FLAGS A HUMAN AND FIRES NO REPAIR
+ * — perfect recall was never the requirement (owner, 2026-09-19).
  *
- * ONE COMPLETE ASK, IN ITS OWN CALL - and that separation was measured, not
- * assumed. The book audit now reads the WHOLE book in one call
- * (bookAudit.MAX_PAGES_PER_CALL), which removed the only reason this question
- * could not ride along, so folding it in was built and run: on
- * job_1789759147125_p08djwhbl the folded call returned 5 and 6 reader's-eye
- * faults on two runs where the same call WITHOUT the size question returned 16
- * on the same book the same day, and thought less (7.0-7.7k vs 8.6k thinking
- * tokens). The size question takes attention from the reading, so it keeps its
- * own call: an 18-page book makes TWO audit calls, down from four. The ask is
- * cheap (images only, no page text, only the pages a candidate prop is on:
- * 3.7k input / 36 output measured).
+ * WHY ANIMALS ARE EXCLUDED BY CONSTRUCTION. Measured on the same story: the dog
+ * correctly returned "SCALE: none", and the raven returned a finding that is
+ * MEANINGLESS BY NATURE — a bird's apparent size changes with its wing spread,
+ * and the same is true of any animal's pose. An animal has no stable drawn size
+ * to compare across pages, so the question cannot be asked of one. The raven
+ * false positive disappears by construction rather than by judgement.
  *
- * AND IT STILL BARELY MEASURES THE THING (validated on the real story,
- * 2026-09-19 — this is the honest state of the check, read it before trusting
- * a finding):
- *  - truth on job_1789759147125_p08djwhbl, by eye: the egg is clearly larger on
- *    p3 (1.69) and p5 (1.83) and clearly smaller on p9 (0.65), with p8 (0.88)
- *    borderline and p2/p4/p7/p14/p16 within the pack (0.94-1.32).
- *  - chunked shape (superseded): "SCALE: none" for the egg twice and an
- *    unrelated animal in the third chunk. 0 of 3 hits, 2 false positives.
- *  - whole-book ask, all three qualifying props, 13 pages, one call:
- *    "SCALE[SMALLER]: dragon egg — p8, p9, p14, p16" and
- *    "SCALE[SMALLER]: Raven — p11". It found the real small outlier p9 and the
- *    borderline p8, and MISSED BOTH large outliers (p3, p5) entirely.
- *    1 of 3 hits, 2-3 false positives (p14, p16, the raven).
- *  - an earlier egg-only whole-book read named p16 alone — 0 of 3.
- *  - ONE PROP PER CALL, over only that prop's own pages (measured 2026-09-19,
- *    two runs, same model, temperature 0, same outlier wording — only the prop
- *    count and the page set changed): the egg call returned
- *    "SCALE[LARGER]: dragon egg — p4, p5" in BOTH runs, byte-identical. That is
- *    1 of 3 hits (p5, the biggest outlier at 1.83) with one false positive
- *    (p4, 1.22, inside the pack), p3 never named and p9 no longer named. The
- *    all-props control on the same day returned the shipped answer both times
- *    ("SMALLER: egg p8, p9, p14, p16"; "SMALLER: Raven p11" / "p11, p18"):
- *    1 of 3 hits, 3 false positives. So the prop count DOES move the answer —
- *    asking about one prop flips the judge from the SMALLER side to the LARGER
- *    side and finds the largest outlier stably — but it does NOT recover the
- *    {p3, p5} result, and it trades three false positives for one.
- *  - WHAT THE EARLIER {p3, p5} SUCCESS ACTUALLY WAS: three runs in DIFFERENT
- *    PAGE ORDERS, intersected. Each single run carried false positives
- *    ([5,3,7], [3,5,4,2], [4,5,3]); only the intersection was clean. At
- *    temperature 0 a repeat in the SAME order is deterministic, so repeats buy
- *    nothing — the signal comes from shuffling, not from repeating. Recovering
- *    {p3, p5} therefore costs three shuffled calls PER PROP, which the owner has
- *    ruled too expensive. The question is closed: one call, of any shape, names
- *    about one of three outliers and one to three innocent pages.
- * So the chunking was a real structural defect and is fixed here, and fixing it
- * moved the result from 0/3 to 1/3: the LARGER direction is still invisible to
- * the judge at this model and this phrasing. The finding text says so, nothing
- * is repaired, and whether the check earns its extra call is an open question
- * for the owner (tasks/BACKLOG.md).
+ * WHY A DECLARED SIZE IS REQUIRED. A prop with no `scaleClass` band and no
+ * stored free-text `size` has no authored size at all, so "drawn larger than it
+ * should be" has no referent — and asking anyway spends a call per prop. The
+ * gate reuses `elementScaleNote()` (visualBible.js), the same one-source-of-
+ * truth read the image prompt uses, so this check and the generator agree on
+ * what "declared size" means.
  *
- * WHAT WAS MEASURED ABOUT THE WORDING EARLIER THAT DAY (CHF ~1.9). Read it as
- * the reason the wording is what it is, NOT as evidence the check works — the
- * real-story validation above is the evidence, and it is negative:
+ * WHY NOT ARITHMETIC FROM THE STORED BOXES (checked 2026-09-19 before any code
+ * was written, because it would have been free): there are no stored object
+ * boxes. `bboxDetection.objects` is EMPTY on every page of both candidate
+ * stories — object grounding is gated OFF by the owner since 2026-08-10
+ * (figureDetection.js, `GDINO_GROUND_OBJECTS`). The ratio route has no input.
+ *
+ * WHY IT IS ITS OWN CALL AND NOT FOLDED INTO THE BOOK AUDIT. Measured the same
+ * day: with the size question appended to the whole-book reading call, the
+ * reader's-eye pass returned 5 and 6 faults on two runs where the same call
+ * WITHOUT it returned 16 on the same book — and it thought less (7.0-7.7k vs
+ * 8.6k thinking tokens). The size question takes attention from the reading.
+ *
+ * WHY REPEATS BUY NOTHING. An earlier {p3, p5} success was three runs in
+ * DIFFERENT PAGE ORDERS, intersected; each single run carried false positives
+ * ([5,3,7], [3,5,4,2], [4,5,3]). At temperature 0 a repeat in the SAME order is
+ * deterministic, so the signal came from shuffling, not repeating — and three
+ * shuffled calls PER PROP is ruled too expensive. One call it is.
+ *
+ * WHAT WAS MEASURED ABOUT THE WORDING (CHF ~1.9, same day). Read it as the
+ * reason the wording is what it is:
  *  - Asking for a per-page RATIO does not work: ceiling ~4/6 on direction
  *    alone, mean error 0.30-0.67, and the verdicts move with the page order.
  *    So the question asks for OUTLIERS, never numbers.
- *  - Asking which pages are significantly LARGER or SMALLER than the rest is
- *    the phrasing that produced a stable signal — the true outliers were named
- *    in every order tried. That phrasing is kept verbatim.
- *  - A single read also carries false positives (pages within +/-11% of the
- *    mean). ACCEPTED: this finding flags for a human and never fires a paid
- *    edit, so a false positive costs a glance. The finding text says so.
- *  - The SMALLER side looked weaker in the wording trials. The real-story
- *    validation inverted that: SMALLER was the only direction that hit, and
- *    LARGER was missed entirely. The finding reports both facts.
+ *  - "significantly LARGER or SMALLER than the rest" is the phrasing that
+ *    produced a stable signal. It is kept verbatim.
  *  - One read in four truncated after ignoring a "no per-page numbers"
- *    instruction and enumerating estimates. That ban is therefore explicit in
- *    the question, and a reply with no usable answer is recorded as NOT
- *    EVALUATED rather than read as "no outliers".
+ *    instruction and enumerating estimates. That ban is therefore explicit, and
+ *    a reply with no usable answer is recorded as NOT EVALUATED rather than
+ *    read as "no outliers".
  *
  * NOTHING HERE REPAIRS. Shrinking a prop was measured to strand the hands off
- * it (the whole moment of that story's p5) and never reached the target size
- * anyway, and the reference-cell area lever is dead (SETTLED.md, 2026-09-19).
- * The finding goes to a human.
+ * it and never reached the target size anyway, and the reference-cell area
+ * lever is dead (SETTLED.md, 2026-09-19). The finding goes to a human.
  */
 
 /**
- * The collections whose entries have a real-world size a reader can misjudge.
- * Characters are excluded (their scale is the cast's own problem and the
- * reference sheets pin it), clothing is worn so it has no independent size,
+ * The collections whose entries have a stable real-world size a reader can
+ * misjudge. Characters are excluded (their scale is the cast's own problem and
+ * the reference sheets pin it), clothing is worn so it has no independent size,
  * and a location IS the frame rather than an object inside it.
+ *
+ * ANIMALS ARE EXCLUDED DELIBERATELY (measured 2026-09-19, see the file header):
+ * an animal's apparent size changes with its pose — a raven with its wings
+ * spread is not a raven that grew — so a size outlier named for one is
+ * meaningless by nature, not merely unreliable.
  */
-const SCALE_COLLECTIONS = ['artifacts', 'vehicles', 'animals'];
+const SCALE_COLLECTIONS = ['artifacts', 'vehicles'];
 
 /** Below this many pages there is no meaningful rest-of-the-book to compare to. */
 const MIN_PAGES = 4;
@@ -134,6 +128,13 @@ function citedIds(scene) {
 /**
  * Pick the props worth asking about.
  *
+ * Three gates, and each one removes a measured failure rather than a guess:
+ * the entry is in a NON-ANIMAL scale collection (an animal's drawn size moves
+ * with its pose), it carries a DECLARED size (`scaleClass` band, or a stored
+ * pre-enum free-text `size` — read through the shared `elementScaleNote()` so
+ * this check and the image prompt agree on what "declared" means), and a brief
+ * CITES it on at least `minPages` audited pages.
+ *
  * GENERIC IS ALREADY HANDLED, and deliberately not re-implemented here: an
  * entry the author marked `generic: true` is DROPPED at parse time into
  * `visualBible.genericObjects[]` with NO id (visualBible.js, isGenericEntry).
@@ -146,6 +147,9 @@ function citedIds(scene) {
  */
 function selectScaleObjects(storyData, auditablePages, opts = {}) {
   const minPages = opts.minPages == null ? MIN_PAGES : opts.minPages;
+  // The one source of scale truth, shared with the image prompt: the authored
+  // `scaleClass` band's phrase, or a pre-enum bible's stored free-text `size`.
+  const { elementScaleNote } = require('./visualBible');
   const vb = (storyData && storyData.visualBible) || {};
   const readable = new Set((auditablePages || []).map(Number));
 
@@ -171,6 +175,7 @@ function selectScaleObjects(storyData, auditablePages, opts = {}) {
         collection,
         label: String(entry.label || entry.name || entry.properName || id).trim(),
         pages,
+        declaredSize: elementScaleNote(entry),
       });
     }
   }
@@ -178,7 +183,8 @@ function selectScaleObjects(storyData, auditablePages, opts = {}) {
   const skipped = [];
   const candidates = [];
   for (const r of rows) {
-    if (r.pages.length < minPages) skipped.push({ ...r, reason: 'too_few_pages' });
+    if (!r.declaredSize) skipped.push({ ...r, reason: 'no_declared_size' });
+    else if (r.pages.length < minPages) skipped.push({ ...r, reason: 'too_few_pages' });
     else candidates.push(r);
   }
   // Most-seen first: the prop a reader meets on the most pages is the one whose
@@ -188,44 +194,45 @@ function selectScaleObjects(storyData, auditablePages, opts = {}) {
 }
 
 /**
- * The question, built ONCE for every page the candidate props appear on.
+ * The question, built for ONE prop, over every page that ONE prop is on.
  *
- * `batchPages` is the full set of pages the audit could read — the caller
- * passes the whole book, never a chunk. A prop is named only when at least two
- * of those pages show it ("larger than on the other pages" is unanswerable
- * from a single picture), and with nothing to ask the text is empty and no
- * call is made at all.
+ * ONE PROP PER CALL is the measured shape (file header): asking about all the
+ * story's props together flipped the judge onto the wrong side of the book's
+ * real defect and carried three false positives; asking about the egg alone
+ * named the boulder page in both runs, byte-identical, with one mild FP.
+ *
+ * `batchPages` is the set of pages the audit could read — the caller passes the
+ * whole book, never a chunk. The prop is asked about only when at least two of
+ * those pages show it ("larger than on the other pages" is unanswerable from a
+ * single picture), and with nothing to ask the text is empty and no call is
+ * made at all.
  *
  * The three things the measurement says must stay in the wording: outliers
  * only (never a ratio), the ban on per-page numeric estimates (ignoring it
  * truncated a read), and explicit permission to answer "none".
  *
- * @param {Array} candidates   rows from selectScaleObjects
+ * @param {Object} candidate   ONE row from selectScaleObjects
  * @param {number[]} batchPages every page the audit resolved, in reading order
- * @returns {{text: string, asked: Array}} `text` is '' when nothing qualifies
+ * @returns {{text: string, asked: Object|null}} `text` is '' when nothing qualifies
  */
-function buildScaleQuestion(candidates, batchPages) {
+function buildScaleQuestion(candidate, batchPages) {
+  if (!candidate) return { text: '', asked: null };
   const inBatch = new Set((batchPages || []).map(Number));
-  const asked = [];
-  for (const c of (candidates || [])) {
-    const here = c.pages.filter(p => inBatch.has(Number(p)));
-    if (here.length < 2) continue;
-    asked.push({ ...c, batchPages: here });
-  }
-  if (asked.length === 0) return { text: '', asked: [] };
+  const here = (candidate.pages || []).filter(p => inBatch.has(Number(p)));
+  if (here.length < 2) return { text: '', asked: null };
+  const asked = { ...candidate, batchPages: here };
 
-  const lines = asked.map(a => `- ${a.label}: pages ${a.batchPages.map(p => `p${p}`).join(', ')}`);
   const text = [
-    'OBJECT SIZE. Below are pages from one finished picture book, in reading order: a label for each page followed by the picture on it. These recurring objects appear on the pages named:',
-    ...lines,
+    'OBJECT SIZE. Below are pages from one finished picture book, in reading order: a label for each page followed by the picture on it. One recurring object appears on the pages named:',
+    `- ${asked.label}: pages ${here.map(p => `p${p}`).join(', ')}`,
     '',
-    'Looking only at how large each object is DRAWN relative to the people and the surroundings in its own picture, is it rendered significantly LARGER on some of those pages than on the rest, or significantly SMALLER? Its colour, its markings, its position and what is happening in the story are outside this question.',
+    'Looking only at how large that object is DRAWN relative to the people and the surroundings in its own picture, is it rendered significantly LARGER on some of those pages than on the rest, or significantly SMALLER? Its colour, its markings, its position and what is happening in the story are outside this question.',
     '',
-    'Name only the pages that depart from how the object looks on the others. Say nothing about a page that sits near the rest. For each object write at most one line of each kind, at the left margin:',
+    'Name only the pages that depart from how the object looks on the others. Say nothing about a page that sits near the rest. Write at most one line of each kind, at the left margin:',
     'SCALE[LARGER]: <object> — p<N>, p<N>',
     'SCALE[SMALLER]: <object> — p<N>',
     '',
-    'An object drawn consistently gets no line at all; write "SCALE: none" when no object departs. Do not estimate a size, a ratio, a percentage or a measurement for any page, and do not write a page-by-page list — name the departing pages or nothing. Write nothing else.',
+    'An object drawn consistently gets no line at all; write "SCALE: none" when it does not depart on any page. Do not estimate a size, a ratio, a percentage or a measurement for any page, and do not write a page-by-page list — name the departing pages or nothing. Write nothing else.',
   ].join('\n');
   return { text, asked };
 }
@@ -268,19 +275,20 @@ function parseScaleAnswer(raw) {
 /**
  * The finding text.
  *
- * It states what the reader must weigh it by, measured on the one real story
- * it has been validated against: the check named 1 of 3 true outliers (the
- * small one), missed both large ones, and named 2-3 pages that were fine. So a
- * SCALE line is a prompt to go and look, never a verdict — and a silent run is
- * not evidence the book is consistent. It flags a human and fires no paid edit,
- * so the cost of being wrong is a glance.
+ * It states what the reader must weigh it by, measured on the one real story it
+ * has been validated against in the shipped one-prop-per-call shape: it names
+ * the book's most visible size outlier, stably across repeat runs, and it also
+ * names the occasional page that merely sits at the book's own average, and it
+ * misses the milder outliers. So a SCALE line is a prompt to go and look, never
+ * a verdict — and a silent run is not evidence the book is consistent. It flags
+ * a human and fires no paid edit, so the cost of being wrong is a glance.
  */
 function buildScaleFinding(label, larger, smaller) {
   const parts = [];
   if ((larger || []).length) parts.push(`drawn larger than on the other pages on ${larger.map(p => `p${p}`).join(', ')}`);
-  if ((smaller || []).length) parts.push(`drawn smaller on ${smaller.map(p => `p${p}`).join(', ')} (the direction measured as weaker on earlier reads, though it is the one that hit on the validation story)`);
+  if ((smaller || []).length) parts.push(`drawn smaller on ${smaller.map(p => `p${p}`).join(', ')}`);
   if (!parts.length) return null;
-  return `SCALE: "${label}" — ${parts.join('; ')}. LOW CONFIDENCE: on the one story this check was validated against it named 1 of 3 true outliers, missed both pages where the object was drawn too LARGE, and named 2-3 pages that were fine, so treat this as "go and look", not as a verdict. Reported for a human — nothing is repainted.`;
+  return `SCALE: "${label}" — ${parts.join('; ')}. LOW CONFIDENCE: on the one story this check was validated against it named the worst size outlier in the book and repeated that answer exactly, byte-identical, across two runs; it also named two pages that merely sit near the book's own average size, and it missed two milder outliers — so treat this as "go and look", not as a verdict, and do not read a quiet run as proof the object is consistent. Reported for a human — nothing is repainted.`;
 }
 
 module.exports = {
