@@ -49583,3 +49583,46 @@ and entity buckets are byte-identical either way. Full unit suite 4097/4097 gree
 **No paid API call was made for this change.**
 
 **Status:** ✅ active — reversible with `PROMPT_COMPLIANCE_JUDGE=true`.
+
+---
+
+## 2026-09-19 — One shot vocabulary, injected: the page's four are distance, the vantage's carry the angle
+
+**Context.** `434ea1e89` (2026-09-16) unified the shot vocabulary — *"the shot rule
+survives the cut, from one vocabulary"* — and reached the `shot` FIELD rule in all four
+brief-authoring templates via `{SHOT_ENUM}`. It left **four other hand-typed lists**
+behind, and no two of them were the same:
+
+| Where | List |
+|---|---|
+| C4, the anti-repetition rule | `close-up / medium / wide / aerial` |
+| the prose checklist, both AD templates | `close-up / medium / wide / aerial` |
+| `scene-iteration.txt` | `close-up / medium / wide / ultra-wide / aerial` |
+
+`SHOT_TYPES` is four values, **all camera distance**: `close-up`, `medium`, `wide`,
+`ultra-wide`. `aerial` is not among them and cannot occur. So C4 — the rule that stops
+two consecutive pages sharing a composition — watched for a value that can never appear
+and was blind to `ultra-wide`, which can and which `job_1789759147125_p08djwhbl` used on
+p11 and p18.
+
+**Decision.** Every PAGE-level list becomes `{SHOT_ENUM}`. C4's third axis, *"camera
+angle"*, now names where an angle actually lives: the vantage the page cites.
+
+**The VANTAGE list is different on purpose and keeps its angles.** `promptBuilders.js`
+says it outright — *"A vantage is a CAMERA ANGLE on the same place, not a different
+place"* — so `wide-low` and `aerial` belong there, and the stored data agrees: across
+~420 vantages, `wide-low` ×4 and `aerial` ×1. That list also **omitted `ultra-wide`,
+which the model used ×4 anyway**, so it now carries it. The line says explicitly that
+unlike a page's `shot`, this list carries angles.
+
+**Consequence worth naming.** Camera angle in this system is a property of the BACKDROP
+PLATE, not of the page — every page of a vantage is drawn on that vantage's plate. An
+aerial or low page is therefore reachable today, by giving the place a vantage with that
+shot. It is offered and almost never taken: 5 of ~420. Making angle variety actually
+happen is a separate piece of work and is not done here.
+
+**Touched:** `prompts/scene-expansion-all.txt` (C4, the prose checklist, the vantage
+list), `prompts/scene-expansion.txt`, `prompts/scene-iteration.txt`,
+`tests/unit/shot-vocabulary-one-source.test.ts`.
+
+**Status:** ✅ active
