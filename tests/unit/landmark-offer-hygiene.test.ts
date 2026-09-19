@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, beforeAll, expect } from 'vitest';
 
 const { buildAvailableLandmarksSection } = require('../../server/lib/promptBuilders');
 const { premiseMentionsLandmark } = require('../../server/lib/landmarkPhotos');
@@ -64,5 +64,40 @@ describe('a photo with no stored description is not offered as a photo', () => {
     }]);
     expect(s).not.toContain('reference photo');
     expect(s).toContain('(interior) Vaulted hall with painted beams');
+  });
+});
+
+describe('the landmark rule is stated ONCE, and only its consumer hears the JSON contract', () => {
+  const { buildArcCreatePrompt, buildSceneExpansionAllPrompt } = require('../../server/lib/promptBuilders');
+  const { loadPromptTemplates } = require('../../server/services/prompts');
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  const landmarks = [{
+    name: 'Lindenhof', type: 'Square', wikipediaExtract: 'The historic centre of the city.',
+    photoVariants: [{ variantNumber: 1, kind: 'medium', description: 'Town square with mature trees' }],
+  }];
+  const input = () => ({
+    pages: 18, characters: [{ name: 'Levin', age: 5 }],
+    availableLandmarks: landmarks, storyDetails: 'Four boys find an egg.', language: 'de-CH',
+  });
+
+  it('the arc prompt states the landmark count once, and it is the two-to-four rule', () => {
+    const arc = buildArcCreatePrompt(input(), 18, {});
+    expect(arc).toContain('two to four is the target');
+    // The contradicting telling rule, deleted 2026-09-19 (owner).
+    expect(arc).not.toContain('at most on the opening page');
+  });
+
+  it('the arc prompt carries no JSON output contract — it writes numbered prose', () => {
+    const arc = buildArcCreatePrompt(input(), 18, {});
+    expect(arc).not.toMatch(/isRealLandmark|landmarkQuery/);
+    expect(arc).not.toContain('Enchanted Castle');
+  });
+
+  it('the Art Director, which does emit those fields, still gets the contract', () => {
+    const s = buildAvailableLandmarksSection(landmarks, '', { jsonFields: true });
+    expect(s).toContain('"isRealLandmark": true');
+    expect(s).toContain('landmarkQuery');
+    expect(s).toContain('Enchanted Castle');
   });
 });

@@ -47125,3 +47125,44 @@ answerable without parsing anybody's prose.
 
 **Status:** ✅ active — supersedes the prose-injection design in the 2026-08-27 and
 2026-08-29 entries above.
+
+---
+
+## 2026-09-19 — The landmark rule is "two to four, woven into the action", stated ONCE, where the landmarks are listed
+
+**Context.** The arc-create prompt stated the landmark rule twice, unconditionally,
+about 5,000 chars apart, and the two versions disagreed:
+
+- the REAL LANDMARKS header (`buildAvailableLandmarksSection`): *"build at least two
+  of them in, woven into the story's action (two to four is the target)"*
+- the last bullet of RULES OF THE TELLING (`buildTellingRulesSection`, gated on a
+  `landmarks: true` option used by this one caller): *"at most on the opening page
+  before the adventure leaves home, or not at all"*
+
+Neither was conditional, so the creator obeyed whichever it read last and no later
+stage could tell which rule the arc had been written under.
+
+**Decision.** The header's version is the rule (owner, 2026-09-19). The telling-rules
+bullet is deleted, and with it the `landmarks` option on `buildTellingRulesSection` —
+the option existed only to add that bullet. A landmark rule now changes in exactly one
+place. Nothing was lost in the deletion: "never relocate the story", "a story set
+elsewhere uses none" and "no listed landmark renamed into a feature of the story's own
+setting" are all in the surviving header.
+
+The same section also carried the `isRealLandmark` / `landmarkQuery` output contract
+and a worked JSON example to EVERY consumer. Only the Art Director
+(`scene-expansion-all.txt`) emits those fields; the arc creator writes numbered prose
+sentences and was reading ~900 chars of JSON schema — including an example object with
+a `"description"` key — in a prompt that ends *"Last line, exactly: Stronger: Arc
+<N>"*. The contract is now behind a `jsonFields` option, passed by the Art Director
+site alone.
+
+**Rationale.** A rule stated twice is a rule that will drift; this pair already had.
+An output contract belongs to the stage that produces that output — handing a JSON
+schema to a prose stage is noise at best and a format trap at worst.
+
+**Touched:** `server/lib/promptBuilders.js` (`buildTellingRulesSection` loses its
+`landmarks` option and bullet; `buildAvailableLandmarksSection` gains `jsonFields`,
+default off; the Art Director site passes it), `tests/unit/landmark-offer-hygiene.test.ts`.
+
+**Status:** ✅ active

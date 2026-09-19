@@ -2536,7 +2536,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     PRIMARY_CHARACTER_NAMES: namedByMain(inputData, false),
     // Each landmark's PHOTOS line: the bible may only name a viewpoint one of
     // them shows, and the per-page `landmarkView` is picked from the same list.
-    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote, { jsonFields: true }),
     CHILD_AGE_BAND: buildChildAgeBandNote(commissionedChildBand(inputData.characters || [])),
     CREATURE_TONE: buildCreatureToneSection(inputData),
     MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3,
@@ -7415,7 +7415,14 @@ const AD_COMPOSITION_RULE = [
  * `landmarks` adds the create-only landmark line; that is the sole difference
  * between the two templates' blocks.
  */
-function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
+// The landmark rule is NOT here. It used to be — a bullet saying landmarks join
+// "at most on the opening page before the adventure leaves home, or not at all"
+// — while the REAL LANDMARKS header of the same prompt said "build at least two
+// of them in, woven into the story's action (two to four is the target)". Both
+// unconditional, ~5k chars apart, so the creator obeyed whichever it read last
+// and no later stage could tell which. Owner ruling 2026-09-19: the header's
+// version is the rule, and it is stated ONCE, where the landmarks are listed.
+function buildTellingRulesSection(inputData = {}) {
   const band = resolveAgeBand(inputData);
   const lvl = String(inputData?.languageLevel || 'standard').toLowerCase();
   const simple = SIMPLE_BANDS.has(band);
@@ -7466,7 +7473,6 @@ function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
     '- Names the commission gives stand as written; every other vessel, vehicle or place name is invented fresh and distinctive — never a variant of a given name, and two vessels never share a word.',
     '- When the deadline is a time of day, the story starts at an hour the book\'s length can cross to reach it.',
     '- The commission\'s central figure acts in every third of the story — chooses, moves, speaks, changes something; never reduced to cargo another figure carries.',
-    ...(landmarks ? ['- Landmarks join the story only where they belong to the world the commission names — at most on the opening page before the adventure leaves home, or not at all; a story set elsewhere uses none, renamed or otherwise; never relocate the story to reach one.'] : []),
   ].join('\n');
 }
 
@@ -7484,7 +7490,7 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = 
     AGE_MODE: buildAgeModeSection(inputData),
     AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
-    TELLING_RULES: buildTellingRulesSection(inputData, { landmarks: true }),
+    TELLING_RULES: buildTellingRulesSection(inputData),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
@@ -8783,7 +8789,17 @@ function shortLandmarkDescription(extract) {
   return window.slice(0, LANDMARK_DESCRIPTION_MAX).replace(/\s+\S*$/, '').trim() + '…';
 }
 
-function buildAvailableLandmarksSection(landmarks, retryNote = '') {
+/**
+ * @param {Object} opts
+ *   jsonFields  emit the `isRealLandmark` / `landmarkQuery` output contract and
+ *               its JSON example. ONLY the Art Director emits those fields, and
+ *               only it should be told about them. The arc creator writes
+ *               numbered prose sentences and was carrying ~900 chars of JSON
+ *               schema for a format it must never produce — including a worked
+ *               example object with a "description" key, in a prompt that ends
+ *               "Last line, exactly: Stronger: Arc <N>".
+ */
+function buildAvailableLandmarksSection(landmarks, retryNote = '', { jsonFields = false } = {}) {
   if (!landmarks || landmarks.length === 0) {
     return '';
   }
@@ -8822,17 +8838,22 @@ function buildAvailableLandmarksSection(landmarks, retryNote = '') {
   const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
   const hasPhotos = landmarks.some(l => Array.isArray(l.photoVariants) && l.photoVariants.length > 0);
 
-  return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none — no entry with isRealLandmark or landmarkQuery, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
+  // THE ONE STATEMENT OF THE LANDMARK RULE (owner, 2026-09-19). The telling
+  // rules used to carry a second, contradictory one ("at most on the opening
+  // page ... or not at all"); it is deleted. If a landmark rule needs changing,
+  // it changes here and nowhere else.
+  return `**REAL LANDMARKS — use only where they belong to the world the commission names. When the story's own places offer landmarks from this list, build at least two of them in, woven into the story's action (two to four is the target); never relocate the story or bend the plot to collect them. A story set anywhere else uses none${jsonFields ? ' — no entry with isRealLandmark or landmarkQuery' : ''}, and no listed landmark renamed or reworked into a feature of the story's own setting. A landmark carried as background scenery counts as used:**
 ${retryNote ? `\n${retryNote}\n` : ''}
 ${landmarkList}
 
 When you use a landmark from the list (even if you rename it in your story):
-- Set "isRealLandmark": true
+${jsonFields ? `- Set "isRealLandmark": true
 - Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
-${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
+` : ''}${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story
 - The DESCRIPTION is reference for you, not wording for the page. Never carry an abbreviation, acronym or technical term from it into the story — name the thing the way a child would say it` : ''}
 ${hasPhotos ? `- A landmark is drawn from one of its PHOTOS. Name a location or a vantage of it only from a viewpoint one of its photos shows — an exterior is seen from the street or the square, an interior from inside, a distant or view-from photo from afar. If no photo shows the view a page needs (a skyline from a hilltop, a bird's-eye, the far side), that landmark is not available for that page: use one whose photos fit, or none` : ''}
 
+${jsonFields ? `
 EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 {
   "name": "The Enchanted Castle",
@@ -8842,7 +8863,7 @@ EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 }
 
 Your "name" can be creative, but "landmarkQuery" MUST match the original name exactly (without the [type] suffix)!
-`;
+` : ''}`;
 }
 
 // ============================================================================
