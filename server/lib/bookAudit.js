@@ -196,10 +196,36 @@ async function judgeChunkOpenRouter(parts, modelId, thinkingLevel) {
   };
 }
 
+/**
+ * The template file holds TWO prompts: the reader's-eye pass, and the
+ * cross-page object-scale pass below this marker. They live in one file
+ * because they are one stage's prompt work, and they are SPLIT before filling
+ * because each pass must never see the other's instructions — a chunk call
+ * that also carried "output only LARGER/SMALLER" would stop reporting faults.
+ */
+const SCALE_SECTION_MARKER = '===OBJECT-SCALE PASS===';
+
+/** @returns {{reading: string, scale: string|null}} */
+function splitBookAuditTemplate(template) {
+  const text = String(template || '');
+  const at = text.indexOf(SCALE_SECTION_MARKER);
+  if (at < 0) return { reading: text, scale: null };
+  return {
+    reading: text.slice(0, at).trimEnd(),
+    scale: text.slice(at + SCALE_SECTION_MARKER.length).trim(),
+  };
+}
+
+/** Dispatch a built part list to whichever vendor the model id names. */
+async function judgeParts(parts, modelId, thinkingLevel) {
+  if (isOpenRouterId(modelId)) return judgeChunkOpenRouter(parts, modelId, thinkingLevel);
+  return judgeGeminiParts(parts, modelId, thinkingLevel);
+}
+
 /** One vision call over one chunk of pages. Returns raw text + usage. */
 async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   const { fillTemplate } = require('../services/prompts');
-  const instructions = fillTemplate(template, {
+  const instructions = fillTemplate(splitBookAuditTemplate(template).reading, {
     PAGE_LIST: chunk.map(p => p.pageNumber).join(', '),
     // ONE rule for every template that authors or judges a page against its
     // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). This audit
@@ -219,9 +245,11 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   }
 
   assertPromptFilled(parts, 'bookAudit.judgeChunk');
+  return judgeParts(parts, modelId, thinkingLevel);
+}
 
-  if (isOpenRouterId(modelId)) return judgeChunkOpenRouter(parts, modelId, thinkingLevel);
-
+/** The native-Google call. Same body production has always sent. */
+async function judgeGeminiParts(parts, modelId, thinkingLevel = null) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY missing');
 
@@ -258,7 +286,7 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   // audit. Say so out loud rather than under-reporting silently.
   const finish = data.candidates?.[0]?.finishReason;
   if (finish && finish !== 'STOP') {
-    log.warn(`⚠️ [BOOK-AUDIT] chunk p${chunk[0].pageNumber}-${chunk[chunk.length - 1].pageNumber} finished as ${finish} — faults may be missing`);
+    log.warn(`⚠️ [BOOK-AUDIT] a call finished as ${finish} — output may be truncated`);
   }
   const text = (data.candidates?.[0]?.content?.parts || [])
     .filter(p => !p.thought)
@@ -273,6 +301,89 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
       thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0,
     },
   };
+}
+
+/**
+ * CROSS-PAGE OBJECT SCALE — three shuffled reads, act on the intersection.
+ *
+ * Every call sees the SAME page images for one prop in a DIFFERENT order,
+ * because the order was measured to move the verdict (see objectScaleAudit.js
+ * for the full evidence). Only a page every successful call named is reported.
+ * Fewer than MIN_ANSWERS usable replies → one retry → the object is recorded
+ * as NOT EVALUATED, never as clean and never as a partial list.
+ *
+ * REPORTED, NOT REPAIRED: the result lands in its own `objectScale` field and
+ * is deliberately kept out of `byRoute`, which is what the corrective rounds
+ * consume.
+ */
+async function auditObjectScale(scaleTemplate, prepared, storyData, opts) {
+  const scaleLib = require('./objectScaleAudit');
+  const { fillTemplate } = require('../services/prompts');
+  const { modelId, thinkingLevel = null, usage, notEvaluated } = opts;
+
+  const pages = prepared.map(p => p.pageNumber);
+  const { candidates, skipped } = scaleLib.selectScaleObjects(storyData, pages);
+  for (const s of skipped) {
+    notEvaluated.record('object_scale', s.reason,
+      `"${s.label}" (${s.id}) cited on ${s.pages.length} audited page(s): ${s.pages.map(p => `p${p}`).join(', ')}`);
+  }
+  if (candidates.length === 0) return { objects: [], findings: [] };
+
+  const byPage = new Map(prepared.map(p => [p.pageNumber, p]));
+  const objects = [];
+  const findings = [];
+
+  for (const obj of candidates) {
+    const instructions = fillTemplate(scaleTemplate, { OBJECT_LABEL: obj.label });
+    const objPages = obj.pages.map(n => byPage.get(n)).filter(Boolean);
+
+    const lists = [];
+    let calls = 0;
+    // SCALE_CALLS reads, plus ONE retry round for the truncation case (1 run in
+    // 4 returned nothing when this was measured).
+    const maxCalls = scaleLib.SCALE_CALLS + scaleLib.MIN_ANSWERS;
+    while (lists.length < scaleLib.MIN_ANSWERS && calls < maxCalls) {
+      const seed = (obj.id.length * 7919) + (calls * 104729) + objPages.length;
+      const order = scaleLib.shuffleWithSeed(objPages, seed);
+      const parts = [{ text: instructions }];
+      for (const p of order) {
+        parts.push({ text: `PAGE ${p.pageNumber}` });
+        parts.push(p.part);
+      }
+      calls += 1;
+      try {
+        assertPromptFilled(parts, 'bookAudit.auditObjectScale');
+        const r = await judgeParts(parts, modelId, thinkingLevel);
+        usage.input_tokens += r.usage.input_tokens;
+        usage.output_tokens += r.usage.output_tokens;
+        usage.thinking_tokens += r.usage.thinking_tokens;
+        if (typeof r.usage.cost_usd === 'number') usage.cost_usd = (usage.cost_usd || 0) + r.usage.cost_usd;
+        const parsed = scaleLib.parseScaleReply(r.text);
+        if (!parsed) {
+          log.warn(`⚠️ [BOOK-AUDIT] object-scale read for "${obj.label}" returned no LARGER/SMALLER line — not counted`);
+          continue;
+        }
+        lists.push(parsed);
+      } catch (err) {
+        log.warn(`⚠️ [BOOK-AUDIT] object-scale read for "${obj.label}" failed: ${err.message}`);
+      }
+    }
+
+    if (lists.length < scaleLib.MIN_ANSWERS) {
+      notEvaluated.record('object_scale', 'insufficient_scale_reads',
+        `"${obj.label}" (${obj.id}): ${lists.length} usable read(s) of ${calls} call(s), ${scaleLib.MIN_ANSWERS} needed to intersect`);
+      objects.push({ id: obj.id, label: obj.label, pages: obj.pages, reads: lists.length, evaluated: false });
+      continue;
+    }
+
+    const larger = scaleLib.intersectOutliers(lists.map(l => l.larger));
+    const smaller = scaleLib.intersectOutliers(lists.map(l => l.smaller));
+    const finding = scaleLib.buildScaleFinding(obj.label, larger, smaller);
+    if (finding) findings.push(finding);
+    objects.push({ id: obj.id, label: obj.label, pages: obj.pages, reads: lists.length, evaluated: true, larger, smaller });
+  }
+
+  return { objects, findings };
 }
 
 /** Pull routed fault lines out of the concatenated raw output. */
@@ -320,6 +431,9 @@ async function auditStoryBook(storyData, opts = {}) {
     modelId = MODEL_DEFAULTS.utility || 'gemini-2.5-flash',
     // Lab-only. Absent = today's behaviour, byte-identical.
     thinkingLevel = null,
+    // The cross-page object-scale pass. On by default; a caller that only
+    // wants the reader's-eye faults (a replay, a Lab arm) turns it off.
+    objectScale: objectScaleEnabled = true,
   } = opts;
   const storyId = opts.storyId || storyData?.id || null;
 
@@ -384,6 +498,26 @@ async function auditStoryBook(storyData, opts = {}) {
     }
     if (raws.length === 0) throw new Error('every chunk failed');
 
+    // Cross-page object scale. Reported only — see auditObjectScale. Its
+    // absences use the shared notEvaluated vocabulary so an analyst reading
+    // stored data sees "could not check" the same way everywhere.
+    const notEvaluated = require('./notEvaluated').createNotEvaluatedRecorder({ pageContext: 'book' });
+    let objectScale = null;
+    const { scale: scaleTemplate } = splitBookAuditTemplate(template);
+    if (objectScaleEnabled && scaleTemplate) {
+      try {
+        const r = await auditObjectScale(scaleTemplate, prepared, storyData, {
+          modelId, thinkingLevel, usage, notEvaluated,
+        });
+        objectScale = { ...r, notEvaluated: notEvaluated.list() };
+        for (const f of r.findings) log.info(`📐 [BOOK-AUDIT] ${f}`);
+      } catch (err) {
+        log.warn(`⚠️ [BOOK-AUDIT] object-scale pass skipped: ${err.message}`);
+        notEvaluated.record('object_scale', 'scale_pass_failed', err.message);
+        objectScale = { objects: [], findings: [], notEvaluated: notEvaluated.list() };
+      }
+    }
+
     const raw = raws.join('\n');
     if (usageTracker && (usage.input_tokens || usage.output_tokens)) {
       usageTracker('gemini_quality', usage, 'book_audit', modelId);
@@ -400,6 +534,7 @@ async function auditStoryBook(storyData, opts = {}) {
       chunkUsage,
       modelId,
       thinkingLevel,
+      objectScale,
       pagesRead: prepared.map(p => p.pageNumber),
       pagesSkipped: missing.sort((a, b) => a - b),
     };
@@ -409,4 +544,12 @@ async function auditStoryBook(storyData, opts = {}) {
   }
 }
 
-module.exports = { auditStoryBook, buildAuditPages, shippedVersionIndex, parseRoutes, CHUNK_PAGES };
+module.exports = {
+  auditStoryBook,
+  buildAuditPages,
+  shippedVersionIndex,
+  parseRoutes,
+  splitBookAuditTemplate,
+  SCALE_SECTION_MARKER,
+  CHUNK_PAGES,
+};

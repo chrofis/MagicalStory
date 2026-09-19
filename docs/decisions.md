@@ -48138,3 +48138,81 @@ contradict one, never work through a whole list") and is untouched.
 `scripts/admin/sibling-registry.json`, `tests/unit/character-source-rule-reach.test.ts`.
 
 **Status:** ✅ active
+
+
+## 2026-09-19 — Cross-page object SCALE is checked once, at the book audit, and it FLAGS a human rather than firing a repair
+
+**Context:** A recurring prop's drawn size drifts page to page (the worked case:
+a dragon egg authored "about as big as a human head", rendered football-sized on
+two pages and fist-sized on another), and nothing in the pipeline can see it.
+Every per-page judge reads ONE image against ONE brief, so both the too-big page
+and the too-small page score clean. Scale is only visible ACROSS the book. The
+owner's ruling: *"You should add this check to the reviewer at the end — the one
+that reviews the entire story with text and images."* That is the final book
+audit (`server/lib/bookAudit.js`), which already holds every page's words beside
+its shipped picture.
+
+**Decision:** A cross-page object-scale pass inside the book audit.
+1. Scope: Visual Bible entries in `artifacts` / `vehicles` / `animals` that a
+   page's brief CITES in `objects[]`. Requiring a cited id IS the generic gate —
+   an entry marked `generic: true` is dropped at parse time with no id
+   (`visualBible.js`, `isGenericEntry`), so everyday clutter cannot be cited.
+   Characters, clothing and locations are excluded by collection. An object on
+   fewer than **4** audited pages is skipped (no meaningful average to depart
+   from) and says so.
+2. Question: **outliers only** — "which pages show the object significantly
+   LARGER than the average across this set, which significantly SMALLER; say
+   nothing about pages near the average; an empty list is allowed." Per-page
+   numeric estimates are explicitly forbidden in the prompt.
+3. **Three calls, each with its own shuffled page order; a page is reported
+   only if every successful call named it.** Fewer than three usable replies →
+   one retry round → the object is recorded through the shared `notEvaluated`
+   machinery (`object_scale` / `insufficient_scale_reads`), never as clean and
+   never from a partial set.
+4. The result lands in its own `objectScale` field on the audit result and is
+   deliberately kept OUT of `byRoute`, which the corrective rounds consume.
+   **Nothing is repainted.** No scored type was added; no scoring changed.
+
+**Rationale:** Measured on `job_1789759147125_p08djwhbl`, CHF ~1.9 total.
+- **Per-page ratios do not work.** Three separate tests; ceiling ~4/6 on
+  DIRECTION alone, mean error 0.30–0.67. And the batched per-page verdicts are
+  ORDER-DEPENDENT: reshuffling the page order flipped **5 of 9** verdicts on
+  byte-identical images, and the judge's chosen reference page moved with
+  position. Reproduced on a second story.
+- **The outlier question works — at the intersection, on the larger side.**
+  Four orders run; the intersection across the three that answered was exactly
+  the true outliers (**p3, p5**) with **zero false positives**, regardless of
+  position. Every SINGLE run's list carried false positives (p7, p2, p4 — all
+  within ±11% of the mean), so the intersection is the result and no single
+  call ever is. This is the same confirm-and-intersect discipline the style
+  audit's `CONFIRMATION_FLAG_RATIO` enforces (Lab 985–987, memory
+  `grid_judge_collapse`): a batched VLM verdict an independent sample does not
+  reproduce is not evidence.
+- **The smaller side is weaker and the finding says so.** p9, a true small
+  outlier, was named twice with a false positive attached and then dropped
+  entirely in the fourth order. The finding text names the larger side as the
+  measured-reliable one and the smaller side as "a pointer, not a verdict", so
+  a reader does not weigh them equally.
+- **1 run in 4 returned nothing**, truncating on its own reasoning after
+  ignoring the "no per-page numbers" instruction and enumerating estimates.
+  That is why the instruction is explicit in the prompt and why a non-answer is
+  a MISSING read rather than an empty one: counting it as empty would silently
+  collapse an intersection.
+- **Why it flags instead of repairing.** Shrinking the prop was measured to
+  strand the hands off it (page 5's whole moment) and never reached the target
+  size anyway; the reference-cell area lever is dead (SETTLED.md, 2026-09-19 —
+  25× cell area bought 0–18% where +90% is needed); and the `scaleClass` text
+  layer is correct and also does not move the pixels. With no lever that works,
+  an automatic repair could only make pages worse. A human sees the finding.
+
+**Cost shape:** three cheap vision calls per audited object, capped at
+`MAX_OBJECTS = 2` per book; objects past the cap are recorded as
+`object_budget_exhausted` rather than dropped in silence.
+
+**Touched:** `server/lib/objectScaleAudit.js` (new — selection, seeded shuffle,
+reply parsing, intersection, finding text), `server/lib/bookAudit.js`
+(`splitBookAuditTemplate`, `judgeParts`, `auditObjectScale`, the `objectScale`
+result field), `prompts/book-audit.txt` (the `===OBJECT-SCALE PASS===` section),
+`tests/unit/book-audit-object-scale.test.ts`, `docs/image-routing.md`.
+
+**Status:** ✅ active
