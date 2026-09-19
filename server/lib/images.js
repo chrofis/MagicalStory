@@ -4045,8 +4045,11 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
   // declared set never depended on the declaration re-ask's output, and judging
   // a correction on the UNION is what the second re-ask's hand-rolled
   // cross-guard was reaching for: a correction that resolves one family by
-  // breaching the other introduces a finding, and an introduced finding is a
-  // refusal.
+  // breaching the other introduces a finding, and an introduced finding is
+  // REPORTED, not a refusal — that refusal branch was deleted on 2026-09-18
+  // (74bcaa79e; briefCorrection.judgeCorrection, and docs/decisions.md "A brief
+  // correction is never refused for a finding it newly REPORTS"). `strict` now
+  // refuses only a correction that resolves nothing.
   //
   // THE DECLARED SET (2026-09-16): objects[] / characters[] may cite only
   // original ∪ plan-line ∪ feedback. Measured on job_1789506283204_3kxqshifx,

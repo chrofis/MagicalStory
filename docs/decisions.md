@@ -21,6 +21,66 @@ superseded and link forward.
 
 ---
 
+## 2026-09-18 — A brief correction is never refused for a finding it newly REPORTS
+
+**Context.** `judgeCorrection` (`server/lib/briefCorrection.js`) is the one verdict both brief
+paths take: the authored path's post-review re-check (beatsPipeline, `advisory`) and the
+rewrite path's corrective re-ask (images.js `iteratePageCore`, `strict`). Since it shipped
+(`5f12f4e66`, 2026-09-17 — "One corrective loop: the authored brief and the rewritten brief
+answer their findings the same way", below) `strict` refused any correction whose after-list
+carried a (page, type) the before-list did not — "refused: introduces …".
+
+**Decision.** That branch is deleted. `strict` now takes a correction when it resolves at
+least one finding, whatever else its re-check reports. `refused: resolves nothing` is
+untouched. The partition is unchanged: `resolved` / `survived` / `introduced` are all still
+returned, the taken verdict names what the corrected text now reports, and `correctFindings`
+raises a dedicated WARN line for it.
+
+**Rationale — measured, not argued.** Replayed offline at `dba954ee6` over the 11 stored
+iterate rounds of staging `job_1789584708605_rts4wqupm` and `job_1789506283204_3kxqshifx`
+(write-up: scratchpad `decisions-refusal-remeasure.md`). The branch fired 5 times and was
+wrong on 5 of 5 (7 of 7 before `element_uncited` was deleted the same morning in `ea8e36198`):
+
+- On every one the corrector had resolved **every** finding it was sent, and the "introduced"
+  fault was already stated in the page's own **plan line**, which predates both the rewrite
+  and the correction.
+- The mechanism is the checks' own inputs. `interaction_multiple_actions` counts
+  `interactions[].action` and `interaction_object_shared_hands` counts `interactions[].hands`
+  (`sceneBriefCheck.js` checks C and D). **All 11 rewrites returned their interaction rows
+  with neither field on any row** — row keys were `character object where priority
+  storyRelevant`, nothing else — so both checks were structurally OFF: silent, not passing.
+  The corrector restores the fields, which is exactly what the `brief_field_dropped` finding
+  asked of it, and the checks wake and report a fault that was always there.
+- **Refusing was not the conservative side.** `iterateSceneMetadata` (images.js) restores
+  seven parent fields onto a rewrite and deliberately NOT `action` / `depth` / `looksAt`, so a
+  refused page ships an interaction table stating nobody is doing anything into the builders
+  that read those fields (`compositeCastBuilder` reads `row.action`, `buildExactPosesBlock`
+  skips background figures by `depth`, `LOOKS_AT_FIELD_RULE` is a stated prompt contract). It
+  traded a reported fault for a silent one.
+- **And the test was blind to what it existed to catch.** It compares finding *types*. Real
+  vandalism — a dropped character, a changed location, a deleted prop — produces *fewer*
+  findings, which a type-set comparison reads as success. It caught the harmless case and
+  missed the harmful one.
+
+**Exposure it removes.** Over 139 staging stories: 657 iterate rounds, 360 reach the
+corrector, and 340 of those (94%) are `brief_field_dropped` — the exact finding whose
+correction unmasks the two counters. At the measured 5-of-11 rate that is ≈160 refused rounds
+over that corpus, ≈2 pages per 18-page story shipping with an unlabelled interaction table.
+Zero production damage to date: `origin/master` is 12 days behind and has never run the rule.
+
+**What would reopen it.** One genuinely new introduced fault — a second action the page's plan
+line does NOT carry and the pre-correction rewrite's own rows do not state. That is now
+greppable: `correctFindings` logs `⚠️ [BRIEF-FIX] …: the corrected text newly reports …`
+on every taken correction that reports something new.
+
+**Touched files.** `server/lib/briefCorrection.js`,
+`tests/unit/brief-corrective-loop-shared.test.ts`. This entry also amends the stale block
+comment above the corrective re-ask in `server/lib/images.js`, which still described the
+deleted branch as live.
+**Status:** ✅ active — commit `74bcaa79e`, staging, not pushed. Supersedes the "introduces
+none" half of "One corrective loop: the authored brief and the rewritten brief answer their
+findings the same way" (2026-09-17, `5f12f4e66`) — everything else in that entry stands.
+
 ## 2026-09-18 — The Grok vision fallback names a model xAI still serves, and retirement becomes a field rather than a comment
 
 **Context.** The pricing audit below (`d19c2dc50`) left a ⚠️ in `MODEL_PRICING` saying that
@@ -3360,7 +3420,8 @@ even identical code."* The three shared halves are ONE implementation in
   it against its own review prompt (the briefs are in `{ALL_SCENES}`); the rewrite path builds its
   payload with `renderCorrectionRequest`, which carries the prior brief by construction.
 - `judgeCorrection({ before, after, acceptance })` — the verdict, keyed by (page, type). `strict`
-  (rewrite path) takes a correction only when it resolves at least one finding and introduces none;
+  (rewrite path) took a correction only when it resolved at least one finding and introduced none
+  — the `introduces none` half was deleted 2026-09-18, see the Status line below;
   `advisory` (authored path, owner ruling 2026-08-11) takes the rewrite whatever it did and reports
   the partition. The authored path's hand-rolled `introduced` / `survived` filters are gone — that
   partition IS this function.
@@ -3453,7 +3514,13 @@ the one that resolves nothing.
 `tests/unit/iterate-rewrite-keeps-the-brief.test.ts`, `tests/unit/iterateBeat.test.ts`,
 `tasks/BACKLOG.md`
 
-**Status:** ✅ active
+**Status:** ✅ active, except the `strict` refusal-on-introduced clause — 🗄 superseded 2026-09-18
+by "A brief correction is never refused for a finding it newly REPORTS" at the top of this file
+(`74bcaa79e`). Two sentences above are historical because of it: the `strict` bullet in the
+Decision section, and "a correction that resolves one family by breaching the other now INTRODUCES
+a finding, and an introduced finding is a refusal" at the end of that section. An introduced
+finding is now REPORTED, not refused — `strict` refuses only a correction that resolves nothing.
+The measurement above stands as written; what changed is the verdict it was used to justify.
 
 ## 2026-09-17 — An object several characters touch is staged where all of them can reach it
 
