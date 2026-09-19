@@ -46689,3 +46689,56 @@ covers the age-band files and none is needed — there is no second copy.
 (`BAND_PREMISE_SLOTS` + its two doc comments), `docs/decisions.md`.
 **Status:** ✅ active, NOT yet measured — committed on `staging`, not pushed. The next idea round is
 what tests it, under the methodology entry of 2026-09-16 (structural counts, one rater, both rounds).
+
+---
+
+## 2026-09-19 — "Not set" and "they don't know each other" are two different answers, and only the second reaches the writer
+
+**Context.** The relationship matrix had ONE value for both cases: `Not Known to`, auto-filled into every
+ordered pair on entering wizard step 2 and also the only way a user could say "these two are strangers".
+`buildRelationshipLines` (`server/lib/promptBuilders.js`) dropped it with `type === 'Not Known to'` — the
+ENGLISH literal, at three comparison sites. The wizard stores the LOCALIZED label, so for de/fr/it the guard
+never fired and every unanswered cell reached the arc author as a positive assertion. Staging
+`job_1789759147125_p08djwhbl` (de-ch) sent ten of them ("Levin is Nicht bekannt mit Max"); the matrix held 12
+ordered pairs and the user had filled 2. 60 occurrences of the German string in stored data, 0 of the English.
+The arc author was told ten times that the cast were strangers and wrote them meeting as strangers. A second
+site, `server/routes/storyIdeas.js`, had no guard at all and emitted the sentinel verbatim in every language,
+English included.
+
+**Decision.** Split the one value into two sentinels, neither of them a relationship.
+
+- **`Not set`** (de `Nicht festgelegt`, fr `Non défini`, it `Non definito`) — the default every cell is
+  seeded with. The user has not answered. Emits **nothing** to any prompt.
+- **`Don't know each other`** (de `Kennen sich nicht`, fr `Ne se connaissent pas`, it `Non si conoscono`) —
+  a deliberate choice. It is a fact about the cast, so it **does** reach the writer, as one reciprocal
+  sentence per pair: `A and B do not know each other`. Both sentinels are symmetric and their own inverse.
+
+The labels live in `shared/relationship-sentinels.json` — one table, two consumers, the same mechanism as
+`shared/topic-age-windows.json`. Each runtime writes its own predicate over that table
+(`isNotSetRelationship` / `isStrangersRelationship`, identically named on both sides); the pair is registered
+as siblings (`relationship-sentinel-predicates`) because the strings cannot drift but the predicates can.
+
+**Legacy data reads as `Not set`.** Before the split one value was both the auto-fill default and the only
+way to say "strangers", so the two are not distinguishable retroactively. The owner's position is that it was
+the default, not a choice — and that is also the safe reading, because it emits nothing, which is exactly
+what the English path already did. The legacy labels stay in the shared table as *recognised input* only.
+**No migration invents deliberate strangers.**
+
+**Rationale.** Absence of input must say nothing; a deliberate statement must say something. Collapsing them
+is what produced the bug — the default was indistinguishable from an assertion, so the only two available
+behaviours were "lie to the writer" and "throw away a real answer". Hand-copying the label list into the
+server was rejected under the standing "fix the mirror class, not the instance" rule: the repo already had a
+shared-JSON mechanism, so the strings became data rather than a second maintained copy. The single ambiguous
+`isNotKnownRelationship` was removed rather than kept, because its call sites meant two different questions —
+the wizard's completeness warning means "is this unanswered?" while the renderer means both — and a predicate
+that silently answers whichever one you assumed is how the two cases got conflated in the first place.
+
+**Touched:** `shared/relationship-sentinels.json` (new), `server/lib/relationships.js` (new),
+`client/src/constants/relationships.ts`, `server/lib/promptBuilders.js` (`buildRelationshipLines`),
+`server/routes/storyIdeas.js`, `client/src/pages/StoryWizard.tsx` (seed, completeness check, warning),
+`client/src/components/story/RelationshipEditor.tsx`,
+`client/src/components/character/CharacterRelationships.tsx`,
+`scripts/admin/sibling-registry.json`, `tests/unit/beats-brief-relationships.test.ts`, `tasks/bugs.json`.
+**Status:** ✅ active — committed on `staging`, not pushed. The trial funnel is unaffected by construction:
+`server/routes/trial.js` creates exactly one character with `relationships: {}` and renders through the same
+`buildRelationshipLines`.

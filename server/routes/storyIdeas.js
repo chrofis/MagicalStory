@@ -70,10 +70,20 @@ async function buildIdeasPromptContext({
     return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
   }).join('\n');
 
-  // Build relationship descriptions
-  const relationshipDescriptions = (relationships || []).map(r =>
-    `- ${r.character1} ${r.relationship} ${r.character2}`
-  ).join('\n');
+  // Build relationship descriptions.
+  // The wizard posts EVERY matrix cell here, sentinels included, so this list
+  // has to make the same two distinctions the story brief makes (owner
+  // 2026-09-19): an unanswered cell says nothing and is dropped; the deliberate
+  // strangers choice is a fact about the cast and is stated as a sentence, never
+  // as the ungrammatical "X <sentinel> Y". Before the split this site emitted
+  // the sentinel verbatim in EVERY language, English included.
+  const { isNotSetRelationship, isStrangersRelationship } = require('../lib/relationships');
+  const relationshipDescriptions = (relationships || [])
+    .filter(r => !isNotSetRelationship(r.relationship))
+    .map(r => isStrangersRelationship(r.relationship)
+      ? `- ${r.character1} and ${r.character2} do not know each other`
+      : `- ${r.character1} ${r.relationship} ${r.character2}`)
+    .join('\n');
 
   // Determine reading level description
   const readingLevelDescriptions = {

@@ -33,7 +33,7 @@ import { characterService, storyService, authService } from '@/services';
 import { reportError } from '@/services/errorReporter';
 import type { ExtractedTraits, ExtractedClothing } from '@/services/characterService';
 import { storyTypes, lifeChallenges, educationalTopics, historicalEvents } from '@/constants/storyTypes';
-import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
+import { getNotSetRelationship, isNotSetRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
 import { createLogger } from '@/services/logger';
 import { useDeveloperMode } from '@/hooks/useDeveloperMode';
 import { getAvatarCooldown, recordAvatarRegeneration } from '@/hooks/useAvatarCooldown';
@@ -2144,7 +2144,9 @@ export default function StoryWizard() {
 
       if (!relationshipsInitialized.current || relationshipsInitialized.current !== charKey) {
         const lang = language as UILanguage;
-        const notKnown = getNotKnownRelationship(lang);
+        // Seed every cell with the DEFAULT, not with the strangers choice:
+        // absence of input must stay distinguishable from a deliberate answer.
+        const notSet = getNotSetRelationship(lang);
         log.debug('Initializing relationships for step 2', { charKey, existingCount: Object.keys(relationships).length });
 
         setRelationships(prev => {
@@ -2157,7 +2159,7 @@ export default function StoryWizard() {
               if (i !== j) {
                 const key = `${char1.id}-${char2.id}`;
                 if (!updated[key]) {
-                  updated[key] = notKnown;
+                  updated[key] = notSet;
                   hasChanges = true;
                   log.debug('Initializing missing relationship:', key);
                 }
@@ -2173,15 +2175,16 @@ export default function StoryWizard() {
     }
   }, [step, characters, language, isLoading]);
 
-  // Check if all relationships are defined (both directions)
+  // Check if all relationships are answered (both directions). An explicit
+  // "they do not know each other" IS an answer and is never flagged as missing;
+  // only an unanswered cell (or a legacy stored value) counts as undefined.
   const areAllRelationshipsDefined = () => {
     if (characters.length < 2) return true;
     for (let i = 0; i < characters.length; i++) {
       for (let j = 0; j < characters.length; j++) {
         if (i !== j) {
           const key = `${characters[i].id}-${characters[j].id}`;
-          const value = relationships[key];
-          if (!value || isNotKnownRelationship(value)) {
+          if (isNotSetRelationship(relationships[key])) {
             return false;
           }
         }
@@ -2202,8 +2205,7 @@ export default function StoryWizard() {
       for (const otherChar of characters) {
         if (char.id !== otherChar.id) {
           const key = `${char.id}-${otherChar.id}`;
-          const value = relationships[key];
-          if (!value || isNotKnownRelationship(value)) {
+          if (isNotSetRelationship(relationships[key])) {
             undefinedCount++;
           }
         }
@@ -5906,10 +5908,10 @@ export default function StoryWizard() {
                 const charWithUndefined = getCharacterWithMostUndefinedRelationships();
                 if (!charWithUndefined) return null;
                 const warningText = language === 'de'
-                  ? `${charWithUndefined.name} hat Beziehungen, die nicht definiert sind ("nicht bekannt")`
+                  ? `${charWithUndefined.name} hat Beziehungen, die nicht festgelegt sind`
                   : language === 'fr'
-                  ? `${charWithUndefined.name} a des relations non définies ("ne connaît pas")`
-                  : language === 'it' ? `${charWithUndefined.name} ha relazioni non definite ("non conosce")` : `${charWithUndefined.name} has undefined relationships ("not known to")`;
+                  ? `${charWithUndefined.name} a des relations non définies`
+                  : language === 'it' ? `${charWithUndefined.name} ha relazioni non definite` : `${charWithUndefined.name} has relationships that are not set`;
                 return (
                   <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
                     <span className="text-amber-600 text-lg">⚠️</span>

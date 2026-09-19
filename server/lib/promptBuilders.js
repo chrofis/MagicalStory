@@ -28,6 +28,7 @@ const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 const { parseProseMetadataFormat, stripSceneMetadata, extractSceneMetadata, collectSceneCharacterNames, enforceSpreadTextPosition, parseSceneHintMetadata, resolveTextStagePictureSpec } = require('./sceneMetadata');
 const { resolveClothingForPage, buildUsedClothingText, buildAvailableAvatarsForPrompt } = require('./clothingResolve');
 const { seasonLabel, buildSeasonNote, buildSeasonInstruction } = require('./season');
+const { isNotSetRelationship, isStrangersRelationship } = require('./relationships');
 const { VB_ELEMENT_BUDGET } = require('./vbElementBudget');
 
 /**
@@ -6041,6 +6042,15 @@ function buildSettingLine(inputData) {
 // never emit a raw id key. A note with no type ("orphan") is still the user's
 // own words about a real pair, so it is rendered with names and no type rather
 // than discarded — deduped by unordered pair so a reciprocal note appears once.
+//
+// TWO CELL VALUES ARE NOT RELATIONSHIPS (owner 2026-09-19): the auto-filled
+// default says the user has not answered and contributes NO line; the deliberate
+// strangers choice says they are strangers, which is a fact about the cast and
+// does reach the writer — as one reciprocal sentence per pair, never as the
+// ungrammatical "X is <sentinel> Y". Both are recognised in every UI language
+// through server/lib/relationships.js, over shared/relationship-sentinels.json.
+// The guard used to compare the English literal only, so for de/fr/it every
+// unanswered cell reached the arc author as an assertion of strangerhood.
 function buildRelationshipLines(inputData) {
   const relationships = inputData.relationships || {};
   const relationshipTexts = inputData.relationshipTexts || {};
@@ -6053,29 +6063,47 @@ function buildRelationshipLines(inputData) {
     const b = byId.get(Number(parts[1]));
     return (a && b && a !== b) ? [a, b] : null;
   };
+  const unorderedKey = (pair) => [Number(pair[0].id), Number(pair[1].id)].sort((x, y) => x - y).join('-');
 
   const lines = [];
+  // Strangers is symmetric, so a reciprocal pair must not say it twice — but the
+  // note may be stored on either side, so the first sentence keeps the slot and
+  // adopts a note the other direction brings.
+  const strangersAt = new Map();   // unordered pair -> { index, base, hasNote }
   for (const [key, type] of Object.entries(relationships)) {
-    if (!type || type === 'Not Known to') continue;
+    if (isNotSetRelationship(type)) continue;
     const pair = resolve(key);
     if (!pair) continue;
     const text = String(relationshipTexts[key] || '').trim();
+    if (isStrangersRelationship(type)) {
+      const unordered = unorderedKey(pair);
+      const seen = strangersAt.get(unordered);
+      if (seen) {
+        if (text && !seen.hasNote) {
+          lines[seen.index] = `${seen.base}. ${text}`;
+          seen.hasNote = true;
+        }
+        continue;
+      }
+      const base = `${pair[0].name} and ${pair[1].name} do not know each other`;
+      strangersAt.set(unordered, { index: lines.length, base, hasNote: Boolean(text) });
+      lines.push(text ? `${base}. ${text}` : base);
+      continue;
+    }
     const base = `${pair[0].name} is ${type} ${pair[1].name}`;
     lines.push(text ? `${base}. ${text}` : base);
   }
 
   const seenOrphan = new Set();
   for (const [key, rawText] of Object.entries(relationshipTexts)) {
-    const type = relationships[key];
-    if (type && type !== 'Not Known to') continue;   // already rendered above
+    if (!isNotSetRelationship(relationships[key])) continue;   // already rendered above
     const text = String(rawText || '').trim();
     if (!text) continue;
     const pair = resolve(key);
     if (!pair) continue;
     const reverseKey = `${pair[1].id}-${pair[0].id}`;
-    const reverseType = relationships[reverseKey];
-    if (reverseType && reverseType !== 'Not Known to') continue; // the note belongs to that line
-    const unordered = [Number(pair[0].id), Number(pair[1].id)].sort((x, y) => x - y).join('-');
+    if (!isNotSetRelationship(relationships[reverseKey])) continue; // the note belongs to that line
+    const unordered = unorderedKey(pair);
     if (seenOrphan.has(unordered)) continue;
     seenOrphan.add(unordered);
     lines.push(`${pair[0].name} and ${pair[1].name}: ${text}`);

@@ -1,6 +1,6 @@
 import { Heart } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { relationshipTypes, getNotKnownRelationship, isNotKnownRelationship } from '@/constants/relationships';
+import { relationshipTypes, getNotSetRelationship, isNotSetRelationship } from '@/constants/relationships';
 import type { Character, RelationshipMap, RelationshipTextMap } from '@/types/character';
 import { getDisplayPhoto } from '@/utils/characterPhotos';
 import type { Language } from '@/types/story';
@@ -69,13 +69,15 @@ export function RelationshipEditor({
             if (i >= j) return null;
             const key = `${char1.id}-${char2.id}`;
             const currentRelationship = relationships[key];
-            const isNotKnown = !currentRelationship || isNotKnownRelationship(currentRelationship);
+            // The deliberate strangers choice is a COMPLETE answer: only an
+            // unanswered cell gets the red 'needs attention' treatment.
+            const isNotSet = isNotSetRelationship(currentRelationship);
 
             return (
               <div
                 key={key}
                 className={`rounded-lg p-3 md:p-4 w-full lg:w-3/4 mx-auto ${
-                  isNotKnown
+                  isNotSet
                     ? 'bg-white border-red-500 border-[3px]'
                     : 'bg-blue-50 border-blue-300 border-2'
                 }`}
@@ -105,10 +107,10 @@ export function RelationshipEditor({
                   {/* Center: Dropdown + Details - fills all available space */}
                   <div className="flex-1 flex flex-col items-center gap-1">
                     <select
-                      value={currentRelationship || getNotKnownRelationship(lang)}
+                      value={currentRelationship || getNotSetRelationship(lang)}
                       onChange={(e) => handleSelectChange(char1.id, char2.id, e.target.value)}
                       className={`w-full px-3 py-2 md:px-4 md:py-2.5 border rounded text-sm md:text-base font-medium text-center ${
-                        isNotKnown
+                        isNotSet
                           ? 'bg-white border-red-400 border-2'
                           : 'bg-blue-100 border-blue-400'
                       }`}
@@ -124,7 +126,7 @@ export function RelationshipEditor({
                     </select>
 
                     {/* Details input below dropdown */}
-                    {!isNotKnown && (
+                    {!isNotSet && (
                       <input
                         type="text"
                         value={relationshipTexts[key] || ''}

@@ -414,6 +414,25 @@
         ],
         "anchorsNote": "The placeholder, not the prose: ONE exported constant (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE) filled at eight sites across four files - promptBuilders.js fills five of them through four builders (buildSceneDescriptionPrompt serves both scene-iteration templates), and evalPipeline.js, sceneValidator.js and bookAudit.js one each. The anchor proves the rule reaches the TEMPLATE; tests/unit/text-not-a-checklist-reach.test.ts proves the constant reaches the BUILT prompt, because fillTemplate deletes an undeclared placeholder silently - and pins image-evaluation.txt as carrying neither the placeholder nor the prose."
       }
+    },
+    {
+      "id": "relationship-sentinel-predicates",
+      "axis": "wizard matrix vs prompt builders",
+      "reason": "The two matrix cell values that are NOT relationships - the auto-filled default (says nothing, emits no line) and the deliberate 'they do not know each other' choice (a fact, and it does reach the writer) - have to be recognised identically by the wizard that writes them and by every prompt path that reads them. The labels are already ONE table, shared/relationship-sentinels.json, so the strings cannot drift; the PREDICATE is written once per runtime (TypeScript for the browser, CommonJS for Node) and that pair can. The disease: the server compared the ENGLISH literal 'Not Known to' while the wizard stored the LOCALIZED label, so for de/fr/it the guard never fired and every cell the user had not answered reached the arc author as 'Levin is Nicht bekannt mit Max' - ten of them in one de-ch story, English never affected. A third sentinel, a re-worded label, or a change to what counts as unanswered (empty, legacy value, trimming) must land on both predicates in the same commit.",
+      "members": [
+        "shared/relationship-sentinels.json",
+        "client/src/constants/relationships.ts",
+        "server/lib/relationships.js"
+      ],
+      "severity": "block",
+      "parity": {
+        "anchors": [
+          "notSet",
+          "strangers",
+          "legacyNotSet"
+        ],
+        "anchorsNote": "The three keys of the shared table, which every member must read: the JSON declares them, and each predicate module resolves all three (legacyNotSet folds into the unanswered set - a pre-split save is not distinguishable from the default retroactively, so it emits nothing). A fourth sentinel added to the table and read by only one runtime is exactly the drift this set exists to catch. The predicates themselves are named identically on both sides - isNotSetRelationship and isStrangersRelationship - so a call site cannot silently get the question it did not mean; that the two agree on every label in every UI language is asserted in tests/unit/beats-brief-relationships.test.ts, which imports the client module and the server module into one test, because an anchor cannot check agreement."
+      }
     }
   ],
   "withinFile": [
