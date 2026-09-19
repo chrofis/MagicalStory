@@ -6217,10 +6217,31 @@ function buildStoryContextFields(inputData) {
 // ~5x so the planner selects what fits instead of forcing every entry. Same
 // filtering as the idea generator's sample (age bands, peril, default-zone
 // category caps).
+//
+// VARIETY IS A SELECTION RULE, NOT A PROMPT INSTRUCTION (owner, 2026-09-19).
+// The draw excludes the catalogue ids this reader's earlier books were offered,
+// so the new story simply never sees them. Nothing about a previous story is
+// ever written into a prompt — see loadUsedChallengeIds in beatsPipeline.js and
+// the block this replaced, which told the arc creator "this reader's earlier
+// books used these challenges" and listed prose lifted from those books' arcs.
 let challengeCatalogueCache = null;
-function buildChallengeIdeasSection(inputData, count = 15) {
+
+/**
+ * Draw a random, age-filtered, category-spread sample of the challenge
+ * catalogue.
+ *
+ * @param {Object} inputData
+ * @param {Object} opts
+ *   count       how many to draw (default 15)
+ *   excludeIds  catalogue ids this reader has already been offered. Applied as
+ *               a filter; if honouring it in full would leave too small a pool
+ *               to draw from, the exclusions are dropped (a thin draw is worse
+ *               for the story than a repeat is).
+ * @returns {{section: string, ids: number[]}}
+ */
+function drawChallengeIdeas(inputData, { count = 15, excludeIds = [] } = {}) {
   const bands = challengeCatalogueBands(inputData);
-  if (!bands.length) return '';
+  if (!bands.length) return { section: '', ids: [] };
   try {
     if (challengeCatalogueCache === null) {
       challengeCatalogueCache = require('fs').readFileSync(
@@ -6228,16 +6249,26 @@ function buildChallengeIdeasSection(inputData, count = 15) {
     }
     const ages = (inputData?.characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
     const youngest = ages.length ? Math.min(...ages) : 8;
-    const entries = challengeCatalogueCache.split('\n')
+    const eligible = challengeCatalogueCache.split('\n')
       .filter(l => l && !l.startsWith('#'))
       .map(l => l.split('|'))
       .filter(f => f.length >= 6)
       .filter(f => bands.some(b => f[4].startsWith(b)))
       .filter(f => youngest > 5 || f[5].trim() !== '1');
+    // Keep the draw well oversupplied relative to what it must produce: below
+    // this the category spread collapses and the "random sample" becomes the
+    // remainder of the catalogue, which is not a sample at all.
+    const MIN_POOL = count * 3;
+    const excluded = new Set((excludeIds || []).map(Number).filter(Number.isFinite));
+    const kept = excluded.size ? eligible.filter(f => !excluded.has(parseInt(f[0], 10))) : eligible;
+    const entries = kept.length >= MIN_POOL ? kept : eligible;
+    if (excluded.size && entries !== kept) {
+      log.info(`[PROMPT] challenge variety: ${excluded.size} prior id(s) would leave ${kept.length} of ${eligible.length} eligible (< ${MIN_POOL}) — drawing from the full band instead`);
+    }
     const byCat = new Map();
     for (const f of entries) {
       if (!byCat.has(f[1])) byCat.set(f[1], []);
-      byCat.get(f[1]).push(`- ${f[2]} (tests: ${f[3]})`);
+      byCat.get(f[1]).push({ id: parseInt(f[0], 10), line: `- ${f[2]} (tests: ${f[3]})` });
     }
     const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
     const picked = [];
@@ -6251,25 +6282,33 @@ function buildChallengeIdeasSection(inputData, count = 15) {
         const pool = byCat.get(c);
         if (!pool.length) continue;
         const i = Math.floor(Math.random() * pool.length);
-        picked.push({ cat: c, line: pool.splice(i, 1)[0] });
+        picked.push({ cat: c, ...pool.splice(i, 1)[0] });
       }
       round++;
     }
-    if (!picked.length) return '';
+    if (!picked.length) return { section: '', ids: [] };
     // Structural budget scales with the book (owner, 2026-08-30): a short book
     // cannot pay off three challenges, a long one starves on two.
     const pages = parseInt(inputData?.pages, 10) || 10;
     const challengeBudget = pages <= 10 ? 'one or two' : pages <= 17 ? 'about three' : 'three or four';
-    return [
-      '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
-      `Build the story's challenges from ${challengeBudget} of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.`,
-      '',
-      ...picked.map(x => x.line),
-    ].join('\n');
+    return {
+      section: [
+        '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
+        `Build the story's challenges from ${challengeBudget} of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.`,
+        '',
+        ...picked.map(x => x.line),
+      ].join('\n'),
+      ids: picked.map(x => x.id),
+    };
   } catch (err) {
     log.warn(`[PROMPT] challenge catalogue unavailable: ${err.message}`);
-    return '';
+    return { section: '', ids: [] };
   }
+}
+
+/** The section alone, for callers that do not record the draw. */
+function buildChallengeIdeasSection(inputData, count = 15) {
+  return drawChallengeIdeas(inputData, { count }).section;
 }
 
 /**
@@ -7432,7 +7471,7 @@ function buildTellingRulesSection(inputData = {}, { landmarks = false } = {}) {
 }
 
 /** CREATE: the creator writes two arcs with self-critiques and commits to one. */
-function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, priorChallenges = '' } = {}) {
+function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcCreate;
   if (!template) {
     log.error('[PROMPT] arcCreate template not loaded — arc machine unavailable');
@@ -7447,7 +7486,6 @@ function buildArcCreatePrompt(inputData, pageCount, { challengeIdeas = null, pri
     ARC_BUDGETS: buildArcBudgetSection(inputData, pageCount),
     TELLING_RULES: buildTellingRulesSection(inputData, { landmarks: true }),
     CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
-    PRIOR_CHALLENGES: String(priorChallenges || '').trim(),
     ARC_LENGTH: arcLengthRange(pageCount),
   });
 }
@@ -9043,6 +9081,7 @@ module.exports = {
   buildRelationshipLines,
   buildBeatsPrompt,
   buildChallengeIdeasSection,
+  drawChallengeIdeas,
   buildArcCreatePrompt,
   buildArcPanelPrompt,
   buildArcRetellPrompt,

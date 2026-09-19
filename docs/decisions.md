@@ -47065,3 +47065,63 @@ divider) — a single separator has no siblings to be an outlier among, so it is
 **Touched:** `server/lib/sceneComposite.js`, `tests/unit/sheet-column-split-bound.test.ts`,
 `tasks/bugs.json`
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — Cross-story challenge variety is a SELECTION rule on the draw, never an instruction in the prompt
+
+**Context.** A family buys several books, and nothing stopped the planner handing them
+the same challenge twice. The first cure (2026-08-27 / 2026-08-29, entries above) read
+this account's previous books' ARCS, pulled their numbered challenge lines out as prose,
+and pasted them into the arc-create prompt under a heading that said *"This reader's
+earlier books used these challenges — this story uses different ones"*, persisting the
+list as `data.arcVarietyExclusions`.
+
+Measured on staging `job_1789759147125_p08djwhbl` ("Fünkli darf nicht kalt werden",
+Zürich, four boys and a cooling dragon egg), that block shipped nine lines including:
+
+- `The cooling egg and Levin's indecision about where to warm it`
+- `Four strangers, one egg — agree or lose the time`
+- `Ramon on the bridge: the Marroni are lost and the egg is abandoned cold.`
+
+Two faults, both structural, neither fixable by rewording the heading:
+
+1. **It instructed the creator to avoid the commission.** Those lines ARE the premise
+   the family had just commissioned — four strangers, one cooling egg, warm it before
+   evening. The prompt gave the exclusion list no precedence rule against the
+   commission, so the arc creator read "write this story" and "do not write this story"
+   with equal force.
+2. **It leaked other books into this one.** The lines carried their own stories' cast by
+   name — Tobias, Ramon, Zünsli — into a prompt whose CHARACTER DETAILS block says
+   "never invent one" and whose budget section counts invented named figures against a
+   hard allowance. Prose lifted from book A is not data about book B.
+
+**Decision.** Variety moved off the prompt and onto the DRAW. Each story records the
+challenge-catalogue **ids** it was offered (`data.challengeDrawIds`); the next story on
+the same account (same `storyType`, last `PRIOR_STORY_LIMIT` = 3 books) filters those ids
+out of its own draw, so it simply never sees them. **No prompt anywhere names, quotes or
+alludes to a previous story.** `arcVarietyExclusions`, `extractChallengeLines`,
+`loadPriorChallenges`, `CHALLENGE_LINE_MAX`, `ARC_VARIETY_MAX` and the
+`{PRIOR_CHALLENGES}` placeholder are deleted.
+
+When honouring the exclusions in full would leave fewer than `count * 3` eligible
+entries, the exclusions are dropped for that draw and the full age band is used: a
+starved pool collapses the category spread, and a thin, unspread draw hurts the story
+more than a repeat does. The fallback logs.
+
+**Rationale.** A selection rule cannot be misread, cannot be outranked by another rule
+in the same prompt, and cannot carry a foreign story's characters. The prose-extraction
+design put a *negative* instruction in front of a creator whose whole job is to write the
+commission — and the one thing a prompt must never do is argue with the commission.
+Recording ids also makes the memory exact: "which of the catalogue did this book see" is
+answerable without parsing anybody's prose.
+
+**Touched:** `server/lib/promptBuilders.js` (`drawChallengeIdeas` returning
+`{section, ids}`, `buildChallengeIdeasSection` as its section-only wrapper,
+`buildArcCreatePrompt` loses `priorChallenges`), `server/lib/beatsPipeline.js`
+(`loadUsedChallengeIds` replaces `loadPriorChallenges` + `extractChallengeLines`),
+`storyJobPipeline.js` (persists `challengeDrawIds`), `prompts/arc-create.txt`
+(`{PRIOR_CHALLENGES}` removed), `tests/unit/challenge-variety-selection.test.ts`.
+
+**Status:** ✅ active — supersedes the prose-injection design in the 2026-08-27 and
+2026-08-29 entries above.

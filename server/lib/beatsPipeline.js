@@ -88,7 +88,7 @@ const textModels = require('./textModels');
 const { MODEL_DEFAULTS, IMAGE_MODELS, TEXT_MODELS } = require('../config/models');
 const {
   buildBeatsPrompt,
-  buildChallengeIdeasSection,
+  drawChallengeIdeas,
   buildArcCreatePrompt,
   buildArcPanelPrompt,
   buildArcRetellPrompt,
@@ -602,98 +602,81 @@ async function runVisualBibleLabelRound(visualBible, { model, language, gl, log:
 // A family buys several books. Nothing used to stop the planner giving them the
 // same challenge twice (the lost thing found, the storm crossed, the rival
 // out-argued) — every run starts from the same commission shape with no memory
-// of what the account already owns. These three caps keep the injection small
-// enough that it never competes with the commission itself.
+// of what the account already owns.
+//
+// VARIETY IS A SELECTION RULE, NOT A PROMPT INSTRUCTION (owner, 2026-09-19).
+//
+// The first design read the previous books' ARCS, pulled their numbered
+// challenge lines out as prose, and pasted them into the arc prompt under "This
+// reader's earlier books used these challenges — this story uses different
+// ones". Two things were wrong with that, both measured on staging
+// job_1789759147125_p08djwhbl:
+//
+//   1. It told the creator to avoid the commission. The nine injected lines
+//      were "The cooling egg and Levin's indecision about where to warm it",
+//      "Four strangers, one egg — agree or lose the time" — which IS the
+//      premise the family had just commissioned. Nothing gave the commission
+//      precedence over the exclusion list.
+//   2. It leaked other books into this one. The lines carried their own stories'
+//      cast by name (Tobias, Ramon, Zünsli) into a prompt that forbids inventing
+//      figures, and into whose CHARACTER DETAILS those names do not appear.
+//
+// So the exclusion moved off the prompt and onto the DRAW. We record which
+// catalogue ids each book was offered, and the next book's draw filters them
+// out — it simply never sees them. No prompt anywhere mentions a previous
+// story, and there is no instruction for the creator to misread.
 const PRIOR_STORY_LIMIT = 3;
-const CHALLENGE_LINE_MAX = 120;
-const ARC_VARIETY_MAX = 600;
 
 /**
- * Pull the numbered challenge lines out of a stored arc.
- *
- * The arc's shape is "Challenges of <names>:" then numbered entries, then a
- * "Moments:" (or "Blocker:") section. Tolerant on purpose: an arc written by an
- * older template, or one the arc reviewer reshaped, must degrade to [] rather
- * than throw or capture the whole arc.
- *
- * @returns {string[]} one truncated line per challenge; [] when the arc has no
- *   Challenges section at all (the injection then skips).
- */
-function extractChallengeLines(arc) {
-  const text = String(arc || '');
-  // "Challenges of <names>:" is the old structured-arc form; "Challenges
-  // taken:" is the arc machine's FINAL ARC form (2026-08-30). In old arcs the
-  // widened match lands on the one-line "Challenges taken:" summary first, and
-  // the numbered filter below still captures the same numbered entries.
-  const start = text.search(/Challenges (?:of[^:\n]*|taken)\s*:/i);
-  if (start < 0) return [];
-  let block = text.slice(start);
-  const end = block.search(/^\s*(?:Moments|Blocker|Used|CRITIQUE)\s*:/mi);
-  if (end > 0) block = block.slice(0, end);
-  return block
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => /^\d+[.)]\s+/.test(l))
-    .map(l => l.replace(/^\d+[.)]\s*/, '').trim())
-    .filter(Boolean)
-    .map(l => (l.length > CHALLENGE_LINE_MAX ? `${l.slice(0, CHALLENGE_LINE_MAX - 1).trimEnd()}…` : l));
-}
-
-/**
- * The challenges this account's previous books already used.
+ * The challenge-catalogue ids this account's previous books were offered.
  *
  * Reads the DB directly (same lazy `require('../services/database')` every other
  * lib module uses) rather than threading a pool through the caller: the query
  * needs nothing storyJobPipeline has that jobId does not already resolve, and a
  * new parameter would have to be plumbed through server.js and the Test Lab too.
  *
- * `data->'beatsReviewReport'->>'arc'` doubles as the completeness filter — a job
- * that never reached the beats review has no approved arc to contribute, and
- * story_jobs rows are pruned, so joining on job status would silently drop the
- * older books that matter most here.
+ * `data->'challengeDrawIds'` doubles as the completeness filter — a job that
+ * never got as far as drawing has nothing to contribute, and story_jobs rows are
+ * pruned, so joining on job status would silently drop the older books that
+ * matter most here.
  *
- * Never throws: a failed lookup means the arc is planned with no memory, which
- * is exactly what happened before this existed.
+ * Never throws: a failed lookup means the draw runs unfiltered, which is exactly
+ * what happened before any of this existed.
  *
- * @returns {Promise<{lines: string[], stories: number}>}
+ * @returns {Promise<{ids: number[], stories: number}>}
  */
-async function loadPriorChallenges(jobId, gl = NOOP_LOG) {
-  if (!jobId) return { lines: [], stories: 0 };
+async function loadUsedChallengeIds(jobId, gl = NOOP_LOG) {
+  if (!jobId) return { ids: [], stories: 0 };
   try {
     const { dbQuery } = require('../services/database');
     const rows = await dbQuery(
-      `SELECT s.id, s.data->'beatsReviewReport'->>'arc' AS arc
+      `SELECT s.id, s.data->'challengeDrawIds' AS ids
          FROM stories s
         WHERE s.user_id = (SELECT user_id FROM story_jobs WHERE id = $1)
           AND s.id <> $1
-          AND s.data->'beatsReviewReport'->>'arc' IS NOT NULL
+          AND jsonb_typeof(s.data->'challengeDrawIds') = 'array'
           -- Same story TYPE only (2026-08-27): the smoke account mixes toddler
-          -- and standard books, and cross-type exclusions injected toddler
-          -- fragments ("she reaches for the parrot") into a pirate plan while
-          -- excluding the race and map mechanics the new story needed.
+          -- and standard books, and the age bands a draw is filtered by differ
+          -- between them, so a toddler book's ids would exclude entries a
+          -- standard book's draw never had access to in the first place.
           AND s.data->>'storyType' IS NOT DISTINCT FROM (SELECT input_data->>'storyType' FROM story_jobs WHERE id = $1)
         ORDER BY s.created_at DESC
         LIMIT ${PRIOR_STORY_LIMIT}`,
       [String(jobId)]
     );
-    const lines = [];
+    const ids = new Set();
     let stories = 0;
-    let budget = ARC_VARIETY_MAX;
     for (const row of rows || []) {
-      const own = extractChallengeLines(row.arc);
-      if (own.length === 0) continue;
+      const own = (Array.isArray(row.ids) ? row.ids : []).map(Number).filter(Number.isFinite);
+      if (!own.length) continue;
       stories += 1;
-      for (const line of own) {
-        if (budget - (line.length + 3) < 0) return { lines, stories };
-        lines.push(line);
-        budget -= line.length + 3;
-      }
+      for (const id of own) ids.add(id);
     }
-    return { lines, stories };
+    return { ids: [...ids], stories };
   } catch (err) {
-    log.warn(`⚠️ [BEATS] Prior-challenge lookup failed (${err.message}) — arc planned without cross-story memory`);
+    log.warn(`⚠️ [BEATS] Prior-challenge lookup failed (${err.message}) — challenges drawn without cross-story memory`);
     gl.warn('arc_variety_failed', `Prior-challenge lookup failed: ${err.message}`);
-    return { lines: [], stories: 0 };
+    return { ids: [], stories: 0 };
   }
 }
 
@@ -855,9 +838,22 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // the arc creator AND the beats planner, and persisted so "which challenges
   // was this book offered / which did it take" is answerable from the story
   // record (owner, 2026-08-29).
-  const challengeIdeas = buildChallengeIdeasSection(inputData);
+  //
+  // The draw EXCLUDES what this account's earlier books were offered
+  // (loadUsedChallengeIds) — variety is a selection rule, so no prompt ever
+  // mentions a previous story. The ids are persisted next to the lines so the
+  // next book can exclude this one.
+  const priorIds = await loadUsedChallengeIds(jobId, gl);
+  if (priorIds.ids.length > 0) {
+    gl.info('arc_variety', `Excluding ${priorIds.ids.length} catalogue challenge(s) offered to ${priorIds.stories} earlier book(s) on this account`, null, {
+      stories: priorIds.stories, excludedIds: priorIds.ids,
+    });
+  }
+  const draw = drawChallengeIdeas(inputData, { excludeIds: priorIds.ids });
+  const challengeIdeas = draw.section;
+  const challengeDrawIds = draw.ids;
   const challengeDraw = challengeIdeas.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
-  if (challengeDraw.length) gl.info('challenge_draw', `Drew ${challengeDraw.length} challenge idea(s) for the arc plan`, null, { challengeDraw });
+  if (challengeDraw.length) gl.info('challenge_draw', `Drew ${challengeDraw.length} challenge idea(s) for the arc plan`, null, { challengeDraw, challengeDrawIds });
   let approvedArc = '';
   // The FINAL ARC's own critique — handed to the beats prompt as the known
   // weak points the page division must not amplify.
@@ -882,16 +878,6 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // CROSS-STORY MEMORY: the challenges this account's previous books used. Only
   // the arc-plan call sees them — that is the one call that invents challenges;
   // every later stage divides and dresses what this one decided.
-  const priorChallenges = await loadPriorChallenges(jobId, gl);
-  const arcVarietyExclusions = priorChallenges.lines;
-  if (arcVarietyExclusions.length > 0) {
-    gl.info('arc_variety', `Excluding ${arcVarietyExclusions.length} challenge(s) from ${priorChallenges.stories} earlier book(s) on this account`, null, {
-      stories: priorChallenges.stories, challenges: arcVarietyExclusions,
-    });
-  }
-  const varietyBlock = arcVarietyExclusions.length > 0
-    ? `This reader's earlier books used these challenges — this story uses different ones:\n${arcVarietyExclusions.map(l => `- ${l}`).join('\n')}`
-    : '';
   let t = Date.now();
   try {
     // OpenRouter/xAI take a temperature; the Anthropic path sends none.
@@ -920,7 +906,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // CREATE. A parse miss (no commitment line, no ARC 2 boundary) gets one
     // full re-create, then throws into the outer containment.
     await stage(1, 'Shaping the story arc...', { next: 2, ms: 90000 });
-    const createPrompt = buildArcCreatePrompt(inputData, pageCount, { challengeIdeas, priorChallenges: varietyBlock });
+    const createPrompt = buildArcCreatePrompt(inputData, pageCount, { challengeIdeas });
     if (!createPrompt) throw new Error('arc-create template unavailable');
     let createRes = null;
     let commit = null;
@@ -3203,7 +3189,7 @@ ${bibleBody}` : bibleBody;
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, arcVarietyExclusions, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneReviewReport };
 }
 
-module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, extractChallengeLines, loadPriorChallenges, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
+module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
