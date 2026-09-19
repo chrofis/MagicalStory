@@ -6128,9 +6128,30 @@ function buildStoryBriefBody(inputData) {
   ].filter(Boolean).join('\n') || '(no additional brief recorded)';
 }
 
+/**
+ * WHICH SOURCE WINS (owner, 2026-09-19). Injected as {CHARACTER_SOURCE_RULE}
+ * into arc-create and arc-retell — ONE constant, never two hand-kept headings.
+ *
+ * The two blocks contradicted each other on staging job_1789759147125_p08djwhbl
+ * and nothing in 37k chars said which to believe. The commission's premise:
+ * "Zwei fremde Buben — Max und Kiaan", "die vier Buben kennen sich nicht", and a
+ * relationship matrix of twelve "Nicht bekannt mit". Levin's saved character
+ * details, under a heading that called them the source of truth: "Max und Kiaan
+ * sind seine guten Freunde". Strangers-meeting was the story's whole engine, and
+ * which state the arc opened in was a coin flip.
+ *
+ * The split is by KIND, not by precedence in general: a saved profile knows who
+ * a child IS and cannot know what happens in a book not yet written.
+ */
+const CHARACTER_SOURCE_RULE = [
+  'These details decide who each figure IS: age, gender, what they are good at, what they find hard, what they like. Never contradict one, never invent one.',
+  "The commission decides the SITUATION: who knows whom here, where they are, what is happening to them. Where a saved detail contradicts the premise — a friendship where the premise stages a first meeting — the premise stands, and the detail is simply not true yet in this book.",
+].join('\n');
+
 function buildStoryContextFields(inputData) {
   const language = inputData.language || 'en';
   const brief = buildStoryBriefBody(inputData);
+  const characterSourceRule = CHARACTER_SOURCE_RULE;
 
   const mainIds = inputData.mainCharacters || [];
   const characterDetails = (inputData.characters || []).map(char => {
@@ -6205,6 +6226,7 @@ function buildStoryContextFields(inputData) {
       brief,
     ].join('\n'),
     STORY_GUIDE_SECTION: guideSection,
+    CHARACTER_SOURCE_RULE: characterSourceRule,
     CHARACTER_DETAILS: characterDetails,
     MAX_CHARACTERS_PER_SCENE: IMAGE_MODELS[imageModelKey]?.maxCharactersPerScene || 3,
   };

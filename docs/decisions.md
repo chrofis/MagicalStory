@@ -47166,3 +47166,44 @@ schema to a prose stage is noise at best and a format trap at worst.
 default off; the Art Director site passes it), `tests/unit/landmark-offer-hygiene.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — The commission owns the SITUATION; the saved profile owns the PERSON
+
+**Context.** The arc prompts headed the saved character data *"CHARACTER DETAILS
+(source of truth: never contradict a trait, never invent one)"*. On staging
+`job_1789759147125_p08djwhbl` that claim collided head-on with the commission:
+
+- Premise: *"Zwei **fremde** Buben — Max und Kiaan"*, *"die vier Buben **kennen sich
+  nicht**"*; relationship matrix: twelve × *"Nicht bekannt mit"*.
+- Levin's saved details, under the source-of-truth heading: *"Max und Kiaan sind seine
+  **guten Freunde**"*. Max's and Kiaan's said the same back.
+
+Four strangers meeting over one egg is that book's entire dramatic engine, and nothing
+in 37,467 chars of prompt said which state to open in.
+
+**Decision.** Split by KIND, stated once as `CHARACTER_SOURCE_RULE` and injected into
+both arc templates:
+
+> These details decide who each figure IS: age, gender, what they are good at, what they
+> find hard, what they like. Never contradict one, never invent one.
+> The commission decides the SITUATION: who knows whom here, where they are, what is
+> happening to them. Where a saved detail contradicts the premise — a friendship where
+> the premise stages a first meeting — the premise stands, and the detail is simply not
+> true yet in this book.
+
+**Rationale.** Not a general precedence ranking — a split along what each source can
+actually know. A saved profile knows who a child is; it cannot know what happens in a
+book that has not been written yet. The reverse also holds, which is why the trait half
+of the old heading survives verbatim: the commission does not get to make a five-year-old
+eight.
+
+One JS constant, two templates, so the two arc prompts cannot drift apart — pinned by a
+test that compares the rendered block across both.
+
+**Touched:** `server/lib/promptBuilders.js` (`CHARACTER_SOURCE_RULE`,
+`buildStoryContextFields`), `prompts/arc-create.txt`, `prompts/arc-retell.txt`,
+`tests/unit/character-source-precedence.test.ts`.
+
+**Status:** ✅ active
