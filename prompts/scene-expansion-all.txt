@@ -387,7 +387,6 @@ Then a single-line JSON object:
   "population": "cast_only",
   "aboard": "VEH001",
   "landmarkView": "exterior",
-  "framingPattern": "over-the-shoulder",
   "era": "present day",
   "objects": ["LOC001", "ART002"],
 <!-- TEXT_OVERLAY_BEGIN -->
@@ -425,7 +424,6 @@ Then a single-line JSON object:
   - `"ambient"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.
   - `"cast_only"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.
   Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them ("a few distant passers-by cross the far side of the square"), and keep them unnamed, distant and small.
-- `framingPattern` is `over-the-shoulder` on a page rule 11 frames that way, and is omitted on every other page. It is the one field that tells the renderer this page is shot from behind the acting figure, so a page framed over the shoulder in the prose and silent here is drawn flat.
 - `landmarkView` is how the page sees a real landmark, when one is cited: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
 - A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping, or feet-on-ground contact, and nothing placed behind the character. The outfit list still names all garments including footwear. A plan line that needs below-waist action is a `medium` shot, not a close-up.
 - Only add `depth` when the character is in the background (default is foreground/midground).

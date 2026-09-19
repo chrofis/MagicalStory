@@ -4352,7 +4352,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // button-up instead of olive sweatshirt + red backpack). Background
         // figures still need the drop — attaching their portrait forces Grok
         // to upsize them past "tiny in the distance".
-        if (sceneMetadata?.framingPattern === 'over-the-shoulder' && pagePhotos.length > 1) {
+        // ONE camera field (2026-09-19): over-the-shoulder is a `shot` value
+        // like any other, not a second field beside it. framingPattern is gone.
+        const pageShot = String(sceneMetadata?.fullData?.shot || sceneMetadata?.shot || '');
+        if (pageShot === 'over-the-shoulder' && pagePhotos.length > 1) {
           const metaChars = sceneMetadata?.fullData?.characters || [];
           const isBackground = (name) => {
             const c = metaChars.find(mc => (mc.name || '').toLowerCase() === (name || '').toLowerCase());

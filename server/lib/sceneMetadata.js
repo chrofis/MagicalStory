@@ -1007,7 +1007,6 @@ function extractSceneMetadata(sceneDescription) {
       // Which view of a cited real landmark this page shows — selects the
       // reference photo by kind (landmarkPhotos.pickVariantForView).
       landmarkView: metadata.landmarkView || null,
-      framingPattern: metadata.framingPattern || null,
       sceneIntent: metadata.sceneIntent || null,
       background: metadata.background || null,
       isJsonFormat: true,
@@ -1170,7 +1169,6 @@ function extractSceneMetadata(sceneDescription) {
       // (for white text legibility) — used to steer empty-scene + main-scene prompts.
       textZoneDescription: parsedData.textZoneDescription || null,
       era: parsedData.era || null,
-      framingPattern: parsedData.framingPattern || null,
       sceneIntent: parsedData.sceneIntent || null,
       isJsonFormat: true
     };
@@ -1261,7 +1259,6 @@ function extractSceneMetadata(sceneDescription) {
         textZoneDescription: null,
         aboard: null,
         era: null,
-        framingPattern: null,
         isJsonFormat: true,
         isProseFormat: true,
         isRecovered: true

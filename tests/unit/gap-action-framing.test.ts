@@ -60,27 +60,41 @@ describe('a gap action is framed over the shoulder or ultra-wide, never flat', (
 });
 
 /**
- * framingPattern was parsed, defaulted and consumed — storyJobPipeline drops
- * background reference photos on an over-the-shoulder page, because attaching a
- * background character's portrait forces the renderer to upsize them past "tiny
- * in the distance". It never ran: nothing told the author to emit the field.
+ * ONE CAMERA FIELD (owner, 2026-09-19). over-the-shoulder is a `shot` value like
+ * any other, not a second field beside it — "one field that has all options in
+ * it, and do not use ots, but spell it out". `framingPattern` is retired
+ * everywhere except the unreachable legacy outline-analysis path.
+ *
+ * The consumer it gates is real: storyJobPipeline drops background reference
+ * photos on an over-the-shoulder page, because attaching a background
+ * character's portrait forces the renderer to upsize them past "tiny in the
+ * distance".
  */
-describe('the field that carries it is declarable at all four brief-authoring sites', () => {
+describe('over-the-shoulder is a shot value, not a second field', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  for (const key of ['sceneExpansionAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {
-    it(`${key} both shows framingPattern in its JSON example and states its field rule`, () => {
-      const t = String(PROMPT_TEMPLATES[key] || '');
-      expect(t, `${key} template missing`).not.toBe('');
-      expect(t, `${key}: no framingPattern in the JSON example`).toContain('"framingPattern": "over-the-shoulder"');
-      expect(t, `${key}: no field rule for framingPattern`).toMatch(/`framingPattern`[:\s]/);
-    });
-  }
+  it('the vocabulary carries it, spelled out', () => {
+    const { SHOT_TYPES } = require('../../server/lib/shotVocabulary');
+    expect(SHOT_TYPES).toContain('over-the-shoulder');
+    expect(SHOT_TYPES.join(' ')).not.toMatch(/ots/);
+  });
 
-  it('the consumer reads exactly the value the templates emit', () => {
+  it('the rule sets `shot`, and names no second field', () => {
+    const r = pb.GAP_ACTION_FRAMING_RULE;
+    expect(r).toContain('set `shot` to `over-the-shoulder`');
+    expect(r).not.toContain('framingPattern');
+  });
+
+  it('no live template mentions framingPattern any more', () => {
+    for (const k of ['sceneExpansionAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {
+      expect(String(PROMPT_TEMPLATES[k] || ''), k).not.toContain('framingPattern');
+    }
+  });
+
+  it('the ref-drop consumer reads the shot field', () => {
     const lf = (x: string) => x.split(String.fromCharCode(13) + String.fromCharCode(10)).join(String.fromCharCode(10));
     const pipeline = lf(require('fs').readFileSync(require('path').join(__dirname, '../..', 'storyJobPipeline.js'), 'utf-8'));
-    expect(pipeline).toContain("framingPattern === 'over-the-shoulder'");
-    expect(String(PROMPT_TEMPLATES.sceneExpansionAll)).toContain('"framingPattern": "over-the-shoulder"');
+    expect(pipeline).toContain("pageShot === 'over-the-shoulder'");
+    expect(pipeline).not.toContain("framingPattern === 'over-the-shoulder'");
   });
 });

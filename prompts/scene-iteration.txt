@@ -140,7 +140,6 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
   ],
   "shot": "medium",
   "landmarkView": "exterior",
-  "framingPattern": "over-the-shoulder",
   "objects": ["LOC001"],
   "interactions": [
     {"character": "CharacterA", "object": "tower", "where": "gazes up at the clock tower", "action": "watching", "storyRelevant": true, "priority": "essential"}
@@ -158,7 +157,6 @@ After the prose, emit exactly `---METADATA---` on its own line, then a single JS
 
 - `sceneIntent`: {SCENE_INTENT_FIELD} It goes at the very top of the rendered image prompt as the **THIS IMAGE DEPICTS:** anchor — the image model weights it heavily.
 - `shot`: the page's camera framing: {SHOT_ENUM}. Decide it once — the prose, the `emptyScenePrompt` and this field use the same framing. Omitting it makes the background plate default to a wide shot.
-- `framingPattern`: `over-the-shoulder` when this page is shot from behind the acting figure (see the gap-action framing rule), omitted otherwise. Carry through whatever the brief you are rewriting declared unless your rewrite changes the framing — dropping it re-renders an over-the-shoulder page flat.
 - `landmarkView`: how the page sees a real landmark, when one is cited: `exterior`, `distant`, `close`, `interior`, `view-from`, or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; omitting it attaches none.
 - `wornItems[]`: one row per Visual Bible element with a `wornAs` link whose owner is on this page, whether or not the prose mentions it. `{id, owner, state, location, wearer, redressNote}`; `state` is `"worn"` or `"off"`, and `off` requires both `location` and `redressNote`, the wardrobe instruction above. Omit a row and the item is drawn on the character by default.
 - `diagnosis[]`: one entry per evaluator finding or preview mismatch. Each entry names the root cause in one short sentence — not the symptom. Empty array if there were no findings.

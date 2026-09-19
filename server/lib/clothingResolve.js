@@ -100,7 +100,7 @@ function applyReferenceMode({
     return { characterPhotos, visualBibleGrid, landmarkPhotos, sceneBackground };
   }
   if (m === 'loose') {
-    const shot = String(sceneMetadata?.fullData?.shot || sceneMetadata?.framingPattern || '').toLowerCase();
+    const shot = String(sceneMetadata?.fullData?.shot || sceneMetadata?.shot || '').toLowerCase();
     const isWide = shot.includes('wide');
     // Two outputs per character: face + body, attached as separate refs (so
     // Grok can use each crop verbatim without splitting a quadrant). On wide

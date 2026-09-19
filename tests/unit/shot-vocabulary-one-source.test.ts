@@ -24,9 +24,24 @@ const PROMPTS = join(__dirname, '../..', 'prompts');
 describe('one shot vocabulary, injected — never hand-typed', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
-  it('SHOT_TYPES is distance only — no angle hides in it', () => {
-    expect(SHOT_TYPES).toEqual(['close-up', 'medium', 'wide', 'ultra-wide']);
-    expect(SHOT_ENUM).not.toMatch(/aerial|worm|low angle|over-the-shoulder/i);
+  it('ONE field carries distance AND camera position, every option spelled out', () => {
+    expect(SHOT_TYPES).toEqual([
+      'close-up', 'medium', 'wide', 'ultra-wide',
+      'over-the-shoulder', 'high-angle', 'low-angle', 'aerial',
+    ]);
+    // Spelled out, never abbreviated (owner, 2026-09-19).
+    expect(SHOT_ENUM).toContain('over-the-shoulder');
+    expect(SHOT_ENUM.split(/[^a-z-]+/)).not.toContain('ots');
+  });
+
+  it("the parser folds the words people write onto those ids", () => {
+    const { SHOT_PATTERNS } = require('../../server/lib/shotVocabulary');
+    const id = (t: string) => (SHOT_PATTERNS.find(([, re]: [string, RegExp]) => re.test(t)) || ['other'])[0];
+    expect(id("worm's-eye of the linden")).toBe('low-angle');
+    expect(id('wide-low plate')).toBe('low-angle');        // the legacy vantage word
+    expect(id("bird's-eye over the roofs")).toBe('aerial');
+    expect(id('over-the-shoulder — Levin throws')).toBe('over-the-shoulder');
+    expect(id('ultra-wide — the rooftops')).toBe('ultra-wide');
   });
 
   it('no prompt hand-types a PAGE shot list any more', () => {
@@ -49,14 +64,6 @@ describe('one shot vocabulary, injected — never hand-typed', () => {
     expect(c4).toContain('camera angle (the vantage they cite)');
   });
 
-  it('the VANTAGE list keeps its angles — a vantage IS a camera angle on a place', () => {
-    // wide-low and aerial are legitimate there and are used: across ~420 stored
-    // vantages, wide-low x4 and aerial x1. ultra-wide was used x4 while NOT
-    // being offered, so the list now carries it.
-    const t = String(PROMPT_TEMPLATES.sceneExpansionAll);
-    expect(t).toContain('`wide|medium|close-up|ultra-wide|wide-low|aerial`');
-    expect(t).toContain('a vantage is a camera ANGLE on the place');
-  });
 
   it('every brief-authoring template fills SHOT_ENUM rather than spelling it', () => {
     for (const k of ['sceneExpansionAll', 'sceneExpansion', 'sceneIteration', 'sceneIterationFree']) {

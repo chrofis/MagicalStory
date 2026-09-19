@@ -49826,3 +49826,62 @@ is deployed. This lands on `staging` only; the master deploy is the owner's
 separate call.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-19 — ONE camera field: `shot` carries distance AND camera position, every option spelled out
+
+**Context.** Camera had grown three fields, none of which could say what the owner wanted
+a page to say:
+
+- page `shot` — four values, **all distance**: `close-up`, `medium`, `wide`, `ultra-wide`
+- vantage `shot` — a *different* list, `wide|medium|close-up|wide-low|aerial`, the only
+  place an angle could be named at all
+- `framingPattern` — added earlier the same day for over-the-shoulder
+
+Owner, 2026-09-19: *"why two fields, I don't like it, it should be one field that gives
+both distance and angle"*, and then *"just one field that has all options in it and do not
+use ots, but spell it out."*
+
+**Decision.** One vocabulary in `shotVocabulary.js`, one flat list, every value spelled
+out:
+
+```
+close-up · medium · wide · ultra-wide · over-the-shoulder · high-angle · low-angle · aerial
+```
+
+The first four say how CLOSE the camera is, the last four where it STANDS. A page has one
+camera, so it has one field. `over-the-shoulder` is a value like any other — not `ots`,
+not a second field.
+
+`framingPattern` is retired: gone from all four brief-authoring templates, from the three
+`sceneMetadata.js` null-defaults, from `clothingResolve.js`'s shot fallback, and from the
+consumer in `storyJobPipeline.js`, which now reads the `shot` field. The only survivor is
+`prompts/outline-analysis-imagefirst.txt`, on the pre-beats path that
+`resolvePipelineMode` makes unreachable for every non-trial job — deliberately left.
+
+**Why this was cheap.** Adding to a flat enum keeps every existing value's exact string,
+so the six exact-match consumers (`=== 'close-up'` ×3, `=== 'ultra-wide'`, the focal-page
+rule, the consecutive-same-shot counter) keep working untouched. They simply do not match
+the new values, which is correct — an `aerial` page is not a close-up. The
+consecutive-same-shot counter gets sharper for free: two `wide` pages at different angles
+stop counting as the same composition.
+
+The parser folds what people actually write onto those ids: `worm's-eye` and the legacy
+vantage word `wide-low` → `low-angle`; `bird's-eye`, `overhead shot`, `top-down` →
+`aerial`; `from above` / `looking down into` → `high-angle`.
+
+**What this unlocks, and what it does not.** Camera angle is now nameable on a page,
+which it never was — every page of every book was drawn at eye level, because the one
+place an angle could be stated was a backdrop plate and it was taken 5 times in ~420
+vantages. Nothing yet *asks* for angle variety or counts it. That is the remaining half
+of the owner's original ask and is not done here.
+
+**Touched:** `server/lib/shotVocabulary.js` (4 new shots + MATCH_ORDER),
+`server/lib/promptBuilders.js` (`GAP_ACTION_FRAMING_RULE`),
+`prompts/scene-expansion-all.txt`, `prompts/scene-expansion.txt`,
+`prompts/scene-iteration.txt`, `prompts/scene-iteration-free.txt`,
+`server/lib/sceneMetadata.js`, `server/lib/clothingResolve.js`, `storyJobPipeline.js`,
+`tests/unit/gap-action-framing.test.ts`, `tests/unit/shot-vocabulary-one-source.test.ts`.
+
+**Status:** ✅ active

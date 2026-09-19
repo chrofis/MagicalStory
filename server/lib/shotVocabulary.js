@@ -47,6 +47,31 @@ const SHOTS = [
     match: /\b(?:ultra[-\s]?wide|extreme[-\s]?wide|establishing[-\s]?wide)\b/i,
     definition: 'An ultra-wide shot shows the whole setting from a distance, the figures small within it and both ends of any separation visible.',
   },
+  // WHERE THE CAMERA STANDS (owner, 2026-09-19). The four above say how CLOSE
+  // the camera is; these say where it is. They share the one field because a
+  // page has one camera. Splitting them left the angle nameable only on a
+  // backdrop plate's own `shot`, where it was offered and taken 5 times in ~420
+  // vantages, so every page of every book was drawn at eye level.
+  {
+    id: 'over-the-shoulder',
+    match: /\b(?:over[-\s]?the[-\s]?shoulder|over[-\s]?shoulder)\b/i,
+    definition: "An over-the-shoulder shot stands behind one figure: their back and shoulder fill a front corner, large and close, and what they face sits small and deep in the opposite corner. The camera's own axis is the line between them, so the picture states who is acting on whom without having to work it out.",
+  },
+  {
+    id: 'high-angle',
+    match: /\b(?:high[-\s]?angle|from[-\s]above|looking[-\s]down[-\s]into)\b/i,
+    definition: 'A high-angle shot looks down at the subject from above head height — the ground behind them, little or no sky.',
+  },
+  {
+    id: 'low-angle',
+    match: /\b(?:low[-\s]?angle|worm'?s[-\s]?eye|from[-\s]below|wide[-\s]?low)\b/i,
+    definition: "A low-angle shot looks up at the subject from below — a worm's-eye view, the sky or ceiling behind them, the subject taller than the camera.",
+  },
+  {
+    id: 'aerial',
+    match: /\b(?:aerial|bird'?s[-\s]?eye|overhead[-\s]?shot|top[-\s]?down)\b/i,
+    definition: "An aerial shot looks straight down from far above — a bird's-eye view of the whole place, figures seen from over their heads.",
+  },
 ];
 
 /**
@@ -54,7 +79,7 @@ const SHOTS = [
  * "close-up" must win over a bare "close". Anything unrecognised counts as
  * 'other' and is reported rather than silently folded into medium.
  */
-const MATCH_ORDER = ['ultra-wide', 'close-up', 'wide', 'medium'];
+const MATCH_ORDER = ['over-the-shoulder', 'ultra-wide', 'close-up', 'high-angle', 'low-angle', 'aerial', 'wide', 'medium'];
 
 if (MATCH_ORDER.length !== SHOTS.length || MATCH_ORDER.some(id => !SHOTS.some(s => s.id === id))) {
   throw new Error('shotVocabulary: MATCH_ORDER and SHOTS disagree — every shot needs a recognition rank');
