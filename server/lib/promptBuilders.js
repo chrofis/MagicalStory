@@ -6676,6 +6676,7 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
     `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
     'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
     'Two figures stay wherever they are: the character whose action a page\'s instant works against, and a character the division would leave with fewer than two pages in the book.',
+    'A finding that names a page names a candidate, not an order. A finding asking the book for a page with no people in frame names the page best suited to give up its cast: empty that one, unless a figure on it is one of the two that stay — then empty another page and say in the declaration why that one could not.',
     'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
     '## YOUR PAGE PLAN',
@@ -6934,6 +6935,35 @@ function parsePlanCheckObstacles(raw) {
     if (names.length) out.set(parseInt(m[1], 10), names);
   }
   return out;
+}
+
+/**
+ * The plan check's PEOPLELESS line — the page the checker nominates to give up
+ * its cast, as DATA.
+ *
+ * Q6 nominates it only when the book has no people-free page at all, which is
+ * exactly when `NO_PEOPLELESS_PAGE` fires. A code heuristic for the same pick
+ * was built and REJECTED on measurement (docs/decisions.md, 2026-09-20): the
+ * roster's `things` column is empty on every page of a real book, so code
+ * cannot see "object-dominant" or "the low point", and every defensible
+ * tie-break ranked the climax above the right page. The checker reads the arc
+ * and already names the pictures that must NOT be emptied (Q4), so the pick is
+ * the prompt's and code only consumes the field.
+ *
+ * "PEOPLELESS 13: the silent egg on the ground" → { page: 13, subject: 'the
+ * silent egg on the ground' }. No line → null.
+ *
+ * @returns {{page: number, subject: string}|null}
+ */
+function parsePlanCheckPeoplelessPick(raw) {
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().replace(/\*\*/g, '').match(/^PEOPLELESS\s+(?:page\s+)?(\d+)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    const page = parseInt(m[1], 10);
+    if (!Number.isFinite(page)) continue;
+    return { page, subject: String(m[2] || '').trim() };
+  }
+  return null;
 }
 
 // A HINT MAY NOT CONTRADICT THE SETTLED ARC (2026-09-19).
@@ -9902,6 +9932,7 @@ module.exports = {
   parsePlanCheck,
   parsePlanCheckRoster,
   parsePlanCheckObstacles,
+  parsePlanCheckPeoplelessPick,
   buildReplanSection,
   parsePlanChanges,
   REPLAN_CHANGES_FORMAT,

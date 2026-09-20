@@ -100,3 +100,76 @@ describe('the dead-letter continuity sentence is gone', () => {
     expect(planner()).toContain('come and go in different combinations');
   });
 });
+
+
+/**
+ * THE PEOPLELESS PAGE IS NOMINATED BY THE CHECKER (2026-09-20).
+ *
+ * `NO_PEOPLELESS_PAGE` is must-fix and named no page. A code heuristic for the
+ * pick was built and rejected on measurement (docs/decisions.md): on
+ * job_1789853503332_riqncqg1i it leaves candidates {2,4,10,13,17} and every
+ * defensible tie-break ranks the hatching climax (p17) or the rescue (p10)
+ * above the right page (p13). Classification belongs to the prompt, so Q6
+ * nominates the page and code only consumes the field.
+ *
+ * The nomination criterion is a hand-kept pair, like WANTED_PICTURE_DEF: the
+ * checker asks it, the planner is told it, and it is pinned here clause by
+ * clause rather than shared as a constant, because the two sides state it in
+ * the two framings this pair exists to keep apart.
+ */
+describe('plan-check Q6 nominates the peopleless page, and the planner is told', () => {
+  beforeAll(async () => { await loadPromptTemplates(); });
+
+  it('the checker is asked for the nomination only when the book has none', () => {
+    const c = checker();
+    expect(c).toContain('When no page is people-free, nominate the one page best suited to give up its cast');
+    expect(c).toContain('a page whose subject is already a thing or a place seen alone');
+    expect(c).toContain('never a moment between people');
+    // Q4's pictures are the ones that may NOT be emptied.
+    expect(c).toContain('never one of the most wanted pictures question 4 names');
+  });
+
+  it('the nomination is emitted in the ROSTER/OBSTACLES shape, not a new syntax', () => {
+    const c = checker();
+    expect(c).toContain('PEOPLELESS <page>: ');
+    expect(c).toContain('only when no page is people-free, one line naming the page best suited to give up its cast');
+    // The all-clear still enumerates every block the reply owes.
+    expect(c).toContain('the peopleless line if one is owed');
+  });
+
+  it('the planner is told the same criterion — the critic asks, the generator is told', () => {
+    const g = planner();
+    expect(g).toContain('At least one page in the book earns this');
+    expect(g).toContain('never a page whose drama is between people');
+    // The clause the checker grades and the planner previously lacked.
+    expect(g).toContain('so does every picture question 6 names as most wanted');
+  });
+
+  it('the re-plan tells the planner a named page is a candidate it may refuse', () => {
+    const section = pb.buildReplanSection(
+      'Page 1: wide — Levin — he runs — he is out',
+      [{ kind: 'counter', code: 'NO_PEOPLELESS_PAGE', line: 'PLAN[NO_PEOPLELESS_PAGE]: x' }],
+      { pageCount: 18 });
+    expect(section).toContain('names a candidate, not an order');
+    // The two refusals it may invoke are still stated right above it.
+    expect(section).toContain('Two figures stay wherever they are');
+  });
+});
+
+describe('parsePlanCheckPeoplelessPick reads the line as data', () => {
+  const parse = pb.parsePlanCheckPeoplelessPick;
+
+  it('reads page and subject', () => {
+    expect(parse('ROSTER 1: people = Levin\nPEOPLELESS 13: the silent egg on the ground'))
+      .toEqual({ page: 13, subject: 'the silent egg on the ground' });
+  });
+
+  it('tolerates the markdown bolding and a "page" word the checker sometimes adds', () => {
+    expect(parse('**PEOPLELESS page 4: the empty clearing**').page).toBe(4);
+  });
+
+  it('returns null when no line was emitted — never a guessed page', () => {
+    expect(parse('ROSTER 1: people = Levin\nOBSTACLES 7: Silvan\nNONE')).toBeNull();
+    expect(parse('')).toBeNull();
+  });
+});

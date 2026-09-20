@@ -531,7 +531,7 @@ function consecutiveRuns(sorted) {
  *   is the names a page reaches without naming them (`coveredNames`).
  * @returns {{findings: Array, lines: string[], stats: Object, cast: Object|null, skipped?: string}}
  */
-function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null } = {}) {
+function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], maxCharactersPerScene = 3, declaredInvented = null, inventedAllowance = null, roster = null, peoplelessPick = null } = {}) {
   const findings = [];
   const add = (code, pageList, detail) => findings.push({ code, pages: pageList, detail });
 
@@ -653,17 +653,25 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   // (`SHOT_NO_CAMERA_POSITION`) is the shape copied here: it enumerates its own
   // legal values in the detail, so it is satisfiable by reading the line alone.
   //
-  // No page is named. The only page-picking signals available in code are the
-  // plan line's prose and the cast arithmetic, and on the two cited stories
-  // they rank the hatching climax above the low point — a heuristic that empties
-  // the wrong page costs a mangled book, and choosing WHICH page is a judgement
-  // the checker's Q6 owns, not arithmetic. A finding naming no page is not the
-  // obstacle it looked like: the re-plan's scope test admits a page the round
-  // DECLARES a change for (`declaredPages`, beatsPipeline), so a declared
-  // `cast out` on any page is in scope.
+  // THE PAGE IS NOMINATED BY THE CHECKER, NEVER BY ARITHMETIC (2026-09-20).
+  //
+  // A code heuristic for the pick was built to spec and rejected on
+  // measurement (docs/decisions.md): on job_1789853503332_riqncqg1i it leaves
+  // candidates {2,4,10,13,17} and every defensible tie-break ranks the
+  // hatching climax (p17) or the rescue (p10) above the right page (p13).
+  // Code cannot see "object-dominant" or "the low point" — the roster's
+  // `things` column is empty on all 18 pages — and a heuristic that empties
+  // the climax costs a mangled book. The checker CAN see it: plan-check Q4
+  // already names the pictures that must NOT be emptied, so Q6 nominates the
+  // page and `peoplelessPick` carries that answer here as DATA, the same way
+  // the OBSTACLES block does. Code never synthesises a page: when no
+  // nomination arrives the finding is the same sentence without the page
+  // clause, and beatsPipeline logs the miss.
   if (emptyPages.length === 0) {
-    add('NO_PEOPLELESS_PAGE', [],
-      `no page shows only a thing or a place, with no people in frame — one page gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people`);
+    const pick = peoplelessPick && Number.isFinite(Number(peoplelessPick.page))
+      ? Number(peoplelessPick.page) : null;
+    add('NO_PEOPLELESS_PAGE', pick ? [pick] : [],
+      `no page shows only a thing or a place, with no people in frame — ${pick ? `page ${pick}` : 'one page'} gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people`);
   }
   // 4b. …but the book may not spend that page on its interpersonal drama.
   //     Measured on job_1789420511893_zly5rcdej: the planner put the mandatory

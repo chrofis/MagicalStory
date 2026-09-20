@@ -117,6 +117,10 @@ describe('NO_PEOPLELESS_PAGE names the move that answers it', () => {
     pages: PAGES, commissionedNames: ['Levin', 'Julian'], placeNames: [],
     maxCharactersPerScene: 6, roster: ROSTER,
   }).findings.find((f: any) => f.code === 'NO_PEOPLELESS_PAGE');
+  const withPick = (peoplelessPick: any) => runPlanCounters({
+    pages: PAGES, commissionedNames: ['Levin', 'Julian'], placeNames: [],
+    maxCharactersPerScene: 6, roster: ROSTER, peoplelessPick,
+  }).findings.find((f: any) => f.code === 'NO_PEOPLELESS_PAGE');
 
   it('still fires on a book with no people-free page', () => {
     expect(finding()).toBeTruthy();
@@ -140,10 +144,82 @@ describe('NO_PEOPLELESS_PAGE names the move that answers it', () => {
     expect(finding().detail).toContain(castOut.syntax);
   });
 
-  it('names no page: the heuristic was measured and rejected, and scope does not need one', () => {
-    // A finding naming no page is not the obstacle it looked like — the
-    // re-plan's merge admits any page the round DECLARES a change for
+  it('names no page when the checker nominated none — code never synthesises one', () => {
+    // The heuristic was built and rejected on measurement (docs/decisions.md,
+    // 2026-09-20). A finding naming no page is not the obstacle it looked like
+    // — the re-plan's merge admits any page the round DECLARES a change for
     // (`declaredPages`, beatsPipeline.js), which a `cast out` line is.
     expect(finding().pages).toEqual([]);
+    expect(finding().detail).toContain('one page gives up its cast');
+  });
+
+  it('names the page plan-check Q6 nominated, and only that page', () => {
+    const f = withPick({ page: 2, subject: 'the egg alone on the leaves' });
+    expect(f.pages).toEqual([2]);
+    expect(f.detail).toContain('page 2 gives up its cast');
+    // ONE sentence, not a second code path: the verb and the criterion are
+    // still in it, whichever way the page clause went.
+    expect(f.detail).toContain('cast out <name>');
+    expect(f.detail).toContain('a page whose subject is already a thing or a place seen alone');
+  });
+
+  it('ignores a nomination that carries no usable page number', () => {
+    expect(withPick({ page: NaN, subject: 'x' }).pages).toEqual([]);
+    expect(withPick({ subject: 'x' } as any).pages).toEqual([]);
+  });
+
+  it('does not fire at all once a page IS people-free, so no nomination is read', () => {
+    const pages = [...PAGES, { pageNumber: 4, planLine: 'wide — the egg — the egg rests on the leaves — it is alone' }];
+    const roster = new Map(ROSTER);
+    roster.set(4, { people: [], things: ['egg'], covers: [] });
+    const found = runPlanCounters({
+      pages, commissionedNames: ['Levin', 'Julian'], placeNames: [],
+      maxCharactersPerScene: 6, roster, peoplelessPick: { page: 2, subject: 'the egg' },
+    }).findings.find((f: any) => f.code === 'NO_PEOPLELESS_PAGE');
+    expect(found).toBeUndefined();
+  });
+});
+
+/**
+ * THE NOMINATION IS A CANDIDATE, NOT AN ORDER.
+ *
+ * Q6 names the page best suited to give up its cast; the re-plan review still
+ * refuses a `cast out` that takes the holder of that page's obstacle, or that
+ * drops a character below the two-page floor. A nominated page must not open a
+ * bypass around either — `reviewPlanChanges` is given no nomination at all,
+ * and this pins that it stays that way.
+ */
+describe('a nominated peopleless page does not bypass the re-plan refusals', () => {
+  const { reviewPlanChanges } = require('../../server/lib/planCounters.js');
+  const standing = [
+    { pageNumber: 1, planLine: 'wide — Levin, Zippi — Zippi blocks the path — Levin is held back' },
+    { pageNumber: 2, planLine: 'medium — Levin — Levin waits — nothing moves' },
+  ];
+  const change = (subject: string, pageNumber: number) => ([{
+    pageNumber, kind: 'cast_out', subject,
+    answers: { code: 'NO_PEOPLELESS_PAGE' }, answersText: 'PLAN[NO_PEOPLELESS_PAGE]',
+    line: `Page ${pageNumber}: cast out ${subject} — PLAN[NO_PEOPLELESS_PAGE]`,
+  }]);
+
+  it('refuses casting out the obstacle holder even on the nominated page', () => {
+    const r = reviewPlanChanges({
+      changes: change('Zippi', 1),
+      standing, returned: [{ pageNumber: 1, planLine: 'wide — the path — the path lies empty — Levin is held back' }],
+      castNames: ['Levin', 'Zippi'], maxCast: 6,
+      obstacles: new Map([[1, ['Zippi']]]),
+    });
+    expect(r.refusals.map((x: any) => x.rule)).toContain('obstacle');
+  });
+
+  it('refuses a cast out that drops a character under the two-page floor', () => {
+    const r = reviewPlanChanges({
+      changes: change('Levin', 2),
+      standing, returned: [
+        { pageNumber: 1, planLine: 'wide — Levin, Zippi — Zippi blocks the path — Levin is held back' },
+        { pageNumber: 2, planLine: 'medium — the clearing — the clearing lies still — nothing moves' },
+      ],
+      castNames: ['Levin', 'Zippi'], maxCast: 6, obstacles: new Map(),
+    });
+    expect(r.refusals.map((x: any) => x.rule)).toContain('span');
   });
 });

@@ -50716,3 +50716,55 @@ so no critic was left scoring a rule the writer no longer has.
 `tests/unit/text-audit-rules-reach-writer.test.ts`
 
 **Status:** ✅ active
+
+
+## The peopleless page is nominated by plan-check Q6, not picked by a code heuristic (2026-09-20)
+
+**Context:** `NO_PEOPLELESS_PAGE` is a must-fix plan counter: a book with no
+page showing only a thing or a place fires it. Since `32a9f9d78` the finding
+names the verb that answers it (`cast out <name>`), but it named no page, and
+the planner still answered it with `action in` on
+`job_1789853503332_riqncqg1i` — the one declarable verb that cannot empty a
+page.
+
+**Decision:** plan-check Q6 nominates the page. When the book has no
+people-free page, the checker emits a `PEOPLELESS <page>: <subject>` line in
+the same declared shape as `ROSTER` and `OBSTACLES`;
+`parsePlanCheckPeoplelessPick` reads it as data and `runPlanCounters` carries
+the page into the finding's detail and its `pages`. Code never picks or
+synthesises a page: with no nomination the finding is the same sentence
+without the page clause, and `beatsPipeline` logs the miss as an ERROR.
+story-beats.txt carries the generator half (a most-wanted picture is never the
+people-free page), and the RE-DIVIDE block tells the planner a named page is a
+candidate it may refuse — `reviewPlanChanges` still refuses a `cast out` on the
+page's obstacle holder or one that drops a character under the two-page floor,
+and is given no nomination at all, so a nominated page opens no bypass.
+
+**Rationale:** A CODE HEURISTIC FOR THE PICK WAS BUILT TO SPEC AND REJECTED ON
+MEASUREMENT — this entry exists so nobody rebuilds it. Replayed over
+`job_1789853503332_riqncqg1i`'s stored roster and plan, it leaves candidates
+{2, 4, 10, 13, 17}, and every defensible tie-break ranks p17 (the hatching
+climax) or p10 (the rescue) above the correct p13 (the low point, "Levin sits
+down in the dark leaves, head bowed"). Code cannot see "object-dominant" or
+"the low point": the roster's `things` column is empty on all 18 pages of that
+book. Shipping it would have nominated the climax as the page to empty, which
+costs a mangled book. The checker CAN see it — its own Q4 on that run named
+pages 2, 10 and 17 as the most wanted pictures, exactly the three that must not
+be emptied — so the judgement moved to the prompt and code only consumes a
+field. Per the eval rule, classification belongs to the prompt; this changed no
+type, bucket or severity.
+
+**Validated:** replayed the counter over that job's stored roster (rung 1,
+stored evidence, $0): the finding reads "… — page 13 gives up its cast (cast
+out <name>), and it is a page whose subject is already a thing or a place seen
+alone, never a moment between people". The MODEL-side nomination itself is
+unvalidated until a real beats run — the replay constructs the `PEOPLELESS`
+line from the stored Q4 answer to exercise the parse and finding path.
+
+**Touched:** `prompts/plan-check.txt`, `prompts/story-beats.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`server/lib/planCounters.js`,
+`tests/unit/cast-cap-and-peopleless-page.test.ts`,
+`tests/unit/plan-shared-definitions.test.ts`
+
+**Status:** ✅ active

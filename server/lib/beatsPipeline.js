@@ -102,6 +102,7 @@ const {
   parsePlanCheck,
   parsePlanCheckRoster,
   parsePlanCheckObstacles,
+  parsePlanCheckPeoplelessPick,
   buildReplanSection,
   parsePlanChanges,
   replanRank,
@@ -1266,6 +1267,11 @@ async function generateStoryViaBeats(inputData, opts = {}) {
     // moment of their own is not a figure a page may quietly drop — so it is
     // read as DATA here, never re-derived from a finding's prose.
     let obstacles = null;
+    // The check's PEOPLELESS line (Q6): the page the checker nominates to give
+    // up its cast, emitted only when no page is people-free. Read as DATA, the
+    // same way the OBSTACLES block is — picking the page in code was built and
+    // rejected on measurement (docs/decisions.md, 2026-09-20).
+    let peoplelessPick = null;
     let checkModelId = null;
     let prompt = null;
     // THE REPLY IS EVIDENCE, NOT A BYPRODUCT (2026-09-19).
@@ -1296,6 +1302,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       modelFindings = parsePlanCheck(res.text || '');
       roster = parsePlanCheckRoster(res.text || '');
       obstacles = parsePlanCheckObstacles(res.text || '');
+      peoplelessPick = parsePlanCheckPeoplelessPick(res.text || '');
       // The roster AS PARSED, page by page. The raw reply above carries the
       // same lines verbatim; this is the form every counter actually reasons
       // on, so a reader can see what the arithmetic was given — including a
@@ -1314,7 +1321,14 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       log.error(`❌ [BEATS] Plan check (${label}) failed (${err.message}) — NO ROSTER, so the entire plan-counter layer is skipped this round`);
       gl.error(`${label}_failed`, `Plan check failed: ${err.message} — no roster, so every plan counter (cast, invented cast, shot variety, focal pages) is skipped this round`, null, { error: err.message, model: planCheckModel });
     }
-    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster });
+    const counters = runPlanCounters({ pages, commissionedNames, placeNames, maxCharactersPerScene: maxCast, declaredInvented: arcInventedNames, inventedAllowance: arcInventedLimit, roster, peoplelessPick });
+    // NO FALLBACK, NO SYNTHESIS. The finding degrades to its page-less
+    // sentence when Q6 nominated nothing; code never picks the page itself.
+    // The miss is loud so a checker that stops answering Q6 is visible.
+    if (!peoplelessPick && counters.findings.some(f => f.code === 'NO_PEOPLELESS_PAGE')) {
+      log.error(`❌ [BEATS] Plan check (${label}) fired NO_PEOPLELESS_PAGE but emitted no PEOPLELESS line — the finding names no page, and the planner picks blind`);
+      gl.error(`${label}_no_peopleless_nomination`, 'The plan check found no people-free page but nominated none either (Q6 PEOPLELESS line absent); the finding degrades to naming no page', null, { model: checkModelId || planCheckModel });
+    }
     if (counters.skipped) {
       const got = roster ? roster.size : 0;
       log.error(`❌ [BEATS] Plan counters (${label}) SKIPPED (${counters.skipped}) — the roster covers ${got} of ${pages.length} page(s); no cast, invented-cast, shot-variety or focal-page counting ran`);
