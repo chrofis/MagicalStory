@@ -31,7 +31,10 @@ const SEGMENT_SPLIT = /\s+[—–]\s+|\s+--\s+/;
  * stages can define. Anything unrecognised counts as 'other' and is reported
  * rather than silently folded into medium.
  */
-const { SHOT_PATTERNS, SHOT_AXIS } = require('./shotVocabulary');
+const {
+  SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
+  shotFloors, MAX_MEDIUM_WIDE_SHARE,
+} = require('./shotVocabulary');
 
 /** Words that look like names but never are, in the who-column's grammar. */
 const NAME_STOPWORDS = new Set([
@@ -567,8 +570,9 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       'the plan line does not carry all four of shot, who, the instant, and what is true after');
   }
 
-  // 2. Shot distribution: about two close-ups and two ultra-wides, never only
-  //    two camera DISTANCES across the book, and not every page at eye level.
+  // 2. Shot distribution, against the tiered table in shotVocabulary: a cap on
+  //    the medium/wide share, a floor per shot, a floor on camera positions
+  //    together, and never only two camera DISTANCES across the book.
   //
   //    The `shot` field carries two axes since 1b53f4d0f (2026-09-19) — four
   //    words for how close the camera is, four for where it stands — and it is
@@ -576,7 +580,7 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   //    no distance. Counting all eight together, as this block did when every
   //    value was a distance, mis-reads the new ones in BOTH directions:
   //    medium/wide/aerial would have passed SHOT_VARIETY on two distances, and
-  //    an angled page reads as "not a close-up" against the 2+2 floor although
+  //    an angled page reads as "not a close-up" against the close-up floor although
   //    it never had the chance to be one. Each counter is scoped to the axis it
   //    is actually about, off the vocabulary's own `axis` — never a second list
   //    of which words are angles.
@@ -588,21 +592,46 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   if (distancesUsed.length <= 2) {
     add('SHOT_VARIETY', [], `the book uses only ${distancesUsed.length} camera distance(s) (${distancesUsed.join(', ') || 'none recognised'}) across ${pageCount} pages`);
   }
-  // Every page drawn from eye level. The vocabulary offered no other option
-  // before 2026-09-19, so this is the state every stored book is in; the floor
-  // is ONE page, the minimum that makes the axis exist at all, and is not a
-  // taste call about how angled a book should be (owner decision pending).
-  if (angledPages.length === 0) {
-    add('SHOT_NO_CAMERA_POSITION', [],
-      `every page of the book is shot from eye level; no page declares a camera position (${Object.keys(SHOT_AXIS).filter(k => SHOT_AXIS[k] === 'position').join(', ')})`);
+
+  // THE FLOORS AND THE CAP COME FROM THE TABLE THE PLANNER WAS GIVEN.
+  // shotVocabulary.SHOT_FLOOR_TIERS is one declaration: shotDistributionPhrase
+  // states it in prompts/story-beats.txt, shotFloors measures it here. Nothing
+  // below re-lists which words are angles or how many of each a book owes.
+  const policy = shotFloors(pageCount);
+
+  // The ratio, not a count — it scales to any book length with no threshold to
+  // maintain. Measured over 11 staging books / 180 pages to 2026-09-20, medium
+  // plus wide was 72% of every page shipped, because the prompt asked for it.
+  // The pages list is empty: any page could be the one that changes, exactly as
+  // SHOT_VARIETY reports.
+  const mediumWide = MID_DISTANCE_SHOTS.reduce((n, id) => n + (shotCounts[id] || 0), 0);
+  if (pageCount > 0 && mediumWide / pageCount > MAX_MEDIUM_WIDE_SHARE) {
+    add('SHOT_MEDIUM_WIDE_EXCESS', [],
+      `${mediumWide}/${pageCount} pages are medium or wide; at most ${policy.maxMediumWide} may be`);
   }
-  if ((shotCounts['close-up'] || 0) < 2) {
-    add('SHOT_CLOSEUP_COUNT', rows.filter(r => r.shot === 'close-up').map(r => r.pageNumber),
-      `${shotCounts['close-up'] || 0} close-up page(s); the plan asks for about two`);
+
+  // Per-shot floors. `ultra-wide` is a DISTANCE and `aerial` a POSITION — two
+  // different shots on two different axes, each with its own floor and its own
+  // code, so a re-plan is told WHICH shot the book is short of rather than that
+  // it is short of something.
+  for (const [shot, floor] of Object.entries(policy.floors)) {
+    const code = SHOT_FLOOR_CODE[shot];
+    const have = shotCounts[shot] || 0;
+    if (have < floor) {
+      add(code, rows.filter(r => r.shot === shot).map(r => r.pageNumber),
+        `${have} ${shot} page(s); the plan asks for at least ${floor} across ${pageCount} pages`);
+    }
   }
-  if ((shotCounts['ultra-wide'] || 0) < 2) {
-    add('SHOT_ULTRAWIDE_COUNT', rows.filter(r => r.shot === 'ultra-wide').map(r => r.pageNumber),
-      `${shotCounts['ultra-wide'] || 0} ultra-wide page(s); the plan asks for about two`);
+
+  // The position axis TAKEN TOGETHER. The per-shot floors above say which
+  // angles; this says how many pages leave eye level at all, which is the
+  // number a long book can satisfy in more than one way. The tier decides:
+  // a short book is asked for none, so a six-page trial never raises this.
+  if (policy.requiredPositions > 0 && angledPages.length < policy.requiredPositions) {
+    add('SHOT_NO_CAMERA_POSITION', angledPages.map(r => r.pageNumber),
+      angledPages.length === 0
+        ? `every page of the book is shot from eye level; ${policy.requiredPositions} page(s) should declare a camera position (${POSITION_SHOTS.join(', ')})`
+        : `${angledPages.length}/${pageCount} pages declare a camera position (${POSITION_SHOTS.join(', ')}); the plan asks for at least ${policy.requiredPositions}`);
   }
 
   // 3. Cast per page, against the CONFIGURED ceiling — never a literal.

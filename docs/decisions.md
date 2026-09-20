@@ -50476,3 +50476,82 @@ Art Director and iterate builders), `tests/unit/text-checklist-by-reader.test.ts
 **Rationale:** Rule 7 and the atomic-action critique exist for a good reason — an instruction full of non-actions produces a model that changes nothing — so widening them to admit prose was the wrong fix. What was missing was a NARROW, NAMED channel for "keep this true while you change that", and half of it was already built and dead. Wiring the existing field is strictly smaller than loosening the rule, and the dead-field half-build was itself the bug.
 **Touched:**   `server/lib/repairLogic.js` (`buildPreserveClause`, `PRESERVE_MAX`), `server/lib/images.js` (`inpaintPage` — builds, sanitises and interpolates `preserveClause`), `prompts/feedback-consolidator.txt` (rule 6b + critique rule 5), `tests/unit/inpaint-preserve-channel.test.ts`
 **Status:**    ✅ active
+
+## 2026-09-20 — The shot spread is one tiered table: the planner is ASKED for it and a re-plan is OBLIGED to answer it
+
+**Context:** Measured across 11 staging books / 180 pages in the fortnight to
+2026-09-20: medium 76 (42%), wide 54 (30%), close-up 37 (21%), ultra-wide 10
+(5.6%), high-angle 2, over-the-shoulder 1, aerial 0. Medium plus wide was 72% of
+every page shipped and a camera position appeared on 3 of 180 pages. Widened to
+every staging book with a stored page plan (25 books / 405 pages) the mix is the
+same: medium 44.2%, wide 27.4%, positions 5 pages in 405, aerial zero.
+
+Two separate faults produced that. **The prompt asked for it**:
+`prompts/story-beats.txt` said "about two close-ups and two ultra-wides, the rest
+medium or wide", which on an 18-page book is an explicit request for ~78%
+medium-or-wide — the planner was complying. **And nothing obliged a fix**:
+`SHOT_CLOSEUP_COUNT` / `SHOT_ULTRAWIDE_COUNT` / `SHOT_NO_CAMERA_POSITION` all
+reported as "also noted", so on `job_1789853503332_riqncqg1i`
+`PLAN[SHOT_ULTRAWIDE_COUNT]` and `PLAN[NO_PEOPLELESS_PAGE]` were raised in BOTH
+plan-check rounds and the book shipped with neither fixed.
+
+**Decision:** one table, `SHOT_FLOOR_TIERS` in `server/lib/shotVocabulary.js`,
+read by both sides.
+
+- The planner is given it as `{SHOT_DISTRIBUTION}`, built by
+  `shotDistributionPhrase(pageCount)` — the prompt states what a good spread IS.
+- The counters measure the same table via `shotFloors(pageCount)`.
+- **Cap:** `SHOT_MEDIUM_WIDE_EXCESS` when `(medium + wide) / pages > 0.5`. A
+  ratio, so it scales to any book length with no threshold to maintain. It
+  applies at every length.
+- **Floors, tiered by page count** (a 6-page trial must not be asked for two
+  over-the-shoulder pages):
+
+  | pages | close-up | ultra-wide | aerial | over-the-shoulder | positions total |
+  |-------|----------|------------|--------|-------------------|-----------------|
+  | ≤8    | 1        | –          | –      | –                 | –               |
+  | 9–13  | 2        | 1          | 1      | 1                 | –               |
+  | ≥14   | 2        | 1          | 1      | 2                 | ceil(pages/6)   |
+
+- `SHOT_OTS_COUNT` and `SHOT_AERIAL_COUNT` are new codes, so a re-plan is told
+  WHICH shot is missing. `SHOT_ULTRAWIDE_COUNT`'s floor drops from 2 to 1 —
+  a floor of 1 that is enforced beats a floor of 2 that is not.
+- `ultra-wide` is a DISTANCE and `aerial` a POSITION. Different axes, separate
+  floors, never folded together.
+- `SHOT_NO_CAMERA_POSITION` now measures the tier's positions TOTAL rather than
+  "any angle at all", and is silent below 9 pages, where the tier asks for none.
+- All six — `SHOT_MEDIUM_WIDE_EXCESS`, `SHOT_CLOSEUP_COUNT`,
+  `SHOT_ULTRAWIDE_COUNT`, `SHOT_AERIAL_COUNT`, `SHOT_OTS_COUNT`,
+  `SHOT_NO_CAMERA_POSITION` — join `REPLAN_MUST_FIX_CODES`.
+  `SHOT_VARIETY` stays advisory; the cap and the floors subsume it.
+
+**Rationale:** This REVERSES the 2026-09-19 decision to leave
+`SHOT_NO_CAMERA_POSITION` out of the must-fix set, which said to revisit "when
+stored plans show the planner reaching for a position unprompted". It never did —
+3 pages in 180 — because nothing asked it to. The prompt moving first is what
+makes the promotion payable: a must-fix round is now spent on a spread the
+planner was actually given, not on a preference it was never told about. Owner
+signed off on both halves.
+
+Floor consistency was checked at every length from 4 to 40 pages: no length asks
+for more pages than the book holds, and at no length do the floors contradict
+the 50% cap. The tightest lengths are 9 and 10 pages, where the mandated 5 pages
+plus the 4- and 5-page medium/wide ceiling exactly fill the book — satisfiable,
+with zero slack.
+
+**Validated** (free replay, no paid call) over the stored `---PAGE PLAN---`
+sections of all 25 staging books of the last 14 days: 0/25 pass the new table,
+21 of them raising 4–5 findings. That is the accepted cost and it is the WORST
+case — every one of those books was planned under the old prompt, which asked
+for the distribution they have. The loop is bounded at `MAX_REPLAN_ROUNDS = 2`
+and a round that does not reduce the must-fix count is discarded.
+
+**Touched:** `server/lib/shotVocabulary.js` (`MAX_MEDIUM_WIDE_SHARE`,
+`MID_DISTANCE_SHOTS`, `SHOT_FLOOR_CODE`, `SHOT_FLOOR_TIERS`, `shotFloors`,
+`shotDistributionPhrase`), `server/lib/planCounters.js` (the shot block),
+`server/lib/promptBuilders.js` (`SHOT_DISTRIBUTION`, `REPLAN_MUST_FIX_CODES`),
+`prompts/story-beats.txt`, `tests/unit/shot-distribution-floors.test.ts`.
+
+**Status:** ✅ active — supersedes the 2026-09-19 "camera position stays
+advisory" reasoning, which is kept in place in `REPLAN_MUST_FIX_CODES` with the
+reversal appended.

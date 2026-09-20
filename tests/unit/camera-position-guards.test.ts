@@ -45,8 +45,10 @@ describe('angles are the exception the book earns, not the default', () => {
 
   it('the planner is given both a floor and a ceiling', () => {
     const p = pb.buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
-    expect(p).toContain('at least one page in the book takes one');
-    expect(p).toContain('most pages still stand at eye level');
+    // The floor is a COUNT since 2026-09-20 and scales with the book (an
+    // 18-page book owes three), and the ceiling is what keeps an angle rare.
+    expect(p).toContain('3 pages in total leave eye level');
+    expect(p).toContain('keep the angled pages few enough that an angle still reads as one');
   });
 
   it('it is offered the positions by name, injected not hand-typed', () => {
@@ -82,12 +84,17 @@ describe('C4 names the two axes for what they are', () => {
 });
 
 /**
- * Promoting it would spend a re-plan round on EVERY book until the planner
- * adapts: 6 of 1,504 stored shot values carry a position at all.
+ * Advisory from 2026-09-19, MUST-FIX from 2026-09-20 (owner). The 2026-09-19
+ * comment said to revisit "when stored plans show the planner reaching for a
+ * position unprompted". It did not reach for one: 3 pages in 180 across eleven
+ * staging books in the fortnight that followed, because the prompt asked for
+ * medium-or-wide and the planner complied. The prompt now states the tiered
+ * table the counters measure, so the round a must-fix spends is spent on a
+ * spread the planner was actually asked for.
  */
-describe('the camera-position counter is advisory, on purpose', () => {
-  it('SHOT_NO_CAMERA_POSITION is not must-fix', () => {
-    expect(pb.replanRank({ kind: 'counter', code: 'SHOT_NO_CAMERA_POSITION' })).toBe('also');
+describe('the camera-position counter is must-fix since the prompt asks for the spread', () => {
+  it('SHOT_NO_CAMERA_POSITION is must-fix', () => {
+    expect(pb.replanRank({ kind: 'counter', code: 'SHOT_NO_CAMERA_POSITION' })).toBe('must');
   });
 
   it('and the reason is written where someone would go to change it', () => {
