@@ -21,6 +21,72 @@ superseded and link forward.
 
 ---
 
+## 2026-09-20 — A lone clean finding skips the consolidator, and a direction word is never trimmed as an adverb
+
+**Context:** The object-scale check emits one finding per page. On
+`job_1789853503332_riqncqg1i` those findings were already phrased as
+imperatives and already free of character names, and they still went through
+`consolidateFeedback`. Its four jobs — dedupe across evaluators, split
+per-character from scene, strip names (rule 3), cap at 3 — were all no-ops on
+that input. Only its critique-and-trim step did anything, and it cut a 49-word
+instruction to 14:
+
+    in:  "…drawn too large — it should be about as big as a human head…
+          Draw it smaller, matching the nearer boy's head in size…"
+    out: "Resize the egg to match the size of the boy in the right foreground."
+
+Two losses in one rewrite. The direction word `smaller` went as redundancy
+under rule 4 ("No adverbs") and rule 1's "flag every prepositional phrase that
+doesn't carry a fact". The referent moved from a head to a whole child under
+rule 3's visual-identifier requirement. Grok grew the egg; it did what it was
+told. Measured: p13 0.64 → 0.58 (wrong direction), p14 1.29 → 1.52 (inverted).
+
+p13 is the load-bearing evidence that the direction word is the real defect,
+not just the p14 referent swap: its referent survived correct ("the boy's
+head") and the egg still moved the wrong way. An instruction that names a
+target but no direction reads as already satisfied.
+
+**Decision:** Two changes.
+
+1. `inpaintPage` sends a finding verbatim when there is exactly one
+   inpaintable issue, it carries its own `fix` text, and that text survives
+   `stripCharacterNames` unchanged. No consolidator call, no trim, no cap, no
+   critique. A name present means rule 3 has real work, so the consolidator
+   runs as before.
+2. Consolidator rule 9: `larger`, `smaller`, `taller`, `shorter`, `closer`,
+   `farther`, `higher`, `lower`, `fewer`, `more` state which way the thing is
+   wrong. Rule 4 does not reach them and the critique never counts them as
+   redundancy. An instruction naming a target size, count or position with no
+   direction is called out as not executable.
+
+**Rationale:** The trim exists because long instructions measurably made Grok
+fix nothing, so raising the word cap was rejected. But the cap was never the
+problem here — the prompt was 49 words, not thousands, and the consolidator had
+nothing to consolidate. Both halves were taken (owner, 2026-09-20) because they
+fix different cases: the bypass covers a lone machine-generated finding, rule 9
+covers every page where the consolidator legitimately runs and a size, count or
+position defect is among the findings. `consolidateFeedback` has exactly one
+caller, so there is no sibling path to keep in step.
+
+Validated by rerunning both pages through the patched path against stored
+images (ladder rung 1, ~CHF 0.08): p14 measured 2.50 → 1.51 and p13 grew, both
+correct. Caveat: the measuring pass collapsed on the two p13 images (egg height
+exactly equal to head height, 201px, on both — the known batch-judge collapse),
+so p13 is confirmed by eye only, and absolute ratios are not comparable across
+judge runs. Direction is what this validates.
+
+**Not fixed here:** the check named only p13/p14 and missed p7, p12 and p16.
+And `scene_fix.preserve` came back empty on both pages despite p14 being
+exactly rule 6b's case — it has still never fired, and structurally cannot on
+the new verbatim path, which produces no plan. Both are in `tasks/BACKLOG.md`.
+
+**Touched:** `server/lib/images.js` (`inpaintPage`),
+`prompts/feedback-consolidator.txt` (rule 9 + worked example),
+`tests/unit/inpaint-direct-fix.test.ts`
+**Status:** ✅ active
+
+---
+
 ## 2026-09-20 — Story chronology does not bind a cover; the book audit stops reporting one for showing the ending
 
 **Context:** The book audit reads the finished book in reading order and asks six
