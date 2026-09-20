@@ -50649,3 +50649,70 @@ is the open alternative, and is a prompt-side change the owner should see first.
 (corrected comment), `tests/unit/cast-cap-and-peopleless-page.test.ts`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-20 — The page's paragraph cap is the length ceiling; the sentence budget only sets precedence
+
+**Context:** An adversarial read of the page-text writer prompt as SENT
+(staging `job_1789853503332_riqncqg1i`, 40,732 chars, stored at
+`stories.data->'storyTextPrompts'->0->'prompt'`) found the length spec
+self-contradictory: the reading level gives a page 3-6 sentences, while the next
+line allowed four paragraphs of 2-4 — 8-16 sentences. The fixed paragraph count
+is wrong at both ends of the three bands (3-6, 3-12, 15-20), so it was replaced
+with a softer rule making the sentence budget authoritative and letting the page
+take "as many paragraphs as that budget allows".
+
+**Measured** by Lab experiment **#1353** (`story_text_replay`, same story, same
+model `claude-sonnet-4-6`), against the shipped text of that story:
+
+| | before | after the rewrite |
+|---|---|---|
+| sentences/page (avg) | 6.8 | 8.4 |
+| outside the 3-6 band | 9/18 | 15/18 |
+| words/page (avg) | 64.1 | 74.3 |
+| over the 70-word ceiling | 2/18 | 14/18 |
+
+**Decision:** "a page holds at most four paragraphs" comes back. The
+contradiction is resolved by stating precedence — where the paragraph shape and
+the sentence count disagree, the sentence count wins and the page takes fewer
+paragraphs — rather than by deleting the cap.
+
+**Rationale:** The paragraph cap was contradictory on paper but was the clause
+doing the actual capping. Removing it removed the only hard ceiling and the
+writer expanded into the slack, making both metrics worse on every measure. A
+contradiction that binds beats a consistent rule that does not. Stating
+precedence keeps the contradiction resolved without giving up the ceiling.
+
+**Touched:** `prompts/story-text-from-beats.txt`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-20 — The six "nothing is leaned on before it is established" rules are one rule
+
+**Context:** The same prompt carried twelve continuity laws as twelve flat
+lines. Six of them — a character knows only what an earlier page gave them, a
+first appearance carries its stated cause, an object earns its meaning where it
+first appears, a stated limit is never broken, a character who discards a thing
+stays done with it, a promised reveal is answered and a price leaves a mark —
+are instances of one principle, and read as six separate constraints each
+costing attention.
+
+**Decision:** Fold them into one rule that names the principle and lists the six
+instances. Every obligation is carried over verbatim in substance.
+
+**Rationale:** Owner's call, 2026-09-20. The first draft silently dropped "want
+it back or" from the refusal clause — the half covering a character who demands
+a discarded thing back WITHOUT taking it, which is the exact
+abandon-then-reclaim case that rule was added for on 2026-09-17 (staging
+`job_1789584708605_rts4wqupm`). `tests/unit/text-audit-rules-reach-writer.ts`
+caught it, which is what that generator↔critic contract test exists for. The
+audit's Q5 CAUSE, Q6 ENTRANCE and Q9 PAYOFF still match the consolidated rule,
+so no critic was left scoring a rule the writer no longer has.
+
+**Touched:** `prompts/story-text-from-beats.txt`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`
+
+**Status:** ✅ active
