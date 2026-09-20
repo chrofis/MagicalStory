@@ -50828,3 +50828,41 @@ hour. The two artefacts differ by a whole pipeline stage.
 **Touched:** `docs/decisions.md`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-20 — The writer's TITLE block is parsed by one shared helper; the Lab stages used to swallow it
+
+**Context:** The page-text writer emits `---ANALYSIS---` / `---STORY TEXT---` /
+`---TITLE---`, TITLE last. `parseRefinedText` stops the final page at that block
+only when TITLE is named as a trailing marker, and it never reads the block at
+all — the title is extracted separately. Production did both
+(`beatsPipeline.js`). The two Test Lab stages that replay the SAME call did
+neither:
+
+- `story_text_replay` called `parseRefinedText(res.text)` bare, so the last page
+  carried `TITLE_CANDIDATES` and the `TITLE_PICK` line as if it were prose, and
+  `title` came back null on every run. Measured on Lab #1354: page 18 was 904
+  chars, 522 of them the actual page.
+- `writer_compare` did the same and then passed those pages to `scoreText`, so
+  every writer-model arm was scored on a final page with the title block glued
+  on.
+
+**Decision:** Both stages parse exactly as production does — expected page
+numbers plus `['TITLE']` as a trailing marker — and the ~30-line title
+extraction moves out of `beatsPipeline.js` into `parseTitleBlock()` in
+`promptBuilders.js`, beside `parseRefinedText`. Production and both stages call
+the one helper. The replay result now also returns `titleCandidates` and
+`titlePick`.
+
+**Rationale:** Hand-copying the extraction into the Lab is the drift the sibling
+registry exists to prevent. Before rewiring production the helper was proved
+byte-identical to the inline block on three real writer responses and two edge
+cases, including reproducing the shipped title of the original run
+(`job_1789853503332_riqncqg1i` → "Vier Freunde und ein Klopfen", pick index 2).
+
+**Touched:** `server/lib/promptBuilders.js` (`parseTitleBlock`),
+`server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`tests/unit/story-text-replay-title-marker.test.ts`
+
+**Status:** ✅ active

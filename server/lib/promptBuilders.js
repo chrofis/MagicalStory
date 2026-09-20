@@ -5343,6 +5343,55 @@ const BRIEF_TRAILING_MARKERS = ['VISUAL BIBLE'];
  * Tolerates the model echoing the ---STORY TEXT--- marker or omitting it.
  * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
  */
+/**
+ * The writer's ---TITLE--- block: the candidate list, the writer's own pick,
+ * and the title to ship. Lives here, beside parseRefinedText, because the beats
+ * pipeline and every Test Lab stage that replays the page-text call read the
+ * SAME response and must read it the same way — the Lab replay used to extract
+ * no title at all and reported `title: null` on every run.
+ *
+ * TITLE is the LAST block (2026-09-11), so it runs to the next block marker or
+ * to the end of the reply.
+ *
+ * @param {string} textRaw - the writer's full response
+ * @returns {{title: string|null, titleCandidates: string[], titleJudge: {pick:number, reason:string, candidates:string[]}|null, outOfRange: string|null}}
+ */
+function parseTitleBlock(textRaw) {
+  const { stableCandidateIndex } = require('./outlineParser/shared');
+  const titleSection = (String(textRaw || '').match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z]|$)/i) || [])[1] || '';
+  const cleanTitle = s => String(s || '')
+    .replace(/^\**\s*TITLE\s*:\s*/i, '')
+    .replace(/^\*{1,2}|\*{1,2}$/g, '')
+    .replace(/^"|"$/g, '')
+    .trim();
+  const titleCandidates = titleSection
+    .split('\n')
+    .map(l => (l.match(/^\s*\d+[.)]\s*(.+?)\s*$/) || [])[1])
+    .filter(Boolean)
+    .map(cleanTitle)
+    .filter(Boolean);
+  // TITLE_PICK: 1-based candidate number + one sentence. Out of range or absent
+  // → titleJudge stays null and the hash pick below stands.
+  const pickMatch = titleSection.match(/^\s*TITLE_PICK\s*:\s*(\d+)\s*(?:[—–-]\s*(.*))?$/im);
+  const pickIdx = pickMatch ? parseInt(pickMatch[1], 10) - 1 : -1;
+  const titleJudge = (pickIdx >= 0 && pickIdx < titleCandidates.length)
+    ? { pick: pickIdx, reason: String(pickMatch[2] || '').trim(), candidates: titleCandidates }
+    : null;
+  // Fall back to the first non-empty line for a writer that ignored the list
+  // format — a run must never lose its title to a format miss.
+  const title = titleJudge
+    ? titleCandidates[titleJudge.pick]
+    : (titleCandidates.length
+      ? titleCandidates[stableCandidateIndex(titleCandidates)]
+      : (cleanTitle(titleSection.split('\n').find(l => l.trim())) || null));
+  return {
+    title,
+    titleCandidates,
+    titleJudge,
+    outOfRange: (pickMatch && !titleJudge) ? `${pickMatch[1]} of ${titleCandidates.length}` : null,
+  };
+}
+
 function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT', trailingMarkers = []) {
   const full = String(raw || '');
   // Built from markerName, not hardcoded: callers pass 'SCENES' for the scene
@@ -9865,6 +9914,7 @@ module.exports = {
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,
   parseRefinedText,
+  parseTitleBlock,
   BRIEF_TRAILING_MARKERS,
   buildStoryContextFields,
   buildRelationshipLines,

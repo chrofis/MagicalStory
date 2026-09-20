@@ -7898,7 +7898,16 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
   if (!String(res.text || '').trim() || res.usage?.output_tokens === 0) {
     throw new Error(`writer ${model} returned an empty response — provider failure, not a result`);
   }
-  const parsed = parseRefinedText(res.text || '');
+  // Parsed exactly as production parses the same response
+  // (beatsPipeline.js:3126): the expected page numbers, and TITLE named as a
+  // trailing marker. Without the marker the final page's text swallowed the
+  // whole ---TITLE--- block and `title` came back null, so every replay's last
+  // page carried the candidate list and the pick line as if it were prose.
+  const parsed = parseRefinedText(
+    res.text || '', textArgs.beats.map(b => b.pageNumber), 'STORY TEXT', ['TITLE']);
+  // parseRefinedText only STOPS the last page at the title block; reading the
+  // block is parseTitleBlock's job, and production runs both (beatsPipeline.js).
+  const titleBlock = require('./promptBuilders').parseTitleBlock(res.text || '');
 
   // scoreOutput: the ONE evaluator grades the regenerated text (storyText only).
   let scorecard = null;
@@ -7922,7 +7931,9 @@ async function runStoryTextReplayStage(target, { params = {}, promptOverride = n
     usage: res.usage,
     promptChars: prompt.length,
     prompt,
-    title: parsed.title || null,
+    title: titleBlock.title || null,
+    titleCandidates: titleBlock.titleCandidates,
+    titlePick: titleBlock.titleJudge ? titleBlock.titleJudge.pick : null,
     analysis: parsed.analysis || '',
     rawResponse: (res.text || '').slice(0, 40000),
     scorecard,
@@ -8040,7 +8051,11 @@ async function runWriterCompareStage(target, { params = {} }) {
           // approvedArc, { arcHints }) — beatsPipeline.js:2327.
           const r = await call(SH.buildStoryTextFromBeatsPrompt(
             storyData, beats, textArgs.expansions, textArgs.arc, { arcHints: textArgs.arcHints }), model, 'text');
-          const parsed = SH.parseRefinedText(r.text);
+          // Same parse production uses (beatsPipeline.js:3126). Without TITLE
+          // named as a trailing marker the last page swallows the whole
+          // ---TITLE--- block, and every arm was scored on a final page
+          // carrying the candidate list and the pick line.
+          const parsed = SH.parseRefinedText(r.text, expectedPages, 'STORY TEXT', ['TITLE']);
           arm.stages.text = { ...WC.scoreText(parsed.pages || [], expectedPages, storyData.language), cost: r.cost, elapsedMs: r.elapsedMs, outTok: r.usage?.output_tokens };
         }
       } catch (err) {

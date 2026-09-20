@@ -3061,35 +3061,16 @@ ${bibleBody}` : bibleBody;
   // the LAST block since 2026-09-11 (the title is picked from the finished
   // pages, not guessed ahead of them), and the old lookahead required a
   // following `---X` that no longer exists.
-  const titleSection = (textRaw.match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z]|$)/i) || [])[1] || '';
-  const cleanTitle = s => String(s || '')
-    .replace(/^\**\s*TITLE\s*:\s*/i, '')
-    .replace(/^\*{1,2}|\*{1,2}$/g, '')
-    .replace(/^"|"$/g, '')
-    .trim();
-  const titleCandidates = titleSection
-    .split('\n')
-    .map(l => (l.match(/^\s*\d+[.)]\s*(.+?)\s*$/) || [])[1])
-    .filter(Boolean)
-    .map(cleanTitle)
-    .filter(Boolean);
-  // TITLE_PICK: 1-based candidate number + one sentence. Out of range or absent
-  // → titleJudge stays null and the hash pick below stands.
-  const pickMatch = titleSection.match(/^\s*TITLE_PICK\s*:\s*(\d+)\s*(?:[—–-]\s*(.*))?$/im);
-  const pickIdx = pickMatch ? parseInt(pickMatch[1], 10) - 1 : -1;
-  const titleJudge = (pickIdx >= 0 && pickIdx < titleCandidates.length)
-    ? { pick: pickIdx, reason: String(pickMatch[2] || '').trim(), candidates: titleCandidates }
-    : null;
-  if (pickMatch && !titleJudge) {
-    log.warn(`⚠️ [BEATS] TITLE_PICK ${pickMatch[1]} out of range (${titleCandidates.length} candidates) — falling back to the hash pick`);
+  // The writer's TITLE block. Parsed by the shared helper in promptBuilders so
+  // this pipeline and the Test Lab stages that replay the SAME page-text call
+  // read it identically — the Lab replay extracted no title at all until
+  // 2026-09-20 and reported `title: null` on every run.
+  const { parseTitleBlock } = require('./promptBuilders');
+  const { title, titleCandidates, titleJudge, outOfRange } = parseTitleBlock(textRaw);
+  if (outOfRange) {
+    log.warn(`⚠️ [BEATS] TITLE_PICK out of range (${outOfRange}) — falling back to the hash pick`);
   }
-  // Fall back to the first non-empty line for a writer that ignored the list
-  // format — a run must never lose its title to a format miss.
-  const title = titleJudge
-    ? titleCandidates[titleJudge.pick]
-    : (titleCandidates.length
-      ? titleCandidates[stableCandidateIndex(titleCandidates)]
-      : (cleanTitle(titleSection.split('\n').find(l => l.trim())) || null));
+
   gl.info('beats_story_text', `Page text by ${textModelId}: ${parsedText.pages.length} page(s)${title ? ` — "${title}"` : ''}${titleCandidates.length ? ` (from ${titleCandidates.length} candidates${titleJudge ? ', writer-picked' : ''})` : ''} (${(meta.timings.storyTextMs / 1000).toFixed(1)}s)`, null, {
     pages: parsedText.pages.length, title, titleCandidates, titlePick: titleJudge?.pick ?? null, titleReason: titleJudge?.reason || null, model: textModelId,
   });
