@@ -54,6 +54,17 @@ const PLACE_PREPOSITIONS = new Set([
 ]);
 
 /** Person words that make a page peopled even with no name in frame. */
+/**
+ * The declarable change that answers `NO_PEOPLELESS_PAGE`.
+ *
+ * Kept verbatim from `PLAN_CHANGE_VOCABULARY`'s `cast_out` syntax
+ * (promptBuilders.js) rather than imported, the way this module already
+ * hand-carries the same verb in `reviewPlanChanges`. The copy is pinned to its
+ * source by tests/unit/plan-counters.test.ts, so a rename cannot land on one
+ * side and leave a finding asking for a verb the parser no longer reads.
+ */
+const PEOPLELESS_ANSWER_VERB = 'cast out <name>';
+
 const PERSON_WORDS = /\b(?:crew|crewman|crewmen|sailor|sailors|man|men|woman|women|boy|boys|girl|girls|child|children|figure|figures|crowd|onlookers|guard|guards|villagers?|people)\b/i;
 
 /**
@@ -628,7 +639,32 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   // in the book is a place, weather, a vessel or an object seen from afar, and
   // the picture is stronger for having no cast in it.
   const emptyPages = rows.filter(r => !r.peopled).map(r => r.pageNumber);
-  if (emptyPages.length === 0) add('NO_PEOPLELESS_PAGE', [], 'no page shows only a thing or a place, with no people in frame');
+  // THE FINDING NAMES THE MOVE THAT ANSWERS IT (2026-09-20).
+  //
+  // This is a must-fix code, and the planner still failed it while tagging its
+  // answer correctly. On job_1789853503332_riqncqg1i it replied
+  // `Page 13: action in Levin sitting alone with silent egg on ground before
+  // him — PLAN[NO_PEOPLELESS_PAGE] — … held here with Levin just present to
+  // satisfy the requirement` — the one declarable verb that CANNOT produce a
+  // people-free page, on a page it had otherwise chosen well.
+  // `REPLAN_FINDING_DIRECTION` already ranks this code 'fewer', so `cast out`
+  // was permitted the whole time; nothing told the planner that was the move.
+  // The advisory finding that WAS answered twice in one round
+  // (`SHOT_NO_CAMERA_POSITION`) is the shape copied here: it enumerates its own
+  // legal values in the detail, so it is satisfiable by reading the line alone.
+  //
+  // No page is named. The only page-picking signals available in code are the
+  // plan line's prose and the cast arithmetic, and on the two cited stories
+  // they rank the hatching climax above the low point — a heuristic that empties
+  // the wrong page costs a mangled book, and choosing WHICH page is a judgement
+  // the checker's Q6 owns, not arithmetic. A finding naming no page is not the
+  // obstacle it looked like: the re-plan's scope test admits a page the round
+  // DECLARES a change for (`declaredPages`, beatsPipeline), so a declared
+  // `cast out` on any page is in scope.
+  if (emptyPages.length === 0) {
+    add('NO_PEOPLELESS_PAGE', [],
+      `no page shows only a thing or a place, with no people in frame — one page gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people`);
+  }
   // 4b. …but the book may not spend that page on its interpersonal drama.
   //     Measured on job_1789420511893_zly5rcdej: the planner put the mandatory
   //     people-free page on the emotional climax — the plan line said "no one
