@@ -23,7 +23,7 @@ const ROOT = path.resolve(__dirname, '../..');
 
 require(path.join(ROOT, 'server/services/database')).initializePool();
 const { resolveAvailableLandmarks } = require(path.join(ROOT, 'server/lib/landmarkPhotos'));
-const { buildIdeasPromptContext, resolveIdeaWorlds } = require(path.join(ROOT, 'server/routes/storyIdeas'));
+const { buildIdeasPromptContext, resolveIdeaWorlds, buildVariantInstructions } = require(path.join(ROOT, 'server/routes/storyIdeas'));
 const { buildSeasonInstruction } = require(path.join(ROOT, 'server/lib/season'));
 const { callTextModelStreaming, getModelDefaults } = require(path.join(ROOT, 'server/lib/textModels'));
 
@@ -159,12 +159,7 @@ async function buildCellPrompts(cell) {
   const ideaWorlds = resolveIdeaWorlds({ storyCategory, storyTheme, location: LOCATION, worldMode: 'auto' });
   const world1 = ideaWorlds ? ideaWorlds[0].world : 'location';
   const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
-  const firstInstruction = world1 === 'fantasy'
-    ? 'Start directly in the adventure world. Avoid local landmarks - use the theme setting instead.'
-    : 'Use local landmarks if available. Create an engaging story that uses the setting naturally.';
-  const secondInstruction = world2 === 'fantasy'
-    ? 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.'
-    : 'Create a DIFFERENT story than the first one: different local places, a different approach to the conflict, and a different story structure. Use local landmarks if available.';
+  const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2);
 
   return {
     ideaWorlds, worlds: [world1, world2],

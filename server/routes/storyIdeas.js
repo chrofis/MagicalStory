@@ -365,6 +365,29 @@ ${adventureGuideContent}`
  */
 const REALISTIC_ENVIRONMENT_THEMES = new Set(['realistic', 'farm', 'forest', 'fireman', 'doctor', 'police', 'detective']);
 
+/**
+ * The per-arm variant instruction pair. One definition, used by the streaming
+ * endpoint and by tests/manual/story-idea-rounds.js, which previously carried a
+ * hand-copied duplicate.
+ *
+ * When BOTH arms play in the real world (realistic-environment life challenges),
+ * "different local places" is not something the model can check itself against -
+ * it never sees the first idea. Name the axes to vary instead. The two calls stay
+ * parallel; serialising them would cost wall-clock on the live wizard.
+ */
+function buildVariantInstructions(world1, world2) {
+  const first = world1 === 'fantasy'
+    ? 'Start directly in the adventure world. Avoid local landmarks - use the theme setting instead.'
+    : 'Use local landmarks if available. Create an engaging story that uses the setting naturally.';
+  const bothLocation = world1 === 'location' && world2 === 'location';
+  const second = world2 === 'fantasy'
+    ? 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.'
+    : bothLocation
+      ? 'Create a DIFFERENT story than the first one, varying all three of these: a different class of place (if the first could be outdoors and public, make this one indoors or at home, or the other way round), a different responsible adult or none at all, and a different outside event that makes the skill hard. Use local landmarks if available.'
+      : 'Create a DIFFERENT story than the first one: different local places, a different approach to the conflict, and a different story structure. Use local landmarks if available.';
+  return [first, second];
+}
+
 function resolveIdeaWorlds({ storyCategory, storyTheme, location, worldMode = 'auto' }) {
   const effectiveCategory = storyCategory || 'adventure';
   if (effectiveCategory === 'historical') return null;
@@ -705,12 +728,7 @@ ${landmarkEntries}`;
 
     const world1 = ideaWorlds ? ideaWorlds[0].world : 'location';
     const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
-    const firstInstruction = world1 === 'fantasy'
-      ? 'Start directly in the adventure world. Avoid local landmarks - use the theme setting instead.'
-      : 'Use local landmarks if available. Create an engaging story that uses the setting naturally.';
-    const secondInstruction = world2 === 'fantasy'
-      ? 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.'
-      : 'Create a DIFFERENT story than the first one: different local places, a different approach to the conflict, and a different story structure. Use local landmarks if available.';
+    const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2);
 
     const prompt1 = buildSinglePrompt(world1, firstInstruction);
     const prompt2 = buildSinglePrompt(world2, secondInstruction);
@@ -805,3 +823,4 @@ ${landmarkEntries}`;
 module.exports = router;
 module.exports.buildIdeasPromptContext = buildIdeasPromptContext;
 module.exports.resolveIdeaWorlds = resolveIdeaWorlds;
+module.exports.buildVariantInstructions = buildVariantInstructions;
