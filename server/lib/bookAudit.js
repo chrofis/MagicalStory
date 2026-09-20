@@ -266,8 +266,20 @@ async function judgeParts(parts, modelId, thinkingLevel) {
  */
 async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   const { fillTemplate } = require('../services/prompts');
+  const { coverLabelForPage } = require('./coverKeys');
+  // A cover reached the judge as a bare "PAGE -3" and was read as a story page
+  // in sequence, so question 6 reported it for showing a moment the text
+  // establishes later. The number stays in the header because the fault line
+  // format is p<N> and the parser keys on it.
+  const pageHeading = (n) => {
+    const label = coverLabelForPage(n);
+    return label ? `PAGE ${n} (${label})` : `PAGE ${n}`;
+  };
   const instructions = fillTemplate(template, {
-    PAGE_LIST: chunk.map(p => p.pageNumber).join(', '),
+    PAGE_LIST: chunk.map(p => {
+      const label = coverLabelForPage(p.pageNumber);
+      return label ? `${p.pageNumber} (${label})` : String(p.pageNumber);
+    }).join(', '),
     // ONE rule for every template that authors or judges a page against its
     // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). This audit
     // is the ONE stage that compares a page's words against its picture, so it
@@ -281,7 +293,7 @@ async function judgeChunk(template, chunk, modelId, thinkingLevel = null) {
   // read either way.
   const parts = [{ text: instructions }];
   for (const p of chunk) {
-    parts.push({ text: `PAGE ${p.pageNumber} TEXT: ${p.text || '(no text on this page)'}` });
+    parts.push({ text: `${pageHeading(p.pageNumber)} TEXT: ${p.text || '(no text on this page)'}` });
     parts.push(p.part);
   }
 

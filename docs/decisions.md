@@ -21,6 +21,47 @@ superseded and link forward.
 
 ---
 
+## 2026-09-20 — Story chronology does not bind a cover; the book audit stops reporting one for showing the ending
+
+**Context:** The book audit reads the finished book in reading order and asks six
+reader's-eye questions. Question 6 (FUTURE) reports a picture that shows a state
+a later page's text still establishes. Covers were fed to the judge as bare
+`PAGE -1` / `PAGE -2` / `PAGE -3` headings with no name, so the judge read them as
+story pages in sequence and reported them under that question — on one book,
+"the picture shows the dragon already hatched and held by [child], which is a
+major event established much later in the story".
+
+Measured over the 14 staging stories carrying a stored audit: 549 faults, of
+which **9 sit on a cover page and 8 are that complaint**. The 9th is a genuine
+continuity fault — a shell drawn green where page 2's text calls it red-brown.
+
+A related claim was raised and is withdrawn: that the audit applied one cover
+fault to all three covers. It did not. The round carries exactly one
+negative-page fault and it names the right surface. The duplication came from a
+scratchpad harness that handed every negative-page fault to every cover reviewer.
+
+**Decision:** Owner ruling — "story chronology does not bind the cover; the cover
+can show the end of the story, that is fine." Two parts:
+
+1. `coverLabelForPage(n)` in `server/lib/coverKeys.js`, the module that already
+   owns every cover naming scheme, and `bookAudit.judgeChunk` now heads a cover
+   `PAGE -3 (BACK COVER)` and lists it the same way in `{PAGE_LIST}`. The number
+   stays because the fault line format is `p<N>` and the parser keys on it.
+
+2. Question 6 gains one clause: a cover stands outside the story's order and may
+   show any moment of it, its end included; never report one there.
+
+**Rationale:** Scoped to question 6 alone, deliberately. A cover that contradicts
+its own words, draws a character wrong, or uses the wrong colours is still a
+fault under the other five questions — the surviving 9th fault is exactly that
+case and must keep firing. Naming the covers rather than only exempting them
+also fixes the cause rather than the symptom: the judge could not previously tell
+a cover from a story page at all, which is why it applied sequence logic to one.
+
+**Touched:** `server/lib/coverKeys.js`, `server/lib/bookAudit.js`,
+`prompts/book-audit.txt`, `tests/unit/book-audit-covers-outside-order.test.ts`.
+**Status:** ✅ active
+
 ## 2026-09-20 — The plan line's FOURTH field owes a change, not the instant described again; and the instant MAY stage an aftermath
 
 **Context:** The plan line is `<shot> — <who is in frame> — <the instant the

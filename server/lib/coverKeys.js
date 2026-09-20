@@ -55,10 +55,23 @@ function coverLabel(keyOrType) {
   return null;
 }
 
+/**
+ * Human-readable label for a NEGATIVE page number, or null for a story page.
+ * The book audit shows the judge a page number and nothing else, so a cover
+ * arrived as a bare "PAGE -3" and was read as a story page in sequence.
+ */
+function coverLabelForPage(pageNumber) {
+  const n = Number(pageNumber);
+  if (!Number.isFinite(n) || n >= 0) return null;
+  const key = COVER_KEYS.find((k) => COVER_PAGE_NUMBERS[k] === n);
+  return key ? coverLabel(key) : null;
+}
+
 module.exports = {
   COVER_KEYS,
   COVER_PAGE_NUMBERS,
   coverKeyToType,
   coverTypeToKey,
   coverLabel,
+  coverLabelForPage,
 };
