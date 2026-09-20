@@ -123,6 +123,7 @@ Critique against:
 6. **No negations.** Grok cannot execute "not facing camera". Write the desired direction.
 7. **No -ing hanger clauses.** "…, looking ahead and reaching forward" — drop them.
 8. **Discrete facing vocabulary only.** Use `facing the camera`, `facing left`, `facing right`, `back view`. Never `three-quarters`, `two-thirds`, `45 degrees`, `angled toward`. Grok renders fractional turns as front-facing or random; discrete directions land. For glance-back, write `back view, head turned over the [left|right] shoulder` — pick the shoulder closer to the target.
+9. **A direction word is the defect — never an adverb.** `larger`, `smaller`, `taller`, `shorter`, `closer`, `farther`, `higher`, `lower`, `fewer`, `more` say which way the thing is wrong. Rule 4 does not touch them and the critique never counts them as redundancy. A final instruction that names a target size, count or position but no direction is not executable — the model reads it as already satisfied and changes nothing. "Resize the prop to match the figure" is such a non-instruction; write "Draw the prop smaller, matching the figure’s head".
 
 Examples of the full draft → critique → final cycle:
 
@@ -133,6 +134,10 @@ Final: `"Rotate the body to face upper-left."`
 Draft: `"Repaint the boy so he faces upward while ascending behind the older man, with eyes looking up the stairs and one hand near the railing."`
 Critique: `"Two actions (face upward, hand on railing) plus an -ing clause and a purposive phrase. Facing direction is the higher-impact fix."`
 Final: `"Turn the boy so he faces upward."`
+
+Draft: `"The prop is drawn far too large for the scene — it should be about the size of a head. Draw it smaller, matching the nearer figure’s head, resting where it already sits."`
+Critique: `"One action (resize) but 31 words with a diagnosis clause and a position clause. The position clause states what must stay true, so it goes to preserve, not into final. ‘Smaller’ is the defect direction and stays."`
+Final: `"Draw the prop smaller, matching the nearer figure’s head."`
 
 Draft: `"Open the eyes wide."`
 Critique: `"Acceptable — already atomic, no critique needed."`
