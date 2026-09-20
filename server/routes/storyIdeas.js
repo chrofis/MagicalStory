@@ -101,6 +101,7 @@ async function buildIdeasPromptContext({
     categoryInstructions = `IMPORTANT: This is a LIFE SKILLS story about "${storyTopic}".
 The story should help children understand and cope with this topic.
 Show the characters facing this challenge and learning to handle it.
+What stands in the way is this skill being hard, met in one outside event — never a feeling on its own.
 ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Keep the setting realistic and relatable.'}`;
   } else if (effectiveCategory === 'educational') {
     categoryInstructions = `IMPORTANT: This is an EDUCATIONAL story teaching about "${storyTopic}".

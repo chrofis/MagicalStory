@@ -494,6 +494,16 @@
         "prompts/plan-check.txt"
       ],
       "severity": "block"
+    },
+    {
+      "id": "story-idea-templates",
+      "axis": "single-idea idea prompt vs two-idea idea prompt",
+      "reason": "generate-story-idea-single.txt (one call per world, the live full-wizard path) and generate-story-ideas.txt (both ideas in one call) carry the SAME back-cover premise contract and the same [REVIEW] checklist; a rule or self-check added to one reads as absent on whichever template the request routes to.",
+      "members": [
+        "prompts/generate-story-idea-single.txt",
+        "prompts/generate-story-ideas.txt"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

@@ -74,7 +74,7 @@ List exactly 5 improvements. Never say "no issues" - always find ways to make it
 
 First check - language: Is the entire draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is an error that must be fixed.
 
-Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) All characters appear with a role? (5) Complexity matches scene count? (6) Back cover, not synopsis: no ending given away, nothing named that decides the outcome, no test stated, no character trait paired with the obstacle it will meet? (7) Peril: is anything dangerous enough that it could lead to death, for anyone? (8) Can you name the one thing they want, the thing against it, and what failing costs, in three words each?
+Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) Characters: for each name, quote the words that give them a stake. A name with no such words is not in the story yet. (5) Complexity matches scene count? (6) Back cover, not synopsis: quote the noun in the draft that a reader would expect to decide the outcome, and quote the sentence that says what happens next. Cut both from the final. If nothing can be quoted, write "nothing to cut". (7) Peril: is anything dangerous enough that it could lead to death, for anyone? (8) Can you name the one thing they want, the thing against it, and what failing costs, in three words each? (9) Topic: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
 
 5 improvements:
 1. [specific improvement]
@@ -119,6 +119,7 @@ Each story idea must be PLAIN TEXT PARAGRAPHS:
 **REQUIRED:**
 - Plain flowing paragraphs only
 - All characters must appear
+- A character is in the idea through what they want or what they are answerable for, never through a list of who came along.
 - Never write how it ends, and never write the middle: no naming the object, gate, figure or trick that decides the outcome, no test the characters will have to pass, and no pairing of a character's trait with the obstacle it will meet. Say who they are, not what each of them will do about it.
 - The want, the obstacle and the cost are each a concrete thing the reader can name: one thing to reach, fetch, mend or be in time for, a stated force or condition against it, and a stated loss. Wanting to find out what something is, an unnamed something standing in the way, or more than they can see, are none of the three.
 - Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level.

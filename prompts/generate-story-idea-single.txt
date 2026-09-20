@@ -74,6 +74,7 @@ RULES:
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
 - All the characters must be mentioned
+- A character is in the idea through what they want or what they are answerable for, never through a list of who came along.
 - Follow the SCENE COMPLEXITY guide above - match story complexity to the number of scenes
 
 EXAMPLES of good story ideas:
@@ -109,10 +110,11 @@ Check and critique:
    - Do events follow logically from each other?
    - Any plot holes or unexplained jumps?
    - Is the timeline coherent?
-4. **Characters**: Do all characters appear and have a role? Anyone missing or passive?
+4. **Characters**: for each name, quote the words that give them a stake. A name with no such words is not in the story yet.
 5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
-6. **Back cover, not synopsis**: does it give away the ending, name what decides the outcome, state a test the characters must pass, or say which obstacle each character's trait will meet? Cut all of it and leave the situation and the stakes.
+6. **Back cover, not synopsis**: quote the noun in the draft that a reader would expect to decide the outcome, and quote the sentence that says what happens next. Cut both from [FINAL]. If nothing can be quoted, write "nothing to cut".
 7. **Peril**: is anything dangerous enough that it could lead to death, for anyone? Replace it with something they can lose.
+8. **Topic**: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
 
 List your 5 improvements (be specific):
 1. [improvement]
