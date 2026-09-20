@@ -52,6 +52,7 @@ The plan line's instant is a single drawable moment:
 - Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.
 - The action at the moment it happens, never the state that follows it.
 - One action per page. {DEED_AND_EFFECT_DEF} When a plan line holds more than one, split them across pages.
+- The who column names every figure the picture shows. A figure that appears only in the instant or in what is true after is not in the picture: put them in the who column or leave them off the page.
 - Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.
 - Never compose the frame — what fills it, how large something looks, where it sits; the shot type is enough.
 - A beat holding two forbidden actions splits across two adjacent pages — one page the contact, the next page the second action — or the picture drops the secondary action and keeps the main event.
