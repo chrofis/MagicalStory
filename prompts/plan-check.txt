@@ -33,7 +33,7 @@ Answer only these eleven:
 7. Plants and payoffs. Name every object or flaw a page plants and the later page where it pays off, and for every payoff the earlier page that planted it. A plant no later page pays off, and a payoff no earlier page planted, are findings.
 8. The last page. {ENDING_EVENT_DEF} Say whether it does. A last page staging a different moment while the ending's event happened earlier, off the page, or not at all is a finding.
 
-9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after.
+9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after. {PAGE_CHANGE} Name every page whose what-is-true-after states no change its instant does not already show.
 
 10. Two heights. Name every page whose instant puts {TWO_HEIGHTS_DEF} Such a page is staged from one level with the other character out of frame, or split into a page per level.
 

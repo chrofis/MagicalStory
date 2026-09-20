@@ -7053,6 +7053,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // The generator's half of the cast contract; PLAN_LINE_CAST_RULE is the
     // consumer's half, in both Art Director templates and the scene review.
     PLAN_LINE_FIELDS: PLAN_LINE_FIELD_CONTRACT,
+    // The fourth field's contract, shared with plan-check.txt check 9.
+    PAGE_CHANGE: PAGE_CHANGE_DEF,
     // The camera positions, from the one vocabulary the counters read — the
     // planner is the only stage that sees the whole book, so a spread of them
     // can only be decided here. See server/lib/shotVocabulary.js.
@@ -7442,6 +7444,26 @@ const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only wha
  * precede it with an imperative and an audit with "name every page whose…".
  */
 const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions.';
+
+/**
+ * ONE definition of what the plan line's FOURTH field owes, for the planner that
+ * writes it (story-beats.txt, beside the filler rule) and the plan check that
+ * audits it (plan-check.txt check 9, which already owns the third/fourth field
+ * boundary).
+ *
+ * The two fields are different KINDS of statement: the third is pictorial — one
+ * drawable instant — and the fourth is narrative, the story-state change the
+ * page delivers. Nothing said so. story-beats.txt already calls a page with no
+ * change filler, and plan-check.txt audits neither that nor the fourth field at
+ * all, so a line could satisfy every stated rule while saying one thing twice.
+ *
+ * Measured 2026-09-20 over 34 staging stories / 485 stored plan lines: 73
+ * (15.1%) have a fourth field that only restates the instant. Owner ruling the
+ * same day: the instant MAY stage an aftermath, so this is not about which
+ * moment the picture takes — only about the fourth field owing a change the
+ * picture does not already show.
+ */
+const PAGE_CHANGE_DEF = 'What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.';
 const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
 const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
@@ -8408,6 +8430,8 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '') {
   }
   return fillTemplate(template, {
     DEED_AND_EFFECT_DEF,
+    // The fourth field's contract, shared with the planner that writes it.
+    PAGE_CHANGE: PAGE_CHANGE_DEF,
     TWO_HEIGHTS_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
@@ -9934,6 +9958,7 @@ module.exports = {
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
   PLAN_LINE_FIELD_CONTRACT,
+  PAGE_CHANGE_DEF,
   // The five definitions story-beats.txt and plan-check.txt share — one
   // constant each, filled into the rule AND the audit (sibling set
   // `beats-planner-vs-plan-check`).

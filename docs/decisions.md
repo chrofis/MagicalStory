@@ -21,6 +21,58 @@ superseded and link forward.
 
 ---
 
+## 2026-09-20 — The plan line's FOURTH field owes a change, not the instant described again; and the instant MAY stage an aftermath
+
+**Context:** The plan line is `<shot> — <who is in frame> — <the instant the
+picture shows> — <what is true after this page that was not before>`. Fields 3
+and 4 are different kinds of statement: the third is pictorial, one drawable
+moment; the fourth is narrative, the story-state change the page delivers.
+Nothing said so. `plan-check.txt` check 9 owned the boundary ("The instant shows
+one, and what follows it belongs in what is true after") but audited only the
+instant, and `story-beats.txt` already called a page with no change filler while
+giving that rule nothing to bite on. So a line could satisfy every stated rule
+and still say one thing twice.
+
+Measured over 34 staging stories and 485 stored plan lines: **73 (15.1%)** have a
+fourth field that only restates the instant — three times the rate of any other
+plan-line fault measured the same day.
+
+A separate question was raised and answered in the same session. 23 of those 485
+lines (4.7%, across 18 of 32 books) stage the *aftermath* of an event in the
+third field rather than the event, so the event is drawn nowhere in the book —
+the clearest case being a catch whose plan line reads "stands with the egg
+pressed against his jacket, both arms wrapped tight". A clause was drafted
+forcing the instant to name the action mid-occurrence.
+
+**Decision:** Two parts.
+
+1. `PAGE_CHANGE_DEF`, one constant filled into both sides — `story-beats.txt`
+   beside its own filler rule, `plan-check.txt` inside check 9, which already
+   owns the third/fourth boundary so no check is renumbered. The checker now
+   names the pages whose fourth field states no change its instant does not
+   already show.
+
+2. **The instant may stage an aftermath.** Owner ruling, 2026-09-20: "It is
+   allowed to draw the aftermath." The drafted clause is withdrawn unshipped and
+   nothing about which moment the picture takes is changed. This also leaves the
+   existing "never two characters interlocked at one instant — a shared grip, an
+   object in flight, a hand-over: pick the moment before or after it" rule
+   exactly as it stands, which the drafted clause would have narrowed to "before".
+
+**Rationale:** The two faults looked like one and are not. Which moment the
+picture takes is a picture question the owner has ruled on; whether the fourth
+field earns the page is a structure question the templates already claimed to
+care about and never enforced. Separating them keeps the settled interlocked-moment
+rule untouched and puts the measured 15.1% where a rule can reach it. Stated on
+both sides as one constant because a definition hand-copied into a generator and
+its critic is what this pair drifts on (four earlier definitions were
+consolidated for the same reason).
+
+**Touched:** `server/lib/promptBuilders.js` (`PAGE_CHANGE_DEF`, both fill maps),
+`prompts/story-beats.txt`, `prompts/plan-check.txt`,
+`tests/unit/plan-line-fourth-field.test.ts`.
+**Status:** ✅ active
+
 ## 2026-09-19 — An UNDECLARED garment state is REPORTED, not defaulted: the Art Director owes a row for every tracked garment, linked or not
 
 **Context:** `resolveWornItemsForPage` has two sources. Source 1 enumerates the
