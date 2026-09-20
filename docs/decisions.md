@@ -51562,3 +51562,86 @@ diff and lector rounds, the lector's failed-round entry), `storyJobPipeline.js`
 `tests/unit/cover-compressed-scene-and-accounting.test.ts`.
 
 **Status:** ✅ active
+
+## Story-idea premise contract: five rating rounds, what moved it and what did not (2026-09-20)
+
+**Context:** The full wizard's two story ideas are rated against the back-cover premise contract
+(decisions.md 2026-09-14): setting/time; who + want; obstacle + cost; no middle, no ending; every
+character present with a role; no adjectives; 3-5 sentences; peril frightening but never lethal;
+correct language; age fit; theme/world fit. R1 measured the baseline as a 3.25 on contract
+compliance with 10 of 20 ideas leaking the middle. The method was the trial-idea round method:
+ten fixed cells × two world arms = 20 ideas, generate, rate by reading, fix the three worst classes,
+rerun the same cells, five rounds. Harness: `tests/manual/story-idea-rounds.js` (replays the live
+route's own `buildIdeasPromptContext` / `resolveIdeaWorlds` / `buildVariantInstructions`, staging
+landmarks, `discoverOnMiss:false`). Round files: `tests/manual/story-idea-rounds/round-{1..5}.json`
++ `round-{1..5}.md` + `round-{1..5}-ratings.md`. 100 ideas, USD 3.2966 total on `claude-sonnet-4-6`.
+
+**Decision:** Keep every prompt lever applied across R2-R5 in BOTH sibling templates
+(`generate-story-idea-single.txt`, `generate-story-ideas.txt`, registry set `story-idea-templates`),
+and keep the one code-side lever (`buildVariantInstructions`). Do NOT build a JS verification of
+the model's CUT list. Do NOT serialise the two idea calls. The series is closed at round 5.
+
+**Rationale — the levers that moved a class:**
+- *Make a review check quote, not answer yes/no.* "For each name, quote the words that give them a
+  stake", "quote the words where the topic is what stands in the way": cast-present 3.90 → 4.65,
+  topic-is-the-engine 3.50 → 4.50 (the largest axis gain in the series). The yes/no forms of the
+  same checks were in the prompt from R1 and moved nothing.
+- *An explicit `CUT:` step* that names the numbers and full text of every sentence the review
+  deleted. Before it, the [REVIEW] verdict did not reach [FINAL]. Since R3 the CUT list has been
+  honest in every round — no nominated sentence appears in any [FINAL].
+- *The life-challenge outside-event sentence* (the skill must be made hard by something outside the
+  character): topic-bolted-on 5/20 → 2/20.
+- *A presence definition rather than a presence rule* ("a character is in the idea through what
+  they want or what they are answerable for", plus "living with, coming along with, or waiting for
+  the others is not a stake"): cast-as-a-list 6/20 → 3/20.
+- *Peril tied to a person, then widened past them.* R3 tied check 7 to the youngest character by
+  age (g 4.15 → 4.55). R5 widened it to anyone in the idea **or the craft they travel in**, which
+  closed the one finding unmoved in four rounds: cell 4 put a nine- and a six-year-old in the Apollo
+  lander in R1-R4 (R4: «wer nicht landet, kehrt nicht zurück», g=1); R5 keeps them in Houston, g=5.
+- *Writing the `ROLES:` heading in the output language* — an English label on German output,
+  2/20 in R1-R2, 0 since R3.
+- *A third `rule` label on the cut check* ("what only happens if, what opens only when, what
+  resets, what someone will not do"), with the closing cost sentence explicitly exempted so the cut
+  step cannot eat it: middle-leak 15/20 → 9/20 and contract 3.10 → 3.65, the best of five rounds.
+- *Computing the variety constraint as a value in code and injecting it* — partially. It is the
+  only shape that ever moved the responsible-adult axis.
+
+**Rationale — the levers that did not:**
+- *Yes/no review checks.* Every check that asks "is it X?" scored the same as no check at all. Only
+  checks that force a quote or a label per sentence changed the output.
+- *"Cut the noun", singular.* R3's check 6 asked the model to cut "the sentence" that leaks; it cut
+  exactly one and kept the rest. Making it exhaustive ("list every cut sentence, not one of them")
+  in R4 removed the narrated-event class entirely (11/20 → 6/20 → 3/20).
+- *Adjective-only variety axes.* "Create a DIFFERENT story", then "vary all three of these:
+  a different class of place, a different responsible adult, a different outside event", then
+  computed values stated as requirements. All three shapes produced exactly 4/20 both-arms-identical
+  ideas. The second call cannot see the first, so "different" is unverifiable from inside it. The
+  remaining lever is serialising the calls, rejected three times on happy-path latency (per-arm wall
+  clock 18.6-48.4 s in R5; serialising doubles a screen the user is waiting at).
+- *A sentence-length bound* (~30 words, "a sentence that needs a dash to hold two clauses is two
+  sentences"). Added in R5; 11 of 20 ideas still contain a dash-joined clause. One round only.
+
+**Rationale — why NO JS `cut ⊄ final` verification was built.** The obvious code-side lever is the
+shape `server/lib/trialIdeaCheck.js` already runs for the trial: the generator copies spans of its
+own output, JS asserts only that the copied spans are genuinely absent from the final, and a failure
+reruns once with the reason fed back. It was measured and rejected for this contract: **the model's
+CUT lists are honest.** In every round since R3, every sentence the model nominated for cutting is
+in fact absent from [FINAL], so a `cut ⊄ final` assertion fires on approximately zero of these 100
+ideas. The residual leak is the sentences the model never nominates, and those are semantic — a
+stated rule or gate reads as ordinary setup prose. Recognising one requires reading meaning, which
+the settled prompt-vs-code split forbids code from doing (no pattern-matching a finding's or an
+idea's text to work out what it means). The fix for a semantic class is a prompt taxonomy, and that
+is what the `rule` label is. Cost of the alternative if ever wired anyway: a rerun sits on the
+wizard's critical path, +~30 s on the arm that fails.
+
+**Touched:** `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`server/routes/storyIdeas.js` (`buildVariantInstructions`, `IDEA_PLACE_CLASSES`,
+`IDEA_EVENT_CLASSES`, `ideaVariantSeed`), `tests/unit/idea-variant-instructions.test.ts`,
+`tests/manual/story-idea-rounds.js`, `tests/manual/story-idea-rounds/round-{1..5}-ratings.md`.
+Commits `0ade598d2`, `f00a844a2`, `e1d352515`, `6d497a619`.
+
+**Status:** ✅ active — series closed at round 5. Open and untriaged: both-arms-identical (4/20,
+flat in all five rounds, owner's call on serialising), the residual rule/gate leak (7/20), the
+dash habit (11/20, one round old), theme-in-name-only (3/20), and whether the model inventing an
+extra character (a mother, a captain, a dragon-keeper — in R5 all three supply the responsible
+adult the RULES line demands) is wanted or not.
