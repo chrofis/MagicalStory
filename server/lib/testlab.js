@@ -411,12 +411,42 @@ async function saveTestVersion(storyId, imageType, pageNumber, imageData, experi
  * referencePhotos carry no clothing, fall back to the expected characters so
  * the contract is still populated.
  */
+/**
+ * The one place that decides whether a brief override is real.
+ *
+ * `||` alone is not enough: a whitespace-only override is truthy, and passing it
+ * through hands the judge a BLANK commission to score against. runSceneComposite
+ * already guarded with .trim(); the eval contract did not, so the same input was
+ * an override on one path and not on the other.
+ */
+function briefOverrideOf(params) {
+  const v = params?.sceneDescriptionOverride;
+  return typeof v === 'string' && v.trim() ? v : null;
+}
+
 function evalSceneDescription(ctx, params = null) {
   // A/B runs with sceneDescriptionOverride generate FROM the override — the
   // eval contract must be the same override, or the judge deducts for lacking
   // exactly the defects the override removed (observed: three P6 A/B renders
   // scored sem=0 against the stored brief's "gap in the railing"/"ankle-deep").
-  return `${params?.sceneDescriptionOverride || ctx.scene.sceneDescription || ''}`;
+  return `${briefOverrideOf(params) || ctx.scene.sceneDescription || ''}`;
+}
+
+/**
+ * SCENE_HINT for evals — the sibling of evalSceneDescription, and it must follow
+ * the same override.
+ *
+ * The judge reads TWO copies of the commission: the eval contract (above) and
+ * SCENE_HINT, which its own prompt calls authoritative. Threading an override
+ * into one and not the other makes the judge score the new image against the
+ * brief the override was written to REPLACE. Measured 2026-09-20: six page-10
+ * A/B arms came back with issues of the form "the authoritative SCENE_HINT
+ * states Julian should be clutching the egg against his chest" — the staging
+ * that had just been deliberately removed. Two arms that rendered the
+ * commissioned event scored -130 and 0 for it.
+ */
+function evalSceneHint(ctx, params = null) {
+  return briefOverrideOf(params) || ctx.outlineHint || null;
 }
 
 /** Reference photos for eval, guaranteed to carry clothingDescription. */
@@ -688,7 +718,7 @@ async function runImageStage(ctx, { promptOverride, experimentId, autoEval = tru
       const evalRes = await evaluateImageQuality(
         result.imageData, evalSceneDescription(ctx, params), evalReferencePhotos(ctx), replay.evaluationType,
         null, `testlab-exp${experimentId}-P${ctx.pageNumber}`,
-        ctx.scene.text || null, ctx.outlineHint, ctx.scene.sceneCharacters || null,
+        ctx.scene.text || null, evalSceneHint(ctx, params), ctx.scene.sceneCharacters || null,
         replay.options
       );
       if (evalRes) {
@@ -4832,10 +4862,11 @@ async function runSceneCompositeStage(ctx, { experimentId, params = {} }) {
   // story rerun — the same knob the image stage has. The override replaces the
   // stored brief and its metadata; everything else on the page stays as stored.
   let scene = ctx.scene || {};
-  if (typeof params.sceneDescriptionOverride === 'string' && params.sceneDescriptionOverride.trim()) {
+  const compositeOverride = briefOverrideOf(params);
+  if (compositeOverride) {
     const { extractSceneMetadata } = require('./storyHelpers');
-    const meta = extractSceneMetadata(params.sceneDescriptionOverride);
-    scene = { ...scene, sceneDescription: params.sceneDescriptionOverride, sceneMetadata: meta,
+    const meta = extractSceneMetadata(compositeOverride);
+    scene = { ...scene, sceneDescription: compositeOverride, sceneMetadata: meta,
       sceneCharacters: meta?.fullData?.characters || meta?.characters || scene.sceneCharacters,
       emptyScenePrompt: meta?.emptyScenePrompt || meta?.fullData?.emptyScenePrompt || scene.emptyScenePrompt,
       compositeBrief: null };
@@ -9581,6 +9612,11 @@ module.exports = {
   // without a story, a DB or a paid model (tests/unit/testlab-beats-scenes-recovery.test.ts)
   collectAllPagesBriefs,
   summarizeSceneExpansions,
+  // The two copies of the commission the judge reads — exported so their
+  // agreement under a brief override can be pinned without a paid render
+  // (tests/unit/testlab-brief-override-reaches-judge.test.ts).
+  evalSceneDescription,
+  evalSceneHint,
   // exported for tests/unit/idea-premise-grouping.test.js
   groupIdeasByPremise,
   ideaPremiseSkeleton,
