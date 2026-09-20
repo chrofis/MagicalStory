@@ -870,7 +870,7 @@ function versionDeductionTotal(version) {
     if (typeof bd.entity?.penalty === 'number') { entityPenalty = capEntityPenalty(bd.entity.penalty); sawAny = true; }
   } else {
     for (const i of (version.fixableIssues || [])) { sceneIssues.push(i); sawAny = true; }
-    for (const i of (version.semanticResult?.semanticIssues || version.semanticResult?.issues || [])) { sceneIssues.push(i); sawAny = true; }
+    for (const i of (require('./repairLogic').semanticFindings(version.semanticResult))) { sceneIssues.push(i); sawAny = true; }
     if (typeof version.entityPenalty === 'number') { entityPenalty = capEntityPenalty(version.entityPenalty); sawAny = true; }
   }
   if (!sawAny) return Infinity;
@@ -1088,7 +1088,7 @@ function hasCatastrophic(version) {
   const bd = version?.scoreBreakdown;
   const lists = bd
     ? [bd.visual?.issues, bd.semantic?.issues, bd.threeStage?.issues]
-    : [version?.fixableIssues, version?.semanticResult?.semanticIssues || version?.semanticResult?.issues];
+    : [version?.fixableIssues, require('./repairLogic').semanticFindings(version?.semanticResult)];
   for (const list of lists) {
     for (const issue of (list || [])) {
       if (deductionPoints({ type: issue?.type, severity: issue?.severity }) >= SEVERITY_POINTS.catastrophic) return true;

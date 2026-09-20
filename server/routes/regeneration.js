@@ -3689,7 +3689,7 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
       {
         // Entity/consistency issues are excluded — those need bbox detection + face repair
         const qualityIssues = preEvalResult.fixableIssues || currentScene.fixableIssues || [];
-        const semanticIssues = (preEvalResult.semanticResult?.issues || preEvalResult.semanticResult?.semanticIssues || [])
+        const semanticIssues = require('../lib/repairLogic').semanticFindings(preEvalResult.semanticResult)
           .map(si => ({ description: require('../lib/scoring').findingText(si), source: 'semantic' }));
         const combinedIssues = [...qualityIssues, ...semanticIssues]
           .filter((issue, idx, arr) => {

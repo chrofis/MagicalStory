@@ -2955,7 +2955,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   }));
 
   // Collect semantic issues (legacy path)
-  const semanticIssues = (evaluation.semanticResult?.issues || evaluation.semanticResult?.semanticIssues || [])
+  const semanticIssues = require('./repairLogic').semanticFindings(evaluation.semanticResult)
     .map(si => ({
       description: require('./scoring').findingText(si),
       source: 'semantic',

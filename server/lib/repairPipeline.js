@@ -1226,7 +1226,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         const ctx = { pageNumber: img.pageNumber, label: '[INPAINT dispatch]' };
         const fx = filterProtectedRemovals(inpaintEval.fixableIssues || [], prot, ctx);
         const sem = filterProtectedRemovals(
-          inpaintEval.semanticResult?.semanticIssues || inpaintEval.semanticResult?.issues || [], prot, ctx);
+          require('./repairLogic').semanticFindings(inpaintEval.semanticResult), prot, ctx);
         const cmp = filterProtectedRemovals(inpaintEval.threeStageResult?.fixableIssues || [], prot, ctx);
         if (fx.dropped.length || sem.dropped.length || cmp.dropped.length) {
           inpaintEval = { ...inpaintEval, fixableIssues: fx.kept };
@@ -2287,7 +2287,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // be manually repaired — instead of shipping a defect without a trace.
         const outstanding = [
           ...(latestEval?.fixableIssues || []),
-          ...(latestEval?.semanticResult?.semanticIssues || latestEval?.semanticResult?.issues || []),
+          ...require('./repairLogic').semanticFindings(latestEval?.semanticResult),
         ].filter(i => /catastrophic|critical/i.test(String(i?.severity || '')));
         if (outstanding.length > 0) {
           log.warn(`  ⚠️  [UNIFIED PIPELINE] Round ${round} page ${img.pageNumber}: giving up with ${outstanding.length} unaddressed ${outstanding.length === 1 ? 'issue' : 'issues'} — ${outstanding.map(i => `[${i.severity}] ${require('./scoring').findingText(i).substring(0, 60)}`).join(' | ')}`);

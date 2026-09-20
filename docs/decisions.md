@@ -197,6 +197,55 @@ the new verbatim path, which produces no plan. Both are in `tasks/BACKLOG.md`.
 
 ---
 
+## 2026-09-20 — An empty-but-present array is truthy: the repair executor never saw the semantic judge's findings
+
+**Context:** `semanticResult` exposes the semantic judge's findings under two
+names, `issues` and `semanticIssues`. Ten readers across six files resolved them
+with `a || b`, and they did not agree on the order. An empty-but-present array is
+TRUTHY, so `issues: []` short-circuits and the findings in `semanticIssues` are
+never seen — while a reader written as `a?.length || b?.length` falls through
+correctly, because `0` is falsy.
+
+That split is why a page could be ROUTED to repair and then found to have nothing
+to repair:
+
+    decideRepairMethod   a?.length || b?.length   -> 4 findings -> route: inpaint
+    inpaintPage          a || b                   -> []         -> "no issues to fix"
+
+`inpaintPage` returned `repaired:false` with **no error**, so the round recorded
+only "inpaint produced no result" — a message naming a component that had not
+been called. Two of run 5's four failed repairs were this, including page 7,
+whose three `emotion` findings were the owner's own complaint about the book.
+
+Measured over **3669 stored `semanticResult` objects** on staging: `issues` is
+populated **zero** times, `semanticIssues` **2348** times, and the two are never
+both populated. Over 1094 pages carrying a semanticResult, **674 (61.6%)** held
+findings only the legacy field carried; on **116** of those the page had no
+quality findings either, so the executor saw nothing at all, and **39** of those
+shipped scoring below 70.
+
+**Decision:** `semanticFindings(semanticResult)` in `repairLogic.js` is the one
+resolver, and all ten call sites use it — router, executor, consolidator,
+scoring, the repair round and the user-facing regeneration route. It prefers the
+first non-empty list, which the measurement above proves is behaviour-preserving
+at every site, and returns `[]` rather than throwing on a malformed result.
+
+**Rationale:** The bug was not which field is canonical — it was ten hand-written
+resolutions of the same question, half of them ordered one way and half the
+other, with a truthiness trap that made the ordering decide whether findings
+existed at all. One resolver removes the ordering question permanently. Which
+field the judge should write remains open and is deliberately untouched here:
+the resolver reads both, so retiring one later changes nothing at the call sites.
+
+**Touched:** `server/lib/repairLogic.js` (`semanticFindings`, router count),
+`server/lib/images.js` (the executor), `server/lib/repairPipeline.js` ×2,
+`server/lib/scoring.js` ×2, `server/lib/feedbackConsolidator.js` ×2,
+`server/routes/regeneration.js`, `tests/unit/semantic-findings-resolver.test.ts`.
+Also `tests/unit/degraded-scene-marker.test.ts`: it asserted on source text with
+a newline literal and so failed on any Windows checkout, since `.gitattributes`
+stores LF and `core.autocrlf` checks CRLF out. Normalised at the read.
+**Status:** ✅ active
+
 ## 2026-09-20 — The consolidator plan has TWO channels; NOT_INPAINTABLE_TYPES gated one of them
 
 **Context:** A consolidator plan can carry an edit instruction in `scene_fix` or

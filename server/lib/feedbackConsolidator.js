@@ -360,9 +360,7 @@ async function consolidateFeedback({
       evaluation.threeStageResult?.issues ||
       rawFixable.filter(i => i?.source === 'three-stage'), '[CONSOLIDATOR compliance]');
     const semanticIssues = guard(
-      evaluation.semanticResult?.semanticIssues ||
-      evaluation.semanticResult?.issues ||
-      [], '[CONSOLIDATOR semantic]');
+      require('./repairLogic').semanticFindings(evaluation.semanticResult), '[CONSOLIDATOR semantic]');
     const bboxFigures = evaluation.bboxDetection?.figures || evaluation.bboxDetection?.detectionHistory?.figures || [];
 
     // Entity issues: pre-flattened list wins; else flatten the report and
@@ -808,8 +806,7 @@ async function consolidateEvaluation({
   const complianceCount = surviving(evalResult.threeStageResult?.fixableIssues
     || evalResult.threeStageResult?.issues
     || rawFixable.filter(i => i?.source === 'three-stage'));
-  const semanticCount = surviving(evalResult.semanticResult?.semanticIssues
-    || evalResult.semanticResult?.issues || []);
+  const semanticCount = surviving(require('./repairLogic').semanticFindings(evalResult.semanticResult));
   const entityCount = Array.isArray(entityIssues) ? entityIssues.length : 0;
   // A page the evaluators like but the READER flagged must still reach the
   // model — skipping on the evaluator counts alone would discard the audit.

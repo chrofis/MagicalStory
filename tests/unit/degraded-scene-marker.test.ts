@@ -8,8 +8,13 @@ const {
   describeDegradedSceneMetadata,
 } = require('../../server/lib/sceneMetadata.js');
 
-const pipelineSrc: string = fs.readFileSync(
-  new URL('../../storyJobPipeline.js', import.meta.url), 'utf8');
+// LF-normalised before any source assertion. .gitattributes stores LF in the
+// index and core.autocrlf checks CRLF out on Windows, so an assertion carrying a
+// newline literal passes on CI and fails on a standard Windows checkout — which
+// is what happened here on 2026-09-20 after a rebase re-checked the file out.
+const pipelineSrc: string = fs
+  .readFileSync(new URL('../../storyJobPipeline.js', import.meta.url), 'utf8')
+  .split('\r\n').join('\n');
 
 // Shaped like the real prose-only failure: the ---METADATA--- delimiter is
 // there (we intended structured metadata) but the tail is unparseable JSON.

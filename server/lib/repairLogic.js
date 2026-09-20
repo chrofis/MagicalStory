@@ -98,7 +98,7 @@ function findBadPages(evalPages, options = {}) {
 function findSafeRepairableFinding(result) {
   const pools = [
     ['quality', result?.fixableIssues],
-    ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
+    ['semantic', semanticFindings(result?.semanticResult)],
     ['consolidated', result?.consolidatedPlan?.deduped_issues],
   ];
   for (const [pool, list] of pools) {
@@ -604,7 +604,7 @@ function collectCriticalFindings(result) {
     ? [['consolidated', deduped]]
     : [
       ['quality', result?.fixableIssues],
-      ['semantic', result?.semanticResult?.semanticIssues || result?.semanticResult?.issues],
+      ['semantic', semanticFindings(result?.semanticResult)],
     ];
   const out = [];
   for (const [pool, list] of pools) {
@@ -837,7 +837,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   // match the round loop's unresolved-issue surfacing uses (images.js).
   const severityIssues = [
     ...(evaluator.fixableIssues || []),
-    ...(evaluator.semanticResult?.semanticIssues || evaluator.semanticResult?.issues || []),
+    ...semanticFindings(evaluator.semanticResult),
     ...(Array.isArray(evaluator.consolidatedPlan?.deduped_issues) ? evaluator.consolidatedPlan.deduped_issues : []),
   ];
   const catastrophicIssue = severityIssues.find(i => /catastrophic/i.test(String(i?.severity || '')));
@@ -1028,8 +1028,7 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
   const fixableCount = evaluator.fixableIssues?.length || 0;
   const enrichedCount = evaluator.enrichedFixTargets?.length || 0;
   const fixTargetCount = evaluator.fixTargets?.length || 0;
-  const semanticIssueCount = (evaluator.semanticResult?.issues?.length
-    || evaluator.semanticResult?.semanticIssues?.length || 0);
+  const semanticIssueCount = semanticFindings(evaluator.semanticResult).length;
   if (fixableCount + enrichedCount + fixTargetCount + semanticIssueCount > 0) {
     const parts = [];
     if (fixableCount) parts.push(`${fixableCount} quality`);
@@ -1219,6 +1218,32 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * it. It reached no model only because the consolidator happened to emit an
  * empty instruction for it.
  */
+/**
+ * THE SEMANTIC JUDGE'S FINDINGS, from whichever field carries them.
+ *
+ * `semanticResult` exposes two: `issues` and `semanticIssues`. Every reader used
+ * `a || b`, and half of them ordered it one way and half the other. An
+ * empty-but-present array is TRUTHY, so `issues: []` short-circuits and the
+ * findings in `semanticIssues` are never seen — while a reader written as
+ * `a?.length || b?.length` falls through correctly, because 0 is falsy.
+ *
+ * That split is why a page could be ROUTED to repair and then found to have
+ * nothing to repair: decideRepairMethod counted with `.length` and saw the
+ * findings; inpaintPage took the arrays and saw none, returning "no issues to
+ * fix" with no error. Measured on staging job_1789853503332_riqncqg1i p6 and p7.
+ *
+ * Measured over 3669 stored semanticResult objects: `issues` is populated ZERO
+ * times, `semanticIssues` 2348 times, and the two are never both populated. So
+ * preferring the non-empty list is behaviour-preserving at every call site.
+ */
+function semanticFindings(semanticResult) {
+  const primary = semanticResult?.issues;
+  if (Array.isArray(primary) && primary.length) return primary;
+  const legacy = semanticResult?.semanticIssues;
+  if (Array.isArray(legacy) && legacy.length) return legacy;
+  return Array.isArray(primary) ? primary : (Array.isArray(legacy) ? legacy : []);
+}
+
 function typesAreInpaintable(types) {
   const list = Array.isArray(types) ? types.filter(Boolean) : [];
   if (!list.length) return true;
@@ -1280,4 +1305,4 @@ function buildPreserveClause(preserve) {
 }
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
