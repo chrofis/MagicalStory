@@ -21,7 +21,7 @@ import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
 
 const require_ = createRequire(import.meta.url);
-const { shotFloors, shotDistributionPhrase, POSITION_SHOTS, MAX_MEDIUM_WIDE_SHARE } =
+const { shotFloors, shotDistributionPhrase, POSITION_SHOTS, MAX_MEDIUM_WIDE_SHARE, PEOPLELESS_SHARED_SHOT } =
   require_('../../server/lib/shotVocabulary');
 const { runPlanCounters } = require_('../../server/lib/planCounters');
 const { replanRank } = require_('../../server/lib/promptBuilders');
@@ -108,11 +108,80 @@ describe('the floors are tiered, so a short book is not asked for a long book sp
       const p = shotFloors(n);
       const positionFloorSum = POSITION_SHOTS.reduce((a: number, id: string) => a + (p.floors[id] || 0), 0);
       const mandated = Object.values(p.floors).reduce((a: number, b: any) => a + Number(b), 0)
-        + Math.max(0, p.requiredPositions - positionFloorSum);
+        + Math.max(0, p.positionsTotal - positionFloorSum);
+      // One arithmetic, not two: shotFloors reports it so no caller re-derives.
+      expect(p.mandatedPages, `${n} pages: mandatedPages disagrees with the floors`).toBe(mandated);
       expect(mandated, `${n} pages: floors exceed the book`).toBeLessThanOrEqual(n);
       expect(mandated + p.maxMediumWide, `${n} pages: floors and the medium/wide cap contradict`)
         .toBeLessThanOrEqual(n);
+      expect(p.slack, `${n} pages: slack disagrees`).toBe(n - mandated - p.maxMediumWide);
+      expect(p.slack, `${n} pages: UNSATISFIABLE`).toBeGreaterThanOrEqual(0);
     }
+  });
+});
+
+/**
+ * THE PEOPLELESS PAGE MAY BE THE ULTRA-WIDE PAGE (owner, 2026-09-20: "books of
+ * 10 page allow a bit of freedom, for example put ultra-wide and no person
+ * together as 1, so only 5 or so are spoken for").
+ *
+ * The arithmetic that forced it. `NO_PEOPLELESS_PAGE` is must-fix and demands a
+ * page with no cast on it, on top of the shot floors. Counted as a SEPARATE
+ * page it made two lengths impossible:
+ *
+ *   pages | mandated shots | +peopleless | medium/wide ceiling | total vs pages
+ *       9 |              5 |           6 |                   4 | 10 > 9   IMPOSSIBLE
+ *      10 |              5 |           6 |                   5 | 11 > 10  IMPOSSIBLE
+ *      11 |              5 |           6 |                   5 | 11 = 11  zero slack
+ *      18 |              6 |           7 |                   9 | 16 < 18
+ *
+ * Riding it on the ultra-wide page takes 9 and 10 back to exactly satisfiable
+ * and gives every longer length a page back.
+ */
+describe('the people-free page rides the ultra-wide page', () => {
+  it('is the ultra-wide page — a distance, so it is on the axis a landscape wants', () => {
+    expect(PEOPLELESS_SHARED_SHOT).toBe('ultra-wide');
+  });
+
+  it('every length 4-40 is satisfiable WITH the people-free page counted in', () => {
+    for (let n = 4; n <= 40; n++) {
+      const p = shotFloors(n);
+      // It costs nothing wherever ultra-wide is floored; where it is not
+      // floored (the trial tier) it is one page out of ample slack.
+      const extra = p.floors[PEOPLELESS_SHARED_SHOT] ? 0 : 1;
+      expect(p.slack - extra, `${n} pages: unsatisfiable once the people-free page is counted`)
+        .toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('the two lengths that were impossible are now exactly satisfiable', () => {
+    for (const n of [9, 10]) {
+      expect(shotFloors(n).slack, `${n} pages`).toBe(0);
+      expect(shotFloors(n).floors[PEOPLELESS_SHARED_SHOT]).toBe(1);
+    }
+  });
+
+  it('APPLIES AT EVERY LENGTH, not below a threshold — it is a permission, not a quota', () => {
+    // Only 9-10 NEED it. A permission legal at ten pages and illegal at
+    // eighteen would be an arbitrary number with nothing behind it, so the
+    // planner is told it wherever the shot it rides is floored at all.
+    for (const n of [9, 10, 13, 18, 24, 40]) {
+      expect(shotDistributionPhrase(n), `${n} pages`).toContain(`may BE the ${PEOPLELESS_SHARED_SHOT} page`);
+    }
+  });
+
+  it('a short book that owes no ultra-wide is not told to put its cast-free page on one', () => {
+    expect(shotFloors(6).floors['ultra-wide']).toBeUndefined();
+    expect(shotDistributionPhrase(6)).not.toContain('may BE the');
+  });
+
+  it('only the CAST property combines — two shot words never share a page', () => {
+    // `shot` is one-of. Nothing added here may let aerial/OTS/close-up/
+    // ultra-wide satisfy each other, and the phrase says so out loud.
+    expect(shotDistributionPhrase(18)).toContain('No two shot words ever share a page');
+    const f18 = shotFloors(18);
+    expect(f18.mandatedPages).toBe(
+      Object.values(f18.floors).reduce((a: number, b: any) => a + Number(b), 0));
   });
 });
 

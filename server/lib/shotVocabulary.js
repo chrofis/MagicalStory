@@ -191,6 +191,40 @@ const MAX_MEDIUM_WIDE_SHARE = 0.5;
 const MID_DISTANCE_SHOTS = ['medium', 'wide'];
 
 /**
+ * THE PEOPLELESS PAGE MAY BE THE ULTRA-WIDE PAGE (owner, 2026-09-20).
+ *
+ * "Books of 10 page allow a bit of freedom, for example put ultra-wide and no
+ * person together as 1, so only 5 or so are spoken for."
+ *
+ * A short book had NO slack. At 9-13 pages the floors mandate close-up 2 +
+ * ultra-wide 1 + aerial 1 + over-the-shoulder 1 = 5 shot pages, and
+ * `NO_PEOPLELESS_PAGE` (must-fix) demands a sixth page with no cast in it,
+ * against a medium/wide ceiling of 4 at nine pages and 5 at ten. Six mandated
+ * pages plus a ceiling of 5 needs an 11-page book; 9 and 10 were therefore
+ * UNSATISFIABLE, and the planner could only ship one finding or the other.
+ *
+ * The two demands are orthogonal and always were: `shot` is a camera word, and
+ * peopleless is a property of the CAST. An ultra-wide landscape with nobody in
+ * it is the natural page to be both, so one page discharges both.
+ *
+ * AT EVERY LENGTH, not below a threshold. Joint satisfaction is only NEEDED at
+ * 9-10 pages (see the arithmetic in tests/unit/shot-distribution-floors.test.ts,
+ * which walks 4-40), but it is a PERMISSION, not a quota. A permission that is
+ * legal at ten pages and illegal at eighteen would be an arbitrary threshold
+ * with nothing behind it and one more number to maintain; at the longer lengths
+ * it simply buys slack the book is free not to spend.
+ *
+ * ONLY THE CAST PROPERTY COMBINES. `shot` is one-of, so aerial, over-the-
+ * shoulder, close-up and ultra-wide can never share a page with each other, and
+ * nothing here lets them.
+ */
+const PEOPLELESS_SHARED_SHOT = 'ultra-wide';
+
+if (!SHOT_TYPES.includes(PEOPLELESS_SHARED_SHOT)) {
+  throw new Error('shotVocabulary: PEOPLELESS_SHARED_SHOT names an unknown shot');
+}
+
+/**
  * id → the finding code planCounters raises when a book is short of that shot.
  * One code per floored shot, so a re-plan is told WHICH shot is missing rather
  * than that the spread is wrong. `ultra-wide` is a DISTANCE and `aerial` a
@@ -250,11 +284,22 @@ function shotFloors(pageCount) {
   const floors = { ...tier.floors };
   const positionsTotal = tier.positionsTotal ? tier.positionsTotal(pages) : 0;
   const positionFloorSum = POSITION_SHOTS.reduce((n, id) => n + (floors[id] || 0), 0);
+  const requiredPositions = Math.max(positionsTotal, positionFloorSum);
+  const maxMediumWide = Math.floor(pages * MAX_MEDIUM_WIDE_SHARE);
+  // THE PAGES THE BOOK OWES, counted once here so no caller re-derives it.
+  // Every floor costs a page, plus any position pages the tier's TOTAL asks for
+  // beyond the per-shot position floors. The mandatory people-free page costs
+  // NOTHING: it rides the ultra-wide page (PEOPLELESS_SHARED_SHOT), which is
+  // already in `floors` wherever it is floored at all.
+  const mandatedPages = Object.values(floors).reduce((n, v) => n + Number(v), 0)
+    + Math.max(0, positionsTotal - positionFloorSum);
   return {
     floors,
     positionsTotal,
-    requiredPositions: Math.max(positionsTotal, positionFloorSum),
-    maxMediumWide: Math.floor(pages * MAX_MEDIUM_WIDE_SHARE),
+    requiredPositions,
+    maxMediumWide,
+    mandatedPages,
+    slack: pages - mandatedPages - maxMediumWide,
   };
 }
 
@@ -273,77 +318,102 @@ function shotDistributionPhrase(pageCount) {
   const positions = requiredPositions
     ? ` ${requiredPositions} page${requiredPositions === 1 ? '' : 's'} in total leave eye level for a camera position (${SHOT_POSITIONS}).`
     : ` A page may leave eye level for a camera position (${SHOT_POSITIONS}) where it earns one.`;
-  return `Across the ${pageCount} pages: at most ${maxMediumWide} of them medium or wide — half the book at most, and never only two camera distances across the book. At least ${list}.${positions} These are floors, not targets: spend the remaining pages on whichever of the eight words each page earns, and keep the angled pages few enough that an angle still reads as one.`;
+  // The permission is stated only where the shot it rides is actually floored;
+  // a short book that owes no ultra-wide is not told to put its people-free
+  // page on one.
+  const shared = floors[PEOPLELESS_SHARED_SHOT]
+    ? ` The page with no people in frame may BE the ${PEOPLELESS_SHARED_SHOT} page — a landscape with nobody in it answers both at once, and that is one page spoken for, not two. No two shot words ever share a page.`
+    : '';
+  return `Across the ${pageCount} pages: at most ${maxMediumWide} of them medium or wide — half the book at most, and never only two camera distances across the book. At least ${list}.${positions} These are floors, not targets: spend the remaining pages on whichever of the eight words each page earns, and keep the angled pages few enough that an angle still reads as one.${shared}`;
 }
 
 /**
- * WHAT A CLOSE-UP MAY NOT STAGE — one declaration of the below-waist verbs.
+ * WHAT A CLOSE-UP MAY NOT STAGE — one declaration of the below-frame subjects.
  *
- * A `close-up` frame ends at the waist, so a beat that needs the legs cannot be
- * drawn in one. That rule is stated at FIVE stops: the beats planner writes the
- * shot word (prompts/story-beats.txt), the two Art Director templates author the
- * brief (scene-expansion.txt, scene-expansion-all.txt), the two iterate
- * templates REWRITE it (scene-iteration.txt, scene-iteration-free.txt), and
- * planCounters measures it. Every one of them spelled the list out by hand and
- * they had already drifted — the Art Director pair said "kneeling, crouching,
- * sitting, stepping, feet-on-ground", the iterate pair said "kneeling,
- * crouching, feet-on-ground" and dropped sitting, which is the single verb that
- * caused the most measured failures. One constant now fills all five, so the
- * generator is told exactly the words the counter looks for.
+ * REVERSED 2026-09-20 (owner): "A child can sit in a close up that is fine."
+ * The rule this replaces forbade `kneeling, crouching, sitting, stepping, or
+ * feet-on-ground contact` and so conflated two different things — the POSE a
+ * character is in, and what the FRAME shows. A close-up ends at the waist, so a
+ * sitting or kneeling child's legs are simply cropped out; that is not a fault,
+ * it is what a close-up IS. Worse, a crouch or a kneel brings the head DOWN to
+ * the ground, which is exactly what puts a ground-level subject inside a
+ * waist-up frame — the pose was the thing making the shot work.
  *
- * MEASURED, 24 staging books / 73 planned close-ups over the 14 days to
- * 2026-09-20: 19 planned close-ups came back from the Art Director as something
- * wider, and on 7 of them the PLAN LINE itself staged a below-waist action — the
- * planner breaking its own rule, silently absorbed downstream. On
- * job_1789853503332_riqncqg1i that cost the book the discovery page, the low
- * point and the hatching.
+ * So what is forbidden is an action whose VISIBLE SUBJECT lies below the frame
+ * line and therefore cannot be in shot at all: the ground at a character's
+ * feet, a story object lying on the floor, a foot placed on a step. Poses come
+ * out; below-frame subject matter stays.
  *
- * NARROW BY DESIGN. This is an explicit verb list, never a reading of what the
- * prose means. It covers four verbs and misses everything else a below-waist
- * beat can be called ("lands on his hands", "one foot on the wall stones" both
- * occur in the stored corpus and are NOT caught). Under-reporting is the chosen
- * error: the finding is advisory, and a wrong one costs a re-plan round.
+ * The rule is stated at SIX stops: the beats planner writes the shot word
+ * (prompts/story-beats.txt), the two Art Director templates author the brief
+ * (scene-expansion.txt, scene-expansion-all.txt), the two iterate templates
+ * REWRITE it (scene-iteration.txt, scene-iteration-free.txt), the
+ * Art-Director-less paths get it as AD_COMPOSITION_RULE (promptBuilders.js),
+ * and planCounters measures it. Every one of them spelled the list out by hand
+ * and they had already drifted — the iterate pair had silently DROPPED
+ * `sitting`, the single verb behind the most measured failures. One constant
+ * now fills all six.
+ *
+ * MEASURED against the narrowed rule, 24 staging books / 73 planned close-ups
+ * over the 14 days to 2026-09-20: the old verb list flagged 13 plan lines, the
+ * narrowed one flags 8, and reading all 13 the five it drops are cropped poses
+ * every time ("sits alone, arms wrapped around his knees"; "crouching, holding
+ * a scale up between two fingers"; "steps back, hands behind him"). The 8 that
+ * survive each name the ground as something the picture must show. Two of them
+ * are pages the OLD list could not see at all ("one foot already on the wall
+ * stones", "digging beside him with bare hands"), so the rule is at once
+ * narrower and a better fit to the class it is about.
+ *
+ * NARROW BY DESIGN. This is an explicit pattern list, never a reading of what
+ * the prose means, and it still misses ways of naming the ground it has no
+ * pattern for. Under-reporting is the chosen error: the finding is advisory,
+ * and a wrong one costs a re-plan round.
  */
 const CLOSEUP_BELOW_WAIST_VERBS = [
-  { verb: 'kneeling', match: /\bkneel(?:s|ing)?\b|\bknelt\b|\bon (?:his|her|their) knees\b/i },
-  { verb: 'crouching', match: /\bcrouch(?:es|ing)?\b|\bsquat(?:s|ting)?\b/i },
-  { verb: 'sitting', match: /\bsit(?:s|ting)?\b|\bseated\b/i },
-  { verb: 'stepping', match: /\bstep(?:s|ping)\b/i },
-  // The rule's own last clause — "nothing placed at the character's feet" —
-  // and the only one whose subject is IN the pattern: a possessive pronoun
-  // naming whose feet they are. `selfSubject` skips the subject guard below,
-  // which looks for a name BEFORE the match and would never find one here.
-  // Three stored plan lines put the frame's floor in a close-up this way
-  // ("red leaves scattered around her feet", "the bilge below the grating at
-  // her feet") and no verb could see them.
-  { verb: 'feet-on-ground contact', selfSubject: true, match: /\b(?:at|around|beneath|below|under) (?:his|her|their) feet\b/i },
+  // Every entry is `selfSubject`: the pattern NAMES the below-frame thing
+  // itself — feet, the ground, a foot on a surface — so there is no separate
+  // actor to look for before it. The old list needed a subject guard only
+  // because bare pose verbs ("sits", "steps") read objects as poses; with the
+  // poses gone, so is that failure mode.
+  {
+    verb: "the ground at the character's feet",
+    selfSubject: true,
+    match: /\b(?:at|around|beneath|below|under) (?:his|her|their|its) feet\b/i,
+  },
+  {
+    verb: 'something lying on the ground or floor',
+    selfSubject: true,
+    match: /\b(?:on|onto|across|against|into) the (?:\w+ )?(?:ground|floor|earth|soil|mud|sand|cobbles|paving)\b/i,
+  },
+  {
+    verb: 'a foot placed on a step or surface',
+    selfSubject: true,
+    match: /\b(?:his|her|their|one|both) (?:foot|feet)\b(?:\s+\w+){0,2}\s+(?:on|onto|in|into|against)\b|\bsteps? (?:onto|up onto|down onto)\b/i,
+  },
 ];
 
-/** The verbs as the prompts state them: "kneeling, crouching, sitting, or stepping". */
+/** The list as the prompts state it, in the slot after "no ". */
 const CLOSEUP_BELOW_WAIST_PHRASE = CLOSEUP_BELOW_WAIST_VERBS
   .map((v, i) => `${i === CLOSEUP_BELOW_WAIST_VERBS.length - 1 ? 'or ' : ''}${v.verb}`)
   .join(', ');
 
 /**
- * A capitalised name or a person pronoun — the SUBJECT a below-waist verb must
- * have before it counts.
- *
- * Without it the list reads objects as poses: of the 12 plan lines the bare
- * verbs flagged across the stored corpus, 2 were "the small dragon sits on his
- * neck" and "the hook where it sits in the ring" — neither a character's pose,
- * both a false positive that would have bought a re-plan round. `it` is
- * deliberately excluded and `he`/`she`/`they` are not: `it` is the pronoun of
- * the prop, never of the child. The cost is a miss when the subject is a
- * lowercase collective ("all four kneel in a ring"); that shape is reported
- * rather than guessed at.
+ * A capitalised name or a person pronoun — kept for the entry that needs an
+ * actor named BEFORE the match rather than inside it. No current entry does
+ * (every one is `selfSubject`), and the guard stays because the next pattern
+ * added may well not be: without it the old list read "the small dragon sits on
+ * his neck" and "the hook where it sits in the ring" as a child's pose, two
+ * false positives out of twelve. `it` is deliberately excluded and
+ * `he`/`she`/`they` are not: `it` is the pronoun of the prop, never of the
+ * child.
  */
 const BELOW_WAIST_SUBJECT = /(?:\b[A-ZÄÖÜ][a-zäöüßéèàâç]+\b|\b(?:he|she|they)\b)[^.;!?]{0,24}$/;
 
 /**
- * The below-waist verbs a piece of plan/brief text stages for a CHARACTER.
+ * The below-frame subjects a piece of plan/brief text stages inside a close-up.
  *
  * @param {string} text
- * @returns {string[]} the matched verb labels, in declaration order.
+ * @returns {string[]} the matched labels, in declaration order.
  */
 function closeUpBelowWaistVerbs(text) {
   const clean = String(text || '');
@@ -371,6 +441,7 @@ module.exports = {
   SHOT_DEFINITIONS,
   MAX_MEDIUM_WIDE_SHARE,
   MID_DISTANCE_SHOTS,
+  PEOPLELESS_SHARED_SHOT,
   SHOT_FLOOR_CODE,
   SHOT_FLOOR_TIERS,
   CLOSEUP_BELOW_WAIST_VERBS,

@@ -7971,7 +7971,12 @@ const AD_COMPOSITION_RULE = [
   '- One level per frame. Two named figures on different levels — one on a deck, floor, bank, wall or roof, the other on the water, ground or stair below — cannot be drawn facing each other at equal size: the renderer flattens every figure onto one plane. Stage the page from one level; the figure on the other level is `depth: background`, small, and on a surface visibly above or below the edge.',
   "- No partial immersion. A character is either on standable ground or fully swimming. Wading, ankle-deep and knee-deep poses render as standing on the water surface — restage them at the water's edge or as swimming.",
   '- Footing. Every standing character has something standable at their declared position and depth — a bank, path, floor, deck or walkway — never open water or air. A moment that puts a figure where nothing standable exists moves the figure or the camera.',
-  '- A `close-up` frame ends at the waist. Poses and interactions stay above it — no kneeling, crouching, sitting, stepping or feet-on-ground contact, and nothing placed behind the character. A moment that needs below-waist action is a `medium` shot.',
+  // The SIXTH copy of the close-up rule, and until 2026-09-20 the one still
+  // hand-written after the other five moved to the shared constant. Filled
+  // from CLOSEUP_BELOW_WAIST_PHRASE like the rest.
+  '- A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there. What it cannot show is an action whose subject lies below the frame line: no '
+    + CLOSEUP_BELOW_WAIST_PHRASE
+    + ', and nothing placed behind the character. A moment whose point is below the waist is a `medium` shot.',
 ].join('\n');
 
 /**
@@ -9054,6 +9059,11 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // character whose own moment no plan line stages — is nameable here and
     // nowhere else upstream of the finished book.
     TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    // Check 7b, from the one constant the six generator sites are given and
+    // planCounters.SHOT_CLOSEUP_BELOW_WAIST measures. It was the last site
+    // still spelling the list out by hand, which is how the critic went on
+    // naming poses after the rule stopped forbidding them.
+    CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
   });
 }
 
