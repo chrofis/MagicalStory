@@ -8930,6 +8930,49 @@ function buildDoNotWriteSection() {
 }
 
 /**
+ * What one character is wearing on one page, as a value that changes when the
+ * outfit does: the clothing category plus the on/off state of every garment
+ * the brief hangs on them. Two pages with the same signature are two pages the
+ * reader sees the same clothes on.
+ *
+ * @param {Object} sceneMetadata - extractSceneMetadata() result for the page
+ * @param {string} name - character name as characterClothing keys it
+ * @returns {string}
+ */
+function characterLookSignature(sceneMetadata, name) {
+  const category = (sceneMetadata && sceneMetadata.characterClothing && sceneMetadata.characterClothing[name]) || '';
+  const worn = (sceneMetadata && Array.isArray(sceneMetadata.wornItems) ? sceneMetadata.wornItems : [])
+    .filter(w => w && w.owner === name)
+    .map(w => `${w.id || ''}:${w.state || ''}`)
+    .sort()
+    .join(',');
+  return `${category}|${worn}`;
+}
+
+/**
+ * Remove one character's appearance appositive — `Name — a preschooler …
+ * wearing a red jacket … — kneels` — leaving `Name kneels`. Only an appositive
+ * that actually describes a look is taken: one naming hair, eyes, build or a
+ * worn garment. An em-dash aside that says what someone is doing or feeling is
+ * story, not staging, and stays.
+ *
+ * @param {string} prose - the brief's prose half
+ * @param {string} name
+ * @returns {string}
+ */
+function dropAppearanceAppositive(prose, name) {
+  if (!prose || !name) return prose;
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // The briefs write the appositive both spaced (`Name — … — verb`) and
+  // unspaced (`Name—…—verb`), so the whitespace on both sides is part of the
+  // match and one space is put back: dropping it welds the name to the verb.
+  return prose.replace(
+    new RegExp(`(${escaped})\\s*[—–]\\s*([^—–]*?)\\s*[—–]\\s*`, 'g'),
+    (whole, who, inner) => (/\b(wearing|hair|eyes|build|heads tall)\b/i.test(inner) ? `${who} ` : whole)
+  );
+}
+
+/**
  * Page text written from the FINAL ARC and the locked PLAN LINES (beats-first
  * pipeline, step 5). The arc is the story; the plan lines divide it into
  * pictures. Beat prose used to stand between the two and was measured as the
@@ -8962,13 +9005,33 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
   // and the writer is never told what they are. cleanPageText's output-side
   // guard only matches the bracketed `[ART001]` form, so the parenthesised ids
   // the briefs actually carry would reach the page unscrubbed.
+  // A character's full appearance is repeated on every page they appear on —
+  // twelve times over for a lead in an eighteen-page book, under a rule that
+  // forbids the writer narrating what anyone wears. It is repeated only where
+  // it CHANGED: the outfit a character is in is `characterClothing` (standard,
+  // winter, summer, costumed:X) and the garments on or off them are
+  // `wornItems`, both already parsed out of the brief's METADATA block. A
+  // change back to an earlier outfit is a change and gets the full description
+  // again, so the state is the LAST outfit seen per character, not a set.
+  const lastLookByCharacter = new Map();
   const briefByPage = new Map(
     (expansions || [])
       .filter(x => x && x.pageNumber != null)
-      .map(x => [x.pageNumber, String(x.brief || '')
-        .split(/---\s*METADATA/i)[0]
-        .replace(/\s*[([]\s*[A-Z]{2,3}\d{3}(?:\.\d+)?\s*[)\]]/g, '')
-        .trim()])
+      .sort((a, b) => a.pageNumber - b.pageNumber)
+      .map(x => {
+        const raw = String(x.brief || '');
+        let prose = raw
+          .split(/---\s*METADATA/i)[0]
+          .replace(/\s*[([]\s*[A-Z]{2,3}\d{3}(?:\.\d+)?\s*[)\]]/g, '')
+          .trim();
+        const meta = extractSceneMetadata(raw);
+        for (const name of Object.keys((meta && meta.characterClothing) || {})) {
+          const look = characterLookSignature(meta, name);
+          if (lastLookByCharacter.get(name) === look) prose = dropAppearanceAppositive(prose, name);
+          else lastLookByCharacter.set(name, look);
+        }
+        return [x.pageNumber, prose];
+      })
   );
   const blocks = beats
     .map(b => {
@@ -9842,6 +9905,8 @@ module.exports = {
   buildSceneReviewBibleBlock,
   buildDoNotWriteSection,
   buildStoryTextFromBeatsPrompt,
+  characterLookSignature,
+  dropAppearanceAppositive,
   buildTitleRule,
   buildStoryBibleFromBeatsPrompt,
   buildTrialStoryPrompt,
