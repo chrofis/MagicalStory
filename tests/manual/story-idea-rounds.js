@@ -159,7 +159,7 @@ async function buildCellPrompts(cell) {
   const ideaWorlds = resolveIdeaWorlds({ storyCategory, storyTheme, location: LOCATION, worldMode: 'auto' });
   const world1 = ideaWorlds ? ideaWorlds[0].world : 'location';
   const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
-  const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2);
+  const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
 
   return {
     ideaWorlds, worlds: [world1, world2],

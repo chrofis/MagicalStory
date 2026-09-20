@@ -375,16 +375,56 @@ const REALISTIC_ENVIRONMENT_THEMES = new Set(['realistic', 'farm', 'forest', 'fi
  * it never sees the first idea. Name the axes to vary instead. The two calls stay
  * parallel; serialising them would cost wall-clock on the live wizard.
  */
-function buildVariantInstructions(world1, world2) {
+// When BOTH idea arms play in the real world, the second call cannot see the
+// first, so "vary the place" is unverifiable from inside it and the two arms
+// came back telling the same story in every round of the 2026-09-20 rating
+// series. The second arm is therefore handed VALUES, not an instruction to
+// differ: one place class and one event class, picked here and stated as
+// requirements. The pick is DETERMINISTIC from the request's own inputs
+// (cast, topic, theme) rather than random per call, so that a fixed set of
+// wizard inputs produces a reproducible pair — the rating harness replays the
+// same cells across rounds — while different inputs land on different classes.
+const IDEA_PLACE_CLASSES = [
+  'indoors, inside a building',
+  'outdoors, in the open air, away from any building',
+  'at home or in the garden or yard belonging to it',
+  'in a public place with other people around'
+];
+const IDEA_EVENT_CLASSES = [
+  'weather that turns',
+  'a time someone else has set, which cannot be moved',
+  'other people in the way — a crowd, a queue, or a closed door',
+  'a thing that breaks or goes missing',
+  'an animal that will not do what it is asked',
+  'somebody arriving who was not expected'
+];
+
+function ideaVariantSeed(seedInput) {
+  const parts = [];
+  for (const c of (seedInput?.characters || [])) parts.push(`${c?.name || ''}:${c?.age || ''}`);
+  parts.push(seedInput?.storyTopic || '', seedInput?.storyTheme || '', seedInput?.language || '');
+  const key = parts.join('|');
+  let h = 5381;
+  for (let i = 0; i < key.length; i++) h = ((h * 33) ^ key.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function buildVariantInstructions(world1, world2, seedInput = {}) {
   const first = world1 === 'fantasy'
     ? 'Start directly in the adventure world. Avoid local landmarks - use the theme setting instead.'
     : 'Use local landmarks if available. Create an engaging story that uses the setting naturally.';
   const bothLocation = world1 === 'location' && world2 === 'location';
-  const second = world2 === 'fantasy'
-    ? 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.'
-    : bothLocation
-      ? 'Create a DIFFERENT story than the first one, varying all three of these: a different class of place (if the first could be outdoors and public, make this one indoors or at home, or the other way round), a different responsible adult or none at all, and a different outside event that makes the skill hard. Use local landmarks if available.'
-      : 'Create a DIFFERENT story than the first one: different local places, a different approach to the conflict, and a different story structure. Use local landmarks if available.';
+  let second;
+  if (world2 === 'fantasy') {
+    second = 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.';
+  } else if (bothLocation) {
+    const h = ideaVariantSeed(seedInput);
+    const place = IDEA_PLACE_CLASSES[h % IDEA_PLACE_CLASSES.length];
+    const event = IDEA_EVENT_CLASSES[Math.floor(h / IDEA_PLACE_CLASSES.length) % IDEA_EVENT_CLASSES.length];
+    second = `Create a DIFFERENT story than the first one. These are requirements, not choices: this story plays ${place}; what makes it hard is ${event}; and whoever is responsible for the youngest character is a different person from the obvious one, or nobody is. Use local landmarks if available.`;
+  } else {
+    second = 'Create a DIFFERENT story than the first one: different local places, a different approach to the conflict, and a different story structure. Use local landmarks if available.';
+  }
   return [first, second];
 }
 
@@ -728,7 +768,7 @@ ${landmarkEntries}`;
 
     const world1 = ideaWorlds ? ideaWorlds[0].world : 'location';
     const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
-    const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2);
+    const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
 
     const prompt1 = buildSinglePrompt(world1, firstInstruction);
     const prompt2 = buildSinglePrompt(world2, secondInstruction);

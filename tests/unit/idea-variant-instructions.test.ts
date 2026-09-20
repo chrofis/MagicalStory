@@ -11,11 +11,30 @@ describe('buildVariantInstructions', () => {
     expect(second).not.toBe(first);
   });
 
-  it('names the three variety axes on the second location arm', () => {
-    const [, second] = buildVariantInstructions('location', 'location');
-    expect(second).toMatch(/class of place/i);
-    expect(second).toMatch(/responsible adult/i);
-    expect(second).toMatch(/outside event/i);
+  it('states the second location arm place class and event class as values, not as a choice', () => {
+    const [, second] = buildVariantInstructions('location', 'location', { characters: [{ name: 'Mia', age: 5 }], storyTopic: 'making-friends' });
+    expect(second).toMatch(/requirements, not choices/i);
+    expect(second).toMatch(/this story plays (indoors|outdoors|at home|in a public place)/i);
+    expect(second).toMatch(/what makes it hard is \S/i);
+    expect(second).toMatch(/responsible for the youngest character/i);
+    // no open-ended "pick a different X" phrasing left for the model to resolve
+    expect(second).not.toMatch(/a different class of place/i);
+  });
+
+  it('is deterministic for the same inputs and varies with them', () => {
+    const a = buildVariantInstructions('location', 'location', { characters: [{ name: 'Mia', age: 5 }], storyTopic: 'making-friends' })[1];
+    const b = buildVariantInstructions('location', 'location', { characters: [{ name: 'Mia', age: 5 }], storyTopic: 'making-friends' })[1];
+    expect(a).toBe(b);
+    const seen = new Set<string>();
+    for (const topic of ['making-friends', 'not-giving-up', 'going-outside', 'managing-emotions', 'sharing', 'bedtime', 'new-school', 'losing-a-pet']) {
+      seen.add(buildVariantInstructions('location', 'location', { characters: [{ name: 'Lena', age: 1 }], storyTopic: topic })[1]);
+    }
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it('never asks the fantasy arm for a place class', () => {
+    const [, second] = buildVariantInstructions('location', 'fantasy', { characters: [{ name: 'Mia', age: 5 }] });
+    expect(second).not.toMatch(/requirements, not choices/i);
   });
 
   it('leaves the location+fantasy pair on the generic instruction', () => {
