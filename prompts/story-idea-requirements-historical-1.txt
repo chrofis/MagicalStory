@@ -3,18 +3,18 @@
 The main characters ARE the historical achievers - they perform the famous deeds themselves.
 
 **OUTPUT FORMAT - START WITH ROLE ASSIGNMENTS:**
-Before writing the story outline, list each character's historical role:
+Open the output with a one-line-per-character role list under a one-word heading written in the output language, then the story outline:
 ```
-ROLES:
+[heading word, in the output language]:
 [Child Name]: [Historical Figure] ([their role in the event])
 [Child Name]: [Historical Figure] ([their role in the event])
 ```
 
-Example outputs:
-- Moon landing: "ROLES:\nChildA: Neil Armstrong (first human to walk on the moon)\nChildB: Mission Control Director (guides the mission from Houston)"
-- Wright Brothers: "ROLES:\nChildC: Orville Wright (pilot of the first flight)\nChildB: Wilbur Wright (runs alongside the plane)"
-- Light bulb: "ROLES:\nChildA: Thomas Edison (inventor testing thousands of materials)"
-- Pyramids: "ROLES:\nChildA: Imhotep (chief architect)\nChildB: Foreman (organizes the workers)\nChildC: Engineer (solves construction puzzles)"
+Example outputs (heading omitted here; write it in the output language):
+- Moon landing: "ChildA: Neil Armstrong (first human to walk on the moon)\nChildB: Mission Control Director (guides the mission from Houston)"
+- Wright Brothers: "ChildC: Orville Wright (pilot of the first flight)\nChildB: Wilbur Wright (runs alongside the plane)"
+- Light bulb: "ChildA: Thomas Edison (inventor testing thousands of materials)"
+- Pyramids: "ChildA: Imhotep (chief architect)\nChildB: Foreman (organizes the workers)\nChildC: Engineer (solves construction puzzles)"
 
 - List all main characters with their assigned historical roles first
 - Then write the story outline
