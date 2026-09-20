@@ -26,6 +26,41 @@ describe('the beats report keeps the evidence it is judged on', () => {
     expect(src).toContain("plannerPrompt: planPrompt || ''");
   });
 
+  it('stores the RE-PLAN prompt per round — the only one carrying the findings', () => {
+    // `plannerPrompt` is the FIRST division's. The re-plan request is the only
+    // prompt in the stage that carries `## MUST FIX` / `## ALSO NOTED`, and it
+    // was stored nowhere, so reconstructing what a round was asked to fix meant
+    // rebuilding buildReplanSection at the run's commit.
+    expect(src).toContain('replanPrompts: shipped.replanPrompts');
+    // The kept round's record carries it…
+    const rec = src.slice(src.indexOf('const roundRecord = {'), src.indexOf('replanRounds.push(roundRecord)'));
+    expect(rec).toContain('replanPrompt,');
+    // …and so does every early-discard push, which returns before roundRecord.
+    for (const m of src.matchAll(/replanRounds\.push\(\{ round,[^)]*\)/g)) {
+      expect(m[0]).toContain('replanPrompt');
+    }
+  });
+
+  it('a DISCARDED round keeps its re-plan prompt — it is why the loop stopped', () => {
+    const { shippedReplanState } = require('../../server/lib/beatsPipeline.js');
+    const out = shippedReplanState([
+      { round: 1, changedPages: [7], kept: true, recheck: null, replanPrompt: 'ROUND ONE PROMPT / ## MUST FIX / PLAN[NO_PEOPLELESS_PAGE]: …' },
+      { round: 2, changedPages: [1, 2], kept: false, discardReason: 'did not reduce must-fix', replanPrompt: 'ROUND TWO PROMPT' },
+    ]);
+    expect(out.replanPrompts).toEqual([{ round: 1, prompt: 'ROUND ONE PROMPT / ## MUST FIX / PLAN[NO_PEOPLELESS_PAGE]: …' }]);
+    expect(out.discardedRounds[0].replanPrompt).toBe('ROUND TWO PROMPT');
+  });
+
+  it('a ledger from before the field stores empty, never undefined', () => {
+    const { shippedReplanState } = require('../../server/lib/beatsPipeline.js');
+    const out = shippedReplanState([
+      { round: 1, changedPages: [3], kept: true, recheck: null },
+      { round: 2, changedPages: [], kept: false, discardReason: 'omitted page(s) 4' },
+    ]);
+    expect(out.replanPrompts).toEqual([]);
+    expect(out.discardedRounds[0].replanPrompt).toBe('');
+  });
+
   it('stores the checker reply and the roster the counters reasoned on', () => {
     expect(src).toContain("checkReply: check1.reply || ''");
     expect(src).toContain('rosterLines: check1.rosterLines || []');

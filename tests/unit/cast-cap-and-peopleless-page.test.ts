@@ -55,8 +55,16 @@ describe('check 3 counts the cast a covers field expands', () => {
 /**
  * The planner is told "At least one page in the book earns this"; the counter
  * reports when none does. As an "also noted" line the re-plan was never obliged
- * to act, so on job_1789759147125_p08djwhbl it was raised in BOTH rounds and
- * shipped unfixed.
+ * to act.
+ *
+ * CORRECTED 2026-09-20. This block used to cite job_1789759147125_p08djwhbl as
+ * "raised in BOTH rounds and shipped unfixed"; that run's stored report says
+ * the first check raised it in NEITHER round — it counted page 11 as
+ * people-free and only the recheck, reading the same untouched line, resolved
+ * "the children" and made the page peopled. That was a measurement fault
+ * (CHANGE 1). The promotion is kept on its surviving evidence,
+ * job_1789853503332_riqncqg1i: must-fix, raised in both rounds, answered with a
+ * correctly-tagged change each time, and shipped 0 for 1.
  */
 describe('a requirement nothing is obliged to answer is not a requirement', () => {
   it('NO_PEOPLELESS_PAGE is must-fix, so a re-plan has to spend a round on it', () => {
@@ -72,5 +80,70 @@ describe('a requirement nothing is obliged to answer is not a requirement', () =
 
   it('an unranked counter is still only also-noted', () => {
     expect(replanRank({ kind: 'counter', code: 'CONSECUTIVE_SAME_SHOT_CAST' })).toBe('also');
+  });
+});
+
+/**
+ * A MUST-FIX FINDING HAS TO BE ANSWERABLE BY READING IT.
+ *
+ * job_1789853503332_riqncqg1i, the run the promotion rests on. The planner
+ * answered with the right page and the right tag and still failed:
+ *   Page 13: action in Levin sitting alone with silent egg on ground before him
+ *     — PLAN[NO_PEOPLELESS_PAGE] — … held here with Levin just present to
+ *     satisfy the requirement while the egg dominates
+ * `action in` is the one declarable verb that cannot empty a page.
+ * `REPLAN_FINDING_DIRECTION` already ranked the code 'fewer', so `cast out` was
+ * permitted; nothing in the finding said so. The advisory finding that WAS
+ * answered twice in the same round, SHOT_NO_CAMERA_POSITION, enumerates its own
+ * legal values in its detail — that shape, not the promotion, is what this
+ * copies.
+ */
+describe('NO_PEOPLELESS_PAGE names the move that answers it', () => {
+  const { runPlanCounters } = require('../../server/lib/planCounters.js');
+  const { PLAN_CHANGE_VOCABULARY } = require('../../server/lib/promptBuilders');
+
+  /** A three-page book, every page peopled. */
+  const PAGES = [
+    { pageNumber: 1, planLine: 'wide — Levin, Julian — Levin digs in the leaves — the egg is found' },
+    { pageNumber: 2, planLine: 'medium — Levin — Levin lifts the egg — the egg knocks' },
+    { pageNumber: 3, planLine: 'close-up — Julian — Julian holds the egg — the egg hatches' },
+  ];
+  const ROSTER = new Map<number, any>([
+    [1, { people: ['Levin', 'Julian'], things: [], covers: [] }],
+    [2, { people: ['Levin'], things: ['egg'], covers: [] }],
+    [3, { people: ['Julian'], things: ['egg'], covers: [] }],
+  ]);
+  const finding = () => runPlanCounters({
+    pages: PAGES, commissionedNames: ['Levin', 'Julian'], placeNames: [],
+    maxCharactersPerScene: 6, roster: ROSTER,
+  }).findings.find((f: any) => f.code === 'NO_PEOPLELESS_PAGE');
+
+  it('still fires on a book with no people-free page', () => {
+    expect(finding()).toBeTruthy();
+  });
+
+  it('names the declarable verb, so the finding can be answered by reading it', () => {
+    const detail = finding().detail;
+    expect(detail).toContain('cast out <name>');
+    // …and not the verb the planner reached for instead.
+    expect(detail).not.toContain('action in');
+  });
+
+  it('says WHICH page may give up its cast, so the answer is not put on the wrong one', () => {
+    const detail = finding().detail;
+    expect(detail).toContain('a page whose subject is already a thing or a place seen alone');
+    expect(detail).toContain('never a moment between people');
+  });
+
+  it('the verb is the one the change parser actually reads — no hand-drifted copy', () => {
+    const castOut = PLAN_CHANGE_VOCABULARY.find((v: any) => v.kind === 'cast_out');
+    expect(finding().detail).toContain(castOut.syntax);
+  });
+
+  it('names no page: the heuristic was measured and rejected, and scope does not need one', () => {
+    // A finding naming no page is not the obstacle it looked like — the
+    // re-plan's merge admits any page the round DECLARES a change for
+    // (`declaredPages`, beatsPipeline.js), which a `cast out` line is.
+    expect(finding().pages).toEqual([]);
   });
 });

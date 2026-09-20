@@ -6601,13 +6601,24 @@ const REPLAN_MUST_FIX_CODES = new Set([
   'NO_FOCAL_PAGE', 'UNDER_COVERED_CHARACTER', 'MAIN_UNDER_HALF', 'NO_COMMISSIONED_ON_PAGE',
   'PEOPLELESS_ON_INTERACTION_PAGE',
   // The planner is told "At least one page in the book earns this" and the
-  // counter reports when none does — but as an "also noted" line the re-plan was
-  // never obliged to spend a round on it, so on
-  // job_1789759147125_p08djwhbl it was raised in both rounds and shipped unfixed.
-  // A requirement nothing is obliged to answer is not a requirement (owner,
-  // 2026-09-19). The checker cannot substitute: plan-check Q6 asks whether an
-  // EXISTING peopleless page earns its place, so it is structurally unable to
-  // notice that the book has none.
+  // counter reports when none does, but as an "also noted" line the re-plan was
+  // never obliged to spend a round on it. A requirement nothing is obliged to
+  // answer is not a requirement (owner, 2026-09-19). The checker cannot
+  // substitute: plan-check Q6 asks whether an EXISTING peopleless page earns
+  // its place, so it is structurally unable to notice that the book has none.
+  //
+  // CORRECTED 2026-09-20. This comment used to cite job_1789759147125_p08djwhbl
+  // as "raised in both rounds and shipped unfixed"; the stored report says
+  // otherwise, and the real failure is worse. That run's FIRST check counted
+  // page 11 as people-free and raised nothing; only the RECHECK, reading the
+  // same untouched plan line, resolved "the children" into four names and made
+  // the page peopled — so the finding appeared after the last round that could
+  // have answered it, on a book that had had its people-free page all along.
+  // The measurement, not the promotion, cost that book its page (CHANGE 1,
+  // docs/decisions.md 2026-09-20). The promotion's own justification is
+  // job_1789853503332_riqncqg1i, where the code was must-fix, was raised in
+  // both rounds, was answered with a tagged change each time, and still shipped
+  // 0 for 1 — which is why the FINDING TEXT now names the verb that answers it.
   'NO_PEOPLELESS_PAGE',
   // THE SHOT DISTRIBUTION JOINED 2026-09-20 (owner), the whole block of it:
   // SHOT_MEDIUM_WIDE_EXCESS, SHOT_CLOSEUP_COUNT, SHOT_ULTRAWIDE_COUNT,
@@ -7037,6 +7048,9 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // that outranks a saved profile here is the ARC, never the commission.
     CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
     MAX_CHARACTERS_PER_SCENE: ctx.MAX_CHARACTERS_PER_SCENE,
+    // The generator's half of the cast contract; PLAN_LINE_CAST_RULE is the
+    // consumer's half, in both Art Director templates and the scene review.
+    PLAN_LINE_FIELDS: PLAN_LINE_FIELD_CONTRACT,
     // The camera positions, from the one vocabulary the counters read — the
     // planner is the only stage that sees the whole book, so a spread of them
     // can only be decided here. See server/lib/shotVocabulary.js.
@@ -7450,7 +7464,28 @@ const COUNTING_RULE = 'Counting rule: an exact number for a group of like things
  * closes both channels. The VB-authoring consequence (which pages such an
  * entry may claim) lives generator-side in the pages-is-earned rule.
  */
-const PLAN_LINE_CAST_RULE = "A tracked animal — one with a Visual Bible entry — counts as a character for this rule: it is in a page's frame only when that page's plan line names it, whichever way it enters — `characters[]`, `objects[]` or the prose — and its entry's `pages` never claims a page whose plan line leaves it out.";
+const PLAN_LINE_CAST_RULE = "The plan line's second field is the complete cast of that picture. A person named anywhere else in the line — as the owner of a prop, or in a clause that places them behind, beyond or outside the action — is context for the staging and never becomes a character: no `characters[]` entry, no appearance, no expression, no place in the frame. Stage what such a clause makes visible, the prop or the aftermath, without the person. A tracked animal — one with a Visual Bible entry — counts as a character for this rule: it is in a page's frame only when that page's plan line names it, whichever way it enters — `characters[]`, `objects[]` or the prose — and its entry's `pages` never claims a page whose plan line leaves it out.";
+
+/**
+ * The same contract stated generator-side, for the planner that WRITES the
+ * line. story-beats.txt:87 defines it as
+ *   <shot> — <who is in frame> — <the instant> — <what is true after>
+ * and forbade nothing about the relationship between fields 2 and 3, so a
+ * planner could list one person as the cast and then stage a second one inside
+ * the instant. The Art Director, told only that "the plan line defines who is
+ * visible", read the whole line and drew them.
+ *
+ * Measured 2026-09-20 over 34 staging stories / 487 stored plan lines: 51 lines
+ * (10.5%) name a person in the instant whom the cast field omits, and the Art
+ * Director promoted them to a declared character in 43 of those 51 (84%). Those
+ * promoted pages score 15.0 points below their own book's other pages, paired
+ * within book, and score worse in 15 of the 20 books that have one.
+ *
+ * Stated on both sides deliberately: the consumer must not read a stray name as
+ * cast, and the producer must not write one. Either alone leaves the other
+ * side's behaviour undefined.
+ */
+const PLAN_LINE_FIELD_CONTRACT = "The second field is the complete cast of that picture. Every person the instant stages — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. A figure the previous page staged does not carry into the next one as background.";
 
 /**
  * ONE contract for an object that shows a different picture on different
@@ -9920,6 +9955,7 @@ module.exports = {
   ANIMAL_FATE_RULE,
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
+  PLAN_LINE_FIELD_CONTRACT,
   // The five definitions story-beats.txt and plan-check.txt share — one
   // constant each, filled into the rule AND the audit (sibling set
   // `beats-planner-vs-plan-check`).

@@ -42,6 +42,7 @@ The plan line's instant is a single drawable moment:
 - Two consecutive actions by one character give the picture one of them: plan the dominant moment and leave the other out, rather than joining both into one instant with "and then", "before turning to", or a trailing clause carrying the second action.
 - One action: one thing is being done, and everyone else watches it or does that same thing in the same place. Two characters given different actions at one instant lose one of them.
 - Two or three named characters carry a page best; {MAX_CHARACTERS_PER_SCENE} is the ceiling the image model can hold, and a named animal that acts in the story counts as one of them. A page that gathers the whole cast is wide or distant, all of them sharing one simple action or seen from behind moving off — never a row of figures facing the viewer. Add no unnamed figures — no crew, crowd, onlookers or extra animals.
+- {PLAN_LINE_FIELDS}
 - One centre of action: never two vehicles, vessels or creatures each with its own state or its own crew.
 - One camera position: an instant is seen from one spot — never inside a vehicle or structure and its exterior at once.
 - One level per picture: {TWO_HEIGHTS_DEF} Two such characters do not share a frame. Stage it from one level with the other character out of frame, or give each level its own page.
@@ -52,6 +53,7 @@ The plan line's instant is a single drawable moment:
 - Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.
 - The action at the moment it happens, never the state that follows it.
 - One action per page. {DEED_AND_EFFECT_DEF} When a plan line holds more than one, split them across pages.
+- The who column names every figure the picture shows. A figure that appears only in the instant or in what is true after is not in the picture: put them in the who column or leave them off the page.
 - Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.
 - Never compose the frame — what fills it, how large something looks, where it sits; the shot type is enough.
 - A beat holding two forbidden actions splits across two adjacent pages — one page the contact, the next page the second action — or the picture drops the secondary action and keeps the main event.

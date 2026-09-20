@@ -180,3 +180,79 @@ describe('covers is presence, and nothing else', () => {
     expect(before.every((r: any) => !('covered' in r))).toBe(true);
   });
 });
+
+/**
+ * THE SAME PLAN LINE MUST YIELD THE SAME ROSTER EVERY TIME.
+ *
+ * Measured on staging job_1789759147125_p08djwhbl. The plan line for page 11 —
+ * "ultra-wide — the Lindenhof hill rooftops against a pale sky, the Grossmünster
+ * towers on the horizon — the last sunlight slides off the roof tiles while the
+ * raven flits ahead over the ridge, the children small and fast on the path
+ * below — the sun is gone and the cold closes in" — was UNTOUCHED between the
+ * first check and the recheck (`changedPages` was [7, 12, 13]). The first check
+ * read it as `{names: []}`; the recheck read it as
+ * `{names: ["Levin","Julian","Max","Kiaan"], covered: [same]}`, having resolved
+ * "the children" — which stands in the INSTANT column, not the who column.
+ *
+ * So the book's one people-free page existed at the first check, was never
+ * raised, and was measured away by the recheck. The roster contract did not say
+ * which column a `covers` reference may be read from, and it offered two
+ * competing readings of a group word ("a word for the group" → expand;
+ * "onlookers, guards" → cover nobody) with no test to decide between them.
+ * The fix is in the CONTRACT (prompts/plan-check.txt), paired with the
+ * planner's half (prompts/story-beats.txt): scope is the who column alone, and
+ * expansion is required whenever the story's cast can put names to it.
+ */
+describe('the roster contract is decidable, so one plan line yields one roster', () => {
+  const P11 = 'ultra-wide — the Lindenhof hill rooftops against a pale sky, the Grossmünster towers on the horizon — the last sunlight slides off the roof tiles while the raven flits ahead over the ridge, the children small and fast on the path below — the sun is gone and the cold closes in';
+
+  it('the who column is the only column a covers expansion may be read from', () => {
+    expect(PLAN_CHECK).toContain('Read the WHO COLUMN ALONE');
+    expect(PLAN_CHECK).toContain('nothing outside the who column is ever expanded');
+  });
+
+  it('expansion is required by resolvability, never by how group-like the phrase sounds', () => {
+    expect(PLAN_CHECK).toContain("whenever this story's own cast can put names to it");
+    expect(PLAN_CHECK).toContain('the test is whether you can name them');
+    // The old wording's competing clause is gone: a group word no longer has
+    // two readings the checker may pick between.
+    expect(PLAN_CHECK).not.toContain('Unnamed figures — a crowd, onlookers, guards — cover nobody');
+  });
+
+  it('the PLANNER is told the same thing — a figure in the instant only is not in frame', () => {
+    const beats = fs.readFileSync(path.join(ROOT, 'prompts/story-beats.txt'), 'utf8');
+    expect(beats).toContain('The who column names every figure the picture shows.');
+    expect(beats).toContain('A figure that appears only in the instant or in what is true after is not in the picture');
+  });
+
+  it('page 11 reads the same both ways once nothing outside the who column is expanded', () => {
+    const pages = [{ pageNumber: 11, planLine: P11 }, ...PAGES];
+    const roster = (covers: string[]) => {
+      const out = new Map<number, any>(ROSTER_NAMES_ONLY);
+      out.set(11, { people: [], things: ['Lindenhof', 'Grossmünster'], covers });
+      return out;
+    };
+    const cast = (r: Map<number, any>) => runPlanCounters({
+      pages, commissionedNames: COMMISSIONED, placeNames: [], maxCharactersPerScene: MAX_CAST, roster: r,
+    }).stats.castPerPage.find((x: any) => x.pageNumber === 11);
+
+    // Both checks now answer the contract the same way: the who column names
+    // rooftops and towers and reaches nobody.
+    expect(cast(roster([])).names).toEqual([]);
+    // …and the page stays on the people-free list, which is what the book lost.
+    const peopleless = runPlanCounters({
+      pages, commissionedNames: COMMISSIONED, placeNames: [], maxCharactersPerScene: MAX_CAST, roster: roster([]),
+    }).stats.peoplelessPages;
+    expect(peopleless).toContain(11);
+
+    // The reading the recheck took — expanding a collective out of the INSTANT
+    // column — is what the contract now forbids; had it been taken, the page
+    // flips to four people and the book reports it has no people-free page.
+    const overreach = runPlanCounters({
+      pages, commissionedNames: COMMISSIONED, placeNames: [], maxCharactersPerScene: MAX_CAST,
+      roster: roster(['Levin', 'Julian', 'Max', 'Kiaan']),
+    });
+    expect(overreach.stats.peoplelessPages).not.toContain(11);
+    expect(overreach.findings.map((f: any) => f.code)).toContain('NO_PEOPLELESS_PAGE');
+  });
+});
