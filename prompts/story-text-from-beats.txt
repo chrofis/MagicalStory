@@ -11,7 +11,7 @@ Write in {LANGUAGE}. Never switch to a dialect or a spoken regional form.
 # TARGET
 
 Reading level: {READING_LEVEL}
-Each paragraph runs 2-4 sentences, and a blank line separates them. The sentence count above is the page's budget: break the page into as many paragraphs as that budget allows, never add sentences to reach a paragraph count.
+Each paragraph runs 2-4 sentences, a page holds at most four paragraphs, and a blank line separates them. Where the paragraph shape and the sentence count above disagree, the sentence count wins and the page takes fewer paragraphs.
 Pages: {PAGE_COUNT}
 Characters: {CHARACTER_NAMES}
 
@@ -50,12 +50,7 @@ No rhetorical set-pieces: no paired negations, no coined sayings or incantations
 {PAGE_OPENING_VARIETY}.
 The story's stake — what must happen and why — is stated plainly in the text: early, in words a small child knows, and again later. A listening child must never wonder what the book is about. Saying it plainly beats leaving it unsaid, even where no picture shows it.
 What the story establishes as load-bearing — a cause, a uniqueness, a limitation — appears in the text in its specific form, never genericized.
-A character knows only what an earlier page or picture gave them: a name said in their hearing, a place they were shown, an ability the book established. Where a page needs them to know it, an earlier page tells them.
-A character's first appearance carries the stated cause that puts them there; already being there, or arriving by chance exactly where they are needed, is not one.
-A character who refuses, gives up or discards a thing stays done with it; where a later page has them want it back or take it up again, that page says what changed.
-An object, sign, mechanism or rule earns its meaning on the page it first appears, before any later page leans on it.
-A limit the plot leans on — a thing that cannot happen, else the story collapses — is stated in the text, and no later page breaks it.
-Every reveal a page promises — a container, a secret, a question — is shown answered on a later page, and every price paid leaves a mark a later page shows.
+Nothing is leaned on before the book establishes it: a character knows only what an earlier page or picture gave them, so where a page needs them to know a thing, an earlier page tells them; a first appearance carries the stated cause that puts them there, and arriving by chance exactly where they are needed is not one; an object, sign, mechanism or rule earns its meaning on the page it first appears; a limit the plot leans on is stated in the text, and no later page breaks it; a character who refuses, gives up or discards a thing stays done with it, and a later page that has them want it back or take it up again says what changed; every reveal a page promises is answered on a later page, and every price paid leaves a mark a later page shows.
 No phrase is repeated from a neighbouring sentence.
 The text gives each page its feeling and its suspense, and fills what the summary leaves out: feelings, dialogue, and the ordinary business between the story's turns — going somewhere and arriving, waiting, approaching people, asking, being answered, a greeting, names given and heard, a thing tried and let go. That is filler, and the text invents it freely wherever the story jumps.
 Event is not filler, and what is fixed is what the story is made of: invent no character, creature, object, place or turn of the plot the story does not carry, and nothing that changes what happens, to whom, or what it costs. The moves between the story's states — a climb, a crossing, a getting there — are told plainly as they happen, never already finished when a page opens. A change of place, of what someone holds, or of the company they are among carries its path on the page.
