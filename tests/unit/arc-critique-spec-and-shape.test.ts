@@ -21,6 +21,20 @@ const input = (age = 5, extra: any = {}) => ({
 describe('the arc critique spec is one source', () => {
   beforeAll(async () => { await loadPromptTemplates(); });
 
+  /**
+   * 6e3b476b0 removed the two per-PAGE questions on the grounds that the arc has
+   * no pages, but the spec never STATED the prohibition, so faults kept citing
+   * them: the arc-2 critique on a staging run cites "Page 9", "After page 11",
+   * "page 13", "page 18" and "page 6". The division happens two stages later.
+   */
+  it('no fault may cite a page number — and both templates are told so', () => {
+    const line = 'The arc has no pages: no fault names a page number or a position in pages.';
+    expect(arcCritiqueSpec()).toContain(line);
+    expect(arcCritiqueSpec({ retell: true })).toContain(line);
+    expect(buildArcCreatePrompt(input(), 18, {})).toContain(line);
+    expect(buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '')).toContain(line);
+  });
+
   it('both templates fill from the same builder, with no placeholder left', () => {
     const create = buildArcCreatePrompt(input(), 18, {});
     const retell = buildArcRetellPrompt(input(), 18, 'ARC 1: ...', '');
