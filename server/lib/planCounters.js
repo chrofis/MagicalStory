@@ -144,6 +144,38 @@ function classifyShot(segment) {
 }
 
 /**
+ * Rewrite a plan line's shot column to the shot the finished brief carries.
+ *
+ * The plan line states the shot the PLANNER asked for. The scene review then
+ * deliberately rewrites a close-up to medium (`prompts/scene-review.txt` rules
+ * 7b and 10) and nothing updated the plan, so the page-text writer — which is
+ * told the PLAN line names the shot — read a shot the picture does not have on
+ * 6.0% of pages (25 of 417 over 27 staging stories, 21 of them close-up into
+ * medium).
+ *
+ * Only the shot column moves. An unrecognised column on either side is left
+ * alone rather than overwritten: 'other' may not be a shot at all, and a plan
+ * line whose first segment is not a shot must not lose it.
+ *
+ * @param {string} planLine
+ * @param {string} briefShot - the brief's own `shot` value
+ * @returns {{planLine: string, changed: boolean, from: string|null, to: string|null}}
+ */
+function refreshPlanShot(planLine, briefShot) {
+  const line = String(planLine || '');
+  const shot = String(briefShot || '').trim();
+  const unchanged = { planLine: line, changed: false, from: null, to: null };
+  if (!line || !shot) return unchanged;
+  if (planSegments(line).length < 2) return unchanged;
+  const from = classifyShot(planSegments(line)[0]);
+  const to = classifyShot(shot);
+  if (from === 'other' || to === 'other' || from === to) return unchanged;
+  const idx = line.search(SEGMENT_SPLIT);
+  if (idx < 0) return unchanged;
+  return { planLine: shot + line.slice(idx), changed: true, from, to };
+}
+
+/**
  * Candidate character names in a piece of plan/beat text.
  *
  * Capitalised runs, minus the stopwords, minus anything sitting directly after
@@ -1230,6 +1262,7 @@ module.exports = {
   calendarNamesForLocale,
   planSegments,
   classifyShot,
+  refreshPlanShot,
   nameCandidates,
   resolveCast,
   canonicalName,

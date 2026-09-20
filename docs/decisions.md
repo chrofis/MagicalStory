@@ -51281,3 +51281,59 @@ cases, including reproducing the shipped title of the original run
 `tests/unit/story-text-replay-title-marker.test.ts`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-20 — The plan line's shot column is refreshed from the finished brief, so it names the shot that shipped
+
+**Context:** The page-text writer is told "Each page's PLAN line names the shot,
+who is in frame, the single instant the picture shows" and "Never contradict a
+page's illustration". But the plan line is written at stage 1 and frozen once
+the Art Director runs at stage 4 — nothing re-derives it. Meanwhile the scene
+review DELIBERATELY moves the shot: `prompts/scene-review.txt` rule 7b
+`[closeup_below_waist]` ("Rewrite that page's `shot` to `medium`") and rule 10
+`[closeup_environment]` both order a close-up to become medium. So the writer
+was told the plan names the shot while the picture had a different one, and the
+drift is a designed behaviour of the review, not a bug in it.
+
+Nothing compared the two. `server/lib/sceneBriefCheck.js` has taken `planLine`
+in its signature since it was written — documented as "for element coverage" —
+and the parameter appears nowhere else in the file.
+
+**Measured** by replaying the refresh over 30 recent staging stories, 447 page
+pairs (plan line from `beatsReviewReport.pagePlan`, brief shot from
+`sceneMetadata.fullData.shot` falling back to the raw `"shot"` key in
+`sceneDescription`):
+
+- **50 of 447 pages (11.2%)** carry a plan shot the finished brief contradicts.
+- Direction is dominated by the review rules: close-up→medium 24,
+  ultra-wide→wide 16, medium→wide 3, high-angle→wide 3, and 4 others.
+- `refreshPlanShot` corrects 50 of 50, and changes **0** non-drifting pages.
+
+(An earlier exact-token count put this at 6.0%; classifying both sides through
+the project's own `shotVocabulary` rather than comparing tokens adds the
+ultra-wide↔wide and high-angle→wide pairs, which are real class disagreements.)
+
+**Decision:** In `runStoryText`, before the writer prompt is built, each beat's
+plan line has its shot column rewritten to the finished brief's shot.
+`refreshPlanShot` (server/lib/planCounters.js) touches the shot column only, and
+only when both sides classify to a KNOWN and different shot — an unrecognised
+column on either side is left alone, because it may not be a shot at all.
+
+`beatsReviewReport.pagePlan` is captured before the Art Director runs and is
+deliberately NOT updated: it keeps its meaning as the division the planner
+decided, while the plan line the writer and the downstream page data see means
+what shipped.
+
+**Rationale:** The alternative — binding the Art Director to the plan's shot —
+collides head-on with the review rules that order the rewrite, so one of the two
+would have to be reversed. Refreshing the plan is the change that makes the
+writer's own contract true without touching a rule that is working as intended.
+Only the shot half is mechanical; the cast and instant halves need a model and
+are NOT addressed here (cast drift measured separately at ~9%, a lower bound).
+
+**Touched:** `server/lib/planCounters.js` (`refreshPlanShot`),
+`server/lib/beatsPipeline.js` (`runStoryText`),
+`tests/unit/plan-shot-refresh.test.ts`
+
+**Status:** ✅ active

@@ -1,6 +1,6 @@
 
 
-const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges } = require('./planCounters');
+const { runPlanCounters, collectPlaceNames, castLostByReplan, reviewPlanChanges, refreshPlanShot } = require('./planCounters');
 const { lookupByName } = require('./castResolver');
 const { textZoneRulesActive } = require('../config/runtime');
 const { commissionedChildBand, applySecondaryAgeBand } = require('./inventedAgeBand');
@@ -3129,6 +3129,25 @@ ${bibleBody}` : bibleBody;
    */
   async function runStoryText(finalExpansions = []) {
     await checkCancellation();
+    // The plan line's shot is what the planner ASKED for; the brief's is what
+    // the Art Director drew, and the scene review deliberately rewrites a
+    // close-up to medium without touching the plan. The writer is told the PLAN
+    // line names the shot, so from here on it names the shot that shipped.
+    // `beatsReviewReport.pagePlan` was captured before the Art Director ran and
+    // keeps its meaning: the division the planner decided.
+    const shotMoves = [];
+    for (const b of beats) {
+      const brief = (finalExpansions || []).find(x => x && x.pageNumber === b.pageNumber);
+      if (!brief || !brief.brief) continue;
+      const shot = (extractSceneMetadata(brief.brief) || {}).shot;
+      const next = refreshPlanShot(b.planLine, shot);
+      if (!next.changed) continue;
+      b.planLine = next.planLine;
+      shotMoves.push(`p${b.pageNumber} ${next.from}->${next.to}`);
+    }
+    if (shotMoves.length) {
+      log.info(`🎬 [BEATS] Plan shot refreshed from the finished brief on ${shotMoves.length} page(s): ${shotMoves.join(', ')}`);
+    }
     const withBrief = (finalExpansions || []).filter(x => x && x.brief).length;
     log.info(`🪜 [BEATS] Step 6 page text: ${withBrief}/${beats.length} page(s) carry a locked scene brief`);
     if (!withBrief) {
