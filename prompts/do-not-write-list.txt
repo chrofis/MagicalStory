@@ -16,6 +16,4 @@ These appear nowhere in the story text or scene prose. Forbidden at write time, 
 
 **Gesture re-use cap:** every gesture (hug, smile, wink, shrug, nod, fist-bump, high-five, thumbs up, pinky promise, silly salute, leaning shoulder-to-shoulder) appears at most ONCE in the entire story. The second time, vary it.
 
-**Scene prose verbs (banned in SCENE blocks only — see line above on plain concrete verbs):** hovers, cradled, perched upon, rests gently against. Use plain concrete verbs: holds, sits on, reaches for, walks toward, gazes at.
-
-**Use instead — for support, connection, warmth:** standing closer, walking side by side, sharing food, helping with a task; warm smile, wink, raised eyebrows, eyes lighting up; fist bump, high five, thumbs up, silly salute, pinky promise; leaning in, sitting next to, making eye contact, a quick nudge.
+**Use instead — for support, connection, warmth (the re-use cap above applies to each of these too):** standing closer, walking side by side, sharing food, helping with a task; warm smile, wink, raised eyebrows, eyes lighting up; fist bump, high five, thumbs up, silly salute, pinky promise; leaning in, sitting next to, making eye contact, a quick nudge.
