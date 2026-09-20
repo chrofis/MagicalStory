@@ -6595,6 +6595,36 @@ function buildChallengeIdeasSection(inputData, count = 25) {
 const REPLAN_MUST_FIX_CHECKS = new Set([4, 8]);
 
 /**
+ * THE SHOT-DISTRIBUTION BLOCK, declared ONCE (2026-09-20).
+ *
+ * These six codes are must-fix — the re-plan is obliged to answer them — but
+ * they are EXEMPT from the convergence test that decides whether a re-plan
+ * round is kept or thrown away. The two things are not the same question:
+ *
+ *   MANDATE     — "must the round address this finding?"  → `replanRank()`
+ *   CONVERGENCE — "did the round make the book better?"   → `convergenceMustFixCount()`
+ *
+ * A shot finding is satisfied by relabelling one page's shot word; a cast or
+ * focal finding costs the book a picture. Counting both in one raw integer lets
+ * four cheap shot clears pay for a lost wanted picture. Measured on
+ * job_1789853503332_riqncqg1i: round 2 rewrote 17 of 18 pages and moved the
+ * cast/focal set from [NO_PEOPLELESS_PAGE, NO_COMMISSIONED_ON_PAGE, Q4, Q4, Q8]
+ * to [NO_PEOPLELESS_PAGE, NO_COMMISSIONED_ON_PAGE, Q4, Q4, Q4] — Q4 wanted-
+ * picture findings 2 → 3, worse — while SHOT_ULTRAWIDE_COUNT fell, so the raw
+ * total read 6 → 5 and the round would have been KEPT. That is precisely the
+ * loss the REPLAN_MUST_FIX_CHECKS header records for the rejected Q5
+ * experiment, arriving through the total instead of through the mandate.
+ *
+ * This is the ONE list of which codes are shot codes on the re-plan side:
+ * REPLAN_MUST_FIX_CODES below spreads it rather than repeating it, so the two
+ * cannot drift.
+ */
+const REPLAN_CONVERGENCE_EXEMPT_CODES = new Set([
+  'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_CLOSEUP_COUNT', 'SHOT_ULTRAWIDE_COUNT',
+  'SHOT_AERIAL_COUNT', 'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION',
+]);
+
+/**
  * Counter codes that outrank the rest: a commissioned character the division
  * left out. Everything else a counter measures — shot distribution, repetition,
  * consecutive-page sameness — is a preference next to these.
@@ -6649,8 +6679,11 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // The planner was complying. It now states the same tiered table these
   // counters measure (shotVocabulary.SHOT_FLOOR_TIERS), so a must-fix round is
   // spent on a spread the planner was actually asked for.
-  'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_CLOSEUP_COUNT', 'SHOT_ULTRAWIDE_COUNT',
-  'SHOT_AERIAL_COUNT', 'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION',
+  //
+  // They are spread from REPLAN_CONVERGENCE_EXEMPT_CODES above, which is the
+  // single declaration of the block: must-fix for the MANDATE, exempt from the
+  // CONVERGENCE test (2026-09-20 — see that header for the measured instance).
+  ...REPLAN_CONVERGENCE_EXEMPT_CODES,
   // THE HISTORY THAT DECISION REVERSES, kept rather than deleted:
   // NOT HERE, DELIBERATELY: SHOT_NO_CAMERA_POSITION (owner, 2026-09-19). Camera
   // position became expressible on a page only today, and the measured baseline
@@ -6677,6 +6710,29 @@ function replanRank(finding) {
   if (finding.check != null && REPLAN_MUST_FIX_CHECKS.has(Number(finding.check))) return 'must';
   if (finding.code && REPLAN_MUST_FIX_CODES.has(finding.code)) return 'must';
   return 'also';
+}
+
+/**
+ * Does this finding COUNT toward convergence? Deliberately a different question
+ * from `replanRank()`, and deliberately named so a reader cannot read one as
+ * the other: the rank is the MANDATE (the re-plan must answer it), this is the
+ * MEASURE (whether the round earned its keep). Must-fix minus the exempt block.
+ */
+function countsTowardConvergence(finding) {
+  if (replanRank(finding) !== 'must') return false;
+  if (finding && typeof finding !== 'string' && finding.code
+      && REPLAN_CONVERGENCE_EXEMPT_CODES.has(finding.code)) return false;
+  return true;
+}
+
+/**
+ * The cast/focal must-fix count of a plan check — the number the round-keeping
+ * decision is made on. Shot findings are excluded (see
+ * REPLAN_CONVERGENCE_EXEMPT_CODES); they still enter the re-plan's MUST FIX
+ * section, they just cannot buy a lost picture.
+ */
+function convergenceMustFixCount(check) {
+  return ((check && check.findings) || []).filter(countsTowardConvergence).length;
 }
 
 /**
@@ -10022,6 +10078,9 @@ module.exports = {
   REPLAN_CHANGES_FORMAT,
   PLAN_CHANGE_VOCABULARY,
   replanRank,
+  countsTowardConvergence,
+  convergenceMustFixCount,
+  REPLAN_CONVERGENCE_EXEMPT_CODES,
   findingPages,
   buildArcReviewPrompt,
   buildArcAuditPrompt,

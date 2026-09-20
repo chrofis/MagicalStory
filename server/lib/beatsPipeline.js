@@ -105,6 +105,8 @@ const {
   buildReplanSection,
   parsePlanChanges,
   replanRank,
+  convergenceMustFixCount,
+  countsTowardConvergence,
   findingPages,
   buildClothingReviewPrompt,
   parseClothingReview,
@@ -1408,10 +1410,20 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // that does not reduce the must-fix count is not converging — it is
       // rolling the dice on every page at once. Such a round is DISCARDED and
       // the previous division stands, which makes the loop monotonic.
-      const mustFixCount = c => (c.findings || []).filter(f => replanRank(f) === 'must').length;
+      //
+      // THE COUNT IS THE CAST/FOCAL MUST-FIX COUNT, NOT THE RAW TOTAL
+      // (2026-09-20). Shot-distribution findings are must-fix — the re-plan is
+      // obliged to answer them — but they are exempt from THIS measure
+      // (promptBuilders.REPLAN_CONVERGENCE_EXEMPT_CODES). A shot finding is
+      // cleared by relabelling one page's shot word; a cast or focal finding
+      // costs the book a picture, so a raw total lets cheap shot clears pay for
+      // a lost wanted picture. Measured on job_1789853503332_riqncqg1i, whose
+      // round 2 rewrote 17 of 18 pages, took Q4 wanted-picture findings 2 -> 3
+      // and dropped its Q8 ending, yet read 6 -> 5 on the total because one
+      // ultra-wide finding fell.
       let bestBeats = beats;
       let bestPagePlan = pagePlan;
-      let bestMustFix = mustFixCount(check1);
+      let bestMustFix = convergenceMustFixCount(check1);
       for (let round = 1; round <= MAX_REPLAN_ROUNDS; round++) {
         await checkCancellation();
         await stage(5, 'Re-dividing the named pages...', { next: 18, ms: 45000 });
@@ -1648,21 +1660,29 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           changeRefusals: reviewRefusals,
         };
         replanRounds.push(roundRecord);
+        // Every surviving must-fix finding — what the NEXT round is mandated to
+        // answer, and what the ships-as-it-stands warning names.
         const stillMustFix = (check2.findings || []).filter(f => replanRank(f) === 'must');
-        if (stillMustFix.length >= bestMustFix && round > 1) {
-          log.warn(`⚠️ [BEATS] Round ${round} did not reduce must-fix (${bestMustFix} → ${stillMustFix.length}) — discarding it, the previous division stands`);
-          gl.warn('beats_replan_discarded', `Round ${round} did not reduce must-fix findings (${bestMustFix} → ${stillMustFix.length}) — the round was discarded and the previous division stands`, null, {
-            round, before: bestMustFix, after: stillMustFix.length,
+        // The subset the round-keeping decision is made on: cast/focal only.
+        const stillConverging = stillMustFix.filter(countsTowardConvergence);
+        const shotOnly = stillMustFix.length - stillConverging.length;
+        if (stillConverging.length >= bestMustFix && round > 1) {
+          const detail = `cast/focal must-fix ${bestMustFix} → ${stillConverging.length}`
+            + ` (${stillMustFix.length} must-fix in total, ${shotOnly} of them shot-distribution, which do not count toward convergence)`;
+          log.warn(`⚠️ [BEATS] Round ${round} did not reduce the cast/focal must-fix count (${detail}) — discarding it, the previous division stands`);
+          gl.warn('beats_replan_discarded', `Round ${round} did not reduce the cast/focal must-fix count (${detail}) — the round was discarded and the previous division stands`, null, {
+            round, before: bestMustFix, after: stillConverging.length,
+            totalMustFixAfter: stillMustFix.length, shotMustFixAfter: shotOnly,
           });
           roundRecord.kept = false;
-          roundRecord.discardReason = `did not reduce must-fix findings (${bestMustFix} → ${stillMustFix.length})`;
+          roundRecord.discardReason = `did not reduce the cast/focal must-fix count (${detail})`;
           beats = bestBeats;
           pagePlan = bestPagePlan;
           break;
         }
         bestBeats = beats;
         bestPagePlan = pagePlan;
-        bestMustFix = stillMustFix.length;
+        bestMustFix = stillConverging.length;
         if (stillMustFix.length === 0) break;
         if (round === MAX_REPLAN_ROUNDS) {
           // Ships with the fault named. A division is never withheld from a

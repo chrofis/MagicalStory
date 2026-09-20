@@ -50727,3 +50727,70 @@ is the open alternative, and is a prompt-side change the owner should see first.
 (corrected comment), `tests/unit/cast-cap-and-peopleless-page.test.ts`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-20 — The re-plan convergence test counts CAST/FOCAL must-fix findings, not the raw must-fix total
+
+**Context:** `beatsPipeline.js` decides whether to keep or discard a re-plan
+round by comparing must-fix counts before and after: `stillMustFix.length >=
+bestMustFix && round > 1` discards the round. That comparison was a raw integer
+over every finding `replanRank()` calls `'must'`, with no notion of class. On
+2026-09-20 six shot-distribution codes joined `REPLAN_MUST_FIX_CODES`
+(`SHOT_MEDIUM_WIDE_EXCESS`, `SHOT_CLOSEUP_COUNT`, `SHOT_ULTRAWIDE_COUNT`,
+`SHOT_AERIAL_COUNT`, `SHOT_OTS_COUNT`, `SHOT_NO_CAMERA_POSITION`). A shot
+finding is satisfied by relabelling one page's shot word; the cast and focal
+findings the test previously protected cost the book a picture. Under the new
+floors 0 of 25 stored books pass and a typical book raises 4–5 shot findings at
+once, so the total the test reads is now dominated by the cheap class.
+
+Measured, staging `job_1789853503332_riqncqg1i`: its round 2 rewrote 17 of 18
+pages and moved the cast/focal set from `[NO_PEOPLELESS_PAGE,
+NO_COMMISSIONED_ON_PAGE, Q4, Q4, Q8]` to `[NO_PEOPLELESS_PAGE,
+NO_COMMISSIONED_ON_PAGE, Q4, Q4, Q4]` — Q4 wanted-picture findings 2 → 3
+(worse), Q8 dropped off. The raw total stayed 5 under the code set of the day,
+so the round was discarded. Under the 12-code set the total reads 6 → 5 because
+`SHOT_ULTRAWIDE_COUNT` fell, and the round would have been KEPT. That is exactly
+the loss the `REPLAN_MUST_FIX_CHECKS` header records for the rejected Q5
+experiment — "churned every page of the division, and cost the book its Q4
+wanted pictures and its Q8 ending" — arriving through the total instead of
+through the mandate.
+
+**Decision (owner):** Shot codes stay must-fix for the MANDATE — the re-plan
+must still answer them, `replanRank()` is unchanged in meaning — but they are
+excluded from the CONVERGENCE test. The round-keeping decision is made on the
+cast/focal must-fix count alone: a round that raises the cast/focal count is
+discarded even if it cleared every shot finding. `promptBuilders.js` declares
+the six codes ONCE as `REPLAN_CONVERGENCE_EXEMPT_CODES`, and
+`REPLAN_MUST_FIX_CODES` spreads that set rather than repeating it, so the two
+cannot drift. Two explicitly-named helpers keep the questions apart:
+`replanRank()` answers "must the round address this?", `countsTowardConvergence()`
+/ `convergenceMustFixCount()` answer "did the round earn its keep?". The old
+comparison is replaced, not kept alongside. The discard log line and
+`roundRecord.discardReason` now state which count moved and how many of the
+surviving must-fix findings were shot-distribution, so a stored report
+distinguishes a shot-only round from a cast/focal regression.
+
+**Rationale:** Two costs that differ by an order of magnitude were being added
+into one integer, which let four cheap shot clears buy a lost wanted picture.
+Replayed over stored `beatsReviewReport` rows on staging (71 books with a report
+in 30 days, 28 with a recheck, 2 with a discarded round — rung 1, zero paid
+calls): `job_1789853503332_riqncqg1i` round 2 reads 6 → 5 KEEP under the raw
+total and 5 → 5 DISCARD under the classed count, the one verdict that flips;
+`job_1789759147125_p08djwhbl` round 2 is DISCARD either way (2 → 4). 7 of the 28
+stored rechecks carry a must-fix total inflated by shot findings, i.e. 7 books
+where a shot-only round could have bought a regression.
+
+**Not changed, and the owner should decide it separately:** `&& round > 1` means
+round 1 is never discardable, so with `MAX_REPLAN_ROUNDS = 2` the convergence
+test can fire at most once per book. That is independent of this defect and was
+left exactly as it was.
+
+**Touched:** `server/lib/promptBuilders.js`
+(`REPLAN_CONVERGENCE_EXEMPT_CODES`, `countsTowardConvergence`,
+`convergenceMustFixCount`, exports), `server/lib/beatsPipeline.js` (the
+convergence comparison, the discard log line and `discardReason`),
+`server/lib/storyHelpers.js` (facade re-exports),
+`tests/unit/replan-convergence-class.test.ts`
+
+**Status:** ✅ active
