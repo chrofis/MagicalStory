@@ -626,7 +626,19 @@ async function runVisualBibleLabelRound(visualBible, { model, language, gl, log:
 // catalogue ids each book was offered, and the next book's draw filters them
 // out — it simply never sees them. No prompt anywhere mentions a previous
 // story, and there is no instruction for the creator to misread.
-const PRIOR_STORY_LIMIT = 3;
+// How many earlier books the draw may remember. Raised 3 -> 12 (2026-09-20)
+// once the exclusion stopped being all-or-nothing: the draw now sheds the
+// OLDEST book's ids one book at a time until its pool clears the floor, so
+// offering more books costs nothing — an unaffordable one is simply dropped
+// instead of collapsing the whole memory.
+//
+// The EFFECTIVE memory is band-limited, not limited by this number. The 3-5
+// band has only 139 eligible entries, so at a draw of 25 it tops out around 3
+// books before the floor bites; 6-8 (336) and 9-12 (256) carry far more. Every
+// story's generationLog records effective-vs-offered, so the ceiling is
+// measured rather than assumed. Raising this further buys the young band
+// nothing — the real lever there is growing the 3-5 band of the catalogue.
+const PRIOR_STORY_LIMIT = 12;
 
 /**
  * The challenge-catalogue ids this account's previous books were offered.
@@ -644,10 +656,15 @@ const PRIOR_STORY_LIMIT = 3;
  * Never throws: a failed lookup means the draw runs unfiltered, which is exactly
  * what happened before any of this existed.
  *
- * @returns {Promise<{ids: number[], stories: number}>}
+ * Returned GROUPED BY BOOK, NEWEST FIRST (the SQL's `created_at DESC` ordering
+ * is the grouping's meaning, so it is preserved all the way to the caller). The
+ * draw sheds from the old end when the pool cannot carry the whole list, which
+ * it can only do if it knows where one book's ids end and the next begin.
+ *
+ * @returns {Promise<{idsByStory: number[][], stories: number}>}
  */
 async function loadUsedChallengeIds(jobId, gl = NOOP_LOG) {
-  if (!jobId) return { ids: [], stories: 0 };
+  if (!jobId) return { idsByStory: [], stories: 0 };
   try {
     const { dbQuery } = require('../services/database');
     const rows = await dbQuery(
@@ -665,19 +682,16 @@ async function loadUsedChallengeIds(jobId, gl = NOOP_LOG) {
         LIMIT ${PRIOR_STORY_LIMIT}`,
       [String(jobId)]
     );
-    const ids = new Set();
-    let stories = 0;
+    const idsByStory = [];
     for (const row of rows || []) {
-      const own = (Array.isArray(row.ids) ? row.ids : []).map(Number).filter(Number.isFinite);
-      if (!own.length) continue;
-      stories += 1;
-      for (const id of own) ids.add(id);
+      const own = [...new Set((Array.isArray(row.ids) ? row.ids : []).map(Number).filter(Number.isFinite))];
+      if (own.length) idsByStory.push(own);
     }
-    return { ids: [...ids], stories };
+    return { idsByStory, stories: idsByStory.length };
   } catch (err) {
     log.warn(`⚠️ [BEATS] Prior-challenge lookup failed (${err.message}) — challenges drawn without cross-story memory`);
     gl.warn('arc_variety_failed', `Prior-challenge lookup failed: ${err.message}`);
-    return { ids: [], stories: 0 };
+    return { idsByStory: [], stories: 0 };
   }
 }
 
@@ -845,14 +859,22 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   // mentions a previous story. The ids are persisted next to the lines so the
   // next book can exclude this one.
   const priorIds = await loadUsedChallengeIds(jobId, gl);
-  if (priorIds.ids.length > 0) {
-    gl.info('arc_variety', `Excluding ${priorIds.ids.length} catalogue challenge(s) offered to ${priorIds.stories} earlier book(s) on this account`, null, {
-      stories: priorIds.stories, excludedIds: priorIds.ids,
+  const draw = drawChallengeIdeas(inputData, { excludeIds: priorIds.idsByStory });
+  if (priorIds.stories > 0) {
+    // EFFECTIVE, not offered. The draw sheds the oldest books whose ids its
+    // band cannot afford, so the number that matters — and the one a story's
+    // generationLog has to show — is how much memory actually survived.
+    const kept = priorIds.idsByStory.slice(0, draw.effectiveStories);
+    const excludedIds = [...new Set(kept.flat())];
+    gl.info('arc_variety', `Excluding ${excludedIds.length} catalogue challenge(s) from ${draw.effectiveStories} of ${priorIds.stories} earlier book(s) on this account`
+      + (draw.effectiveStories < priorIds.stories ? ` — the oldest ${priorIds.stories - draw.effectiveStories} shed, this age band's pool cannot carry them` : ''), null, {
+      storiesOffered: priorIds.stories, storiesEffective: draw.effectiveStories, excludedIds,
     });
   }
-  const draw = drawChallengeIdeas(inputData, { excludeIds: priorIds.ids });
   const challengeIdeas = draw.section;
   const challengeDrawIds = draw.ids;
+  // Filled by the re-telling below (the only call that reports its choices).
+  let challengeTakenIds = [];
   const challengeDraw = challengeIdeas.split('\n').filter(l => l.startsWith('- ')).map(l => l.slice(2));
   if (challengeDraw.length) gl.info('challenge_draw', `Drew ${challengeDraw.length} challenge idea(s) for the arc plan`, null, { challengeDraw, challengeDrawIds });
   let approvedArc = '';
@@ -989,7 +1011,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // stays in the trail via each panel entry's `letter` + `model`.
       panel.forEach((p, i) => { p.letter = String.fromCharCode(65 + i); });
       const solutionsText = panel.map(p => `## PANELIST ${p.letter}\n${p.text}`).join('\n\n');
-      const retellPrompt = buildArcRetellPrompt(inputData, pageCount, currentBlock, solutionsText);
+      const retellPrompt = buildArcRetellPrompt(inputData, pageCount, currentBlock, solutionsText, { challengeIdeas });
       if (!retellPrompt) throw new Error('arc-retell template unavailable');
       let retellRes = null;
       let retold = null;
@@ -1003,6 +1025,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         }
       }
       approvedArc = retold.finalArc;
+      // Which of the drawn challenges this book actually built on, by catalogue
+      // id — the join between what was offered and what shipped. The last
+      // re-telling wins: it is the one whose arc becomes the story.
+      challengeTakenIds = retold.takenIds || [];
       // The critique travels to the beats prompt together with the re-telling's
       // contract lines: what was already fixed, and which scenes and turns must
       // survive the page division untouched (owner refinement, 2026-08-30 —
@@ -3301,7 +3327,7 @@ ${bibleBody}` : bibleBody;
   // trimmed, age-clamped, landmark-linked. The caller prefers it over a
   // re-parse of rawOutline so the two can never diverge (the transcript is
   // kept in step by syncVisualBibleSection; the re-parse is the fallback).
-  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneExpansionReport, sceneReviewReport };
+  return { title, titleJudge, beats, pages, scenes, rawOutline, visualBible, meta, challengeDrawIds, challengeTakenIds, challengeDraw, arcReviewReport, beatsReviewReport, clothingReviewReport, sceneExpansionReport, sceneReviewReport };
 }
 
 module.exports = { generateStoryViaBeats, applyReviewBibleCorrections, runVisualBibleLabelRound, resolvePipelineMode, PIPELINE_MODES, loadUsedChallengeIds, syncVisualBibleSection, replaceClothingSection, extractBibleSections, shippedReplanState, BIBLE_MARKERS, CLOTHING_MARKERS, AD_BIBLE_MARKERS };
