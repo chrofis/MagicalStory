@@ -220,9 +220,16 @@ describe('the roster contract is decidable, so one plan line yields one roster',
   });
 
   it('the PLANNER is told the same thing — a figure in the instant only is not in frame', () => {
+    // Stated ONCE, by the constant the template fills (2026-09-20): the
+    // hand-written bullet that used to say this alongside it was folded in,
+    // with its fourth-field clause carried over. The contract is pinned here,
+    // not the sentence that carries it.
+    const { PLAN_LINE_FIELD_CONTRACT } = require('../../server/lib/promptBuilders');
     const beats = fs.readFileSync(path.join(ROOT, 'prompts/story-beats.txt'), 'utf8');
-    expect(beats).toContain('The who column names every figure the picture shows.');
-    expect(beats).toContain('A figure that appears only in the instant or in what is true after is not in the picture');
+    expect(beats).toContain('{PLAN_LINE_FIELDS}');
+    expect(PLAN_LINE_FIELD_CONTRACT).toMatch(/complete cast of that picture/i);
+    expect(PLAN_LINE_FIELD_CONTRACT).toMatch(/not written into the instant at all/i);
+    expect(PLAN_LINE_FIELD_CONTRACT).toMatch(/named only in what is true after this page is not in the picture/i);
   });
 
   it('page 11 reads the same both ways once nothing outside the who column is expanded', () => {

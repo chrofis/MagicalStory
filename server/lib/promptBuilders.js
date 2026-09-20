@@ -7432,7 +7432,7 @@ const PLAN_LINE_CAST_RULE = "The plan line's second field is the complete cast o
  * cast, and the producer must not write one. Either alone leaves the other
  * side's behaviour undefined.
  */
-const PLAN_LINE_FIELD_CONTRACT = "The second field is the complete cast of that picture. Every person the instant stages — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. A figure the previous page staged does not carry into the next one as background.";
+const PLAN_LINE_FIELD_CONTRACT = "The second field is the complete cast of that picture. Every person the instant stages — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.";
 
 /**
  * ONE contract for an object that shows a different picture on different
