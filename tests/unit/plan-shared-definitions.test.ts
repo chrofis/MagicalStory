@@ -36,6 +36,18 @@ describe('planner and checker share one definition, not two copies', () => {
     expect(planner()).toContain('which picture does a child most want to see there');
   });
 
+  /**
+   * 455704f89 factored TWO_HEIGHTS_DEF out of story-beats.txt and left the
+   * hand-written tail sentence behind, so the built prompt stated the whole-cast
+   * clause twice, twenty words apart.
+   */
+  it('the definition is stated once in the built prompt, not once per copy', () => {
+    const p = planner();
+    for (const sentence of pb.TWO_HEIGHTS_DEF.split(/(?<=\.)\s+/).filter((x: string) => x.length > 25)) {
+      expect(p.split(sentence).length - 1, `duplicated: ${sentence}`).toBe(1);
+    }
+  });
+
   it('neither prompt ships an unfilled placeholder', () => {
     expect(planner().match(/\{[A-Z_]+\}/g) || []).toEqual([]);
     expect(checker().match(/\{[A-Z_]+\}/g) || []).toEqual([]);
