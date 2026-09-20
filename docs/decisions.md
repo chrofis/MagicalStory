@@ -50768,3 +50768,63 @@ line from the stored Q4 answer to exercise the parse and finding path.
 `tests/unit/plan-shared-definitions.test.ts`
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-20 — SUPERSEDES the paragraph-cap entry above: the cap changes nothing, and the writer overshoots the sentence budget on every page
+
+**Context:** The entry above claimed the "at most four paragraphs" clause was
+the load-bearing page-length ceiling, on the strength of Lab #1353 measuring
+sentences/page 6.8 → 8.4 after the clause was softened. That comparison was
+invalid. The 6.8 figure is the story's SHIPPED text, which has been through the
+pipeline's refine pass; the 8.4 is a `story_text_replay` result, which is the
+raw writer call with no refine. Refined prose was compared against raw prose and
+the refine pass was read as a rule effect.
+
+**Measured** properly, from `stories.data->'storyTextPrompts'->0->>'rawResponse'`
+— the original run's own raw writer output under the OLD prompt — against both
+replays of the same story on the same model:
+
+| arm | sentences/page | outside 3-6 | words/page |
+|---|---|---|---|
+| raw writer, old prompt (true before) | 8.8 | 17/18 | 74.4 |
+| Lab #1353, cap deleted | 8.4 | 15/18 | 74.3 |
+| Lab #1354, cap restored + precedence | 8.8 | 17/18 | 76.0 |
+| shipped text, after refine | 6.8 | 9/18 | 64.1 |
+
+**Decision:** The paragraph clause has no measurable effect on page length in
+either form. The current wording — the cap plus explicit precedence for the
+sentence count — is kept because it is the coherent statement of the rule, NOT
+because it controls length. No length claim may be attached to it.
+
+**Rationale:** The real finding is the one the bad comparison hid: the writer
+has always overshot its own sentence budget by roughly 50% — 8.8 sentences
+against a 3-6 band, 17 of 18 pages out of range — and the refine pass is what
+drags it back to 6.8, still 9 of 18 out of range. That is a live defect in the
+writer, not in the paragraph clause, and it is invisible in shipped text because
+refine masks it. Fixing it is open work.
+
+**Touched:** `prompts/story-text-from-beats.txt` (wording kept),
+`docs/decisions.md`
+
+**Status:** ✅ active — supersedes the length claim in the entry above
+
+---
+
+## 2026-09-20 — A Lab `story_text_replay` result is raw writer output; never compare it to shipped text
+
+**Context:** See the entry above. `story_text_replay` runs the page-text call
+and stops. Shipped page text has additionally been through the refine pass,
+which on one 18-page book cut 2.0 sentences and 10 words off the average page.
+
+**Decision:** Any before/after using a replay stage takes its BEFORE from the
+same stage — for the text writer, `storyTextPrompts[N].rawResponse`, which the
+pipeline stores for exactly this reason — never from `sceneImages[].text`.
+
+**Rationale:** One invalid comparison produced a confident false verdict, a
+shipped prompt revert and a decisions entry that had to be superseded within the
+hour. The two artefacts differ by a whole pipeline stage.
+
+**Touched:** `docs/decisions.md`
+
+**Status:** ✅ active
