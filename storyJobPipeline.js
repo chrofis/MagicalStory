@@ -6988,6 +6988,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (pipelineBookAuditRounds) {
       finalChecksReport = finalChecksReport || {};
       finalChecksReport.bookAuditRounds = pipelineBookAuditRounds;
+
+      // OBJECT SCALE — the cross-page prop-size check (2026-09-20). It reports
+      // to a HUMAN and fires no repair, so a field nobody reads is the same as
+      // a check that never ran. Surfaced from the LAST round that carries one,
+      // beside the other final checks the dev panel already reads.
+      const lastScale = [...pipelineBookAuditRounds].reverse().find(r => r && r.objectScale);
+      if (lastScale) finalChecksReport.objectScale = lastScale.objectScale;
     }
 
     // Per-round, per-method repair effectiveness (owner, 2026-09-13): which

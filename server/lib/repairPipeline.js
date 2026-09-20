@@ -1993,7 +1993,15 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         // off the page object, which was PRE-REFINE prose.
         const auditPages = buildAuditPages(rawImages, (pageNumber) => selectBestVersion(pageVersions.get(pageNumber) || []));
         const audit = auditPages.length > 0
-          ? await auditStoryBook({ id: consolidatorStoryId, sceneImages: auditPages }, { usageTracker })
+          // The BIBLE rides along (2026-09-20). `auditPages` is a projection —
+          // page number, final text, shipped bytes, cited object ids — and the
+          // object-scale check also needs the visual bible to know which props
+          // carry a declared size. Passing only the projection starved it: zero
+          // candidates, zero skips, no notEvaluated row, total silence in the
+          // live path. bookAudit now log.errors on a starved call.
+          ? await auditStoryBook(
+              { id: consolidatorStoryId, visualBible: storyData?.visualBible || visualBible || null, sceneImages: auditPages },
+              { usageTracker })
           : null;
         if (audit) {
           readerFindingsByPage.clear();
@@ -2036,6 +2044,13 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             textFaults: audit.byRoute.TEXT,
             pagesRead: audit.pagesRead,
             pagesSkipped: audit.pagesSkipped,
+            // OBJECT SCALE (2026-09-20). It was computed and then DROPPED here:
+            // the record is a hand-kept whitelist of fields, so a new audit
+            // field that nobody adds to it is discarded no matter how good the
+            // measurement was. Same class of bug as notEvaluated, degradedScene
+            // and threeStageResult. It fires no repair — it flags a human — so
+            // being stored IS the whole deliverable.
+            objectScale: audit.objectScale || null,
           });
           const record = bookAuditRounds[bookAuditRounds.length - 1];
           log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);

@@ -67,6 +67,12 @@ const { assertPromptFilled } = require('../services/prompts');
 // longer. A book of 25+ pages splits into calls of at most 24.
 const MAX_PAGES_PER_CALL = 24;
 
+/** Does this bible carry any entry in a collection the scale check can read? */
+function SCALE_COLLECTIONS_PRESENT(vb) {
+  const { SCALE_COLLECTIONS } = require('./objectScaleAudit');
+  return SCALE_COLLECTIONS.some(c => Array.isArray(vb?.[c]) && vb[c].length > 0);
+}
+
 // Every fault line, tagged with its route. LEADING WHITESPACE IS TOLERATED on
 // purpose: the judge sometimes nests a fault under the page it was reasoning
 // about, and an anchored `^FAULT` silently dropped exactly those — the audit
@@ -149,18 +155,33 @@ async function loadShippedImage(scene, { pool, imageLoader, storyId, activeVersi
  * A page with no resolvable image is dropped — half a page tells the judge
  * nothing about whether words and picture agree.
  *
+ * THE BRIEF'S OBJECT CITATIONS RIDE ALONG (2026-09-20). The projection used to
+ * emit `{pageNumber, text, imageData}` and nothing else, and the caller then
+ * handed that stripped list to `auditStoryBook` as the whole story. The
+ * object-scale check reads `sceneMetadata.objects` to learn which pages a prop
+ * is on, so it saw zero citations on every page, produced zero candidates AND
+ * zero skips, and recorded nothing at all — a check running in the live path,
+ * measuring nothing, silently. `citedIds` is carried here so the scale check
+ * has its input by construction, not by the caller remembering to pass it.
+ *
  * @param {Array} images        page objects carrying pageNumber, text, imageData
  * @param {Function} [pickVersion] (pageNumber) => version — the picked version
- * @returns {Array<{pageNumber:number, text:string, imageData:string}>}
+ * @returns {Array<{pageNumber:number, text:string, imageData:string, citedIds:string[]}>}
  */
 function buildAuditPages(images, pickVersion) {
+  const { citedIds } = require('./objectScaleAudit');
   const out = [];
   for (const img of images || []) {
     if (!img || typeof img.pageNumber !== 'number') continue;
     const picked = typeof pickVersion === 'function' ? pickVersion(img.pageNumber) : null;
     const imageData = picked?.imageData || img.imageData;
     if (!imageData) continue;
-    out.push({ pageNumber: img.pageNumber, text: img.text || '', imageData });
+    out.push({
+      pageNumber: img.pageNumber,
+      text: img.text || '',
+      imageData,
+      citedIds: [...citedIds(img)],
+    });
   }
   return out;
 }
@@ -521,6 +542,25 @@ async function auditStoryBook(storyData, opts = {}) {
     let scaleCandidates = [];
     const askedByObject = new Map();
     if (objectScaleEnabled) {
+      // STARVATION GUARD (2026-09-20). The object-scale check needs TWO inputs
+      // from the story blob: the visual bible (which props have a declared
+      // size) and each page's cited object ids. A caller that hands this
+      // function a stripped projection — `{ id, sceneImages: auditPages }`,
+      // which the live repair pipeline did — starves it of both, and the
+      // selector then returns zero candidates AND zero skips, so not even a
+      // `notEvaluated` row is written. A check that measures nothing while
+      // reporting nothing is the worst failure mode a measurement has. It is
+      // now LOUD and RECORDED, never silent.
+      const vb = storyData?.visualBible || null;
+      const bibleEmpty = !vb || !SCALE_COLLECTIONS_PRESENT(vb);
+      const noCitations = !(storyData?.sceneImages || []).some(s => scaleLib.citedIds(s).size > 0);
+      if (bibleEmpty || noCitations) {
+        const why = bibleEmpty
+          ? (vb ? 'visual bible carries no artifacts/vehicles collection' : 'visual bible absent from the story passed in')
+          : 'no page carries object citations';
+        log.error(`❌ [BOOK-AUDIT] object-scale check STARVED — ${why}. The caller passed a story without the scale check's inputs; it cannot measure anything.`);
+        notEvaluated.record('object_scale', 'missing_input', `object-scale check starved: ${why}`);
+      }
       const picked = scaleLib.selectScaleObjects(storyData, prepared.map(p => p.pageNumber));
       scaleCandidates = picked.candidates;
       for (const sk of picked.skipped) {

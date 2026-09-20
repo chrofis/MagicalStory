@@ -114,9 +114,19 @@ function baseId(id) {
   return m ? m[1] : (s || null);
 }
 
-/** The object ids a scene's Art Director brief cites, deduped, base form. */
+/**
+ * The object ids a scene's Art Director brief cites, deduped, base form.
+ *
+ * Three shapes, one answer: the full page object (`sceneMetadata.objects`), a
+ * page carrying `objects` directly, or an already-projected audit page carrying
+ * a flat `citedIds` array (bookAudit.buildAuditPages). The third exists because
+ * the audit is handed a PROJECTION of the book, not the book — and when the
+ * projection dropped the citations this check went silently blind.
+ */
 function citedIds(scene) {
-  const raw = (scene && scene.sceneMetadata && scene.sceneMetadata.objects) || (scene && scene.objects) || [];
+  const raw = (scene && scene.citedIds)
+    || (scene && scene.sceneMetadata && scene.sceneMetadata.objects)
+    || (scene && scene.objects) || [];
   const out = new Set();
   for (const o of (Array.isArray(raw) ? raw : [])) {
     const b = baseId(typeof o === 'string' ? o : (o && o.id));
