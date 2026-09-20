@@ -1202,6 +1202,30 @@ const NOT_INPAINTABLE_TYPES = new Set([
 ]);
 
 /**
+ * ONE predicate for "may inpaint be asked to do this?", given the DECLARED types
+ * of a consolidator fix. Never the instruction prose — classifying by reading
+ * text is what docs/SETTLED.md forbids.
+ *
+ * An entry with no types is left alone: older plans predate the field, and
+ * silently dropping their fixes would lose real pose work.
+ *
+ * It exists because the plan has TWO channels and the gate reached one. The
+ * 2026-08-28 fix ("the plan path needed the same gate as the fallback") landed
+ * on `per_character_fixes`; `scene_fix` stayed ungated, so a scene fix whose own
+ * `types` are all forbidden could still be sent. Measured on staging
+ * job_1789853503332_riqncqg1i: the front cover's plan carried
+ * `scene_fix.types: ['extra_character']` — the route the owner closed on
+ * 2026-09-13 after a removal erased a commissioned child — and nothing stopped
+ * it. It reached no model only because the consolidator happened to emit an
+ * empty instruction for it.
+ */
+function typesAreInpaintable(types) {
+  const list = Array.isArray(types) ? types.filter(Boolean) : [];
+  if (!list.length) return true;
+  return !list.every((t) => NOT_INPAINTABLE_TYPES.has(String(t).toLowerCase()));
+}
+
+/**
  * Types local repair (inpaint) handles well: additive or local edits to objects,
  * props, counts and expression. Deliberately NARROW — anything in
  * NOT_INPAINTABLE_TYPES is excluded by construction below, and composition /
@@ -1256,4 +1280,4 @@ function buildPreserveClause(preserve) {
 }
 
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

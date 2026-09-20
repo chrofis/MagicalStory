@@ -2988,7 +2988,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   //
   // Filtering on the DECLARED type, never on the description prose: classifying
   // by reading the text is what docs/SETTLED.md forbids.
-  const { NOT_INPAINTABLE_TYPES } = require('./repairLogic');
+  const { NOT_INPAINTABLE_TYPES, typesAreInpaintable } = require('./repairLogic');
   const inpaintableIssues = combinedIssues.filter(i => {
     const t = String(i.type || '').toLowerCase();
     if (!t) return true;                       // untyped: leave the old behaviour alone
@@ -3149,7 +3149,17 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     });
 
     const sceneInstrRaw = consolidatedPlan.scene_fix?.instruction || '';
-    const sceneInstr = stripNames(sceneInstrRaw, null);
+    // THE SCENE CHANNEL TAKES THE SAME GATE AS THE PER-CHARACTER ONE. The
+    // 2026-08-28 fix below reached `per_character_fixes` only, so a scene fix
+    // whose own declared types are all forbidden went through ungated — the
+    // front cover of job_1789853503332_riqncqg1i carried
+    // scene_fix.types ['extra_character'] and nothing stopped it.
+    const sceneTypes = consolidatedPlan.scene_fix?.types;
+    const sceneAllowed = typesAreInpaintable(sceneTypes);
+    if (!sceneAllowed) {
+      log.info(`[INPAINT PAGE] P${pageNumber}: dropping scene fix "${(Array.isArray(sceneTypes) ? sceneTypes : []).join('/')}" — not inpaintable, character repair or a page redo owns it`);
+    }
+    const sceneInstr = sceneAllowed ? stripNames(sceneInstrRaw, null) : '';
     // THE PLAN PATH NEEDED THE SAME GATE AS THE FALLBACK (owner, 2026-08-28).
     // NOT_INPAINTABLE_TYPES filtered `combinedIssues`, which only feeds the
     // consolidator-failed fallback. A plan's `per_character_fixes` bypassed it
@@ -3165,8 +3175,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // fixes would lose real pose work.
     const perCharSource = (consolidatedPlan.per_character_fixes || []).filter(p => {
       const types = Array.isArray(p?.types) ? p.types.filter(Boolean) : [];
-      if (!types.length) return true;
-      const blocked = types.every(t => NOT_INPAINTABLE_TYPES.has(String(t).toLowerCase()));
+      const blocked = !typesAreInpaintable(types);
       if (blocked) {
         log.info(`[INPAINT PAGE] P${pageNumber}: dropping "${types.join('/')}" fix for ${p.characterName || 'a character'} — not inpaintable, character repair owns it`);
       }

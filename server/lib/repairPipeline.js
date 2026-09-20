@@ -2559,7 +2559,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 grokRefImages: null,
               };
             }
-            return failed('inpaint produced no result');
+            // SAY WHICH OF THE THREE IT WAS. "inpaint produced no result" reads
+            // as an image-model failure and was recorded for all of them, so a
+            // page that never reached a model, one whose editor errored, and one
+            // whose editor returned nothing were indistinguishable in the round
+            // record — on job_1789853503332_riqncqg1i three of four failed
+            // repairs carried that one string and none of the causes survived.
+            return failed(
+              inpaintResult.error ? `inpaint edit failed: ${inpaintResult.error}`
+                : inpaintResult.instruction ? 'inpaint editor returned no image'
+                  : 'inpaint had no instruction to send (every finding was filtered or the plan left it empty)'
+            );
           }
           if (method === 'iterate') {
             const result = await executeIterateAction(img, latestEval);

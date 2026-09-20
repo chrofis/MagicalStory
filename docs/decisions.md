@@ -197,6 +197,67 @@ the new verbatim path, which produces no plan. Both are in `tasks/BACKLOG.md`.
 
 ---
 
+## 2026-09-20 — The consolidator plan has TWO channels; NOT_INPAINTABLE_TYPES gated one of them
+
+**Context:** A consolidator plan can carry an edit instruction in `scene_fix` or
+in `per_character_fixes`. The 2026-08-28 fix — "the plan path needed the same
+gate as the fallback" — added the `NOT_INPAINTABLE_TYPES` check to
+`per_character_fixes` only. `scene_fix` stayed ungated, so a scene fix whose own
+declared `types` were all forbidden could still be sent to the image editor.
+
+Replayed over every stored consolidator plan on staging — **89 stories, 2350
+plans**: 103 scene fixes carried only forbidden types, and **8 of those also
+carried a non-empty instruction**, so they would have been sent. All 8 are
+`extra_character` removals:
+
+    Remove the small figure at center-left (bbox [0.068, 0.604, 0.199, 0.651])
+    Remove the extra grey tomcat figure            (same tracked animal, 3 pages)
+    Remove the rabbit figure from the foreground
+    Remove the boy in yellow from center-foreground
+    Remove the white dog with black and tan patches and red collar
+    Remove the dog figure
+
+That is the exact failure the 2026-09-13 ruling closed `extra_character` for —
+a Grok whole-frame edit told to "remove this figure" erased a commissioned child
+from a cover. One of these eight names a child; four name tracked animals. The
+already-gated channel blocked 544 fixes over the same corpus.
+
+A second finding, separate: the round recorded the literal string "inpaint
+produced no result" for three distinct outcomes — a page that never reached a
+model, an editor that threw, and an editor that returned nothing. On
+`job_1789853503332_riqncqg1i` three of four failed repairs carried that one
+string and no cause survived in stored data.
+
+**Decision:**
+
+1. `typesAreInpaintable(types)` in `repairLogic.js` is the ONE predicate, used by
+   both channels in `inpaintPage`. Untyped fixes stay allowed — older plans
+   predate the field, and dropping them would lose real pose work. A MIXED fix
+   stays allowed: it still carries work the editor may legally do.
+
+2. The round records which of the three happened: `inpaint edit failed: <error>`,
+   `inpaint editor returned no image`, or `inpaint had no instruction to send`.
+
+**Rationale:** The set's membership is a routing decision with its own owner
+rulings and is untouched here — the defect was never which types are forbidden,
+it was that one of the two channels never asked. Sharing the predicate is what
+stops the pair drifting a third time. The error-reporting half is what made this
+cost a day to find: the message named a component that had not been called.
+
+**NOT changed, and worth recording:** an earlier reading of this session claimed
+`emotion` and `missing_element` were in NOT_INPAINTABLE_TYPES and that three
+failed repairs were closed routes. That reading was wrong — it came from a
+line-range extraction that ran past the set's closing bracket into
+`SAFE_REPAIRABLE_TYPES`. The set holds 16 entries, all identity, hair, clothing,
+scale or extra_character. `tests/unit/inpaint-scene-fix-gate.test.ts` pins that
+the five types those pages actually carried are permitted, so the claim cannot
+drift back.
+
+**Touched:** `server/lib/repairLogic.js` (`typesAreInpaintable`),
+`server/lib/images.js` (both plan channels), `server/lib/repairPipeline.js`
+(failure reason), `tests/unit/inpaint-scene-fix-gate.test.ts`.
+**Status:** ✅ active
+
 ## 2026-09-20 — Story chronology does not bind a cover; the book audit stops reporting one for showing the ending
 
 **Context:** The book audit reads the finished book in reading order and asks six
