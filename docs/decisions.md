@@ -197,6 +197,43 @@ the new verbatim path, which produces no plan. Both are in `tasks/BACKLOG.md`.
 
 ---
 
+## 2026-09-20 — `semanticResult.issues` is deleted: one field, one accessor
+
+**Context:** The entry below introduced `semanticFindings()` as a resolver over
+two field names and left open "which field the judge SHOULD write". Owner the
+same day: "Unify this. Delete the other variables." The resolver was a bridge,
+and keeping it as one is the second-path shape the no-fallbacks rule forbids.
+
+`semanticResult` is produced by `sceneValidator.evaluateSemanticFidelity`, which
+returns `{score, verdict, semanticIssues, usage}`. It has **never** emitted
+`issues` — confirmed by grep for any assignment and by 3669 stored objects in
+which `issues` is populated zero times. Five readers guarded for it anyway, and
+two test fixtures constructed it, which is why the phantom looked real.
+
+**Decision:** `semanticResult.issues` is deleted everywhere — server and client.
+`semanticFindings()` now reads exactly one field and is the only place that
+names it. The deleted readers:
+
+  - `repairPipeline.js` the defensive write-back, and the dead router's copy
+  - `client/src/hooks/useRepairWorkflow.ts` TWO dead loops that re-walked the
+    phantom after correctly walking the real field — they would have
+    double-reported every finding had it ever been populated
+  - the resolver's own two-field branch
+
+Two unit fixtures that built `semanticResult: { issues: [...] }` are corrected to
+the shape the producer actually emits. They passed only because the code
+tolerated both names, and they were the reason the phantom survived review.
+
+**Rationale:** The bug was never which name is canonical — it was that a name
+nothing writes was read in five places, and one truthiness trap made the reading
+order decide whether findings existed at all. Deleting the unwritten name removes
+the question. A unit test now keeps it out of all seven files.
+
+**Touched:** `server/lib/repairLogic.js`, `server/lib/repairPipeline.js`,
+`client/src/hooks/useRepairWorkflow.ts`, `tests/unit/semantic-findings-resolver.test.ts`,
+`tests/unit/repair-gate-cap.test.ts`, `tests/unit/repair-method.test.ts`.
+**Status:** ✅ active
+
 ## 2026-09-20 — An empty-but-present array is truthy: the repair executor never saw the semantic judge's findings
 
 **Context:** `semanticResult` exposes the semantic judge's findings under two

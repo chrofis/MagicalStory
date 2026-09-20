@@ -154,7 +154,8 @@ test('CRITICAL action + MAJOR clothing → inpaint, reason names the precedence'
     fixableIssues: [],
     // The CRITICAL also lives in the semantic pool, as on the real page —
     // the inline fallback counts the evaluator pools, not the plan.
-    semanticResult: { issues: [criticalAction] },
+    // the producer emits `semanticIssues`; `issues` never existed on this object
+    semanticResult: { semanticIssues: [criticalAction] },
     consolidatedPlan: { deduped_issues: [criticalAction, clothingMajor('Ethan')] },
   }, null);
   assert.strictEqual(decision.method, 'inpaint', `expected inpaint, got ${decision.method} (${decision.reason})`);

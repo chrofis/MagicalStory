@@ -430,14 +430,6 @@ export function useRepairWorkflow({
               fix: si.expected ? `Expected: ${si.expected}` : '',
             }, 'semantic eval');
           }
-          for (const si of (evalPage.semanticResult.issues || [])) {
-            addIssue({
-              description: findingText(si),
-              severity: si.severity?.toLowerCase() || 'medium',
-              type: si.type || 'semantic',
-              fix: '',
-            }, 'semantic eval');
-          }
         }
 
         // Source 4: Consistency regen issues (from server evaluation data)
@@ -610,14 +602,6 @@ export function useRepairWorkflow({
                 severity: si.severity?.toLowerCase() || 'medium',
                 type: si.type || 'semantic',
                 fix: si.expected ? `Expected: ${si.expected}` : '',
-              }, 'semantic eval');
-            }
-            for (const si of (evalPage.semanticResult.issues || [])) {
-              addIssue({
-                description: findingText(si),
-                severity: si.severity?.toLowerCase() || 'medium',
-                type: si.type || 'semantic',
-                fix: '',
               }, 'semantic eval');
             }
           }

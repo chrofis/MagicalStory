@@ -115,9 +115,7 @@ function chooseRepairStrategy(evaluation) {
   // catastrophic issue fall through to inpaint.
   const isCritical = (s) => /catastrophic|critical/i.test(String(s || ''));
   const fixable = evaluation.fixableIssues || [];
-  const semIssues = evaluation.semanticResult?.semanticIssues
-    || evaluation.semanticResult?.issues
-    || [];
+  const semIssues = require('./repairLogic').semanticFindings(evaluation.semanticResult);
   const criticalCount = fixable.filter(i => isCritical(i.severity)).length
     + semIssues.filter(i => isCritical(i.severity)).length;
 
@@ -1233,7 +1231,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           if (inpaintEval.semanticResult) {
             inpaintEval.semanticResult = { ...inpaintEval.semanticResult };
             if (Array.isArray(inpaintEval.semanticResult.semanticIssues)) inpaintEval.semanticResult.semanticIssues = sem.kept;
-            if (Array.isArray(inpaintEval.semanticResult.issues)) inpaintEval.semanticResult.issues = sem.kept;
           }
           if (inpaintEval.threeStageResult) {
             inpaintEval.threeStageResult = { ...inpaintEval.threeStageResult, fixableIssues: cmp.kept };

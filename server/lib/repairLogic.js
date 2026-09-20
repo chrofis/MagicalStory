@@ -1219,29 +1219,28 @@ const NOT_INPAINTABLE_TYPES = new Set([
  * empty instruction for it.
  */
 /**
- * THE SEMANTIC JUDGE'S FINDINGS, from whichever field carries them.
+ * THE SEMANTIC JUDGE'S FINDINGS. One field, and this is the only reader of its
+ * name — a rename touches this line and nothing else.
  *
- * `semanticResult` exposes two: `issues` and `semanticIssues`. Every reader used
- * `a || b`, and half of them ordered it one way and half the other. An
- * empty-but-present array is TRUTHY, so `issues: []` short-circuits and the
- * findings in `semanticIssues` are never seen — while a reader written as
- * `a?.length || b?.length` falls through correctly, because 0 is falsy.
+ * `semanticResult` is produced by sceneValidator.evaluateSemanticFidelity, which
+ * returns `{score, verdict, semanticIssues, usage}`. It has never emitted an
+ * `issues` field. Five readers guarded for one anyway, and because an
+ * empty-but-present array is TRUTHY, `a || b` written in that order returned the
+ * empty one and the findings were never seen — while `a?.length || b?.length`
+ * fell through correctly, since 0 is falsy.
  *
  * That split is why a page could be ROUTED to repair and then found to have
  * nothing to repair: decideRepairMethod counted with `.length` and saw the
  * findings; inpaintPage took the arrays and saw none, returning "no issues to
- * fix" with no error. Measured on staging job_1789853503332_riqncqg1i p6 and p7.
+ * fix" with no error. Measured on staging job_1789853503332_riqncqg1i p6 and p7,
+ * and across the corpus on 674 of 1094 pages.
  *
- * Measured over 3669 stored semanticResult objects: `issues` is populated ZERO
- * times, `semanticIssues` 2348 times, and the two are never both populated. So
- * preferring the non-empty list is behaviour-preserving at every call site.
+ * That phantom alias is now deleted everywhere, server and client, and a unit
+ * test keeps it out. Only this accessor knows the survivor's name.
  */
 function semanticFindings(semanticResult) {
-  const primary = semanticResult?.issues;
-  if (Array.isArray(primary) && primary.length) return primary;
-  const legacy = semanticResult?.semanticIssues;
-  if (Array.isArray(legacy) && legacy.length) return legacy;
-  return Array.isArray(primary) ? primary : (Array.isArray(legacy) ? legacy : []);
+  const found = semanticResult?.semanticIssues;
+  return Array.isArray(found) ? found : [];
 }
 
 function typesAreInpaintable(types) {

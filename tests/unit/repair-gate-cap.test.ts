@@ -63,7 +63,8 @@ describe('type rescue', () => {
     const p = {
       evaluated: true,
       finalScore: 82,
-      semanticResult: { issues: [{ type: 'object_count', severity: 'major', description: 'three instead of five' }] },
+      // the producer emits `semanticIssues`; `issues` never existed on this object
+      semanticResult: { semanticIssues: [{ type: 'object_count', severity: 'major', description: 'three instead of five' }] },
     };
     expect(findBadPages({ 9: p })).toEqual([9]);
   });

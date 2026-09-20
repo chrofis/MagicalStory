@@ -1,71 +1,99 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 
 const { semanticFindings } = require('../../server/lib/repairLogic');
 
-// `semanticResult` exposes the judge's findings under two names, `issues` and
-// `semanticIssues`. Every reader used `a || b` — and an empty-but-present array
-// is TRUTHY, so `issues: []` short-circuits and the findings in `semanticIssues`
-// are never seen. A reader written as `a?.length || b?.length` falls through
-// correctly, because 0 is falsy.
+// ONE FIELD (owner, 2026-09-20: "unify this, delete the other variables").
+//
+// `semanticResult` is produced by sceneValidator.evaluateSemanticFidelity, which
+// returns {score, verdict, semanticIssues, usage}. It has NEVER emitted an
+// `issues` field. Five readers guarded for one anyway — and because an
+// empty-but-present array is TRUTHY, `a || b` written in that order returned the
+// empty one and the findings were never seen, while `a?.length || b?.length`
+// fell through correctly because 0 is falsy.
 //
 // That split is why a page could be ROUTED to repair and then found to have
-// nothing to repair. decideRepairMethod counted with `.length` and saw the
+// nothing to repair: decideRepairMethod counted with `.length` and saw the
 // findings; inpaintPage took the arrays and saw none, returning "no issues to
-// fix" — with no error, so the round recorded only "inpaint produced no result".
+// fix" with no error — so the round could only report "inpaint produced no
+// result", naming a component that had never been called.
 //
-// Measured over 3669 stored semanticResult objects on staging: `issues` is
-// populated ZERO times, `semanticIssues` 2348 times, and the two are never both
-// populated — so preferring the non-empty list is behaviour-preserving at every
-// call site. 674 of 1094 pages (61.6%) carried findings only the legacy field
-// held; on 116 of them the page had no quality findings either, so repair could
-// see nothing at all, and 39 of those shipped scoring below 70.
+// Measured before the change: over 3669 stored semanticResult objects, `issues`
+// was populated ZERO times and `semanticIssues` 2348; 674 of 1094 pages (61.6%)
+// carried findings only through the field the executor did not read.
 //
-// These pin the resolver's contract, not any field's name.
+// `semanticResult.issues` is now deleted everywhere, server and client. These
+// pin that there is exactly one field, and that this accessor is the only place
+// that knows its name.
 
 const finding = (type: string) => ({ type, severity: 'MAJOR', description: type + ' is wrong' });
+const SRC = (rel: string) => fs.readFileSync(path.join(__dirname, '..', '..', rel), 'utf8');
 
-describe('semanticFindings — one resolver for the judge\'s two field names', () => {
-  it('reads the legacy field when the primary one is an EMPTY array', () => {
-    // The whole bug in one case: [] is truthy, so `a || b` returned [].
-    const sem = { issues: [], semanticIssues: [finding('emotion'), finding('missing_element')] };
-    expect(semanticFindings(sem)).toHaveLength(2);
+describe('semanticFindings — the one accessor for the judge\'s findings', () => {
+  it('returns the findings', () => {
+    expect(semanticFindings({ semanticIssues: [finding('emotion'), finding('scale')] })).toHaveLength(2);
   });
 
-  it('reads the primary field when it carries findings', () => {
-    const sem = { issues: [finding('emotion')], semanticIssues: [] };
-    expect(semanticFindings(sem)).toHaveLength(1);
-  });
-
-  it('prefers the primary field when both carry findings', () => {
-    const sem = { issues: [finding('a')], semanticIssues: [finding('b'), finding('c')] };
-    expect(semanticFindings(sem)).toHaveLength(1);
-    expect(semanticFindings(sem)[0].type).toBe('a');
-  });
-
-  it('returns an empty array when neither carries anything', () => {
-    expect(semanticFindings({ issues: [], semanticIssues: [] })).toEqual([]);
+  it('returns an empty array when there are none', () => {
+    expect(semanticFindings({ semanticIssues: [] })).toEqual([]);
     expect(semanticFindings({})).toEqual([]);
   });
 
+  it('ignores a phantom `issues` field entirely', () => {
+    // The deleted name must not come back through the accessor either: a stray
+    // `issues` on some caller's object is not the judge's output.
+    const sem = { issues: [finding('a'), finding('b')], semanticIssues: [finding('real')] };
+    expect(semanticFindings(sem)).toHaveLength(1);
+    expect(semanticFindings(sem)[0].type).toBe('real');
+    expect(semanticFindings({ issues: [finding('a')] })).toEqual([]);
+  });
+
   it('never throws on a missing or malformed result', () => {
-    for (const junk of [null, undefined, 0, 'x', { issues: 'nope' }, { semanticIssues: 7 }]) {
+    for (const junk of [null, undefined, 0, 'x', { semanticIssues: 'nope' }, { semanticIssues: 7 }]) {
       expect(Array.isArray(semanticFindings(junk as never))).toBe(true);
       expect(semanticFindings(junk as never)).toHaveLength(0);
     }
   });
 
-  it('agrees with a length-based count — the asymmetry that caused this', () => {
-    // The router counted correctly by accident (`a?.length || b?.length`, 0 is
-    // falsy); the executor took the arrays and did not. Both now go through here.
-    const sem = { issues: [], semanticIssues: [finding('emotion'), finding('scale'), finding('setting')] };
-    const legacyRouterCount = (sem.issues?.length || sem.semanticIssues?.length || 0);
-    expect(semanticFindings(sem).length).toBe(legacyRouterCount);
-    expect(semanticFindings(sem).length).toBe(3);
-  });
-
   it('returns the array itself, not a copy that drops fields', () => {
     const issues = [finding('emotion')];
-    const sem = { issues: [], semanticIssues: issues };
-    expect(semanticFindings(sem)[0]).toBe(issues[0]);
+    expect(semanticFindings({ semanticIssues: issues })[0]).toBe(issues[0]);
+  });
+});
+
+describe('the deleted field is gone from every reader', () => {
+  const FILES = [
+    'server/lib/repairLogic.js',
+    'server/lib/images.js',
+    'server/lib/repairPipeline.js',
+    'server/lib/scoring.js',
+    'server/lib/feedbackConsolidator.js',
+    'server/routes/regeneration.js',
+    'client/src/hooks/useRepairWorkflow.ts',
+  ];
+
+  it('no file reads or writes semanticResult.issues', () => {
+    for (const f of FILES) {
+      const src = SRC(f);
+      expect(src, f).not.toMatch(/semanticResult\?\.issues/);
+      expect(src, f).not.toMatch(/semanticResult\.issues/);
+    }
+  });
+
+  it('every repair reader that had the two-field fallback now calls the accessor', () => {
+    // Scoped to the repair path, where the bug lived. The eval pipeline BUILDS
+    // semanticResult and the UI DISPLAYS it; both name the field directly and
+    // should — an accessor cannot reach the client, and the producer owns the
+    // shape.
+    for (const f of ['server/lib/images.js', 'server/lib/repairPipeline.js',
+      'server/lib/feedbackConsolidator.js', 'server/routes/regeneration.js']) {
+      expect(SRC(f), f).toMatch(/semanticFindings\(/);
+    }
+  });
+
+  it('the accessor is the only place in repairLogic that names the field', () => {
+    const src = SRC('server/lib/repairLogic.js');
+    expect(src.split('semanticResult?.semanticIssues').length - 1).toBe(1);
   });
 });
