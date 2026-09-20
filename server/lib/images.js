@@ -3041,23 +3041,49 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   // Text-only consolidator: no image. Sonnet's job is to dedupe / sort / trim
   // evaluator findings, not to run its own vision pass. Without this, Sonnet
   // would invent fixes (e.g. "Replace the face") that no evaluator flagged.
-  const consolidation = await consolidateFeedback({
-    sceneDescription,
-    evaluation,
-    entityReport,
-    pageNumber,
-    characters: characters || [],
-    sceneClothing,
-    storyId,
-    round,
-    landmarkPhotos,
-    era,
-    // The consolidator's INPUT carries the scene brief's ---METADATA--- block
-    // (raw VB ids) and the evaluators' findings; its OUTPUT instruction fields
-    // are merged into the Grok edit instruction below. Both sides need the
-    // bible to resolve those ids -- see feedbackConsolidator.buildFeedbackInput.
-    visualBible,
-  });
+  // ONE CLEAN FINDING NEEDS NO CONSOLIDATION (owner, 2026-09-20). The
+  // consolidator exists to dedupe findings across evaluators, split per-character
+  // from scene work, strip character names, and cap at 3. When a single issue
+  // arrives already phrased as an instruction and already free of names, every
+  // one of those jobs is a no-op — and the critique-and-trim step still runs,
+  // which is pure loss: on job_1789853503332 it cut a 49-word scale fix down to
+  // "Resize the egg to match the size of the boy", deleting the word "smaller".
+  // A target with no direction is read as already satisfied, so the repair did
+  // nothing on one page and inverted on the other. Send the finding as written.
+  const soleDirectFix = (() => {
+    if (inpaintableIssues.length !== 1) return null;
+    const only = inpaintableIssues[0];
+    const fix = typeof only.fix === "string" ? only.fix.trim() : "";
+    if (!fix) return null;
+    const names = (characters || []).map(c => c?.name).filter(Boolean);
+    // Rule 3 is the consolidator’s to enforce: if a name is present, it has real
+    // work to do and we do not shortcut past it.
+    if (stripCharacterNames(fix, { names }) !== fix) return null;
+    return fix;
+  })();
+
+  let consolidation = null;
+  if (soleDirectFix) {
+    log.info(`[INPAINT PAGE] P${pageNumber}: one name-free finding with its own instruction — sent verbatim, no consolidation`);
+  } else {
+    consolidation = await consolidateFeedback({
+      sceneDescription,
+      evaluation,
+      entityReport,
+      pageNumber,
+      characters: characters || [],
+      sceneClothing,
+      storyId,
+      round,
+      landmarkPhotos,
+      era,
+      // The consolidator's INPUT carries the scene brief's ---METADATA--- block
+      // (raw VB ids) and the evaluators' findings; its OUTPUT instruction fields
+      // are merged into the Grok edit instruction below. Both sides need the
+      // bible to resolve those ids -- see feedbackConsolidator.buildFeedbackInput.
+      visualBible,
+    });
+  }
 
   // Decide the instruction to send Grok.
   // - If consolidator produced a plan: use scene_fix.instruction + attach avatars
@@ -3072,7 +3098,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   const referenceImages = [];
   const referenceImageSources = [];
 
-  if (consolidation?.plan && !consolidation.error) {
+  if (soleDirectFix) {
+    // Verbatim. No trim, no critique, no cap — there was nothing to consolidate.
+    editInstruction = `1. ${sanitizeIssueForInpaint(soleDirectFix)}`;
+  } else if (consolidation?.plan && !consolidation.error) {
     consolidatedPlan = consolidation.plan;
 
     // SAFETY NET — Haiku is told never to use character names in fix
