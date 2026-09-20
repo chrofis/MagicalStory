@@ -700,7 +700,7 @@ async function loadUsedChallengeIds(jobId, gl = NOOP_LOG) {
  * discarded round is the diagnostic evidence for why the loop stopped.
  *
  * @param {Array<{round:number, changedPages?:number[], recheck?:Object|null, kept:boolean, discardReason?:string}>} rounds
- * @returns {{changedPages:number[], recheck:Object|null, discardedRounds:Array<{round:number, reason:string, changedPages:number[], recheck:Object|null}>}}
+ * @returns {{changedPages:number[], recheck:Object|null, discardedRounds:Array<{round:number, reason:string, changedPages:number[], recheck:Object|null, replanPrompt:string}>, replanPrompts:Array<{round:number, prompt:string}>}}
  */
 function shippedReplanState(rounds = []) {
   const changed = new Set();
@@ -710,11 +710,19 @@ function shippedReplanState(rounds = []) {
   // the review refused. A removal used to be recorded nowhere (2026-09-18).
   const declaredChanges = [];
   const changeRefusals = [];
+  const replanPrompts = [];
   for (const r of (rounds || [])) {
     if (!r) continue;
     if (r.kept) {
       for (const n of (r.changedPages || [])) changed.add(Number(n));
       for (const line of (r.declaredChanges || [])) declaredChanges.push({ round: r.round, line });
+      // THE PROMPT THE RE-PLAN ACTUALLY READ (2026-09-20). `plannerPrompt` is
+      // the FIRST-DIVISION prompt; the re-plan prompt is the only one that
+      // carries `## MUST FIX` / `## ALSO NOTED`, and it was stored nowhere, so
+      // answering "what was this round asked to fix" meant rebuilding
+      // buildReplanSection at the run's commit. Same gap `plannerPrompt` closed,
+      // one level down. Shaped like `declaredChanges`: one entry per kept round.
+      if (r.replanPrompt) replanPrompts.push({ round: r.round, prompt: r.replanPrompt });
       for (const ref of (r.changeRefusals || [])) changeRefusals.push({ round: r.round, ...ref });
       // The recheck that measured the division now standing. A later kept round
       // supersedes an earlier one; a discarded round never does.
@@ -725,10 +733,13 @@ function shippedReplanState(rounds = []) {
         reason: r.discardReason || 'discarded',
         changedPages: r.changedPages || [],
         recheck: r.recheck || null,
+        // A discarded round is the diagnostic evidence for why the loop
+        // stopped, so it keeps the prompt it was given like a kept round does.
+        replanPrompt: r.replanPrompt || '',
       });
     }
   }
-  return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals };
+  return { changedPages: [...changed].sort((a, b) => a - b), recheck, discardedRounds, declaredChanges, changeRefusals, replanPrompts };
 }
 
 /**
@@ -1547,7 +1558,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           if (dupe) {
             log.warn(`[BEATS] Round ${round} returned two pages with the same line - discarding it, the previous division stands`);
             gl.warn('beats_replan_duplicate', `Round ${round} produced two pages with an identical plan line; the round was discarded and the previous division stands`, null, { round, line: dupe.slice(0, 160) });
-            replanRounds.push({ round, changedPages: [], recheck: null, kept: false, discardReason: 'two pages returned with an identical plan line' });
+            replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, discardReason: 'two pages returned with an identical plan line' });
             beats = bestBeats;
             pagePlan = bestPagePlan;
             break;
@@ -1563,7 +1574,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (second.parsed.pages.length !== beats.length) {
           log.warn(`[BEATS] Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book - discarding it, the previous division stands`);
           gl.warn('beats_replan_page_count', `Round ${round} returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book; the round was discarded and the previous division stands`, null, { round, returned: second.parsed.pages.length, expected: beats.length });
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, discardReason: `returned ${second.parsed.pages.length} page(s) for a ${beats.length}-page book` });
           beats = bestBeats;
           pagePlan = bestPagePlan;
           break;
@@ -1571,7 +1582,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         if (second.parsed.missing.length > 0) {
           log.warn(`⚠️ [BEATS] Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
           gl.warn('beats_replan_incomplete', `Re-plan omitted page(s) ${second.parsed.missing.join(', ')} — previous division kept`);
-          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
+          replanRounds.push({ round, changedPages: [], recheck: null, kept: false, replanPrompt, discardReason: `omitted page(s) ${second.parsed.missing.join(', ')}` });
           break;
         }
         const before = new Map(beats.map(p => [p.pageNumber, p.planLine || '']));
@@ -1597,6 +1608,10 @@ async function generateStoryViaBeats(inputData, opts = {}) {
           round,
           changedPages: changedThisRound,
           findingsIn: pendingCheck.lines.length,
+          // The re-plan request this round was given, verbatim — the only
+          // prompt in the stage that carries the findings (## MUST FIX / ##
+          // ALSO NOTED). Text, additive, read by nothing.
+          replanPrompt,
           recheck: recheckRecord(check2),
           kept: true,
           // WHAT THE ROUND SAID IT DID, AND WHAT THE REVIEW MADE OF IT. Before
@@ -1708,6 +1723,12 @@ async function generateStoryViaBeats(inputData, opts = {}) {
       // reconstruction, not the bytes sent. The arc stage has kept its
       // creator prompt (`arcReviewReport.createPrompt`) since it was written.
       plannerPrompt: planPrompt || '',
+      // …and the RE-PLAN prompts, one per kept round. `plannerPrompt` is the
+      // FIRST division's; the re-plan request is the only prompt in this stage
+      // that carries the findings (## MUST FIX / ## ALSO NOTED), so it is the
+      // only one that answers "what was this round asked to fix". A discarded
+      // round keeps its own under `discardedRounds[].replanPrompt`.
+      replanPrompts: shipped.replanPrompts,
       // The checker's reply verbatim, and the roster as the counters received
       // it. See the comment in runCheck: `modelFindings: []` is otherwise
       // unreadable.
