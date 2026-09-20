@@ -3957,130 +3957,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             genLog.error('text_refine_join_failed', `Text refinement failed and no round landed — the text audit did not apply: nothing checked these pages for the faults its two auditors exist to catch, text/picture alignment among them; the unrefined text ships as written`);
           }
         }
+        // STORE THE REPORT WHENEVER THE CHAIN PRODUCED ONE (2026-09-20).
+        // This projection used to sit behind `usable?.changed?.length`, so a run
+        // whose audits found faults and whose repair closed none of them stored
+        // NOTHING — no ledger, no audits, no merge stats, no word budget, no
+        // failed round. Staging's 94 stories carrying a report show 0 unresolved
+        // findings and 0 quote-absent drops ever, which the guard alone would
+        // explain: the runs that HAD them were the runs it discarded.
+        //
+        // "Ran and changed nothing" vs "did not run" is the `usable` object, not
+        // the page count. We are inside `if (textRefinePromise)`, so the chain
+        // started; `usable` is refineStoryText's return or the last snapshot it
+        // published, and it is null only when the chain rejected before ever
+        // publishing — nothing to project, and no empty husk is written.
+        //
+        // The projection itself moved to textRefine.projectTextRefineReport,
+        // verbatim, so it can be replayed over a stored run in a test.
+        if (usable) {
+          const beforeByPage = new Map(
+            (expandedScenes || []).map(sc => [sc.pageNumber, sc.text || ''])
+          );
+          const { projectTextRefineReport } = require('./server/lib/textRefine');
+          textRefineReport = projectTextRefineReport(usable, beforeByPage);
+        }
         if (usable?.changed?.length) {
-          // Capture the pre-refine prose BEFORE the overwrite below — it is the
-          // only moment both versions exist. Without it the refiner's work is
-          // invisible: the story ships the rewritten text with no record of what
-          // changed, and 10 of 14 pages were rewritten on the first real run.
-          textRefineReport = {
-            rounds: usable.rounds.length,
-            // Per-step trace (owner, 2026-08-27): the count alone made "what did
-            // this step change" unanswerable twice. `kind` says which step —
-            // 'repair' or 'lector'. Analyses capped — text only.
-            roundTrace: usable.rounds.map(r => ({
-              round: r.round,
-              kind: r.kind || null,
-              ok: r.ok,
-              modelKey: r.modelKey || null,
-              modelId: r.modelId || null,
-              elapsedMs: r.elapsedMs || 0,
-              cost: r.cost ?? null,
-              changedPages: r.changedPages || [],
-              // How much each round landed, in that round's own unit: findings
-              // the code-side applier placed for the lector and the diff (see
-              // applyLectorFindings), pages rewritten for the whole-page passes
-              // (repair / repetition_fix / length_fix), which have no
-              // per-finding applier. `droppedCount` stays applier-only.
-              appliedCount: r.appliedCount ?? null,
-              droppedCount: r.droppedCount ?? null,
-              // THE PASS'S OWN REPORT vs THE DIFF (2026-09-17). A whole-page
-              // pass claims a rewrite by returning a page block; these say which
-              // of those blocks came back identical, and which pages it rewrote
-              // that no finding named. The per-finding appliers answer the same
-              // question with `unparsedCount`: finding-shaped lines the parser
-              // could not read, which used to be skipped in silence.
-              returnedIdentical: r.returnedIdentical || [],
-              changedUnasked: r.changedUnasked || [],
-              unparsedCount: r.unparsedCount ?? null,
-              unparsedLines: r.unparsedLines || [],
-              // WHY each non-applied finding was not applied. The count alone
-              // cannot answer "what happened to that finding" — which is the
-              // whole question the ledger below exists for, asked of the
-              // per-finding appliers (quote-absent / overlap / no-such-page).
-              droppedFindings: r.droppedFindings || [],
-              // The whole-page passes' per-finding outcomes (textRefine.js,
-              // resolveFindingOutcomes). Present only on repair / repetition_fix
-              // / length_fix, which are the rounds handed FAULT lines.
-              findingOutcomes: (r.findingOutcomes || []).map(f => ({
-                pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
-                text: f.text, outcome: f.outcome, reason: f.reason || null,
-              })),
-              error: r.error || null,
-              analysis: (r.analysis || '').slice(0, 15000),
-            })),
-            changedPages: usable.changed,
-            // Cross-page repetition check after the repair pass (2026-09-10):
-            // { pairs, correctivePassRan, resolved, ... } — see textRefine.js.
-            repetition: usable.repetition || null,
-            // THE TWO AUDITS (owner ruling 2026-09-03) — one entry each, raw
-            // output included so a fault can be traced to the auditor that found
-            // it, plus the merged list the single repair pass actually answered.
-            audits: (usable.audits || []).map(a => ({
-              source: a.source,
-              ok: !!a.ok,
-              modelKey: a.modelKey || null,
-              modelId: a.modelId || null,
-              faults: a.faults ?? 0,
-              byCategory: a.byCategory || {},
-              elapsedMs: a.elapsedMs || 0,
-              cost: a.cost ?? null,
-              error: a.error || null,
-              raw: (a.raw || '').slice(0, 40000),
-            })),
-            mergedFindings: (usable.mergedFindings || []).map(f => ({
-              pageNumber: f.pageNumber,
-              category: f.category,
-              text: f.text,
-              sources: f.sources,
-            })),
-            mergeStats: usable.mergeStats || null,
-            // THE LEDGER — one entry per merged finding, each with the outcome
-            // the repair pass gave it and, where that is not `page-rewritten`,
-            // the reason. Without it the report could say 20 findings went in
-            // and 17 pages came out, and nothing at all about which finding
-            // reached which page (staging job_1789584708605_rts4wqupm).
-            findingLedger: (usable.findingLedger || []).map(f => ({
-              pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
-              text: f.text, outcome: f.outcome, reason: f.reason || null,
-            })),
-            // The word counter's re-measurement after the whole-page passes
-            // (textRefine.js): before/after violation counts, every page's final
-            // word count, and whether the corrective pass ran. It is the one
-            // finding class whose closure is MEASURED rather than assumed, and
-            // it was computed on every run since 2026-09-11 and stored on none.
-            wordBudget: usable.wordBudget || null,
-            // The lector's raw output, its parsed findings, and what the
-            // code-side applier did with each (see applyLectorFindings).
-            proofread: usable.proofread || '',
-            lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-            lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
-            // A dropped finding keeps its REASON: quote-absent is the
-            // hallucination guard firing, overlap is two findings on one span.
-            lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
-            durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
-            model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
-            // Same three fields beatsReviewReport and sceneReviewReport carry, so
-            // renderDiffPanel shows all three panels alike (owner 2026-09-06).
-            // They were already IN the round entries — this only projects them.
-            // `prompt` is the repair round's prompt (the lector round has its own
-            // template and no rewrite prompt); `briefsIn` is the page text as
-            // sent in; `analysis` concatenates EVERY round's analysis, labelled,
-            // because a run has a repair round and a lector round and storing
-            // only the last would read as the whole stage's reasoning.
-            prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
-            briefsIn: (usable.original || []).map(p => ({ pageNumber: p.pageNumber, brief: p.text || '' })),
-            analysis: usable.rounds
-              .filter(r => (r.analysis || '').trim())
-              .map(r => `--- Round ${r.round} (${r.kind || 'repair'}${r.modelId ? `, ${r.modelId}` : ''}) ---\n${r.analysis.trim()}`)
-              .join('\n\n'),
-            pages: usable.pages
-              .filter(p => usable.changed.includes(p.pageNumber))
-              .map(p => ({
-                pageNumber: p.pageNumber,
-                before: expandedScenes.find(sc => sc.pageNumber === p.pageNumber)?.text || '',
-                after: p.text,
-              })),
-          };
           // BOTH arrays: allImages[].text is a COPY taken when the page was
           // prepared, so updating only the scene would leave the saved story on
           // the pre-refinement prose.

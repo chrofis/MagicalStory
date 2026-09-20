@@ -1091,6 +1091,25 @@ export interface ReviewDiffReport {
   clothingFindings?: string | null;
   /** Clothing faults still present after the review. */
   clothingUnfixed?: { pageNumber: number; type: string; character?: string; detail?: string }[];
+  /**
+   * Text refine only. The merged audit findings with the outcome the repair
+   * pass gave each one, and how many of them nothing closed. Stored since the
+   * chain's first ledger; rendered by nothing until 2026-09-20.
+   */
+  findingLedger?: { pageNumber: number | null; category?: string; sources?: string[]; text: string; outcome: string; reason?: string | null }[];
+  unresolvedCount?: number;
+  /** Text refine only: corrections the appliers refused, with the reason. */
+  lectorDropped?: { pageNumber: number; quote: string; correction?: string; reason?: string }[];
+  diffDropped?: { pageNumber: number; quote: string; correction?: string; reason?: string }[];
+  /** Text refine only: the per-round trace, including failed rounds. */
+  roundTrace?: {
+    round: number; kind?: string | null; ok?: boolean; modelId?: string | null;
+    error?: string | null; appliedCount?: number | null; changedPages?: number[];
+    droppedFindings?: { pageNumber: number; quote?: string; reason?: string }[];
+    unparsedLines?: { line: string; reason: string }[];
+    prompt?: string; rawResponse?: string;
+    pages?: { pageNumber: number; after: string }[];
+  }[];
 }
 
 export interface SavedStory {
@@ -1127,7 +1146,7 @@ export interface SavedStory {
   /** Per-function model/token/cost/time ledger (dev mode "Models used" panel). */
   tokenUsage?: Record<string, unknown> | null;
   /** Per-page before/after from the parallel text-refine pass (dev mode diff). */
-  textRefineReport?: { rounds?: number; changedPages?: number[]; durationMs?: number; model?: string | null; pages?: { pageNumber: number; before: string; after: string }[] } | null;
+  textRefineReport?: (ReviewDiffReport & { rounds?: number }) | null;
   /** Per-page before/after from the beats review (beats pipeline, dev-mode diff). */
   arcReviewReport?: ArcReviewReport | null;
   beatsReviewReport?: ReviewDiffReport | null;

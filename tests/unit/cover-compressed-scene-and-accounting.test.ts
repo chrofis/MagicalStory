@@ -177,7 +177,8 @@ describe('every text-refine round records how much it landed', () => {
   it('the trace no longer treats appliedCount as lector-only', () => {
     // `null` must keep ONE meaning across the trace: this round recorded
     // nothing. Reading it as "not applicable here" is what hid a $0.94 call.
-    expect(pipeline).toContain('appliedCount: r.appliedCount ?? null');
+    // The projection moved to textRefine.projectTextRefineReport (2026-09-20).
+    expect(textRefine).toContain('appliedCount: r.appliedCount ?? null');
     expect(pipeline).not.toContain('// Lector only: how many of its findings');
   });
 

@@ -7,6 +7,7 @@ import {
   awaitTextRefineJoin,
   selectJoinResult,
   isTotalTextAuditLoss,
+  projectTextRefineReport,
 } from '../../server/lib/textRefine.js';
 
 /**
@@ -194,5 +195,166 @@ describe('wiring: the join cannot be re-bounded', () => {
   it('the deadline machinery is gone from the library too', () => {
     expect(lib).not.toContain('computeTextRefineJoinTimeoutMs');
     expect(lib).not.toContain('shouldGraceJoin');
+  });
+});
+
+
+/**
+ * WHAT THE STORY ROW KEEPS OF THE REFINE CHAIN (2026-09-20).
+ *
+ * The projection used to sit behind `if (usable?.changed?.length)` in
+ * storyJobPipeline.js, so a run that audited every page and rewrote none of
+ * them stored NOTHING — no ledger, no audits, no merge stats, no word budget,
+ * no failed round. Staging's 94 stories carrying a report show 0 unresolved
+ * findings and 0 quote-absent drops ever; the guard alone explains that, because
+ * the runs that HAD them are the runs it discarded.
+ *
+ * These pin behaviour, not wording: a zero-change run produces a report, a
+ * round's output round-trips, and the diff's four fields are stored the way the
+ * lector's always were.
+ */
+const round = (over: any = {}) => ({
+  round: 1, kind: 'repair', ok: true, modelKey: 'k', modelId: 'm',
+  elapsedMs: 10, cost: 0.1, changedPages: [], appliedCount: 0,
+  ...over,
+});
+
+describe('projectTextRefineReport: a run that changed nothing is still stored', () => {
+  const zeroChange = {
+    pages: [{ pageNumber: 1, text: 'unchanged' }],
+    original: [{ pageNumber: 1, text: 'unchanged' }],
+    changed: [],
+    rounds: [
+      round({ round: 1, kind: 'repair', ok: false, error: 'the model threw', prompt: 'REPAIR PROMPT' }),
+      round({ round: 2, kind: 'lector', ok: false, error: 'timed out', prompt: 'LECTOR PROMPT', rawResponse: '' }),
+    ],
+    audits: [{ source: 'arc', ok: true, faults: 4, raw: 'FAULT p1 ...' }],
+    mergedFindings: [{ pageNumber: 1, category: 'MISMATCH', text: 'f', sources: ['arc'] }],
+    mergeStats: { bySource: { arc: 4 }, duplicates: 0 },
+    findingLedger: [
+      { pageNumber: 1, category: 'MISMATCH', text: 'f', outcome: 'page-unchanged', reason: 'the pass did not return page 1' },
+    ],
+    wordBudget: { before: 2, after: 2 },
+    partial: true,
+  };
+
+  it('produces a report at all', () => {
+    const rep = projectTextRefineReport(zeroChange, new Map());
+    expect(rep).toBeTruthy();
+    expect(rep.changedPages).toEqual([]);
+    expect(rep.pages).toEqual([]);
+  });
+
+  it('keeps every diagnostic the guard used to discard', () => {
+    const rep = projectTextRefineReport(zeroChange, new Map());
+    expect(rep.findingLedger).toHaveLength(1);
+    expect(rep.audits).toHaveLength(1);
+    expect(rep.mergeStats).toEqual({ bySource: { arc: 4 }, duplicates: 0 });
+    expect(rep.wordBudget).toEqual({ before: 2, after: 2 });
+    expect(rep.roundTrace).toHaveLength(2);
+    expect(rep.roundTrace.filter((r: any) => !r.ok)).toHaveLength(2);
+    expect(rep.roundTrace[0].error).toBe('the model threw');
+  });
+
+  it('counts what nothing closed, so the panel does not recompute it', () => {
+    const rep = projectTextRefineReport(zeroChange, new Map());
+    expect(rep.unresolvedCount).toBe(1);
+  });
+
+  it('refuses to invent a report when the chain produced nothing', () => {
+    expect(() => projectTextRefineReport(null as any, new Map())).toThrow();
+  });
+});
+
+describe('projectTextRefineReport: each round keeps what it was sent and what it returned', () => {
+  const usable = {
+    pages: [{ pageNumber: 1, text: 'final' }],
+    original: [{ pageNumber: 1, text: 'draft' }],
+    changed: [1],
+    rounds: [
+      round({
+        round: 1, kind: 'repair', ok: true, prompt: 'REPAIR PROMPT',
+        rawResponse: 'ANALYSIS + PAGE BLOCKS', analysis: 'why',
+        changedPages: [1], appliedCount: 1,
+        pages: [{ pageNumber: 1, before: 'draft', after: 'repaired', original: 'draft' }],
+      }),
+      round({
+        round: 2, kind: 'diff', ok: true, prompt: 'DIFF PROMPT',
+        rawResponse: 'p1: "a" -> "b"',
+        findings: [{ pageNumber: 1, quote: 'a', correction: 'b' }],
+        reviewedPages: [1], appliedCount: 1,
+        droppedFindings: [{ pageNumber: 1, quote: 'z', reason: 'quote-absent' }],
+        pages: [{ pageNumber: 1, before: 'repaired', after: 'final', original: 'draft' }],
+      }),
+      round({
+        round: 3, kind: 'lector', ok: true, prompt: 'LECTOR PROMPT',
+        rawResponse: 'no findings', appliedCount: 0,
+        pages: [{ pageNumber: 1, before: 'final', after: 'final', original: 'draft' }],
+      }),
+    ],
+    audits: [], mergedFindings: [], mergeStats: null, findingLedger: [],
+    proofread: 'no findings',
+    lectorFindings: [], lectorApplied: [], lectorDropped: [],
+    diffReview: 'p1: "a" -> "b"',
+    diffFindings: [{ pageNumber: 1, quote: 'a', correction: 'b' }],
+    diffApplied: [{ pageNumber: 1, quote: 'a', correction: 'b' }],
+    diffDropped: [{ pageNumber: 1, quote: 'z', correction: 'y', reason: 'quote-absent' }],
+    wordBudget: null, repetition: null, partial: false,
+  };
+
+  it('stores the prompt for the diff and the lector, not only the repair', () => {
+    const rep = projectTextRefineReport(usable, new Map([[1, 'draft']]));
+    expect(rep.roundTrace.map((r: any) => r.prompt))
+      .toEqual(['REPAIR PROMPT', 'DIFF PROMPT', 'LECTOR PROMPT']);
+  });
+
+  it("round-trips each round's returned page text", () => {
+    const rep = projectTextRefineReport(usable, new Map([[1, 'draft']]));
+    expect(rep.roundTrace[0].pages).toEqual([{ pageNumber: 1, after: 'repaired' }]);
+    expect(rep.roundTrace[1].pages).toEqual([{ pageNumber: 1, after: 'final' }]);
+  });
+
+  it('keeps the finding-list replies raw and drops the redundant rewriter reply', () => {
+    const rep = projectTextRefineReport(usable, new Map([[1, 'draft']]));
+    // A repair reply IS its analysis plus the page blocks, both already stored.
+    expect(rep.roundTrace[0].rawResponse).toBe('');
+    expect(rep.roundTrace[0].analysis).toBe('why');
+    expect(rep.roundTrace[1].rawResponse).toBe('p1: "a" -> "b"');
+    expect(rep.roundTrace[2].rawResponse).toBe('no findings');
+  });
+
+  it("stores the diff's four fields the way the lector's always were", () => {
+    const rep = projectTextRefineReport(usable, new Map([[1, 'draft']]));
+    expect(rep.diffReview).toBe('p1: "a" -> "b"');
+    expect(rep.diffFindings).toHaveLength(1);
+    expect(rep.diffApplied).toHaveLength(1);
+    expect(rep.diffDropped[0].reason).toBe('quote-absent');
+  });
+});
+
+describe('wiring: the report is no longer gated on a page having changed', () => {
+  const pipeline = fs.readFileSync(new URL('../../storyJobPipeline.js', import.meta.url), 'utf8');
+  const lib = fs.readFileSync(new URL('../../server/lib/textRefine.js', import.meta.url), 'utf8');
+  const panel = fs.readFileSync(
+    new URL('../../client/src/components/generation/StoryDisplay.tsx', import.meta.url), 'utf8');
+
+  it('the pipeline projects through the pure function, on `usable` alone', () => {
+    expect(pipeline).toContain('projectTextRefineReport(usable, beforeByPage)');
+    // The exact regressed shape: the projection assembled inside the guard.
+    expect(pipeline).not.toMatch(/if \(usable\?\.changed\?\.length\) \{[\s\S]{0,400}textRefineReport = \{/);
+  });
+
+  it('a failed lector round is recorded, exactly as a failed diff round is', () => {
+    expect(lib).toMatch(/kind: 'lector', ok: false[\s\S]{0,120}prompt: lectorPromptSent/);
+    expect(lib).toMatch(/kind: 'diff', ok: false[\s\S]{0,120}prompt: diffPromptSent/);
+  });
+
+  it('the dev panel renders what nothing closed', () => {
+    expect(panel).toContain('rep?.findingLedger');
+    expect(panel).toContain('rep?.unresolvedCount');
+    expect(panel).toContain('rep?.diffDropped');
+    expect(panel).toContain('rep?.lectorDropped');
+    // A zero-change run must not fall through the panel's empty check.
+    expect(panel).toContain('&& !unresolved.length && !dropped.length && !trace.length) return null;');
   });
 });

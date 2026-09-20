@@ -51484,3 +51484,81 @@ are NOT addressed here (cast drift measured separately at ~9%, a lower bound).
 `tests/unit/plan-shot-refresh.test.ts`
 
 **Status:** ✅ active
+
+## The text-refine report is stored whenever the chain ran, not only when it rewrote a page (2026-09-20)
+
+**Context:** The `textRefineReport` projection in `storyJobPipeline.js` sat behind
+`if (usable?.changed?.length)`. A run whose two audits found faults and whose
+repair pass then failed, answered nothing, or was refused by the appliers stored
+NOTHING at all: no `findingLedger`, no `audits[]`, no `mergeStats`, no
+`wordBudget`, no failed round entry. The report existed only for runs that had
+already succeeded.
+
+Two measurements motivated this. On `job_1789853503332_riqncqg1i` the 12
+corrections the diff pass substituted into the shipped book were unrecoverable
+(the diff's prompt, raw reply and returned pages were all dropped by the
+projection, and its four top-level fields — `diffReview` / `diffFindings` /
+`diffApplied` / `diffDropped` — were returned by the chain and projected by
+nobody, while the lector's equivalents were stored), and two ledger claims could
+not be attributed to a round. Across staging's **94 stories carrying a
+`textRefineReport`** the counters read: 0 unresolved findings ever, 0
+`quote-absent` drops ever, 0 failed rounds, 1 dropped finding in total. Those
+zeros are not credible for a four-model chain.
+
+**Decision:** Three additive diagnostics changes. Nothing about what the pipeline
+does to a story changes.
+
+1. **The projection runs on `usable` alone.** It moved verbatim out of the
+   pipeline into the pure `textRefine.projectTextRefineReport(usable,
+   beforeByPage)` so it can be replayed over a stored run in a test. "Ran and
+   changed nothing" is distinguished from "did not run" by the `usable` object,
+   not by the page count: the call site is already inside
+   `if (textRefinePromise)`, so the chain started, and `usable` is
+   `refineStoryText`'s return or the last snapshot it published. It is null only
+   when the chain rejected before its first `publish()` — there is then nothing
+   to project and no empty husk is written.
+2. **Each round keeps what it was sent and what it returned.** `roundTrace[]`
+   now carries `prompt`, `rawResponse`, `findings`, `reviewedPages` and
+   `pages: [{pageNumber, after}]` for every round including failed ones, and the
+   diff's four top-level fields are projected alongside the lector's. The lector's
+   catch block, which used to push no round at all while the diff's always did,
+   now records its failure with the prompt it sent.
+3. **The dev panel renders it.** `renderDiffPanel` gained three blocks —
+   unresolved findings with outcome and reason, dropped diff/lector corrections
+   with quote and reason, and a per-round trace — and its empty check now counts
+   them, so a zero-change or failed run is legible instead of invisible.
+
+**Rationale:** The guard is the hypothesis this tests. If the 94-story zero
+counts were real, the new reports will keep reading zero; if the guard was
+hiding the failed runs, the first stored zero-change report will carry the
+unresolved findings and the drops that were never recorded. Either answer is
+worth more than the guess.
+
+Size was measured before the shape was settled, by replaying the projection over
+the stored `job_1789853503332_riqncqg1i` shape (prompts for the diff and lector
+rebuilt from the stored text, no model call): the report grows **123,714 →
+230,237 bytes, +106.5 KB**, on a story row of 8.7 MB raw / 3.7 MB compressed —
+**+1.2% of the row**. Two redundancies were trimmed rather than shipped: the
+whole-page passes' `rawResponse` is NOT stored (a repair reply is its analysis
+block plus the page blocks, both already stored verbatim — ~27 KB of pure
+duplication), and each round's pages keep only `after` (round N's `before` is
+round N−1's `after`, and round 1's is `briefsIn` — ~14 KB). The one duplication
+left is the repair round's prompt, which is also the report's top-level `prompt`
+that the shared panel reads: 55.7 KB, left in place so the per-round shape is
+symmetric, and flagged in the backlog as the remaining trim.
+
+**Validation:** rung 1 — the projection replayed over the stored shape of
+`job_1789853503332_riqncqg1i`: the repair round's returned pages round-trip, the
+diff and lector prompts are stored, the diff's four fields land, and a synthetic
+zero-change run (both rounds failed) produces a 30 KB report carrying 2 audits,
+a 16-entry ledger, 16 unresolved findings, both failed rounds, the word budget
+and the merge stats — where the old guard stored nothing.
+
+**Touched:** `server/lib/textRefine.js` (`projectTextRefineReport`, prompts on the
+diff and lector rounds, the lector's failed-round entry), `storyJobPipeline.js`
+(the call site and its guard), `client/src/components/generation/StoryDisplay.tsx`
+(`renderDiffPanel`), `client/src/types/story.ts`, `tests/unit/text-refine-join.test.ts`,
+`tests/unit/repair-reference-and-finding-ledger.test.ts`,
+`tests/unit/cover-compressed-scene-and-accounting.test.ts`.
+
+**Status:** ✅ active

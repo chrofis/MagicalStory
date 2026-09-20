@@ -725,6 +725,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
   let diffApplied = [];
   let diffDropped = [];
   let diffUnparsed = [];
+  // The prompts the diff and the lector were actually SENT. Hoisted out of
+  // their try blocks so a FAILED round can store the prompt too: a round that
+  // threw is exactly the one whose input needs reading, and the catch below
+  // cannot see a `const` declared inside the try.
+  let diffPromptSent = '';
+  let lectorPromptSent = '';
   let repetition = null;
   let wordBudget = null;
 
@@ -1200,6 +1206,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
       .filter(p => changedPages.includes(p.pageNumber))
       .map(p => ({ pageNumber: p.pageNumber, before: original.find(o => o.pageNumber === p.pageNumber)?.text, after: p.text }));
     const diffPrompt = pairs.length ? buildTextDiffPrompt(storyData, pairs) : null;
+    diffPromptSent = diffPrompt || '';
     if (diffPrompt && TEXT_MODELS[diffModel]) {
       beginStep();
       const t0 = Date.now();
@@ -1240,6 +1247,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
         kind: 'diff',
         ok: true,
         modelKey: diffModel,
+        prompt: diffPrompt,
         modelId: dr.modelId || TEXT_MODELS[diffModel].modelId,
         elapsedMs: Date.now() - t0,
         reviewedPages: pairs.map(p => p.pageNumber),
@@ -1273,7 +1281,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
     }
   } catch (de) {
     log.error(`❌ [TEXT-DIFF] failed (${de.message}) — rewrite damage is unchecked, text kept as the repair pass left it`);
-    rounds.push({ round: rounds.length + 1, kind: 'diff', ok: false, modelKey: diffModel, error: de.message });
+    rounds.push({ round: rounds.length + 1, kind: 'diff', ok: false, modelKey: diffModel, error: de.message, prompt: diffPromptSent, rawResponse: diffReview });
     publish();
   }
 
@@ -1295,6 +1303,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
   // this pass.
   try {
     const lectorPrompt = buildTextProofreadPrompt(storyData, current);
+    lectorPromptSent = lectorPrompt || '';
     if (lectorPrompt && TEXT_MODELS[lectorModel]) {
       beginStep();
       const t0 = Date.now();
@@ -1342,6 +1351,7 @@ async function refineStoryText(storyData, pages, opts = {}) {
         kind: 'lector',
         ok: true,
         modelKey: lectorModel,
+        prompt: lectorPrompt,
         modelId: lr.modelId || TEXT_MODELS[lectorModel].modelId,
         elapsedMs: Date.now() - t0,
         usage: { input_tokens: lr.usage?.input_tokens || 0, output_tokens: lr.usage?.output_tokens || 0 },
@@ -1373,6 +1383,12 @@ async function refineStoryText(storyData, pages, opts = {}) {
     }
   } catch (le) {
     log.warn(`⚠️ [LECTOR] failed (${le.message}) — text kept as the repair pass left it`);
+    // PARITY WITH THE DIFF (2026-09-20). This catch used to push no round at
+    // all, so a lector that threw left no trace in `rounds` — the stored trace
+    // showed a chain that simply had no lector step, indistinguishable from one
+    // where the template or the model was absent. The diff's catch has always
+    // recorded its failure; both do now.
+    rounds.push({ round: rounds.length + 1, kind: 'lector', ok: false, modelKey: lectorModel, error: le.message, prompt: lectorPromptSent, rawResponse: proofread });
     publish();   // clears the in-flight flag the join's grace period reads
   }
 
@@ -1567,8 +1583,136 @@ function isTotalTextAuditLoss(partial) {
   return !partial?.changed?.length;
 }
 
+/**
+ * PROJECT THE CHAIN'S RESULT ONTO THE STORY ROW. Pure — no I/O, no clock.
+ *
+ * Lifted verbatim out of storyJobPipeline.js (2026-09-20) so it can be replayed
+ * over a stored run's shape in a test instead of only by running a story.
+ *
+ * WHEN IT IS CALLED (the guard that used to live here is gone): whenever the
+ * chain produced a result AT ALL — a snapshot or a complete return — and NOT
+ * only when it rewrote a page. A run that audited 18 pages, found faults and
+ * closed none of them used to store nothing, which is precisely the run whose
+ * ledger needs reading. "Did not run" stays unstored: the caller passes no
+ * `usable` when the chain never started or never published a single snapshot.
+ *
+ * @param {object} usable   refineStoryText's return, or a published snapshot
+ * @param {Map<number,string>} beforeByPage  the pre-refine page text
+ * @returns {object} the textRefineReport
+ */
+function projectTextRefineReport(usable, beforeByPage = new Map()) {
+  if (!usable) throw new Error('projectTextRefineReport: no chain result to project');
+  const changed = usable.changed || [];
+  // WHOLE-PAGE PASSES vs FINDING-LIST PASSES — the reason `rawResponse` is not
+  // stored for every round. A repair / repetition_fix / length_fix reply IS its
+  // analysis block plus the rewritten page blocks, and both are already stored
+  // verbatim (`analysis`, `pages[].after`): keeping the raw reply as well was
+  // measured at ~27KB of pure duplication per story. A diff or lector reply is
+  // a finding list — a few hundred bytes, and the only place the lines the
+  // parser rejected can be read back. So: pages for the rewriters, raw for the
+  // finding lists, nothing duplicated.
+  const WHOLE_PAGE_KINDS = new Set(['repair', 'repetition_fix', 'length_fix']);
+  return {
+    rounds: usable.rounds.length,
+    roundTrace: usable.rounds.map(r => ({
+      round: r.round,
+      kind: r.kind || null,
+      ok: r.ok,
+      modelKey: r.modelKey || null,
+      modelId: r.modelId || null,
+      elapsedMs: r.elapsedMs || 0,
+      cost: r.cost ?? null,
+      changedPages: r.changedPages || [],
+      appliedCount: r.appliedCount ?? null,
+      droppedCount: r.droppedCount ?? null,
+      returnedIdentical: r.returnedIdentical || [],
+      changedUnasked: r.changedUnasked || [],
+      unparsedCount: r.unparsedCount ?? null,
+      unparsedLines: r.unparsedLines || [],
+      droppedFindings: r.droppedFindings || [],
+      findingOutcomes: (r.findingOutcomes || []).map(f => ({
+        pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+        text: f.text, outcome: f.outcome, reason: f.reason || null,
+      })),
+      // THE FINDINGS THIS ROUND PARSED, not only the ones it applied. The
+      // projection used to drop them, so a diff round's dropped finding could
+      // be read while the applied ones could not.
+      findings: (r.findings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+      reviewedPages: r.reviewedPages || [],
+      // THE PROMPT THIS ROUND WAS SENT — every round, including a failed one.
+      // Only the repair round's prompt was ever stored, so the diff's and the
+      // lector's inputs were unreadable after the run.
+      prompt: r.prompt || '',
+      rawResponse: WHOLE_PAGE_KINDS.has(r.kind) ? '' : String(r.rawResponse || ''),
+      // WHAT THE ROUND RETURNED, per page. `before` is not stored: for round N
+      // it is round N-1's `after`, and for round 1 it is `briefsIn` — storing
+      // it would double the bytes for no information.
+      pages: (r.pages || []).map(p => ({ pageNumber: p.pageNumber, after: p.after })),
+      error: r.error || null,
+      analysis: (r.analysis || '').slice(0, 15000),
+    })),
+    changedPages: changed,
+    repetition: usable.repetition || null,
+    audits: (usable.audits || []).map(a => ({
+      source: a.source,
+      ok: !!a.ok,
+      modelKey: a.modelKey || null,
+      modelId: a.modelId || null,
+      faults: a.faults ?? 0,
+      byCategory: a.byCategory || {},
+      elapsedMs: a.elapsedMs || 0,
+      cost: a.cost ?? null,
+      error: a.error || null,
+      raw: (a.raw || '').slice(0, 40000),
+    })),
+    mergedFindings: (usable.mergedFindings || []).map(f => ({
+      pageNumber: f.pageNumber,
+      category: f.category,
+      text: f.text,
+      sources: f.sources,
+    })),
+    mergeStats: usable.mergeStats || null,
+    findingLedger: (usable.findingLedger || []).map(f => ({
+      pageNumber: f.pageNumber, category: f.category, sources: f.sources || [],
+      text: f.text, outcome: f.outcome, reason: f.reason || null,
+    })),
+    // Recomputable from the ledger, and recomputed by nobody: the count is the
+    // headline the dev panel leads with, and deriving it in the client would be
+    // a second implementation of unresolvedFindings.
+    unresolvedCount: unresolvedFindings(usable.findingLedger || []).length,
+    wordBudget: usable.wordBudget || null,
+    proofread: usable.proofread || '',
+    lectorFindings: (usable.lectorFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+    lectorApplied: (usable.lectorApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+    lectorDropped: (usable.lectorDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
+    // THE DIFF'S FOUR, stored the way the lector's four always were. They were
+    // returned by the chain and projected by nobody, so the pass that catches
+    // rewrite damage was the one pass whose output could not be read back.
+    diffReview: usable.diffReview || '',
+    diffFindings: (usable.diffFindings || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+    diffApplied: (usable.diffApplied || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction })),
+    diffDropped: (usable.diffDropped || []).map(f => ({ pageNumber: f.pageNumber, quote: f.quote, correction: f.correction, reason: f.reason })),
+    durationMs: usable.rounds.reduce((n, r) => n + (r.elapsedMs || 0), 0),
+    model: usable.rounds[0]?.modelId || usable.rounds[0]?.modelKey || null,
+    prompt: usable.rounds.find(r => r.kind === 'repair' && r.prompt)?.prompt || '',
+    briefsIn: (usable.original || []).map(p => ({ pageNumber: p.pageNumber, brief: p.text || '' })),
+    analysis: usable.rounds
+      .filter(r => (r.analysis || '').trim())
+      .map(r => `--- Round ${r.round} (${r.kind || 'repair'}${r.modelId ? `, ${r.modelId}` : ''}) ---\n${r.analysis.trim()}`)
+      .join('\n\n'),
+    pages: (usable.pages || [])
+      .filter(p => changed.includes(p.pageNumber))
+      .map(p => ({
+        pageNumber: p.pageNumber,
+        before: beforeByPage.get(p.pageNumber) || '',
+        after: p.text,
+      })),
+  };
+}
+
 module.exports = {
   refineStoryText,
+  projectTextRefineReport,
   extractRefinablePages,
   startBackgroundRefine,
   parseFaultLines,

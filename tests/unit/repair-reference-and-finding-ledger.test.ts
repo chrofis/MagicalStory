@@ -199,7 +199,7 @@ describe('parseLectorLines — findings AND the lines it could not read', () => 
     const src = read('server/lib/textRefine.js');
     expect(src).toMatch(/unparsedCount: lectorUnparsed\.length/);
     expect(src).toMatch(/unparsedCount: diffUnparsed\.length/);
-    expect(read('storyJobPipeline.js')).toMatch(/unparsedCount: r\.unparsedCount \?\? null/);
+    expect(read('server/lib/textRefine.js')).toMatch(/unparsedCount: r\.unparsedCount \?\? null/);
   });
 });
 
@@ -243,7 +243,7 @@ describe('resolveFindingOutcomes separates a refuted claim from an unanswered fi
     expect(src).toMatch(/const returnedIdentical = returnedPages\.filter\(n => !changedPages\.includes\(n\)\)/);
     expect(src).toMatch(/const changedUnasked = changedPages\.filter\(n => !askedPages\.has\(n\)\)/);
     expect(src).toMatch(/resolveFindingOutcomes\(findings, base, changedPages, returnedPages\)/);
-    expect(read('storyJobPipeline.js')).toMatch(/returnedIdentical: r\.returnedIdentical \|\| \[\]/);
+    expect(read('server/lib/textRefine.js')).toMatch(/returnedIdentical: r\.returnedIdentical \|\| \[\]/);
   });
 });
 

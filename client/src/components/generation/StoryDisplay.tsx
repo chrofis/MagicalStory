@@ -2658,11 +2658,26 @@ export function StoryDisplay({
               const analysis = (rep?.analysis || '').trim();
               const briefsIn = rep?.briefsIn || [];
               const unfixed = rep?.clothingUnfixed || [];
+              // WHAT NOTHING CLOSED. The ledger and the dropped corrections have
+              // been stored since the chain was built and rendered by nothing —
+              // so a run that audited every page and fixed none of them looked,
+              // in the only panel that shows this stage, exactly like a clean
+              // run. Those are the runs this panel exists for.
+              const unresolved = (rep?.findingLedger || []).filter(
+                f => f.outcome && f.outcome !== 'page-rewritten'
+              );
+              const dropped = [
+                ...(rep?.diffDropped || []).map(d => ({ ...d, from: 'diff' })),
+                ...(rep?.lectorDropped || []).map(d => ({ ...d, from: 'lector' })),
+              ];
+              const trace = rep?.roundTrace || [];
+              const failedRounds = trace.filter(r => r.ok === false);
               // A stage that ran and rewrote nothing still has findings worth
               // reading — and that is exactly the case worth inspecting — so the
               // prompt, the briefs it saw and the clothing trail keep the panel
               // alive even with zero diffs and no analysis.
-              if (!pages.length && !analysis && !briefsIn.length && !rep?.prompt) return null;
+              if (!pages.length && !analysis && !briefsIn.length && !rep?.prompt
+                && !unresolved.length && !dropped.length && !trace.length) return null;
               const c = TONES[tone];
               return (
                 <details key={panelKey} className={c.box}>
@@ -2673,7 +2688,9 @@ export function StoryDisplay({
                       [{pages.length} {language === 'de' ? 'Seiten geändert' : 'pages changed'}
                       {rep?.model && ` · ${rep.model}`}
                       {rep?.rounds != null && ` · ${rep.rounds} ${language === 'de' ? 'Runden' : 'rounds'}`}
-                      {rep?.durationMs != null && ` · ${(rep.durationMs / 1000).toFixed(0)}s`}]
+                      {rep?.durationMs != null && ` · ${(rep.durationMs / 1000).toFixed(0)}s`}
+                      {rep?.unresolvedCount ? ` · ${rep.unresolvedCount} ${language === 'de' ? 'offen' : 'unresolved'}` : ''}
+                      {failedRounds.length > 0 && ` · ${failedRounds.length} ${language === 'de' ? 'Runden fehlgeschlagen' : 'rounds failed'}`}]
                     </span>
                   </summary>
                   {(rep?.clothingFindings || unfixed.length > 0) && (
@@ -2697,6 +2714,107 @@ export function StoryDisplay({
                         </ul>
                       )}
                     </div>
+                  )}
+                  {unresolved.length > 0 && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {language === 'de' ? 'Offene Befunde (nichts hat sie geschlossen)' : 'Unresolved findings (nothing closed them)'}
+                        <span className="ml-2 text-gray-500">({unresolved.length})</span>
+                      </summary>
+                      <ul className="mt-2 text-xs text-red-700 list-disc pl-5">
+                        {unresolved.map((f, i) => (
+                          <li key={i}>
+                            p{f.pageNumber ?? '?'}{f.category ? ` [${f.category}]` : ''} {f.text}
+                            <span className="text-gray-600"> — {f.outcome}{f.reason ? `: ${f.reason}` : ''}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  {dropped.length > 0 && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {language === 'de' ? 'Verworfene Korrekturen' : 'Dropped corrections'}
+                        <span className="ml-2 text-gray-500">({dropped.length})</span>
+                      </summary>
+                      <ul className="mt-2 text-xs text-red-700 list-disc pl-5">
+                        {dropped.map((d, i) => (
+                          <li key={i}>
+                            p{d.pageNumber} [{d.from}] «{d.quote}»
+                            <span className="text-gray-600"> — {d.reason || (language === 'de' ? 'ohne Grund' : 'no reason recorded')}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                  {trace.length > 0 && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {language === 'de' ? 'Runden' : 'Rounds'}
+                        <span className="ml-2 text-gray-500">({trace.length})</span>
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {trace.map(r => (
+                          <details key={r.round} className="border border-gray-200 rounded p-2">
+                            <summary className="text-xs font-semibold text-gray-700 cursor-pointer">
+                              {r.round}. {r.kind || 'repair'}
+                              <span className={`ml-2 ${r.ok === false ? 'text-red-600' : 'text-gray-400'}`}>
+                                {r.ok === false
+                                  ? `${language === 'de' ? 'fehlgeschlagen' : 'failed'}${r.error ? `: ${r.error}` : ''}`
+                                  : `${r.appliedCount ?? 0} ${language === 'de' ? 'angewandt' : 'applied'}`}
+                              </span>
+                            </summary>
+                            {(r.droppedFindings || []).length > 0 && (
+                              <ul className="mt-2 text-xs text-red-700 list-disc pl-5">
+                                {(r.droppedFindings || []).map((d, i) => (
+                                  <li key={i}>p{d.pageNumber} «{d.quote}» — {d.reason}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {(r.unparsedLines || []).length > 0 && (
+                              <ul className="mt-2 text-xs text-red-700 list-disc pl-5">
+                                {(r.unparsedLines || []).map((u, i) => (
+                                  <li key={i}>{u.reason}: {u.line}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {r.prompt && (
+                              <details className="mt-2">
+                                <summary className={c.sub}>
+                                  {language === 'de' ? 'Prompt' : 'Prompt'}
+                                  <span className="ml-2 text-gray-500">({r.prompt.length.toLocaleString()} {language === 'de' ? 'Zeichen' : 'chars'})</span>
+                                </summary>
+                                <pre className="mt-2 text-[11px] text-gray-700 whitespace-pre-wrap break-words font-mono max-h-96 overflow-auto">{r.prompt}</pre>
+                              </details>
+                            )}
+                            {r.rawResponse && (
+                              <details className="mt-2">
+                                <summary className={c.sub}>
+                                  {language === 'de' ? 'Rohe Antwort' : 'Raw response'}
+                                </summary>
+                                <pre className="mt-2 text-[11px] text-gray-700 whitespace-pre-wrap break-words font-mono max-h-96 overflow-auto">{r.rawResponse}</pre>
+                              </details>
+                            )}
+                            {(r.pages || []).length > 0 && (
+                              <details className="mt-2">
+                                <summary className={c.sub}>
+                                  {language === 'de' ? 'Zurückgegebener Text' : 'Text this round returned'}
+                                  <span className="ml-2 text-gray-500">({(r.pages || []).length})</span>
+                                </summary>
+                                <div className="mt-2 space-y-2">
+                                  {(r.pages || []).map(pg => (
+                                    <div key={pg.pageNumber}>
+                                      <div className={c.label}>{language === 'de' ? 'Seite' : 'Page'} {pg.pageNumber}</div>
+                                      <pre className="text-[11px] text-gray-700 whitespace-pre-wrap break-words font-sans">{pg.after}</pre>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                          </details>
+                        ))}
+                      </div>
+                    </details>
                   )}
                   {rep?.prompt && (
                     <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
