@@ -33,7 +33,7 @@ const SEGMENT_SPLIT = /\s+[—–]\s+|\s+--\s+/;
  */
 const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
-  shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs,
+  shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs, PEOPLELESS_SHARED_SHOT,
 } = require('./shotVocabulary');
 
 /** Words that look like names but never are, in the who-column's grammar. */
@@ -655,26 +655,33 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
         : `${angledPages.length}/${pageCount} pages declare a camera position (${POSITION_SHOTS.join(', ')}); the plan asks for at least ${policy.requiredPositions}`);
   }
 
-  // 2b. A close-up page that stages a below-waist action. The planner is told
-  //     (prompts/story-beats.txt) that "a close-up page is a waist-up moment,
-  //     never a kneeling or floor action" and nothing checked, so the Art
-  //     Director silently answered the contradiction by widening the page to
-  //     `medium` — the plan asked for the close-up, the book shipped without it.
-  //     Measured over 24 staging books to 2026-09-20: 19 planned close-ups came
-  //     back wider, 7 of them because the plan line itself staged the pose.
+  // 2b. A close-up page whose SUBJECT is below the frame line. The planner is
+  //     told (prompts/story-beats.txt) that a close-up page is a waist-up
+  //     moment and nothing checked, so the Art Director silently answered the
+  //     contradiction by widening the page to `medium` — the plan asked for the
+  //     close-up, the book shipped without it.
   //
-  //     The verbs come from shotVocabulary.CLOSEUP_BELOW_WAIST_VERBS, the same
-  //     constant the four brief templates and the planner state as the rule —
-  //     never a second list here, and never a reading of what the prose means.
-  //     Advisory ("also noted"): the planner can answer it two legitimate ways,
-  //     by restaging the beat waist-up OR by making the page a `medium`, and
-  //     which one is right is the planner's call, not this counter's.
+  //     NARROWED 2026-09-20 with the rule it enforces (owner: "a child can sit
+  //     in a close up that is fine"). It no longer counts a POSE the frame
+  //     crops away — sitting, kneeling, crouching, stepping — only an action
+  //     whose visible subject lies below the frame line and so cannot be in
+  //     shot at all. Re-measured over the same 24 staging books / 73 planned
+  //     close-ups: 13 plan lines flagged before, 8 after, and the five dropped
+  //     are cropped poses on a read of all 13.
+  //
+  //     The patterns come from shotVocabulary.CLOSEUP_BELOW_WAIST_VERBS, the
+  //     same constant the six brief/planner sites and scene-review check 7b
+  //     state as the rule — never a second list here, and never a reading of
+  //     what the prose means. Advisory ("also noted"): the planner can answer
+  //     it two legitimate ways, by restaging the beat waist-up OR by making the
+  //     page a `medium`, and which one is right is the planner's call.
   const belowWaist = rows
     .map(r => ({ page: r.pageNumber, verbs: r.shot === 'close-up' ? closeUpBelowWaistVerbs(r.staging) : [] }))
     .filter(r => r.verbs.length);
   if (belowWaist.length) {
     add('SHOT_CLOSEUP_BELOW_WAIST', belowWaist.map(r => r.page),
-      `${belowWaist.map(r => `page ${r.page} (${[...new Set(r.verbs)].join(', ')})`).join('; ')}: a close-up frame ends at the waist, so a page staging one of these cannot be drawn as one. `
+      `${belowWaist.map(r => `page ${r.page} (${[...new Set(r.verbs)].join(', ')})`).join('; ')}: a close-up frame ends at the waist, so a page whose SUBJECT is below that line cannot be drawn as one. `
+      + `A sitting or kneeling pose is fine in a close-up — the legs are simply cropped — so the fix is usually to drop the below-frame detail, not the pose. `
       + `Either restage the moment waist-up — holding, reaching, reacting — or give the page a wider shot; leaving both as they are means the page is drawn wider and the close-up is lost.`);
   }
 
@@ -725,7 +732,8 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
   // `cast out` on any page is in scope.
   if (emptyPages.length === 0) {
     add('NO_PEOPLELESS_PAGE', [],
-      `no page shows only a thing or a place, with no people in frame — one page gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people`);
+      `no page shows only a thing or a place, with no people in frame — one page gives up its cast (${PEOPLELESS_ANSWER_VERB}), and it is a page whose subject is already a thing or a place seen alone, never a moment between people. `
+      + `That page may be the \`${PEOPLELESS_SHARED_SHOT}\` page the shot floors already ask for: a landscape with nobody in it answers both, and a short book has no page to spare for two`);
   }
   // 4b. …but the book may not spend that page on its interpersonal drama.
   //     Measured on job_1789420511893_zly5rcdej: the planner put the mandatory

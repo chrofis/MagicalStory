@@ -690,9 +690,10 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
         // asks; it must not tell the Art Director its own staging was at fault
         // when on some of these pages the beat genuinely needed the room.
         detail: `The page plan asks for a close-up and the brief came back \`${declaredShot}\`. `
-          + `The plan line names none of ${CLOSEUP_BELOW_WAIST_PHRASE}, so nothing in the beat obviously forces the wider frame. `
-          + `If the moment can be staged waist-up — holding, reaching, reacting — restage it and put \`shot\` back to \`close-up\`. `
-          + `If it genuinely needs what is below the waist, keep the wider shot and say in the prose what needs the room.`,
+          + `The plan line names none of ${CLOSEUP_BELOW_WAIST_PHRASE}, so nothing in the beat forces the wider frame. `
+          + `A sitting, kneeling or crouching pose does NOT force it: a close-up crops the legs away, which is what a close-up is, and a crouch brings the head down to what it is looking at. `
+          + `Restage the moment waist-up — holding, reaching, reacting — and put \`shot\` back to \`close-up\`. `
+          + `Keep the wider shot only if the picture must SHOW something below the frame line, and then say in the prose what needs the room.`,
       });
     }
   }

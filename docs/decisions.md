@@ -21,6 +21,117 @@ superseded and link forward.
 
 ---
 
+## 2026-09-20 — A child may SIT in a close-up: the rule forbids a below-frame SUBJECT, not a cropped POSE (supersedes 2026-08-12 "Close-up framing is the scene creator's job")
+
+**Context.** Since 2026-08-12 (Lab #515–#539) a `close-up` page was forbidden to stage
+`kneeling, crouching, sitting, stepping, or feet-on-ground contact`. That rule conflated two
+different things: the POSE a character is in, and what the FRAME shows. A close-up ends at the
+waist, so a sitting or kneeling child's legs are simply cropped out — that is not a fault, it is
+what a close-up IS. Worse, a crouch or a kneel brings the head DOWN to the thing it is looking at,
+which is exactly what puts a ground-level subject inside a waist-up frame: the pose was the thing
+making the shot work, and the rule banned it.
+
+The evidence for the 2026-08-12 verdict never separated the two. The brief that beat every
+image-prompt strength in that run was `"kneels…ankle boots…chest behind him"` — a pose word
+travelling with below-waist garment prose and an object placed behind the character. Two of those
+three are forbidden by other clauses of the same rule that are unaffected here. The measurement
+showed that below-waist SUBJECT MATTER in the prose widens the render; it never showed that a pose
+word alone does.
+
+**Decision (owner, 2026-09-20): "A child can sit in a close up that is fine, change it."** The rule
+now forbids an action whose visible subject lies below the frame line — the ground at a character's
+feet, a story object lying on the ground or floor, a foot placed on a step or surface. `sitting`,
+`kneeling`, `crouching` and `stepping` come out as poses.
+
+**Rationale (measured).** Two bodies of evidence, both cited by the owner.
+
+1. **2026-09-17, Lab #1299–#1312**, 18 renders of staging `job_1789584708605_rts4wqupm` p4 (a child
+   at a hollow among tree roots): a brief declaring `shot: close-up` produced the head-to-object
+   contact the page is about **9/10**; medium-shot briefs produced it **0/8**. The strongest single
+   signal in that run, and it was unshippable at the time precisely because the beat is a kneeling
+   floor beat and the 08-12 rule sent it to `medium`. *Its own stated confound stands and is not
+   resolved by this entry:* every close-up arm's prose also said "head and object fill the frame",
+   so the enum and the prose travelled together and one page cannot separate them.
+2. **2026-09-20, `job_1789853503332_riqncqg1i`:** 5 close-ups planned, 2 delivered. Pages 2, 13 and
+   17 were widened — the discovery, the low point and the hatching, three of the book's load-bearing
+   pages, each losing its intended framing to a pose word.
+
+**Re-measured against the narrowed rule** — 24 staging books / 73 planned close-ups over the 14 days
+to 2026-09-20, replayed over stored `stories.data` plan blocks (rung 1, no paid calls). The old verb
+list flagged **13** plan lines; the narrowed one flags **8**. Reading all 13: the five dropped are
+cropped poses every time ("sits alone on the bank, arms wrapped around his knees"; "crouching,
+holding a single shining scale up between two fingers"; "sitting on the cold summit rock, head
+dropped"; "crouches among the barrels"; "steps back, hands behind him"). The 8 that survive each
+name the ground as something the picture must show ("the dark bilge visible below the grating at her
+feet"; "one hand pressed flat on the cold ground"; "the silent egg resting on the ground before
+him"). **Two of the 8 are pages the old list could not see at all** — "one foot already on the wall
+stones at the shaft's edge" and "digging beside him with bare hands — the branch biting into the
+soil" — both named as known misses in `tasks/BACKLOG.md`. The rule is at once narrower and a better
+fit to the class it is about.
+
+**The rule had drifted into seven hand-written copies.** The constant introduced days earlier
+reached five prompt sites, but `AD_COMPOSITION_RULE` (`promptBuilders.js`, the Art-Director-less
+trial and unified paths) and scene-review check 7b — the CRITIC — were still spelling the list out
+by hand, so the judge went on naming poses the generator had stopped being told about. Both now fill
+from `CLOSEUP_BELOW_WAIST_PHRASE`. Recorded for the record: the two iterate templates
+(`scene-iteration.txt`, `scene-iteration-free.txt`) had silently DROPPED `sitting` from their copy
+— the very verb behind the widened pages 13 and 17 above.
+
+**Follow-through.** `SHOT_CLOSEUP_BELOW_WAIST` and scene-review `[closeup_below_waist]` (7b) are
+NOT deleted — they narrow with the rule and still catch the genuine case. `shot_widened`
+(`sceneBriefCheck.js`) gets MORE legitimate and its wording was firmed accordingly: with poses no
+longer forcing a widen, an Art Director that widens a sitting close-up is plainly at fault, so the
+finding now states that a sitting/kneeling/crouching pose does NOT force the wider frame and asks
+for the restage, where before it only reported the mismatch and asked.
+
+**NOT on `docs/SETTLED.md`** (verified), so the full flip-flop protocol is not triggered; this
+superseding entry is the requirement that does apply.
+
+**Touched files.** `server/lib/shotVocabulary.js` (`CLOSEUP_BELOW_WAIST_VERBS` rewritten),
+`server/lib/planCounters.js`, `server/lib/sceneBriefCheck.js`, `server/lib/promptBuilders.js`
+(`AD_COMPOSITION_RULE`, `buildSceneReviewPrompt` placeholder), `prompts/story-beats.txt`,
+`prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`, `prompts/scene-iteration.txt`,
+`prompts/scene-iteration-free.txt`, `prompts/scene-review.txt`,
+`tests/unit/closeup-below-waist.test.ts`, `tasks/BACKLOG.md`.
+**Status:** ✅ active.
+
+## 2026-09-20 — The people-free page may BE the ultra-wide page: one page discharges two floors
+
+**Context.** At 9–10 pages the floors left ZERO slack. The 9–13 tier mandates close-up 2 +
+ultra-wide 1 + aerial 1 + over-the-shoulder 1 = 5 shot pages, and `NO_PEOPLELESS_PAGE` — a must-fix
+counter — demands a sixth page with no cast in it, against a medium/wide ceiling of 4 at nine pages
+and 5 at ten. Six mandated pages plus a ceiling of 5 needs an 11-page book, so **9 and 10 pages were
+unsatisfiable**: the planner could ship one finding or the other, never neither. Measured on
+`job_1789853503332_riqncqg1i`, it answered `NO_PEOPLELESS_PAGE` with `action in … held here with
+[the main character] just present to satisfy the requirement` — the one move that cannot produce a
+people-free page.
+
+**Decision (owner, 2026-09-20): "books of 10 page allow a bit of freedom, for example put ultra-wide
+and no person together as 1, so only 5 or so are spoken for."** The peopleless page and the
+ultra-wide page may be the SAME page. They are orthogonal: `shot` is a camera word, peopleless is a
+property of the CAST, and an ultra-wide landscape with nobody in it is the natural page to be both.
+
+**At every length, not below a threshold.** Joint satisfaction is only NEEDED at 9–10 pages, but it
+is a PERMISSION, not a quota. A permission legal at ten pages and illegal at eighteen would be an
+arbitrary threshold with nothing behind it and one more number to maintain; at the longer lengths it
+simply buys slack the book is free not to spend. It is stated only where `ultra-wide` is actually
+floored, so a six-page trial — which owes no ultra-wide — is not told to put its cast-free page on
+one.
+
+**Only the CAST property combines.** `shot` is one-of, so aerial, over-the-shoulder, close-up and
+ultra-wide can never satisfy each other; the planner phrase says so out loud and a test pins it.
+
+**Rationale (the arithmetic).** `shotFloors` now reports `mandatedPages` and `slack` so no caller
+re-derives them, and the floor-consistency check walks every length 4–40 with the people-free page
+counted in. Slack after the change (pages − mandated − medium/wide ceiling): 4–8 pages 1–3;
+**9–10 pages 0** (exactly satisfiable, was impossible); 11–12 pages 1; 13 pages 2; 14 pages 1;
+18–19 pages 3; 24 pages 5; 30 pages 7; 40 pages 10. **No length is unsatisfiable.**
+
+**Touched files.** `server/lib/shotVocabulary.js` (`PEOPLELESS_SHARED_SHOT`, `shotFloors`,
+`shotDistributionPhrase`), `server/lib/planCounters.js` (`NO_PEOPLELESS_PAGE` detail),
+`tests/unit/shot-distribution-floors.test.ts`.
+**Status:** ✅ active.
+
 ## 2026-09-19 — An UNDECLARED garment state is REPORTED, not defaulted: the Art Director owes a row for every tracked garment, linked or not
 
 **Context:** `resolveWornItemsForPage` has two sources. Source 1 enumerates the
@@ -17114,6 +17225,12 @@ were left alone.
 `server/lib/images.js`.
 
 ## 2026-08-12: Close-up framing is the scene creator's job, not the image prompt's
+
+> **SUPERSEDED in part, 2026-09-20** — see "A child may SIT in a close-up: the rule forbids a
+> below-frame SUBJECT, not a cropped POSE". The verdict that the constraint lives in the Art
+> Director templates STANDS. What is reversed is its scope: `kneeling`, `crouching`, `sitting`
+> and `stepping` are no longer forbidden as poses — a close-up crops the legs away, which is
+> what a close-up is. Only an action whose visible subject lies below the frame line is.
 
 **Context:** Declared close-up pages consistently rendered as full figures — feet in
 frame, object turned to the camera, gaze at the viewer (Zauberer-Ruedi P3, Baden P2,
