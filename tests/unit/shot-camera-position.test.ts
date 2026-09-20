@@ -101,40 +101,63 @@ describe('SHOT_VARIETY is about camera DISTANCE, not about eight words', () => {
 });
 
 describe('SHOT_NO_CAMERA_POSITION — a book drawn entirely at eye level', () => {
+  // TEN PAGES, NOT FOUR (2026-09-20). The position floor became TIERED with the
+  // distribution table: a book of eight pages or fewer is asked for no angle at
+  // all, so a four-page fixture no longer trips this counter — by design, so a
+  // six-page trial is never sent back for an over-the-shoulder page. Ten pages
+  // sits in the middle tier, which owes two positions.
   const eyeLevel = [
     page(1, line('wide', 'Ana')),
     page(2, line('close-up', 'Ben')),
     page(3, line('medium', 'Ana and Ben')),
     page(4, line('ultra-wide', 'Ana')),
+    page(5, line('close-up', 'Ben')),
+    page(6, line('wide', 'Ana')),
+    page(7, line('medium', 'Ben')),
+    page(8, line('ultra-wide', 'Ana and Ben')),
+    page(9, line('close-up', 'Ana')),
+    page(10, line('medium', 'Ben')),
   ];
+  /** The book with its last N pages replaced by angled ones. */
+  const angled = (...shots: string[]) => [
+    ...eyeLevel.slice(0, eyeLevel.length - shots.length),
+    ...shots.map((shot, i) => page(eyeLevel.length - shots.length + i + 1, line(shot, 'Ana'))),
+  ];
+
+  it('a book of eight pages or fewer is asked for no camera position at all', () => {
+    expect(codesFor(eyeLevel.slice(0, 8))).not.toContain('SHOT_NO_CAMERA_POSITION');
+  });
 
   it('fires when no page declares a camera position', () => {
     expect(codesFor(eyeLevel)).toContain('SHOT_NO_CAMERA_POSITION');
   });
 
-  it('is answered by a single angled page — the floor is one, not a quota', () => {
-    const withAngle = [...eyeLevel.slice(0, 3), page(4, line('high-angle', 'Ana'))];
-    expect(codesFor(withAngle)).not.toContain('SHOT_NO_CAMERA_POSITION');
+  it('one angled page is not enough at this length — the tier asks for two', () => {
+    expect(codesFor(angled('high-angle'))).toContain('SHOT_NO_CAMERA_POSITION');
+    expect(codesFor(angled('high-angle', 'low-angle'))).not.toContain('SHOT_NO_CAMERA_POSITION');
   });
 
   it('is answered by any of the four positions', () => {
     for (const id of POSITION_SHOTS) {
-      const pages = [...eyeLevel.slice(0, 3), page(4, line(id, 'Ana'))];
-      expect(codesFor(pages), `\`${id}\` did not satisfy the counter`)
+      expect(codesFor(angled(id, id)), `\`${id}\` did not satisfy the counter`)
         .not.toContain('SHOT_NO_CAMERA_POSITION');
     }
   });
 
-  it('names no page — it is a property of the whole book, like SHOT_VARIETY', () => {
+  it('names the angled pages it found, and none when the book is all eye level', () => {
     const f = runPlanCounters({ roster: rosterFor(eyeLevel), pages: eyeLevel, commissionedNames: CAST })
       .findings.find((x: any) => x.code === 'SHOT_NO_CAMERA_POSITION');
     expect(f.pages).toEqual([]);
   });
 
-  // A must-fix finding spends a re-plan round on every book that trips it, and
-  // every book stored today trips this one. Not must-fix without an owner call.
-  it('is not a must-fix code', () => {
-    expect(PB.replanRank({ code: 'SHOT_NO_CAMERA_POSITION' })).toBe('also');
+  // REVERSED 2026-09-20 (owner). It reported as "also noted" from 2026-09-19,
+  // on the reasoning that a must-fix would spend a re-plan round on every book
+  // until the planner reached for a position unprompted. It never did: 3 pages
+  // in 180 across the eleven staging books of the following fortnight, because
+  // nothing in the prompt asked for one. The prompt now states the table these
+  // counters measure, and the finding is must-fix.
+  it('is a must-fix code', () => {
+    expect(PB.replanRank({ code: 'SHOT_NO_CAMERA_POSITION' })).toBe('must');
     expect(PB.replanRank({ code: 'NO_FOCAL_PAGE' })).toBe('must');
   });
 });
@@ -154,8 +177,12 @@ describe('the planner is asked for a camera position', () => {
     }
   });
 
-  it('the template fills the list rather than spelling it out', () => {
+  it('the template fills the distribution rather than spelling it out', () => {
+    // The position list reaches the planner inside {SHOT_DISTRIBUTION} since
+    // 2026-09-20: one sentence states the words AND how many pages owe one, and
+    // that count is page-count aware, so the template cannot hold a literal.
     const { PROMPT_TEMPLATES } = require_('../../server/services/prompts');
-    expect(String(PROMPT_TEMPLATES.storyBeats)).toContain('{SHOT_POSITIONS}');
+    expect(String(PROMPT_TEMPLATES.storyBeats)).toContain('{SHOT_DISTRIBUTION}');
+    expect(String(PROMPT_TEMPLATES.storyBeats)).not.toContain('{SHOT_POSITIONS}');
   });
 });

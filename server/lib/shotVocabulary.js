@@ -2,8 +2,9 @@
  * SHOT VOCABULARY — one definition of the camera-framing words, for every stage
  * that writes, counts, or acts on one.
  *
- * A shot word is PRODUCED by the beats planner (prompts/story-beats.txt: "about
- * two close-ups and two ultra-wides"), COUNTED here by planCounters
+ * A shot word is PRODUCED by the beats planner (prompts/story-beats.txt, which
+ * states the distribution shotDistributionPhrase below builds), COUNTED here by
+ * planCounters
  * (SHOT_VARIETY / SHOT_CLOSEUP_COUNT / SHOT_ULTRAWIDE_COUNT), carried through
  * the Art Director's `shot` field (prompts/scene-expansion.txt,
  * scene-expansion-all.txt) and finally ACTED ON by the illustrator
@@ -156,6 +157,125 @@ const SHOT_POSITIONS = POSITION_SHOTS
  */
 const SHOT_DEFINITIONS = `**SHOT:** The scene description declares the shot. ${SHOTS.map(s => s.definition).join(' ')}`;
 
+/**
+ * HOW MANY PAGES OF EACH — the one declaration of the distribution, read by the
+ * planner that WRITES the shots (prompts/story-beats.txt, via
+ * shotDistributionPhrase) and by the counters that MEASURE them
+ * (server/lib/planCounters.js, via shotFloors). One table, so the book is never
+ * marked down against a spread nobody asked it for.
+ *
+ * MEASURED, 11 staging books / 180 pages over the 14 days to 2026-09-20:
+ * medium 76 (42%), wide 54 (30%), close-up 37 (21%), ultra-wide 10 (5.6%),
+ * high-angle 2 (1.1%), over-the-shoulder 1 (0.6%), aerial 0. Medium plus wide
+ * is 72% of every page shipped, and a camera position appears on 3 pages in 180.
+ *
+ * The planner was COMPLYING. The prompt asked for "about two close-ups and two
+ * ultra-wides, the rest medium or wide", which on an 18-page book is an explicit
+ * request for ~78% medium-or-wide. The fix is therefore the prompt first — it
+ * now states this table — and the counters second (owner, 2026-09-20).
+ *
+ * Why a SHARE and not a count: the cap scales to any book length with no
+ * threshold to maintain. Why TIERED floors: a 6-page trial must not be asked for
+ * two over-the-shoulder pages.
+ *
+ * `ultra-wide` is a DISTANCE and `aerial` is a POSITION — different shots on
+ * different axes, each with its own floor. They are never folded together.
+ */
+const MAX_MEDIUM_WIDE_SHARE = 0.5;
+
+/**
+ * The two middle distances the cap is about — the default framings a book falls
+ * back on when no page earns anything else. Declared here so the counters read a
+ * name instead of spelling the two words out for themselves.
+ */
+const MID_DISTANCE_SHOTS = ['medium', 'wide'];
+
+/**
+ * id → the finding code planCounters raises when a book is short of that shot.
+ * One code per floored shot, so a re-plan is told WHICH shot is missing rather
+ * than that the spread is wrong. `ultra-wide` is a DISTANCE and `aerial` a
+ * POSITION: different shots on different axes, never folded together.
+ */
+const SHOT_FLOOR_CODE = {
+  'close-up': 'SHOT_CLOSEUP_COUNT',
+  'ultra-wide': 'SHOT_ULTRAWIDE_COUNT',
+  'over-the-shoulder': 'SHOT_OTS_COUNT',
+  'aerial': 'SHOT_AERIAL_COUNT',
+};
+
+/**
+ * Tightest tier first; a book takes the first tier whose `maxPages` it fits.
+ * `positionsTotal` is a floor on camera positions TAKEN TOGETHER, on top of the
+ * per-shot floors — null where the tier asks for no total.
+ */
+const SHOT_FLOOR_TIERS = [
+  { maxPages: 8, floors: { 'close-up': 1 }, positionsTotal: null },
+  {
+    maxPages: 13,
+    floors: { 'close-up': 2, 'ultra-wide': 1, 'aerial': 1, 'over-the-shoulder': 1 },
+    positionsTotal: null,
+  },
+  {
+    maxPages: Infinity,
+    floors: { 'close-up': 2, 'ultra-wide': 1, 'aerial': 1, 'over-the-shoulder': 2 },
+    positionsTotal: (pages) => Math.ceil(pages / 6),
+  },
+];
+
+for (const tier of SHOT_FLOOR_TIERS) {
+  for (const id of Object.keys(tier.floors)) {
+    if (!SHOT_TYPES.includes(id)) {
+      throw new Error(`shotVocabulary: SHOT_FLOOR_TIERS floors an unknown shot \`${id}\``);
+    }
+    if (!SHOT_FLOOR_CODE[id]) {
+      throw new Error(`shotVocabulary: no finding code for the floored shot \`${id}\` — a floor nothing can report is not enforceable`);
+    }
+  }
+}
+
+/**
+ * The distribution one book of `pageCount` pages owes.
+ *
+ * @returns {{floors: Object<string, number>, positionsTotal: number,
+ *            requiredPositions: number, maxMediumWide: number}}
+ *   `floors` id → minimum pages; `positionsTotal` the tier's own total floor (0
+ *   where it asks for none); `requiredPositions` what the tier actually demands
+ *   on the position axis, which is the larger of that total and the position
+ *   floors added up; `maxMediumWide` the most medium-or-wide pages the book may
+ *   hold — one more than this exceeds MAX_MEDIUM_WIDE_SHARE.
+ */
+function shotFloors(pageCount) {
+  const pages = Math.max(0, Number(pageCount) || 0);
+  const tier = SHOT_FLOOR_TIERS.find(t => pages <= t.maxPages) || SHOT_FLOOR_TIERS[SHOT_FLOOR_TIERS.length - 1];
+  const floors = { ...tier.floors };
+  const positionsTotal = tier.positionsTotal ? tier.positionsTotal(pages) : 0;
+  const positionFloorSum = POSITION_SHOTS.reduce((n, id) => n + (floors[id] || 0), 0);
+  return {
+    floors,
+    positionsTotal,
+    requiredPositions: Math.max(positionsTotal, positionFloorSum),
+    maxMediumWide: Math.floor(pages * MAX_MEDIUM_WIDE_SHARE),
+  };
+}
+
+/**
+ * The same table as one sentence for the planner. Built from shotFloors, so the
+ * words the planner reads and the numbers the counters enforce cannot drift.
+ */
+function shotDistributionPhrase(pageCount) {
+  const { floors, requiredPositions, maxMediumWide } = shotFloors(pageCount);
+  const list = SHOT_TYPES
+    .filter(id => floors[id])
+    .map(id => `${floors[id]} ${id} page${floors[id] === 1 ? '' : 's'}`)
+    .join(', ');
+  // A short book is asked for no angle, but it is still SHOWN the words — the
+  // page that earns one may take it at any length.
+  const positions = requiredPositions
+    ? ` ${requiredPositions} page${requiredPositions === 1 ? '' : 's'} in total leave eye level for a camera position (${SHOT_POSITIONS}).`
+    : ` A page may leave eye level for a camera position (${SHOT_POSITIONS}) where it earns one.`;
+  return `Across the ${pageCount} pages: at most ${maxMediumWide} of them medium or wide — half the book at most, and never only two camera distances across the book. At least ${list}.${positions} These are floors, not targets: spend the remaining pages on whichever of the eight words each page earns, and keep the angled pages few enough that an angle still reads as one.`;
+}
+
 module.exports = {
   SHOTS,
   SHOT_TYPES,
@@ -167,4 +287,10 @@ module.exports = {
   SHOT_ENUM,
   SHOT_POSITIONS,
   SHOT_DEFINITIONS,
+  MAX_MEDIUM_WIDE_SHARE,
+  MID_DISTANCE_SHOTS,
+  SHOT_FLOOR_CODE,
+  SHOT_FLOOR_TIERS,
+  shotFloors,
+  shotDistributionPhrase,
 };

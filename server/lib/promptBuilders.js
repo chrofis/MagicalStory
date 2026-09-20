@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, shotDistributionPhrase } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -6609,6 +6609,29 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // EXISTING peopleless page earns its place, so it is structurally unable to
   // notice that the book has none.
   'NO_PEOPLELESS_PAGE',
+  // THE SHOT DISTRIBUTION JOINED 2026-09-20 (owner), the whole block of it:
+  // SHOT_MEDIUM_WIDE_EXCESS, SHOT_CLOSEUP_COUNT, SHOT_ULTRAWIDE_COUNT,
+  // SHOT_AERIAL_COUNT, SHOT_OTS_COUNT and SHOT_NO_CAMERA_POSITION.
+  //
+  // MEASURED, 11 staging books / 180 pages over the 14 days to 2026-09-20:
+  // medium 76 (42%), wide 54 (30%), close-up 37 (21%), ultra-wide 10 (5.6%),
+  // high-angle 2, over-the-shoulder 1, aerial 0. Medium plus wide is 72% of
+  // every page shipped and a camera position appears on 3 pages in 180 — the
+  // state the paragraph below predicted would persist while these reported as
+  // "also noted". It did: on job_1789853503332_riqncqg1i SHOT_ULTRAWIDE_COUNT
+  // was raised in BOTH plan-check rounds and the book shipped without one.
+  // A finding nothing is obliged to answer is not a finding, which is the same
+  // reasoning that promoted NO_PEOPLELESS_PAGE above.
+  //
+  // The prompt side moved FIRST and is the actual fix: story-beats.txt asked
+  // for "about two close-ups and two ultra-wides, the rest medium or wide",
+  // which on an 18-page book is an explicit request for ~78% medium-or-wide.
+  // The planner was complying. It now states the same tiered table these
+  // counters measure (shotVocabulary.SHOT_FLOOR_TIERS), so a must-fix round is
+  // spent on a spread the planner was actually asked for.
+  'SHOT_MEDIUM_WIDE_EXCESS', 'SHOT_CLOSEUP_COUNT', 'SHOT_ULTRAWIDE_COUNT',
+  'SHOT_AERIAL_COUNT', 'SHOT_OTS_COUNT', 'SHOT_NO_CAMERA_POSITION',
+  // THE HISTORY THAT DECISION REVERSES, kept rather than deleted:
   // NOT HERE, DELIBERATELY: SHOT_NO_CAMERA_POSITION (owner, 2026-09-19). Camera
   // position became expressible on a page only today, and the measured baseline
   // is that every stored book is eye level on every page — 6 of 1,504 stored
@@ -6618,6 +6641,9 @@ const REPLAN_MUST_FIX_CODES = new Set([
   // counters, whose own header calls shot distribution "a preference next to
   // these". Revisit when stored plans show the planner reaching for a position
   // unprompted, so the finding is the exception rather than the rule.
+  // REVISITED 2026-09-20, as that last sentence asked: the planner did not
+  // reach for one unprompted (3 pages in 180), because nothing asked it to.
+  // The prompt now does, and the code above enforces the floor.
 ]);
 
 /**
@@ -7015,6 +7041,12 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // planner is the only stage that sees the whole book, so a spread of them
     // can only be decided here. See server/lib/shotVocabulary.js.
     SHOT_POSITIONS,
+    // WHAT A GOOD SPREAD OF SHOTS IS, stated to the planner from the same table
+    // server/lib/planCounters.js measures it against (shotVocabulary's
+    // SHOT_FLOOR_TIERS). The planner is the only stage that sees the whole book,
+    // so the spread can only be decided here — and it is page-count aware, so a
+    // six-page trial is never asked for two over-the-shoulder pages.
+    SHOT_DISTRIBUTION: shotDistributionPhrase(pageCount),
     PAGE_COUNT: pageCount,
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE
