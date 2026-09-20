@@ -1,6 +1,6 @@
 import { describe, it, beforeAll, expect } from 'vitest';
 
-const { buildBeatsPrompt, buildStoryTextFromBeatsPrompt } = require('../../server/lib/promptBuilders');
+const { buildBeatsPrompt, buildStoryTextFromBeatsPrompt, HINT_VS_ARC_RULE } = require('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require('../../server/services/prompts');
 
 const HINTS = [
@@ -57,9 +57,23 @@ describe('an arc hint is a story change, not a licence to break a picture rule',
     expect(p).toContain('Keep Nia on a short leash beside Max through every later beat.');
   });
 
+  /**
+   * Second half of the same guard: the picture rules were covered, the settled
+   * story was not. A hint born from a saved profile can ask for a situation the
+   * arc rules out (job_1789853503332_riqncqg1i) and both stages obeyed it.
+   */
+  it('both hint headings carry the same arc-outranks-hint rule, from one constant', () => {
+    expect(HINT_VS_ARC_RULE).toBeTruthy();
+    const plan = buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: HINTS });
+    const text = buildStoryTextFromBeatsPrompt(input(), [], [], '1. A story.', { arcHints: HINTS });
+    expect(plan).toContain(HINT_VS_ARC_RULE);
+    expect(text).toContain(HINT_VS_ARC_RULE);
+  });
+
   it('no hints, no block and no orphan clause', () => {
     const p = buildBeatsPrompt(input(), 18, { finalArc: '1. A story.', arcHints: '' });
     expect(p).not.toContain('FIX WHILE DIVIDING');
     expect(p).not.toContain('Never break a rule below to honour a hint.');
+    expect(p).not.toContain(HINT_VS_ARC_RULE);
   });
 });

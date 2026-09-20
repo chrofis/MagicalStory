@@ -6925,6 +6925,15 @@ function parsePlanCheckObstacles(raw) {
   return out;
 }
 
+// A HINT MAY NOT CONTRADICT THE SETTLED ARC (2026-09-19).
+// One constant, injected into BOTH hint headings — the planner's and the text
+// writer's — which form one contract (docs/sibling-paths.md). The hint pass
+// reads the arc and the saved character profiles together; a hint that carries
+// a profile detail the arc rules out (staging job_1789853503332_riqncqg1i: a
+// saved friendship against an arc that stages a first meeting) reaches both
+// stages, and neither was told which to believe.
+const HINT_VS_ARC_RULE = 'A hint never changes the situation the story settled: where one asks for what the story above rules out — a saved profile\'s friendship where the story stages a first meeting — the story stands and the hint is dropped.';
+
 function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', replan = '' } = {}) {
   const template = PROMPT_TEMPLATES.storyBeats;
   if (!template) {
@@ -6997,6 +7006,7 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
         '# FIX WHILE DIVIDING — apply these where the division can carry them',
         '',
         'Each is a change to the STORY. Apply it in the pages where a picture can hold it. Where it cannot — a figure kept in frame past the cast limit, two actions at one instant — leave it to the text, which is told to apply what the division has not. Never break a rule below to honour a hint.',
+        HINT_VS_ARC_RULE,
         '',
         String(arcHints).trim(),
       ].join('\n')
@@ -7969,7 +7979,7 @@ function arcCritiqueSpec({ retell = false } = {}) {
     '5. Where the commission states a theme, topic or life skill, is the story genuinely rich in its material — introduced where it first matters, not present in name only — does it drive the climax, and does the character who most needs it visibly act on it before the end, acted on and never stated as a moral?',
     '6. Does every planted object or flaw pay off, and does every payoff trace to a plant — an orphan on either side is cut?',
     '',
-    `"Faults:" and 3 to 6 numbered story-level faults${remain}; they usually look like: an event without a cause, a stake that cannot be lost or that never bites (announced but never felt), a cost the world undoes for free — a thing taken, blocked or used up whose replacement is lying all around and nothing closes that way, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids, an action that does not accomplish what the sentence claims it accomplishes, a mechanism that runs on rules instead of sight — a contraption needing more than one rule to understand, or a stated rule about what would happen that is never seen happening (a fault whenever a child cannot retell how it works in one sentence, or a single picture cannot show it working), a character who is anyone — nothing they do comes from who they are, an interaction no real person would have — a reaction the plot needs but the person would not give. The last three are MAJOR by default; a main cast of interchangeable figures is CRITICAL. Numeric precision and sourced measurements and times are not arc faults — later stages fix those; never list one. Tag every fault [CRITICAL] — the story is broken; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.`,
+    `"Faults:" and 3 to 6 numbered story-level faults${remain}; they usually look like: an event without a cause, a stake that cannot be lost or that never bites (announced but never felt), a cost the world undoes for free — a thing taken, blocked or used up whose replacement is lying all around and nothing closes that way, a removable character, a rival who stops pressing, knowledge nobody could have, a premise the commission forbids, an action that does not accomplish what the sentence claims it accomplishes, a mechanism that runs on rules instead of sight — a contraption needing more than one rule to understand, or a stated rule about what would happen that is never seen happening (a fault whenever a child cannot retell how it works in one sentence, or a single picture cannot show it working), a character who is anyone — nothing they do comes from who they are, an interaction no real person would have — a reaction the plot needs but the person would not give. The last three are MAJOR by default; a main cast of interchangeable figures is CRITICAL. Numeric precision and sourced measurements and times are not arc faults — later stages fix those; never list one. The arc has no pages: no fault names a page number or a position in pages. Tag every fault [CRITICAL] — the story is broken; [MAJOR] — a real story fault repairable inside the existing structure; or [MINOR] — a blemish.`,
   ].join('\n');
 }
 
@@ -8047,6 +8057,12 @@ function buildArcHintsPrompt(inputData, finalArc) {
   const ctx = buildStoryContextFields(inputData);
   return fillTemplate(template, {
     STORY_BRIEF: ctx.STORY_BRIEF,
+    // 'arc', not the default 'premise': this stage reads a FINAL arc that is
+    // already settled, so the arc outranks a saved profile on the situation.
+    // Without it the hint pass read the profile as master and emitted a CHANGE
+    // undoing a first meeting the arc staged (job_1789853503332_riqncqg1i); the
+    // hint rides into buildBeatsPrompt and the planner obeyed it.
+    CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
     CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
     FINAL_ARC: String(finalArc || '').trim(),
   });
@@ -8941,11 +8957,19 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
   }
   // Brief per page, trimmed to the prose the writer needs. The METADATA block
   // is machine data for the image call (zones, depths, bbox hints) — it would
-  // only invite the writer to narrate staging.
+  // only invite the writer to narrate staging. Visual-Bible ids go for the same
+  // reason: `(ART001.1)`, `(VEH001)` and friends are grounding handles for the
+  // image call, the brief already names the thing in plain words beside them,
+  // and the writer is never told what they are. cleanPageText's output-side
+  // guard only matches the bracketed `[ART001]` form, so the parenthesised ids
+  // the briefs actually carry would reach the page unscrubbed.
   const briefByPage = new Map(
     (expansions || [])
       .filter(x => x && x.pageNumber != null)
-      .map(x => [x.pageNumber, String(x.brief || '').split(/---\s*METADATA/i)[0].trim()])
+      .map(x => [x.pageNumber, String(x.brief || '')
+        .split(/---\s*METADATA/i)[0]
+        .replace(/\s*[([]\s*[A-Z]{2,3}\d{3}(?:\.\d+)?\s*[)\]]/g, '')
+        .trim()])
   );
   const blocks = beats
     .map(b => {
@@ -8957,7 +8981,7 @@ function buildStoryTextFromBeatsPrompt(inputData, beats = [], expansions = [], a
   return fillTemplate(template, {
     STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
     ARC_HINTS: String(arcHints || '').trim()
-      ? `# HINTS — apply these in the text where the beats have not\n\n${String(arcHints).trim()}`
+      ? `# HINTS — apply these in the text where the beats have not\n\n${HINT_VS_ARC_RULE}\n\n${String(arcHints).trim()}`
       : '',
     // NO COMMISSION HERE. The template carries no {STORY_BRIEF}: by this stage
     // the arc IS the story, and it has already ruled on the idea's mechanics —
@@ -9737,6 +9761,7 @@ module.exports = {
   // `beats-planner-vs-plan-check`).
   DEED_AND_EFFECT_DEF,
   TWO_HEIGHTS_DEF,
+  HINT_VS_ARC_RULE,
   NAMING_DEF,
   ENDING_EVENT_DEF,
   WANTED_PICTURE_DEF,

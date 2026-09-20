@@ -50476,3 +50476,65 @@ Art Director and iterate builders), `tests/unit/text-checklist-by-reader.test.ts
 **Rationale:** Rule 7 and the atomic-action critique exist for a good reason — an instruction full of non-actions produces a model that changes nothing — so widening them to admit prose was the wrong fix. What was missing was a NARROW, NAMED channel for "keep this true while you change that", and half of it was already built and dead. Wiring the existing field is strictly smaller than loosening the rule, and the dead-field half-build was itself the bug.
 **Touched:**   `server/lib/repairLogic.js` (`buildPreserveClause`, `PRESERVE_MAX`), `server/lib/images.js` (`inpaintPage` — builds, sanitises and interpolates `preserveClause`), `prompts/feedback-consolidator.txt` (rule 6b + critique rule 5), `tests/unit/inpaint-preserve-channel.test.ts`
 **Status:**    ✅ active
+
+## 2026-09-20 — The object-scale check ran in the live path and measured nothing: a starved input and a discarded field
+
+**Context:**   The cross-page object-scale check (`objectScaleAudit.js`, shipped 2026-09-19) was wired into the live repair pipeline and produced nothing on any story. Two independent faults, both invisible. (1) STARVATION: `repairPipeline.js` calls `auditStoryBook({ id, sceneImages: buildAuditPages(...) })`, and `buildAuditPages` projected each page down to `{pageNumber, text, imageData}`. So the story handed to the audit carried **no `visualBible`** and **no `sceneMetadata.objects`**. `selectScaleObjects` read `vb.artifacts` as `[]` and every page's citations as empty, returning zero candidates AND zero skips — so not even a `notEvaluated` row was written. Total silence, in a check whose whole output is a `notEvaluated` row or a finding. (2) DISCARD: `audit.objectScale` was never copied into the `bookAuditRounds.push({…})` record, which is a hand-kept field whitelist, and nothing wrote `finalChecksReport.objectScale`. A real finding would have been computed and thrown away — the same whitelist class that previously ate `notEvaluated`, `degradedScene` and `threeStageResult`.
+
+**Decision:**  The citations ride on the projection (`buildAuditPages` emits `citedIds`, and `objectScaleAudit.citedIds` reads that third page shape), the caller passes `visualBible`, the result is stored on the round record and surfaced as `finalChecksReport.objectScale` from the last round that carries one. And a **starvation guard**: when object-scale is enabled and the story carries no scale-collection bible entries or no page citations, `auditStoryBook` `log.error`s and records `notEvaluated('object_scale','missing_input')`. A starved check is never allowed to return quietly again.
+
+**Rationale:** Both faults are a projection problem, not a logic problem — the selector is correct, and against the real story blob it picks `ART001 "large warm egg"` on 15 pages and correctly skips three props as `too_few_pages`. The guard exists because this is the third starved-component bug of the same shape: the component that is starved is exactly the one that cannot notice, so the noticing has to be written at the boundary where the story is received. Verified on staging `job_1789853503332_riqncqg1i` (18 pages): once wired, the check named the egg **larger on p14 and smaller on p13**, both confirmed by eye (p13 ≈ 0.64× a child's head, p14 ≈ 1.3×). It missed p16 (≈ 1.4×, the toddler hugging it) — consistent with the finding text's own stated miss-mode, and the reason the finding is worded "go and look", not a verdict.
+
+**Touched:**   `server/lib/bookAudit.js` (`buildAuditPages` citations, starvation guard), `server/lib/objectScaleAudit.js` (`citedIds` third shape), `server/lib/repairPipeline.js` (bible passed in, `objectScale` stored on the round), `storyJobPipeline.js` (`finalChecksReport.objectScale`), `tests/unit/book-audit-scale-starvation.test.ts`
+**Status:**    ✅ active
+
+---
+
+## 2026-09-20 — The hint pass answers to the ARC, and a hint may not contradict the settled arc anywhere it lands
+
+**Context:** The 2026-09-19 character-source split (`characterSourceRule()`,
+commits 54da822b1 / f1c589a83) injected one constant into four prompts —
+arc-create, arc-retell, story-arc-review (master `premise`) and story-beats
+(master `arc`). `prompts/arc-hints.txt` is a FIFTH stage reading the same two
+inputs: the full saved character profiles and the story. It got nothing. The
+built prompt showed the profiles and the arc side by side with no statement of
+which outranks which.
+
+Measured on staging `job_1789853503332_riqncqg1i`: the commission stages four
+boys who do not know each other; a main character's saved profile names two of
+them as good friends. The arc honoured the commission. The hint pass then
+emitted *"ISSUE: The boys introduce themselves as strangers even though … details
+already name … as his good friends → CHANGE: Have them greet one another by
+name as friends"*. Hints ride into `buildBeatsPrompt` (beatsPipeline.js:1157),
+so the stored plannerPrompt carried the hint at line 37 and the contradicting
+character-source rule at line 65. The planner obeyed the hint: plan p3 has them
+greeting by name, and the arc's introductions beat never reached the book.
+
+**Decision:** Two changes, both from existing constants.
+1. `arc-hints.txt` declares `{CHARACTER_SOURCE_RULE}` and
+   `buildArcHintsPrompt` fills it with `characterSourceRule({ master: 'arc' })`.
+   The stage is handed a FINAL arc (`buildArcHintsPrompt(inputData, finalArc)`),
+   so the arc is master — the same choice `buildBeatsPrompt` makes. The
+   template's `# THE FINAL ARC` block moved above `# CHARACTER DETAILS` so the
+   rule's "the arc above" is literally true.
+2. A new single constant `HINT_VS_ARC_RULE` is appended to BOTH arc-hint
+   headings — the planner's `# FIX WHILE DIVIDING` block and the text writer's
+   `# HINTS` block, the declared sibling pair `arc-hint-handoff`. It states that
+   a hint never changes the situation the story settled. The existing
+   "A HINT IS A STORY CHANGE, NOT A LICENCE TO BREAK A PICTURE RULE" guard was
+   extended, not duplicated: it covered picture rules only.
+
+**Rationale:** Fixing only the hint pass would leave the planner with no ruling
+when a hint from an older run, a Lab replay or a future stage contradicts the
+arc; fixing only the planner would leave the hint pass generating hints nobody
+can act on. One rule at the source, one rule at both consumers, no second code
+path. The registry set `character-source-claim` gains `arc-hints.txt` as a fifth
+member so the next stage to read these two inputs cannot be missed the same way.
+
+**Touched:** `prompts/arc-hints.txt`, `server/lib/promptBuilders.js`
+(`buildArcHintsPrompt`, `HINT_VS_ARC_RULE`, `buildBeatsPrompt` ARC_HINTS,
+`buildStoryTextFromBeatsPrompt` ARC_HINTS), `scripts/admin/sibling-registry.json`,
+`tests/unit/character-source-rule-reach.test.ts`,
+`tests/unit/arc-hint-handoff.test.ts`, `tasks/bugs.json`.
+
+**Status:** ✅ active

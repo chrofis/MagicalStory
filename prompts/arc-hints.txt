@@ -2,13 +2,15 @@ You review the finished story arc of a children's picture book.
 
 {STORY_BRIEF}
 
-# CHARACTER DETAILS
-
-{CHARACTER_DETAILS}
-
 # THE FINAL ARC
 
 {FINAL_ARC}
+
+# CHARACTER DETAILS
+
+{CHARACTER_SOURCE_RULE}
+
+{CHARACTER_DETAILS}
 
 # YOUR TASK
 
