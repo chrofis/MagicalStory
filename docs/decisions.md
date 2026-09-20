@@ -50551,3 +50551,101 @@ member so the next stage to read these two inputs cannot be missed the same way.
 `tests/unit/arc-hint-handoff.test.ts`, `tasks/bugs.json`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-20 — The plan-check roster reads the WHO COLUMN ALONE, and expands every collective its own cast can name
+
+**Context:** `peopled`, `peoplelessPages` and every cast-derived plan counter
+are arithmetic over the plan check MODEL's roster, including its prose
+resolution of a who column into `coveredNames` (`planCounters.js:474`). On
+staging `job_1789759147125_p08djwhbl` the SAME untouched plan line for page 11 —
+`ultra-wide — the Lindenhof hill rooftops against a pale sky, the Grossmünster
+towers on the horizon — the last sunlight slides off the roof tiles while the
+raven flits ahead over the ridge, the children small and fast on the path below
+— the sun is gone and the cold closes in` — was read as `castPerPage {names: []}`
+by the first check and `{names:["Levin","Julian","Max","Kiaan"], covered:[same]}`
+by the recheck. `changedPages` was `[7,12,13]`; page 11 was never re-planned.
+Both paths share one parser (`parsePlanCheckRoster`, one call site,
+`beatsPipeline.js:1286`), so the asymmetry was not in code — it was in the
+contract. Two holes: the contract never said which COLUMN a `covers` reference
+may be read from ("the children" stands in the INSTANT column, and the recheck
+expanded it anyway), and it offered two competing readings of a group word with
+no test to decide between them — "a word for the group" says expand, "a crowd,
+onlookers, guards" says cover nobody.
+
+**Decision:** Prompt-side, both halves of the `beats-planner-vs-plan-check`
+pair. The critic (`prompts/plan-check.txt`) now states: read the who column
+alone, nothing outside it is ever expanded, and expand every reference the who
+column does carry whenever the story's own cast can put names to it — the test
+is resolvability, never how group-like the phrase sounds. The generator
+(`prompts/story-beats.txt`) is given the matching imperative: the who column
+names every figure the picture shows, and a figure appearing only in the instant
+or in what is true after is not in the picture.
+
+**Rationale:** Making the derivation deterministic beats voting on it: two
+agreeing checks would have doubled the cost of a whole-book measurement and
+still left the contract undecidable. The ambiguity was in the roster contract
+the checker is asked to follow, so the fix belongs in the prompt —
+classification belongs to the PROMPT and code may only change a severity. A
+code-side "one shared parse" was not available: the parse already IS shared. The
+generator half is what makes the critic's job answerable at all — a plan line
+that puts a figure in the instant and not in the who column has no correct
+roster reading. Replayed over both jobs' stored rosters: under the first check's
+(contract-correct) roster, page 11 of `p08djwhbl` is people-free and
+`NO_PEOPLELESS_PAGE` is not raised — the book had its people-free page all
+along, and the recheck measured it away.
+
+**Touched:** `prompts/plan-check.txt`, `prompts/story-beats.txt`,
+`tests/unit/plan-collective-cast.test.ts`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-20 — NO_PEOPLELESS_PAGE names the verb that answers it; the promotion's original justification did not survive inspection
+
+**Context:** The code was promoted to must-fix on 2026-09-19 with the comment
+that on `job_1789759147125_p08djwhbl` it "was raised in both rounds and shipped
+unfixed". The stored report contradicts that: the first check of that run raised
+it in NEITHER round — it counted page 11 as people-free — and only the recheck
+raised it, after resolving a collective out of the instant column. That run was
+a MEASUREMENT fault (entry above), not a promotion failure. The promotion's
+surviving evidence is `job_1789853503332_riqncqg1i`: must-fix, raised in both
+rounds, answered with a correctly-tagged change each time, shipped 0 for 1. Its
+answer was `Page 13: action in Levin sitting alone with silent egg on ground
+before him — PLAN[NO_PEOPLELESS_PAGE] — … held here with Levin just present to
+satisfy the requirement while the egg dominates`. `action in` is the one
+declarable verb that cannot empty a page; `REPLAN_FINDING_DIRECTION` already
+ranked the code `'fewer'` (`planCounters.js`), so `cast out` was permitted the
+whole time and nothing told the planner that was the move. The advisory finding
+answered TWICE in one round of the same story, `SHOT_NO_CAMERA_POSITION`,
+enumerates its own legal values in its detail and is satisfiable by reading the
+line alone.
+
+**Decision:** Keep the must-fix promotion; rewrite the detail in the
+camera-finding's shape. It now names the declarable verb (`cast out <name>`,
+kept in step with `PLAN_CHANGE_VOCABULARY` by a test) and the kind of page that
+may give up its cast — one whose subject is already a thing or a place seen
+alone, never a moment between people. The finding still names NO page.
+
+**Rationale:** A candidate-page heuristic in the counter was built as far as
+measurement and rejected. The only page-picking signals available in code are
+the plan line's prose and the cast arithmetic; applied to
+`job_1789853503332_riqncqg1i` (lowest cast count, drop pages the
+interaction-drama guard flags, drop pages whose removal breaks the two-page span
+floor) they leave `{2, 4, 10, 13, 17}` and every defensible tie-break ranks p17
+— the hatching — or p10 — the rescue — above p13, the low point the owner
+identified. A heuristic that empties the book's climax costs a mangled page, and
+choosing WHICH page earns emptiness is a judgement plan-check Q6 already owns.
+The premise that `pages: []` blocks the answer also does not hold: the re-plan's
+merge admits any page the round DECLARES a change for (`declaredPages`,
+`beatsPipeline.js:1437`), which a `cast out` line is — and
+`SHOT_NO_CAMERA_POSITION`, which also carries `pages: []`, was answered twice.
+Answerability, not targeting, was the defect. Extending Q6 to nominate the page
+is the open alternative, and is a prompt-side change the owner should see first.
+
+**Touched:** `server/lib/planCounters.js`, `server/lib/promptBuilders.js`
+(corrected comment), `tests/unit/cast-cap-and-peopleless-page.test.ts`
+
+**Status:** ✅ active
