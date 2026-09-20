@@ -1705,7 +1705,7 @@ guard is already lost in. Rationale + the full measurement: `docs/decisions.md` 
 - [x] (2026-09-19) `planCheck` ← `COUNTER_FINDINGS` — CLOSED: deliberate removal on 2026-09-11 left the fill behind; parameter and fill deleted → `server/lib/promptBuilders.js` `buildPlanCheckPrompt`
 - [ ] `sceneExpansion` ← 9 undeclared keys (`SCENE_SUMMARY`, `SCENE_CONTEXT`, `CHARACTERS`, `LANGUAGE_NAME`, `LANGUAGE_INSTRUCTION`, `LANGUAGE_NOTE`, `CORRECTION_NOTES`, `MAX_CHARACTERS_PER_SCENE`, `SCALE_CLASS_SPEC`). The per-page Art Director fallback; the all-pages sibling declares some of these, so check which are dead and which are drift → `server/lib/promptBuilders.js:2799`, `prompts/scene-expansion.txt`
 - [ ] `sceneExpansionAll` ← `MAX_CHARACTERS_PER_SCENE`. The cast cap is computed and not shown to the Art Director on the live beats path — check whether the cap reaches it by another route before deleting the fill → `server/lib/promptBuilders.js:2523`, `prompts/scene-expansion-all.txt`
-- [ ] `storyBeats` ← `WANTED_PICTURE_DEF`. The planner/checker shared-definition test asserts the planner asks the question in its own words, so this fill is probably dead — confirm and delete → `server/lib/promptBuilders.js:6888`, `prompts/story-beats.txt`
+- [x] (2026-09-20) `storyBeats` ← `WANTED_PICTURE_DEF` — CLOSED: confirmed dead (rebuilding the planner prompt before/after deleting the key is byte-identical, 13,145 chars) and deleted. `prompts/story-beats.txt` hand-states the equivalent; `tests/unit/plan-shared-definitions.test.ts` now pins the ending-event and not-staged clauses on both twins → `server/lib/promptBuilders.js` `buildBeatsPrompt`, `prompts/story-beats.txt`
 - [ ] `storyTrial` ← `LANGUAGE_NOTE` → `server/lib/promptBuilders.js:9060`, `prompts/story-trial.txt`
 - [ ] `trialIdea` ← `TITLE` (two call sites: the builder and its manual render harness) → `server/lib/promptBuilders.js:9428`, `tests/manual/render-trial-idea-prompt.js`, `prompts/trial-idea.txt`
 - [ ] `sheet2x4StyleEval` ← `REQUESTED_OUTFIT`. Same key, same judge family as the 2026-09-14 bug where a heads branch shipped the literal `{REQUESTED_OUTFIT}` to a judge — check whether the style eval is meant to see the outfit → `server/lib/character2x4Sheet.js:1214`, `prompts/sheet-2x4-style-eval.txt`
@@ -1778,3 +1778,30 @@ three below are prompt/classification questions and are the owner's call.
   counter yet asks for a minimum count or a ceiling on consecutive eye-level pages. Decide whether a
   spread rule is wanted before reading the next run's variety as evidence.
   → `server/lib/planCounters.js` (`SHOT_NO_CAMERA_POSITION`), `docs/decisions.md` "The shot field has two axes"
+
+- [ ] **The 3–5 challenge band is the binding constraint on challenge variety — grow the catalogue, not the knobs.**
+  `prompts/challenge-catalogue.txt` holds 395 entries, but a draw only sees the reader's age band:
+  **3–5 = 139**, 6–8 = 336, 9–12 = 256. With the draw raised to 25 (owner, 2026-09-20) the effective
+  cross-story memory is ~3 books in the 3–5 band versus 11 and 8 in the other two, because oldest-first
+  shedding hits the pool floor long before `PRIOR_STORY_LIMIT` (now 12) does. Most books run in this
+  band. Every code lever here trades one good property for another; adding 3–5 entries is the only
+  change that buys both a wide draw and deep memory.
+  → `prompts/challenge-catalogue.txt`, `server/lib/promptBuilders.js` (`drawChallengeIdeas`, MIN_POOL)
+
+- [ ] **Story `job_1789853503332_riqncqg1i` page 7 shipped at q=40 / sem=20, unrepaired.** The book's
+  inciting theft. The plan asked for Silvan riding away down the lane with the egg, the square empty and
+  cold, Levin shouting for an adult. The image shows Silvan standing still and smiling with the four boys
+  lined up smiling in a sunlit square — the theft reads as a group photo. Nothing in the repair ladder
+  picked it up despite being the lowest-scoring page in the book. Owner has not triaged.
+  → `stories.data->'sceneImages'` p7, `server/lib/evalPipeline.js`
+
+- [ ] **Same story, page 12: five boys for a four-boy cast.** Max is duplicated (orange hoodie at both
+  left and right of the ring). Survived a repair round and shipped at q=60 / sem=50. The page is the one
+  overhead shot in the book, so the whole cast is visible and countable. Owner has not triaged.
+  → `stories.data->'sceneImages'` p12, `server/lib/entityConsistency.js`
+
+- [ ] **Same story, page 3 fails its own stated plan purpose.** The plan line's payload is "all four
+  friends are present and all four hands are on the egg"; Julian is absent from the image. The Art
+  Director legitimately trims cast, but nothing checks a plan line's stated *purpose* against the cast
+  the AD kept, so a page can satisfy every counter and still not do the job it was planned for.
+  → `prompts/scene-expansion.txt`, `server/lib/planCounters.js`

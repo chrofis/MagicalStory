@@ -6980,7 +6980,6 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     TWO_HEIGHTS_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
-    WANTED_PICTURE_DEF,
     FINAL_ARC: String(finalArc || '').trim() || '(no final arc was recorded — divide the story the idea below describes)',
     // A HINT IS A STORY CHANGE, NOT A LICENCE TO BREAK A PICTURE RULE
     // (2026-09-19).

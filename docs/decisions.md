@@ -49463,6 +49463,19 @@ Each is now one constant — `DEED_AND_EFFECT_DEF`, `TWO_HEIGHTS_DEF`, `NAMING_D
 `COUNTING_RULE` and `ONE_INSTANT_RULE` already are. They had not drifted; five hand-kept
 pairs across two live prompts is where drift comes from.
 
+**Correction, 2026-09-20 — four of the five, not five.** `WANTED_PICTURE_DEF` reaches
+the CHECKER only. `prompts/story-beats.txt` never declared a `{WANTED_PICTURE_DEF}`
+placeholder, so the key `buildBeatsPrompt` passed into the `storyBeats` fill object was
+dropped silently by `fillTemplate` — the planner kept its hand-written equivalent
+(story-beats.txt line 35, the same definition phrased as a planning question). Proved by
+rebuilding the planner prompt with the real builder before and after deleting the key:
+byte-identical, 13,145 chars. The dead fill is deleted. The planner is not
+under-equipped — its hand-written line carries the ending-event clause and both
+not-staged clauses — but nothing kept the twins agreeing, so
+`tests/unit/plan-shared-definitions.test.ts` now pins those clauses verbatim on BOTH
+sides: editing one twin without the other fails the suite. The four genuinely shared
+constants are unchanged.
+
 `NAMING_DEF` carries no leading article, because the planner says *"stages **their**
 arrival"* and the checker *"stages **an** arrival"* — both wordings are pinned by tests,
 including a pre-existing one (`plan-critic-rules-reach-planner`) that caught the first

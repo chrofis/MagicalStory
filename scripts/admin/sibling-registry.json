@@ -488,7 +488,7 @@
     {
       "id": "beats-planner-vs-plan-check",
       "axis": "generator-vs-critic",
-      "reason": "story-beats.txt states each page rule as an imperative and plan-check.txt audits the same rule as a question — the generator/critic pair for page division. The FRAMING is deliberately different and is not shared; the DEFINITION inside each was written out twice by hand, and a definition that drifts between the rule and the audit is a generator that cannot satisfy the judge grading it. Five of them are now single constants in promptBuilders.js (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, NAMING_DEF, ENDING_EVENT_DEF, WANTED_PICTURE_DEF) filled into both templates; this set stops a sixth pair being hand-copied instead.",
+      "reason": "story-beats.txt states each page rule as an imperative and plan-check.txt audits the same rule as a question — the generator/critic pair for page division. The FRAMING is deliberately different and is not shared; the DEFINITION inside each was written out twice by hand, and a definition that drifts between the rule and the audit is a generator that cannot satisfy the judge grading it. Four of them are now single constants in promptBuilders.js (DEED_AND_EFFECT_DEF, TWO_HEIGHTS_DEF, NAMING_DEF, ENDING_EVENT_DEF) filled into both templates. WANTED_PICTURE_DEF is the exception: it reaches plan-check.txt only, story-beats.txt hand-states the equivalent as a planning question, and the pair is pinned clause-by-clause by tests/unit/plan-shared-definitions.test.ts. This set stops a further pair being hand-copied instead.",
       "members": [
         "prompts/story-beats.txt",
         "prompts/plan-check.txt"

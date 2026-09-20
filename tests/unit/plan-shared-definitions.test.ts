@@ -31,9 +31,25 @@ describe('planner and checker share one definition, not two copies', () => {
     });
   }
 
-  it('WANTED_PICTURE_DEF reaches the checker; the planner asks it as a planning question', () => {
+  /**
+   * WANTED_PICTURE_DEF is the one definition that is NOT shared: it is filled
+   * into plan-check.txt only, and story-beats.txt hand-states the equivalent as
+   * a planning question. The two copies are hand-kept, so they are pinned here
+   * clause by clause — editing one twin without the other fails this test.
+   */
+  it('WANTED_PICTURE_DEF reaches the checker; the planner hand-states the same clauses', () => {
     expect(checker()).toContain(pb.WANTED_PICTURE_DEF);
-    expect(planner()).toContain('which picture does a child most want to see there');
+    const p = planner();
+    expect(p).toContain('which picture does a child most want to see there');
+    // (a) the ending-event clause, verbatim in both twins
+    const endingClause = "The ending's own event — the reunion, the goodbye, the parting — is always one of them.";
+    expect(pb.WANTED_PICTURE_DEF, 'the checker copy lost the ending-event clause').toContain(endingClause);
+    expect(p, 'the planner copy lost the ending-event clause').toContain(endingClause);
+    // (b) the not-staged clause: both halves of what does not count
+    for (const half of ['falls between two pages', "only a page's change reports as already done"]) {
+      expect(p, `the planner copy lost: ${half}`).toContain(half);
+      expect(checker(), `the checker copy lost: ${half}`).toContain(half);
+    }
   });
 
   /**
