@@ -33,6 +33,9 @@
  *                       numeric ids and `secondaryCharacters` was empty — the
  *                       Art Director invented CHR ids for main characters, who
  *                       are referred to by name.
+ *   shot_widened        the page plan asked for a `close-up`, the brief's
+ *                       `shot` came back wider, and the plan line staged
+ *                       nothing below the waist that would have forced it.
  *
  * Like clothingCheck, this module REPORTS and never fixes. The scene review
  * authored both halves and has the prose in front of it; inventing a
@@ -43,6 +46,13 @@
 const { log } = require('../utils/logger');
 const { extractSceneMetadata, findCastMissingFromMetadata, isSameFigureName } = require('./sceneMetadata');
 const { checkVbElementBudget } = require('./vbElementBudget');
+// planCounters requires only shotVocabulary, so this is not a cycle. It is the
+// one declaration of how a shot column is read — the plan's word and the
+// brief's `shot` are classified by the SAME function, so `close‑up` written
+// with a non-ASCII hyphen (3 pages in the stored corpus) cannot read as a
+// different shot on one side and the same shot on the other.
+const { planSegments, classifyShot } = require('./planCounters');
+const { closeUpBelowWaistVerbs, CLOSEUP_BELOW_WAIST_PHRASE } = require('./shotVocabulary');
 
 // A visual-bible id: three letters, three digits, optionally a landmark variant
 // suffix (`LOC003.1` is variant 1 of LOC003 and resolves to it). Anything not
@@ -639,6 +649,54 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   // K — the bible's page table and this page's citations disagree.
   findings.push(...checkBiblePageTable(page, metadata, visualBible));
 
+  // E2 — the plan asked for a close-up and the brief came back wider.
+  //
+  // Rule 5d already tells the Art Director "a close-up is not widened into an
+  // establishing shot without need" and nothing measured whether it held.
+  // Measured over 24 staging books to 2026-09-20: 19 planned close-ups were
+  // delivered wider, and on 12 of them the plan line was clean — the AD invented
+  // the below-waist staging itself, usually by carrying a sitting pose over from
+  // the neighbouring page, and then owed itself the wider frame. On
+  // job_1789853503332_riqncqg1i that took the close-up off the hatching page,
+  // whose plan line is a pure waist-up holding beat.
+  //
+  // A widening the PLAN caused is legitimate here and is not reported: the
+  // planner is the one that has to answer it, and planCounters raises
+  // SHOT_CLOSEUP_BELOW_WAIST against the same verb list for exactly that case.
+  // Reporting it twice would have the Art Director rewrite around a fault it
+  // did not author.
+  const planLine = String((page && page.planLine) || '');
+  if (planLine) {
+    const planSegs = planSegments(planLine);
+    const plannedShot = planSegs.length ? classifyShot(planSegs[0]) : 'other';
+    // `extractSceneMetadata` puts the brief's own JSON under `fullData` and
+    // lifts only some fields to the top — `shot` is not one of them. Every
+    // other reader in the pipeline spells it this way round (images.js,
+    // scaleRepair.js, storyJobPipeline.js); reading `metadata.shot` alone finds
+    // nothing on a real brief and the check silently never fires.
+    const declaredShot = String((metadata && ((metadata.fullData && metadata.fullData.shot) || metadata.shot)) || '').trim();
+    const gotShot = classifyShot(declaredShot);
+    const planStaged = closeUpBelowWaistVerbs(planSegs.slice(1).join(' — '));
+    if (plannedShot === 'close-up' && declaredShot && gotShot !== 'close-up' && planStaged.length === 0) {
+      findings.push({
+        pageNumber: page.pageNumber,
+        type: 'shot_widened',
+        // WHAT THIS DOES NOT CLAIM. The plan line was screened against an
+        // explicit verb list (${CLOSEUP_BELOW_WAIST_PHRASE}) and that list is
+        // narrow on purpose — reading the 13 pages it raises over the stored
+        // corpus, several plan lines do stage something below the waist in
+        // words no verb can catch ("lands on his hands", "digging with bare
+        // hands", "on the bottom step"). So the finding states the MISMATCH and
+        // asks; it must not tell the Art Director its own staging was at fault
+        // when on some of these pages the beat genuinely needed the room.
+        detail: `The page plan asks for a close-up and the brief came back \`${declaredShot}\`. `
+          + `The plan line names none of ${CLOSEUP_BELOW_WAIST_PHRASE}, so nothing in the beat obviously forces the wider frame. `
+          + `If the moment can be staged waist-up — holding, reaching, reacting — restage it and put \`shot\` back to \`close-up\`. `
+          + `If it genuinely needs what is below the waist, keep the wider shot and say in the prose what needs the room.`,
+      });
+    }
+  }
+
   // F — R4, the text half only. The depth-mismatch half of the old check 24b
   // is deliberately not restored (owner ruling, rule-survival audit 2026-09-03).
   if (opts && opts.textZoneRules) {
@@ -819,6 +877,10 @@ function checkScenes(pages, castNames = [], visualBible = null, opts = {}) {
 const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands', 'interaction_actor_unknown',
   'vb_element_overflow', 'vb_state_contradicted', 'vb_state_no_base',
   'vb_page_uncited', 'vb_cite_offpage',
+  // The scene review already has the brief and the plan line in front of it and
+  // already rewrites briefs, so restoring a forfeited close-up costs no extra
+  // round — which is why this reports to the reviewer rather than forcing one.
+  'shot_widened',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They

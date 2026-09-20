@@ -119,6 +119,14 @@ describe('which sceneBriefCheck types reach a rewrite', () => {
   it('the admitted set is REVIEWABLE minus the whole-book, text-zone and already-covered types', () => {
     const admitted = new Set<string>([...IB.REINSTATE_TYPES, ...IB.INTRODUCED_TYPES]);
     const excluded = ['vb_state_no_base', 'vb_page_uncited', 'vb_cite_offpage',
+      // `shot_widened` compares the plan's shot against the brief's, and on the
+      // iterate path the brief's `shot` is not the model's to choose: the
+      // iterateSceneMetadata merge carries it over from the parent in code
+      // (images.js — the test above pins exactly that). A rewrite therefore
+      // cannot answer this finding however it restages the prose, and an
+      // unanswerable finding on a paid round is the shape this file exists to
+      // keep out. It reaches the scene REVIEW, which authors `shot` itself.
+      'shot_widened',
       'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor',
       'textzone_bottom_floor', 'textzone_half_streak'];
     for (const t of SBC.REVIEWABLE) {

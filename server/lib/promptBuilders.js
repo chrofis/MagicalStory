@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, shotDistributionPhrase } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -2624,6 +2624,9 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // beats planner produces it, planCounters counts it, and the image prompt
     // defines it. See server/lib/shotVocabulary.js.
     SHOT_ENUM,
+    // The below-waist verbs a close-up may not stage, from the one constant the
+    // plan counter and the brief check read (shotVocabulary).
+    CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -2916,6 +2919,9 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // beats planner produces it, planCounters counts it, and the image prompt
     // defines it. See server/lib/shotVocabulary.js.
     SHOT_ENUM,
+    // The below-waist verbs a close-up may not stage, from the one constant the
+    // plan counter and the brief check read (shotVocabulary).
+    CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
     // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
     // list of distances, and where the camera stands is no longer the vantage's
     // business but the shot word's own.
@@ -3363,6 +3369,9 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       COUNTING_RULE,
       VB_ELEMENT_BUDGET,
       SHOT_ENUM,
+      // The below-waist verbs a close-up may not stage, from the one constant the
+      // plan counter and the brief check read (shotVocabulary).
+      CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
       // C4 names the two axes separately — the eight-word SHOT_ENUM is not a
       // list of distances, and where the camera stands is no longer the vantage's
       // business but the shot word's own.
@@ -7061,6 +7070,10 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // so the spread can only be decided here — and it is page-count aware, so a
     // six-page trial is never asked for two over-the-shoulder pages.
     SHOT_DISTRIBUTION: shotDistributionPhrase(pageCount),
+    // The same below-waist verb list the Art Director templates are given and
+    // planCounters.SHOT_CLOSEUP_BELOW_WAIST measures — the generator/critic pair
+    // for the waist-up rule is one constant, not two hand-kept sentences.
+    CLOSEUP_BELOW_WAIST: CLOSEUP_BELOW_WAIST_PHRASE,
     PAGE_COUNT: pageCount,
     // The output scope follows the mode. A first plan (no replan section)
     // owes every page; a re-plan owes only the pages it changes under RE-DIVIDE

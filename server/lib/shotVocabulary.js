@@ -276,6 +276,88 @@ function shotDistributionPhrase(pageCount) {
   return `Across the ${pageCount} pages: at most ${maxMediumWide} of them medium or wide — half the book at most, and never only two camera distances across the book. At least ${list}.${positions} These are floors, not targets: spend the remaining pages on whichever of the eight words each page earns, and keep the angled pages few enough that an angle still reads as one.`;
 }
 
+/**
+ * WHAT A CLOSE-UP MAY NOT STAGE — one declaration of the below-waist verbs.
+ *
+ * A `close-up` frame ends at the waist, so a beat that needs the legs cannot be
+ * drawn in one. That rule is stated at FIVE stops: the beats planner writes the
+ * shot word (prompts/story-beats.txt), the two Art Director templates author the
+ * brief (scene-expansion.txt, scene-expansion-all.txt), the two iterate
+ * templates REWRITE it (scene-iteration.txt, scene-iteration-free.txt), and
+ * planCounters measures it. Every one of them spelled the list out by hand and
+ * they had already drifted — the Art Director pair said "kneeling, crouching,
+ * sitting, stepping, feet-on-ground", the iterate pair said "kneeling,
+ * crouching, feet-on-ground" and dropped sitting, which is the single verb that
+ * caused the most measured failures. One constant now fills all five, so the
+ * generator is told exactly the words the counter looks for.
+ *
+ * MEASURED, 24 staging books / 73 planned close-ups over the 14 days to
+ * 2026-09-20: 19 planned close-ups came back from the Art Director as something
+ * wider, and on 7 of them the PLAN LINE itself staged a below-waist action — the
+ * planner breaking its own rule, silently absorbed downstream. On
+ * job_1789853503332_riqncqg1i that cost the book the discovery page, the low
+ * point and the hatching.
+ *
+ * NARROW BY DESIGN. This is an explicit verb list, never a reading of what the
+ * prose means. It covers four verbs and misses everything else a below-waist
+ * beat can be called ("lands on his hands", "one foot on the wall stones" both
+ * occur in the stored corpus and are NOT caught). Under-reporting is the chosen
+ * error: the finding is advisory, and a wrong one costs a re-plan round.
+ */
+const CLOSEUP_BELOW_WAIST_VERBS = [
+  { verb: 'kneeling', match: /\bkneel(?:s|ing)?\b|\bknelt\b|\bon (?:his|her|their) knees\b/i },
+  { verb: 'crouching', match: /\bcrouch(?:es|ing)?\b|\bsquat(?:s|ting)?\b/i },
+  { verb: 'sitting', match: /\bsit(?:s|ting)?\b|\bseated\b/i },
+  { verb: 'stepping', match: /\bstep(?:s|ping)\b/i },
+  // The rule's own last clause — "nothing placed at the character's feet" —
+  // and the only one whose subject is IN the pattern: a possessive pronoun
+  // naming whose feet they are. `selfSubject` skips the subject guard below,
+  // which looks for a name BEFORE the match and would never find one here.
+  // Three stored plan lines put the frame's floor in a close-up this way
+  // ("red leaves scattered around her feet", "the bilge below the grating at
+  // her feet") and no verb could see them.
+  { verb: 'feet-on-ground contact', selfSubject: true, match: /\b(?:at|around|beneath|below|under) (?:his|her|their) feet\b/i },
+];
+
+/** The verbs as the prompts state them: "kneeling, crouching, sitting, or stepping". */
+const CLOSEUP_BELOW_WAIST_PHRASE = CLOSEUP_BELOW_WAIST_VERBS
+  .map((v, i) => `${i === CLOSEUP_BELOW_WAIST_VERBS.length - 1 ? 'or ' : ''}${v.verb}`)
+  .join(', ');
+
+/**
+ * A capitalised name or a person pronoun — the SUBJECT a below-waist verb must
+ * have before it counts.
+ *
+ * Without it the list reads objects as poses: of the 12 plan lines the bare
+ * verbs flagged across the stored corpus, 2 were "the small dragon sits on his
+ * neck" and "the hook where it sits in the ring" — neither a character's pose,
+ * both a false positive that would have bought a re-plan round. `it` is
+ * deliberately excluded and `he`/`she`/`they` are not: `it` is the pronoun of
+ * the prop, never of the child. The cost is a miss when the subject is a
+ * lowercase collective ("all four kneel in a ring"); that shape is reported
+ * rather than guessed at.
+ */
+const BELOW_WAIST_SUBJECT = /(?:\b[A-ZÄÖÜ][a-zäöüßéèàâç]+\b|\b(?:he|she|they)\b)[^.;!?]{0,24}$/;
+
+/**
+ * The below-waist verbs a piece of plan/brief text stages for a CHARACTER.
+ *
+ * @param {string} text
+ * @returns {string[]} the matched verb labels, in declaration order.
+ */
+function closeUpBelowWaistVerbs(text) {
+  const clean = String(text || '');
+  const out = [];
+  for (const { verb, match, selfSubject } of CLOSEUP_BELOW_WAIST_VERBS) {
+    const re = new RegExp(match.source, 'gi');
+    let m;
+    while ((m = re.exec(clean)) !== null) {
+      if (selfSubject || BELOW_WAIST_SUBJECT.test(clean.slice(0, m.index))) { out.push(verb); break; }
+    }
+  }
+  return out;
+}
+
 module.exports = {
   SHOTS,
   SHOT_TYPES,
@@ -291,6 +373,9 @@ module.exports = {
   MID_DISTANCE_SHOTS,
   SHOT_FLOOR_CODE,
   SHOT_FLOOR_TIERS,
+  CLOSEUP_BELOW_WAIST_VERBS,
+  CLOSEUP_BELOW_WAIST_PHRASE,
+  closeUpBelowWaistVerbs,
   shotFloors,
   shotDistributionPhrase,
 };

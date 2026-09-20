@@ -33,7 +33,7 @@ const SEGMENT_SPLIT = /\s+[—–]\s+|\s+--\s+/;
  */
 const {
   SHOT_PATTERNS, SHOT_AXIS, POSITION_SHOTS, MID_DISTANCE_SHOTS, SHOT_FLOOR_CODE,
-  shotFloors, MAX_MEDIUM_WIDE_SHARE,
+  shotFloors, MAX_MEDIUM_WIDE_SHARE, closeUpBelowWaistVerbs,
 } = require('./shotVocabulary');
 
 /** Words that look like names but never are, in the who-column's grammar. */
@@ -134,7 +134,11 @@ function planSegments(planLine) {
 
 /** Classify a plan line's shot column. Returns 'other' when nothing matches. */
 function classifyShot(segment) {
-  const text = String(segment || '');
+  // Every Unicode hyphen reads as the ASCII one. The vocabulary's patterns
+  // spell the words with `-`, and a model that writes `close‑up` with a
+  // non-breaking hyphen — 3 pages of the 14-day staging corpus do — otherwise
+  // classifies as `other`, which reads downstream as a shot nobody asked for.
+  const text = String(segment || '').replace(/[‐-―−]/g, '-');
   for (const [name, re] of SHOT_PATTERNS) if (re.test(text)) return name;
   return 'other';
 }
@@ -565,6 +569,12 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       complete,
       segments: segs.length,
       shot: segs.length >= 1 ? classifyShot(segs[0]) : 'other',
+      // Every segment EXCEPT the shot column — what the page stages, wherever
+      // the planner put it. The below-waist verb is not reliably in the instant:
+      // over the stored corpus the planner writes three-segment lines that carry
+      // the pose in the who column ("close-up — <name> sitting on the ground —
+      // …"), and probing the instant alone missed one of the two worst cases.
+      staging: segs.slice(1).join(' — '),
       who,
       present,
       covered,
@@ -643,6 +653,29 @@ function runPlanCounters({ pages = [], commissionedNames = [], placeNames = [], 
       angledPages.length === 0
         ? `every page of the book is shot from eye level; ${policy.requiredPositions} page(s) should declare a camera position (${POSITION_SHOTS.join(', ')})`
         : `${angledPages.length}/${pageCount} pages declare a camera position (${POSITION_SHOTS.join(', ')}); the plan asks for at least ${policy.requiredPositions}`);
+  }
+
+  // 2b. A close-up page that stages a below-waist action. The planner is told
+  //     (prompts/story-beats.txt) that "a close-up page is a waist-up moment,
+  //     never a kneeling or floor action" and nothing checked, so the Art
+  //     Director silently answered the contradiction by widening the page to
+  //     `medium` — the plan asked for the close-up, the book shipped without it.
+  //     Measured over 24 staging books to 2026-09-20: 19 planned close-ups came
+  //     back wider, 7 of them because the plan line itself staged the pose.
+  //
+  //     The verbs come from shotVocabulary.CLOSEUP_BELOW_WAIST_VERBS, the same
+  //     constant the four brief templates and the planner state as the rule —
+  //     never a second list here, and never a reading of what the prose means.
+  //     Advisory ("also noted"): the planner can answer it two legitimate ways,
+  //     by restaging the beat waist-up OR by making the page a `medium`, and
+  //     which one is right is the planner's call, not this counter's.
+  const belowWaist = rows
+    .map(r => ({ page: r.pageNumber, verbs: r.shot === 'close-up' ? closeUpBelowWaistVerbs(r.staging) : [] }))
+    .filter(r => r.verbs.length);
+  if (belowWaist.length) {
+    add('SHOT_CLOSEUP_BELOW_WAIST', belowWaist.map(r => r.page),
+      `${belowWaist.map(r => `page ${r.page} (${[...new Set(r.verbs)].join(', ')})`).join('; ')}: a close-up frame ends at the waist, so a page staging one of these cannot be drawn as one. `
+      + `Either restage the moment waist-up — holding, reaching, reacting — or give the page a wider shot; leaving both as they are means the page is drawn wider and the close-up is lost.`);
   }
 
   // 3. Cast per page, against the CONFIGURED ceiling — never a literal.
