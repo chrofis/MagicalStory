@@ -4141,6 +4141,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // The challenges from this account's earlier books that the arc planner was
     // told to avoid. Stored so a repeat can be audited against what was excluded.
     const challengeDrawIds = beatsResult?.challengeDrawIds || null;
+    // Which drawn challenges the arc actually built on, by catalogue id — the
+    // join that makes "was the draw used" a query rather than a prose read.
+    const challengeTakenIds = beatsResult?.challengeTakenIds || null;
     const challengeDraw = beatsResult?.challengeDraw || null;
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
@@ -7254,6 +7257,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // the whole of the cross-story variety rule: no prompt names a previous
       // story, so nothing can leak one book's cast into another's.
       challengeDrawIds,
+      challengeTakenIds, // which of them the arc built on, by catalogue id
       challengeDraw, // the random catalogue menu the arc plan was offered (beats mode)
       beatsReviewReport, // per-page before/after from the beats review (beats mode)
       clothingReviewReport, // per-outfit before/after from the wardrobe review (beats mode)

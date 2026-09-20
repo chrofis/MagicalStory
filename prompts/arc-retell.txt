@@ -20,6 +20,8 @@ Reading level: {READING_LEVEL}
 
 {TELLING_RULES}
 
+{CHALLENGE_IDEAS}
+
 # THE COMMITTED ARC AND ITS CRITIQUE
 
 {COMMITTED_ARC}
@@ -39,7 +41,7 @@ Output, in this order:
 - "Invented figures:" then one dash line per named figure the commission did not name, counted by the rule in the budgets, "- <name> — <what it is in the story, three words>", then one line "Allowed: <N>. Written: <M>." Never numbered. Write the heading and the two counts even when no figure is on the list.
 - One line "Fixing:" — which faults, by what approach.
 - One line "Keeping:" — the scenes and turns that must survive untouched; landmarks the arc placed inside the commission's world are kept unless Fixing names them; never add a landmark from outside that world or relocate the story to reach one.
-- "Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each.
+- "Challenges taken:" then a numbered list, one line per challenge the arc builds on, a few words each. Each line opens with the [C###] tag of the drawn challenge it builds on, or with [own] where the challenge is the arc's own invention. The tag names the source only; it is never written into a story sentence.
 - One line "Used:" naming which panelists you drew on, by letter ("Panelist A").
 - "FINAL ARC:" then the numbered sentences.
 - "CRITIQUE:" then a fresh blunt self-critique of the final arc, built exactly like this:

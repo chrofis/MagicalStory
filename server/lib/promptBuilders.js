@@ -6401,21 +6401,60 @@ function buildStoryContextFields(inputData) {
 let challengeCatalogueCache = null;
 
 /**
+ * The quality floor on the pool the draw samples from.
+ *
+ * Flat, not a multiple of `count` (2026-09-20). A `count * 3` floor scaled with
+ * the draw, so raising the draw to 25 would have demanded 75 — more than half
+ * the 3-5 band's entire eligible pool (measured: age 3-5 = 139 eligible,
+ * 6-8 = 336, 9-12 = 256 of 395 catalogue entries in 30 categories) — and that
+ * band would have shed its whole memory on the first book.
+ *
+ * 45 is ~1.8x the draw size: enough oversupply that the per-category spread
+ * still has somewhere to go. Below it the spread degenerates and the "random
+ * sample" becomes the remainder of the catalogue, which is not a sample.
+ */
+const MIN_POOL = 45;
+
+/**
+ * The exclusion list as GROUPS, newest book first.
+ *
+ * A flat array of ids is read as one book's worth, so a caller with no per-book
+ * grouping keeps working and still travels one code path.
+ */
+function exclusionGroups(excludeIds) {
+  const raw = Array.isArray(excludeIds) ? excludeIds : [];
+  const groups = raw.some(Array.isArray) ? raw : [raw];
+  return groups
+    .map(g => [...new Set((Array.isArray(g) ? g : [g]).map(Number).filter(Number.isFinite))])
+    .filter(g => g.length);
+}
+
+/**
  * Draw a random, age-filtered, category-spread sample of the challenge
  * catalogue.
  *
  * @param {Object} inputData
  * @param {Object} opts
- *   count       how many to draw (default 15)
- *   excludeIds  catalogue ids this reader has already been offered. Applied as
- *               a filter; if honouring it in full would leave too small a pool
- *               to draw from, the exclusions are dropped (a thin draw is worse
- *               for the story than a repeat is).
- * @returns {{section: string, ids: number[]}}
+ *   count       how many to draw (default 25)
+ *   excludeIds  catalogue ids this reader has already been offered, GROUPED BY
+ *               BOOK, NEWEST FIRST (a flat array is read as one book). Honoured
+ *               as far as the pool allows: when the full list would starve the
+ *               pool, the OLDEST book's ids are shed one book at a time until
+ *               the pool clears MIN_POOL. The list is never discarded wholesale
+ *               — the most recent book stays excluded whenever any exclusion
+ *               happens, because repeating the book the family just read is the
+ *               repeat they actually notice.
+ *
+ *               One exception, functional rather than cosmetic: if even the
+ *               newest book alone leaves fewer than `count` entries there is no
+ *               draw to make, so the exclusion is abandoned. A draw that cannot
+ *               be filled is a broken input, not a thin sample.
+ * @returns {{section: string, ids: number[], offeredStories: number, effectiveStories: number}}
  */
-function drawChallengeIdeas(inputData, { count = 15, excludeIds = [] } = {}) {
+function drawChallengeIdeas(inputData, { count = 25, excludeIds = [] } = {}) {
   const bands = challengeCatalogueBands(inputData);
-  if (!bands.length) return { section: '', ids: [] };
+  const groups = exclusionGroups(excludeIds);
+  if (!bands.length) return { section: '', ids: [], offeredStories: groups.length, effectiveStories: 0 };
   try {
     if (challengeCatalogueCache === null) {
       challengeCatalogueCache = require('fs').readFileSync(
@@ -6429,20 +6468,29 @@ function drawChallengeIdeas(inputData, { count = 15, excludeIds = [] } = {}) {
       .filter(f => f.length >= 6)
       .filter(f => bands.some(b => f[4].startsWith(b)))
       .filter(f => youngest > 5 || f[5].trim() !== '1');
-    // Keep the draw well oversupplied relative to what it must produce: below
-    // this the category spread collapses and the "random sample" becomes the
-    // remainder of the catalogue, which is not a sample at all.
-    const MIN_POOL = count * 3;
-    const excluded = new Set((excludeIds || []).map(Number).filter(Number.isFinite));
-    const kept = excluded.size ? eligible.filter(f => !excluded.has(parseInt(f[0], 10))) : eligible;
-    const entries = kept.length >= MIN_POOL ? kept : eligible;
-    if (excluded.size && entries !== kept) {
-      log.info(`[PROMPT] challenge variety: ${excluded.size} prior id(s) would leave ${kept.length} of ${eligible.length} eligible (< ${MIN_POOL}) — drawing from the full band instead`);
+    // OLDEST-FIRST SHEDDING (2026-09-20). The valve this replaced was
+    // all-or-nothing: one book too many and the ENTIRE memory was discarded, so
+    // the draw ran unfiltered. Now the memory is trimmed from the old end until
+    // it fits, and a reader keeps as much variety as their band can pay for.
+    const poolAfter = (n) => {
+      if (!n) return eligible;
+      const excluded = new Set(groups.slice(0, n).flat());
+      return eligible.filter(f => !excluded.has(parseInt(f[0], 10)));
+    };
+    let effectiveStories = groups.length;
+    while (effectiveStories > 1 && poolAfter(effectiveStories).length < MIN_POOL) effectiveStories -= 1;
+    // The newest book alone cannot even fill the draw: no exclusion is possible.
+    if (effectiveStories === 1 && poolAfter(1).length < count) effectiveStories = 0;
+    const entries = poolAfter(effectiveStories);
+    if (groups.length) {
+      const detail = `${effectiveStories}/${groups.length} book(s) of memory kept, pool ${entries.length} of ${eligible.length} eligible (floor ${MIN_POOL}, draw ${count})`;
+      if (effectiveStories === groups.length) log.info(`[PROMPT] challenge variety: ${detail}`);
+      else log.info(`[PROMPT] challenge variety: shed the oldest — ${detail}`);
     }
     const byCat = new Map();
     for (const f of entries) {
       if (!byCat.has(f[1])) byCat.set(f[1], []);
-      byCat.get(f[1]).push({ id: parseInt(f[0], 10), line: `- ${f[2]} (tests: ${f[3]})` });
+      byCat.get(f[1]).push({ id: parseInt(f[0], 10), line: `- [C${parseInt(f[0], 10)}] ${f[2]} (tests: ${f[3]})` });
     }
     const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
     const picked = [];
@@ -6460,7 +6508,7 @@ function drawChallengeIdeas(inputData, { count = 15, excludeIds = [] } = {}) {
       }
       round++;
     }
-    if (!picked.length) return { section: '', ids: [] };
+    if (!picked.length) return { section: '', ids: [], offeredStories: groups.length, effectiveStories };
     // Structural budget scales with the book (owner, 2026-08-30): a short book
     // cannot pay off three challenges, a long one starves on two.
     const pages = parseInt(inputData?.pages, 10) || 10;
@@ -6469,19 +6517,22 @@ function drawChallengeIdeas(inputData, { count = 15, excludeIds = [] } = {}) {
       section: [
         '# CHALLENGE IDEAS (drawn at random from a catalogue of classic trials)',
         `Build the story's challenges from ${challengeBudget} of these — the ones that fit the commission and its world, adapted freely. Ignore the rest. A challenge the commission itself sets always stands.`,
+        'The [C###] tag is a reference label for naming a choice back. It is never part of the story and never appears in a sentence.',
         '',
         ...picked.map(x => x.line),
       ].join('\n'),
       ids: picked.map(x => x.id),
+      offeredStories: groups.length,
+      effectiveStories,
     };
   } catch (err) {
     log.warn(`[PROMPT] challenge catalogue unavailable: ${err.message}`);
-    return { section: '', ids: [] };
+    return { section: '', ids: [], offeredStories: 0, effectiveStories: 0 };
   }
 }
 
 /** The section alone, for callers that do not record the draw. */
-function buildChallengeIdeasSection(inputData, count = 15) {
+function buildChallengeIdeasSection(inputData, count = 25) {
   return drawChallengeIdeas(inputData, { count }).section;
 }
 
@@ -8014,13 +8065,17 @@ function buildArcPanelPrompt(inputData, committedBlock) {
 }
 
 /** RE-TELL: the same creator re-tells the story whole from arc + critique + solutions. */
-function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutions) {
+// `challengeIdeas`: the SAME drawn section the arc creator was given. The
+// re-telling reports which drawn challenges it took, by tag, so the draw is
+// auditable — it can only do that if it can see the tags.
+function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutions, { challengeIdeas = null } = {}) {
   const template = PROMPT_TEMPLATES.arcRetell;
   if (!template) {
     log.error('[PROMPT] arcRetell template not loaded — arc re-tell unavailable');
     return null;
   }
   return fillTemplate(template, {
+    CHALLENGE_IDEAS: challengeIdeas ?? buildChallengeIdeasSection(inputData),
     ...buildStoryContextFields(inputData),
     PAGE_COUNT: pageCount,
     STORY_SHAPE: buildStoryShapeSection(inputData, pageCount, { arc: true }),
@@ -8202,11 +8257,26 @@ function parseArcRetell(raw) {
   const keeping = contractLine(head, 'Keeping') || contractLine(full, 'Keeping');
   // A "Challenges taken:" block ahead of FINAL ARC (current contract order).
   let headChallenges = '';
+  let takenIds = [];
   const chIdx = head.search(/^\s*(?:\*\*)?Challenges taken\s*:/mi);
   if (chIdx >= 0) {
     const tail = head.slice(chIdx);
     const stop = tail.search(/^\s*(?:\*\*)?(?:Used|Fixing|Keeping)\s*:/mi);
     headChallenges = (stop > 0 ? tail.slice(0, stop) : tail).replace(/\*\*/g, '').trim();
+    // WHICH DRAWN CHALLENGES DID THIS BOOK USE (2026-09-20). Each taken line
+    // opens with the [C###] tag of the entry it builds on, or [own] when the
+    // arc invented it, so "taken" joins to "drawn" by id instead of by prose.
+    takenIds = [...new Set(
+      headChallenges.split('\n')
+        .map(l => (l.match(/\[C(\d+)\]/i) || [, ''])[1])
+        .filter(Boolean)
+        .map(Number)
+        .filter(Number.isFinite)
+    )];
+    // The tag is bookkeeping, not story. The arc text travels on to the beats
+    // planner, the text writer and the image prompts, and a stray [C###] there
+    // reads as a VB cell reference.
+    headChallenges = headChallenges.replace(/\[(?:C\d+|own)\]\s*/gi, '');
   }
   // A stray "Changing:" block (briefly in the contract, dropped by owner
   // reversal 2026-08-30) sits ahead of FINAL ARC and is simply ignored.
@@ -8223,7 +8293,7 @@ function parseArcRetell(raw) {
   const critique = critIdx >= 0
     ? after.slice(critIdx).replace(/^\s*(?:\*\*|#+\s*)?CRITIQUE\s*:?\**\s*/i, '').trim()
     : '';
-  return { finalArc, used, critique, fixing, keeping, invented: parseInventedFigures(head), premiseFigures: parsePremiseFigures(head) };
+  return { finalArc, used, critique, fixing, keeping, takenIds, invented: parseInventedFigures(head), premiseFigures: parsePremiseFigures(head) };
 }
 
 /**

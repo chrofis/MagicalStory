@@ -8910,7 +8910,7 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
 /**
  * TRIAL CHALLENGE DRAW — the random catalogue draw, with and without.
  *
- * buildChallengeIdeasSection() draws 15 age-banded challenges from
+ * buildChallengeIdeasSection() draws 25 age-banded challenges from
  * prompts/challenge-catalogue.txt and injects them as prompt text (no model
  * call, no cost). It reaches arc-create.txt through the beats pipeline, which
  * draws once and persists the draw as `challengeDraw`. buildTrialStoryPrompt
@@ -8926,15 +8926,15 @@ async function runTrialIdeaVarietyStage(target, { params = {}, promptOverride = 
  *  - BAND SHAPE. `challengeCatalogueBands` returns nothing for the three simple
  *    bands (routine / quest / tries), so at age 3 production draws NO challenges
  *    at all — the catalogue is age-banded but not band-shape-aware, and the
- *    `tries` band wants one problem met three times, which a list of fifteen
- *    separate trials does not describe. The stage reports the resolved band, the
+ *    `tries` band wants one problem met three times, which a list of separate
+ *    trials does not describe. The stage reports the resolved band, the
  *    band's own plot-shape text, and every drawn entry with the trait it tests,
  *    so the fit is judged on the entries rather than on a heuristic.
  *  - `params.forceBands` draws anyway for a simple-band story (Lab-only; it
  *    mirrors the production filter so the entries are the real catalogue ones).
  *
  * params.withDraw   — 'true' / 'false' runs ONE arm; omitted runs both
- * params.drawCount  — entries to draw (default 15, production's count)
+ * params.drawCount  — entries to draw (default 25, production's count)
  * params.forceBands — comma-separated catalogue bands ('3', '6', '9') for a
  *                     story whose band suppresses the draw
  * params.model      — writer (default MODEL_DEFAULTS.outline, as the trial's own call)
@@ -9001,7 +9001,7 @@ async function runTrialChallengeDrawStage(target, { params = {}, promptOverride 
   // times). Read next to challengeDraw, it is the fit question, unheuristic.
   const bandShapeText = buildAgeModeSection(inputData);
 
-  const drawCount = parseInt(params.drawCount, 10) || 15;
+  const drawCount = parseInt(params.drawCount, 10) || 25;
   const forceBands = String(params.forceBands || '').split(',').map(s => s.trim()).filter(Boolean);
   let drawSection = buildChallengeIdeasSection(inputData, drawCount);
   let drawSource = drawSection ? 'production' : 'none (band draws no challenges)';
