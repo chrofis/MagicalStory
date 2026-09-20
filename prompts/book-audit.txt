@@ -12,7 +12,7 @@ For every page, answer six questions:
 3. ONPAGE: does the event this page is for happen in the picture or in the words, or did it happen between pages?
 4. EMOTION: where the words name a feeling, does any visible body language carry it?
 5. CHANGE: could a five-year-old looking at the pictures alone say what changed since the previous page?
-6. FUTURE: does the picture show a state a later page's text still establishes — a thing already freed, opened, reached or arrived? A small moment offset inside this page's own words is not a fault.
+6. FUTURE: does the picture show a state a later page's text still establishes — a thing already freed, opened, reached or arrived? A small moment offset inside this page's own words is not a fault. A cover stands outside the story's order and may show any moment of it, its end included; never report one here.
 
 Answer these questions for every page, but do not write the answers down. Output only the faults they found.
 

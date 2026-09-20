@@ -24,11 +24,11 @@ describe('the text audit\'s questions reach the writer', () => {
   });
 
   it('Q1 ASSUMED — a character knows only what a page gave them', () => {
-    expect(prompt).toContain('A character knows only what an earlier page or picture gave them');
+    expect(prompt).toContain('a character knows only what an earlier page or picture gave them');
   });
 
   it('Q6 ENTRANCE — a stated cause places a character at their first appearance', () => {
-    expect(prompt).toContain("A character's first appearance carries the stated cause that puts them there");
+    expect(prompt).toContain('a first appearance carries the stated cause that puts them there');
   });
 
   it('Q3 DEVICE — a device earns its meaning where it first appears', () => {
@@ -36,12 +36,12 @@ describe('the text audit\'s questions reach the writer', () => {
   });
 
   it('Q8 LIMIT — the limit the plot leans on is stated and never broken', () => {
-    expect(prompt).toContain('A limit the plot leans on');
+    expect(prompt).toContain('a limit the plot leans on');
     expect(prompt).toContain('no later page breaks it');
   });
 
   it('Q9 PAYOFF — a promise is answered, a price leaves a mark', () => {
-    expect(prompt).toContain('is shown answered on a later page, and every price paid leaves a mark a later page shows');
+    expect(prompt).toContain('is answered on a later page, and every price paid leaves a mark a later page shows');
   });
 
   it('Q4 TRANSITION — a change of company or possession carries its path', () => {
@@ -133,7 +133,7 @@ describe('a reversed decision is a rule on both sides', () => {
   const blind = () => B.buildTextAuditBlindPrompt(story(7), [{ pageNumber: 1, text: 'A page.' }]);
 
   it('the beats writer is told it', () => {
-    expect(beats()).toContain('stays done with it; where a later page has them want it back or take it up again, that page says what changed');
+    expect(beats()).toContain('stays done with it, and a later page that has them want it back or take it up again says what changed');
   });
 
   it('the trial writer is told it', () => {

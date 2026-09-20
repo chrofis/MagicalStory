@@ -29,11 +29,11 @@ Answer only these eleven:
 3. Cast of three or more. For each page with three or more named characters in frame — counting the names that page's ROSTER line expands under `covers`, never the who column alone — say whether its plan line justifies the third. A justification that repeats the action, names the place, or asserts the characters are needed does not hold.
 4. The most wanted pictures. {WANTED_PICTURE_DEF} Name both. A picture that falls between two pages, or that only a page's change reports as already done, is a finding.
 5. The instant. Name every page whose plan line's instant only states presence or position — stands, together, visible, gathered, waits — instead of an action being performed, and every page whose instant is the state after an action rather than the action itself.
-6. Peopleless pages. Name every page with no people in frame and say whether its subject is something the story has been driving toward — a discovery, an arrival, a payoff. A peopleless page whose subject carries no story weight is a finding. A page that is BOTH the people-free page and the ultra-wide page is not a finding for that reason alone — one page is allowed to answer both, and a landscape with nobody in it is the natural page to do it; judge it on its story weight like any other.
+6. Peopleless pages. Name every page with no people in frame and say whether its subject is something the story has been driving toward — a discovery, an arrival, a payoff. A peopleless page whose subject carries no story weight is a finding. When no page is people-free, nominate the one page best suited to give up its cast and give it a PEOPLELESS line: a page whose subject is already a thing or a place seen alone — a vessel, an object, the weather, a place — never a moment between people, and never one of the most wanted pictures question 4 names. A book with no people-free page and no nomination is a finding. A page that is BOTH the people-free page and the ultra-wide page is not a finding for that reason alone — one page is allowed to answer both, and a landscape with nobody in it is the natural page to do it; judge it on its story weight like any other.
 7. Plants and payoffs. Name every object or flaw a page plants and the later page where it pays off, and for every payoff the earlier page that planted it. A plant no later page pays off, and a payoff no earlier page planted, are findings.
 8. The last page. {ENDING_EVENT_DEF} Say whether it does. A last page staging a different moment while the ending's event happened earlier, off the page, or not at all is a finding.
 
-9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after.
+9. Deed and effect. Name every page whose instant shows an action and the result of that action together. {DEED_AND_EFFECT_DEF} The instant shows one, and what follows it belongs in what is true after. {PAGE_CHANGE} Name every page whose what-is-true-after states no change its instant does not already show.
 
 10. Two heights. Name every page whose instant puts {TWO_HEIGHTS_DEF} Such a page is staged from one level with the other character out of frame, or split into a page per level.
 
@@ -49,6 +49,10 @@ Then one line for each page whose instant works against what a character is doin
 
 OBSTACLES <page>: <the character whose action the instant works against>
 
+Then, only when no page is people-free, one line naming the page best suited to give up its cast, and no line at all when some page already is:
+
+PEOPLELESS <page>: <the thing or the place that page's picture is already of>
+
 Then the findings: numbered, one line each, nothing before or after. Each line begins with the number of the check it answers, then names the page and what is wrong; several findings may carry the same number. Never propose a rewrite, never write a plan line. When a check finds nothing, write no line for it.
 
-When the roster is complete and nothing is wrong anywhere, write the roster, the obstacle lines, and then exactly: NONE
+When the roster is complete and nothing is wrong anywhere, write the roster, the obstacle lines, the peopleless line if one is owed, and then exactly: NONE

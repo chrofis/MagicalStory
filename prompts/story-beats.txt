@@ -28,14 +28,14 @@ The arc above delivers the commission; keep its names and world as written.
 
 Before dividing, plan the pictures — simple pages first:
 1. The story's emotional highlights: which moments earn a page of one character showing a strong feeling, close up?
-2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces.
+2. Which moments earn a page with no people in frame? Only a subject the story has been driving toward — a discovery, an arrival, a payoff: the castle found after the long search. A place with no story weight never gets its own page. At least one page in the book earns this. Choose one whose drama is a place, the weather, a vessel or an object seen from afar; never a page whose drama is between people — a parting, a confrontation, tears, a promise, a handover. Those pages get faces, and so does every picture question 6 names as most wanted.
 3. Where does the whole cast share one simple action — boarding, hauling one line together, all turned toward one thing ahead of them, or seen from behind moving off? Never a row of figures facing the viewer, never everyone present doing nothing.
 4. Where are three or more characters truly unavoidable? Bypass it where the story allows; keep it only where the story demands it. Where one is kept, the plan line itself carries what the third character does that the page cannot show without them — repeating the action, naming the place, or asserting the characters are needed does not hold.
 5. Where does each close-up land, where does each ultra-wide? And which pages are worth leaving eye level for — looking down into a place from above, up at something from below, past one character's shoulder at what they face, or straight down on the whole place from the air?
 6. For each act — setup, middle, ending — which picture does a child most want to see there, and which page stages it as its instant? The ending's own event — the reunion, the goodbye, the parting — is always one of them. A picture that falls between two pages, or that only a page's change reports as already done, is not staged.
 {SHOT_DISTRIBUTION} The shot field takes a camera position in place of a distance, so a page that declares one states no distance and spends its word on where the camera stands. A page looking UP at a grown-up or a creature standing over a child is not one of them; look up at a thing, a height or a sky instead.
 Then one line per page: shot — who is in frame — the instant the picture shows — what is true after this page that was not before.
-A complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page.
+A complicated page — much action, many characters at once — is a fault: simplify the picture, never the story. A page after which nothing is true that was not before is filler: give it a change or give its material to a neighbouring page. {PAGE_CHANGE}
 
 The plan line's instant is a single drawable moment:
 - One moment — no montage, no before-and-after, no "then", no passage of time inside one picture, no sequence of actions by one character; when a beat contains a change, pick the single moment that shows it.
@@ -53,7 +53,6 @@ The plan line's instant is a single drawable moment:
 - Never an exact count of like things in the instant: one, two, or several — a number above two belongs to the text.
 - The action at the moment it happens, never the state that follows it.
 - One action per page. {DEED_AND_EFFECT_DEF} When a plan line holds more than one, split them across pages.
-- The who column names every figure the picture shows. A figure that appears only in the instant or in what is true after is not in the picture: put them in the who column or leave them off the page.
 - Name what is in the picture, never what is absent, empty or missing from it. When the absence is the story point, name its visible consequence, or make the empty place the page's subject.
 - Never compose the frame — what fills it, how large something looks, where it sits; the shot type is enough.
 - A beat holding two forbidden actions splits across two adjacent pages — one page the contact, the next page the second action — or the picture drops the secondary action and keeps the main event.

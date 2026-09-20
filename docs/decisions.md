@@ -131,6 +131,98 @@ counted in. Slack after the change (pages − mandated − medium/wide ceiling):
 `shotDistributionPhrase`), `server/lib/planCounters.js` (`NO_PEOPLELESS_PAGE` detail),
 `tests/unit/shot-distribution-floors.test.ts`.
 **Status:** ✅ active.
+## 2026-09-20 — Story chronology does not bind a cover; the book audit stops reporting one for showing the ending
+
+**Context:** The book audit reads the finished book in reading order and asks six
+reader's-eye questions. Question 6 (FUTURE) reports a picture that shows a state
+a later page's text still establishes. Covers were fed to the judge as bare
+`PAGE -1` / `PAGE -2` / `PAGE -3` headings with no name, so the judge read them as
+story pages in sequence and reported them under that question — on one book,
+"the picture shows the dragon already hatched and held by [child], which is a
+major event established much later in the story".
+
+Measured over the 14 staging stories carrying a stored audit: 549 faults, of
+which **9 sit on a cover page and 8 are that complaint**. The 9th is a genuine
+continuity fault — a shell drawn green where page 2's text calls it red-brown.
+
+A related claim was raised and is withdrawn: that the audit applied one cover
+fault to all three covers. It did not. The round carries exactly one
+negative-page fault and it names the right surface. The duplication came from a
+scratchpad harness that handed every negative-page fault to every cover reviewer.
+
+**Decision:** Owner ruling — "story chronology does not bind the cover; the cover
+can show the end of the story, that is fine." Two parts:
+
+1. `coverLabelForPage(n)` in `server/lib/coverKeys.js`, the module that already
+   owns every cover naming scheme, and `bookAudit.judgeChunk` now heads a cover
+   `PAGE -3 (BACK COVER)` and lists it the same way in `{PAGE_LIST}`. The number
+   stays because the fault line format is `p<N>` and the parser keys on it.
+
+2. Question 6 gains one clause: a cover stands outside the story's order and may
+   show any moment of it, its end included; never report one there.
+
+**Rationale:** Scoped to question 6 alone, deliberately. A cover that contradicts
+its own words, draws a character wrong, or uses the wrong colours is still a
+fault under the other five questions — the surviving 9th fault is exactly that
+case and must keep firing. Naming the covers rather than only exempting them
+also fixes the cause rather than the symptom: the judge could not previously tell
+a cover from a story page at all, which is why it applied sequence logic to one.
+
+**Touched:** `server/lib/coverKeys.js`, `server/lib/bookAudit.js`,
+`prompts/book-audit.txt`, `tests/unit/book-audit-covers-outside-order.test.ts`.
+**Status:** ✅ active
+
+## 2026-09-20 — The plan line's FOURTH field owes a change, not the instant described again; and the instant MAY stage an aftermath
+
+**Context:** The plan line is `<shot> — <who is in frame> — <the instant the
+picture shows> — <what is true after this page that was not before>`. Fields 3
+and 4 are different kinds of statement: the third is pictorial, one drawable
+moment; the fourth is narrative, the story-state change the page delivers.
+Nothing said so. `plan-check.txt` check 9 owned the boundary ("The instant shows
+one, and what follows it belongs in what is true after") but audited only the
+instant, and `story-beats.txt` already called a page with no change filler while
+giving that rule nothing to bite on. So a line could satisfy every stated rule
+and still say one thing twice.
+
+Measured over 34 staging stories and 485 stored plan lines: **73 (15.1%)** have a
+fourth field that only restates the instant — three times the rate of any other
+plan-line fault measured the same day.
+
+A separate question was raised and answered in the same session. 23 of those 485
+lines (4.7%, across 18 of 32 books) stage the *aftermath* of an event in the
+third field rather than the event, so the event is drawn nowhere in the book —
+the clearest case being a catch whose plan line reads "stands with the egg
+pressed against his jacket, both arms wrapped tight". A clause was drafted
+forcing the instant to name the action mid-occurrence.
+
+**Decision:** Two parts.
+
+1. `PAGE_CHANGE_DEF`, one constant filled into both sides — `story-beats.txt`
+   beside its own filler rule, `plan-check.txt` inside check 9, which already
+   owns the third/fourth boundary so no check is renumbered. The checker now
+   names the pages whose fourth field states no change its instant does not
+   already show.
+
+2. **The instant may stage an aftermath.** Owner ruling, 2026-09-20: "It is
+   allowed to draw the aftermath." The drafted clause is withdrawn unshipped and
+   nothing about which moment the picture takes is changed. This also leaves the
+   existing "never two characters interlocked at one instant — a shared grip, an
+   object in flight, a hand-over: pick the moment before or after it" rule
+   exactly as it stands, which the drafted clause would have narrowed to "before".
+
+**Rationale:** The two faults looked like one and are not. Which moment the
+picture takes is a picture question the owner has ruled on; whether the fourth
+field earns the page is a structure question the templates already claimed to
+care about and never enforced. Separating them keeps the settled interlocked-moment
+rule untouched and puts the measured 15.1% where a rule can reach it. Stated on
+both sides as one constant because a definition hand-copied into a generator and
+its critic is what this pair drifts on (four earlier definitions were
+consolidated for the same reason).
+
+**Touched:** `server/lib/promptBuilders.js` (`PAGE_CHANGE_DEF`, both fill maps),
+`prompts/story-beats.txt`, `prompts/plan-check.txt`,
+`tests/unit/plan-line-fourth-field.test.ts`.
+**Status:** ✅ active
 
 ## 2026-09-19 — An UNDECLARED garment state is REPORTED, not defaulted: the Art Director owes a row for every tracked garment, linked or not
 
@@ -50909,5 +51001,217 @@ left exactly as it was.
 convergence comparison, the discard log line and `discardReason`),
 `server/lib/storyHelpers.js` (facade re-exports),
 `tests/unit/replan-convergence-class.test.ts`
+## 2026-09-20 — The page's paragraph cap is the length ceiling; the sentence budget only sets precedence
+
+**Context:** An adversarial read of the page-text writer prompt as SENT
+(staging `job_1789853503332_riqncqg1i`, 40,732 chars, stored at
+`stories.data->'storyTextPrompts'->0->'prompt'`) found the length spec
+self-contradictory: the reading level gives a page 3-6 sentences, while the next
+line allowed four paragraphs of 2-4 — 8-16 sentences. The fixed paragraph count
+is wrong at both ends of the three bands (3-6, 3-12, 15-20), so it was replaced
+with a softer rule making the sentence budget authoritative and letting the page
+take "as many paragraphs as that budget allows".
+
+**Measured** by Lab experiment **#1353** (`story_text_replay`, same story, same
+model `claude-sonnet-4-6`), against the shipped text of that story:
+
+| | before | after the rewrite |
+|---|---|---|
+| sentences/page (avg) | 6.8 | 8.4 |
+| outside the 3-6 band | 9/18 | 15/18 |
+| words/page (avg) | 64.1 | 74.3 |
+| over the 70-word ceiling | 2/18 | 14/18 |
+
+**Decision:** "a page holds at most four paragraphs" comes back. The
+contradiction is resolved by stating precedence — where the paragraph shape and
+the sentence count disagree, the sentence count wins and the page takes fewer
+paragraphs — rather than by deleting the cap.
+
+**Rationale:** The paragraph cap was contradictory on paper but was the clause
+doing the actual capping. Removing it removed the only hard ceiling and the
+writer expanded into the slack, making both metrics worse on every measure. A
+contradiction that binds beats a consistent rule that does not. Stating
+precedence keeps the contradiction resolved without giving up the ceiling.
+
+**Touched:** `prompts/story-text-from-beats.txt`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-20 — The six "nothing is leaned on before it is established" rules are one rule
+
+**Context:** The same prompt carried twelve continuity laws as twelve flat
+lines. Six of them — a character knows only what an earlier page gave them, a
+first appearance carries its stated cause, an object earns its meaning where it
+first appears, a stated limit is never broken, a character who discards a thing
+stays done with it, a promised reveal is answered and a price leaves a mark —
+are instances of one principle, and read as six separate constraints each
+costing attention.
+
+**Decision:** Fold them into one rule that names the principle and lists the six
+instances. Every obligation is carried over verbatim in substance.
+
+**Rationale:** Owner's call, 2026-09-20. The first draft silently dropped "want
+it back or" from the refusal clause — the half covering a character who demands
+a discarded thing back WITHOUT taking it, which is the exact
+abandon-then-reclaim case that rule was added for on 2026-09-17 (staging
+`job_1789584708605_rts4wqupm`). `tests/unit/text-audit-rules-reach-writer.ts`
+caught it, which is what that generator↔critic contract test exists for. The
+audit's Q5 CAUSE, Q6 ENTRANCE and Q9 PAYOFF still match the consolidated rule,
+so no critic was left scoring a rule the writer no longer has.
+
+**Touched:** `prompts/story-text-from-beats.txt`,
+`tests/unit/text-audit-rules-reach-writer.test.ts`
+
+**Status:** ✅ active
+
+
+## The peopleless page is nominated by plan-check Q6, not picked by a code heuristic (2026-09-20)
+
+**Context:** `NO_PEOPLELESS_PAGE` is a must-fix plan counter: a book with no
+page showing only a thing or a place fires it. Since `32a9f9d78` the finding
+names the verb that answers it (`cast out <name>`), but it named no page, and
+the planner still answered it with `action in` on
+`job_1789853503332_riqncqg1i` — the one declarable verb that cannot empty a
+page.
+
+**Decision:** plan-check Q6 nominates the page. When the book has no
+people-free page, the checker emits a `PEOPLELESS <page>: <subject>` line in
+the same declared shape as `ROSTER` and `OBSTACLES`;
+`parsePlanCheckPeoplelessPick` reads it as data and `runPlanCounters` carries
+the page into the finding's detail and its `pages`. Code never picks or
+synthesises a page: with no nomination the finding is the same sentence
+without the page clause, and `beatsPipeline` logs the miss as an ERROR.
+story-beats.txt carries the generator half (a most-wanted picture is never the
+people-free page), and the RE-DIVIDE block tells the planner a named page is a
+candidate it may refuse — `reviewPlanChanges` still refuses a `cast out` on the
+page's obstacle holder or one that drops a character under the two-page floor,
+and is given no nomination at all, so a nominated page opens no bypass.
+
+**Rationale:** A CODE HEURISTIC FOR THE PICK WAS BUILT TO SPEC AND REJECTED ON
+MEASUREMENT — this entry exists so nobody rebuilds it. Replayed over
+`job_1789853503332_riqncqg1i`'s stored roster and plan, it leaves candidates
+{2, 4, 10, 13, 17}, and every defensible tie-break ranks p17 (the hatching
+climax) or p10 (the rescue) above the correct p13 (the low point, "Levin sits
+down in the dark leaves, head bowed"). Code cannot see "object-dominant" or
+"the low point": the roster's `things` column is empty on all 18 pages of that
+book. Shipping it would have nominated the climax as the page to empty, which
+costs a mangled book. The checker CAN see it — its own Q4 on that run named
+pages 2, 10 and 17 as the most wanted pictures, exactly the three that must not
+be emptied — so the judgement moved to the prompt and code only consumes a
+field. Per the eval rule, classification belongs to the prompt; this changed no
+type, bucket or severity.
+
+**Validated:** replayed the counter over that job's stored roster (rung 1,
+stored evidence, $0): the finding reads "… — page 13 gives up its cast (cast
+out <name>), and it is a page whose subject is already a thing or a place seen
+alone, never a moment between people". The MODEL-side nomination itself is
+unvalidated until a real beats run — the replay constructs the `PEOPLELESS`
+line from the stored Q4 answer to exercise the parse and finding path.
+
+**Touched:** `prompts/plan-check.txt`, `prompts/story-beats.txt`,
+`server/lib/promptBuilders.js`, `server/lib/beatsPipeline.js`,
+`server/lib/planCounters.js`,
+`tests/unit/cast-cap-and-peopleless-page.test.ts`,
+`tests/unit/plan-shared-definitions.test.ts`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-20 — SUPERSEDES the paragraph-cap entry above: the cap changes nothing, and the writer overshoots the sentence budget on every page
+
+**Context:** The entry above claimed the "at most four paragraphs" clause was
+the load-bearing page-length ceiling, on the strength of Lab #1353 measuring
+sentences/page 6.8 → 8.4 after the clause was softened. That comparison was
+invalid. The 6.8 figure is the story's SHIPPED text, which has been through the
+pipeline's refine pass; the 8.4 is a `story_text_replay` result, which is the
+raw writer call with no refine. Refined prose was compared against raw prose and
+the refine pass was read as a rule effect.
+
+**Measured** properly, from `stories.data->'storyTextPrompts'->0->>'rawResponse'`
+— the original run's own raw writer output under the OLD prompt — against both
+replays of the same story on the same model:
+
+| arm | sentences/page | outside 3-6 | words/page |
+|---|---|---|---|
+| raw writer, old prompt (true before) | 8.8 | 17/18 | 74.4 |
+| Lab #1353, cap deleted | 8.4 | 15/18 | 74.3 |
+| Lab #1354, cap restored + precedence | 8.8 | 17/18 | 76.0 |
+| shipped text, after refine | 6.8 | 9/18 | 64.1 |
+
+**Decision:** The paragraph clause has no measurable effect on page length in
+either form. The current wording — the cap plus explicit precedence for the
+sentence count — is kept because it is the coherent statement of the rule, NOT
+because it controls length. No length claim may be attached to it.
+
+**Rationale:** The real finding is the one the bad comparison hid: the writer
+has always overshot its own sentence budget by roughly 50% — 8.8 sentences
+against a 3-6 band, 17 of 18 pages out of range — and the refine pass is what
+drags it back to 6.8, still 9 of 18 out of range. That is a live defect in the
+writer, not in the paragraph clause, and it is invisible in shipped text because
+refine masks it. Fixing it is open work.
+
+**Touched:** `prompts/story-text-from-beats.txt` (wording kept),
+`docs/decisions.md`
+
+**Status:** ✅ active — supersedes the length claim in the entry above
+
+---
+
+## 2026-09-20 — A Lab `story_text_replay` result is raw writer output; never compare it to shipped text
+
+**Context:** See the entry above. `story_text_replay` runs the page-text call
+and stops. Shipped page text has additionally been through the refine pass,
+which on one 18-page book cut 2.0 sentences and 10 words off the average page.
+
+**Decision:** Any before/after using a replay stage takes its BEFORE from the
+same stage — for the text writer, `storyTextPrompts[N].rawResponse`, which the
+pipeline stores for exactly this reason — never from `sceneImages[].text`.
+
+**Rationale:** One invalid comparison produced a confident false verdict, a
+shipped prompt revert and a decisions entry that had to be superseded within the
+hour. The two artefacts differ by a whole pipeline stage.
+
+**Touched:** `docs/decisions.md`
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-20 — The writer's TITLE block is parsed by one shared helper; the Lab stages used to swallow it
+
+**Context:** The page-text writer emits `---ANALYSIS---` / `---STORY TEXT---` /
+`---TITLE---`, TITLE last. `parseRefinedText` stops the final page at that block
+only when TITLE is named as a trailing marker, and it never reads the block at
+all — the title is extracted separately. Production did both
+(`beatsPipeline.js`). The two Test Lab stages that replay the SAME call did
+neither:
+
+- `story_text_replay` called `parseRefinedText(res.text)` bare, so the last page
+  carried `TITLE_CANDIDATES` and the `TITLE_PICK` line as if it were prose, and
+  `title` came back null on every run. Measured on Lab #1354: page 18 was 904
+  chars, 522 of them the actual page.
+- `writer_compare` did the same and then passed those pages to `scoreText`, so
+  every writer-model arm was scored on a final page with the title block glued
+  on.
+
+**Decision:** Both stages parse exactly as production does — expected page
+numbers plus `['TITLE']` as a trailing marker — and the ~30-line title
+extraction moves out of `beatsPipeline.js` into `parseTitleBlock()` in
+`promptBuilders.js`, beside `parseRefinedText`. Production and both stages call
+the one helper. The replay result now also returns `titleCandidates` and
+`titlePick`.
+
+**Rationale:** Hand-copying the extraction into the Lab is the drift the sibling
+registry exists to prevent. Before rewiring production the helper was proved
+byte-identical to the inline block on three real writer responses and two edge
+cases, including reproducing the shipped title of the original run
+(`job_1789853503332_riqncqg1i` → "Vier Freunde und ein Klopfen", pick index 2).
+
+**Touched:** `server/lib/promptBuilders.js` (`parseTitleBlock`),
+`server/lib/beatsPipeline.js`, `server/lib/testlab.js`,
+`tests/unit/story-text-replay-title-marker.test.ts`
 
 **Status:** ✅ active

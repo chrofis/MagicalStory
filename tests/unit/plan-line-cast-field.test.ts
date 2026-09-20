@@ -92,3 +92,42 @@ describe('both templates actually consume their half', () => {
     }
   });
 });
+
+/**
+ * ONE BULLET, NOT TWO (2026-09-20).
+ *
+ * `81115d30a` added PLAN_LINE_FIELD_CONTRACT to story-beats.txt while the
+ * template already carried a narrower hand-written bullet making the same
+ * point ("The who column names every figure the picture shows. A figure that
+ * appears only in the instant or in what is true after is not in the
+ * picture…"). Owner's call: keep the broader constant, drop the narrower
+ * duplicate, and fold the one clause the broader one did not cover — the
+ * FOURTH field, "what is true after" — into it rather than losing it.
+ *
+ * Two statements of one contract in one prompt is the same disease the
+ * constant exists to cure; this pins that the built prompt states it once.
+ */
+describe('the planner states the who-column contract exactly once', () => {
+  const beats = () => read('story-beats.txt');
+
+  it('the narrower hand-written bullet is gone', () => {
+    expect(beats()).not.toContain('The who column names every figure the picture shows');
+  });
+
+  it('and its fourth-field clause survives in the constant that replaced it', () => {
+    expect(PLAN_LINE_FIELD_CONTRACT).toMatch(/what is true after/i);
+    expect(PLAN_LINE_FIELD_CONTRACT).toMatch(/not in the picture either/i);
+  });
+
+  it('the contract is stated once in the BUILT planner prompt, not once per copy', async () => {
+    const pb = require('../../server/lib/promptBuilders');
+    const { loadPromptTemplates } = require('../../server/services/prompts');
+    await loadPromptTemplates();
+    const built = pb.buildBeatsPrompt(
+      { pages: 18, language: 'de-CH', characters: [{ id: 'a', name: 'Levin', age: 5 }], mainCharacters: ['a'] },
+      18, { finalArc: '1. A story.' });
+    expect(built).toContain(PLAN_LINE_FIELD_CONTRACT);
+    expect(built.split('complete cast of that picture').length - 1).toBe(1);
+    expect(built.split('not in the picture').length - 1).toBe(1);
+  });
+});

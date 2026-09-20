@@ -5352,6 +5352,55 @@ const BRIEF_TRAILING_MARKERS = ['VISUAL BIBLE'];
  * Tolerates the model echoing the ---STORY TEXT--- marker or omitting it.
  * @returns {{pages: Array<{pageNumber:number,text:string}>, missing: number[]}}
  */
+/**
+ * The writer's ---TITLE--- block: the candidate list, the writer's own pick,
+ * and the title to ship. Lives here, beside parseRefinedText, because the beats
+ * pipeline and every Test Lab stage that replays the page-text call read the
+ * SAME response and must read it the same way — the Lab replay used to extract
+ * no title at all and reported `title: null` on every run.
+ *
+ * TITLE is the LAST block (2026-09-11), so it runs to the next block marker or
+ * to the end of the reply.
+ *
+ * @param {string} textRaw - the writer's full response
+ * @returns {{title: string|null, titleCandidates: string[], titleJudge: {pick:number, reason:string, candidates:string[]}|null, outOfRange: string|null}}
+ */
+function parseTitleBlock(textRaw) {
+  const { stableCandidateIndex } = require('./outlineParser/shared');
+  const titleSection = (String(textRaw || '').match(/---\s*TITLE\s*---\s*([\s\S]*?)(?=---\s*[A-Z]|$)/i) || [])[1] || '';
+  const cleanTitle = s => String(s || '')
+    .replace(/^\**\s*TITLE\s*:\s*/i, '')
+    .replace(/^\*{1,2}|\*{1,2}$/g, '')
+    .replace(/^"|"$/g, '')
+    .trim();
+  const titleCandidates = titleSection
+    .split('\n')
+    .map(l => (l.match(/^\s*\d+[.)]\s*(.+?)\s*$/) || [])[1])
+    .filter(Boolean)
+    .map(cleanTitle)
+    .filter(Boolean);
+  // TITLE_PICK: 1-based candidate number + one sentence. Out of range or absent
+  // → titleJudge stays null and the hash pick below stands.
+  const pickMatch = titleSection.match(/^\s*TITLE_PICK\s*:\s*(\d+)\s*(?:[—–-]\s*(.*))?$/im);
+  const pickIdx = pickMatch ? parseInt(pickMatch[1], 10) - 1 : -1;
+  const titleJudge = (pickIdx >= 0 && pickIdx < titleCandidates.length)
+    ? { pick: pickIdx, reason: String(pickMatch[2] || '').trim(), candidates: titleCandidates }
+    : null;
+  // Fall back to the first non-empty line for a writer that ignored the list
+  // format — a run must never lose its title to a format miss.
+  const title = titleJudge
+    ? titleCandidates[titleJudge.pick]
+    : (titleCandidates.length
+      ? titleCandidates[stableCandidateIndex(titleCandidates)]
+      : (cleanTitle(titleSection.split('\n').find(l => l.trim())) || null));
+  return {
+    title,
+    titleCandidates,
+    titleJudge,
+    outOfRange: (pickMatch && !titleJudge) ? `${pickMatch[1]} of ${titleCandidates.length}` : null,
+  };
+}
+
 function parseRefinedText(raw, expectedPages = [], markerName = 'STORY TEXT', trailingMarkers = []) {
   const full = String(raw || '');
   // Built from markerName, not hardcoded: callers pass 'SCENES' for the scene
@@ -6818,6 +6867,7 @@ function buildReplanSection(pagePlan, findingLines, { pageCount = null } = {}) {
     `The book keeps ${span}. No number is added and none is retired. A moment that earns a picture of its own takes an existing number: that page's material joins a neighbouring page, and the freed number stages the moment. Return both pages.`,
     'A finding is answered by adding or by removing, whichever that finding asks for. A page holding none of the commissioned characters gains one. A page past the cast ceiling loses one, or a page holding more than one action keeps the first alone and what follows from it goes to "what is true after" or to a page of its own. A name, an action or a page goes only where a finding asks for less in frame, never where one asks for more.',
     'Two figures stay wherever they are: the character whose action a page\'s instant works against, and a character the division would leave with fewer than two pages in the book.',
+    'A finding that names a page names a candidate, not an order. A finding asking the book for a page with no people in frame names the page best suited to give up its cast: empty that one, unless a figure on it is one of the two that stay — then empty another page and say in the declaration why that one could not.',
     'Declare every change you make under ---CHANGES---, with the finding it answers and why. A change you do not declare is undone.',
     '',
     '## YOUR PAGE PLAN',
@@ -7078,6 +7128,35 @@ function parsePlanCheckObstacles(raw) {
   return out;
 }
 
+/**
+ * The plan check's PEOPLELESS line — the page the checker nominates to give up
+ * its cast, as DATA.
+ *
+ * Q6 nominates it only when the book has no people-free page at all, which is
+ * exactly when `NO_PEOPLELESS_PAGE` fires. A code heuristic for the same pick
+ * was built and REJECTED on measurement (docs/decisions.md, 2026-09-20): the
+ * roster's `things` column is empty on every page of a real book, so code
+ * cannot see "object-dominant" or "the low point", and every defensible
+ * tie-break ranked the climax above the right page. The checker reads the arc
+ * and already names the pictures that must NOT be emptied (Q4), so the pick is
+ * the prompt's and code only consumes the field.
+ *
+ * "PEOPLELESS 13: the silent egg on the ground" → { page: 13, subject: 'the
+ * silent egg on the ground' }. No line → null.
+ *
+ * @returns {{page: number, subject: string}|null}
+ */
+function parsePlanCheckPeoplelessPick(raw) {
+  for (const line of String(raw || '').split('\n')) {
+    const m = line.trim().replace(/\*\*/g, '').match(/^PEOPLELESS\s+(?:page\s+)?(\d+)\s*:\s*(.*)$/i);
+    if (!m) continue;
+    const page = parseInt(m[1], 10);
+    if (!Number.isFinite(page)) continue;
+    return { page, subject: String(m[2] || '').trim() };
+  }
+  return null;
+}
+
 // A HINT MAY NOT CONTRADICT THE SETTLED ARC (2026-09-19).
 // One constant, injected into BOTH hint headings — the planner's and the text
 // writer's — which form one contract (docs/sibling-paths.md). The hint pass
@@ -7116,6 +7195,8 @@ function buildBeatsPrompt(inputData, pageCount, { finalArc = '', arcHints = '', 
     // The generator's half of the cast contract; PLAN_LINE_CAST_RULE is the
     // consumer's half, in both Art Director templates and the scene review.
     PLAN_LINE_FIELDS: PLAN_LINE_FIELD_CONTRACT,
+    // The fourth field's contract, shared with plan-check.txt check 9.
+    PAGE_CHANGE: PAGE_CHANGE_DEF,
     // The camera positions, from the one vocabulary the counters read — the
     // planner is the only stage that sees the whole book, so a spread of them
     // can only be decided here. See server/lib/shotVocabulary.js.
@@ -7515,6 +7596,26 @@ const HANDS_HOLD_ONLY_NAMED_RULE = "**HANDS:** A character's hands hold only wha
  * precede it with an imperative and an audit with "name every page whose…".
  */
 const DEED_AND_EFFECT_DEF = 'A deed, its effect, and where the effect goes are three actions. Watching, standing and being present are not actions.';
+
+/**
+ * ONE definition of what the plan line's FOURTH field owes, for the planner that
+ * writes it (story-beats.txt, beside the filler rule) and the plan check that
+ * audits it (plan-check.txt check 9, which already owns the third/fourth field
+ * boundary).
+ *
+ * The two fields are different KINDS of statement: the third is pictorial — one
+ * drawable instant — and the fourth is narrative, the story-state change the
+ * page delivers. Nothing said so. story-beats.txt already calls a page with no
+ * change filler, and plan-check.txt audits neither that nor the fourth field at
+ * all, so a line could satisfy every stated rule while saying one thing twice.
+ *
+ * Measured 2026-09-20 over 34 staging stories / 485 stored plan lines: 73
+ * (15.1%) have a fourth field that only restates the instant. Owner ruling the
+ * same day: the instant MAY stage an aftermath, so this is not about which
+ * moment the picture takes — only about the fourth field owing a change the
+ * picture does not already show.
+ */
+const PAGE_CHANGE_DEF = 'What is true after is a change in the story’s state, not the instant in other words: something now held, moved, opened, broken, learned, decided or agreed that was not true before this page. A fourth field that only redescribes the picture states no change.';
 const TWO_HEIGHTS_DEF = 'two named characters at different heights — deck and water, ledge and ground, roof and street. A whole cast carried together on one back or one boat is one level.';
 // No leading article: the planner says "stages THEIR arrival", the checker "stages AN arrival", and both wordings are pinned by tests.
 const NAMING_DEF = 'arrival or a naming by someone present; a badge, a garment, a title or an epithet is not a naming.';
@@ -7554,7 +7655,7 @@ const PLAN_LINE_CAST_RULE = "The plan line's second field is the complete cast o
  * cast, and the producer must not write one. Either alone leaves the other
  * side's behaviour undefined.
  */
-const PLAN_LINE_FIELD_CONTRACT = "The second field is the complete cast of that picture. Every person the instant stages — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. A figure the previous page staged does not carry into the next one as background.";
+const PLAN_LINE_FIELD_CONTRACT = "The second field is the complete cast of that picture. Every person the instant stages — including one named only as the owner of a prop, or one watching from the background — belongs in that field, or is not written into the instant at all. A figure named only in what is true after this page is not in the picture either: put them in that field or leave them off the page. A figure the previous page staged does not carry into the next one as background.";
 
 /**
  * ONE contract for an object that shows a different picture on different
@@ -8505,6 +8606,8 @@ function buildPlanCheckPrompt(inputData, beats, arc = '', pagePlan = '') {
   }
   return fillTemplate(template, {
     DEED_AND_EFFECT_DEF,
+    // The fourth field's contract, shared with the planner that writes it.
+    PAGE_CHANGE: PAGE_CHANGE_DEF,
     TWO_HEIGHTS_DEF,
     NAMING_DEF,
     ENDING_EVENT_DEF,
@@ -10016,6 +10119,7 @@ module.exports = {
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,
   parseRefinedText,
+  parseTitleBlock,
   BRIEF_TRAILING_MARKERS,
   buildStoryContextFields,
   buildRelationshipLines,
@@ -10035,6 +10139,7 @@ module.exports = {
   COUNTING_RULE,
   PLAN_LINE_CAST_RULE,
   PLAN_LINE_FIELD_CONTRACT,
+  PAGE_CHANGE_DEF,
   // The five definitions story-beats.txt and plan-check.txt share — one
   // constant each, filled into the rule AND the audit (sibling set
   // `beats-planner-vs-plan-check`).
@@ -10083,6 +10188,7 @@ module.exports = {
   parsePlanCheck,
   parsePlanCheckRoster,
   parsePlanCheckObstacles,
+  parsePlanCheckPeoplelessPick,
   buildReplanSection,
   parsePlanChanges,
   REPLAN_CHANGES_FORMAT,
