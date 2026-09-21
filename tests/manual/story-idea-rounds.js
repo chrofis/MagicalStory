@@ -33,7 +33,11 @@ const { callTextModelStreaming, getModelDefaults } = require(path.join(ROOT, 'se
 
 const { MODEL_PRICING } = require(path.join(ROOT, 'server/config/models'));
 
-const MODEL = getModelDefaults().idea; // claude-sonnet
+// Default = what production sends (claude-sonnet). --model=<id> overrides it for
+// MEASUREMENT runs only (e.g. --model=claude-opus to separate prompt from model);
+// it never changes what the route uses. Ids come from TEXT_MODELS in
+// server/config/models.js.
+const MODEL = (process.argv.find(a => a.startsWith('--model=')) || '').split('=')[1] || getModelDefaults().idea;
 
 // The Anthropic streaming path reports tokens, not a charge (direct_cost is only
 // populated by providers that bill a real amount back). Price them with the
