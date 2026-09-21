@@ -53007,3 +53007,58 @@ line), `tests/unit/eval-vb-secondary-reference.test.ts`.
 **Status:** 🟡 conditional — in the working tree, validated by replay over the stored pages of
 `job_1789853503332_riqncqg1i` (references before/after) and by unit tests; not yet exercised by a
 live story.
+
+## The idea call gets an idea-shaped guide; the story writer's inputs leave both idea templates (2026-09-21)
+
+**Context:** the round-10 blind buy-axis read (`tests/manual/story-idea-rounds/blind-scores-r10.md`,
+key `blind-key-r10.json`) splits cleanly by CATEGORY: adventure 4.25 — unchanged since round 1 —
+against historical 3.75 and life-challenge 3.63. Eleven rounds of contract work moved the shared
+template and never moved that split, because the split is not in the template. Each weak arm was
+handed the STORY writer's input and wrote it back as a synopsis:
+- historical ideas received the full fact sheet — PERIOD COSTUMES, HISTORICAL DETAILS,
+  LOCATION_REFERENCES, THEMES and all — and received it **twice**: `categoryInstructions` embedded
+  `getTeachingGuide('historical', topic)` and `{TOPIC_GUIDE}` filled the same string again. Cell 4
+  and cell 8 came back "engineering-dry" and "stuffed with roles and hardware" (2, 3).
+- life-challenge ideas received a BOOK BRIEF — "What the book is / What happens / Ending" — which
+  is a finished story's plan, not a premise's material. The route's own obstacle line pointed the
+  same way: "what stands in the way is this skill being hard".
+
+**Decision:** three cuts, none of which reaches an adventure prompt except the third.
+1. The historical guide is injected ONCE, and the idea path gets `getIdeaGuide()` — the sheet's
+   idea-shaped view: the EVENT line, one sentence of context, KEY FIGURES, STORY ANGLES (the
+   seeds), and one line: *the idea is one child's day inside this event*. The four story-prompt
+   sections are dropped from the IDEA path only; `getTeachingGuide` is untouched, so
+   `buildBeatsPrompt` and every other story builder still read the whole sheet.
+2. A topic guide may carry an `[[idea]] … [[/idea]]` block in the shape `[going-outside]` already
+   models — **What the child wants** / **What answers back** / **The child moves**. Added to
+   `making-friends`, `managing-emotions` and `not-giving-up`; `getIdeaGuide` returns that block
+   alone, and a guide with no block yields the whole guide unchanged. The route line becomes
+   "What stands in the way is a person, a creature or a thing that answers back", the same wording
+   in `trial.js` and `testlab.js` (registry set `trial-idea-prompt-mirror`).
+3. `{SCENE_COMPLEXITY_GUIDE}`, review check 5 (Complexity), `{CHALLENGE_CATALOGUE}`, "Be specific
+   about locations and time periods" and "Follow the SCENE COMPLEXITY guide above" come out of both
+   templates (set `story-idea-templates`); the checks renumber 1..14. `{AGE_MODE}` stays but is
+   sliced to the band's `[[premise]]` rules (`bandView: 'premise-open'`) — a back-cover premise does
+   not need per-page craft or page arithmetic. The catalogue builder in `buildIdeasPromptContext`
+   is DELETED, not left unused.
+
+**Rationale:** the guide is what the model actually builds from — the same finding as the
+world-seed entry above — so a guide written for the wrong stage outweighs eleven rounds of template
+rules. "What answers back" is the one thing both weak categories lacked and adventure always had:
+something in the world that resists, rather than a difficulty or a fact.
+
+**Touched:** `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`prompts/life-challenge-guides.txt`, `server/lib/promptBuilders.js` (`getIdeaGuide`,
+`buildHistoricalIdeaGuide`), `server/lib/storyHelpers.js`, `server/routes/storyIdeas.js`,
+`server/routes/trial.js`, `server/lib/testlab.js`,
+`tests/unit/idea-guide-shape.test.ts` (new, 18 pins).
+
+**Validation:** dry runs of cells 1, 4, 5 and 7 diffed against a worktree checked out at the
+pre-change HEAD. The adventure cell differs by (3) alone: -1084 chars. Historical -9660,
+life-challenge -4865 (cell 5) and -2493 (cell 7). Gates: `check-sibling-paths.js --list`, and
+`npx vitest run tests/unit/sibling-parity tests/unit/prompt* tests/unit/idea-* tests/unit/teaching-guide-parser tests/unit/trial-idea*` — 16 files, 202 tests green.
+Round 14 generated the twelve non-adventure ideas (cells 2, 4, 5, 7, 8, 10) at USD 0.7778
+(`tests/manual/story-idea-rounds/round-14.json` / `.md`); the owner stopped the blind read of it in
+favour of a full ten-cell run after the fantasy-arm fixes land on top, so **R14 carries no rated
+verdict** and this entry rests on the prompt diffs, not on a score.
+**Status:** ✅ active — committed on `staging`, not pushed.
