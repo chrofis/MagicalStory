@@ -52288,6 +52288,67 @@ Artefacts: `round-13.json` / `.md`, `round-13-defects.md`, `blind-set-r13.md`,
 
 
 
+**Follow-up (2026-09-21) — the series RESTARTS FROM ROUND 10. The templates are reverted to
+`902399b9b`, and four single-change variants are screened from the harness, not from the
+templates. The screen was stopped before any generation ran; nothing was spent.**
+
+*Why.* Rounds 11, 12 and 13 each moved the defect axes and none of them moved the buy axis
+(3.50 / 3.30 / 3.50 against R10's 3.90 on an R1 anchor that reads 3.45-3.55 across seven
+independent reads). Three consecutive rounds of compounding changes on top of each other also
+means no round after 10 measures ONE thing. So the owner's call: put the templates back to the
+round-10 state and screen one change at a time against it.
+
+*The baseline.* `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`
+and `prompts/age-band-journey.txt` are byte-identical to `902399b9b`. Kept from after round 10,
+because none of it is a template or a prompt-structure change: the adventure guides with their
+`Who lives here` / `What turns` lists (`abf78b05d`), `SHAPE_PERIL_PRONE` (`6e0032049`), the
+world-seed module and its telemetry, and the client's roles cast line. **The world seed is
+still picked and still logged; it is no longer injected** — there is no `{WORLD_SEED}`
+placeholder in either template. All three placeholders stay declared in `applyReplacements`
+so no call site can ship an unfilled one, and `tests/unit/world-seeds.test.ts` pins both halves
+of that (absent from the templates, declared in the route).
+
+*Verified, not assumed.* `--dry-run --cells=1` against the stored round-10 prompt: the two
+built prompts differ in exactly two places. (1) The adventure-guide section carries the two
+lists and the five-prop list — deliberate, identical in the baseline and in all four variants.
+(2) **The premise shapes shift by one position on every cell whose youngest is ≤ 5** (cells 1,
+2, 6, 7), because `SHAPE_PERIL_PRONE` removes `rescue` from the pool and the index arithmetic
+lands elsewhere. That follows from the filter that was kept, and it is recorded here because it
+means the baseline is not shape-identical to round 10 on four of ten cells.
+
+*The mechanism.* `tests/manual/story-idea-rounds.js --variant=<name>` — every variant lives in
+the harness, so all four runs come from one commit and nothing is edited between them, and the
+committed templates never leave the round-10 state (pinned by
+`tests/unit/idea-turn-slot.test.ts`, repurposed from pinning R13's turn slot to pinning R10's
+slot list). Three forms, all of which fail loudly: a substitution asserts its `from` occurs
+exactly once in BOTH sibling templates (a substitution that lands on one template only is a
+drifted set, and a missed one would silently measure the baseline twice); a guide suffix
+overrides the `ADVENTURE_SETTING_GUIDE` value, for which the route now returns
+`adventureSettingGuide`; and a route option, `perilYoungestMax`, which defaults to
+`SHAPE_PERIL_MAX_YOUNGEST` so production behaviour is unchanged.
+
+*The four variants and their measured dry-run diffs*
+(`tests/manual/story-idea-rounds/screen-baseline-diffs.md`):
+
+| variant | change | diff against the baseline |
+|---|---|---|
+| `peril-input` | `perilYoungestMax: 7` — catalogue entries flagged peril-prone and the `rescue` shape are withheld for a youngest under 8, not under 6 | no template byte. Cell 3 (youngest 7): peril-flagged entries in the 40-entry sample **3 → 0**; shapes `an unwanted companion`/`a promise to keep` → `a promise to keep`/`a secret kept`. Cell 1 (youngest 3) is unaffected — it was already below the old threshold |
+| `adult-line` | the round-10 responsibility rule and the co-location clause of check 4 both become "An adult is in the idea only when the story needs them, and then they want something of their own." | exactly two lines per template, both arms; peril check, CUT labels, hook/promise checks and the four-to-six budget untouched |
+| `turn-examples` | the three examples become the three of `3c9937df8`, verbatim | three lines per template. Each example gains one sentence where something acts back, and its cost sentence changes with it; six sentences each, inside the round-10 budget. No rule, no check, no label |
+| `seeds-soft` | one line appended to the guide section: "Pick one from each list, or one in their spirit." | one line per built prompt, after the guide and before the location/season blocks. No code pick, no placeholder |
+
+*Stopped.* The owner halted the screen before the four generations. **USD 0.00 spent**; no
+round files, no blind set, no defect counts. `make-blind.js` and `analyze-blind.js` are
+untouched and still take two rounds — extending them to N rounds is part of the unrun work.
+**R10's 3.90 therefore still stands as the best measured version on the buy axis, and no
+variant has any evidence for or against it.**
+
+**Touched:** `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`prompts/age-band-journey.txt` (all three reverted to `902399b9b`),
+`server/routes/storyIdeas.js`, `tests/manual/story-idea-rounds.js`,
+`tests/unit/idea-turn-slot.test.ts`, `tests/unit/world-seeds.test.ts`, `docs/decisions.md`.
+Artefact: `tests/manual/story-idea-rounds/screen-baseline-diffs.md`.
+
 ---
 
 ## 2026-09-21 — The figure detector is MASTER for identity; the witnesses may only deadlock it; an independent ARBITER resolves the deadlock

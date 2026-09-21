@@ -49,6 +49,73 @@ function costOf(usage, modelId) {
   if (!p) return 0;
   return ((usage?.input_tokens || 0) * p.input + (usage?.output_tokens || 0) * p.output) / 1e6;
 }
+// ---- Screen variants (2026-09-21). Baseline = the round-10 state. ----
+// One change each, selected with --variant=<name> so all four runs come from ONE
+// commit and nothing is edited between them. A variant is either a substitution
+// applied to BOTH sibling templates (so the pair template and the single
+// template never drift), a line appended to the adventure-guide section, or a
+// route option. The committed templates stay at the round-10 state: a variant
+// that lives here never reaches production.
+//
+// Every substitution asserts its `from` occurs EXACTLY ONCE in each template —
+// a silently-missed edit is a run that measures the baseline twice.
+const TURN_EXAMPLES = [
+  {
+    "from": "A stone in the wall of a ruin sits loose, and behind it is a way into somewhere that is on no map. A child wants the little carved animal their grandmother lost in there when she was small. Whoever keeps that gap says the animal belongs to him now. The child squeezes through the wall with the evening bell already ringing at home. If they are still inside when the last bell goes, their grandmother waits alone.",
+    "to": "A stone in the wall of a ruin sits loose, and behind it is a way into somewhere that is on no map. A child wants the little carved animal their grandmother lost in there when she was small. Whoever keeps that gap says the animal belongs to him now. Then he says the grandmother's name, and he says it as though he has been waiting for her. The child squeezes through the wall with the evening bell already ringing at home. If the last bell goes first, the animal stays his, and the grandmother has only the story of it."
+  },
+  {
+    "from": "A bone as long as an arm lies half out of the gravel at the foot of a quarry. A child wants to carry it up to their grandfather, who is the only one who will know what animal it came from. An older brother says it is a stick and walks on, and the gate at the top of the path is locked when the sun goes down. The child kneels in the gravel and digs with both hands while the light turns orange. If the gate closes first, nobody ever finds out what it was.",
+    "to": "A bone as long as an arm lies half out of the gravel at the foot of a quarry. A child wants to carry it up to their grandfather, who is the only one who will know what animal it came from. An older brother says it is a stick and walks on, and the gate at the top of the path is locked when the sun goes down. The gravel slides, and there is more of the animal under it than one child can carry. The child kneels in the gravel and digs with both hands while the light turns orange. If the gate closes first, the whole of it goes back under, and nobody ever hears what it was."
+  },
+  {
+    "from": "A goat is standing on the kitchen table eating the birthday cake. A child wants that cake out in the garden, where everyone is already singing. The goat is bigger than the child and will not be pushed. The child stands in the doorway and holds out an apple in both hands. If the cake never comes out, the singing stops and there is nothing to carry in.",
+    "to": "A goat is standing on the kitchen table eating the birthday cake. A child wants that cake out in the garden, where everyone is already singing. The goat is bigger than the child and will not be pushed. The singing stops, and the whole garden decides it was the child who let the goat in. The child stands in the doorway and holds out an apple in both hands. If the cake never comes out, it stays the child's fault for as long as anyone remembers that birthday."
+  }
+];
+
+const VARIANTS = {
+  // The catalogue sample and the premise-shape pool exclude peril-prone entries
+  // for a youngest under 8 (baseline: under 6). No template change.
+  'peril-input': { perilYoungestMax: 7 },
+
+  // One positive adult sentence replaces the round-10 responsibility rule and
+  // the co-location clause of check 4.
+  'adult-line': {
+    subs: [
+      { from: 'The youngest main character does something in the idea, and whoever is responsible for them is named.',
+        to: 'An adult is in the idea only when the story needs them, and then they want something of their own.' },
+      { from: 'Living with, coming along with, or waiting for the others is not a stake. ',
+        to: 'An adult is in the idea only when the story needs them, and then they want something of their own. ' },
+    ],
+  },
+
+  // The three examples become three that each carry a turn (commit 3c9937df8).
+  // No rule, no check, no label: the examples are the only change.
+  'turn-examples': { subs: TURN_EXAMPLES },
+
+  // The guide's own two lists already reach the prompt. One line invites the
+  // model to use them. No code pick, no placeholder.
+  'seeds-soft': { guideSuffix: '\n\nPick one from each list, or one in their spirit.' },
+};
+
+const VARIANT = (process.argv.find(a => a.startsWith('--variant=')) || '').split('=')[1] || '';
+if (VARIANT && !VARIANTS[VARIANT]) {
+  console.error(`unknown --variant=${VARIANT}; known: ${Object.keys(VARIANTS).join(', ')}`);
+  process.exit(1);
+}
+const V = VARIANTS[VARIANT] || {};
+
+function applyVariantSubs(template, label) {
+  let out = template;
+  for (const { from, to } of (V.subs || [])) {
+    const n = out.split(from).length - 1;
+    if (n !== 1) throw new Error(`--variant=${VARIANT}: ${label} contains ${n} copies of ${JSON.stringify(from.slice(0, 60))}, expected 1`);
+    out = out.split(from).join(to);
+  }
+  return out;
+}
+
 const LOCATION = { city: 'Baden', region: 'Aargau', country: 'Switzerland' };
 const OUT_DIR = path.join(__dirname, 'story-idea-rounds');
 const STRANGERS_DE = require(path.join(ROOT, 'shared/relationship-sentinels.json')).strangers.de;
@@ -155,14 +222,25 @@ async function buildCellPrompts(cell) {
     storyCategory, storyTopic, storyTheme, storyTypeName: undefined, customThemeText: undefined,
     language, languageLevel, characters, relationships, pages,
     userLocationInstruction, availableLandmarksSection, seasonInstruction,
+    ...(V.perilYoungestMax !== undefined ? { perilYoungestMax: V.perilYoungestMax } : {}),
   });
+
+  const singleTemplate = applyVariantSubs(ctx.singlePromptTemplate, 'generate-story-idea-single.txt');
+  // The pair template is not sent by this harness, but a substitution that does
+  // not land on BOTH siblings is a drifted set. Built and asserted, never used.
+  applyVariantSubs(ctx.promptTemplate, 'generate-story-ideas.txt');
+  // The guide reaches the prompt through its own placeholder, so an appended
+  // line is an override of that value — not a template edit.
+  const guideOverride = (V.guideSuffix && ctx.adventureSettingGuide)
+    ? { ADVENTURE_SETTING_GUIDE: ctx.adventureSettingGuide + V.guideSuffix } : {};
 
   const buildSinglePrompt = (world, variantInstruction, shape, seeds) => {
     const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
     const worldOverrides = world === 'fantasy' ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' } : {};
-    return ctx.applyReplacements(ctx.singlePromptTemplate, {
+    return ctx.applyReplacements(singleTemplate, {
       STORY_VARIANT_INSTRUCTION: variantInstruction, STORY_REQUIREMENTS: requirements,
-      PREMISE_SHAPE: premiseShapeInstruction(shape), WORLD_SEED: worldSeedInstruction(seeds), ...worldOverrides,
+      PREMISE_SHAPE: premiseShapeInstruction(shape), WORLD_SEED: worldSeedInstruction(seeds),
+      ...guideOverride, ...worldOverrides,
     });
   };
 
@@ -213,7 +291,7 @@ async function runCell(cell) {
       const b = await buildCellPrompts(cell);
       built.push({ cell: cell.id, worlds: b.worlds, shapes: b.premiseShapes.map(x => x.name), worldSeeds: b.worldSeeds, prompts: b.prompts });
     }
-    const f = path.join(OUT_DIR, `dry-run-${cells.map(c => c.id).join('-')}.json`);
+    const f = path.join(OUT_DIR, `dry-run-${VARIANT ? VARIANT + '-' : ''}${cells.map(c => c.id).join('-')}.json`);
     fs.writeFileSync(f, JSON.stringify(built, null, 2));
     console.log(`written ${f}`);
     process.exit(0);
@@ -228,7 +306,7 @@ async function runCell(cell) {
   results.sort((a, b) => a.cell.id - b.cell.id);
 
   const totalCost = results.reduce((s, r) => s + r.ideas.reduce((t, x) => t + x.cost, 0), 0);
-  const report = { round, model: MODEL, location: LOCATION, generatedAt: new Date().toISOString(), totalCost, cells: results };
+  const report = { round, variant: VARIANT || null, model: MODEL, location: LOCATION, generatedAt: new Date().toISOString(), totalCost, cells: results };
   fs.writeFileSync(path.join(OUT_DIR, `round-${round}.json`), JSON.stringify(report, null, 2));
 
   const md = [`# Story ideas — round ${round}`, '', `Model: ${MODEL} · cost USD ${totalCost.toFixed(4)} · location ${LOCATION.city}`, ''];

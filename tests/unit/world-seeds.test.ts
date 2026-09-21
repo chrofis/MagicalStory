@@ -74,13 +74,21 @@ describe('pickWorldSeeds', () => {
   });
 });
 
-describe('both idea templates carry the world seed', () => {
+describe('the world seed is picked but NOT injected at the round-10 baseline', () => {
+  // The screen of 2026-09-21 restarts from round 10, whose templates predate the
+  // seed. `pickWorldSeeds` and `worldSeedInstruction` stay — the value is still
+  // computed and still rides in the `idea_generated` telemetry detail — and all
+  // three placeholders stay declared in `applyReplacements` so no call site can
+  // ship an unfilled one. What is gone is the placeholder in both templates.
   const fs = require('fs');
   const single = fs.readFileSync(path.join(ROOT, 'prompts/generate-story-idea-single.txt'), 'utf-8');
   const pair = fs.readFileSync(path.join(ROOT, 'prompts/generate-story-ideas.txt'), 'utf-8');
-  it('single template has {WORLD_SEED}', () => expect(single).toContain('{WORLD_SEED}'));
-  it('two-idea template has one per arm', () => {
-    expect(pair).toContain('{WORLD_SEED_1}');
-    expect(pair).toContain('{WORLD_SEED_2}');
+  const route = fs.readFileSync(path.join(ROOT, 'server/routes/storyIdeas.js'), 'utf-8');
+  it('neither template carries a seed placeholder', () => {
+    expect(single).not.toContain('{WORLD_SEED');
+    expect(pair).not.toContain('{WORLD_SEED');
+  });
+  it('the route still declares all three placeholders', () => {
+    for (const k of ['WORLD_SEED:', 'WORLD_SEED_1:', 'WORLD_SEED_2:']) expect(route).toContain(k);
   });
 });

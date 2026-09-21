@@ -57,7 +57,13 @@ async function buildIdeasPromptContext({
   storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
   language, languageLevel = 'standard', characters, relationships,
   pages = 10, userLocationInstruction = '', availableLandmarksSection = '',
-  seasonInstruction = ''
+  seasonInstruction = '',
+  // Measurement knob, not a product setting. The age below which a peril-prone
+  // catalogue entry or premise shape is withheld from the sample; production
+  // leaves it at SHAPE_PERIL_MAX_YOUNGEST (5, set by round 11's trace). The
+  // rating harness raises it to screen `peril-input`
+  // (tests/manual/story-idea-rounds.js --variant=peril-input).
+  perilYoungestMax = SHAPE_PERIL_MAX_YOUNGEST
 }) {
   const { getLanguageInstruction } = require('../lib/languages');
 
@@ -231,7 +237,7 @@ ${adventureGuideContent}`
   // all, so there is nothing to sample for — challengeCatalogueBands returns an
   // empty list for them, and picks the bands for every other age.
   const { buildAgeModeSection, resolveAgeBand, challengeCatalogueBands } = require('../lib/promptBuilders');
-  const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language });
+  const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language, perilYoungestMax });
   // One centre and one turn per arm, picked in code from the adventure guide's
   // two ten-item lists (server/lib/worldSeeds.js). null — and nothing injected —
   // for a theme with no adventure guide (custom, historical).
@@ -251,7 +257,7 @@ ${adventureGuideContent}`
       .map(l => l.split('|'))
       .filter(f => f.length >= 6)
       .filter(f => bands.some(b => f[4].startsWith(b)))
-      .filter(f => youngest > 5 || f[5].trim() !== '1');
+      .filter(f => youngest > perilYoungestMax || f[5].trim() !== '1');
     const byCat = new Map();
     for (const f of entries) {
       if (!byCat.has(f[1])) byCat.set(f[1], []);
@@ -372,6 +378,9 @@ ${adventureGuideContent}`
     relationshipDescriptions,
     sceneCount,
     promptTemplate,
+    // The guide section verbatim, so a caller can screen an edit to it without
+    // rebuilding it (the `seeds-soft` variant appends one line).
+    adventureSettingGuide,
     premiseShapes,
     worldSeeds,
     singlePromptTemplate,
@@ -487,11 +496,12 @@ function pickPremiseShapes(seedInput = {}) {
   const chars = seedInput?.characters || [];
   const ages = chars.map(c => parseInt(c?.age, 10)).filter(Number.isFinite);
   const youngest = ages.length ? Math.min(...ages) : 8;
+  const perilMax = Number.isFinite(seedInput?.perilYoungestMax) ? seedInput.perilYoungestMax : SHAPE_PERIL_MAX_YOUNGEST;
   const mains = chars.filter(c => c?.isMain).length;
   const pool = loadPremiseShapes()
     .filter(s => youngest >= s.minAge)
     .filter(s => mains >= 2 || !SHAPE_NEEDS_TWO_MAINS.has(s.id))
-    .filter(s => youngest > SHAPE_PERIL_MAX_YOUNGEST || !SHAPE_PERIL_PRONE.has(s.id));
+    .filter(s => youngest > perilMax || !SHAPE_PERIL_PRONE.has(s.id));
   if (pool.length < 2) throw new Error(`premise-shapes: only ${pool.length} shape(s) for youngest age ${youngest}`);
   const h = ideaVariantSeed(seedInput);
   const i1 = h % pool.length;

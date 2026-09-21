@@ -32,8 +32,6 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 
 {ADVENTURE_SETTING_GUIDE}
 
-{WORLD_SEED}
-
 {CHALLENGE_CATALOGUE}
 
 {USER_LOCATION_INSTRUCTION}
@@ -61,7 +59,7 @@ Your entire output must be in the language specified above.
 Generate a story idea that includes:
 1. THE SETUP: who is there and what they want.
 2. WHAT STANDS IN THE WAY.
-3. THE TURN: something that changes what the reader expected.
+3. THE PROMISE: one thing that happens in this book.
 4. WHAT IT COSTS THEM TO FAIL.
 
 The reader already chose the town and the season. Do not open with an address. The place is the scene the action happens in, named where the action is, never a sentence that states where and when.
@@ -81,28 +79,29 @@ The idea answers these:
 
 RULES:
 - No adjectives allowed. Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
-- Three to five sentences, whatever the page count, and at most one sentence per slot. A longer text turns into a plot summary.
-- One sentence is the turn: something changes what the reader expected. The thing acts back, the wrong person is believed, the helper turns out to need help. It stands between the obstacle and the cost, and it names neither the middle nor the ending.
+- Four to six sentences, whatever the page count, and at most one sentence per slot. A longer text turns into a plot summary.
+- One sentence is an event this book contains, written in the story's voice as a thing that happens and can be pictured. It never addresses the reader and never names the reader, the book, the page or the picture. Never whether they manage it, and never what decides it. It stands after the obstacle.
 - No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
-- The last sentence states what failing costs, and the cost is something of theirs. Nothing comes after it.
+- The last sentence states what failing costs. Nothing comes after it.
 - [FINAL] holds the idea text only: no notes, no headings, no second version, no commentary.
-- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. No child is left alone at a height or on an edge, and no cost ends on a child never coming home. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
+- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
 - All the characters must be mentioned
-- A character is in the idea through what they want, what they are answerable for, or the part of the main character's want they hold: someone waiting for them, someone they fetch it for. That is presence.
-- The youngest main character does something in the idea. An adult is in the idea only when the story needs them, and then they want something of their own.
+- A character is in the idea through what they want or what they are answerable for, never through a list of who came along.
+- The youngest main character does something in the idea, and whoever is responsible for them is named.
 - The want is the main character's own want, stated as theirs, and they are the one who sets out after it. An errand an adult handed them is not their want. For a main character aged two or under the want is something to reach, follow, touch, hold or get to, never an object to fetch back and never an arrangement to sort out.
+- One thing in the idea is out of the ordinary and can be pointed at in a picture: a thing, a creature, a place or an event, named with a plain noun. It stands in the first or second sentence and belongs to the setup or to the obstacle, never to what decides the outcome. It is named and never explained: not what it does, not what it opens, not who it obeys, not why it is as it is.
 - The want is one a child would have for themselves: something to reach, to keep, to get into, to be first at, to give to someone, or to be allowed. A submission, a measurement, a permit, a set of numbers, or a repair an adult is paid to do is not one.
 - Follow the SCENE COMPLEXITY guide above - match story complexity to the number of scenes
 
 EXAMPLES of good story ideas:
 
-Example 1: "A stone in the wall of a ruin sits loose, and behind it is a way into somewhere that is on no map. A child wants the little carved animal their grandmother lost in there when she was small. Whoever keeps that gap says the animal belongs to him now, and at home the evening bell is already ringing. Then he says the grandmother's name, and he says it as though he has been waiting for her. If the last bell goes first, the animal stays his, and the grandmother has only the story of it."
+Example 1: "A stone in the wall of a ruin sits loose, and behind it is a way into somewhere that is on no map. A child wants the little carved animal their grandmother lost in there when she was small. Whoever keeps that gap says the animal belongs to him now. The child squeezes through the wall with the evening bell already ringing at home. If they are still inside when the last bell goes, their grandmother waits alone."
 
-Example 2: "A bone as long as an arm lies half out of the gravel at the foot of a quarry. A child wants to carry it up to their grandfather, who is the only one who will know what animal it came from. An older brother says it is a stick and walks on, and the gate at the top of the path is locked when the sun goes down. The gravel slides, and there is more of the animal under it than one child can carry. If the gate closes first, the whole of it goes back under, and nobody ever hears what it was."
+Example 2: "A bone as long as an arm lies half out of the gravel at the foot of a quarry. A child wants to carry it up to their grandfather, who is the only one who will know what animal it came from. An older brother says it is a stick and walks on, and the gate at the top of the path is locked when the sun goes down. The child kneels in the gravel and digs with both hands while the light turns orange. If the gate closes first, nobody ever finds out what it was."
 
-Example 3: "A goat is standing on the kitchen table eating the birthday cake. A child wants that cake out in the garden, where everyone is already singing. The goat is bigger than the child and will not be pushed. The singing stops, and the whole garden decides it was the child who let the goat in. If the cake never comes out, it stays the child's fault for as long as anyone remembers that birthday."
+Example 3: "A goat is standing on the kitchen table eating the birthday cake. A child wants that cake out in the garden, where everyone is already singing. The goat is bigger than the child and will not be pushed. The child stands in the doorway and holds out an apple in both hands. If the cake never comes out, the singing stops and there is nothing to carry in."
 
 ---
 
@@ -130,17 +129,18 @@ Check and critique:
    - Do events follow logically from each other?
    - Any plot holes or unexplained jumps?
    - Is the timeline coherent?
-4. **Characters**: for each name, quote the words that put them in the idea: what they want, what they are answerable for, or the part of the main character's want they hold. A name with none of that is not in the story yet. For each adult, quote what they want of their own; an adult the story does not need comes out of [FINAL].
+4. **Characters**: for each name, quote the words that give them a stake. Living with, coming along with, or waiting for the others is not a stake. A name with no such words is not in the story yet.
 5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
-6. **Back cover, not synopsis**: number the sentences of [FINAL]. Label each one "setup", "turn", "event", "rule" or "cost". A "turn" is the sentence where something changes what the reader expected. A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Only "event" and "rule" are cut: every sentence marked "event" other than the last, and every sentence marked "rule". Setup, turn and cost are kept. The sentence marked "cost" names something of theirs that is lost. List every cut sentence, not one of them.
-7. **Peril**: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in [FINAL]. Then quote any words that leave a child alone at a height or on an edge, and any words in the cost sentence that end on a child not coming home or not returning; replace the place, and replace that cost with a loss the child can bear. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
+6. **Back cover, not synopsis**: number the sentences of [FINAL]. Label each one "setup", "hook", "promise", "event", "rule" or "cost". A "promise" names an event the book contains, in the story's voice, and does not say whether they manage it. A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Only "event" and "rule" are cut: every sentence marked "event" other than the last, and every sentence marked "rule". Setup, hook, promise and cost are kept. List every cut sentence, not one of them.
+7. **Peril**: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in [FINAL]. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 8. **Topic**: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
-9. **The child acts**: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in [FINAL]. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have.
-10. **Turn**: quote the sentence where something changes what the reader expected. If there is nothing to quote, add one to [FINAL]. If it says how the story goes on from there, or how it ends, rewrite it.
-11. **Shape**: name the shape you were given and quote the words in [FINAL] that carry it. If it is not there, rewrite [FINAL] to the shape.
-12. **Opening**: quote the first sentence. If it states where and when rather than showing the main character, rewrite it.
-13. **Length**: count the sentences of [FINAL] and the words of the longest one. Past five sentences, or past 30 words, split or cut before [FINAL].
-14. **Would a parent buy it**: answer each of these with a quote from [FINAL].
+9. **Hook**: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to [FINAL]. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them.
+10. **The child acts**: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in [FINAL]. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have.
+11. **Promise**: quote the sentence that names an event the book contains. If there is nothing to quote, add one to [FINAL]. If it says whether they manage it, or what decides it, rewrite it. Then quote any words that address the reader or name the reader, the book, the page or the picture, and cut them.
+12. **Shape**: name the shape you were given and quote the words in [FINAL] that carry it. If it is not there, rewrite [FINAL] to the shape.
+13. **Opening**: quote the first sentence. If it states where and when rather than showing the hook or the main character, rewrite it.
+14. **Length**: count the sentences of [FINAL] and the words of the longest one. Past six sentences, or past 30 words, split or cut before [FINAL].
+15. **Would a parent buy it**: answer each of these with a quote from [FINAL].
 {BUY_CRITERION}
 A question with no quote to answer it means that part of [FINAL] gets rewritten until there is one. This is the last check, and it outranks the others: an idea that survives every check above and answers none of these is not worth printing.
 
