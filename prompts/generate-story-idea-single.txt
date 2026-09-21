@@ -51,6 +51,7 @@ Your entire output must be in the language specified above.
 {AGE_MODE}
 
 {PREMISE_SHAPE}
+{WORLD_PLACE}
 
 Generate a story idea that includes:
 1. THE SETUP: who is there and what they want.

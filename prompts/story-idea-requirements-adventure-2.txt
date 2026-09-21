@@ -1,6 +1,6 @@
 --- STORY REQUIREMENTS ---
 
-- IGNORE the user's location completely
-- Start DIRECTLY in the adventure world from the first sentence
-- No transition from real life - the adventure is already happening
-- Example: Characters wake up on a pirate ship, are already exploring a castle, find themselves in a jungle
+- The idea plays in the world of the theme
+- It may open at home or already inside that world
+- A stake at home is allowed: someone waiting, someone it is for
+- The real town and its landmarks stay out of the world

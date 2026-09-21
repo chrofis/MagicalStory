@@ -67,6 +67,7 @@ For EACH story idea, output these three stages:
 
 [DRAFT_1]
 {PREMISE_SHAPE_1}
+{WORLD_PLACE_1}
 
 Write your first story idea, set in the child's own town and at the real local landmarks listed
 above. A costume or theme shows in what they wear and what they play, never in travelling somewhere
@@ -97,10 +98,11 @@ Corrected final version of story 1.
 
 [DRAFT_2]
 {PREMISE_SHAPE_2}
+{WORLD_PLACE_2}
 
-Write a DIFFERENT story idea, set in a make-believe world. It opens where the child really is —
-dressing up, or starting to play — and the make-believe follows from that, so the reader sees where
-it began and where it will come back to.
+Write a story idea set in a make-believe world. It may open where the child really is, or
+already inside that world. Somebody at home waiting, or somebody it is for, is allowed as the
+stake. The real town and its landmarks stay out of the world.
 
 [REVIEW_2]
 Same process - first check language, then list exactly 5 improvements:

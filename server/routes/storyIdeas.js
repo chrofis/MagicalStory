@@ -19,7 +19,7 @@ const { log } = require('../utils/logger');
 const { fillTemplate } = require('../services/prompts');
 // Per-arm world seeds (a centre and a turn from the adventure guide's two lists)
 // and the shared idea seed hash.
-const { pickWorldSeeds, worldSeedInstruction, ideaVariantSeed } = require('../lib/worldSeeds');
+const { pickWorldSeeds, worldSeedInstruction, pickWorldPlace, worldPlaceInstruction, ideaVariantSeed } = require('../lib/worldSeeds');
 
 // Landmark resolution — one shared resolver + cache in landmarkPhotos.js.
 // This route once kept a PRIVATE cache here, so landmarks it discovered were
@@ -235,6 +235,10 @@ ${adventureGuideContent}`
   // two ten-item lists (server/lib/worldSeeds.js). null — and nothing injected —
   // for a theme with no adventure guide (custom, historical).
   const worldSeeds = [0, 1].map(arm => pickWorldSeeds({ theme: effectiveTheme, characters, topic: storyTopic, language, arm }));
+  // One concrete place per arm, from the guide's own setting line. Injected on
+  // the FANTASY arm only (the location arm already has named landmarks), so the
+  // value is computed here and the world is applied at the call site.
+  const worldPlaces = [0, 1].map(arm => pickWorldPlace({ theme: effectiveTheme, characters, topic: storyTopic, language, arm }));
   // `premise-open` (promptBuilders BAND_VIEW_KEEPS), not the writer's whole band
   // file: the idea call is writing a back-cover premise, so it gets the band's
   // [[premise]] rules and not its per-page craft or its page-count arithmetic.
@@ -316,6 +320,12 @@ ${adventureGuideContent}`
     WORLD_SEED: worldSeedInstruction(worldSeeds[0]),
     WORLD_SEED_1: worldSeedInstruction(worldSeeds[0]),
     WORLD_SEED_2: worldSeedInstruction(worldSeeds[1]),
+    // {WORLD_PLACE*} is the fantasy arm's answer to the location arm's named
+    // landmarks. Declared empty here for every call site — historical and the
+    // location arms ship no line — and overridden by the caller on a fantasy arm.
+    WORLD_PLACE: '',
+    WORLD_PLACE_1: '',
+    WORLD_PLACE_2: '',
     ...extraReplacements,
   });
 
@@ -331,6 +341,7 @@ ${adventureGuideContent}`
     adventureSettingGuide,
     premiseShapes,
     worldSeeds,
+    worldPlaces,
     singlePromptTemplate,
     storyRequirements1,
     storyRequirements2,
@@ -481,13 +492,20 @@ function premiseShapeInstruction(shape) {
 }
 
 function buildVariantInstructions(world1, world2, seedInput = {}) {
+  // The fantasy arm's steering is the WORLD, nothing else. "Start directly in
+  // the adventure world" and "Create a DIFFERENT story" both came off it after
+  // the round-10 blind: arm 2 read 3.70 against arm 1's 4.10 and the fantasy
+  // world 3.63 against location's 4.08, with arm and world perfectly
+  // confounded. The two calls run in parallel and cannot see each other, so
+  // "be different" is unverifiable from inside one of them; the difference is
+  // carried by the premise shape and the world, both picked in code.
   const first = world1 === 'fantasy'
-    ? 'Start directly in the adventure world. Avoid local landmarks - use the theme setting instead.'
+    ? 'Avoid local landmarks - use the theme setting instead.'
     : 'Use local landmarks if available. Create an engaging story that uses the setting naturally.';
   const bothLocation = world1 === 'location' && world2 === 'location';
   let second;
   if (world2 === 'fantasy') {
-    second = 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.';
+    second = 'Avoid local landmarks - use the theme setting instead.';
   } else if (bothLocation) {
     const h = ideaVariantSeed(seedInput);
     const place = IDEA_PLACE_CLASSES[h % IDEA_PLACE_CLASSES.length];
@@ -626,8 +644,14 @@ ${landmarkEntries}`;
     // sections so the city cannot leak in
     const bothFantasy = ideaWorlds && ideaWorlds[0].world === 'fantasy' && ideaWorlds[1].world === 'fantasy';
 
+    // The place line goes to the fantasy arm only — the sibling of the
+    // streaming path's per-arm WORLD_PLACE.
+    const placeFor = (arm) => (ideaWorlds && ideaWorlds[arm].world === 'fantasy')
+      ? worldPlaceInstruction(ctx.worldPlaces[arm]) : '';
     const prompt = ctx.applyReplacements(ctx.promptTemplate, {
       STORY_REQUIREMENTS: combinedRequirements,
+      WORLD_PLACE_1: placeFor(0),
+      WORLD_PLACE_2: placeFor(1),
       ...(bothFantasy ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' } : {})
     });
 
@@ -843,7 +867,7 @@ ${landmarkEntries}`;
     // with landmarks (requirements-1), 'fantasy' = direct start in the theme
     // world, no landmarks (requirements-2). Fantasy prompts get the location
     // and landmarks sections blanked so the real city cannot leak in.
-    const buildSinglePrompt = (world, variantInstruction, shape, seeds) => {
+    const buildSinglePrompt = (world, variantInstruction, shape, seeds, place) => {
       const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
       const worldOverrides = world === 'fantasy'
         ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
@@ -853,6 +877,7 @@ ${landmarkEntries}`;
         STORY_REQUIREMENTS: requirements,
         PREMISE_SHAPE: premiseShapeInstruction(shape),
         WORLD_SEED: worldSeedInstruction(seeds),
+        WORLD_PLACE: world === 'fantasy' ? worldPlaceInstruction(place) : '',
         ...worldOverrides
       });
     };
@@ -861,8 +886,8 @@ ${landmarkEntries}`;
     const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
     const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
 
-    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0], ctx.worldSeeds[0]);
-    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1], ctx.worldSeeds[1]);
+    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0], ctx.worldSeeds[0], ctx.worldPlaces[0]);
+    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1], ctx.worldSeeds[1], ctx.worldPlaces[1]);
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
     // wizard can label each card before/while the ideas stream in

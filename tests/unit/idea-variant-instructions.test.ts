@@ -46,7 +46,24 @@ describe('buildVariantInstructions', () => {
   });
 
   it('keeps the first arm keyed to its own world', () => {
-    expect(buildVariantInstructions('fantasy', 'location')[0]).toMatch(/adventure world/);
+    expect(buildVariantInstructions('fantasy', 'location')[0]).toMatch(/theme setting/);
     expect(buildVariantInstructions('location', 'fantasy')[0]).toMatch(/local landmarks/);
+  });
+
+  // 2026-09-21: the round-10 blind read arm 2 at 3.70 against arm 1's 4.10 and
+  // the fantasy world at 3.63 against location's 4.08, with arm and world
+  // perfectly confounded. The two calls run in parallel and cannot see each
+  // other, so a blind "make it different" is unverifiable from inside one of
+  // them; the difference is carried by the premise shape and the world.
+  it('never tells the fantasy arm to be different from an idea it cannot see', () => {
+    for (const pair of [['location', 'fantasy'], ['fantasy', 'fantasy']] as const) {
+      for (const instruction of buildVariantInstructions(pair[0], pair[1], { characters: [{ name: 'Mia', age: 5 }] })) {
+        if (/theme setting/.test(instruction)) {
+          expect(instruction).not.toMatch(/DIFFERENT/i);
+          expect(instruction).not.toMatch(/different (location|approach|story structure)/i);
+          expect(instruction).not.toMatch(/Start directly/i);
+        }
+      }
+    }
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
-const { parseWorldSeeds, pickWorldSeeds, worldSeedInstruction } = require(path.join(ROOT, 'server/lib/worldSeeds'));
+const { parseWorldSeeds, pickWorldSeeds, worldSeedInstruction, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction } = require(path.join(ROOT, 'server/lib/worldSeeds'));
 const { parseTeachingGuideFile, getAdventureGuide } = require(path.join(ROOT, 'server/lib/promptBuilders'));
 
 const GUIDES = parseTeachingGuideFile(path.join(ROOT, 'prompts', 'adventure-guides.txt'));
@@ -90,5 +90,95 @@ describe('the world seed is picked but NOT injected at the round-10 baseline', (
   });
   it('the route still declares all three placeholders', () => {
     for (const k of ['WORLD_SEED:', 'WORLD_SEED_1:', 'WORLD_SEED_2:']) expect(route).toContain(k);
+  });
+});
+
+
+// ---- WORLD PLACE (2026-09-21) ----
+// The location arm is handed named landmarks; the fantasy arm invented its own
+// scenery and read 3.63 against the location arm's 4.08 in the round-10 blind.
+// Worlds with no setting line in their guide yield null and inject nothing.
+const WORLDS_WITHOUT_A_SETTING_LINE = new Set(['detective', 'ninja']);
+
+describe('parseWorldPlaces', () => {
+  it('yields places for every adventure world that names them, and null for the rest', () => {
+    expect(GUIDES.size).toBeGreaterThanOrEqual(30);
+    let withPlaces = 0;
+    for (const [id, text] of GUIDES) {
+      const places = parseWorldPlaces(text);
+      if (WORLDS_WITHOUT_A_SETTING_LINE.has(id)) {
+        expect(places, `world ${id} was expected to have no setting line`).toBeNull();
+        continue;
+      }
+      expect(places, `world ${id} has no setting line`).not.toBeNull();
+      withPlaces++;
+      expect(places.length, `world ${id} places`).toBeGreaterThanOrEqual(3);
+      for (const place of places) {
+        expect(place.length, `world ${id}: ${place}`).toBeGreaterThan(2);
+        // a place, not a list, not a leftover bullet, not a parenthetical
+        expect(place).not.toMatch(/^[-•]/);
+        expect(place).not.toContain(',');
+        expect(place).not.toContain('(');
+        expect(place).not.toContain(')');
+        expect(place).not.toMatch(/^(or|and)/i);
+        expect(place).toBe(place.trim());
+      }
+    }
+    expect(withPlaces).toBe(GUIDES.size - WORLDS_WITHOUT_A_SETTING_LINE.size);
+  });
+
+  it('takes the places after a colon, not the era in front of it', () => {
+    const places = parseWorldPlaces(GUIDES.get('roman'));
+    expect(places).not.toContain('ancient Rome');
+    expect(places[0]).toBe('marble forums');
+    // the parenthetical on the Colosseum entry is dropped, the entry is kept
+    expect(places).toContain('Colosseum');
+  });
+
+  it('handles a setting line with a preposition other than "in"', () => {
+    expect(parseWorldPlaces(GUIDES.get('pirate'))).toEqual(['ships', 'tropical islands', 'coastal towns']);
+  });
+
+  it('returns null with no setting line at all', () => {
+    expect(parseWorldPlaces('Story guidance:\n- Focus on teamwork')).toBeNull();
+    expect(parseWorldPlaces('')).toBeNull();
+    expect(parseWorldPlaces(null)).toBeNull();
+  });
+});
+
+describe('pickWorldPlace', () => {
+  const cast = [{ name: 'Noah', age: 3, isMain: true }];
+  const input = { theme: 'pirate', characters: cast, topic: '', language: 'de' };
+
+  it('is deterministic and gives the two arms different places', () => {
+    expect(pickWorldPlace({ ...input, arm: 0 })).toBe(pickWorldPlace({ ...input, arm: 0 }));
+    expect(pickWorldPlace({ ...input, arm: 1 })).not.toBe(pickWorldPlace({ ...input, arm: 0 }));
+  });
+
+  it('picks a place the guide actually names, for every world', () => {
+    for (const [id, text] of GUIDES) {
+      for (const arm of [0, 1]) {
+        const place = pickWorldPlace({ theme: id, characters: cast, topic: 'x', language: 'de', arm });
+        if (WORLDS_WITHOUT_A_SETTING_LINE.has(id)) { expect(place).toBeNull(); continue; }
+        expect(parseWorldPlaces(text), `world ${id}`).toContain(place);
+      }
+    }
+  });
+
+  it('yields null with no theme and for a theme with no adventure guide', () => {
+    expect(pickWorldPlace({ ...input, theme: null })).toBeNull();
+    expect(pickWorldPlace({ ...input, theme: 'no-such-world' })).toBeNull();
+  });
+});
+
+describe('worldPlaceInstruction', () => {
+  it('names the place where the action is and asks for no description', () => {
+    const line = worldPlaceInstruction('a lantern-lit porch');
+    expect(line).toContain('a lantern-lit porch');
+    expect(line).toMatch(/do not describe it/i);
+  });
+  it('is empty when there is no place', () => {
+    expect(worldPlaceInstruction(null)).toBe('');
+    expect(worldPlaceInstruction('')).toBe('');
   });
 });

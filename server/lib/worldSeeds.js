@@ -104,4 +104,97 @@ function worldSeedInstruction(seeds) {
   return `This idea starts from this centre and this turn. Centre: ${seeds.centre}. Turn: ${seeds.turn}. Swap one only if it cannot fit the cast or the topic; keep the other.`;
 }
 
-module.exports = { parseWorldSeeds, pickWorldSeeds, worldSeedInstruction, ideaVariantSeed };
+
+/**
+ * WORLD PLACE — one concrete place from the guide's own setting line.
+ *
+ * The location arm is handed named landmarks; the fantasy arm was handed
+ * nothing and invented its scenery in the first sentence, which the round-10
+ * blind read at 3.63 against the location arm's 4.08. Every adventure guide's
+ * "Story guidance:" block opens with a setting line ("- Set in castles,
+ * enchanted forests, medieval villages"), a comma list of the world's real
+ * places. One is picked HERE, for the same reason the centre and the turn are:
+ * the model left to itself reaches for the first item, and the two arms cannot
+ * see each other.
+ *
+ * A world with no setting line (detective, ninja) and a theme with no adventure
+ * guide at all (custom, historical) yield null, and nothing is injected.
+ */
+
+/** Split on commas that are not inside parentheses. */
+function _splitTopLevel(text) {
+  const out = [];
+  let depth = 0, cur = '';
+  for (const c of text) {
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    if (c === ',' && depth === 0) { out.push(cur); cur = ''; } else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+const SETTING_PREFIX = /^-\s*Set\b\s*/;
+// The line and each of its items open with a preposition ("Set on ships, ... at
+// harbours and jetties"); the place is what follows it.
+const PLACE_PREPOSITION = /^(?:up\s+in|out\s+on|inside|aboard|among|along|under|over|near|in|on|at)\s+/i;
+
+/**
+ * The places named on one world's setting line.
+ * @param {string} guideText - the guide body getAdventureGuide returns
+ * @returns {string[]|null} null when the guide has no setting line
+ */
+function parseWorldPlaces(guideText) {
+  if (!guideText || typeof guideText !== 'string') return null;
+  const line = guideText.replace(/\r/g, '').split('\n').find(l => SETTING_PREFIX.test(l.trim()));
+  if (!line) return null;
+  let body = line.trim().replace(SETTING_PREFIX, '');
+  // "Set in ancient Rome: marble forums, villas..." — the places are after the
+  // colon; the words before it are the era, not a place the action happens at.
+  const colon = body.indexOf(':');
+  if (colon !== -1) body = body.slice(colon + 1);
+  const places = _splitTopLevel(body)
+    .map(part => part
+      .replace(/\([^)]*\)/g, '')       // "agora (marketplace)" -> "agora"
+      .replace(/^\s*(?:or|and)\s+/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(PLACE_PREPOSITION, '')
+      .replace(/[.;]+$/, ''))
+    .filter(Boolean);
+  return places.length ? places : null;
+}
+
+/**
+ * One place for the given arm, deterministic from the same seed the shapes and
+ * the world seeds use. The two arms never share a place.
+ *
+ * @param {object} input
+ * @param {string} input.theme @param {Array} [input.characters]
+ * @param {string} [input.topic] @param {string} [input.language] @param {number} input.arm
+ * @returns {string|null} null when the world names no places
+ */
+function pickWorldPlace({ theme, characters, topic, storyTopic, language, arm = 0 } = {}) {
+  if (!theme) return null;
+  const { getAdventureGuide } = require(path.join(__dirname, 'promptBuilders'));
+  const places = parseWorldPlaces(getAdventureGuide(theme));
+  if (!places) return null;
+  const h = ideaVariantSeed({
+    characters,
+    storyTopic: topic ?? storyTopic,
+    storyTheme: theme,
+    language,
+  });
+  // A third independent offset, so the place list is not walked in lockstep
+  // with the centre list or the turn list.
+  const [p1, p2] = _twoIndices((h * 40503) >>> 0, places.length);
+  return places[arm === 1 ? p2 : p1];
+}
+
+/** The prompt line, terse. Empty when the world names no places. */
+function worldPlaceInstruction(place) {
+  if (!place) return '';
+  return `The scene is ${place}. Name it where the action is; do not describe it.`;
+}
+
+module.exports = { parseWorldSeeds, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction, pickWorldSeeds, worldSeedInstruction, ideaVariantSeed };
