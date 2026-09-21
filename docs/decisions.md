@@ -361,6 +361,57 @@ the new verbatim path, which produces no plan. Both are in `tasks/BACKLOG.md`.
 
 ---
 
+## 2026-09-21 — An angled page takes a plate DERIVED from the vantage's, not the vantage's own
+
+**Context:** A backdrop plate is painted once per vantage and every page of that
+vantage is drawn on it — that is what makes consecutive pages of one place look
+like one place. The plate takes its camera from the group's representative page,
+which `storyJobPipeline.js` picked as `group.pageNumbers[0]`. A page whose own
+shot differed inherited someone else's camera: on `job_1789853503332_riqncqg1i`,
+6 of 18 pages, including a `high-angle` page handed a plate built for `medium`.
+
+Owner: "we should redo the plate if it is off a lot. A medium and wide might
+still work, as well as an over-the-shoulder. But a medium plate for a high-angle
+or for an ultra-wide is bound to fail."
+
+**Decision:** Two parts.
+
+1. **What may share.** Not the distance/position axis — `over-the-shoulder` is a
+   POSITION and shares fine, because the shoulder is a FIGURE and a plate is
+   background-only. What cannot share is a shot that moves the HORIZON
+   (`high-angle`, `low-angle`, `aerial`) or grows the COVERAGE (`ultra-wide`).
+   `plateClass()` in `shotVocabulary.js` is the one declaration; the pipeline
+   also picks its representative from a plate-sharing page, so the base plate is
+   never painted from the angled one.
+
+2. **How the angled plate is made.** DERIVED from the base plate by an image
+   edit, never generated fresh — owner: "use the plate as an input and say this
+   is a medium shot, prepare it for a different angle so that the structure stays
+   the same." A fresh generation of the same place from a new camera returns a
+   different building line, a different tree and a different palette, and the
+   continuity breaks exactly between two adjacent pages of one location, which is
+   the whole reason a plate is shared. The instruction names what must STAY —
+   shape, position, material, colour, palette, season, light direction —
+   positively, because a negation renders as nothing.
+
+**On failure the page keeps the base plate** (owner's call). It is a degraded
+path and the no-fallbacks rule normally forbids one; it is taken here because
+the alternative is the existing no-plate route, and the wrong camera on the right
+place beats no plate at all. It logs at error level, and `plateDerivedFor` on the
+page's background records which pages actually got a derived plate.
+
+**Measured** over the 10 staging stories carrying vantages, 157 pages: 5 pages
+(3.2%) draw on a plate built for a camera that cannot hold them, and honouring
+this costs 3 extra plates on 39 (+7.7%). Their shipped scores are 0, 60, 85, 100,
+100 — score does not detect this, and cannot: the judges under-charge (the
+2026-09-20 entry on that stands open). The case is geometric, not score-based,
+and the corpus is thin because vantages are recent.
+
+**Touched:** `server/lib/shotVocabulary.js` (`PLATE_DERIVED_SHOTS`,
+`plateClass`, `buildPlateDeriveInstruction`), `storyJobPipeline.js` (vantage
+representative, the derive, the fan-out), `tests/unit/plate-derive-for-angle.test.ts`.
+**Status:** ✅ active
+
 ## 2026-09-20 — `semanticResult.issues` is deleted: one field, one accessor
 
 **Context:** The entry below introduced `semanticFindings()` as a resolver over

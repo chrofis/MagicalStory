@@ -463,11 +463,80 @@ function closeUpBelowWaistVerbs(text) {
   return out;
 }
 
+/**
+ * WHICH SHOTS CAN SHARE ONE BACKDROP PLATE (owner, 2026-09-21).
+ *
+ * A plate is painted once per vantage and every page of that vantage is drawn
+ * on it, which is what makes consecutive pages of one place look like one
+ * place. The plate takes its camera from the group's representative page, so a
+ * page whose own shot differs inherits someone else's camera. Owner: "a medium
+ * and wide might still work, as well as an over-the-shoulder. But a medium
+ * plate for a high-angle or for an ultra-wide is bound to fail."
+ *
+ * The line is NOT the distance/position axis. It is what moves the HORIZON or
+ * grows the COVERAGE:
+ *
+ *   share the base plate  close-up, medium, wide   — same eye level, cropped in
+ *                         over-the-shoulder        — eye level; the shoulder is
+ *                                                    a FIGURE, and a plate is
+ *                                                    background-only
+ *   derive their own      high-angle, low-angle,   — the horizon leaves frame
+ *                         aerial
+ *                         ultra-wide               — needs more of the place
+ *                                                    than the plate holds
+ *
+ * Measured over the 10 staging stories carrying vantages, 157 pages: 5 pages
+ * (3.2%) are drawn on a plate built for a camera that cannot hold them, and
+ * honouring this costs 3 extra plates on 39 (+7.7%).
+ */
+const PLATE_DERIVED_SHOTS = new Set(['ultra-wide', 'high-angle', 'low-angle', 'aerial']);
+
+if ([...PLATE_DERIVED_SHOTS].some(id => !SHOT_TYPES.includes(id))) {
+  throw new Error('shotVocabulary: PLATE_DERIVED_SHOTS names a shot that does not exist');
+}
+
+/** The class every plate-sharing shot collapses to. */
+const PLATE_BASE_CLASS = 'eye-level';
+
+/**
+ * Which plate a page belongs on. Pages sharing a class share a plate; a page
+ * whose class is not the base one gets a plate derived from the base.
+ */
+function plateClass(shot) {
+  const id = String(shot || '').trim();
+  return PLATE_DERIVED_SHOTS.has(id) ? id : PLATE_BASE_CLASS;
+}
+
+/**
+ * The instruction that turns the base plate into the angled one.
+ *
+ * DERIVED, never generated fresh (owner, 2026-09-21: "use the plate as an input
+ * and say this is a medium shot, prepare it for a different angle so that the
+ * structure stays the same"). A fresh generation of the same place from a new
+ * camera returns a different building line, a different tree and a different
+ * palette — and the continuity breaks exactly between two adjacent pages of one
+ * place, which is the whole reason a plate is shared at all.
+ *
+ * Positive and structural: it names what must stay, never what must not change.
+ */
+function buildPlateDeriveInstruction(baseShot, targetShot) {
+  const target = SHOTS.find(s => s.id === targetShot);
+  if (!target) return null;
+  const from = String(baseShot || '').trim();
+  const fromPhrase = from ? `painted as a ${from} shot` : 'painted at eye level';
+  return `This backdrop is ${fromPhrase} of a place. Re-paint the same place as a ${target.id} shot. ${target.definition} `
+    + 'Every building, wall, roof, tree, path and surface keeps its own shape, position, material and colour, the palette and the season stay identical, and the light keeps the same direction and time of day. The camera moves; the place stays as it is.';
+}
+
 module.exports = {
   SHOTS,
   SHOT_TYPES,
   SHOT_AXES,
   SHOT_AXIS,
+  PLATE_DERIVED_SHOTS,
+  PLATE_BASE_CLASS,
+  plateClass,
+  buildPlateDeriveInstruction,
   DISTANCE_SHOTS,
   POSITION_SHOTS,
   SHOT_PATTERNS,

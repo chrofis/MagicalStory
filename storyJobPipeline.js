@@ -4618,8 +4618,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await Promise.all(realGroups.map(([vantageId, group]) => vLimit(async () => {
             await checkCancellation();
             const v = group.vantage;
+            // THE REP MUST BE A PLATE-SHARING PAGE (owner, 2026-09-21). The base
+            // plate is what every angled page is derived FROM, so it is painted
+            // at eye level whenever the group holds such a page. Taking
+            // pageNumbers[0] blindly could paint the base from a high-angle page
+            // and hand that horizon to everyone else on the vantage.
+            const { plateClass, PLATE_BASE_CLASS, buildPlateDeriveInstruction } = require('./server/lib/shotVocabulary');
+            const shotOfPage = (pn) => (pageDataArray.find(pd => pd.pageNumber === pn)
+              ?.sceneMetadata?.fullData?.shot || '').trim();
             // Pull a representative page so we can inherit aspect / model / landmark refs.
-            const repPageNum = group.pageNumbers[0];
+            const repPageNum = group.pageNumbers.find(pn => plateClass(shotOfPage(pn)) === PLATE_BASE_CLASS)
+              ?? group.pageNumbers[0];
             const repPageData = pageDataArray.find(pd => pd.pageNumber === repPageNum);
             if (!repPageData) return;
             const artStyleDesc = resolveArtStyle(inputData.artStyle || 'pixar', repPageData.pageImageBackend) || '';
@@ -4849,12 +4858,49 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 log.warn(`⚠️ [VANTAGE] ${vantageId} QC errored (${qcErr.message}) — keeping the unvalidated plate`);
               }
 
-              // Fan out the same canvas to every page in the group.
+              // AN ANGLED PAGE TAKES A PLATE DERIVED FROM THIS ONE (owner,
+              // 2026-09-21). close-up/medium/wide/over-the-shoulder share the
+              // base plate; high-angle, low-angle, aerial and ultra-wide move
+              // the horizon or grow the coverage and cannot. The derived plate
+              // is EDITED FROM the base rather than generated fresh, so the
+              // buildings, trees and palette stay the same place — a fresh
+              // generation breaks continuity exactly between adjacent pages of
+              // one location, which is what a shared plate exists to prevent.
+              // On failure the page keeps the base plate (owner's call): the
+              // wrong camera on the right place beats no plate at all.
+              const derivedPlates = new Map();
+              const baseShotForDerive = plateClass(vantageShot) === PLATE_BASE_CLASS ? vantageShot : '';
+              for (const pn of group.pageNumbers) {
+                const cls = plateClass(shotOfPage(pn));
+                if (cls === PLATE_BASE_CLASS || derivedPlates.has(cls)) continue;
+                const deriveInstruction = buildPlateDeriveInstruction(baseShotForDerive, cls);
+                if (!deriveInstruction) continue;
+                try {
+                  const { editImageWithPrompt } = require('./server/lib/images');
+                  const derived = await editImageWithPrompt(
+                    plateImage, deriveInstruction, MODEL_DEFAULTS.emptyScenePlateModel, [], null, layoutAspect);
+                  if (derived?.imageData) {
+                    derivedPlates.set(cls, { imageData: derived.imageData, prompt: deriveInstruction });
+                    if (derived.usage) addUsage('gemini_image', derived.usage, 'page_images', derived.usage.model || MODEL_DEFAULTS.emptyScenePlateModel);
+                    log.info(`🏛️ [VANTAGE] ${vantageId}: derived a ${cls} plate from the ${baseShotForDerive || 'base'} one`);
+                  } else {
+                    log.error(`❌ [VANTAGE] ${vantageId}: ${cls} plate derive returned no image — those pages keep the base plate, drawn for a camera that cannot hold them`);
+                  }
+                } catch (deriveErr) {
+                  log.error(`❌ [VANTAGE] ${vantageId}: ${cls} plate derive failed (${deriveErr.message}) — those pages keep the base plate`);
+                }
+                imageGenHeartbeat();
+              }
+
+              // Fan out the canvas to every page in the group — the base plate,
+              // or the derived one where the page's own camera earned it.
               for (const pn of group.pageNumbers) {
                 if (sceneBackgrounds[pn]) continue; // pre-populated (e.g. trial mode)
+                const derivedForPage = derivedPlates.get(plateClass(shotOfPage(pn))) || null;
                 sceneBackgrounds[pn] = {
-                  imageData: plateImage,
-                  prompt: platePrompt,
+                  imageData: derivedForPage ? derivedForPage.imageData : plateImage,
+                  prompt: derivedForPage ? derivedForPage.prompt : platePrompt,
+                  plateDerivedFor: derivedForPage ? plateClass(shotOfPage(pn)) : null,
                   // Refs packed into the plate call that produced plateImage
                   // (the retry's, when the retry won). Same field name every
                   // other image call stores its packed refs under.
