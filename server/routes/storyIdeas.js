@@ -669,7 +669,7 @@ ${landmarkEntries}`;
 
     // Try [FINAL_1]/[FINAL_2] format first (expected from prompt)
     // Include \n--- as terminator for markdown horizontal rule separator between stories
-    let idea1Match = responseText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\n---|\[DRAFT_2[AB]?\]|\[FINAL_2\]|##\s*STORY\s*2|$)/i);
+    let idea1Match = responseText.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\n---|\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2|$)/i);
     let idea2Match = responseText.match(/\[FINAL_2\]\s*([\s\S]*?)$/);
 
     // Try ## STORY 1 / ## STORY 2 format
@@ -845,7 +845,7 @@ ${landmarkEntries}`;
     // used to make the parser grab from the first mention all the way to EOF
     // — pulling in the tail of the review, a literal second [FINAL] header,
     // and then the actual story. Taking the last marker gives us the real
-    // final section since the prompt structure is [DRAFT_A] → [DRAFT_B] → [REVIEW] → [FINAL].
+    // final section since the prompt structure is [DRAFT] → [REVIEW] → [FINAL].
     const parseFinal = (text) => {
       const matches = [...text.matchAll(/\[FINAL\]\s*/gi)];
       if (matches.length === 0) return null;
