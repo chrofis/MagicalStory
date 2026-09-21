@@ -578,6 +578,11 @@ export const TESTLAB_STAGES = [
   // (buildArcCreatePrompt, story data already filled in), not a template — so
   // there is nothing to prefill and no template key for this stage.
   { id: 'arc_rounds', label: 'Arc rounds (plan the arc, review it N times / best-of-N, scored each round)', producesImage: false, overridable: true, storyLevel: true, builtPromptOverride: true },
+  // Bake-off: every model repairs the SAME stored arc in place, returning only
+  // the beats it rewrites, and each repair is judged improved / neutral /
+  // damaged. `issueWasReal: false` is the signal — a model that invented a
+  // problem and edited a good beat to fix it.
+  { id: 'arc_amend', label: 'Arc amend bake-off (models repair the stored arc in place, each beat judged)', producesImage: false, overridable: true, storyLevel: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.

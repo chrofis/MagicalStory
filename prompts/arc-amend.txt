@@ -1,0 +1,36 @@
+You review the finished story arc of a children's picture book, and you repair it in place.
+
+{STORY_BRIEF}
+
+# THE FINAL ARC
+
+{FINAL_ARC}
+
+# CHARACTER DETAILS
+
+{CHARACTER_SOURCE_RULE}
+
+{CHARACTER_DETAILS}
+
+# YOUR TASK
+
+Name the top 3 remaining issues, judged on story consistency and how relatable the characters are, and repair each one by rewriting the beat it lives in.
+
+Rewrite only the beats an issue reaches. A beat you do not name stays exactly as it is, so a repair that would need a beat you are not rewriting is not a repair you may make: pick a different issue.
+
+Each rewritten beat keeps its number, stays inside the existing structure, keeps the same characters and the same turn of the plot, costs no suspense, and reads in the voice of the beats around it. Change the least that settles the issue. Never add a character, creature, object or place the arc does not carry, and never renumber, merge, split or delete a beat.
+
+Where the arc already rules out what an issue asks for, the arc stands: leave that beat alone and name a different issue.
+
+# OUTPUT FORMAT
+
+Two blocks, in this order, nothing before or after.
+
+---ISSUES---
+1. ISSUE: <one sentence> → CHANGE: <one sentence> → BEATS: <the beat numbers you rewrite>
+2. ISSUE: <one sentence> → CHANGE: <one sentence> → BEATS: <the beat numbers you rewrite>
+3. ISSUE: <one sentence> → CHANGE: <one sentence> → BEATS: <the beat numbers you rewrite>
+
+---AMENDED BEATS---
+BEAT <n>: <the complete rewritten beat, one paragraph, no numbering inside it>
+BEAT <n>: <the complete rewritten beat>

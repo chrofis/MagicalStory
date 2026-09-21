@@ -325,6 +325,8 @@ async function loadPromptTemplates() {
     ['arcPanel', 'arc-panel.txt'],
     ['arcRetell', 'arc-retell.txt'],
     ['arcHints', 'arc-hints.txt'],
+    ['arcAmend', 'arc-amend.txt'],
+    ['arcAmendJudge', 'arc-amend-judge.txt'],
     ['storyArcJudge', 'story-arc-judge.txt'],
     // Blind audits: each stage's artifact interrogated with ONLY what its
     // audience would have, before the full-context reviewer runs. The audit

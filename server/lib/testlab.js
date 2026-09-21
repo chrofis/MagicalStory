@@ -8127,6 +8127,129 @@ async function runWriterCompareStage(target, { params = {} }) {
  *   Compare against sequential rounds: N drafts in one call cost roughly one
  *   draft's input tokens, where N review rounds pay the input twice per round.
  */
+/**
+ * arc_amend — the bake-off for repairing the arc in place.
+ *
+ * Today's hint pass emits a DIRECTIVE against a frozen arc: the planner obeys
+ * it, the arc keeps asserting the opposite, and nobody can diff what changed.
+ * The amend pass returns the repaired BEAT instead, which is boundable
+ * (server/lib/arcAmend.js). Whether a cheap model may rewrite a beat an Opus
+ * call wrote is the open question, so every model runs the same prompt on the
+ * same stored arc and each repair is judged improved / neutral / damaged.
+ *
+ * The judge is the half that matters: a model can execute a WRONG instruction
+ * faithfully, and guards alone would pass it. `issueWasReal: false` is the
+ * signal to watch — it means the model invented a problem and edited a good
+ * beat to "fix" it.
+ *
+ * params: { models, judgeModel }   target: { storyId }
+ */
+async function runArcAmendStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildArcAmendPrompt } = require('./promptBuilders');
+  const { extractJsonFromText } = require('./storyHelpers');
+  const { parseArcAmend, checkAmendGuards, applyArcAmendment, splitArcBeats } = require('./arcAmend');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, calculateTextCost } = require('../config/models');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const arc = resolveReplayArc(storyData);
+  if (!arc) throw new Error('story has no stored arc to amend');
+
+  const models = String(params.models || 'grok-4.6,deepseek-v4-pro,gpt-5.6-luna-pro,claude-sonnet-4-6')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  const judgeModel = params.judgeModel || 'claude-sonnet';
+  for (const m of [...models, judgeModel]) {
+    if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
+  }
+
+  const template = promptOverride || PROMPT_TEMPLATES.arcAmend;
+  if (!template) throw new Error('arc-amend template unavailable');
+  const prompt = (() => {
+    const saved = PROMPT_TEMPLATES.arcAmend;
+    try { PROMPT_TEMPLATES.arcAmend = template; return buildArcAmendPrompt(storyData, arc); }
+    finally { PROMPT_TEMPLATES.arcAmend = saved; }
+  })();
+  if (!prompt) throw new Error('arc-amend prompt could not be built');
+
+  const judgeTemplate = PROMPT_TEMPLATES.arcAmendJudge;
+  if (!judgeTemplate) throw new Error('arc-amend-judge template unavailable');
+  const beforeByNumber = new Map(splitArcBeats(arc).map(b => [b.n, b.text]));
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+
+  const judgeOne = async (issue, n, after) => {
+    const input = fillTemplate(judgeTemplate, {
+      FINAL_ARC: arc,
+      ISSUE: issue ? `${issue.issue} → ${issue.change}` : '(the model named no issue for this beat)',
+      BEAT_BEFORE: beforeByNumber.get(n) || '(beat not found)',
+      BEAT_AFTER: after,
+    });
+    const r = await callTextModelStreaming(input, null, null, judgeModel, { usageLabel: 'testlab_arc_amend_judge' });
+    let v = null;
+    try { v = extractJsonFromText(r.text); } catch { /* a bad draw is not a verdict */ }
+    return { verdict: v, cost: costOf(r) };
+  };
+
+  // The arms are independent, so they go concurrently.
+  const arms = await Promise.all(models.map(async (model) => {
+    const t = Date.now();
+    try {
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_arc_amend' });
+      const parsed = parseArcAmend(res.text || '');
+      const guard = checkAmendGuards(arc, parsed);
+      const applied = applyArcAmendment(arc, parsed);
+      const issueFor = n => parsed.issues.find(i => (i.beats || []).includes(n)) || null;
+      const judged = [];
+      let judgeCost = 0;
+      for (const [n, after] of parsed.beats) {
+        if (!beforeByNumber.has(n)) continue;
+        const j = await judgeOne(issueFor(n), n, after);
+        judgeCost += j.cost;
+        judged.push({
+          beat: n,
+          before: beforeByNumber.get(n),
+          after,
+          issue: issueFor(n),
+          ...(j.verdict || { verdict: 'unjudged' }),
+        });
+      }
+      const tally = judged.reduce((acc, j) => {
+        acc[j.verdict] = (acc[j.verdict] || 0) + 1;
+        if (j.issueWasReal === false) acc.inventedIssue = (acc.inventedIssue || 0) + 1;
+        return acc;
+      }, {});
+      return {
+        model, modelId: res.modelId, ok: true,
+        issues: parsed.issues,
+        beatsRewritten: [...parsed.beats.keys()],
+        guardOk: guard.ok,
+        violations: guard.violations,
+        judged, tally,
+        amendedArc: applied.arc,
+        cost: costOf(res), judgeCost,
+        elapsedMs: Date.now() - t,
+        outTok: res.usage?.output_tokens,
+      };
+    } catch (err) {
+      return { model, ok: false, error: String(err.message || err), elapsedMs: Date.now() - t };
+    }
+  }));
+
+  return {
+    storyId: target.storyId,
+    judgeModel,
+    beatCount: beforeByNumber.size,
+    arcChars: arc.length,
+    promptChars: prompt.length,
+    arms,
+    // One line per arm, so a reader can rank without opening every arm.
+    summary: arms.map(a => a.ok
+      ? `${a.model}: beats ${a.beatsRewritten.join(',') || '-'} | ${JSON.stringify(a.tally)} | guards ${a.guardOk ? 'ok' : a.violations.join('; ')} | $${(a.cost + a.judgeCost).toFixed(4)}`
+      : `${a.model}: FAILED ${a.error}`),
+  };
+}
+
 async function runArcRoundsStage(target, { params = {}, promptOverride = null }) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -9480,6 +9603,7 @@ const STORY_STAGES = {
   trial_challenge_draw: runTrialChallengeDrawStage,
   vb_element_cell: runVbElementCellStage,
   arc_rounds: runArcRoundsStage,
+  arc_amend: runArcAmendStage,
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
   style_check: runStyleCheckStage,

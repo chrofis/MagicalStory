@@ -8579,6 +8579,28 @@ function buildArcHintsPrompt(inputData, finalArc) {
 }
 
 /**
+ * The amend variant of the hint pass: same context, but it returns the REPAIRED
+ * BEAT instead of a directive, so the arc carries no contradiction and the
+ * change can be bounded (server/lib/arcAmend.js). Not wired into production —
+ * built to be baked off in the Lab first (owner, 2026-09-20), because whether a
+ * cheap model may rewrite a beat an Opus call wrote is unmeasured.
+ */
+function buildArcAmendPrompt(inputData, finalArc) {
+  const template = PROMPT_TEMPLATES.arcAmend;
+  if (!template) {
+    log.error('[PROMPT] arcAmend template not loaded — arc amend pass unavailable');
+    return null;
+  }
+  const ctx = buildStoryContextFields(inputData);
+  return fillTemplate(template, {
+    STORY_BRIEF: ctx.STORY_BRIEF,
+    CHARACTER_SOURCE_RULE: characterSourceRule({ master: 'arc' }),
+    CHARACTER_DETAILS: ctx.CHARACTER_DETAILS,
+    FINAL_ARC: String(finalArc || '').trim(),
+  });
+}
+
+/**
  * Parse the arc-hints output: "ISSUE: <sentence> → CHANGE: <sentence>" lines,
  * top 3. Tolerant: numbering, bullets, bold and ASCII arrows are accepted;
  * lines that don't match are skipped; no matches return '' (the caller skips
@@ -10374,6 +10396,7 @@ module.exports = {
   buildArcPanelPrompt,
   buildArcRetellPrompt,
   buildArcHintsPrompt,
+  buildArcAmendPrompt,
   buildArcBudgetSection,
   buildTellingRulesSection,
   characterSourceRule,

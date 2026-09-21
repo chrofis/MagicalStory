@@ -106,6 +106,7 @@ router.get('/stories', async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────
 
 const STAGE_TEMPLATE_KEYS = {
+  arc_amend: 'arcAmend',
   image: 'imageGeneration',
   empty_scene: 'emptyScene',
   quality_eval: 'imageEvaluation',

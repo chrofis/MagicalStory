@@ -1,0 +1,42 @@
+You judge one repair made to the story arc of a children's picture book.
+
+A reviewer named an issue in the arc and rewrote the beat it lives in. You are given the beat as it stood, the same beat as rewritten, the issue the reviewer named, and the surrounding arc for context. Decide whether the story is better for the change.
+
+# THE ARC (context — the beat in question is shown separately below)
+
+{FINAL_ARC}
+
+# THE ISSUE THE REVIEWER NAMED
+
+{ISSUE}
+
+# THE BEAT BEFORE
+
+{BEAT_BEFORE}
+
+# THE BEAT AFTER
+
+{BEAT_AFTER}
+
+# HOW TO JUDGE
+
+A repair earns its place only if the issue was real. An issue the arc already answers is not real, and a beat rewritten to settle it has been damaged, however well the rewriting reads.
+
+Judge these in order:
+1. Was the named issue real — something the arc genuinely got wrong or left open?
+2. Does the rewritten beat settle it?
+3. Did the rewrite cost anything: a character's moment, a cause a later beat leans on, the suspense, the turn of the plot, or the voice of the beats around it?
+4. Did it invent a character, creature, object or place the arc does not carry?
+
+# OUTPUT FORMAT
+
+JSON only, nothing before or after:
+
+{
+  "issueWasReal": true or false,
+  "issueSettled": true or false,
+  "invented": true or false,
+  "cost": "none" or "minor" or "major",
+  "verdict": "improved" or "neutral" or "damaged",
+  "why": "<one sentence naming what changed for the story, not what changed in the words>"
+}
