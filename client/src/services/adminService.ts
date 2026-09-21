@@ -387,12 +387,15 @@ export interface UserDetailsResponse {
 
 export interface ActivityEvent {
   ts: string;
-  type: 'new_user' | 'trial_started' | 'login' | 'story' | 'trial_story' | 'job_failed' | 'order' | 'credits';
+  type: 'new_user' | 'trial_started' | 'login' | 'story' | 'trial_story' | 'job_failed' | 'order' | 'credits' | 'credit_purchase';
   user: string;
   label: string;
   storyId?: string;
   jobId?: string;
   orderId?: string;
+  amountCents?: number | null;
+  currency?: string;
+  quantity?: number | null;
 }
 
 export interface ActivityFeed {
@@ -406,7 +409,15 @@ export interface ActivityFeed {
     trialStories: number;
     failedJobs: number;
     orders: number;
+    creditPurchases: number;
     creditTopUps: number;
+    purchases: number;
+    /** Cents per ISO currency, never converted between currencies. */
+    revenueByCurrency: Record<string, number>;
+    /** Single total; null when the window mixes currencies (read revenueByCurrency). */
+    revenueCents: number | null;
+    revenueCurrency: string | null;
+    revenueUnknownCount: number;
   };
   events: ActivityEvent[];
 }

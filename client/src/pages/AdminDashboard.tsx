@@ -793,7 +793,8 @@ export default function AdminDashboard() {
                     ['Trial Stories', activityFeed.summary.trialStories, false],
                     ['Failed', activityFeed.summary.failedJobs, true],
                     ['Orders', activityFeed.summary.orders, false],
-                    ['Credits+', activityFeed.summary.creditTopUps, false],
+                    ['Credits+ (gratis)', activityFeed.summary.creditTopUps, false],
+                    ['Käufe', activityFeed.summary.purchases, false],
                   ] as [string, number, boolean][]).map(([label, n, warn]) => (
                     <div key={label} className={`rounded-lg p-3 text-center ${warn && n > 0 ? 'bg-red-50' : 'bg-gray-50'}`}>
                       <div className={`text-xl font-bold ${warn && n > 0 ? 'text-red-600' : 'text-gray-800'}`}>{n}</div>

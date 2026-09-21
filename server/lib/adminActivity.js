@@ -15,6 +15,25 @@
 
 const { sentinelExclusion } = require('./gdprSentinel');
 
+// Credit packs are sold in CHF only (server/config/credits.js CREDIT_PACKAGES /
+// print.js checkout), and credit_transactions has no currency column — so the
+// pack currency is a fact about the product, not a guess about the row.
+const CREDIT_PACK_CURRENCY = 'CHF';
+
+/** Order statuses that mean the money was actually collected. */
+const PAID_ORDER_STATUSES = new Set(['paid', 'completed']);
+
+/** Stripe stores lowercase ISO codes ('chf'); the report shows them uppercase. */
+function normaliseCurrency(c) {
+  return String(c || CREDIT_PACK_CURRENCY).toUpperCase();
+}
+
+/** Cents -> "CHF 42.00". A missing amount says so instead of showing 0. */
+function formatAmount(cents, currency) {
+  if (cents == null || !Number.isFinite(cents)) return `${currency} ?`;
+  return `${currency} ${(cents / 100).toFixed(2)}`;
+}
+
 /**
  * @param {Pool} dbPool
  * @param {number} hours - lookback window (1..168)
@@ -23,6 +42,16 @@ const { sentinelExclusion } = require('./gdprSentinel');
 async function buildActivityFeed(dbPool, hours = 24) {
   const h = Math.min(168, Math.max(1, parseInt(hours, 10) || 24));
   const events = [];
+
+  // Revenue accumulates per currency. Cents of different currencies are never
+  // added together and no conversion rate is invented — a mixed window reports
+  // each currency on its own line.
+  const revenueByCurrency = {};
+  let revenueUnknownCount = 0;
+  const addRevenue = (cents, currency) => {
+    if (cents == null || !Number.isFinite(cents)) { revenueUnknownCount++; return; }
+    revenueByCurrency[currency] = (revenueByCurrency[currency] || 0) + cents;
+  };
 
   // New users (registered + anonymous trials)
   const newUsers = await dbPool.query(`
@@ -91,36 +120,66 @@ async function buildActivityFeed(dbPool, hours = 24) {
     });
   }
 
-  // Orders
+  // Orders. amount_total/currency are what Stripe charged — the revenue side of
+  // the report reads THESE, never a price recomputed from the product config.
   const orders = await dbPool.query(`
-    SELECT o.id, o.created_at, o.payment_status, u.email
+    SELECT o.id, o.created_at, o.payment_status, o.amount_total, o.currency,
+           o.quantity, o.story_id, u.email
     FROM orders o LEFT JOIN users u ON u.id::text = o.user_id::text
     WHERE o.created_at > NOW() - ($1 * INTERVAL '1 hour')
     ORDER BY o.created_at`, [h]);
   for (const o of orders.rows) {
+    const cents = o.amount_total == null ? null : Number(o.amount_total);
+    const currency = normaliseCurrency(o.currency);
     events.push({
       ts: o.created_at,
       type: 'order',
       user: o.email || '(unknown)',
-      label: `Order placed (payment: ${o.payment_status})`,
+      label: `Order placed — ${formatAmount(cents, currency)}${o.quantity > 1 ? ` (${o.quantity}×)` : ''} (payment: ${o.payment_status})`,
       orderId: o.id,
+      storyId: o.story_id || undefined,
+      amountCents: cents,
+      currency,
+      quantity: o.quantity == null ? null : Number(o.quantity),
     });
+    // Only a paid order is revenue. 'completed' is a LATER state of a paid
+    // order (print.js flips it once Gelato accepts the print job), so it counts
+    // too; 'failed' rows carry an amount that was never collected and must not
+    // inflate the number. They still show in the feed.
+    if (PAID_ORDER_STATUSES.has(o.payment_status)) addRevenue(cents, currency);
   }
 
   // Credit top-ups / refunds (positive amounts only — generation deductions
   // would just mirror the story events as noise)
   const credits = await dbPool.query(`
-    SELECT ct.created_at, ct.amount, ct.transaction_type, ct.description, u.email
+    SELECT ct.created_at, ct.amount, ct.transaction_type, ct.description,
+           ct.price_cents, u.email
     FROM credit_transactions ct LEFT JOIN users u ON u.id = ct.user_id
     WHERE ct.created_at > NOW() - ($1 * INTERVAL '1 hour') AND ct.amount > 0
     ORDER BY ct.created_at`, [h]);
   for (const c of credits.rows) {
-    events.push({
-      ts: c.created_at,
-      type: 'credits',
-      user: c.email || '(unknown)',
-      label: `+${c.amount} credits (${c.transaction_type}${c.description ? `: ${c.description.slice(0, 80)}` : ''})`,
-    });
+    const paid = c.transaction_type === 'purchase';
+    if (paid) {
+      // A bought pack is money; a signup bonus is not. They get different event
+      // types so the report can never present one as the other.
+      const cents = c.price_cents == null ? null : Number(c.price_cents);
+      events.push({
+        ts: c.created_at,
+        type: 'credit_purchase',
+        user: c.email || '(unknown)',
+        label: `+${c.amount} credits purchased — ${formatAmount(cents, CREDIT_PACK_CURRENCY)}${c.description ? ` (${c.description.slice(0, 80)})` : ''}`,
+        amountCents: cents,
+        currency: CREDIT_PACK_CURRENCY,
+      });
+      addRevenue(cents, CREDIT_PACK_CURRENCY);
+    } else {
+      events.push({
+        ts: c.created_at,
+        type: 'credits',
+        user: c.email || '(unknown)',
+        label: `+${c.amount} credits (${c.transaction_type}${c.description ? `: ${c.description.slice(0, 80)}` : ''})`,
+      });
+    }
   }
 
   events.sort((a, b) => new Date(b.ts) - new Date(a.ts));
@@ -148,7 +207,19 @@ async function buildActivityFeed(dbPool, hours = 24) {
       trialStories: count('trial_story'),
       failedJobs: count('job_failed'),
       orders: count('order'),
+      creditPurchases: count('credit_purchase'),
       creditTopUps: count('credits'),
+      purchases: count('order') + count('credit_purchase'),
+      revenueByCurrency,
+      // Single number only while one currency is in play; null means "look at
+      // revenueByCurrency", never "zero".
+      revenueCents: Object.keys(revenueByCurrency).length === 1
+        ? Object.values(revenueByCurrency)[0]
+        : (Object.keys(revenueByCurrency).length === 0 ? 0 : null),
+      revenueCurrency: Object.keys(revenueByCurrency).length === 1
+        ? Object.keys(revenueByCurrency)[0]
+        : null,
+      revenueUnknownCount,
       customerFailures: failures?.totals.customer ?? 0,
       internalFailures: failures?.totals.internal ?? 0,
     },
@@ -158,4 +229,4 @@ async function buildActivityFeed(dbPool, hours = 24) {
   };
 }
 
-module.exports = { buildActivityFeed };
+module.exports = { buildActivityFeed, PAID_ORDER_STATUSES, formatAmount, normaliseCurrency, CREDIT_PACK_CURRENCY };

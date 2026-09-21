@@ -1034,7 +1034,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
   const TYPE_LABELS = {
     new_user: '👤 Signup', trial_started: '🕵️ Trial', login: '🔑 Login',
     story: '📖 Story', trial_story: '📖 Trial story', job_failed: '❌ Failed',
-    order: '🛒 Order', credits: '💰 Credits',
+    order: '🛒 Order', credits: '🎁 Credits (gratis)', credit_purchase: '💳 Kauf',
   };
   const esc = (t) => String(t == null ? '' : t)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1051,6 +1051,29 @@ async function sendAdminDailySummary(feed, dateLabel) {
       <div style="font-size:22px; font-weight:bold; color:${warn && n > 0 ? '#ef4444' : '#1f2937'};">${n}</div>
       <div style="font-size:11px; color:#6b7280;">${label}</div>
     </td>`;
+
+  // REVENUE. Amounts come from the DB rows (orders.amount_total / currency,
+  // credit_transactions.price_cents); nothing is converted between currencies.
+  // revenueCents === null means several currencies were taken in that window —
+  // they are then listed separately instead of summed into a wrong total.
+  const byCurrency = s.revenueByCurrency || {};
+  const currencies = Object.keys(byCurrency);
+  const money = (cents, cur) => `${cur} ${(cents / 100).toFixed(2)}`;
+  const mixedCurrency = s.revenueCents == null;
+  const revenueTileLabel = mixedCurrency
+    ? 'Umsatz (gemischt)'
+    : `Umsatz (${s.revenueCurrency || 'CHF'})`;
+  const revenueTileValue = mixedCurrency
+    ? currencies.map(c => money(byCurrency[c], c)).join(' + ')
+    : ((s.revenueCents || 0) / 100).toFixed(2);
+  const revenueNote = (mixedCurrency || s.revenueUnknownCount)
+    ? `<div style="margin-top:8px; font-size:12px; color:#6b7280;">${
+        mixedCurrency ? `Umsatz nach Währung: ${currencies.map(c => money(byCurrency[c], c)).join(' · ')}. Keine Umrechnung.` : ''
+      }${s.revenueUnknownCount ? ` ${s.revenueUnknownCount} Zahlung(en) ohne hinterlegten Betrag — nicht im Umsatz enthalten.` : ''}</div>`
+    : '';
+  const subjectRevenue = currencies.length
+    ? `, ${currencies.map(c => money(byCurrency[c], c)).join(' + ')} Umsatz`
+    : '';
 
   const health = feed.health || [];
   const limitHits = health.reduce((n, x) => n + x.count, 0);
@@ -1085,7 +1108,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
     const { data, error } = await resend.emails.send({
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
-      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}${failures?.totals.customer ? `, ${failures.totals.customer} Kundenfehler` : ''}`,
+      subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}${failures?.totals.customer ? `, ${failures.totals.customer} Kundenfehler` : ''}${subjectRevenue}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 720px; margin: 0 auto;">
           <h2 style="color:#4f46e5;">MagicalStory Tagesbericht — ${dateLabel}</h2>
@@ -1096,7 +1119,10 @@ async function sendAdminDailySummary(feed, dateLabel) {
             ${stat('Stories', (s.stories || 0) + (s.trialStories || 0))}
             ${stat('Failed', s.failedJobs || 0, true)}
             ${stat('Orders', s.orders || 0)}
+            ${stat('Käufe', s.purchases || 0)}
+            ${stat(revenueTileLabel, revenueTileValue)}
           </tr></table>
+          ${revenueNote}
           ${healthBanner}
           ${failureBlock}
           ${rows ? `
