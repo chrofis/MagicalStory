@@ -53062,3 +53062,117 @@ Round 14 generated the twelve non-adventure ideas (cells 2, 4, 5, 7, 8, 10) at U
 favour of a full ten-cell run after the fantasy-arm fixes land on top, so **R14 carries no rated
 verdict** and this entry rests on the prompt diffs, not on a score.
 **Status:** ✅ active — committed on `staging`, not pushed.
+
+## The three handicaps come off the fantasy/second idea arm — and the axis they were meant to fix does not survive a second reader (2026-09-21)
+
+**Context:** the round-10 blind read (`blind-scores-r10.md`, key `blind-key-r10.json`) split on two
+axes at once: the second arm at **3.70** against the first arm's **4.10**, and the fantasy world at
+**3.63** against location's **4.08** — and arm and world are perfectly confounded in the ten-cell
+grid (every cell with a fantasy arm has it as arm 2). Reading the prompt actually sent to a fantasy
+arm (`prompt-r10-c5-fantasy.txt`) showed three things done to that arm and to no other:
+1. `buildVariantInstructions` and the two-idea template's `[DRAFT_2]` framing both ordered it to
+   "Create a DIFFERENT story. Use a different location, different approach to the conflict, and
+   different story structure." The two idea calls run **in parallel and cannot see each other**, so
+   this is an instruction the model has no way to check itself against.
+2. `story-idea-requirements-adventure-2.txt` ordered it to "IGNORE the user's location completely",
+   to "Start DIRECTLY in the adventure world from the first sentence" and to have "No transition
+   from real life" — which forbids a stake at home outright.
+3. The location arm is handed real named landmarks; the fantasy arm was handed nothing and had to
+   invent its scenery in its first sentence.
+
+**Decision:** all three come off, and the difference between the arms is carried only by values
+picked in code (the premise shape, `pickPremiseShapes`, and the world, `resolveIdeaWorlds`).
+(1) The blind "be different" leaves both siblings in step; "Start directly in the adventure world"
+goes with it, and the second-location-arm variety values (the place class) stay, because those are
+computed constraints, not a request to differ. (2) The requirements file now reads: the idea plays
+in the world of the theme; it may open at home or already inside that world; a stake at home
+(someone waiting, someone it is for) is allowed; the real town and its landmarks stay out of the
+world. `storyIdeas.js` is the only reader of these files — no trial sibling in the registry.
+(3) A new `pickWorldPlace` / `worldPlaceInstruction` in `server/lib/worldSeeds.js` parses each world
+guide's own `- Set in …` guidance line into its comma list of places and hands ONE over as
+`{WORLD_PLACE}` ("The scene is <place>. Name it where the action is; do not describe it."),
+deterministic per arm from the same seed as the shapes and the world seeds. It is declared empty in
+`applyReplacements` for every call site and filled on fantasy arms only; 30 of the 32 worlds carry a
+setting line (detective and ninja do not) and historical has no adventure guide at all, so both
+yield nothing.
+
+**What round 15 measured, and the finding that matters most.** Ten cells, twenty ideas,
+`claude-sonnet-4-6`, USD 0.9948 (`round-15.json` / `.md`). A fresh agent read R1, R10 and R15
+**pooled in one shuffle of 60 anonymous texts** (`blind-set-r15.md` → `blind-scores-r15.md`,
+`analyze-blind.js --rounds=1,10,15`), which is the first time the three rounds have been rated on
+one scale by one reader.
+
+| axis | group | R1 | R10 | **R15** |
+|---|---|---|---|---|
+| overall | mean (n=20) | 3.45 | 3.65 | **3.50** |
+| | 5s | 2 | 1 | **1** |
+| category | adventure | 3.88 | 3.63 | **3.63** |
+| | life-challenge | 3.13 | 3.38 | **3.38** |
+| | historical | 3.25 | 4.25 | **3.50** |
+| arm | arm 1 | 3.40 | 3.70 | **3.80** |
+| | arm 2 | 3.50 | 3.60 | **3.20** |
+| world | location | 3.42 | 3.58 | **3.67** |
+| | fantasy | 3.50 | 3.75 | **3.25** |
+| age band | 0-2 | 3.00 | 3.00 | **3.50** |
+| | 3-5 | 3.67 | 3.50 | **3.50** |
+| | 6-9 | 3.88 | 4.00 | **3.63** |
+| | 10-12 | 2.50 | 3.50 | **3.25** |
+| cast size | 1 / 2 / 3 | 3.25 / 3.50 / 4.25 | 3.25 / 3.83 / 3.75 | **3.25 / 3.83 / 4.00** |
+| | 4 / 5 / 6 | 3.50 / 2.00 / 3.50 | 4.50 / 3.00 / 3.50 | **3.00 / 2.50 / 3.50** |
+
+Paired by cell-arm, R15 beats R1 7-5-8 and R10 3-4-13.
+
+**The arm/world gap the fixes were aimed at is not a stable property of the ideas — it is a
+property of the reader.** This reader, scoring all three rounds on one scale, puts R10's arm 2 at
+**3.60 against arm 1's 3.70** and R10's fantasy at **3.75 against location's 3.58** — the opposite
+sign on the world axis, and a tenth of a point on the arm axis, where the original round-10 reader
+measured 0.40 and 0.45 gaps. Two readers disagree about the sign of the very effect that motivated
+this change. The honest reading is that a 0.4 gap on n=8-12 single-rater ordinal scores is inside
+reader noise, and **no future prompt change should be motivated by an arm or world split until the
+same split survives two independent blind reads.**
+
+**What did land, measured on the artefacts rather than the score.** The concrete place reaches
+**6 of 6** fantasy arms that have a guide to draw from (ships, the Floating Islands, the river
+plain, an amber forest, the research station, the valley of mist); the two historical arms
+correctly get no line. Four of the six fantasy arms now carry a **home stake inside the fantasy
+world** (the father casting off, Oma Ruth losing her spells, Yara following, Mila's brother waiting
+on the clearing), and a fifth recasts the mother into the world as Dame Élodie — the exact shape
+"No transition from real life" used to forbid — with none of them spending a sentence travelling
+there. The two R10 cast omissions (Sofia, Zara; both second/fantasy arms of the largest casts) are
+**both fixed**; the one remaining omission is on a *location* arm, so that class is no longer an
+arm-2 phenomenon. On the defect axes (`round-15-defects.md`): cast 4.10 → **4.45**, peril 3.50 →
+**3.95**, topic-is-the-engine 4.75 → **4.88**, format 4.10 → **4.15**.
+
+**The cost.** Contract fell 2.95 → **2.50**, with narrated middles 11 → 16 of 20 while the
+stated-rule shape of the same leak collapsed 5 → 2: the leak changed form rather than going away.
+Two changes are in flight at once here (R14's cut of `{SCENE_COMPLEXITY_GUIDE}` and the challenge
+catalogue, and R15's removal of the second arm's structural instruction), so neither can be blamed
+cleanly. R10 already recorded that the blind rater does not punish narrated middles — several score
+4 — so **contract and buy are pulling apart**, and contract is the axis with no buy-side pressure
+behind it. Peril is unchanged in incidence (8 of 20, height 5 and never-coming-back 2); check 7 has
+not moved since R8 and remains the class to fix next.
+
+**Rationale:** an instruction a model cannot check itself against is not a constraint, it is noise
+in the prompt; a rule that forbids a stake at home removes the one thing that makes a make-believe
+premise matter to a parent; and an arm given no concrete place will invent one. All three are
+defensible on the prompt alone, which is what this entry rests on — not on the round mean, which
+moved 3.65 → 3.50, inside this reader's own spread.
+
+**Touched:** `server/lib/worldSeeds.js` (`parseWorldPlaces`, `pickWorldPlace`,
+`worldPlaceInstruction`), `server/routes/storyIdeas.js` (`buildVariantInstructions`,
+`buildIdeasPromptContext`'s `worldPlaces` + `applyReplacements` declarations, both endpoints),
+`prompts/story-idea-requirements-adventure-2.txt`, `prompts/generate-story-ideas.txt`,
+`prompts/generate-story-idea-single.txt` (set `story-idea-templates`),
+`tests/unit/world-seeds.test.ts`, `tests/unit/idea-variant-instructions.test.ts`,
+`tests/manual/story-idea-rounds.js`, `tests/manual/story-idea-rounds/make-blind.js` (carries the
+cell's category, age band and cast size into the KEY, never into the set),
+`tests/manual/story-idea-rounds/analyze-blind.js` (N rounds + the five breakdowns).
+
+**Validation:** dry runs of cells 1 and 3, both arms — all three changes on the fantasy arm, the
+location arm unchanged, no unfilled placeholders. Gates: `check-sibling-paths.js --list`;
+`npx vitest run tests/unit/sibling-parity tests/unit/prompt* tests/unit/idea-* tests/unit/world-seeds* tests/unit/idea-guide-shape`
+— 13 files, 153 tests green. Then the full paid round above.
+Artefacts: `round-15.json` / `.md`, `round-15-defects.md`, `blind-set-r15.md`,
+`blind-key-r15.json`, `blind-scores-r15.md`.
+
+**Status:** ✅ active — committed on `staging`, not pushed.
