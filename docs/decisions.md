@@ -52204,6 +52204,88 @@ is not indicated by any of this evidence.
 Artefacts: `round-12.json` / `.md`, `round-12-defects.md`, `blind-set-r12.md`,
 `blind-scores-r12.md`, `blind-key-r12.json`.
 
+**Follow-up (2026-09-21) — round 13: subtraction. The HOOK and PROMISE slots come out, the back
+cover loses a fifth of its words, the contract mean is the best of the series — and the buy axis
+recovers only to 3.50. R10's 3.90 still stands, and this is now the fourth consecutive round in
+which nothing moves it.**
+
+*What was changed* (`89dc2f1c2`), acting on R12's verdict and on the shape of its six blind losses,
+which all said one thing — «five names tangled around a capsule», «three wants competing», «a
+riddle, not a picture»: **too populated to follow on a back cover.** The world seed already hands
+each arm a centre and a turn, picked in code: a picturable thing and a change. The HOOK rule ("one
+thing in the idea is out of the ordinary and can be pointed at in a picture") and the PROMISE slot
+("one sentence is an event this book contains") were asking the model to invent the same two things
+a second time, and charging two sentences for it. So both came out, both sibling templates in step:
+the `THE PROMISE` slot-list entry, both RULES bullets, the Hook and Promise quoting checks (checks
+renumbered), and the `"hook"` / `"promise"` CUT labels — the labels are now setup / turn / event /
+rule / cost, with setup, turn and cost kept. The turn now stands between the obstacle and the cost.
+**The sentence budget went four-to-six → three-to-five**, and the length check with it. The three
+examples lost their promise sentence and run five sentences each (example 1's deadline moved into
+the obstacle sentence, so its cost still has a bell to refer to). Everything else is untouched and
+was verified present in the BUILT prompt on `--dry-run --cells=1,3`: the contract and the CUT step,
+the turn, the child's own want and the child acting, the positive adult rule, cast presence, peril
+including the historical-danger exemption verbatim, the language block, the buy criterion (still
+exactly twice per built prompt — the pinned test), the shape, the world seed.
+
+*Result* (`round-13.json` / `.md`, 20 ideas, USD 1.0045; `round-13-defects.md`).
+**a 3.85 → 4.10** (best of thirteen), g 4.35 → 4.40, h 4.75 → 4.38, **c 4.40 → 3.90**,
+**f 4.30 → 3.25**. And the length, which is the whole point of the change, computed from the jsons
+with the `Rollen:` block stripped:
+
+| | mean sentences | mean words |
+|---|---|---|
+| R10 | 5.35 | 99.4 |
+| R12 | 6.00 | 114.0 |
+| **R13** | **4.45** | **89.6** |
+
+**−1.55 sentences and −24.4 words against R12: a fifth of the back cover gone, the shortest of the
+series.** Two fault classes closed with it: **narrated middles 4 → 1** (the promise slot WAS the
+narrated middle — an "event this book contains, written in the story's voice" is one by
+construction, and the model was being asked for one and then marked down for it), and **the peril
+height class 4 → 0**, with peril overall 5 → 3.
+
+*What it cost, and it is not what was removed.* **f fell a full point, and 11 of its 14 faults are
+one fault — a dash welding two clauses together.** That rule is untouched and still checked. **c
+fell half a point on a class that had never appeared: three ideas INVENT a character** (a
+grandmother, a Madeleine, a dragon called Finn) and two drop real ones (one loses three of a cast of
+five, one loses two of six). Both are the same pressure: told to say the same things in two fewer
+sentences, the model fuses clauses rather than drop one, and a cast gets trimmed or padded to fit.
+**The budget cut, not the slot removal, is what these two axes are measuring** — which also means
+they are cheap to address, since both rules already exist and are simply being outvoted.
+
+*The blind read.* R1 vs R13, 40 texts, ids shuffled, a fresh rater who saw no labels and no ratings
+file: **R1 3.55 (2:4 3:4 4:9 5:3), R13 3.50 (2:2 3:6 4:12 5:0), diff −0.05; R13 wins 5 arms, loses
+7, ties 8.** That is +0.20 on R12, identical to R11, and −0.40 on R10. **Zero 5s for the third round
+running.** The distribution is the tell: R13 has the fewest 2s of any round (2 against R1's 4) and
+no 5s at all — subtraction removed the bottom and the top together.
+
+**The important negative: the crowding complaint is gone from the rater's reasons and the score did
+not follow it.** Not one losing reason in R13 mentions population or too many names. They are all
+about the want — «the want reverses on itself», «the want is adult-shaped», «who is lost and who is
+searching never resolves», «Herr Keller will die Leitung sperren — nobody to care about». The
+diagnosis drawn from R12's losses was correct about what the rater disliked and wrong about what it
+was worth: fixing it bought 0.20 and exposed the next complaint underneath.
+
+*Verdict.* 🟡 **KEPT.** The templates are shorter, the contract is the cleanest it has been, the
+height peril class is at zero, and the slots removed were provably redundant against a code-supplied
+input. But R10 (3.90) remains the best measured version on the buy axis, and the series now reads
+unambiguously: **four consecutive rounds — a rule round, a code round, and now a subtraction round —
+have moved the defect axes and not the buy axis.** Nothing in the premise template is the lever.
+Two items stand, both named since R11 and both untouched by this round: the space guide's own
+machinery (cell 5 has been the floor for four straight rounds for exactly that reason), and whether
+"a loss the child can bear" should be defined by what is at stake rather than by which shapes are
+forbidden. Two cheap follow-ups this round created and did not fix: the dash rule and the cast rule
+are now the two constraints under most strain at the shorter budget, and one orphan remains —
+`prompts/age-band-journey.txt` still says "the thing out of the ordinary is one they hold or touch,
+never one they operate", a clause that now refers to a term neither template defines. It still
+constrains correctly and was left alone deliberately, because that file is shared with the story-side
+beats prompt and editing it is a separate change.
+
+**Touched:** `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`tests/unit/idea-turn-slot.test.ts`, `docs/decisions.md`.
+Artefacts: `round-13.json` / `.md`, `round-13-defects.md`, `blind-set-r13.md`,
+`blind-scores-r13.md`, `blind-key-r13.json`.
+
 
 
 ---
