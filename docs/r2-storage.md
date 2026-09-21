@@ -176,6 +176,41 @@ staging serves `images-staging.magicalstory.ch` from a different bucket, and a s
 with production credentials would leave staging rows referencing objects production's own
 GC would later delete.
 
+#### Every environment cleans itself, nightly (owner, 2026-09-21)
+
+The daily housekeeping routine's offload used to cover `characters.data` and `stories.data`
+while the sweep beside it reported on all 35 json/jsonb columns — so a leak into
+`characters.metadata`, `story_jobs.input_data` or `users.trial_data` was reported loudly
+every morning and fixed by nobody. Since 2026-09-21 the routine runs
+`offloadInlineImages()` over **all of `OFFLOADABLE_COLUMNS`**, which is the same list the
+admin tool uses, through the same `offloadJsonbColumn()` implementation. That is what
+finally cleans staging: staging serves a different R2 bucket and only production
+credentials are checked in, so the bytes can only be moved by the staging container itself,
+with its own keys, on its own schedule.
+
+Because it now runs unattended against live data it is bounded and resumable:
+
+- **Budget** `DAILY_OFFLOAD_BUDGET` = 100 rows / 256 MB per run, checked before each row.
+  The measured corpus is 34 rows / 33.8 MB (production, 190 days' accumulation), 38 rows /
+  99.7 MB (staging), largest single row 7.07 MB — so a real backlog clears in one night,
+  while a write path that starts dumping bytes into every row costs at most 100 rewritten
+  rows per 24 h instead of the whole database in one unattended pass.
+- **Resume** the column a run stopped in is stored in `config.db_housekeeping_offload_cursor`
+  and the next run starts there, rotating through the rest so no column is starved. A
+  skipped row consumes no budget, so a column that cannot be cleaned cannot hold the
+  cursor hostage.
+- **Refusal** the routine calls the shared `verifyBucketMatchesDatabase()` before writing
+  anything: R2 unconfigured, no sample URL to check against, or a bucket host that is not
+  the one this database serves ⇒ it logs an error and writes nothing. The admin script
+  turns the identical verdict into a hard error.
+- **Self-check** the sweep runs after the offload, and a column the offload cleaned this
+  run (no skipped rows, not the cursor column) that the sweep still finds bytes in is
+  logged as `OFFLOAD/SWEEP DISAGREE` — the fixer and the guard are not seeing the same
+  bytes, which matters more than the leak.
+
+`story_job_checkpoints.step_data` is absent from `OFFLOADABLE_COLUMNS` and stays untouched.
+All of this is pinned by `tests/unit/jsonb-image-offload.test.ts`.
+
 Options: `--age-days=30` (cohort age floor — a cohort whose newest object is younger than
 this is never swept, which protects an in-flight generation), `--list=20` (sample keys per
 prefix), `--out=path.json` / `--no-manifest` (the review manifest).

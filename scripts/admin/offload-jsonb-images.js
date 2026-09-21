@@ -45,6 +45,7 @@ const { Pool } = require('pg');
 const {
   offloadJsonbColumn,
   OFFLOADABLE_COLUMNS,
+  verifyBucketMatchesDatabase,
 } = require('../../server/lib/dbHousekeeping');
 
 const ENVS = {
@@ -64,35 +65,31 @@ const log = {
  * Prove the configured R2 bucket is the one the TARGET database actually writes
  * to, before a single byte moves.
  *
- * The checked-in `.env` holds PRODUCTION R2 credentials
- * (`images.magicalstory.ch` / magicalstory-images); staging serves
- * `images-staging.magicalstory.ch` from a DIFFERENT bucket — verified
- * 2026-09-21 by resolving a staging object key against the production bucket
- * (absent). Without this check a staging run would replace staging's inline
- * bytes with URLs into the production bucket: a cross-environment reference
- * that production's own R2 garbage collection would eventually delete, taking
- * the only remaining copy of those images with it.
+ * The verdict comes from `verifyBucketMatchesDatabase` in dbHousekeeping.js —
+ * the same guard the unattended daily routine applies, so the attended tool and
+ * the schedule cannot disagree about which bucket belongs to which database.
+ * There the verdict is logged and the run refuses; here it is a hard error.
  *
- * Same guard, same reasoning as `assertBucketMatchesDatabase` in
- * scripts/admin/delete-user-data.js. Refuse rather than guess.
+ * Why it exists: the checked-in `.env` holds PRODUCTION R2 credentials
+ * (`images.magicalstory.ch`); staging serves `images-staging.magicalstory.ch`
+ * from a DIFFERENT bucket. Without this check a staging run from a developer
+ * machine would replace staging's inline bytes with URLs into the production
+ * bucket, which production's own R2 garbage collection would eventually delete —
+ * taking the only remaining copy of those images with it.
  */
 async function assertBucketMatchesDatabase(pool, envLabel) {
-  const sample = (await pool.query(
-    "SELECT image_url FROM story_images WHERE image_url LIKE 'http%' ORDER BY id DESC LIMIT 1")).rows[0];
-  if (!sample) throw new Error(`no stored image URL on ${envLabel} — cannot verify the R2 bucket; refusing to run`);
-  const dbHost = new URL(sample.image_url).host;
-  const cfgHost = new URL(process.env.R2_PUBLIC_URL || 'https://unset.invalid').host;
-  if (dbHost !== cfgHost) {
+  const verdict = await verifyBucketMatchesDatabase(pool);
+  if (!verdict.ok) {
     throw new Error(
-      `R2 BUCKET MISMATCH — refusing to run.\n`
-      + `    ${envLabel} database serves images from : ${dbHost}\n`
-      + `    R2_PUBLIC_URL points at               : ${cfgHost}  (bucket "${process.env.R2_BUCKET}")\n\n`
-      + `  Offloading with these settings would leave ${envLabel} rows pointing at another\n`
-      + `  environment's bucket. Point R2_ACCOUNT_ID / R2_ACCESS_KEY_ID /\n`
-      + `  R2_SECRET_ACCESS_KEY / R2_BUCKET / R2_PUBLIC_URL at the ${envLabel} bucket\n`
-      + `  (${dbHost}) and re-run.`);
+      [
+        `R2 BUCKET CHECK FAILED on ${envLabel} — refusing to run.`,
+        `    ${verdict.message}`,
+        '',
+        '  Point R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET /',
+        `  R2_PUBLIC_URL at the ${envLabel} bucket${verdict.dbHost ? ` (${verdict.dbHost})` : ''} and re-run.`,
+      ].join('\n'));
   }
-  console.log(`  R2 bucket verified: ${process.env.R2_BUCKET} (${cfgHost}) matches ${envLabel}`);
+  console.log(`  R2 bucket verified: ${verdict.bucket} (${verdict.cfgHost}) matches ${envLabel}`);
 }
 
 /**

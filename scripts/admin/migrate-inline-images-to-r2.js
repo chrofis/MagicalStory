@@ -27,7 +27,7 @@ const path = require('path');
 require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 const { Pool } = require('pg');
 const r2 = require('../../server/lib/r2');
-const { collect, offloadInlineImages, databaseSize } = require('../../server/lib/dbHousekeeping');
+const { collectInlineImageTasks, offloadInlineImages, databaseSize, OFFLOADABLE_COLUMNS } = require('../../server/lib/dbHousekeeping');
 
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
@@ -60,14 +60,17 @@ const log = {
     const rows = (await pool.query(
       `SELECT id, data FROM ${table} WHERE data::text LIKE '%data:image%'
         ORDER BY pg_column_size(data) DESC${LIMIT ? ` LIMIT ${LIMIT}` : ''}`)).rows;
-    const bytes = rows.reduce((s, r) => s + collect(r.data, 'x').reduce((a, t) => a + t.bytes, 0), 0);
+    const bytes = rows.reduce((s, r) => s + collectInlineImageTasks(r.data, 'x').reduce((a, t) => a + t.bytes, 0), 0);
     console.log(`\n=== ${label} ${table}: ${rows.length} row(s) with inline images, ~${MB(bytes)} MB ===`);
   }
 
   if (!APPLY) {
     console.log('\n(dry run — pass --apply)');
   } else {
-    const res = await offloadInlineImages(pool, log, { tables: TABLES, limit: LIMIT });
+    const res = await offloadInlineImages(pool, log, {
+      specs: OFFLOADABLE_COLUMNS.filter(s => TABLES.includes(s.table) && s.column === 'data'),
+      limit: LIMIT, budget: null,
+    });
     console.log(`\n✅ ${res.rows} row(s) migrated, ${res.images} image(s) to R2 ` +
                 `(${res.mb.toFixed(1)} MB), ${res.skipped} row(s) skipped`);
   }

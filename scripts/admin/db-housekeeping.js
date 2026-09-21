@@ -95,8 +95,12 @@ async function refuseIfBusy() {
     console.log(`  ${t}: ${r.rows[0].k} row(s) with inline images (${(Number(r.rows[0].b) / 1024 / 1024).toFixed(1)} MB)`);
   }
   if (APPLY) {
-    const res = await offloadInlineImages(pool, log);
+    // No budget here: this is an attended run, the operator is watching it.
+    const res = await offloadInlineImages(pool, log, { budget: null });
     console.log(`  → ${res.rows} row(s) migrated, ${res.images} image(s) to R2, ${res.skipped} skipped`);
+    for (const [col, c] of Object.entries(res.byColumn)) {
+      if (c.candidates) console.log(`      ${col}: ${c.rows}/${c.candidates} row(s), ${c.mb.toFixed(1)} MB, ${c.skipped} skipped`);
+    }
   } else {
     console.log('  → run with --apply to move them');
   }

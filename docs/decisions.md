@@ -53649,3 +53649,52 @@ and each points at a different undo, so no line is reverted on one round:
 **Touched files:** `tests/manual/story-idea-rounds/round-18.md`,
 `round-18-defects.md`, `blind-set-r18.md`, `blind-scores-r18.md`,
 `blind-key-r18.json`.
+
+## The nightly offload covers every offloadable JSONB column, bounded and resumable (2026-09-21)
+
+**Context:** The 2026-09-21 storage fix (`c25e665fb`) cleaned production by hand and closed
+the write paths, but the *daily* housekeeping routine still offloaded only `characters.data`
+and `stories.data`, while the read-only `sweepInlineImages()` beside it reported on all 35
+json/jsonb columns. So the routine reported a leak in `characters.metadata`,
+`story_jobs.input_data` or `users.trial_data` every morning and fixed none of it. That gap is
+why staging still held 38 rows / 99.67 MB nobody could clean: staging serves a *different* R2
+bucket and only production credentials are checked in, so running the admin tool from a
+developer machine would point staging rows into the production bucket, where production's own
+R2 GC would eventually delete the only copy.
+
+**Decision** (owner, 2026-09-21): the daily routine's offload runs over all of
+`OFFLOADABLE_COLUMNS`, so each environment cleans ITSELF, on its own schedule, with its own
+R2 credentials. Because it is now unattended against live data it is bounded and resumable:
+
+- `DAILY_OFFLOAD_BUDGET` = 100 rows / 256 MB per run, checked before each row (never mid-row
+  — stopping mid-row is the half-migrated state the all-or-nothing rule exists to prevent).
+- The column a run stopped in is stored in `config.db_housekeeping_offload_cursor`; the next
+  run starts there and rotates through the rest. Skipped rows consume no budget, so a column
+  that cannot be cleaned cannot wedge the cursor.
+- `verifyBucketMatchesDatabase()` — one implementation, shared with the admin script — must
+  pass before anything is written. R2 unconfigured, no sample URL, or a bucket host that is
+  not the one this database serves ⇒ log an error and write nothing.
+- The sweep that follows asserts the columns the offload just cleaned are zero; a column
+  cleaned this run (no skipped rows, not the cursor column) that still shows bytes logs
+  `OFFLOAD/SWEEP DISAGREE`.
+
+**Rationale:** 100 rows / 256 MB is ~2.5x the largest whole-environment backlog ever measured
+(production 34 rows / 33.76 MB accumulated over ~190 days; staging 38 rows / 99.67 MB; largest
+single row 7.07 MB), so any real backlog clears in one night — while a pathological write path
+dumping bytes into every row costs at most 100 rewritten rows and 256 MB of uploads per 24 h
+instead of the entire database in one unattended pass. Every safety property of `c25e665fb` is
+unchanged, because the budget and the cursor were added INSIDE the one implementation
+(`offloadJsonbColumn`) rather than beside it: upload → fetch back → md5 compare → replace,
+all-or-nothing per row against the pre-write `::text` fingerprint, content-addressed keys,
+sibling-column reuse, diagnostics offloaded never stripped, `story_job_checkpoints.step_data`
+untouched.
+
+**Touched:** `server/lib/dbHousekeeping.js` (`offloadInlineImages` now spec-driven,
+`verifyBucketMatchesDatabase`, `DAILY_OFFLOAD_BUDGET`, `KEY_OFFLOAD_CURSOR`, budget/cursor in
+`offloadJsonbColumn`, per-column summary + disagreement check in `runDailyHousekeeping`),
+`scripts/admin/offload-jsonb-images.js` (uses the shared bucket guard),
+`scripts/admin/db-housekeeping.js`, `scripts/admin/migrate-inline-images-to-r2.js`,
+`scripts/admin/sibling-registry.json` (`jsonb-offload-entrypoints`),
+`tests/unit/jsonb-image-offload.test.ts`, `docs/r2-storage.md`.
+
+**Status:** ✅ active — takes effect on each environment's next 03:30 CH run after deploy.

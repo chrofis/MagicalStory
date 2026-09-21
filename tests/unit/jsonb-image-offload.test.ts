@@ -167,3 +167,164 @@ describe('offloadJsonbColumn', () => {
     expect(pool.stored.w1).toBe(before);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The unattended half: the DAILY routine's offload (owner, 2026-09-21).
+//
+// It covers every offloadable column, not the two it was born with; it is
+// bounded so one night cannot rewrite the database; it resumes where the budget
+// stopped it; and it refuses outright when the configured bucket does not belong
+// to the database being cleaned — which is the whole reason staging could not be
+// cleaned from a developer machine.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const {
+  offloadInlineImages,
+  OFFLOADABLE_COLUMNS,
+  DAILY_OFFLOAD_BUDGET,
+} = require_('../../server/lib/dbHousekeeping');
+
+/**
+ * A fake pool that answers for EVERY offloadable table, keyed by the table name
+ * in the SQL. `rows` is { 'table.column': { id: value } }.
+ */
+function multiPool(rows: Record<string, Record<string, any>>, { imageUrlHost = 'r2.example' } = {}) {
+  const stored: Record<string, Record<string, string>> = {};
+  for (const [col, byId] of Object.entries(rows)) {
+    stored[col] = {};
+    for (const [id, v] of Object.entries(byId)) stored[col][id] = JSON.stringify(v);
+  }
+  const of = (sql: string) => {
+    const m = sql.match(/FROM\s+"([a-z_]+)"/i) || sql.match(/UPDATE\s+"([a-z_]+)"/i);
+    const c = sql.match(/"([a-z_]+)"(?:::text)?\s+AS\s+[vt]\b/i) || sql.match(/SET\s+"([a-z_]+)"/i);
+    return `${m ? m[1] : ''}.${c ? c[1] : ''}`;
+  };
+  const query = async (sql: string, params: any[] = []) => {
+    if (/FROM story_images/i.test(sql)) {
+      return { rows: imageUrlHost ? [{ image_url: `https://${imageUrlHost}/x.jpg` }] : [] };
+    }
+    if (/AS id\s*$|AS id\s*\n/i.test(sql) || /::text AS id/i.test(sql)) {
+      const table = (sql.match(/FROM\s+"([a-z_]+)"/i) || [])[1];
+      const column = (sql.match(/WHERE\s+"([a-z_]+)" IS NOT NULL/i) || [])[1];
+      const bag = stored[`${table}.${column}`] || {};
+      let ids = Object.keys(bag);
+      const lim = sql.match(/LIMIT (\d+)/);
+      if (lim) ids = ids.slice(0, parseInt(lim[1], 10));
+      return { rows: ids.map(id => ({ id })) };
+    }
+    if (/FOR UPDATE/i.test(sql)) {
+      const k = of(sql);
+      return { rows: stored[k]?.[params[0]] !== undefined ? [{ t: stored[k][params[0]] }] : [] };
+    }
+    if (/^\s*UPDATE/i.test(sql)) { stored[of(sql)][params[0]] = params[1]; return { rows: [] }; }
+    if (/^\s*SELECT/i.test(sql)) {
+      const k = of(sql);
+      if (stored[k]?.[params[0]] === undefined) return { rows: [] };
+      return { rows: [{ v: stored[k][params[0]], owner: 'u1' }] };
+    }
+    return { rows: [] };
+  };
+  const client = { query: async (s: string, p?: any[]) => query(s, p), release: () => {} };
+  return { query, connect: async () => client, stored };
+}
+
+describe('the daily routine offload', () => {
+  const prevPublic = process.env.R2_PUBLIC_URL;
+  beforeEach(() => { process.env.R2_PUBLIC_URL = 'https://r2.example'; });
+  afterEach(() => { process.env.R2_PUBLIC_URL = prevPublic; });
+
+  it('covers EVERY offloadable column, not just characters.data and stories.data', async () => {
+    const rows: Record<string, Record<string, any>> = {};
+    for (const s of OFFLOADABLE_COLUMNS) rows[`${s.table}.${s.column}`] = { [`${s.table}-1`]: { p: { face: uri(s.column) } } };
+    const pool: any = multiPool(rows);
+
+    const out = await offloadInlineImages(pool, log);
+
+    expect(out.refused).toBe(null);
+    expect(Object.keys(out.byColumn).sort())
+      .toEqual(OFFLOADABLE_COLUMNS.map((s: any) => `${s.table}.${s.column}`).sort());
+    expect(out.rows).toBe(OFFLOADABLE_COLUMNS.length);
+    for (const bag of Object.values(pool.stored) as any[]) {
+      for (const text of Object.values(bag) as string[]) {
+        expect(findInlineImages(JSON.parse(text))).toEqual([]);
+      }
+    }
+  });
+
+  it('never touches story_job_checkpoints.step_data — the declared exception', () => {
+    expect(OFFLOADABLE_COLUMNS.some((s: any) => s.table === 'story_job_checkpoints')).toBe(false);
+  });
+
+  it('stops at the per-run budget and leaves the rest for the next run', async () => {
+    const pool: any = multiPool({
+      'characters.data': { c1: { p: { a: uri('a') } }, c2: { p: { a: uri('b') } }, c3: { p: { a: uri('c') } } },
+      'stories.data': { s1: { p: { a: uri('d') } } },
+    });
+
+    const out = await offloadInlineImages(pool, log, { budget: { rows: 2, bytes: 1e9 } });
+
+    expect(out.rows).toBe(2);
+    expect(out.budgetExhausted).toBe(true);
+    expect(out.nextCursor).toBe('characters.data');
+    // The untouched rows still hold their bytes — nothing was lost, just deferred.
+    const left = Object.values(pool.stored['characters.data'] as Record<string, string>)
+      .filter(t => findInlineImages(JSON.parse(t)).length);
+    expect(left.length).toBe(1);
+    expect(findInlineImages(JSON.parse(pool.stored['stories.data'].s1)).length).toBe(1);
+  });
+
+  it('resumes at the cursor the previous run handed back', async () => {
+    const pool: any = multiPool({
+      'characters.data': { c1: { p: { a: uri('a') } } },
+      'users.trial_data': { u1: { p: { a: uri('u') } } },
+    });
+
+    const out = await offloadInlineImages(pool, log, { cursor: 'users.trial_data', budget: { rows: 1, bytes: 1e9 } });
+
+    // It started at the cursor, not back at the top of the list.
+    expect(Object.keys(out.byColumn)).toEqual(['users.trial_data']);
+    expect(findInlineImages(JSON.parse(pool.stored['users.trial_data'].u1))).toEqual([]);
+    expect(findInlineImages(JSON.parse(pool.stored['characters.data'].c1)).length).toBe(1);
+  });
+
+  it('a row whose upload cannot be verified is skipped and keeps its bytes', async () => {
+    const pool: any = multiPool({ 'characters.data': { c1: { p: { a: uri('a') } } } });
+    const before = pool.stored['characters.data'].c1;
+    r2.uploadImage = vi.fn(async (_i: any, key: string) => { bucket.set(key, Buffer.from('wrong')); return `https://r2.example/${key}`; });
+
+    const out = await offloadInlineImages(pool, log);
+
+    expect(out.rows).toBe(0);
+    expect(out.skipped).toBe(1);
+    expect(pool.stored['characters.data'].c1).toBe(before);
+  });
+
+  it('REFUSES when the configured bucket is not this database\'s bucket', async () => {
+    const pool: any = multiPool({ 'characters.data': { c1: { p: { a: uri('a') } } } },
+      { imageUrlHost: 'images-staging.magicalstory.ch' });   // staging DB, production R2 configured
+    const before = pool.stored['characters.data'].c1;
+
+    const out = await offloadInlineImages(pool, log);
+
+    expect(out.refused).toBe('bucket-mismatch');
+    expect(out.rows).toBe(0);
+    expect(r2.uploadImage).not.toHaveBeenCalled();
+    expect(pool.stored['characters.data'].c1).toBe(before);
+  });
+
+  it('REFUSES when R2 is not configured at all', async () => {
+    r2.isConfigured = vi.fn(() => false);
+    const pool: any = multiPool({ 'characters.data': { c1: { p: { a: uri('a') } } } });
+
+    const out = await offloadInlineImages(pool, log);
+
+    expect(out.refused).toBe('r2-not-configured');
+    expect(r2.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('has a budget that is a real bound, not a formality', () => {
+    expect(DAILY_OFFLOAD_BUDGET.rows).toBeGreaterThan(0);
+    expect(DAILY_OFFLOAD_BUDGET.bytes).toBeGreaterThan(0);
+    expect(DAILY_OFFLOAD_BUDGET.rows).toBeLessThanOrEqual(1000);
+  });
+});

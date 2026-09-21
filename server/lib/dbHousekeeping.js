@@ -100,8 +100,8 @@ const safe = (v) => String(v).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
 // -----------------------------------------------------------------------------
 // The standing guard for the IRON RULE: no image bytes in JSONB, R2 only.
 //
-// offloadInlineImages() below only cleans `characters.data` and `stories.data`
-// - the two columns it was built for. This sweep asks the question the rule
+// offloadInlineImages() below FIXES every column in OFFLOADABLE_COLUMNS — the
+// ones we know how to address a row in. This sweep asks the question the rule
 // actually states, of EVERY json/jsonb column in the schema, discovered from
 // information_schema so a column added tomorrow is covered tomorrow. It is
 // read-only: it reports, it never writes, and the daily routine logs an error
@@ -346,11 +346,19 @@ const candidatePredicate = (column) => `
  * @param {Pool}   pool
  * @param {Object} log
  * @param {Object} spec    one entry of OFFLOADABLE_COLUMNS
- * @param {Object} [opts]  { limit, dryRun, onRow }
+ * @param {Object} [opts]  { limit, dryRun, onRow, budget }
+ *
+ * `budget` ({ rows, bytes }) bounds ONE pass. It is checked before each row, so
+ * a pass overshoots the byte budget by at most the one row it is already
+ * committed to — deliberate, because stopping mid-row is the half-migrated
+ * state the all-or-nothing rule exists to prevent. `out.budgetExhausted` tells
+ * the caller the column still has work, which is what the resume cursor stores.
+ * Skipped rows do not consume budget: a column that cannot be cleaned must not
+ * be able to hold the cursor hostage.
  */
-async function offloadJsonbColumn(pool, log, spec, { limit = null, dryRun = false, onRow = null } = {}) {
+async function offloadJsonbColumn(pool, log, spec, { limit = null, dryRun = false, onRow = null, budget = null } = {}) {
   const { table, column, idColumn = 'id', ownerColumn = null, reuseColumn = null } = spec;
-  const out = { table, column, rows: 0, images: 0, reused: 0, bytes: 0, skipped: 0, candidates: 0, details: [] };
+  const out = { table, column, rows: 0, images: 0, reused: 0, bytes: 0, skipped: 0, candidates: 0, budgetExhausted: false, details: [] };
   if (!dryRun && !r2.isConfigured()) {
     log.warn(`[db-housekeeping] R2 not configured — cannot offload ${table}.${column}`);
     return out;
@@ -364,6 +372,12 @@ async function offloadJsonbColumn(pool, log, spec, { limit = null, dryRun = fals
   out.candidates = candidates.length;
 
   for (const { id } of candidates) {
+    if (budget && (out.rows >= budget.rows || out.bytes >= budget.bytes)) {
+      out.budgetExhausted = true;
+      log.info(`[db-housekeeping] ${table}.${column}: per-run budget reached after ${out.rows} row(s) / `
+        + `${MB(out.bytes).toFixed(1)} MB — the rest resumes on the next run`);
+      break;
+    }
     // `::text`, not the parsed value: the walker MUTATES the parsed tree in
     // place, so a parsed snapshot would silently become the post-offload state
     // and the concurrency check below would compare the row against itself.
@@ -524,25 +538,129 @@ async function writeIfUnchanged(pool, { table, column, idColumn, id, beforeText,
 }
 
 /**
- * The daily routine's offload: characters.data and stories.data, the two
- * columns it has always cleaned. Everything else is driven by
- * scripts/admin/offload-jsonb-images.js, against the same one implementation.
+ * Prove the configured R2 bucket belongs to the database being cleaned.
+ *
+ * The checked-in `.env` holds PRODUCTION R2 credentials (images.magicalstory.ch);
+ * staging serves images-staging.magicalstory.ch from a DIFFERENT bucket. Writing
+ * staging rows with this configuration would point them into the production
+ * bucket, where production's own R2 garbage collection would eventually delete
+ * the only remaining copy. Each environment cleans itself with its own
+ * credentials, or nothing gets written.
+ *
+ * The evidence is the database's own most recent stored image URL: whatever host
+ * it serves images from IS this database's bucket. Returns a verdict rather than
+ * throwing, so the unattended routine can refuse-and-log while the admin script
+ * turns the same verdict into a hard error. One implementation, two entry points.
  */
-async function offloadInlineImages(pool, log, { tables = TABLES, limit = null } = {}) {
-  const result = { rows: 0, images: 0, mb: 0, skipped: 0, byTable: {} };
+async function verifyBucketMatchesDatabase(pool) {
   if (!r2.isConfigured()) {
-    log.warn('[db-housekeeping] R2 not configured — cannot offload inline images; skipping');
-    return result;
+    return { ok: false, reason: 'r2-not-configured',
+      message: 'R2 is not configured in this environment — there is nowhere to put the bytes' };
   }
-  for (const table of tables) {
-    const spec = OFFLOADABLE_COLUMNS.find(s => s.table === table && s.column === 'data');
-    if (!spec) continue;
-    const r = await offloadJsonbColumn(pool, log, spec, { limit });
-    result.byTable[table] = r.candidates;
+  const sample = (await pool.query(
+    "SELECT image_url FROM story_images WHERE image_url LIKE 'http%' ORDER BY id DESC LIMIT 1")).rows[0];
+  if (!sample) {
+    return { ok: false, reason: 'no-sample-url',
+      message: 'no stored image URL in this database — the bucket cannot be verified' };
+  }
+  const dbHost = new URL(sample.image_url).host;
+  const cfgHost = new URL(process.env.R2_PUBLIC_URL || 'https://unset.invalid').host;
+  if (dbHost !== cfgHost) {
+    return { ok: false, reason: 'bucket-mismatch', dbHost, cfgHost,
+      message: `this database serves images from ${dbHost} but R2_PUBLIC_URL points at ${cfgHost} `
+        + `(bucket "${process.env.R2_BUCKET}") — offloading would write cross-bucket URLs` };
+  }
+  return { ok: true, dbHost, cfgHost, bucket: process.env.R2_BUCKET };
+}
+
+/**
+ * Per-run bound on the unattended offload (owner, 2026-09-21).
+ *
+ * The measured corpus: production's whole backlog was 34 rows / 33.76 MB across
+ * 190 days, staging's is 38 rows / 99.67 MB, and the largest single row seen was
+ * 7.07 MB. 100 rows / 256 MB is ~2.5x the largest whole-environment backlog ever
+ * observed, so any real backlog clears in one night — while a pathological write
+ * path that starts dumping bytes into every row can cost at most 100 rewritten
+ * rows and 256 MB of uploads per 24 hours instead of the entire database in one
+ * unattended pass. The cursor makes the remainder the next run's work.
+ */
+const DAILY_OFFLOAD_BUDGET = { rows: 100, bytes: 256 * 1024 * 1024 };
+const KEY_OFFLOAD_CURSOR = 'db_housekeeping_offload_cursor';
+
+const specKey = (s) => `${s.table}.${s.column}`;
+
+/**
+ * The daily routine's offload: EVERY offloadable column, not two of them.
+ *
+ * Until 2026-09-21 this cleaned only characters.data and stories.data while the
+ * sweep next to it reported on all 35 json/jsonb columns. That gap is why
+ * staging kept 38 rows / 99.67 MB nobody could clean from a developer machine:
+ * staging serves a different R2 bucket and only production credentials are
+ * checked in, so the fix has to be the environment cleaning ITSELF on its own
+ * schedule with its own keys.
+ *
+ * Bounded by DAILY_OFFLOAD_BUDGET and resumable: the column a run stopped in is
+ * stored as a cursor, and the next run starts there, rotating through the rest.
+ * `story_job_checkpoints.step_data` is absent from OFFLOADABLE_COLUMNS and stays
+ * untouched — the declared exception.
+ */
+async function offloadInlineImages(pool, log, {
+  specs = OFFLOADABLE_COLUMNS,
+  limit = null,
+  dryRun = false,
+  budget = DAILY_OFFLOAD_BUDGET,
+  cursor = null,
+} = {}) {
+  const result = {
+    rows: 0, images: 0, mb: 0, skipped: 0, reused: 0,
+    byColumn: {}, cleanedColumns: [], budgetExhausted: false,
+    nextCursor: null, refused: null,
+  };
+
+  if (!dryRun) {
+    const verdict = await verifyBucketMatchesDatabase(pool);
+    if (!verdict.ok) {
+      log.error(`[db-housekeeping] JSONB image offload REFUSED — ${verdict.message}. `
+        + 'Nothing was written. This environment must run with its own R2 credentials.');
+      result.refused = verdict.reason;
+      return result;
+    }
+  }
+
+  // Rotate so the column a previous run stopped in goes first; everything else
+  // keeps its turn, so one busy column cannot starve the others forever.
+  const start = Math.max(0, specs.findIndex(s => specKey(s) === cursor));
+  const ordered = [...specs.slice(start), ...specs.slice(0, start)];
+
+  const remaining = { rows: budget ? budget.rows : Infinity, bytes: budget ? budget.bytes : Infinity };
+  for (const spec of ordered) {
+    if (remaining.rows <= 0 || remaining.bytes <= 0) {
+      result.budgetExhausted = true;
+      if (!result.nextCursor) result.nextCursor = specKey(spec);
+      break;
+    }
+    const r = await offloadJsonbColumn(pool, log, spec, {
+      limit, dryRun,
+      budget: budget ? { rows: remaining.rows, bytes: remaining.bytes } : null,
+    });
+    result.byColumn[specKey(spec)] = {
+      candidates: r.candidates, rows: r.rows, images: r.images,
+      mb: MB(r.bytes), skipped: r.skipped, reused: r.reused,
+    };
     result.rows += r.rows;
     result.images += r.images;
     result.mb += MB(r.bytes);
     result.skipped += r.skipped;
+    result.reused += r.reused;
+    if (r.rows > 0) result.cleanedColumns.push(specKey(spec));
+    remaining.rows -= r.rows;
+    remaining.bytes -= r.bytes;
+    if (r.budgetExhausted) {
+      result.budgetExhausted = true;
+      // Resume IN this column: its remaining candidates are the next run's first work.
+      result.nextCursor = specKey(spec);
+      break;
+    }
   }
   return result;
 }
@@ -756,21 +874,39 @@ async function runDailyHousekeeping({ pool, log }) {
     log.warn(`[db-housekeeping] pending R2 deletion retry failed: ${err.message}`);
   }
 
-  const offload = await offloadInlineImages(pool, log);
+  const offloadCursor = await readMarker(pool, KEY_OFFLOAD_CURSOR);
+  const offload = await offloadInlineImages(pool, log, { cursor: offloadCursor });
+  // The cursor is written AFTER the run, from its result: a run that crashes
+  // leaves the old cursor, and the next one re-enters the same column — which is
+  // idempotent, so re-entering costs nothing and skipping a column would not be.
+  // A refused run walked no column, so it has no opinion about where to resume:
+  // clearing the cursor there would send the next run back to the top for nothing.
+  if (!offload.refused && offload.nextCursor !== offloadCursor) {
+    await writeMarker(pool, KEY_OFFLOAD_CURSOR, offload.nextCursor || '');
+  }
   if (offload.rows > 0 || offload.skipped > 0) {
     // Not routine noise. Rows only get here because a write path stored image
     // bytes in JSONB instead of an R2 URL — the offload cleaned up after a bug.
-    const where = Object.entries(offload.byTable)
-      .filter(([, n]) => n > 0).map(([t, n]) => `${t}: ${n} row(s)`).join(', ');
-    log.warn(`[db-housekeeping] BUG: inline images found in JSONB (${where}) — ` +
-             `a write path is bypassing the R2 offload. Moved ${offload.images} image(s), ` +
-             `${offload.mb.toFixed(1)} MB, from ${offload.rows} row(s); ${offload.skipped} row(s) skipped`);
+    const where = Object.entries(offload.byColumn)
+      .filter(([, c]) => c.candidates > 0)
+      .map(([k, c]) => `${k}: ${c.rows}/${c.candidates} row(s), ${c.images} image(s), `
+        + `${c.mb.toFixed(1)} MB, ${c.skipped} skipped`)
+      .join('; ');
+    log.warn(`[db-housekeeping] BUG: inline images found in JSONB — a write path is bypassing `
+      + `the R2 offload. Moved ${offload.images} image(s), ${offload.mb.toFixed(1)} MB, from `
+      + `${offload.rows} row(s); ${offload.reused} reused an object already in R2; `
+      + `${offload.skipped} row(s) skipped. Per column — ${where}`);
+  }
+  if (offload.budgetExhausted) {
+    log.warn(`[db-housekeeping] offload stopped at its per-run budget `
+      + `(${DAILY_OFFLOAD_BUDGET.rows} rows / ${MB(DAILY_OFFLOAD_BUDGET.bytes).toFixed(0)} MB); `
+      + `resuming at ${offload.nextCursor} on the next run`);
   }
 
-  // The standing guard. offloadInlineImages only reaches characters.data and
-  // stories.data; this asks the whole schema, so a leak in a column nobody
-  // thought about (characters.metadata, story_jobs.input_data and
-  // users.trial_data all held megabytes on 2026-09-21) is loud the next morning.
+  // The standing guard. The offload fixes the columns we know how to address a
+  // row in; this asks the whole schema, so a leak in a column nobody thought
+  // about (characters.metadata, story_jobs.input_data and users.trial_data all
+  // held megabytes on 2026-09-21) is loud the next morning.
   let inlineSweep = null;
   try {
     inlineSweep = await sweepInlineImages(pool);
@@ -787,6 +923,20 @@ async function runDailyHousekeeping({ pool, log }) {
         log.error(`[db-housekeeping] IRON RULE BROKEN: ${col} - ${e.rows} row(s), ` +
                   `${MB(e.bytes).toFixed(1)} MB of image bytes in JSONB at ` +
                   `${[...e.paths].slice(0, 8).join(', ')}. R2 is the only byte store.`);
+        // The fixer just cleaned this column and the guard still sees bytes in
+        // it. One of the two is wrong — a walker that skips a value the sweep
+        // flags, or a write that landed between them — and that disagreement is
+        // worth more than the leak itself, because it means the daily routine
+        // can report "cleaned" while the bytes are still there.
+        // A skipped row keeps its bytes by design, and a column the budget
+        // stopped in still has candidates on purpose: neither is a disagreement.
+        if (offload.cleanedColumns.includes(col)
+            && (offload.byColumn[col]?.skipped || 0) === 0
+            && offload.nextCursor !== col) {
+          log.error(`[db-housekeeping] OFFLOAD/SWEEP DISAGREE: ${col} was offloaded this run `
+            + `(${offload.byColumn[col]?.rows || 0} row(s)) yet the sweep still finds `
+            + `${MB(e.bytes).toFixed(1)} MB there. The fixer and the guard do not see the same bytes.`);
+        }
       }
     } else {
       log.info(`[db-housekeeping] inline-image sweep clean across ${inlineSweep.columns} json/jsonb column(s)`);
@@ -926,6 +1076,9 @@ module.exports = {
   runWeeklyReclaim,
   offloadInlineImages,
   offloadJsonbColumn,
+  verifyBucketMatchesDatabase,
+  DAILY_OFFLOAD_BUDGET,
+  KEY_OFFLOAD_CURSOR,
   OFFLOADABLE_COLUMNS,
   candidatePredicate,
   decodeInlineImage,

@@ -531,6 +531,16 @@
         "server/routes/admin/testlab.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "jsonb-offload-entrypoints",
+      "axis": "unattended daily offload vs attended admin offload",
+      "reason": "The daily housekeeping routine (server/lib/dbHousekeeping.js, every environment at 03:30 CH with its own R2 credentials) and scripts/admin/offload-jsonb-images.js are two entry points to the SAME offload. They deliberately share one implementation (offloadJsonbColumn) and one bucket-versus-database guard (verifyBucketMatchesDatabase), so a scope, safety or reporting change made in one must hold in the other: the routine ran on two columns while the script ran on eight for a whole release, which is exactly how staging ended up with 38 rows nobody could clean. The attended tool may legitimately differ on budget (none, an operator is watching) and backups (it writes them) — that is what the Siblings-Checked vouch is for.",
+      "members": [
+        "server/lib/dbHousekeeping.js",
+        "scripts/admin/offload-jsonb-images.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [
