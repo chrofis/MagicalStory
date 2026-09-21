@@ -67,3 +67,33 @@ describe('peril-prone shapes', () => {
     expect(seen.has('rescue')).toBe(true);
   });
 });
+
+// A historical idea sits inside an event that already happened and cannot be
+// made to come out differently. Round 15 cell 4 drew "a swap or a mix-up" on the
+// moon landing and came back with two children swapping TV-listing marks while
+// Apollo 11 landed off-page.
+describe('historical shapes — only the ones a fixed event can carry', () => {
+  const FIT = new Set(['race against time', 'rescue', 'a promise to keep', 'a door that opens once', 'a message to deliver']);
+
+  it('never offers a shape that asks the event to bend', () => {
+    for (const topic of ['moon-landing', 'wright-brothers', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+      for (const chars of [
+        cast(['Luca', 9, true], ['Nora', 6], ['Bello', 4]),
+        cast(['Amir', 10, true], ['Yara', 8]),
+      ]) {
+        const picked = pickPremiseShapes({ characters: chars, storyTopic: topic, storyCategory: 'historical' });
+        expect(picked.length).toBe(2);
+        expect(picked[0].id).not.toBe(picked[1].id);
+        for (const s of picked) expect(FIT.has(s.name), `${topic}: ${s.name}`).toBe(true);
+      }
+    }
+  });
+
+  it('leaves every other category pool alone', () => {
+    const seen = new Set<string>();
+    for (const topic of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']) {
+      for (const s of pickPremiseShapes({ characters: cast(['Finn', 12, true], ['Alina', 12, true]), storyTopic: topic, storyCategory: 'life-challenge' })) seen.add(s.name);
+    }
+    expect([...seen].some(n => !FIT.has(n))).toBe(true);
+  });
+});

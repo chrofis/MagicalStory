@@ -19,7 +19,7 @@ const { log } = require('../utils/logger');
 const { fillTemplate } = require('../services/prompts');
 // Per-arm world seeds (a centre and a turn from the adventure guide's two lists)
 // and the shared idea seed hash.
-const { pickWorldSeeds, worldSeedInstruction, pickWorldPlace, worldPlaceInstruction, ideaVariantSeed } = require('../lib/worldSeeds');
+const { pickWorldSeeds, worldSeedInstruction, stripSeedLists, pickHistoricalAngle, historicalAngleInstruction, pickWorldPlace, worldPlaceInstruction, ideaVariantSeed } = require('../lib/worldSeeds');
 
 // Landmark resolution — one shared resolver + cache in landmarkPhotos.js.
 // This route once kept a PRIVATE cache here, so landmarks it discovered were
@@ -223,18 +223,35 @@ ${teachingGuide}`
     : '';
 
   // Always get adventure guide for setting/costume context
-  const adventureGuideContent = getAdventureGuide(effectiveTheme);
+  // The IDEA prompt sees the guide WITHOUT its two ten-item seed lists: the
+  // model is handed one centre picked in code, and printing the menu beside the
+  // pick is what it answered instead. getAdventureGuide itself is untouched, so
+  // every story-side builder still reads the guide whole (stripSeedLists lives
+  // in server/lib/worldSeeds.js, next to the parser that needs the lists).
+  const adventureGuideContent = stripSeedLists(getAdventureGuide(effectiveTheme));
   const adventureSettingGuide = adventureGuideContent
     ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
 ${adventureGuideContent}`
     : '';
 
   const { buildAgeModeSection } = require('../lib/promptBuilders');
-  const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language, perilYoungestMax });
+  const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language, storyCategory: effectiveCategory, perilYoungestMax });
   // One centre and one turn per arm, picked in code from the adventure guide's
   // two ten-item lists (server/lib/worldSeeds.js). null — and nothing injected —
   // for a theme with no adventure guide (custom, historical).
   const worldSeeds = [0, 1].map(arm => pickWorldSeeds({ theme: effectiveTheme, characters, topic: storyTopic, language, arm }));
+  // Historical has no adventure guide and therefore no centre list. Its guide's
+  // own STORY ANGLES block is the same material, so the historical arms get one
+  // angle each, picked the same way, into the same {WORLD_SEED*} slot.
+  const historicalAngles = effectiveCategory === 'historical'
+    ? [0, 1].map(arm => pickHistoricalAngle({ sheet: teachingGuide, characters, topic: storyTopic, language, arm }))
+    : [null, null];
+  // ONE line per arm, whichever kind it is. Every call site fills {WORLD_SEED*}
+  // from here so the streaming endpoint, the pair endpoint and the rating
+  // harness cannot each build their own.
+  const worldSeedLines = [0, 1].map(arm => (historicalAngles[arm]
+    ? historicalAngleInstruction(historicalAngles[arm])
+    : worldSeedInstruction(worldSeeds[arm])));
   // One concrete place per arm, from the guide's own setting line. Injected on
   // the FANTASY arm only (the location arm already has named landmarks), so the
   // value is computed here and the world is applied at the call site.
@@ -317,9 +334,9 @@ ${adventureGuideContent}`
     // template takes {WORLD_SEED} (overridden per arm by the caller), the
     // two-idea template {WORLD_SEED_1} / {WORLD_SEED_2}. All three declared so
     // no call site can ship an unfilled placeholder.
-    WORLD_SEED: worldSeedInstruction(worldSeeds[0]),
-    WORLD_SEED_1: worldSeedInstruction(worldSeeds[0]),
-    WORLD_SEED_2: worldSeedInstruction(worldSeeds[1]),
+    WORLD_SEED: worldSeedLines[0],
+    WORLD_SEED_1: worldSeedLines[0],
+    WORLD_SEED_2: worldSeedLines[1],
     // {WORLD_PLACE*} is the fantasy arm's answer to the location arm's named
     // landmarks. Declared empty here for every call site — historical and the
     // location arms ship no line — and overridden by the caller on a fantasy arm.
@@ -341,6 +358,8 @@ ${adventureGuideContent}`
     adventureSettingGuide,
     premiseShapes,
     worldSeeds,
+    historicalAngles,
+    worldSeedLines,
     worldPlaces,
     singlePromptTemplate,
     storyRequirements1,
@@ -446,6 +465,15 @@ const SHAPE_NEEDS_TWO_MAINS = new Set([10]);
 const SHAPE_PERIL_PRONE = new Set([2]);
 const SHAPE_PERIL_MAX_YOUNGEST = 5;
 
+// A historical idea sits inside an event that already happened and cannot be
+// made to come out differently. Only the shapes that a fixed event can carry
+// are offered: race against time, rescue, a promise to keep, a door that opens
+// once, a message to deliver. Withheld, because each one asks the event itself
+// to bend: a swap or a mix-up (round 15 cell 4 drew it on the moon landing and
+// came back with two children swapping TV-listing marks while Apollo 11
+// landed off-page), a secret kept, a thing that grows, and the rest.
+const SHAPE_HISTORICAL_FIT = new Set([1, 2, 7, 9, 12]);
+
 /**
  * One shape per arm, DETERMINISTIC from the same seed buildVariantInstructions
  * uses, always two different shapes, and never a shape above the youngest
@@ -460,7 +488,8 @@ function pickPremiseShapes(seedInput = {}) {
   const pool = loadPremiseShapes()
     .filter(s => youngest >= s.minAge)
     .filter(s => mains >= 2 || !SHAPE_NEEDS_TWO_MAINS.has(s.id))
-    .filter(s => youngest > perilMax || !SHAPE_PERIL_PRONE.has(s.id));
+    .filter(s => youngest > perilMax || !SHAPE_PERIL_PRONE.has(s.id))
+    .filter(s => seedInput?.storyCategory !== 'historical' || SHAPE_HISTORICAL_FIT.has(s.id));
   if (pool.length < 2) throw new Error(`premise-shapes: only ${pool.length} shape(s) for youngest age ${youngest}`);
   const h = ideaVariantSeed(seedInput);
   const i1 = h % pool.length;
@@ -867,7 +896,7 @@ ${landmarkEntries}`;
     // with landmarks (requirements-1), 'fantasy' = direct start in the theme
     // world, no landmarks (requirements-2). Fantasy prompts get the location
     // and landmarks sections blanked so the real city cannot leak in.
-    const buildSinglePrompt = (world, variantInstruction, shape, seeds, place) => {
+    const buildSinglePrompt = (world, variantInstruction, shape, seedLine, place) => {
       const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
       const worldOverrides = world === 'fantasy'
         ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
@@ -876,7 +905,7 @@ ${landmarkEntries}`;
         STORY_VARIANT_INSTRUCTION: variantInstruction,
         STORY_REQUIREMENTS: requirements,
         PREMISE_SHAPE: premiseShapeInstruction(shape),
-        WORLD_SEED: worldSeedInstruction(seeds),
+        WORLD_SEED: seedLine,
         WORLD_PLACE: world === 'fantasy' ? worldPlaceInstruction(place) : '',
         ...worldOverrides
       });
@@ -886,8 +915,8 @@ ${landmarkEntries}`;
     const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
     const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
 
-    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0], ctx.worldSeeds[0], ctx.worldPlaces[0]);
-    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1], ctx.worldSeeds[1], ctx.worldPlaces[1]);
+    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0], ctx.worldSeedLines[0], ctx.worldPlaces[0]);
+    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1], ctx.worldSeedLines[1], ctx.worldPlaces[1]);
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
     // wizard can label each card before/while the ideas stream in

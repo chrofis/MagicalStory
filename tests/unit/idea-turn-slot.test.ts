@@ -67,7 +67,6 @@ describe('story-idea templates — the round-10 cast and adult rules', () => {
     expect(src).not.toMatch(/An adult is in the idea only when the story needs them/);
     expect(src).not.toMatch(/Every named adult does one thing/);
     expect(src).not.toMatch(/One sentence is the turn/);
-    expect(src).not.toMatch(/\{WORLD_SEED/);
   });
 
   it.each(TEMPLATES)('%s keeps the cast rule', (t) => {

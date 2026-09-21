@@ -53176,3 +53176,151 @@ Artefacts: `round-15.json` / `.md`, `round-15-defects.md`, `blind-set-r15.md`,
 `blind-key-r15.json`, `blind-scores-r15.md`.
 
 **Status:** ✅ active — committed on `staging`, not pushed.
+
+## Round 16 — the guide hands over ONE pick, not its menu; the space world is made of who is there; historical draws only shapes a fixed event can carry (2026-09-21)
+
+**Context — read off the prompts that were actually SENT in round 15**
+(`tests/manual/story-idea-rounds/prompt-r15-c5-a1.txt`, `-c5-a2.txt`, `-c4-a2.txt`, extracted
+verbatim from `round-15.json`, which stores the built prompt per arm).
+
+1. **Cell 5 has been the floor for five rounds and its prompt says why.** The space arm was
+   pushed at machinery from five directions at once: the guide's `- Include weightlessness,
+   tethers, airlocks, countdowns, slow careful movement in a suit, the silence outside` and
+   `- Key props: helmet with visor reflection, tether line, control panel, floating pencil`
+   (four props, four hardware); the `not-giving-up` `[[idea]]` block's own example of what
+   answers back, `a machine that slips back`; and — the largest single contributor — **1,324
+   characters of un-injected MENU**. `Who lives here (pick one):` (664 chars) and `What turns
+   (pick one):` (660) shipped whole, ten alternatives each, sitting three lines above the ONE
+   centre the code had already picked. On a 19,857-character fantasy prompt that is 6.7%, and it
+   is 6.7% spent telling the model that the value it was given is one of twenty.
+2. **Cell 4 arm 2 was a swapped TV listing because the shape it was handed asked for one.**
+   `{PREMISE_SHAPE}` read *"This idea has the shape: a swap or a mix-up — two things, or two
+   people, are taken for each other, and everyone acts on the wrong one. Keep the shape; the
+   shape is a requirement, not a choice."* — drawn for a story about 20 July 1969. The observer
+   requirements said only that the children "observe, help, or are inspired by the historical
+   figures" and "Focus on the child's perspective and what they learn/experience": no want, and
+   no obstacle. The model obeyed both: Nora swaps Luca's mark in the TV listing, Papa Daniel
+   turns the dial, and Apollo 11 lands off-page. A shape that requires the world to come out
+   wrong cannot be laid over an event that cannot come out wrong.
+3. **The CUT back-reference was NOT the cause of the narrated-middle rise — but it is broken in
+   the sibling.** R14 renumbered the review checks 1..14 in both templates. In
+   `generate-story-idea-single.txt` the CUT step was renumbered with them (`check 6` → `check
+   5`, verified in the sent prompt: check 5 *is* "Back cover, not synopsis"). In
+   `generate-story-ideas.txt` it was not: both `CUT_1` and `CUT_2` still said **"every sentence
+   cut by check 6"**, which is now *Peril* — a check that cuts nothing — and the buy check was
+   still labelled `(16)` in a list that ends at (14). The rounds run the single template, so R15
+   is unaffected; the live non-streaming `POST /generate-story-ideas` endpoint is not. Textbook
+   gate-9 drift: one side of a registry set renumbered, the other not.
+4. **What did rise the narrated middles 11 → 16, on the R10↔R15 line-by-line diff of cell 5.**
+   Everything R14/R15 REMOVED cut *against* narrating a middle (the low-point rule "Before the end
+   there is a page where the plan has failed", "Every one of those beats is on the page, in that
+   order", "A twist, a sidekick who earns their place, and a setup on an early page that pays off
+   at the end", the STORY COMPLEXITY block's "6-8 key events with meaningful progression", the
+   43-line challenge catalogue). What was ADDED is a sequence: the `[[idea]]` block's *"Each
+   attempt, the change made after each failure, and the asking for help at the point of being
+   stuck"* is three beats in a row, and `worldSeedInstruction` handed over a **turn** — *"Turn:
+   The launch window closes in an hour and does not open again for a year"* — which is by
+   definition a change over time, asked of a five-sentence back cover. The R13 finding was that a
+   slot asking for an event IS the narrated middle; the turn is that slot under another name.
+
+**Decision.**
+
+1. **The guide hands over its pick, never its menu.** `stripSeedLists` (`server/lib/worldSeeds.js`,
+   next to the parser that needs the lists) removes both ten-item blocks where
+   `buildIdeasPromptContext` assembles `ADVENTURE_SETTING_GUIDE`. `getAdventureGuide` is
+   untouched, so `buildBeatsPrompt` and every story-side builder still read the guide whole —
+   pinned by a test that asserts both halves.
+2. **ONE centre per arm, and no turn.** `{WORLD_SEED}` goes back into both templates (set
+   `story-idea-templates`): in the single template right after the world guide, in the pair
+   template as `{WORLD_SEED_1}`/`{WORLD_SEED_2}` beside each draft's shape. The line is
+   *"Someone in this idea: <centre>. Build the want or the obstacle on them."* The turn is still
+   picked — it is what guarantees the arms differ, and it rides in the `idea_generated`
+   telemetry — and it is no longer shown to the model. Every world guide's trailing
+   `- The idea is built on one centre and one turn, never on the props.` becomes
+   `- The idea is built on who is there, never on the props.` (32 worlds), because a prompt that
+   names a turn nobody gave it is a prompt asking the model to invent one.
+3. **Historical gets a centre too, from its own material.** Historical has no adventure guide, so
+   `pickHistoricalAngle` draws one line from the guide's `STORY ANGLES` block, deterministic from
+   the same seed, different per arm, into the same slot: *"This idea is seen from here:
+   <angle>. Build the want or the obstacle on it."* Both kinds are built once, in
+   `buildIdeasPromptContext`'s `worldSeedLines`, so the streaming endpoint, the pair endpoint and
+   the rating harness cannot each assemble their own.
+4. **The space world is made of who is there.** Its `Include` line now leads with people and keeps
+   every texture word it had (`Include who is aboard first - the crew, a creature found aboard, a
+   voice from home, whoever is waiting at the other end - and then the texture around them:
+   weightlessness, tethers, airlocks, countdowns, the silence outside`), plus a new line: `At most
+   one machine matters in an idea, and it belongs to someone`. Key props are five, of which five
+   are alive or handheld. The same rewrite went to **fireman** and to fireman only — of the five
+   prop-heavy worlds checked, fireman's Include line was the other pure-hardware one (`the engine
+   and its ladder, hose reels, sirens and blue lights, the sliding pole and the kit racks`).
+   **doctor** (`gentle examinations, listening to heartbeats, cheerful waiting rooms`),
+   **police** (`helping people find their way`), **ocean** and **jungle** (both lead with named
+   animals) already lead with the living and were left alone.
+5. **`not-giving-up`'s hard thing is a body or a creature, never a device.** The `[[idea]]` block
+   (idea path only; the story path reads the guide whole) now asks for one hard thing the child's
+   own body does or one creature won over, with three examples across three worlds — the rope
+   bridge crossed without being carried, staying on the pony all the way round the field, getting
+   the station's cat to come when called — and forbids *a repair, a docking, a system, a device*,
+   *nothing that is mended, fitted, started, unlocked or made to work again*. What answers back
+   is one person or one creature; `a machine that slips back` is gone, and **the one who has done
+   it before is here and will not do it for them.**
+6. **Historical premise shapes are restricted to those a fixed event can carry.**
+   `SHAPE_HISTORICAL_FIT = {race against time, rescue, a promise to keep, a door that opens once,
+   a message to deliver}`; `pickPremiseShapes` filters on `storyCategory === 'historical'`. The
+   seed hash is unchanged (`ideaVariantSeed` never saw the category), so only the pool moves.
+   Withheld: a swap or a mix-up, a secret kept, a thing that grows, and the rest.
+7. **The observer requirements name a want and an obstacle.**
+   `story-idea-requirements-historical-2.txt` gains two paragraphs: the child's want is to BE
+   THERE — to see it with their own eyes, to get close enough to touch the thing, to stand next
+   to the person doing it, or to be believed afterwards by somebody who was not there; never to
+   fix it, to be given a job in it, or to change how it came out. What stands in the way is one
+   LIVING obstacle: a person who says no and means it, a younger sibling who follows and has to
+   be carried, an animal that will not be left behind — never a rule, a schedule, a ticket or a
+   locked door on its own.
+8. **The pair template's CUT step is fixed.** `check 6` → `check 5` on both `CUT_1` and `CUT_2`,
+   and `(16)` → `(15)` on the buy check.
+
+**Result — round 16, cells 4, 5 and 8 only, six ideas, `claude-sonnet-4-6`, USD 0.2783**
+(`round-16.json` / `.md`). **No blind read and no scoring** — the owner reads the six against
+their round-15 counterparts himself. Prompt sizes, R15 → R16:
+
+| cell | arm | R15 | R16 | delta |
+|---|---|---|---|---|
+| 4 | 1 | 18,275 | 18,400 | +125 |
+| 4 | 2 | 17,889 | 18,582 | +693 |
+| 5 | 1 | 24,048 | 23,552 | **−496** |
+| 5 | 2 | 19,857 | 19,328 | **−529** |
+| 8 | 1 | 17,741 | 17,868 | +127 |
+| 8 | 2 | 17,362 | 17,999 | +637 |
+
+The adventure cells shrink (the menu is 1,324 chars out, the seed line ~140 in); the historical
+cells grow by the two observer paragraphs, and their second arms by the longer angle line.
+
+**Validation:** `--dry-run --cells=4,5,8`, six built prompts — one seed line per arm, different
+per arm on all three cells, neither seed list present, no `one centre and one turn` left, no
+unfilled placeholder. Gates: `node scripts/admin/check-sibling-paths.js --list`;
+`npx vitest run tests/unit/sibling-parity tests/unit/prompt* tests/unit/idea-* tests/unit/world-seeds* tests/unit/idea-guide-shape tests/unit/teaching-guide-parser`
+— 14 files, 171 tests green. Then the paid round above (rung 2 of the validation ladder: the real
+route builder, the real model, real stored landmarks).
+
+**Open, not fixed, and named here so it is not re-derived:** the historical prompt still ships the
+whole `STORY ANGLES` block next to the one angle picked from it — the same menu-beside-the-pick
+shape that was stripped from the adventure guides. It was left alone because the agreed change
+scoped the strip to `Who lives here` / `What turns`; stripping it too is a one-line follow-up if
+the owner wants it. Second: round-16 cell 4 arm 1 (the participant arm) ends on `kommt niemand je
+zurück`, the never-coming-home cost class; it is covered by the historical-danger exemption, but
+it is the class R11 could not move and it is still here.
+
+**Touched:** `server/lib/worldSeeds.js` (`stripSeedLists`, `parseHistoricalAngles`,
+`pickHistoricalAngle`, `historicalAngleInstruction`, `worldSeedInstruction` rewritten),
+`server/routes/storyIdeas.js` (`worldSeedLines`, `historicalAngles`, `SHAPE_HISTORICAL_FIT`, the
+guide strip, all three call sites), `prompts/generate-story-idea-single.txt`,
+`prompts/generate-story-ideas.txt` (set `story-idea-templates`),
+`prompts/adventure-guides.txt`, `prompts/life-challenge-guides.txt`,
+`prompts/story-idea-requirements-historical-2.txt`, `tests/unit/world-seeds.test.ts`,
+`tests/unit/idea-premise-shapes.test.ts`, `tests/unit/idea-turn-slot.test.ts`,
+`tests/manual/story-idea-rounds.js`.
+Artefacts: `round-16.json` / `.md`, `dry-run-4-5-8.json`, and the three round-15 sent prompts
+`prompt-r15-c5-a1.txt`, `prompt-r15-c5-a2.txt`, `prompt-r15-c4-a2.txt`.
+
+**Status:** ✅ active — committed on `staging`, not pushed.

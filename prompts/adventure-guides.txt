@@ -49,7 +49,7 @@ Story guidance:
 - Pirates as fun adventurers, not scary villains
 - Focus on teamwork, exploration, and problem-solving
 - Key props: treasure chest, rolled-up map, parrot, ship wheel, compass
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 - The crew's vessel is a proper pirate ship: raised stern, bowsprit, tall mast, large sail with a pirate marking, deck big enough for the whole crew — never a rowboat, dinghy, or plain lake boat, even in a modern real-world setting
 
 
@@ -97,7 +97,7 @@ Story guidance:
 - Knights as brave, kind, and honorable protectors
 - Focus on courage, helping others, keeping promises
 - Key props: shield with emblem, wooden sword, banner, castle tower, drawbridge
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [princess]
@@ -143,7 +143,7 @@ Story guidance:
 - True royalty comes from kindness, not crowns
 - Focus on kindness, self-expression, helping others, inner beauty
 - Key props: tiara/crown, golden invitation, magic mirror, rose garden, grand staircase
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [viking]
@@ -189,7 +189,7 @@ Story guidance:
 - Include sea voyages, rune stones, Norse mythology elements (friendly versions)
 - Focus on exploration, family bonds, bravery
 - Key props: longship with dragon prow, wooden shields, rune stones, horn cups, fishing nets
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 - Avoid: Horned helmets (historically inaccurate), raids, violence
 
 [roman]
@@ -234,7 +234,7 @@ Story guidance:
 - Include chariot races, mosaics, Roman baths, toga parties
 - Educational opportunities: Roman numerals, Latin words, engineering marvels
 - Key props: laurel branch (held, not worn), scrolls, columns, mosaic tiles, Roman coins
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 [detective]
 COSTUME: not needed - use standard, summer or winter avatar
@@ -276,7 +276,7 @@ Story guidance:
 - Mysteries about: lost items, missing pets, secret messages, treasure hunts
 - Focus on observation, logic, teamwork, asking good questions
 - Key props: magnifying glass, notebook, flashlight, footprint molds, secret codes
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [cowboy]
@@ -323,7 +323,7 @@ Story guidance:
 - Cowboys as helpful ranch hands, honest adventurers, animal friends
 - Can include Native American friends with respectful, accurate portrayal
 - Key props: lasso, saddle, campfire, horseshoe, wagon
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [egyptian]
@@ -369,7 +369,7 @@ Story guidance:
 - Egyptians as builders, scribes, artists, astronomers
 - Educational: hieroglyphic writing, pyramid building, Nile flooding cycle
 - Key props: papyrus scrolls, ankh symbol, sphinx statue, palm trees, golden artifacts
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [greek]
@@ -415,7 +415,7 @@ Story guidance:
 - Greeks as thinkers, athletes, artists, storytellers
 - Educational: Greek myths (friendly versions), Olympics origins, democracy basics
 - Key props: olive branches (held), amphora vases, columns, lyres, discus
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [caveman]
@@ -462,7 +462,7 @@ Story guidance:
 - Cavemen as inventors (fire, tools, art), artists (cave paintings), close-knit families
 - Focus on discovery, creativity, cooperation
 - Key props: fire pit, cave paintings, stone tools, berry baskets
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [samurai]
@@ -508,7 +508,7 @@ Story guidance:
 - Samurai as protectors, scholars, poets (different from ninja stealth)
 - Focus on discipline, respect, protecting the weak, inner peace
 - Key props: wooden katana (bokken), folding fan, koi ponds, paper lanterns
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [ninja]
@@ -554,7 +554,7 @@ Story guidance:
 - Ninjas as clever problem-solvers who use wit over force
 - Focus on stealth, agility, puzzle-solving, clever tricks
 - Key props: grappling hook, harmless smoke bombs (for escapes), throwing stars (toy/wooden), bamboo
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [wizard]
@@ -601,7 +601,7 @@ Story guidance:
 - Wizards as wise teachers, curious students, protectors of magic
 - Focus on learning, responsibility with power, friendship
 - Key props: magic wand, spell book, crystal ball, cauldron, glowing orbs
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [superhero]
@@ -648,7 +648,7 @@ Story guidance:
 - Superheroes as helpers, friends, and role models
 - Focus on using abilities responsibly, helping community, teamwork
 - Key props: cape, emblem, gadget belt (for non-powered heroes)
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [mermaid]
@@ -695,7 +695,7 @@ Story guidance:
 - Mermaids as curious, kind, protective of ocean life
 - Focus on friendship, protecting nature, bridging land and sea worlds
 - Key props: seashells, pearls, coral, sea glass
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [fireman]
@@ -737,13 +737,14 @@ Story entry points (pick one or combine):
 
 Story guidance:
 - Set at the fire station, in the streets of a town, on ladders and rooftops, in fields and woods
-- Include the engine and its ladder, hose reels, sirens and blue lights, the sliding pole and the kit racks
+- Include who is there first - the crew, the neighbours out in the street, the animal that needs getting down - and then the engine and its ladder, the hose reels, the sirens, the sliding pole
+- At most one machine matters in an idea, and it belongs to someone: it is theirs, they look after it, or they are the only one who can work it
 - Rescues stay gentle and winnable: a cat in a tree, a jammed door, a flooded cellar, a lost hiker, a small kitchen fire already under control
 - Firefighters as calm, careful helpers who check and plan before they act - never reckless
 - Focus on courage, staying calm, following a plan, helping neighbours
 - Fire is shown small, contained and quickly handled; no frightening scale, no one hurt
-- Key props: helmet, hose, ladder, breathing mask, dalmatian mascot
-- The idea is built on one centre and one turn, never on the props.
+- Key props: dalmatian mascot, a cat that will not come down, a helmet carried under an arm, a coiled hose somebody is holding, a neighbour's front-door key
+- The idea is built on who is there, never on the props.
 
 
 [doctor]
@@ -791,7 +792,7 @@ Story guidance:
 - Focus on kindness, listening carefully, being brave about small things, taking care of others
 - No serious illness, no needles dwelt on, no fear - the patient always leaves better
 - Key props: stethoscope, bandage roll, thermometer, clipboard chart, plaster
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [police]
@@ -839,7 +840,7 @@ Story guidance:
 - Focus on fairness, helping strangers, telling the truth, keeping people safe
 - No weapons, no chases, no arrests, no crime that would worry a child
 - Key props: notebook, whistle, torch, cap, police dog
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [dragon]
@@ -887,7 +888,7 @@ Story guidance:
 - Focus on trust between very different creatures, earning a friendship, keeping a promise, being small and brave
 - Fire is shown as warmth, light, a cooked meal or a signal - never as harm
 - Key props: dragon egg, single large scale, saddle and harness, a hot spring
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [unicorn]
@@ -935,7 +936,7 @@ Story guidance:
 - Focus on gentleness, patience, being trusted, kindness to shy creatures
 - Colour and shine belong to the whole world, not only the unicorn - keep it warm rather than sugary
 - Key props: spiral horn, flower crown, glowing spring, rainbow bridge, star-flowers
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [dinosaur]
@@ -983,7 +984,7 @@ Story guidance:
 - Plant-eaters make the best companions: slow, huge, patient, surprisingly gentle
 - Focus on curiosity, careful observation, respect for wild animals, being small in a big world
 - Key props: fossil bone, footprint bigger than a child, nest of eggs, amber, ferns
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [space]
@@ -1027,11 +1028,12 @@ Story guidance:
 - Set aboard a spacecraft, on a space station, on the surface of a moon or planet, in the black between stars
 - Keep real places recognisable and simple: Earth from orbit, the Moon's grey dust and craters, red rocky Mars, ringed Saturn, the Sun
 - Invent no facts about real places - for anything beyond the commonly known, invent an unnamed world instead
-- Include weightlessness, tethers, airlocks, countdowns, slow careful movement in a suit, the silence outside
+- Include who is aboard first - the crew, a creature found aboard, a voice from home, whoever is waiting at the other end - and then the texture around them: weightlessness, tethers, airlocks, countdowns, the silence outside
+- At most one machine matters in an idea, and it belongs to someone: it is theirs, they built it, or they are the only one who can work it
 - Any aliens are curious and friendly and communicate without words - never invaders
 - Focus on wonder, checking things twice, teamwork over long distances, looking back at home
-- Key props: helmet with visor reflection, tether line, control panel, floating pencil
-- The idea is built on one centre and one turn, never on the props.
+- Key props: a creature no bigger than a hand, a crewmate's helmet with the visor reflection, a photograph from home, a floating pencil, a tether line held in a glove
+- The idea is built on who is there, never on the props.
 
 
 [ocean]
@@ -1079,7 +1081,7 @@ Story guidance:
 - Focus on exploration, protecting the sea, clearing away what does not belong there, respecting wild animals
 - The water itself can be the obstacle - currents, depth, fading light - solved by planning, never by panic
 - Key props: mask and snorkel, waterproof torch, sample jar, boat rope, sea chart
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [jungle]
@@ -1127,7 +1129,7 @@ Story guidance:
 - Focus on tracking and noticing, respecting a wild place, not taking what belongs there, finding the way back
 - Heat, noise and green half-light are the mood - loud and alive rather than frightening
 - Key props: compass, rope bridge, canteen, binoculars, hand-drawn map
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [farm]
@@ -1175,7 +1177,7 @@ Story guidance:
 - Problems are practical and solvable: a gate left open, a hen who will not lay, a storm before the hay is in, a lost lamb
 - Focus on responsibility, early mornings, patience with animals, being needed and being useful
 - Key props: feed bucket, muddy boots, tractor, hay bales, egg basket
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [forest]
@@ -1223,7 +1225,7 @@ Story guidance:
 - Focus on quiet observation, finding the way, leaving no trace, friendship across differences
 - The wood can feel big and dim without ever becoming frightening - light through leaves, not darkness closing in
 - Key props: fallen log bridge, lantern, animal tracks, den of branches, owl feather
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [christmas]
@@ -1271,7 +1273,7 @@ Story guidance:
 - Focus on giving rather than getting, waiting well, including someone left out, making something by hand
 - Presents are never the reward for good behaviour - the warmth comes from people
 - Key props: decorated tree, wrapped parcel, string of lights, baking tray, candle
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [newyear]
@@ -1319,7 +1321,7 @@ Story guidance:
 - Focus on looking back honestly, hoping forward, staying up for something that matters, sharing a moment
 - Fireworks are seen from a distance and never handled by children
 - Key props: clock face near midnight, paper streamers, notebook of plans, warm coat, sky full of light
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [easter]
@@ -1367,7 +1369,7 @@ Story guidance:
 - Focus on patience, sharing a find, fairness with someone smaller, beginning again after a hard stretch
 - Any rabbit character stays a character with its own reasons, not a delivery service
 - Key props: painted eggs, woven basket, dye cups, blossom branch, nest
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [halloween]
@@ -1415,7 +1417,7 @@ Story guidance:
 - Focus on being brave about small dark things, seeing past appearances, kindness to someone who looks strange
 - Costumes are a way of trying on being someone else, which is a story in itself
 - Key props: carved lantern, sweet bucket, bedsheet ghost, pile of leaves, cat on a wall
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [mothers-day]
@@ -1463,7 +1465,7 @@ Story guidance:
 - Focus on noticing, saying thank you properly, giving time rather than objects, seeing a parent as a person
 - Avoid sentimentality - the warmth comes from one specific, ordinary, observed thing
 - Key props: breakfast tray, handmade card, picked flowers, apron far too big, photograph
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.
 
 
 [fathers-day]
@@ -1511,4 +1513,4 @@ Story guidance:
 - Focus on noticing, saying thank you properly, giving time rather than objects, seeing a parent as a person
 - Avoid sentimentality - the warmth comes from one specific, ordinary, observed thing
 - Key props: toolbox, handmade card, half-built thing, bicycle pump, workbench
-- The idea is built on one centre and one turn, never on the props.
+- The idea is built on who is there, never on the props.

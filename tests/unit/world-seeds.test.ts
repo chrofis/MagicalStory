@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
-const { parseWorldSeeds, pickWorldSeeds, worldSeedInstruction, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction } = require(path.join(ROOT, 'server/lib/worldSeeds'));
+const { parseWorldSeeds, stripSeedLists, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction } = require(path.join(ROOT, 'server/lib/worldSeeds'));
 const { parseTeachingGuideFile, getAdventureGuide } = require(path.join(ROOT, 'server/lib/promptBuilders'));
 
 const GUIDES = parseTeachingGuideFile(path.join(ROOT, 'prompts', 'adventure-guides.txt'));
@@ -66,30 +66,110 @@ describe('pickWorldSeeds', () => {
     expect(worldSeedInstruction(null)).toBe('');
   });
 
-  it('names the centre and the turn in the instruction', () => {
+  // The turn is still PICKED — it is what guarantees the two arms differ and it
+  // rides in the idea_generated telemetry — and it is deliberately not in the
+  // line: round 12 measured the turn supplying a place and peril's height class
+  // going 1 -> 4 on it, and a "turn" asked of a five-sentence back cover is a
+  // middle to narrate.
+  it('names the centre in the instruction, and never the turn', () => {
     const picked = pickWorldSeeds({ ...input, arm: 0 });
     const line = worldSeedInstruction(picked);
-    expect(line).toContain(`Centre: ${picked.centre}.`);
-    expect(line).toContain(`Turn: ${picked.turn}.`);
+    expect(line).toBe(`Someone in this idea: ${picked.centre}. Build the want or the obstacle on them.`);
+    expect(line).not.toContain(picked.turn);
+    expect(line).not.toContain('Turn:');
   });
 });
 
-describe('the world seed is picked but NOT injected at the round-10 baseline', () => {
-  // The screen of 2026-09-21 restarts from round 10, whose templates predate the
-  // seed. `pickWorldSeeds` and `worldSeedInstruction` stay — the value is still
-  // computed and still rides in the `idea_generated` telemetry detail — and all
-  // three placeholders stay declared in `applyReplacements` so no call site can
-  // ship an unfilled one. What is gone is the placeholder in both templates.
+describe('stripSeedLists — the idea prompt sees the pick, never the menu', () => {
+  it('removes both ten-item lists from every world, and keeps everything else', () => {
+    for (const [id, text] of GUIDES) {
+      const stripped = stripSeedLists(text);
+      expect(stripped, `world ${id}`).not.toContain('Who lives here (pick one):');
+      expect(stripped, `world ${id}`).not.toContain('What turns (pick one):');
+      const seeds = parseWorldSeeds(text);
+      for (const line of [...seeds.centres, ...seeds.turns]) expect(stripped, `world ${id}`).not.toContain(line);
+      expect(stripped, `world ${id}`).toContain('Story guidance:');
+      expect(stripped, `world ${id}`).toMatch(/^COSTUME:/m);
+      expect(parseWorldPlaces(stripped) || [], `world ${id}`).toEqual(parseWorldPlaces(text) || []);
+    }
+  });
+
+  it('leaves a guide with no lists alone, and is safe on empty input', () => {
+    const plain = 'COSTUME: none\n\nStory guidance:\n- be nice';
+    expect(stripSeedLists(plain)).toBe(plain);
+    expect(stripSeedLists('')).toBe('');
+    expect(stripSeedLists(null)).toBeNull();
+  });
+
+  it('the STORY path still gets the lists — only the idea route strips them', () => {
+    expect(getAdventureGuide('space')).toContain('Who lives here (pick one):');
+    const route = require('fs').readFileSync(path.join(ROOT, 'server/routes/storyIdeas.js'), 'utf-8');
+    expect(route).toContain('stripSeedLists(getAdventureGuide(effectiveTheme))');
+  });
+});
+
+describe('pickHistoricalAngle — historical has no centre list, so its angles are the seed', () => {
+  const sheet = 'EVENT: A thing (1969)\n\nSTORY ANGLES:\n- angle one about a child\n- angle two about a sister\n- angle three about a dog\n- angle four about a radio\n\nTHEMES:\n- courage';
+  const cast = [{ name: 'Luca', age: 9, isMain: true }];
+
+  it('parses the angles and stops at the next section', () => {
+    expect(parseHistoricalAngles(sheet)).toEqual([
+      'angle one about a child', 'angle two about a sister', 'angle three about a dog', 'angle four about a radio',
+    ]);
+    expect(parseHistoricalAngles('EVENT: x')).toBeNull();
+    expect(parseHistoricalAngles(null)).toBeNull();
+  });
+
+  it('is deterministic and gives the two arms different angles', () => {
+    const a = pickHistoricalAngle({ sheet, characters: cast, topic: 'moon-landing', language: 'de', arm: 0 });
+    const b = pickHistoricalAngle({ sheet, characters: cast, topic: 'moon-landing', language: 'de', arm: 1 });
+    expect(a).toBe(pickHistoricalAngle({ sheet, characters: cast, topic: 'moon-landing', language: 'de', arm: 0 }));
+    expect(a).not.toBe(b);
+    expect(parseHistoricalAngles(sheet)).toContain(a);
+  });
+
+  it('injects nothing when the sheet names no angles', () => {
+    expect(pickHistoricalAngle({ sheet: 'EVENT: x', characters: cast, arm: 0 })).toBeNull();
+    expect(historicalAngleInstruction(null)).toBe('');
+    expect(historicalAngleInstruction('angle one')).toBe('This idea is seen from here: angle one. Build the want or the obstacle on it.');
+  });
+
+  it('every real historical guide yields two different angles', () => {
+    const { getIdeaGuide, getTeachingGuide } = require(path.join(ROOT, 'server/lib/promptBuilders'));
+    for (const topic of ['moon-landing', 'wright-brothers']) {
+      const guide = getIdeaGuide('historical', topic);
+      expect(guide, topic).toBeTruthy();
+      const a = pickHistoricalAngle({ sheet: guide, characters: cast, topic, language: 'de', arm: 0 });
+      const b = pickHistoricalAngle({ sheet: guide, characters: cast, topic, language: 'de', arm: 1 });
+      expect(a, topic).toBeTruthy();
+      expect(a, topic).not.toBe(b);
+      expect(parseHistoricalAngles(getTeachingGuide('historical', topic))).toContain(a);
+    }
+  });
+});
+
+describe('the seed line is injected once per arm, in both siblings', () => {
+  // Round 16: the centre goes back into the templates, alone. Both members of
+  // the `story-idea-templates` set carry it — the single template once (the
+  // caller overrides {WORLD_SEED} per arm), the pair template once per draft
+  // block, beside the shape it sits with.
   const fs = require('fs');
   const single = fs.readFileSync(path.join(ROOT, 'prompts/generate-story-idea-single.txt'), 'utf-8');
   const pair = fs.readFileSync(path.join(ROOT, 'prompts/generate-story-ideas.txt'), 'utf-8');
   const route = fs.readFileSync(path.join(ROOT, 'server/routes/storyIdeas.js'), 'utf-8');
-  it('neither template carries a seed placeholder', () => {
-    expect(single).not.toContain('{WORLD_SEED');
-    expect(pair).not.toContain('{WORLD_SEED');
+  it('the single template carries {WORLD_SEED} exactly once, right after the world guide', () => {
+    expect(single.split('{WORLD_SEED}').length - 1).toBe(1);
+    expect(single).toMatch(/\{ADVENTURE_SETTING_GUIDE\}\s*\n\s*\n\{WORLD_SEED\}/);
   });
-  it('the route still declares all three placeholders', () => {
+  it('the pair template carries one per draft block, beside the shape', () => {
+    expect(pair.split('{WORLD_SEED_1}').length - 1).toBe(1);
+    expect(pair.split('{WORLD_SEED_2}').length - 1).toBe(1);
+    expect(pair).toMatch(/\{PREMISE_SHAPE_1\}\n\{WORLD_SEED_1\}/);
+    expect(pair).toMatch(/\{PREMISE_SHAPE_2\}\n\{WORLD_SEED_2\}/);
+  });
+  it('the route still declares all three placeholders, from ONE per-arm value', () => {
     for (const k of ['WORLD_SEED:', 'WORLD_SEED_1:', 'WORLD_SEED_2:']) expect(route).toContain(k);
+    expect(route).toContain('worldSeedLines');
   });
 });
 

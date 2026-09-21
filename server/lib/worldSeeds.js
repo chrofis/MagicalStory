@@ -98,10 +98,92 @@ function pickWorldSeeds({ theme, characters, topic, storyTopic, language, arm = 
   };
 }
 
-/** The prompt line, terse. */
+/**
+ * The guide text as the IDEA prompt should see it: its own pick, not the menu.
+ *
+ * The two ten-item lists exist for the picker in this file. Shipping them as
+ * well hands the model twenty alternatives next to the one value it was given,
+ * and 1,324 of the round-15 space prompt's characters were that menu. The lists
+ * stay in prompts/adventure-guides.txt — getAdventureGuide still returns them
+ * whole, so the beats/story path is untouched — and this strip runs only where
+ * the idea prompt's guide section is assembled.
+ *
+ * @param {string} guideText @returns {string} the guide without the two lists
+ */
+function stripSeedLists(guideText) {
+  if (!guideText || typeof guideText !== 'string') return guideText;
+  const lines = guideText.replace(/\r/g, '').split('\n');
+  const out = [];
+  let skipping = false;
+  for (const line of lines) {
+    const t = line.trim();
+    if (t === CENTRE_LABEL || t === TURN_LABEL) { skipping = true; continue; }
+    if (skipping) {
+      if (line.startsWith('- ') || !t) continue;
+      skipping = false;
+    }
+    out.push(line);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/**
+ * The prompt line, terse. ONE centre, and no turn.
+ *
+ * The turn is still picked — it rides in the idea_generated telemetry and it is
+ * what keeps the two arms provably different — but it is not handed to the
+ * model. Round 12 measured the turn supplying a PLACE (a ruin at dusk, a broken
+ * wall, an outer hull) and peril's height class went 1 -> 4 on it, and a "turn"
+ * asked of a five-sentence back cover is a middle to narrate.
+ */
 function worldSeedInstruction(seeds) {
   if (!seeds) return '';
-  return `This idea starts from this centre and this turn. Centre: ${seeds.centre}. Turn: ${seeds.turn}. Swap one only if it cannot fit the cast or the topic; keep the other.`;
+  return `Someone in this idea: ${seeds.centre}. Build the want or the obstacle on them.`;
+}
+
+const ANGLE_LABEL = 'STORY ANGLES:';
+
+/**
+ * The angles named on a historical guide's STORY ANGLES block.
+ * @param {string} sheet - a historical guide, whole sheet or idea view
+ * @returns {string[]|null} null when the sheet has no angles block
+ */
+function parseHistoricalAngles(sheet) {
+  if (!sheet || typeof sheet !== 'string') return null;
+  return _bulletsAfter(sheet.replace(/\r/g, '').split('\n'), ANGLE_LABEL);
+}
+
+/**
+ * One story angle for the given arm — historical's answer to the adventure
+ * worlds' centre. Historical has no adventure guide and therefore no centre
+ * list; its guide's STORY ANGLES block is the same kind of material. Same
+ * determinism as every other idea pick: the two calls run in parallel and
+ * cannot see each other, so the difference is handed over as a value, and the
+ * two arms never share an angle.
+ *
+ * @param {object} input
+ * @param {string} input.sheet - the historical guide text
+ * @param {Array} [input.characters] @param {string} [input.topic]
+ * @param {string} [input.language] @param {number} input.arm
+ * @returns {string|null}
+ */
+function pickHistoricalAngle({ sheet, characters, topic, storyTopic, language, arm = 0 } = {}) {
+  const angles = parseHistoricalAngles(sheet);
+  if (!angles) return null;
+  const h = ideaVariantSeed({
+    characters,
+    storyTopic: topic ?? storyTopic,
+    storyTheme: 'historical',
+    language,
+  });
+  const [a1, a2] = _twoIndices(h, angles.length);
+  return angles[arm === 1 ? a2 : a1];
+}
+
+/** The prompt line for a historical arm. Same slot as worldSeedInstruction. */
+function historicalAngleInstruction(angle) {
+  if (!angle) return '';
+  return `This idea is seen from here: ${angle}. Build the want or the obstacle on it.`;
 }
 
 
@@ -197,4 +279,4 @@ function worldPlaceInstruction(place) {
   return `The scene is ${place}. Name it where the action is; do not describe it.`;
 }
 
-module.exports = { parseWorldSeeds, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction, pickWorldSeeds, worldSeedInstruction, ideaVariantSeed };
+module.exports = { parseWorldSeeds, stripSeedLists, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, ideaVariantSeed };
