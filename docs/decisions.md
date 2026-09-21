@@ -51801,6 +51801,74 @@ USD 0.0798, `round-7b.json` / `.md`): both arms are clean idea text, no heading,
 no English inside the German, the hook material intact (a dinosaur bone at the Teufelskeller; a
 picture book between a Triceratops's feet) and both at five sentences.
 
+
+**Follow-up, 2026-09-21 — round 8: the contract gains room and a promise slot, plus a computed
+shape catalogue; and the harness had been rating a prompt production never sends.**
+
+Owner decision after round 7, three changes, then round 8 on the same ten cells (USD 1.0298,
+`round-8.json` / `.md` / `round-8-ratings.md`).
+
+*A — contract room and a PROMISE slot (extends the 2026-09-14 premise contract; "no middle, no
+ending" is untouched).* The setting sentence stops being a required slot — the reader picked the
+town and the season in the wizard, so the idea opens on the hook or on the child and the place is
+the scene the action is in, not an address sentence. A **promise** slot is added: one sentence of
+what the reader will get to see, a picturable event the book contains, saying neither whether the
+hero manages it nor what decides it. The CUT step's sentence labels go from three
+(setup / event / rule) to six (setup / hook / promise / event / rule / cost) so the new slot cannot
+be cut as an event; only event and rule are cut. Budget four to six sentences, one per slot. The
+examples in both templates were rewritten to model the new shape, because examples override rules.
+
+*B — a story-shape catalogue, computed in code.* `prompts/premise-shapes.txt` (twelve shapes,
+`id|name|definition|min age`) plus `pickPremiseShapes` in `server/routes/storyIdeas.js`: one shape
+per arm, deterministic from the same seed `buildVariantInstructions` uses, never the same shape on
+both arms, never one above the youngest character's age, and the two-mains shape withheld from a
+one-main cast. Injected as `{PREMISE_SHAPE}` (single template) and `{PREMISE_SHAPE_1}` /
+`{PREMISE_SHAPE_2}` (two-idea template), all three declared in `applyReplacements` so no call site
+can ship an unfilled placeholder. The EVENT class was REMOVED from `buildVariantInstructions`'
+second location arm — the shape now owns what makes the story hard and two sources for it
+contradicted; the place class and the responsible-adult axis stay. Unit test:
+`tests/unit/idea-premise-shapes.test.ts`.
+
+*C — the 10-12 band, and what the SENT prompt actually showed.* The diagnosis was not the band's
+text. `tests/manual/story-idea-rounds.js` never called `loadPromptTemplates()`, which the server
+does at boot (`server.js:2364`), so `PROMPT_TEMPLATES` was empty in the harness,
+`buildAgeModeSection` returned only `AGE_OWNS_PROPS_RULE`, and **rounds 1-7 rated a prompt with no
+age-band plot-shape rules in it at all, in every cell**. Fixed in the harness. The narrow content
+fix for cell 5's school-project pull went into the `not-giving-up` topic guide
+(`prompts/life-challenge-guides.txt`), which the idea path and the story path share by
+construction, so it is one edit: "**Whose it is.** The hard thing is one the main character took on
+for themselves and could walk away from. Never a piece of work set by a school or a grown-up, never
+a submission or an assessment, and the place it is practised is not a classroom."
+`story-idea-requirements-adventure-1.txt` also moved from "incorporate 1-2 landmarks" to "one of
+them is the scene the action happens at".
+
+*Results (R7 → R8).* a 3.15 → 3.60, b 3.95 → 4.20, i 3.55 → 3.65 (equal to the series best);
+c 4.40 → 4.30, e 4.75 → 4.65, f 3.60 → 3.45; d, g, h flat. The promise slot landed in 19 of 20
+ideas and **never once became a leaked middle** — the regression this change was watched for. No
+idea in twenty opens with an address sentence, against every earlier round, and the narrated-event
+leak fell 8 → 5. The shape was kept in 13 of 20 and partly in 2; where it took, the cell moved
+(cell 6 i 2.0 → 4.0, cell 3 3.5 → 4.5, cell 5 3.0 → 4.0 — cell 5's school-exhibition slot and
+«das Modul neu kalibrieren», unmoved across rounds 6 and 7, are both gone). Cell 4 kept its
+historical peril and its Apollo-lander miss, now seven rounds of eight.
+
+*What it cost.* Format drift is at 12/20, the worst of the series: not length (19 of 20 honour the
+six-sentence budget) but the dash, in nine ideas, plus five sentences past 30 words. The likeliest
+cause is prompt length — the age band adds ~350 words and the shape and promise rules ~80 — against
+a clause-joining rule that is one line in a twenty-line RULES list. Cast-as-a-list went 3 → 5, all
+five a responsible adult named by relation rather than by name, three of them in casts of one where
+the wizard supplies no adult to name. Peril 3 → 4: the shape catalogue can push peril and, unlike
+`challenge-catalogue.txt`, has no peril column.
+
+*Comparability.* A round-7-to-round-8 delta on any axis is four changes wide, and round 8 is the
+first round whose prompt matches what `POST /generate-story-ideas-stream` sends.
+
+**Touched files:** `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`prompts/premise-shapes.txt` (new), `prompts/life-challenge-guides.txt`,
+`prompts/story-idea-requirements-adventure-1.txt`, `server/routes/storyIdeas.js`,
+`tests/manual/story-idea-rounds.js`, `tests/unit/idea-premise-shapes.test.ts` (new),
+`tests/unit/idea-variant-instructions.test.ts`, `docs/prompt-inventory.md`,
+`tasks/story-idea-rounds-2026-09-20.md`.
+
 ---
 
 ## 2026-09-21 — The figure detector is MASTER for identity; the witnesses may only deadlock it; an independent ARBITER resolves the deadlock
