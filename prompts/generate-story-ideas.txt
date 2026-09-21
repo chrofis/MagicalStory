@@ -72,6 +72,8 @@ For EACH story idea, output these three stages:
 [DRAFT_1]
 {PREMISE_SHAPE_1}
 
+{WORLD_SEED_1}
+
 Write your first story idea, set in the child's own town and at the real local landmarks listed
 above. A costume or theme shows in what they wear and what they play, never in travelling somewhere
 else. Where no landmarks are listed, use the town's own everyday places.
@@ -101,6 +103,8 @@ Corrected final version of story 1.
 
 [DRAFT_2]
 {PREMISE_SHAPE_2}
+
+{WORLD_SEED_2}
 
 Write a DIFFERENT story idea, set in a make-believe world. It opens where the child really is —
 dressing up, or starting to play — and the make-believe follows from that, so the reader sees where

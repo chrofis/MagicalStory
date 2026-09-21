@@ -29,6 +29,7 @@ const { buildIdeasPromptContext, resolveIdeaWorlds, buildVariantInstructions, pr
 // plot-shape rules and rounds 1-7 rated a prompt production never sends.
 const { loadPromptTemplates } = require(path.join(ROOT, 'server/services/prompts'));
 const { buildSeasonInstruction } = require(path.join(ROOT, 'server/lib/season'));
+const { worldSeedInstruction } = require(path.join(ROOT, 'server/lib/worldSeeds'));
 const { callTextModelStreaming, getModelDefaults } = require(path.join(ROOT, 'server/lib/textModels'));
 
 const { MODEL_PRICING } = require(path.join(ROOT, 'server/config/models'));
@@ -156,12 +157,12 @@ async function buildCellPrompts(cell) {
     userLocationInstruction, availableLandmarksSection, seasonInstruction,
   });
 
-  const buildSinglePrompt = (world, variantInstruction, shape) => {
+  const buildSinglePrompt = (world, variantInstruction, shape, seeds) => {
     const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
     const worldOverrides = world === 'fantasy' ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' } : {};
     return ctx.applyReplacements(ctx.singlePromptTemplate, {
       STORY_VARIANT_INSTRUCTION: variantInstruction, STORY_REQUIREMENTS: requirements,
-      PREMISE_SHAPE: premiseShapeInstruction(shape), ...worldOverrides,
+      PREMISE_SHAPE: premiseShapeInstruction(shape), WORLD_SEED: worldSeedInstruction(seeds), ...worldOverrides,
     });
   };
 
@@ -174,7 +175,8 @@ async function buildCellPrompts(cell) {
     ideaWorlds, worlds: [world1, world2],
     landmarkNames: availableLandmarks.slice(0, 10).map(l => l.name),
     premiseShapes: ctx.premiseShapes,
-    prompts: [buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0]), buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1])],
+    worldSeeds: ctx.worldSeeds,
+    prompts: [buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0], ctx.worldSeeds[0]), buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1], ctx.worldSeeds[1])],
   };
 }
 
@@ -209,7 +211,7 @@ async function runCell(cell) {
     const built = [];
     for (const cell of cells) {
       const b = await buildCellPrompts(cell);
-      built.push({ cell: cell.id, worlds: b.worlds, shapes: b.premiseShapes.map(x => x.name), prompts: b.prompts });
+      built.push({ cell: cell.id, worlds: b.worlds, shapes: b.premiseShapes.map(x => x.name), worldSeeds: b.worldSeeds, prompts: b.prompts });
     }
     const f = path.join(OUT_DIR, `dry-run-${cells.map(c => c.id).join('-')}.json`);
     fs.writeFileSync(f, JSON.stringify(built, null, 2));

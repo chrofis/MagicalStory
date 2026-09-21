@@ -17,6 +17,9 @@ const { storyIdeasLimiter } = require('../middleware/rateLimit');
 // Services
 const { log } = require('../utils/logger');
 const { fillTemplate } = require('../services/prompts');
+// Per-arm world seeds (a centre and a turn from the adventure guide's two lists)
+// and the shared idea seed hash.
+const { pickWorldSeeds, worldSeedInstruction, ideaVariantSeed } = require('../lib/worldSeeds');
 
 // Landmark resolution — one shared resolver + cache in landmarkPhotos.js.
 // This route once kept a PRIVATE cache here, so landmarks it discovered were
@@ -229,6 +232,10 @@ ${adventureGuideContent}`
   // empty list for them, and picks the bands for every other age.
   const { buildAgeModeSection, resolveAgeBand, challengeCatalogueBands } = require('../lib/promptBuilders');
   const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language });
+  // One centre and one turn per arm, picked in code from the adventure guide's
+  // two ten-item lists (server/lib/worldSeeds.js). null — and nothing injected —
+  // for a theme with no adventure guide (custom, historical).
+  const worldSeeds = [0, 1].map(arm => pickWorldSeeds({ theme: effectiveTheme, characters, topic: storyTopic, language, arm }));
   const ageModeSection = buildAgeModeSection({ characters });
   const bands = challengeCatalogueBands({ characters });
 
@@ -348,6 +355,13 @@ ${adventureGuideContent}`
     PREMISE_SHAPE: premiseShapeInstruction(premiseShapes[0]),
     PREMISE_SHAPE_1: premiseShapeInstruction(premiseShapes[0]),
     PREMISE_SHAPE_2: premiseShapeInstruction(premiseShapes[1]),
+    // The world seed, same per-arm shape as {PREMISE_SHAPE*}: the single-idea
+    // template takes {WORLD_SEED} (overridden per arm by the caller), the
+    // two-idea template {WORLD_SEED_1} / {WORLD_SEED_2}. All three declared so
+    // no call site can ship an unfilled placeholder.
+    WORLD_SEED: worldSeedInstruction(worldSeeds[0]),
+    WORLD_SEED_1: worldSeedInstruction(worldSeeds[0]),
+    WORLD_SEED_2: worldSeedInstruction(worldSeeds[1]),
     ...extraReplacements,
   });
 
@@ -359,6 +373,7 @@ ${adventureGuideContent}`
     sceneCount,
     promptTemplate,
     premiseShapes,
+    worldSeeds,
     singlePromptTemplate,
     storyRequirements1,
     storyRequirements2,
@@ -420,15 +435,8 @@ const IDEA_EVENT_CLASSES = [
   'somebody arriving who was not expected'
 ];
 
-function ideaVariantSeed(seedInput) {
-  const parts = [];
-  for (const c of (seedInput?.characters || [])) parts.push(`${c?.name || ''}:${c?.age || ''}`);
-  parts.push(seedInput?.storyTopic || '', seedInput?.storyTheme || '', seedInput?.language || '');
-  const key = parts.join('|');
-  let h = 5381;
-  for (let i = 0; i < key.length; i++) h = ((h * 33) ^ key.charCodeAt(i)) >>> 0;
-  return h;
-}
+// The idea seed lives in server/lib/worldSeeds.js — one definition, shared by
+// the shape pick, the place-class pick and the world-seed pick.
 
 /**
  * The premise-shape catalogue (prompts/premise-shapes.txt).
@@ -717,7 +725,7 @@ ${landmarkEntries}`;
       shapes: ctx.premiseShapes,
       model: result.modelId || modelToUse,
       costUsd: ideaCallCost(result.modelId || modelToUse, result.usage),
-      detail: { streaming: false, ideasParsed: storyIdeas.length },
+      detail: { streaming: false, ideasParsed: storyIdeas.length, worldSeeds: ctx.worldSeeds },
     });
 
     // Return ideas array, prompt and model for dev mode display
@@ -877,7 +885,7 @@ ${landmarkEntries}`;
     // with landmarks (requirements-1), 'fantasy' = direct start in the theme
     // world, no landmarks (requirements-2). Fantasy prompts get the location
     // and landmarks sections blanked so the real city cannot leak in.
-    const buildSinglePrompt = (world, variantInstruction, shape) => {
+    const buildSinglePrompt = (world, variantInstruction, shape, seeds) => {
       const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
       const worldOverrides = world === 'fantasy'
         ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
@@ -886,6 +894,7 @@ ${landmarkEntries}`;
         STORY_VARIANT_INSTRUCTION: variantInstruction,
         STORY_REQUIREMENTS: requirements,
         PREMISE_SHAPE: premiseShapeInstruction(shape),
+        WORLD_SEED: worldSeedInstruction(seeds),
         ...worldOverrides
       });
     };
@@ -894,8 +903,8 @@ ${landmarkEntries}`;
     const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
     const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
 
-    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0]);
-    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1]);
+    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0], ctx.worldSeeds[0]);
+    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1], ctx.worldSeeds[1]);
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
     // wizard can label each card before/while the ideas stream in
@@ -988,7 +997,7 @@ ${landmarkEntries}`;
       model: streamModelId || modelToUse,
       costUsd: (ideaCallCost(streamModelId || modelToUse, usage1) || 0)
              + (ideaCallCost(streamModelId || modelToUse, usage2) || 0),
-      detail: { streaming: true, chars1: fullResponse1.length, chars2: fullResponse2.length },
+      detail: { streaming: true, chars1: fullResponse1.length, chars2: fullResponse2.length, worldSeeds: ctx.worldSeeds },
     });
     log.debug('  Both stories complete, sending done event...');
 
