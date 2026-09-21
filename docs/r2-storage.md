@@ -151,6 +151,31 @@ One declared exception: `story_job_checkpoints.step_data` for the `partial_page`
 `partial_cover` steps, which ARE the progressive-display payload and die with their job.
 The save path is pinned by `tests/unit/no-inline-images-in-jsonb.test.ts`.
 
+**Fixing what it finds** is `scripts/admin/offload-jsonb-images.js`, which drives
+`offloadJsonbColumn()` — the same one implementation the daily routine uses, sharing this
+sweep's candidate predicate and byte test, so a column the sweep flags is a column the tool
+can clean:
+
+```bash
+node scripts/admin/offload-jsonb-images.js --dry-run                      # report only
+node scripts/admin/offload-jsonb-images.js --env=production --limit=5
+node scripts/admin/offload-jsonb-images.js --table=characters.metadata
+```
+
+It **never deletes a byte**. A value becomes a URL only after the object behind that URL is
+fetched back and md5-matched against the value being replaced; keys are content-addressed
+(`…-<md5>.jpg`), so a re-run is a no-op and an image already in R2 — including the same
+image offloaded earlier into a sibling column — is proven identical and reused rather than
+re-uploaded. Each row is written in its own transaction against the pre-write `::text`
+fingerprint, so a row that changed under the run is skipped, not clobbered. Every affected
+row is dumped to `--backup-dir` BEFORE the write.
+
+Like `delete-r2-dead-cohorts.js`, it **refuses to run when the configured bucket is not the
+one the target database serves** — `.env` points at production (`images.magicalstory.ch`),
+staging serves `images-staging.magicalstory.ch` from a different bucket, and a staging run
+with production credentials would leave staging rows referencing objects production's own
+GC would later delete.
+
 Options: `--age-days=30` (cohort age floor — a cohort whose newest object is younger than
 this is never swept, which protects an in-flight generation), `--list=20` (sample keys per
 prefix), `--out=path.json` / `--no-manifest` (the review manifest).

@@ -19,7 +19,7 @@ const { CREDIT_CONFIG } = require('../config/credits');
 // Services
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
-const { getPool, withTransaction } = require('../services/database');
+const { getPool, withTransaction, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const email = require('../../email');
 
 function getDbPool() { return getPool(); }
@@ -454,6 +454,15 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
       // job INSERT fails — e.g. a concurrent double-submit hits the idempotency
       // unique index — the whole transaction rolls back, so a debit can never
       // stick without a story_jobs row to refund it from later.
+      // IRON RULE: no image bytes in JSONB. `inputData.characters` is the
+      // client's wizard state — avatars, styled sheets, photos and the
+      // `*Url` fields that have historically held data URIs — and it is
+      // written verbatim. Measured 2026-09-21, this column held 40.9 MB of
+      // base64 on staging. Offload before the INSERT, never after.
+      await offloadJsonbImages(
+        inlineOffloadPrefix('story_jobs', 'input_data', userId, jobId),
+        `story_jobs.input_data/${jobId}`, inputData);
+
       let insufficientRace = false;
       try {
         await withTransaction(async (txClient) => {

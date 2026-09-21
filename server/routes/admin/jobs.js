@@ -8,7 +8,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
+const { dbQuery, getPool, isDatabaseMode, offloadJsonbImages, inlineOffloadPrefix } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { judgeStoryText } = require('../../lib/textQualityJudge');
@@ -136,6 +136,12 @@ router.post('/:jobId/retry', authenticateToken, requireAdmin, async (req, res) =
     // Create new job ID
     const newJobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
+      // A rerun copies the source job's input verbatim, so it copies whatever
+      // bytes that row holds. Sweep on the way in — the same guard as the
+      // original create, so a rerun cannot reintroduce what a sweep removed.
+    await offloadJsonbImages(
+      inlineOffloadPrefix('story_jobs', 'input_data', userId, newJobId),
+      `story_jobs.input_data/${newJobId}`, inputData);
     // Insert new job with same input data (no credit charge for admin retry)
     await pool.query(
       `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
@@ -275,6 +281,12 @@ router.post('/:jobId/rerun-text', authenticateToken, requireAdmin, async (req, r
     const created = [];
     for (let i = 0; i < runs; i++) {
       const newJobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      // A rerun copies the source job's input verbatim, so it copies whatever
+      // bytes that row holds. Sweep on the way in — the same guard as the
+      // original create, so a rerun cannot reintroduce what a sweep removed.
+      await offloadJsonbImages(
+        inlineOffloadPrefix('story_jobs', 'input_data', userId, newJobId),
+        `story_jobs.input_data/${newJobId}`, inputData);
       await pool.query(
         `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
          VALUES ($1, $2, 'pending', $3, 0, 'Test Lab text-only rerun', 0)`,
@@ -367,6 +379,12 @@ router.post('/:jobId/rerun-full', authenticateToken, requireAdmin, async (req, r
     inputData.adminRerun = true;
 
     const newJobId = `job_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+      // A rerun copies the source job's input verbatim, so it copies whatever
+      // bytes that row holds. Sweep on the way in — the same guard as the
+      // original create, so a rerun cannot reintroduce what a sweep removed.
+    await offloadJsonbImages(
+      inlineOffloadPrefix('story_jobs', 'input_data', sourceJob.user_id, newJobId),
+      `story_jobs.input_data/${newJobId}`, inputData);
     await pool.query(
       `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
        VALUES ($1, $2, 'pending', $3, 0, 'Admin full rerun', 0)`,

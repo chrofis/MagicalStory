@@ -20,7 +20,7 @@ const { trialSourceWhereClause } = require('../lib/trialSource');
 // Every full-blob characters.data write in this file goes through this —
 // image bytes belong in R2, the row holds URLs. Never throws; on an R2
 // failure it alarms and lets the write proceed (see its JSDoc).
-const { offloadCharacterImages } = require('../services/database');
+const { offloadCharacterImages, offloadJsonbImages, inlineOffloadPrefix } = require('../services/database');
 const { assertPromptFilled } = require('../services/prompts');
 // The trial's declared age is MANDATORY (owner, 2026-09-15) — one parser for
 // every entry point below. See server/lib/trialAge.js for the range and why
@@ -1559,6 +1559,16 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       log.debug(`[TRIAL] Client provided location: ${resolvedLocation.city}, ${resolvedLocation.country || ''}`);
     }
 
+    // IRON RULE: no image bytes in JSONB. `characterData` is copied straight
+    // off the character row — photos, styled avatars, preview avatar — so any
+    // inline value that survived the character write lands here too, and this
+    // is the one copy of a real person's uploaded photograph until they claim
+    // the account. Offload before the write (measured 2026-09-21: 8.4 MB
+    // across 11 production rows, 3.8 MB across 7 on staging).
+    await offloadJsonbImages(
+      inlineOffloadPrefix('users', 'trial_data', userId, userId),
+      `users.trial_data/${userId}`, characterData);
+
     // Store trial data for later claim (stories_generated already incremented atomically above)
     // Also set preferred_language so emails (story complete, etc.) use the right language
     await pool.query(
@@ -2817,6 +2827,12 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     trialMode: true, // Trial prompt with visual bible backgrounds for early empty scene streaming
     ...(userLocation?.city ? { userLocation } : {}), // IP-based location for landmark personalization
   };
+
+  // The trial character's photos and avatars are copied into inputData above;
+  // sweep them the same way the full path does before the row is written.
+  await offloadJsonbImages(
+    inlineOffloadPrefix('story_jobs', 'input_data', userId, jobId),
+    `story_jobs.input_data/${jobId}`, inputData);
 
   // Trial stories are free — no credit deduction
   await pool.query(

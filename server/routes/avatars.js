@@ -2535,6 +2535,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               clothing: results.clothing,
             };
 
+            // IRON RULE: no image bytes in JSONB. `onlyIfNoUrl` / `onlyMissingThumbs`
+            // deliberately keep the INLINE avatar or thumbnail whenever R2
+            // returned no URL, so the user's avatar is never lost — and those
+            // fallbacks are then written into characters.data AND .metadata by
+            // the jsonb_set chain below, which no offload covered.
+            // alarmInlineAvatarFallback only LOGS it. Sweep both payloads here:
+            // a second R2 attempt usually succeeds, and when it does not the
+            // bytes still persist and the daily sweep is the backstop.
+            await offloadCharacterImages(freshRowId, job.userId, newAvatarData);
+            await offloadCharacterImages(freshRowId, job.userId, lightAvatarData);
+
             // Build atomic update SQL with all field updates using FRESH index
             // Each jsonb_set wraps the previous, creating nested atomic updates
             let dataUpdate = 'data';
@@ -3599,6 +3610,17 @@ These corrections OVERRIDE what is visible in the reference photo.
               bodyThumbnails: stdBody ? { standard: stdBody } : undefined,
               clothing: results.clothing,
             };
+
+            // IRON RULE: no image bytes in JSONB. `onlyIfNoUrl` / `onlyMissingThumbs`
+            // deliberately keep the INLINE avatar or thumbnail whenever R2
+            // returned no URL, so the user's avatar is never lost — and those
+            // fallbacks are then written into characters.data AND .metadata by
+            // the jsonb_set chain below, which no offload covered.
+            // alarmInlineAvatarFallback only LOGS it. Sweep both payloads here:
+            // a second R2 attempt usually succeeds, and when it does not the
+            // bytes still persist and the daily sweep is the backstop.
+            await offloadCharacterImages(rowId, req.user.id, newAvatarData);
+            await offloadCharacterImages(rowId, req.user.id, lightAvatarData);
 
             // Build atomic update SQL with all field updates
             let dataUpdate = 'data';

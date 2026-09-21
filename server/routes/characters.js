@@ -96,7 +96,11 @@ router.get('/', authenticateToken, async (req, res) => {
               return light;
             });
             const repairedMeta = Array.isArray(fullData) ? lightChars : { ...fullData, characters: lightChars };
-            dbQuery('UPDATE characters SET metadata = $1 WHERE id = $2', [JSON.stringify(repairedMeta), characterId])
+            // IRON RULE: no image bytes in JSONB. `stdThumb` falls back to the
+            // INLINE `faceThumbnails.standard` when no URL sibling exists, so
+            // this repair can copy base64 out of `data` and into `metadata`.
+            offloadCharacterImages(characterId, req.user.id, repairedMeta)
+              .then(() => dbQuery('UPDATE characters SET metadata = $1 WHERE id = $2', [JSON.stringify(repairedMeta), characterId]))
               .then(() => console.log('[Characters] GET - Metadata auto-repaired successfully'))
               .catch(err => console.error('[Characters] GET - Metadata auto-repair failed:', err.message));
           }

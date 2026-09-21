@@ -952,9 +952,34 @@ function buildStoryMetadata(story) {
  * @returns {Promise<number>} how many payloads were moved
  */
 async function extractCharacterInlineImagesToR2(characterId, userId, data) {
+  const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  return extractJsonbInlineImagesToR2(
+    `characters/${sanitize(userId || 'unknown')}/${sanitize(characterId)}/inline`,
+    `character ${characterId}`, data);
+}
+
+/**
+ * The generic form: the same sweep, against ANY json/jsonb payload, keyed by a
+ * caller-chosen R2 prefix.
+ *
+ * It exists because the rule is about COLUMNS, not about characters. Measured
+ * 2026-09-21, four columns the story- and character-scoped offloads never
+ * covered held 133 MB of image bytes between the two databases:
+ * `characters.metadata`, `story_jobs.input_data`, `users.trial_data` and
+ * `testlab_experiments.results`/`.params`. Each of those write paths built its
+ * payload out of values that HAD been offloaded elsewhere and then copied the
+ * inline fallbacks forward. One generic sweep at each write is the whole fix;
+ * a fifth bespoke extractor would just be the fifth thing to forget.
+ *
+ * @param {string} prefix  R2 key prefix, e.g. `story-jobs/<user>/<job>/input`
+ * @param {string} label   what to name in the log line
+ * @param {Object} data    payload — mutated in place
+ * @returns {Promise<number>} how many payloads were moved
+ */
+async function extractJsonbInlineImagesToR2(prefix, label, data) {
   if (!data || typeof data !== 'object') return 0;
   if (!r2.isConfigured()) {
-    throw new Error('R2 is not configured — refusing to store character image bytes in JSONB');
+    throw new Error(`R2 is not configured — refusing to store ${label} image bytes in JSONB`);
   }
 
   const looksLikeBytes = (s) =>
@@ -964,7 +989,6 @@ async function extractCharacterInlineImagesToR2(characterId, userId, data) {
     && s.length > 1024;
 
   const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
-  const prefix = `characters/${sanitize(userId || 'unknown')}/${sanitize(characterId)}/inline`;
 
   const tasks = [];
   const usedKeys = new Set();
@@ -1015,9 +1039,9 @@ async function extractCharacterInlineImagesToR2(characterId, userId, data) {
   // Fail loudly. Saving the row with some bytes still inline is precisely the
   // silent half-success that produced the 73 MB.
   if (failures.length) {
-    throw new Error(`R2 upload failed for ${failures.length}/${tasks.length} character image(s): ${failures[0]}`);
+    throw new Error(`R2 upload failed for ${failures.length}/${tasks.length} ${label} image(s): ${failures[0]}`);
   }
-  log.info(`[R2-extract] character ${characterId}: moved ${moved} inline image(s) to R2`);
+  log.info(`[R2-extract] ${label}: moved ${moved} inline image(s) to R2`);
   return moved;
 }
 
@@ -1086,6 +1110,41 @@ function measureInlineImageBytes(data) {
  * @returns {Promise<Object>} the payload to persist
  */
 async function offloadCharacterImages(rowId, userId, data, logger = log) {
+  const sanitize = (s) => String(s).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  return offloadJsonbImages(
+    `characters/${sanitize(userId || 'unknown')}/${sanitize(rowId)}/inline`,
+    `characters row ${rowId}`, data, logger);
+}
+
+/**
+ * The guard EVERY json/jsonb write with a user-supplied payload goes through.
+ *
+ * Same contract as offloadCharacterImages, which is now one line of this: move
+ * the bytes to R2, and on failure persist the row anyway but alarm hard (owner
+ * ruling 2026-09-06 — an R2 outage must not turn into "your work could not be
+ * saved"). The daily housekeeping sweep is the backstop.
+ *
+ * Never throws. Mutates `data` in place on success and also returns it.
+ *
+ * @param {string} prefix  R2 key prefix for this row
+ * @param {string} label   what to name in the alarm, e.g. `story_jobs.input_data/<id>`
+ * @param {Object} data    payload — mutated in place
+ * @param {Object} [logger]
+ */
+/**
+ * The R2 key prefix for one JSONB row's offloaded images.
+ *
+ * `<table>/<owner>/<row>/<column>` — one shape for every column, so an object
+ * in the bucket says which row and which column it came out of. Characters keep
+ * their historical `characters/<user>/<row>/inline` prefix (built in
+ * offloadCharacterImages) because objects are already referenced under it.
+ */
+function inlineOffloadPrefix(table, column, ownerId, rowId) {
+  const san = (v) => String(v == null ? 'unknown' : v).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
+  return `${san(table)}/${san(ownerId)}/${san(rowId)}/${san(column)}`;
+}
+
+async function offloadJsonbImages(prefix, label, data, logger = log) {
   if (!data || typeof data !== 'object') return data;
 
   // Cheap path first: nothing inline means nothing to do, and crucially no R2
@@ -1094,13 +1153,13 @@ async function offloadCharacterImages(rowId, userId, data, logger = log) {
   if (inlineBytes === 0) return data;
 
   try {
-    await extractCharacterInlineImagesToR2(rowId, userId, data);
+    await extractJsonbInlineImagesToR2(prefix, label, data);
     return data;
   } catch (err) {
     const mb = (inlineBytes / 1024 / 1024).toFixed(2);
     (logger || log).error(
-      `[R2-offload] characters row ${rowId}: R2 offload FAILED (${err.message}). `
-      + `Persisting ~${mb} MB of image bytes INLINE in characters.data so the user's work is not lost. `
+      `[R2-offload] ${label}: R2 offload FAILED (${err.message}). `
+      + `Persisting ~${mb} MB of image bytes INLINE in JSONB so the user's work is not lost. `
       + `The daily housekeeping sweep will move them to R2 — this write path is the defect, not the sweep.`
     );
     return data;
@@ -3936,6 +3995,9 @@ module.exports = {
   stripInlineImagesFromStoryData,
   extractInlineImagesToR2,
   extractCharacterInlineImagesToR2,
+  extractJsonbInlineImagesToR2,
+  offloadJsonbImages,
+  inlineOffloadPrefix,
   offloadCharacterImages,
   measureInlineImageBytes,
   upsertStory,

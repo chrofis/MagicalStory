@@ -14,7 +14,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, setActiveVersion } = require('../../services/database');
+const { dbQuery, isDatabaseMode, setActiveVersion, offloadJsonbImages, inlineOffloadPrefix } = require('../../services/database');
 const { authenticateToken, requireAdmin } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 
@@ -565,6 +565,16 @@ async function executeExperiment(experimentId, stage, targets, opts) {
     if (entry.promptUsed && entry.promptUsed.length > 30000) {
       entry.promptUsed = entry.promptUsed.slice(0, 30000) + '\n…[truncated]';
     }
+    // IRON RULE: no image bytes in JSONB. An entry is `{...result}` from
+    // whatever the stage returned, unfiltered — a stage that hands back
+    // `imageData`, `passes.*` or `sentToGrok.referenceImages[].dataUri` puts
+    // raw base64 straight into this column (measured 2026-09-21: one staging
+    // row held 12.0 MB). Diagnostics are a research asset and are never
+    // dropped, so they are OFFLOADED, not stripped: the entry keeps every
+    // field, now holding an R2 URL.
+    await offloadJsonbImages(
+      inlineOffloadPrefix('testlab_experiments', 'results', 'lab', experimentId),
+      `testlab_experiments.results/${experimentId}`, entry);
     await dbQuery(
       `UPDATE testlab_experiments SET results = results || $2::jsonb, results_count = results_count + COALESCE(jsonb_array_length($2::jsonb), 1) WHERE id = $1`,
       [experimentId, JSON.stringify([entry])]
@@ -714,6 +724,20 @@ router.post('/experiments', async (req, res) => {
       }
     }
     const paramsToStore = { ...(params || {}), ...(genericity && !genericity.generic ? { genericityWarnings: genericity.issues } : {}) };
+
+    // `params` is client-supplied and unfiltered, and `params.reuseModelOutput`
+    // is documented as "a tl_step versionIndex OR a data URI" — so a data URI is
+    // persisted as inline bytes (measured 2026-09-21: 3.1 MB across 5 staging
+    // rows). `targets[]._params` is copied through wholesale for the same
+    // reason. Both go through the sweep; the key is keyed on the STAGE, since
+    // the experiment id does not exist until the INSERT returns.
+    const paramsKeySeed = `${stage}-${Date.now()}`;
+    await offloadJsonbImages(
+      inlineOffloadPrefix('testlab_experiments', 'params', 'lab', paramsKeySeed),
+      'testlab_experiments.params', paramsToStore);
+    await offloadJsonbImages(
+      inlineOffloadPrefix('testlab_experiments', 'targets', 'lab', paramsKeySeed),
+      'testlab_experiments.targets', targets);
 
     const rows = await dbQuery(
       // target_count/results_count are maintained here and on every append so
@@ -942,12 +966,18 @@ async function executeRedo(experimentId, exp, entry, resultIndex, override, extr
       }
       const newEntry = { ...entry, ...redo, ok: true, error: undefined, redoOf: resultIndex, redoneAt: new Date().toISOString(), promptOverridden: !!override };
       if (newEntry.promptUsed && newEntry.promptUsed.length > 30000) newEntry.promptUsed = newEntry.promptUsed.slice(0, 30000) + '\n…[truncated]';
+      await offloadJsonbImages(
+        inlineOffloadPrefix('testlab_experiments', 'results', 'lab', experimentId),
+        `testlab_experiments.results/${experimentId}`, newEntry);
       await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb, results_count = results_count + COALESCE(jsonb_array_length($2::jsonb), 1) WHERE id = $1`, [experimentId, JSON.stringify([newEntry])]);
       log.info(`[TESTLAB] redo done: exp ${experimentId} result ${resultIndex}`);
     }
   } catch (err) {
     log.error(`[TESTLAB] redo failed: ${err.message}`);
     const failedEntry = { ...entry, ok: false, error: err.message, redoOf: resultIndex, redoneAt: new Date().toISOString(), versionIndex: undefined, imageType: entry.imageType, ...(err.partialResult || {}) };
+    await offloadJsonbImages(
+      inlineOffloadPrefix('testlab_experiments', 'results', 'lab', experimentId),
+      `testlab_experiments.results/${experimentId}`, failedEntry);
     await dbQuery(`UPDATE testlab_experiments SET results = results || $2::jsonb, results_count = results_count + COALESCE(jsonb_array_length($2::jsonb), 1) WHERE id = $1`,
       [experimentId, JSON.stringify([failedEntry])]).catch(() => {});
   } finally {

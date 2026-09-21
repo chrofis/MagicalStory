@@ -519,6 +519,18 @@
         "prompts/generate-story-ideas.txt"
       ],
       "severity": "block"
+    },
+    {
+      "id": "jsonb-image-write-guards",
+      "axis": "the write paths that persist a user payload into a JSONB column",
+      "reason": "story_jobs.input_data is written by the full create (routes/jobs.js), the trial create (routes/trial.js) and three admin reruns (routes/admin/jobs.js); users.trial_data is written from the same trial character payload; testlab_experiments.results/params record the Lab's own. Every one of them copies values that were offloaded elsewhere, so the inline FALLBACKS travel with them — measured 2026-09-21, four columns held 133 MB of base64 across the two databases, and each column had at least one writer with no sweep. A guard added to one create and not its siblings leaves the column dirty through the other door.",
+      "members": [
+        "server/routes/jobs.js",
+        "server/routes/trial.js",
+        "server/routes/admin/jobs.js",
+        "server/routes/admin/testlab.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [
@@ -559,6 +571,15 @@
         "evaluationType: 'cover'"
       ],
       "excludeReason": "evaluationType: 'cover' is the terminator that closes the push block so its body is measured exactly; it is not a record-building site.",
+      "severity": "block"
+    },
+    {
+      "id": "avatar-persist-async-vs-sync",
+      "axis": "async avatar job vs sync clothing-avatars path",
+      "reason": "both paths build the SAME two payloads (newAvatarData, lightAvatarData) with the same onlyIfNoUrl/onlyMissingThumbs INLINE fallbacks, and write them with the same jsonb_set chain into characters.data and .metadata. alarmInlineAvatarFallback only logs; the offload is what keeps the bytes out of JSONB, and a guard on one path guards half the avatars.",
+      "file": "server/routes/avatars.js",
+      "blockPattern": "const lightAvatarData = \\{",
+      "mustContain": "offloadCharacterImages",
       "severity": "block"
     }
   ]

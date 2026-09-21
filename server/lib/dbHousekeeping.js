@@ -27,6 +27,7 @@
  */
 'use strict';
 
+const crypto = require('crypto');
 const r2 = require('./r2');
 
 const TABLES = ['characters', 'stories'];
@@ -173,13 +174,7 @@ async function sweepInlineImages(pool) {
     const { rows: candidates } = await pool.query(`
       SELECT ctid::text AS ctid
       FROM "${table}"
-      WHERE "${column}" IS NOT NULL
-        AND (strpos("${column}"::text, 'data:image/') > 0
-          OR strpos("${column}"::text, '"/9j/') > 0
-          OR strpos("${column}"::text, '"iVBORw0') > 0
-          OR strpos("${column}"::text, '"R0lGOD') > 0
-          OR strpos("${column}"::text, '"UklGR') > 0
-          OR "${column}"::text ~ '${BASE64_RUN_SQL}')`);
+      WHERE ${candidatePredicate(column)}`);
     rowsScanned += candidates.length;
 
     for (const { ctid } of candidates) {
@@ -223,25 +218,50 @@ async function sweepInlineImages(pool) {
   return { columns: columns.length, rowsScanned, violations, transient };
 }
 
-/** Queue every byte-string in the tree, keyed by its own JSON path. */
-function collect(data, prefix) {
+/**
+ * Queue every byte-string in the tree, keyed by its own JSON path.
+ *
+ * Content-addressed: the R2 key ends in the md5 of the DECODED bytes, so the
+ * same image always lands on the same object. That is what makes the offload
+ * idempotent (a second run finds the object already there and re-derives the
+ * identical URL) and what lets a reused object be PROVEN identical rather than
+ * assumed. The readable path segment stays in front of the hash so a key is
+ * still traceable back to the field it came from.
+ *
+ * Both byte shapes are collected — headered (`data:`, `/9j/`, …) and a long
+ * unbroken headerless base64 run — because the sweep flags both, and a value
+ * the sweep calls a violation but the offload walks past is a row that can
+ * never be cleaned.
+ */
+function collectInlineImageTasks(data, prefix) {
   const tasks = [];
-  const used = new Set();
   const seen = new WeakSet();
   const walk = (node, segs) => {
     if (!node || typeof node !== 'object' || seen.has(node)) return;
     seen.add(node);
+    const isArray = Array.isArray(node);
     for (const k of Object.keys(node)) {
       const child = node[k];
-      if (typeof child === 'string' && looksLikeBytes(child)) {
-        const base = `${prefix}/${[...segs, safe(k)].join('-')}`;
-        let key = `${base}.jpg`;
-        let n = 1;
-        while (used.has(key)) key = `${base}__${n++}.jpg`;
-        used.add(key);
-        tasks.push({ input: child, key, apply: (url) => { node[k] = url; }, bytes: child.length });
+      const jsonSeg = isArray ? `[${k}]` : `.${k}`;
+      if (typeof child === 'string' && (looksLikeBytes(child) || looksLikeHeaderlessBytes(child))) {
+        const buf = decodeInlineImage(child);
+        if (!buf || !buf.length) continue;          // not decodable: not an image
+        const hash = md5(buf);
+        const key = `${prefix}/${[...segs.map(s => s.safe), safe(k)].join('-')}-${hash.slice(0, 12)}.jpg`;
+        tasks.push({
+          input: child,
+          buf,
+          hash,
+          key,
+          jsonPath: `$${[...segs.map(s => s.json), jsonSeg].join('')}`,
+          pathSegs: [...segs.map(s => s.raw), k],
+          apply: (url) => { node[k] = url; },
+          bytes: child.length,
+        });
       } else if (child && typeof child === 'object') {
-        walk(child, [...segs, safe(k)]);
+        // segs carry the raw key (sibling lookup), a JSON-path fragment
+        // (reporting) and a filesystem-safe slug (the R2 key).
+        walk(child, [...segs, { raw: k, json: jsonSeg, safe: safe(k) }]);
       }
     }
   };
@@ -249,12 +269,264 @@ function collect(data, prefix) {
   return tasks;
 }
 
+/** Decode an inline image string to its bytes. Returns null when it is not base64. */
+function decodeInlineImage(s) {
+  if (typeof s !== 'string') return null;
+  const stripped = s.replace(/^data:image\/\w+;base64,/, '').replace(/\s+/g, '');
+  try {
+    const buf = Buffer.from(stripped, 'base64');
+    return buf.length ? buf : null;
+  } catch { return null; }
+}
+
+const md5 = (buf) => crypto.createHash('md5').update(buf).digest('hex');
+
+/** Follow a raw key path (as recorded by the collector) into a parsed JSON value. */
+function valueAtPath(root, pathSegs) {
+  let node = root;
+  for (const seg of pathSegs) {
+    if (node === null || typeof node !== 'object') return undefined;
+    node = Array.isArray(node) ? node[Number(seg)] : node[seg];
+  }
+  return node;
+}
+
 /**
- * Move every inline image byte out of characters.data / stories.data into R2.
+ * The columns that are allowed to be offloaded, and how to address a row in
+ * each. `story_job_checkpoints.step_data` is deliberately absent: it is the
+ * declared exception (progressive-display payload, dies with its job).
  *
- * All-or-nothing per row: a row whose uploads partly fail is left ALONE and
- * counted in `skipped`. A half-migrated row is both still bloated AND
- * internally inconsistent, which is strictly worse than not touching it.
+ * `reuseColumn` names a SIBLING column on the same row that mirrors the JSON
+ * shape. `characters.data` was cleaned by the 2026-09-01 migration while
+ * `.metadata` was not, so for most of those rows the identical sheet is ALREADY
+ * in R2 and its URL is sitting at the same JSON path in `data`. Reuse is only
+ * taken when the bytes behind that URL hash-match the inline copy.
+ */
+const OFFLOADABLE_COLUMNS = [
+  { table: 'characters', column: 'data', idColumn: 'id', ownerColumn: 'user_id' },
+  { table: 'characters', column: 'metadata', idColumn: 'id', ownerColumn: 'user_id', reuseColumn: 'data' },
+  { table: 'stories', column: 'data', idColumn: 'id', ownerColumn: 'user_id' },
+  { table: 'story_jobs', column: 'input_data', idColumn: 'id', ownerColumn: 'user_id' },
+  { table: 'story_jobs', column: 'result_data', idColumn: 'id', ownerColumn: 'user_id' },
+  { table: 'users', column: 'trial_data', idColumn: 'id', ownerColumn: 'id' },
+  { table: 'testlab_experiments', column: 'results', idColumn: 'id', ownerColumn: 'created_by' },
+  { table: 'testlab_experiments', column: 'params', idColumn: 'id', ownerColumn: 'created_by' },
+];
+
+/** The row-candidate predicate, shared with the sweep so both see the same rows. */
+const candidatePredicate = (column) => `
+  "${column}" IS NOT NULL
+  AND (strpos("${column}"::text, 'data:image/') > 0
+    OR strpos("${column}"::text, '"/9j/') > 0
+    OR strpos("${column}"::text, '"iVBORw0') > 0
+    OR strpos("${column}"::text, '"R0lGOD') > 0
+    OR strpos("${column}"::text, '"UklGR') > 0
+    OR "${column}"::text ~ '${BASE64_RUN_SQL}')`;
+
+/**
+ * Move every inline image byte out of ONE json/jsonb column into R2.
+ *
+ * The one implementation. Every caller — the daily housekeeping routine, the
+ * on-demand admin tool — goes through here, so there is no second uploader to
+ * drift from this one.
+ *
+ * Guarantees, in the order they matter:
+ *  - NOTHING IS EVER DELETED. A value is replaced by a URL only after the bytes
+ *    behind that URL have been fetched back and hash-matched against the value
+ *    being replaced. An unverifiable value fails its row.
+ *  - All-or-nothing per row. A row whose uploads partly fail is left ALONE and
+ *    counted in `skipped` — a half-migrated row is both still bloated AND
+ *    internally inconsistent, which is strictly worse than not touching it.
+ *  - Idempotent and resumable. Keys are content-addressed, so a second run
+ *    re-derives the same key, finds the object, verifies it and writes the same
+ *    URL; a crash mid-way leaves every row either fully old or fully new.
+ *  - Concurrency-safe. The row is re-read inside the transaction and skipped if
+ *    it changed while the uploads were in flight.
+ *
+ * @param {Pool}   pool
+ * @param {Object} log
+ * @param {Object} spec    one entry of OFFLOADABLE_COLUMNS
+ * @param {Object} [opts]  { limit, dryRun, onRow }
+ */
+async function offloadJsonbColumn(pool, log, spec, { limit = null, dryRun = false, onRow = null } = {}) {
+  const { table, column, idColumn = 'id', ownerColumn = null, reuseColumn = null } = spec;
+  const out = { table, column, rows: 0, images: 0, reused: 0, bytes: 0, skipped: 0, candidates: 0, details: [] };
+  if (!dryRun && !r2.isConfigured()) {
+    log.warn(`[db-housekeeping] R2 not configured — cannot offload ${table}.${column}`);
+    return out;
+  }
+
+  const { rows: candidates } = await pool.query(`
+    SELECT "${idColumn}"::text AS id
+    FROM "${table}"
+    WHERE ${candidatePredicate(column)}
+    ORDER BY pg_column_size("${column}") DESC${limit ? ` LIMIT ${limit}` : ''}`);
+  out.candidates = candidates.length;
+
+  for (const { id } of candidates) {
+    // `::text`, not the parsed value: the walker MUTATES the parsed tree in
+    // place, so a parsed snapshot would silently become the post-offload state
+    // and the concurrency check below would compare the row against itself.
+    // Postgres renders jsonb deterministically, so the stored text is an exact,
+    // stable fingerprint of what was read.
+    const sel = await pool.query(
+      `SELECT "${column}"::text AS v${ownerColumn ? `, "${ownerColumn}"::text AS owner` : ''}`
+      + `${reuseColumn ? `, "${reuseColumn}"::text AS reuse` : ''} FROM "${table}" WHERE "${idColumn}"::text = $1`, [id]);
+    if (!sel.rows.length) continue;
+    const beforeText = sel.rows[0].v;
+    const value = beforeText ? JSON.parse(beforeText) : null;
+    if (!value || typeof value !== 'object') continue;
+    const reuseTree = reuseColumn && sel.rows[0].reuse ? JSON.parse(sel.rows[0].reuse) : null;
+    const owner = sel.rows[0].owner || 'unknown';
+
+    const prefix = `jsonb-offload/${table}/${safe(column)}/${safe(owner)}/${safe(id)}`;
+    const tasks = collectInlineImageTasks(value, prefix);
+    if (!tasks.length) continue;
+
+    const rowDetail = {
+      row: id, table, column,
+      images: tasks.length,
+      bytes: tasks.reduce((a, t) => a + t.bytes, 0),
+      paths: tasks.map(t => ({ path: collapsePath(t.jsonPath), key: t.key, bytes: t.bytes })),
+    };
+    if (dryRun) {
+      out.rows++; out.images += tasks.length; out.bytes += rowDetail.bytes;
+      out.details.push({ ...rowDetail, action: 'would-offload' });
+      if (onRow) await onRow({ ...rowDetail, value, action: 'would-offload' });
+      continue;
+    }
+    if (onRow) await onRow({ ...rowDetail, value, action: 'about-to-offload' });
+
+    const failures = [];
+    const uploaded = [];
+    let reusedHere = 0;
+    const PARALLEL = 8;
+    let next = 0;
+    await Promise.all(new Array(Math.min(PARALLEL, tasks.length)).fill(null).map(async () => {
+      while (true) {
+        const i = next++;
+        if (i >= tasks.length) return;
+        const t = tasks[i];
+        try {
+          const resolved = await resolveTaskUrl(t, reuseTree);
+          t.apply(resolved.url);
+          if (resolved.reused) reusedHere++; else uploaded.push(t.key);
+        } catch (err) {
+          failures.push(`${t.key}: ${err.message}`);
+        }
+      }
+    }));
+
+    if (failures.length) {
+      // The row keeps its inline bytes, so the uploads that DID succeed are
+      // referenced by nothing. Record them for reclamation instead of leaving
+      // them in the bucket unreachable. Safe because the row still holds the
+      // inline bytes: a later pass re-uploads the same deterministic keys.
+      // That is also why the pending retry runs BEFORE this offload in
+      // runDailyHousekeeping — reversing the order would delete an object the
+      // same run had just re-uploaded and referenced.
+      log.warn(`[db-housekeeping] ${table}.${column}/${id}: ${failures.length}/${tasks.length} `
+        + `image(s) could not be verified in R2 — row left unchanged (${failures[0]})`);
+      try {
+        const r2Pending = require('./r2Pending');
+        for (const key of uploaded) {
+          await r2Pending.recordPending('object', key, `partial JSONB offload of ${table}.${column}/${id}`);
+        }
+      } catch (err) {
+        log.warn(`[db-housekeeping] could not record ${uploaded.length} unreferenced upload(s): ${err.message}`);
+      }
+      out.skipped++;
+      out.details.push({ ...rowDetail, action: 'skipped', reason: failures[0] });
+      continue;
+    }
+
+    const wrote = await writeIfUnchanged(pool, { table, column, idColumn, id, beforeText, after: value });
+    if (!wrote) {
+      log.warn(`[db-housekeeping] ${table}.${column}/${id}: row changed under us — left unchanged`);
+      out.skipped++;
+      out.details.push({ ...rowDetail, action: 'skipped', reason: 'row changed during upload' });
+      continue;
+    }
+    out.rows++;
+    out.images += tasks.length;
+    out.reused += reusedHere;
+    out.bytes += rowDetail.bytes;
+    out.details.push({ ...rowDetail, action: 'offloaded', reused: reusedHere });
+    log.info(`[db-housekeeping] ${table}.${column}/${id}: ${tasks.length} image(s) `
+      + `(${reusedHere} reused) → R2, ${MB(rowDetail.bytes).toFixed(2)} MB out of JSONB`);
+  }
+  return out;
+}
+
+/**
+ * Resolve one inline value to a URL whose bytes are PROVEN to be the same.
+ *
+ * Three routes, cheapest first, and all three end in the same proof:
+ *   1. the sibling column already holds a URL at this exact JSON path,
+ *   2. the content-addressed object already exists (a previous run, or another
+ *      row carrying the identical image),
+ *   3. upload it.
+ * In every case the bytes are fetched back over HTTP and hash-compared before
+ * the caller is allowed to drop the inline copy.
+ */
+async function resolveTaskUrl(task, reuseTree) {
+  if (reuseTree) {
+    const sibling = valueAtPath(reuseTree, task.pathSegs);
+    if (typeof sibling === 'string' && /^https?:\/\//i.test(sibling)) {
+      if (await urlMatches(sibling, task.hash)) return { url: sibling, reused: true };
+    }
+  }
+  const existingUrl = r2.publicUrlForKey(task.key);
+  if (existingUrl && await r2.objectExists(task.key)) {
+    if (await urlMatches(existingUrl, task.hash)) return { url: existingUrl, reused: true };
+  }
+  const url = await r2.uploadImage(task.buf, task.key);
+  if (!url) throw new Error('upload returned no URL');
+  if (!await urlMatches(url, task.hash)) {
+    throw new Error('uploaded object did not read back with the same bytes');
+  }
+  return { url, reused: false };
+}
+
+/** True when the object at `url` is byte-identical to the hash we are replacing. */
+async function urlMatches(url, hash) {
+  const buf = await r2.fetchImageBytes(url, { retries: 2, timeoutMs: 30000 });
+  return !!buf && buf.length > 0 && md5(buf) === hash;
+}
+
+/**
+ * Write the cleaned value back, but only if nothing else touched the row while
+ * the uploads were in flight. The comparison is on the stored text itself, so
+ * it needs no version column and cannot be fooled by an equal-looking update.
+ */
+async function writeIfUnchanged(pool, { table, column, idColumn, id, beforeText, after }) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const cur = await client.query(
+      `SELECT "${column}"::text AS t FROM "${table}" WHERE "${idColumn}"::text = $1 FOR UPDATE`, [id]);
+    if (!cur.rows.length) { await client.query('ROLLBACK'); return false; }
+    if (md5(Buffer.from(cur.rows[0].t)) !== md5(Buffer.from(beforeText))) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    await client.query(
+      `UPDATE "${table}" SET "${column}" = $2::jsonb WHERE "${idColumn}"::text = $1`,
+      [id, JSON.stringify(after)]);
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    try { await client.query('ROLLBACK'); } catch { /* connection already gone */ }
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * The daily routine's offload: characters.data and stories.data, the two
+ * columns it has always cleaned. Everything else is driven by
+ * scripts/admin/offload-jsonb-images.js, against the same one implementation.
  */
 async function offloadInlineImages(pool, log, { tables = TABLES, limit = null } = {}) {
   const result = { rows: 0, images: 0, mb: 0, skipped: 0, byTable: {} };
@@ -262,62 +534,15 @@ async function offloadInlineImages(pool, log, { tables = TABLES, limit = null } 
     log.warn('[db-housekeeping] R2 not configured — cannot offload inline images; skipping');
     return result;
   }
-
   for (const table of tables) {
-    const rows = (await pool.query(
-      `SELECT id, user_id AS owner, data FROM ${table}
-        WHERE data::text LIKE '%data:image%'
-        ORDER BY pg_column_size(data) DESC${limit ? ` LIMIT ${limit}` : ''}`)).rows;
-    result.byTable[table] = rows.length;
-    if (!rows.length) continue;
-
-    for (const row of rows) {
-      const prefix = `${table}/${safe(row.owner || 'unknown')}/${safe(row.id)}/migrated`;
-      const tasks = collect(row.data, prefix);
-      if (!tasks.length) continue;
-
-      let failed = 0;
-      const uploaded = [];
-      const PARALLEL = 12;
-      let next = 0;
-      await Promise.all(new Array(Math.min(PARALLEL, tasks.length)).fill(null).map(async () => {
-        while (true) {
-          const i = next++;
-          if (i >= tasks.length) return;
-          try {
-            const url = await r2.uploadImage(tasks[i].input, tasks[i].key);
-            if (!url) throw new Error('no URL');
-            tasks[i].apply(url);
-            uploaded.push(tasks[i].key);
-          } catch { failed++; }
-        }
-      }));
-
-      if (failed) {
-        // The row keeps its inline bytes, so the uploads that DID succeed are
-        // referenced by nothing. Record them for reclamation instead of leaving
-        // them in the bucket unreachable. Safe because the row still holds the
-        // inline bytes: a later pass re-uploads the same deterministic keys.
-        // That is also why the pending retry runs BEFORE this offload in
-        // runDailyHousekeeping — reversing the order would delete an object the
-        // same run had just re-uploaded and referenced.
-        log.warn(`[db-housekeeping] ${table}/${row.id}: ${failed}/${tasks.length} uploads failed — row left unchanged`);
-        try {
-          const r2Pending = require('./r2Pending');
-          for (const key of uploaded) {
-            await r2Pending.recordPending('object', key, `partial JSONB offload of ${table}/${row.id}`);
-          }
-        } catch (err) {
-          log.warn(`[db-housekeeping] could not record ${uploaded.length} unreferenced upload(s): ${err.message}`);
-        }
-        result.skipped++;
-        continue;
-      }
-      await pool.query(`UPDATE ${table} SET data = $2 WHERE id = $1`, [row.id, JSON.stringify(row.data)]);
-      result.rows++;
-      result.images += tasks.length;
-      result.mb += MB(tasks.reduce((a, t) => a + t.bytes, 0));
-    }
+    const spec = OFFLOADABLE_COLUMNS.find(s => s.table === table && s.column === 'data');
+    if (!spec) continue;
+    const r = await offloadJsonbColumn(pool, log, spec, { limit });
+    result.byTable[table] = r.candidates;
+    result.rows += r.rows;
+    result.images += r.images;
+    result.mb += MB(r.bytes);
+    result.skipped += r.skipped;
   }
   return result;
 }
@@ -700,12 +925,16 @@ module.exports = {
   runDailyHousekeeping,
   runWeeklyReclaim,
   offloadInlineImages,
+  offloadJsonbColumn,
+  OFFLOADABLE_COLUMNS,
+  candidatePredicate,
+  decodeInlineImage,
   vacuumAnalyze,
   bloatReport,
   logBloatReport,
   restartOwnPostgres,
   shouldRun,
-  collect,
+  collectInlineImageTasks,
   looksLikeBytes,
   looksLikeHeaderlessBytes,
   findInlineImages,

@@ -26,7 +26,7 @@ import { createRequire } from 'module';
 
 const require_ = createRequire(import.meta.url);
 const r2 = require_('../../server/lib/r2');
-const { extractInlineImagesToR2 } = require_('../../server/services/database');
+const { extractInlineImagesToR2, offloadJsonbImages } = require_('../../server/services/database');
 const { findInlineImages, collapsePath, looksLikeHeaderlessBytes } =
   require_('../../server/lib/dbHousekeeping');
 
@@ -120,5 +120,119 @@ describe('the save path leaves no image bytes in the blob', () => {
     expect(looksLikeHeaderlessBytes('Zm9v'.repeat(400))).toBe(true);
     expect(looksLikeHeaderlessBytes('a short token')).toBe(false);
     expect(looksLikeHeaderlessBytes('some ordinary prose '.repeat(200))).toBe(false);
+  });
+});
+
+/**
+ * The rule is about COLUMNS, not about stories. Measured 2026-09-21, four
+ * columns that no offload path covered held 133 MB of image bytes across the
+ * two databases — `characters.metadata`, `story_jobs.input_data`,
+ * `users.trial_data` and `testlab_experiments.results`/`.params` — every one of
+ * them built from values that HAD been offloaded elsewhere and then copied the
+ * inline fallbacks forward. These pin the payload SHAPES those write paths
+ * persist, so a new field on any of them fails here.
+ */
+describe('the other JSONB write paths leave no image bytes either', () => {
+  const cases: Array<[string, () => any]> = [
+    ['story_jobs.input_data (wizard state, written verbatim)', () => ({
+      pages: 12,
+      characters: [{
+        name: 'Main',
+        previewAvatar: raw('a'),
+        photos: { face: uri('b'), body: raw('c'), bodyNoBg: uri('d') },
+        // Named *Url, holding a data URI — the shape that has leaked twice.
+        photoUrl: uri('e'), bodyPhotoUrl: raw('f'), bodyNoBgUrl: uri('g'),
+        preGeneratedAvatarSlides: [raw('h'), uri('i')],
+        preGeneratedStyledAvatars: { Main: { standard: uri('j'), costumed: { default: raw('k') } } },
+        avatars: {
+          standard: uri('l'),
+          styledAvatars: { watercolor: { standard: raw('m'), costumed: { default: uri('n') } } },
+          storyHistory: [{ sheetUrl: raw('o') }],
+        },
+      }],
+    })],
+    ["users.trial_data (a real person's only uploaded photo)", () => ({
+      photos: { face: uri('p'), body: raw('q'), bodyNoBg: uri('r') },
+      _previewAvatar: raw('s'),
+      _preGeneratedStyledAvatars: { Main: { standard: uri('t'), costumed: { default: raw('u') } } },
+    })],
+    ['testlab_experiments.results (a diagnostics entry, offloaded not stripped)', () => ({
+      ok: true,
+      passes: {
+        pass1: {
+          imageData: uri('v'),
+          attempts: [{ imageData: raw('w'), sentToGrok: { referenceImages: [{ dataUri: uri('x') }] } }],
+          sentToGrok: { referenceImages: [{ dataUri: raw('y') }] },
+        },
+        pass2: { imageData: raw('z') },
+      },
+    })],
+    ['testlab_experiments.params (client-supplied, reuseModelOutput takes a data URI)', () => ({
+      autoEval: true,
+      reuseModelOutput: uri('A'),
+    })],
+  ];
+
+  it.each(cases)('%s', async (_name, build) => {
+    const data: any = build();
+    expect(findInlineImages(data).length).toBeGreaterThan(0);   // the fixture can fail
+
+    await offloadJsonbImages('pinned/prefix', 'pinned', data);
+
+    const left = findInlineImages(data);
+    const paths = [...new Set(left.map((f: any) => collapsePath(f.keyPath)))];
+    expect(paths, `image bytes survived at: ${paths.join(', ')}`).toEqual([]);
+  });
+
+  it('keeps the artefact — every offloaded slot holds an R2 URL, never null', async () => {
+    const data: any = {
+      photos: { face: uri('B') },
+      passes: { pass1: { sentToGrok: { referenceImages: [{ dataUri: raw('C') }] } } },
+    };
+    await offloadJsonbImages('pinned/prefix', 'pinned', data);
+    expect(data.photos.face).toMatch(/^https:\/\/r2\.example\//);
+    expect(data.passes.pass1.sentToGrok.referenceImages[0].dataUri).toMatch(/^https:\/\/r2\.example\//);
+  });
+});
+
+/**
+ * A payload guard only helps where it is CALLED. These four columns each have
+ * several writers in different files, and the 2026-09-21 sweep found bytes in
+ * all of them precisely because a writer was added without one. So: any file
+ * that writes one of these columns must also import an offload helper. A new
+ * writer in a new file fails here, naming itself.
+ */
+describe('every file that writes an at-risk JSONB column imports an offload helper', () => {
+  const fs = require_('fs');
+  const path = require_('path');
+  const ROOT = path.join(__dirname, '..', '..', 'server');
+
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p, out);
+      else if (e.name.endsWith('.js')) out.push(p);
+    }
+    return out;
+  };
+
+  // A write that only sets a status/flag or NULLs the column carries no bytes.
+  const WRITES = [
+    /INSERT INTO story_jobs\s*\([^)]*input_data/i,
+    /UPDATE\s+story_jobs\s+SET[^;]*input_data\s*=/i,
+    /UPDATE\s+users\s+SET\s+trial_data\s*=\s*\$/i,
+    /UPDATE\s+testlab_experiments\s+SET\s+results\s*=\s*results\s*\|\|/i,
+    /INSERT INTO testlab_experiments\s*\([^)]*params/i,
+  ];
+  const IMPORTS_HELPER = /offloadJsonbImages|offloadCharacterImages|extractInlineImagesToR2|extractJsonbInlineImagesToR2/;
+
+  it('no unguarded writer', () => {
+    const offenders: string[] = [];
+    for (const file of walk(ROOT)) {
+      const src = fs.readFileSync(file, 'utf8');
+      if (!WRITES.some(re => re.test(src))) continue;
+      if (!IMPORTS_HELPER.test(src)) offenders.push(path.relative(ROOT, file));
+    }
+    expect(offenders, `these files write an at-risk JSONB column with no offload helper in sight: ${offenders.join(', ')}`).toEqual([]);
   });
 });
