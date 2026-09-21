@@ -72,7 +72,7 @@ RULES:
 - Three to five sentences, whatever the page count. A longer text turns into a plot summary.
 - No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
 - The last sentence states what failing costs. Nothing comes after it.
-- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level.
+- Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
 - All the characters must be mentioned
@@ -117,7 +117,7 @@ Check and critique:
 4. **Characters**: for each name, quote the words that give them a stake. Living with, coming along with, or waiting for the others is not a stake. A name with no such words is not in the story yet.
 5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
 6. **Back cover, not synopsis**: number the sentences of [FINAL]. For each one after the first, write "setup", "event", or "rule". A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Every sentence marked "event" other than the last is cut, and every sentence marked "rule" is cut. The last sentence states what failing costs: that is not a rule, and it is kept. List every cut sentence, not one of them.
-7. **Peril**: name the youngest character and their age, then quote any words that put anyone in the idea — or the craft they travel in — at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in [FINAL].
+7. **Peril**: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in [FINAL]. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 8. **Topic**: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
 
 List your 5 improvements (be specific):

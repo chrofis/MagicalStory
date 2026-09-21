@@ -187,7 +187,8 @@ async function runCell(cell) {
 }
 
 (async () => {
-  const round = Number((process.argv.find(a => a.startsWith('--round=')) || '--round=1').split('=')[1]);
+  // Label, not a number: a re-run of one cell after a fix is round-5b, not round-6.
+  const round = (process.argv.find(a => a.startsWith('--round=')) || '--round=1').split('=')[1];
   const only = (process.argv.find(a => a.startsWith('--cells=')) || '').split('=')[1];
   const cells = only ? CELLS.filter(c => only.split(',').map(Number).includes(c.id)) : CELLS;
 

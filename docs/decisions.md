@@ -21,6 +21,81 @@ superseded and link forward.
 
 ---
 
+## 2026-09-20 — A brief may not people a setting its own `population` declares empty: the contradiction is a BRIEF fault the scene review fixes
+
+**Context.** `population` is the one field the evaluator's SETTING POPULATION line (N-09) and the
+presence arithmetic (`evalPipeline.derivePresenceFinding`) both read, and by design neither ever
+infers it from prose — that is what keeps a figure count arithmetic rather than a second reading
+of the brief (2026-09-13 / 2026-09-19). The design only holds while the two halves of a brief
+agree. On staging `job_1789853503332_riqncqg1i` p1 they did not: `population: "cast_only"` for a
+cast of two, while the same brief's prose ordered "three older boys on metal scooters" through the
+midground and "unnamed adults" at the chess boards in the background. The renderer drew them, the
+arithmetic counted five surplus figures and billed a CRITICAL `extra_character`, the consolidator's
+answer ("remove five figures") was refused as un-inpaintable, and the semantic judge scored the same
+page 100 with those figures in `expected.characters`. The page shipped at 45.
+
+**Decision.** A new mechanical brief check, `population_contradicted` (`sceneBriefCheck.js`), faults
+a `cast_only` page whose prose stages unnamed figures, and the finding goes to the scene review as a
+BRIEF FAULT (new check `[population_contradicted]`), which sets the field or cuts the figures. The
+Art Director templates gained the converse of the rule they already carried ("prose that puts
+unnamed figures in the frame is `ambient` or `crowd`, never `cast_only`"), and the iterate path
+checks it as an INTRODUCED type, since a rewrite inherits `population` from its parent.
+
+**Rationale.** Nothing here infers a population — the check REPORTS and the review decides, which is
+the contract every other prose-vs-metadata check in that module keeps, and it leaves the
+"never inferred from prose" rule in the eval untouched. The alternative considered and NOT taken:
+deriving the presence expectation from the same source the semantic judge uses (its
+`expected.characters`), which would make the two judges agree but would move a mechanical count onto
+a model's opinion. Detection is deliberately narrow — a plural people-noun must sit in a clause that
+also places those people away from the cast (background, midground, far side, in the distance) or
+calls them unnamed, and a definite collective ("the two boys", "all four boys") is read as the cast.
+Measured over 385 stored staging briefs: 6 fire, 1.6%, and the loose first version fired on 31 with
+7 of the first 12 inspected being the cast being framed.
+
+**Touched:** `server/lib/sceneBriefCheck.js`, `server/lib/iterateBeat.js`, `prompts/scene-review.txt`,
+`prompts/scene-expansion.txt`, `prompts/scene-expansion-all.txt`,
+`tests/unit/brief-population-contradiction.test.ts`
+**Status:** ✅ active
+
+## 2026-09-20 — A CRITICAL no repair method owns routes to iterate, once the round has nothing else to execute
+
+**Context.** Staging `job_1789853503332_riqncqg1i` p10/p15 carried a CRITICAL `character_identity`
+on Silvan, a secondary the STORY invented (visual-bible CHR001, no uploaded roster entry). Every
+route declined and none was wrong on its own terms: gate 2 never saw the finding (it came from the
+quality judge, not the entity report, whose own arithmetic correctly declines an identity claim
+against a cast member it holds no reference for — `unclaimed_cast_has_no_reference`); char-fix
+cannot paint a figure with no avatar or face photo (`charFixReferenceGap`); and
+`character_identity` is in `NOT_INPAINTABLE_TYPES`, so the consolidator dropped it
+`requires_char_fix_not_inpaint` and the round's instruction carried only a MODERATE pose note. p15
+shipped at 50 with the CRITICAL, and nothing logged that the defect had been orphaned rather than
+judged not worth fixing.
+
+**Decision.** New gate 2c in `decideRepairMethod`: a CRITICAL finding whose type is un-inpaintable
+AND whose character has no roster entry routes to `iterate` — but only when the round has no
+executable finding at all. With one, the executable finding takes the round and the orphan is logged
+and waits for the next, exactly as gate 2b defers clothing.
+
+**Rationale.** Iterate is the only method left — it rewrites the brief and re-renders from the visual
+bible, which is where an invented figure's appearance lives. The "nothing else to execute" condition
+is measured, not cautious: p10's own round inpainted a MAJOR scale fault and took the page 15 → 70,
+and p15 v0 went 36 → 50 the same way; spending either round on a regeneration gamble would have
+thrown a working repair away. This does NOT reverse the 2026-09-04 ruling that MAJOR entity findings
+go unrepaired, nor the critical-only char-fix gate: only CRITICAL reaches the gate, and char-fix was
+declined here by the absence of a reference, not by policy. The salvage floor is deliberately not
+consulted, for the reason a spec conflict and a CATASTROPHIC finding skip it: there is no local
+repair to prefer, and the alternative is shipping the CRITICAL. Replayed over the stored evaluations
+of p1/p10/p15, the gate changes no round of that run's routing and adds the log line that was
+missing; on a 3-pass production budget the orphan claims a later round.
+
+**Open (owner's call, not implemented).** The other half is a classification question and
+classification belongs to the prompt: `image-evaluation.txt` D-02 could carry the skip its sibling
+rule already has in code — a cast entry REF_IMAGES holds no photo for cannot be identity-matched,
+the way D-20 skips an object with no reference supplied. That would have kept the finding off p10
+and p15 entirely.
+
+**Touched:** `server/lib/repairLogic.js`, `tests/unit/repair-orphan-critical.test.ts`
+**Status:** ✅ active
+
 ## 2026-09-20 — A child may SIT in a close-up: the rule forbids a below-frame SUBJECT, not a cropped POSE (supersedes 2026-08-12 "Close-up framing is the scene creator's job")
 
 **Context.** Since 2026-08-12 (Lab #515–#539) a `close-up` page was forbidden to stage
@@ -51640,8 +51715,182 @@ wizard's critical path, +~30 s on the arm that fails.
 `tests/manual/story-idea-rounds.js`, `tests/manual/story-idea-rounds/round-{1..5}-ratings.md`.
 Commits `0ade598d2`, `f00a844a2`, `e1d352515`, `6d497a619`.
 
+**Correction (2026-09-21) — R5's widened peril check removed a historical event's real danger; reverted.**
+Owner ruling: **a historical story must keep the historical peril. It may be softened in the telling,
+never removed.** R5's widening of check 7 to "anyone in the idea — or the craft they travel in" did
+not soften cell 4's Apollo peril, it deleted the subject: the participant arm dropped the lunar
+module and sat the children in front of a television in Houston, which is the observer premise, not
+a participant one. Check 7 is reverted to its R3 wording (the youngest character by age, and the
+place that puts *them* at a height / in water / underground / in a vehicle with a supply running
+out) in both sibling templates, and one sentence is added in three places — check 7, the RULES peril
+bullet, and both historical requirement files — saying the danger a historical event really had
+stays in the idea, told at a child's level, never removed. Evidence, cell 4 regenerated alone
+(`round-5b.json` / `.md`, USD 0.0861, same cell, same model): the participant arm is back in the
+lander with its real stakes — «Hoch über dem Mond liest Nora die Alarmcodes vor, während Luca die
+Fähre von Hand steuert und nach einem sicheren Landeplatz sucht. Der Treibstoff geht zur Neige…
+Wenn die Fähre nicht rechtzeitig landet, gibt es keinen Weg zurück.» — while the observer arm keeps
+a child-scale stake at Mission Control (a dog lost in the crowd, doors that shut at midnight). The
+R5 round record and its ratings are history and stay as measured; the bullet above describing the
+widening as a win is superseded by this paragraph. Also touched:
+`prompts/story-idea-requirements-historical-1.txt`, `-2.txt`, and
+`tests/manual/story-idea-rounds.js` (the `--round=` label is a string, so a one-cell re-run is
+`5b` rather than a new round).
+
 **Status:** ✅ active — series closed at round 5. Open and untriaged: both-arms-identical (4/20,
 flat in all five rounds, owner's call on serialising), the residual rule/gate leak (7/20), the
 dash habit (11/20, one round old), theme-in-name-only (3/20), and whether the model inventing an
 extra character (a mother, a captain, a dragon-keeper — in R5 all three supply the responsible
 adult the RULES line demands) is wanted or not.
+
+---
+
+## 2026-09-21 — A second-witness veto renames the DETECTOR's figures too, and voids the entity findings the overturned labels produced
+
+**Context.** `reconcileIdentityWithSecondWitness` asks a third model who-is-who on the pages
+where the evaluator and the figure detector disagree and the detector is about to overwrite the
+evaluator. Where the witness backs the evaluator the rewrite is withheld — and that was the whole
+of it. The detector's `figures[]` kept the names two witnesses had just rejected, and every
+consumer that reads a FIGURE rather than a MATCH went on believing them. The entity-consistency
+check is the worst of these: it runs in `Promise.all` alongside the evaluation
+(`repairPipeline.js`), crops figure N and judges it against the contract of whoever the detector
+named. Measured on `job_1789853503332_riqncqg1i` p14 — two boys wearing each other's outfits,
+evaluator and witness both said the labels were swapped, veto fired, nothing renamed: 7 MAJOR
+entity findings that are nothing but the swap restated, quality 95 shipped as 55, and a character
+fix routed at the wrong figure which the face gate then refused.
+
+**Decision.** (1) A veto now writes the evaluator's names onto the detector figures
+(`applyEvaluatorNamesToDetection`), recording `detectorName` / `identityCorrectedBy` on each and
+`detectorRenamed` on the report. It refuses unless the result is still one name per figure, so a
+partial veto cannot put one child on the page twice. (2) Immediately after the `Promise.all`, and
+therefore before the report is stamped, before `getEntityPenaltyAndIssues` charges for it and
+before any repair is routed, `voidEntityIssuesContestedByWitness` drops that page's entity
+findings about the contested names. A third child on the same page, cropped under a name nobody
+disputed, keeps their findings.
+
+**Rationale.** This does not reverse the settled veto rule ("the witness may only ever WITHHOLD",
+2026-09-18): the witness still cannot cause a rename of the EVALUATION, and the number of
+evaluation renames is unchanged on every path. It makes the withholding mean the same thing on
+both sides of the page instead of shipping two contradictory namings. The entity verdicts are
+VOIDED rather than re-attributed because they are not invertible — the grid is gone and
+re-judging the crops costs a paid call, so "we judged the wrong child" is honestly recorded as
+"not judged", never as a clean pass.
+
+**Touched:** `server/lib/identityAgreement.js` (`applyEvaluatorNamesToDetection`,
+`voidEntityIssuesContestedByWitness`, the veto tail of
+`reconcileIdentityWithSecondWitness`), `server/lib/repairPipeline.js` (void call after the
+eval/entity `Promise.all`), `tests/unit/identity-second-witness.test.ts`.
+Siblings ruled out: `server/routes/regeneration.js` and `server/lib/entityConsistency.js` read the
+PERSISTED `bboxDetection.figures`, which now already carry the corrected names (the rename happens
+in `images.js` before the detection is stored), and they run sequentially over stored data — there
+is no parallel window for them to race.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-21 — The reference-sheet chain states an age once, splits a sheet once, and stores an image once (pipeline review A9 / B4 / D5)
+
+**Context.** Three findings from the review of `job_1789853503332_riqncqg1i` all sit on the
+character-reference chain. (A9) The bodies judge scores PROPORTIONS — the one axis the declared
+age decides — but only the identity and pass-2 style judges were ever handed `CHARACTER_AGE`, so
+the generator was anchored on the declared age while its critic could only confirm the drawing
+looked like itself; the same pass-1 body prompt also asserted both "natural proportions matching
+the person's apparent age in Image 3" and the declared block's "that stated age outranks any
+impression of age taken from the photo". (B4) `cropSheetCell` memoised the analyzer's
+`/split-reference-sheet` call in a `WeakMap` keyed on the sheet Buffer, while every caller
+re-fetched its own Buffer from the sheet's R2 URL — the key never hit, so a 4-character 18-page
+story split the same 4 sheets ~50 times (~50 analyzer round-trips, ~50 × 392 KB of R2 traffic).
+(D5) The finished styled sheet was PUT to R2 four times per character under four keys, all
+byte-identical, because `extractInlineImagesToR2`'s content-dedupe map was consulted only by the
+generic Phase-1.5 sweep and not by the explicit walkers.
+
+**Decision.**
+1. `evaluateSheetRow('bodies', …)` takes `declaredAge` and fills `{CHARACTER_AGE}` in
+   `sheet-row-bodies-eval.txt` (same fill the identity and style evals use); TASK 4 scores against
+   that stated age and treats a figure drawn older/taller than it as a defect. Unknown age → the
+   prompt judges apparent age, as before. The heads row is not given it — it scores no proportions.
+2. `buildBodyRowPrompt` states the age ONCE: when the declared block is present, the two
+   photo-age clauses are removed rather than left to contradict it.
+3. The sheet-split memo is keyed on the sheet's CONTENT (Buffer md5 / URL), not the Buffer
+   object, and the URL→bytes fetch is memoised under the same key. Bounded FIFO (32 sheets).
+4. `extractInlineImagesToR2`'s `upload()` aliases identical bytes: the first task uploads, every
+   later slot holding the same bytes gets that task's URL. Nothing is deleted — every diagnostic
+   field still resolves to a URL, they just share one object.
+
+**Rationale.** (1)+(2) are the generator-vs-critic pair for age: a rule the judge deducts for is a
+rule the generator was given, and two contradictory age instructions in one prompt let the model
+pick the photo. (3) is a pure memo-key bug — the fix is the key, not a second cache. (4) follows
+"diagnostics are a research asset": deduplicate the object, never drop the artefact.
+
+**Not done, needs an owner call.** The same sheet is also uploaded by `storyAvatars.sheetToR2`
+(`characters/<user>/<char>/story-sheets/<job>-<slot>.jpg`, the per-user story history) and by the
+characters-row offload. Those are different rows with different lifetimes — the history is meant
+to outlive the story — so collapsing them onto the story blob's object is a durability decision,
+not a cleanup.
+
+**Touched:** `prompts/sheet-row-bodies-eval.txt`, `server/lib/character2x4Sheet.js`,
+`server/lib/sceneComposite.js`, `server/services/database.js`, `tests/unit/sheet-split-memo.test.ts`,
+`tests/unit/built-prompt-values.test.ts`, `tests/unit/avatar-sheet-declared-age.test.ts`,
+`tests/unit/r2-extract-no-double-upload.test.ts`
+**Status:** ✅ active
+
+## 2026-09-21 — One consolidation per evaluation: `inpaintPage` takes the plan, it does not make one
+
+**Context:** the repair pipeline consolidates every evaluation the moment it lands
+(`repairPipeline.consolidatePageEval` → `consolidateEvaluation`), stores the plan on the version as
+`consolidatedPlan`, scores the version against it, and mirrors it onto the eval object
+(`roundEvalPages`). `inpaintPage` then called `consolidateFeedback` **again** on that same
+evaluation. Measured on staging `job_1789853503332_riqncqg1i`: of 21 `consolidator_calls` rows, p10,
+p12 and p15 each hold **two** round-1 calls — ~29k prompt chars apiece — and the two plans for a page
+differ in wording. The page was therefore repaired from a plan nothing had scored against, and the
+number in `finalScore` came from the other one.
+
+**Decision:** the plan is an **input** to `inpaintPage` (`options.consolidatedPlan`, falling through
+to `evaluation.consolidatedPlan`, which is the same object). `executeInpaintAction` passes the plan
+of the version it is repairing. An inpaint that arrives with **no** plan and no single
+self-describing finding **stops** and returns `error: 'no consolidated plan on the evaluation'` — it
+does not re-consolidate, and the legacy severity-ranked issue-concat branch is **deleted** (NO
+FALLBACKS). The `soleDirectFix` shortcut (owner, 2026-09-20) stays the first branch, untouched.
+The one surviving consolidation now carries the page's wardrobe: the scene-clothing resolve that
+lived inside `inpaintPage` moved to `clothingResolve.resolveSceneClothingDescriptions` and is called
+by `consolidatePageEval`, so the single call is no poorer than the two it replaces. The Test Lab
+`inpaint` stage produces the plan at its own call site (same one call as before, now visible).
+
+**Rationale:** two consolidations of one evaluation are two answers to one question, and the repair
+executed the one the score did not. Saving is a by-product: 3 of 21 calls on the reference story,
+~87k prompt chars.
+
+**Touched:** `server/lib/images.js` (`inpaintPage`), `server/lib/repairPipeline.js`,
+`server/lib/clothingResolve.js`, `server/lib/testlab.js`,
+`tests/unit/inpaint-direct-fix.test.ts`
+**Status:** ✅ active
+
+## 2026-09-21 — A `retryHistory` entry links to its version instead of copying its detection
+
+**Context:** `stories.data` for `job_1789853503332_riqncqg1i` is 8.59 MB, and the same
+`bboxDetection` object is stored three times per page: on the scene (152 KB total), on
+`imageVersions[]` (147 KB) and on `retryHistory[]` (147 KB). The retry array is built by
+`versions.map((v, idx) => …)` — entry *idx* **is** version *idx* — so the third copy carries no
+information the second does not.
+
+**Decision:** a retry entry stamps `versionIndex: idx` and no `bboxDetection`. Readers resolve it
+through `repairLogic.detectionForRetryEntry(scene, entry, index)`, which returns the entry's own copy
+when it has one (every story written before today), then the linked version's. Measured by replaying
+the store shape over the reference story: **147,404 bytes, 1.72%** of `stories.data` — and again in
+`story_jobs.result_data`, which is a second copy of it. No stored row is rewritten.
+
+A latent bug fell out of the inventory and is fixed in the same edit: the version-merge path in
+`server/routes/stories.js` assigned `scene.imageVersions[i].bboxDetection = retryEntry.bboxDetection
+|| null`, so a retry entry without a detection **wiped** the detection `mergeFields` had just merged
+in from the version. It now takes the legacy copy only when one exists.
+
+**Rationale:** the link is the same fact as the copy, and the copy is the one that goes stale.
+
+**Touched:** `server/lib/repairPipeline.js`, `server/lib/repairLogic.js`,
+`server/routes/stories.js`, `server/lib/entityConsistency.js` (a log line that named
+`retryHistory` as the source it never read), `client/src/types/story.ts`,
+`scripts/analysis/bbox-style-grid.js`, `scripts/analysis/bbox-multi-style.js`,
+`scripts/analysis/bbox-investigation.js`, `tests/unit/retry-history-detection-link.test.ts`
+**Status:** ✅ active — the other two D3 halves (version `prompt` byte-equal to the page prompt;
+scene-level eval fields byte-identical to the picked version's) were NOT done: both reverse
+deliberate recent decisions and need an owner call. See the report / `tasks/BACKLOG.md`.
