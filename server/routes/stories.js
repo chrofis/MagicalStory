@@ -20,6 +20,7 @@ const { enforceSpreadTextPosition, updatePageText } = require('../lib/storyHelpe
 const { getTextAreaMask } = require('../lib/textMasks');
 const { loadVbReferenceBytes } = require('../lib/characterPhotos');
 const { stripDataUriPrefix } = require('../lib/r2');
+const { recordStoryView } = require('../lib/storyViews');
 
 /**
  * Normalize image data to ensure it has the correct data URI prefix.
@@ -3160,6 +3161,10 @@ router.get('/:id', authenticateToken, async (req, res) => {
     console.log(`📖 GET /api/stories/${id} - User: ${req.user.username}, impersonating: ${req.user.impersonating || false}`);
 
     let story = null;
+    // Distinguishes an owner opening their own book from an admin opening
+    // someone else's — the view record says which, so admin traffic can be
+    // excluded from any "did the customer look at it" question.
+    let isOwnStory = true;
 
     if (isDatabaseMode()) {
       let rows;
@@ -3167,6 +3172,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
         // Admin (plain or impersonating) - try own/impersonated user first, then any story
         rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
         if (rows.length === 0) {
+          isOwnStory = false;
           rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
           if (rows.length > 0) {
             console.log(`📖 [ADMIN-READ] Admin viewing story owned by user_id: ${rows[0].user_id}`);
@@ -3216,6 +3222,17 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     console.log(`📖 Returning full story: ${story.title} with ${story.sceneImages?.length || 0} images`);
+
+    // The story was actually opened — record the view. One construction shared
+    // with the public shared-viewer sibling (server/routes/sharing.js); see
+    // server/lib/storyViews.js for why this uses `logs` and not a new table.
+    // Not awaited: a view record must never delay handing the book over.
+    recordStoryView({
+      storyId: id,
+      source: canReadAnyStory(req) && !isOwnStory ? 'admin' : 'owner',
+      req,
+    });
+
     res.json(story);
   } catch (err) {
     console.error('❌ Error fetching story:', err);

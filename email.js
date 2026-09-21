@@ -4,6 +4,9 @@ const { Resend } = require('resend');
 const fs = require('fs');
 const path = require('path');
 const { CREDIT_CONFIG } = require('./server/config/credits');
+// Every send goes through sendTracked so it lands in email_sends and carries
+// the tags the Resend webhook correlates on — see server/lib/emailSends.js.
+const { sendTracked } = require('./server/lib/emailSends');
 
 // Initialize Resend client
 const resend = process.env.RESEND_API_KEY
@@ -287,7 +290,7 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
       console.log(`📧 Attaching PDF to story complete email (${(options.pdfBuffer.length / 1024).toFixed(1)}KB)`);
     }
 
-    const { data, error } = await resend.emails.send(emailPayload);
+    const { data, error } = await sendTracked(resend, 'story-complete', emailPayload, { storyId, language });
 
     if (error) {
       console.error('❌ Failed to send story complete email:', error);
@@ -327,14 +330,14 @@ async function sendStoryFailedEmail(userEmail, firstName, language = 'English') 
   };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'story-failed', {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
-    });
+    }, { language });
 
     if (error) {
       console.error('❌ Failed to send story failed email:', error);
@@ -497,7 +500,7 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
       }];
     }
 
-    const { data, error } = await resend.emails.send(emailPayload);
+    const { data, error } = await sendTracked(resend, 'trial-reminder', emailPayload, { storyId: options.storyId, language, detail: { reminderType } });
 
     if (error) {
       console.error('❌ Failed to send trial reminder email:', error);
@@ -608,14 +611,14 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
   };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'order-confirmation', {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
-    });
+    }, { storyId: orderDetails.storyId, language });
 
     if (error) {
       console.error('❌ Failed to send order confirmation email:', error);
@@ -663,7 +666,7 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
   };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'order-shipped', {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
@@ -671,7 +674,7 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
-    });
+    }, { language });
 
     if (error) {
       console.error('❌ Failed to send order shipped email:', error);
@@ -709,14 +712,14 @@ async function sendOrderFailedEmail(customerEmail, customerName, errorMessage, l
   };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'order-failed', {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
-    });
+    }, { language });
 
     if (error) {
       console.error('❌ Failed to send order failed email:', error);
@@ -785,14 +788,14 @@ async function sendEmailVerificationEmail(userEmail, userName, verifyUrl, langua
   };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'email-verification', {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
-    });
+    }, { language });
 
     if (error) {
       console.error('❌ Failed to send email verification email:', error);
@@ -860,14 +863,14 @@ async function sendPasswordResetEmail(userEmail, userName, resetUrl, language = 
   };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'password-reset', {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
-    });
+    }, { language });
 
     if (error) {
       console.error('❌ Failed to send password reset email:', error);
@@ -904,7 +907,7 @@ async function sendAdminStoryFailureAlert(jobId, userId, userName, userEmail, er
   }
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'admin-story-failure-alert', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
       subject: `[MagicalStory] Story Generation Failed - Job ${jobId}`,
@@ -931,7 +934,7 @@ async function sendAdminStoryFailureAlert(jobId, userId, userName, userEmail, er
           </p>
         </div>
       `,
-    });
+    }, { storyId: jobId, userId });
 
     if (error) {
       console.error('❌ Failed to send admin alert:', error);
@@ -956,7 +959,7 @@ async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName
   }
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'admin-order-failure-alert', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
       subject: `[CRITICAL] Book Order Failed After Payment - ${sessionId.slice(-8)}`,
@@ -999,7 +1002,7 @@ async function sendAdminOrderFailureAlert(sessionId, customerEmail, customerName
           </p>
         </div>
       `,
-    });
+    }, {});
 
     if (error) {
       console.error('❌ Failed to send critical admin alert:', error);
@@ -1105,7 +1108,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
           </div>` : '';
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'admin-daily-summary', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
       subject: `[MagicalStory] Tagesbericht ${dateLabel} — ${s.stories + (s.trialStories || 0) || 0} Stories, ${s.newUsers || 0} Signups${s.failedJobs ? `, ${s.failedJobs} FAILED` : ''}${limitHits ? `, ⚠️${limitHits} API-Limits` : ''}${failures?.totals.customer ? `, ${failures.totals.customer} Kundenfehler` : ''}${subjectRevenue}`,
@@ -1141,7 +1144,7 @@ async function sendAdminDailySummary(feed, dateLabel) {
           </p>
         </div>
       `,
-    });
+    }, {});
     if (error) {
       console.error('📧 Daily summary email failed:', error);
       return null;
@@ -1237,7 +1240,7 @@ async function sendAdminWeeklyCostReport(report) {
           </p>`;
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'admin-weekly-cost-report', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
       subject: `[MagicalStory] ${days}-Tage-Kosten — ${usd(grandTotal)} total (Railway ${usd(current.totals.total)}${api ? ` + API ${usd(api.totals.total)}` : ''}), Hochrechnung ${usd(report.projectedMonthly + (api ? api.projectedMonthly : 0))}/Monat`,
@@ -1287,7 +1290,7 @@ async function sendAdminWeeklyCostReport(report) {
           </p>
         </div>
       `,
-    });
+    }, {});
     if (error) {
       console.error('📧 Weekly cost report email error:', error);
       return null;
@@ -1313,7 +1316,7 @@ async function sendAdminHealthReport(subject, reportText) {
   const esc = (t) => String(t == null ? '' : t)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   try {
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await sendTracked(resend, 'admin-health-report', {
       from: EMAIL_FROM,
       to: ADMIN_EMAIL,
       subject: `[MagicalStory] ${subject}`,
@@ -1322,7 +1325,7 @@ async function sendAdminHealthReport(subject, reportText) {
           <h2 style="color:#4f46e5;">${esc(subject)}</h2>
           <pre style="font-family: ui-monospace, Consolas, monospace; font-size: 13px; white-space: pre-wrap; background:#f8fafc; border:1px solid #e5e7eb; border-radius:8px; padding:14px;">${esc(reportText)}</pre>
         </div>`,
-    });
+    }, {});
     if (error) {
       console.error('📧 Health report email error:', error);
       return null;

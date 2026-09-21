@@ -93,6 +93,7 @@ const { authLimiter, registerLimiter, apiLimiter, aiProxyLimiter, storyGeneratio
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate, buildEmptyScenePrompt } = require('./server/services/prompts');
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder, getCoverDimensions } = require('./server/lib/gelato');
+const { resendWebhookHandler } = require('./server/lib/resendWebhook');
 const {
   hashImageData,
   generateImageCacheKey,
@@ -1378,6 +1379,24 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
     res.status(200).json({ received: true, error: err.message });
   }
 });
+
+// Resend webhook endpoint — delivery / open / click events for the emails we send.
+// The handler itself lives in server/lib/resendWebhook.js so a test can exercise
+// the REAL one rather than a re-implementation of it.
+//
+// IMPORTANT: like the two webhooks above, this MUST be defined BEFORE the global
+// express.json() middleware, and for a stronger reason than Gelato's: Resend signs
+// the RAW BYTES. express.raw() keeps them; parsing to an object and re-stringifying
+// changes key order and whitespace and breaks every signature.
+//
+// Signature scheme (Resend docs, verified 2026-09-21): Resend delivers through
+// Svix and sends three headers — svix-id, svix-timestamp, svix-signature. The
+// signature is an HMAC over `${svix-id}.${svix-timestamp}.${raw body}` keyed by
+// the webhook's signing secret, and it is checked here by the Resend SDK's own
+// resend.webhooks.verify(), which also enforces the timestamp tolerance that
+// makes a captured delivery unreplayable. No hand-rolled HMAC: the scheme is
+// not ours to invent, and the SDK is already a dependency.
+app.post('/api/resend/webhook', express.raw({ type: 'application/json' }), resendWebhookHandler);
 
 // Global body limit — character data includes base64 photos, so needs to be generous
 app.use(express.json({ limit: '50mb' }));

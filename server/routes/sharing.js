@@ -20,6 +20,7 @@ const { dbQuery, getStoryImage, getActiveVersion, imagesExistByType } = require(
 const { log } = require('../utils/logger');
 const { stripDataUriPrefix } = require('../lib/r2');
 const { verifyToken } = require('../middleware/auth');
+const { recordStoryView } = require('../lib/storyViews');
 
 // Base URL for OG tags and share links (consistent with stories.js)
 const SITE_URL = process.env.FRONTEND_URL || process.env.BASE_URL || 'https://www.magicalstory.ch';
@@ -292,6 +293,19 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     }
 
     const isOwner = !!req.user && req.user.id === story.userId;
+
+    // The shared book was actually opened — record the view. Same construction
+    // as the authenticated sibling (server/routes/stories.js GET /:id); the
+    // shared/trial path in this repo has repeatedly lagged the full path, so
+    // both call server/lib/storyViews.js rather than hand-rolling a payload.
+    // Not awaited: a view record must never delay a public page load.
+    recordStoryView({
+      storyId: story.id,
+      source: 'shared',
+      req,
+      shareToken,
+      ownerUserId: story.userId,
+    });
 
     // Check if owner needs to set a password (trial user without password)
     let needsPassword = false;

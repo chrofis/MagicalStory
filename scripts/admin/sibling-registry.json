@@ -541,6 +541,17 @@
         "scripts/admin/offload-jsonb-images.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "story-view-instrumentation",
+      "axis": "authenticated story route vs public shared viewer",
+      "reason": "a story is opened on two routes — GET /api/stories/:id (server/routes/stories.js) and GET /api/shared/:shareToken (server/routes/sharing.js) — and the shared/trial path in this repo has repeatedly lagged the full path by weeks. Both record the view through server/lib/storyViews.js; a field or a source value added on one side and not the other reads as absent for half of all views.",
+      "members": [
+        "server/routes/stories.js",
+        "server/routes/sharing.js",
+        "server/lib/storyViews.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

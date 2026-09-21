@@ -53955,3 +53955,77 @@ fires, not that it sells better.
 `tests/manual/story-idea-rounds/round-20.json` / `round-20.md`, `ideas-r20.html`.
 
 **Status:** ✅ active on `staging` only; not on master.
+
+---
+
+## 2026-09-21 — Engagement tracking: story views go in `logs`, email sends get their own table, and open/click arrives by signed Resend webhook
+
+**Context:** Three blind spots, verified read-only before any code was written.
+(a) Nothing recorded that a story had been opened: no `viewed_at` / `view_count`
+column, `GET /api/stories/:id` logged a console line and no row, and the public
+shared viewer had no counter at all. (b) Nothing recorded that an email had been
+sent: `email.js` called `resend.emails.send()`, printed the message id to stdout
+and threw it away — 38 production tables, none email-related. (c) No open/click
+signal existed: no tracking pixel, no link wrapper, and no Resend webhook (the
+only webhooks wired were Stripe and Gelato).
+
+**Decision:**
+1. **Views reuse `logs`.** `recordStoryView()` (`server/lib/storyViews.js`)
+   writes a `STORY_VIEWED` row through the existing `logActivity()`, from BOTH
+   the authenticated route and the public shared viewer, with
+   `source: 'owner' | 'admin' | 'shared'`. No new table and no column on
+   `stories`. An in-process 10-minute window per (story, viewer, source) damps
+   refresh loops.
+2. **Sends get `email_sends`** (migration `040_email_sends.sql`). Every send site
+   in `email.js` — all 13 — now goes through `sendTracked()`; `resend.emails.send`
+   is called from exactly one place in the codebase.
+3. **Events get `email_events`,** fed by `POST /api/resend/webhook`, with cheap
+   rollups (`open_count`, `first_opened_at`, `delivered_at`, …) denormalised onto
+   the send row.
+
+**Rationale:**
+- *`logs`, not a new table, for views.* `logActivity()` is the house convention
+  every other behavioural event already uses, and a view is one of those events.
+  (Note for the next reader: **CLAUDE.md's DB section names an `activity_log`
+  table that does not exist** — the production activity table is `logs`, verified
+  against `information_schema` on 2026-09-21.)
+- *Two email tables, not one.* A send is a row we create; an event is something
+  Resend tells us later, out of order, and repeatedly. One table would either
+  lose the per-event detail or force a read-modify-write race on every webhook.
+- *Correlation by `data.email_id`, not by tags.* Tags ARE attached to every
+  outgoing send (`email_type`, `environment`, `story_id`, `user_id`) so the
+  Resend dashboard can be sliced — but an id equality join is exact and a tag
+  match is not.
+- *Idempotency is the UNIQUE `svix_id`.* Svix retries a delivery until it gets a
+  2xx; the ingest inserts `ON CONFLICT DO NOTHING … RETURNING id` and skips the
+  rollup when no row comes back, so a redelivered open cannot double a count.
+- *Status only moves forward* (`STATUS_RANK`), so a late `email.sent` cannot
+  un-bounce a row — webhook ordering is not guaranteed.
+- *Signature verification is the vendor's, not ours.* Resend delivers via Svix
+  (`svix-id` / `svix-timestamp` / `svix-signature`, HMAC over
+  `${id}.${timestamp}.${raw body}`). `resend.webhooks.verify()` is used, which
+  also enforces the timestamp tolerance that makes a captured delivery
+  unreplayable. The route is mounted behind `express.raw()` BEFORE the global
+  `express.json()`, because re-stringifying the body breaks every signature.
+- *Status codes differ from the Gelato handler's always-200 on purpose.* No
+  secret → 500, unverifiable → 401, verified-but-unstorable → 500. Svix retries a
+  non-2xx, so a database blip costs a retry and not the event; acknowledging an
+  unverified delivery would silently drop it.
+- *A failed RECORD never fails the SEND.* The mail is already gone; throwing
+  would be caught upstream as "send failed" and could produce a duplicate mail to
+  a real customer. This is not a fallback path — the send has exactly one
+  implementation.
+
+**Touched:** `migrations/040_email_sends.sql`, `server/lib/emailSends.js`,
+`server/lib/resendWebhook.js`, `server/lib/storyViews.js`, `email.js`,
+`server.js`, `server/routes/stories.js`, `server/routes/sharing.js`,
+`scripts/admin/sibling-registry.json` (`story-view-instrumentation`),
+`tests/unit/email-engagement-tracking.test.ts`
+
+**Manual configuration the owner must still do** (nothing in the code can do it):
+enable open + click tracking in the Resend dashboard, create a webhook pointing at
+`https://magicalstory.ch/api/resend/webhook` (and the staging equivalent), and set
+`RESEND_WEBHOOK_SECRET` on Railway in BOTH environments. Until that secret exists
+the endpoint answers 500 by design.
+
+**Status:** ✅ active
