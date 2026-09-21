@@ -53749,3 +53749,91 @@ untouched.
 `tests/unit/jsonb-image-offload.test.ts`, `docs/r2-storage.md`.
 
 **Status:** ✅ active — takes effect on each environment's next 03:30 CH run after deploy.
+
+## REVERSAL — the back cover's LENGTH follows the scope, and the last sentence is the picture, not the cost (2026-09-21)
+
+**This reverses the 2026-09-14 line "a long book gets the same short back-cover
+text as a short one."** That line was carried last by the round-17 cleanup entry
+(2026-09-21, `eda7d62f9`..`b82dfe587`), whose `{STORY_SCOPE}` tail read "The back
+cover stays four to six sentences whatever the scope". Owner sign-off for the
+reversal: 2026-09-21, on the round-18 read.
+
+**Context.** Round 18 is the cleanest round of the series on every mechanical
+axis and the worst since round 1 on the axis that matters: blind buy mean
+3.70 → **3.25**, one five instead of three, losing 8 of 20 paired cell-arms and
+winning 2. The same round's mean text length fell 606 → 572 → **543** chars, and
+the reader's low-score reasons were length words — "only one beat", "slight",
+"thin". `round-18.md` also shows a second, unmeasured uniformity: **all 20 ideas
+end on the same construction**, a "Wenn X nicht …, dann … für immer" cost line.
+A 10-page book and a 25-page book were being sold with the same four-line
+paragraph, and every one of them closed on a condition rather than on something
+a parent can see.
+
+**Decision** (owner, 2026-09-21), two parts:
+
+1. **Length follows scope, as a COUNT, not a range.** `buildStoryScope(pages)`
+   now names the sentence count and the paragraph shape: **≤10 pages → four
+   sentences in one paragraph** (one place, one creature or thing, one want, one
+   obstacle; the cast beside the child); **11-20 → six sentences in one
+   paragraph** (the goal elsewhere, two or three places named where the action
+   is, one side character with a want of their own, one turn); **21+ → nine
+   sentences in two paragraphs** (first the home and the want; then the world —
+   several places, days passing, two side characters with wants of their own, a
+   second thread crossing the main one, one turn). Both templates' fixed "four to
+   six sentences" rule and their Length check are replaced by "the sentence count
+   the scope names"; the ~30-word sentence bound is kept, and the Length check
+   now counts paragraphs too. New rule in both: *every sentence carries one
+   concrete thing a reader can see — a creature, a place, an act, an object; a
+   sentence that only states a condition or a feeling is not one of them.*
+
+2. **The ending is the picture.** "The last sentence states what failing costs.
+   Nothing comes after it." is replaced by: the idea names what failing costs
+   **wherever it fits**, and the loss is one the book could show on a page; the
+   **last sentence is the main character in the act**, the picture a parent can
+   see. The CUT step follows: `"act"` joins the label list, a sentence labelled
+   `"cost"` may stand anywhere and is kept, and the final sentence is labelled
+   `"act"` and kept. No banned words were added — the rule is stated positively.
+   The single template's slot list gains `5. THE PICTURE`; the two-idea
+   template's OUTPUT FORMAT paragraph states the same order and follows the
+   scope's paragraph shape.
+
+**Rationale.** The round-18 split named three candidate causes and this reverses
+the first one: the short-book band read as permission to write less story rather
+than as a description of the book's size, and it applied to every book. A count
+the model can check is the only form of the rule a self-check can enforce — a
+range invites the floor. The cost line was the other half: made mandatory *and*
+terminal, it became the single most repeated sentence in the corpus, and it is
+the one sentence in a back cover that cannot be drawn.
+
+**Sibling set `story-idea-templates`:** both templates changed in the same commit
+(`check-sibling-paths.js --list` clean); every substitution was applied under an
+exactly-once assertion so a missed edit fails loudly.
+
+**Validated (rung 2 — real generation on the real builder, USD 0.52):** dry-run
+of cells 1 and 10 first (scope line, count, ending rule, CUT labels present; no
+unfilled placeholders), then `node tests/manual/story-idea-rounds.js --round=19
+--cells=1,3,10,7` — 8 ideas. Every idea landed on its band: 10-page cells 1 and 7
+at **4 sentences** (53/70/57/59 words, one paragraph), 16-page cell 3 at
+**6** (112/81 words), 25-page cell 10 at **9-10 sentences in two paragraphs**
+(153/144 words). Mean length 311 → 880 chars across the bands, against round 18's
+flat 543. **Six of the eight now end on an act** — the two exceptions are cell 7's arms (main character aged 1), which still close on a "Wenn …" conditional, one of them with the act folded inside it ("Wenn das Huhn den Kamm erreicht, streckt Lena beide Hände ins Leere."). Against round 18's 20-of-20 cost endings that is the change landing everywhere except the youngest band. No blind read was
+run: this entry records that the mechanism fires, not that it sells better.
+
+**Known tension, not resolved here:** the three worked examples in both templates
+still end on a cost line, and `idea-turn-slot.test.ts` still pins them that way.
+Round 19 overrode them on all eight ideas, so the rule is winning — but the
+examples are the next thing to look at if the ending drifts back.
+
+**Touched:** `server/routes/storyIdeas.js` (`buildStoryScope`, `SCOPE_TAIL`),
+`prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`
+(sibling set `story-idea-templates`), `tests/unit/idea-scope-and-landmarks.test.ts`,
+`tests/unit/idea-turn-slot.test.ts`, `tests/manual/story-idea-rounds.js` (cell 10
+20p → 25p so the 21+ band is exercised at all),
+`tests/manual/story-idea-rounds/build-ideas-html.js` (new — the r17/r18 page was
+a one-off `node -e` nobody could regenerate), `round-19.json` / `round-19.md`,
+`ideas-r19.html`.
+
+**Not in `docs/SETTLED.md`:** checked — the file carries no back-cover length or
+idea-scope line, so there is nothing there to update.
+
+**Status:** ✅ active on `staging` only; not on master.

@@ -55,21 +55,23 @@ const { buildSeasonInstruction } = require('../lib/season');
 
 /**
  * What the page count means to a back cover: the SIZE of what stands behind the
- * idea, never a sentence budget and never a beat count. The old
+ * idea, and with it the sentence COUNT the back cover is written to (four, six or nine —
+ * owner, 2026-09-21, reversing the 2026-09-14 "same length whatever the scope"
+ * line). The old
  * {STORY_LENGTH_CATEGORY} handed the model "MEDIUM (11-20 pages) - 8 sentences
- * max per idea", which is a limit the four-to-six-sentence rule already sets,
+ * max per idea", which is a limit the scope's own sentence count already sets,
  * stated in a unit the back cover does not use.
  *
  * @param {number} pages @returns {string} the {STORY_SCOPE} block
  */
-const SCOPE_TAIL = 'The back cover stays four to six sentences whatever the scope; the scope is the size of what stands behind them.';
+const SCOPE_TAIL = 'Write the sentence count this scope names, no more and no less; the scope is the size of what stands behind them. No sentence runs past about 30 words.';
 
 function buildStoryScope(pages) {
   const band = pages <= 10
-    ? 'This is a short book: one place, one want, one thing in the way. The cast is beside the child. It fits in an afternoon.'
+    ? 'This is a short book. The back cover is four sentences in one paragraph: one place, one creature or thing, one want, one obstacle. The cast is beside the child.'
     : pages <= 20
-      ? 'This is a journey: the goal is somewhere else, the story passes through two or three places, and one side character wants something of their own.'
-      : 'This is a world: several places, days pass, and a second thread crosses the main one.';
+      ? 'This is a journey. The back cover is six sentences in one paragraph: the goal is somewhere else, two or three places named where the action is, one side character with a want of their own, one turn.'
+      : 'This is a world. The back cover is nine sentences in two paragraphs. The first paragraph is the home and the want. The second is the world: several places, days pass, two side characters with wants of their own, a second thread that crosses the main one, one turn.';
   return `${band}\n\n${SCOPE_TAIL}`;
 }
 

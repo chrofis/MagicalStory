@@ -126,6 +126,8 @@ const ch = (name, age, gender, isMain, specialDetails) => ({
 });
 
 // ---- The 10 cells. Fixed across every round; never edit between rounds. ----
+// Exception, 2026-09-21: cell 10 went 20p -> 25p so the 21+ scope band (nine
+// sentences, two paragraphs) is exercised at all. Rounds before 19 ran it at 20p.
 const CELLS = [
   { id: 1, language: 'de', pages: 10, languageLevel: '1st-grade', storyCategory: 'adventure', storyTheme: 'pirate',
     characters: [ch('Noah', 3, 'male', true)], relationships: [] },
@@ -168,7 +170,7 @@ const CELLS = [
     relationships: [
       { character1: 'Théo', character2: 'Chloé', relationship: 'est le frère de' },
       { character1: 'Maman Élodie', character2: 'Chloé', relationship: 'est la mère de' }] },
-  { id: 10, language: 'de', pages: 20, languageLevel: 'standard', storyCategory: 'life-challenge', storyTopic: 'managing-emotions', storyTheme: 'dragon',
+  { id: 10, language: 'de', pages: 25, languageLevel: 'standard', storyCategory: 'life-challenge', storyTopic: 'managing-emotions', storyTheme: 'dragon',
     characters: [ch('Jonas', 8, 'male', true), ch('Mila', 8, 'female', true)],
     relationships: [{ character1: 'Jonas', character2: 'Mila', relationship: STRANGERS_DE }] },
 ];

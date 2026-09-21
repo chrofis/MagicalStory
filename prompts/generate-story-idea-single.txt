@@ -56,6 +56,7 @@ Generate a story idea that includes:
 2. WHAT STANDS IN THE WAY.
 3. THE PROMISE: one thing that happens in this book.
 4. WHAT IT COSTS THEM TO FAIL.
+5. THE PICTURE: the main character in the act, last.
 
 The reader already chose the town and the season. Do not open with an address. The place is the scene the action happens in, named where the action is, never a sentence that states where and when.
 
@@ -72,10 +73,11 @@ The idea answers these:
 
 RULES:
 - No adjectives allowed. Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
-- Four to six sentences, whatever the scope, and at most one sentence per slot. A longer text turns into a plot summary.
+- Write the sentence count the scope names, no more and no less. A longer text turns into a plot summary.
+- Every sentence carries one concrete thing a reader can see: a creature, a place, an act, an object. A sentence that only states a condition or a feeling is not one of them.
 - One sentence is an event this book contains, written in the story's voice as a thing that happens and can be pictured. It never addresses the reader and never names the reader, the book, the page or the picture. Never whether they manage it, and never what decides it. It stands after the obstacle.
 - No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
-- The last sentence states what failing costs. Nothing comes after it.
+- The idea names what failing costs, wherever it fits, and the loss is one the book could show on a page. The last sentence is the main character in the act, the picture a parent can see.
 - [FINAL] holds the idea text only: no notes, no headings, no second version, no commentary.
 - Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 - The idea centres on the main characters
@@ -117,7 +119,7 @@ Check and critique:
    - Within the sentence limit?
    - No sentence past about 30 words, and no dash holding two clauses together in one sentence?
 3. **Characters**: for each name, quote the words that give them a stake. Living with, coming along with, or waiting for the others is not a stake. A name with no such words is not in the story yet.
-4. **Back cover, not synopsis**: number the sentences of [FINAL]. Label each one "setup", "hook", "promise", "event", "rule" or "cost". A "promise" names an event the book contains, in the story's voice, and does not say whether they manage it. A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Only "event" and "rule" are cut: every sentence marked "event" other than the last, and every sentence marked "rule". Setup, hook, promise and cost are kept. List every cut sentence, not one of them.
+4. **Back cover, not synopsis**: number the sentences of [FINAL]. Label each one "setup", "hook", "promise", "event", "rule", "cost" or "act". A "promise" names an event the book contains, in the story's voice, and does not say whether they manage it. A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. An "act" is the main character in the act, the picture a parent can see; the last sentence is labelled "act" and kept. A "cost" may stand anywhere and is kept. Only "event" and "rule" are cut: every sentence marked "event" other than the last, and every sentence marked "rule". Setup, hook, promise, cost and act are kept. List every cut sentence, not one of them.
 5. **Peril**: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in [FINAL]. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 6. **Topic**: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
 7. **Hook**: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to [FINAL]. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them.
@@ -125,7 +127,7 @@ Check and critique:
 9. **Promise**: quote the sentence that names an event the book contains. If there is nothing to quote, add one to [FINAL]. If it says whether they manage it, or what decides it, rewrite it. Then quote any words that address the reader or name the reader, the book, the page or the picture, and cut them.
 10. **Shape**: name the shape you were given and quote the words in [FINAL] that carry it. If it is not there, rewrite [FINAL] to the shape.
 11. **Opening**: quote the first sentence. If it states where and when rather than showing the hook or the main character, rewrite it.
-12. **Length**: count the sentences of [FINAL] and the words of the longest one. Past six sentences, or past 30 words, split or cut before [FINAL].
+12. **Length**: count the sentences of [FINAL], count its paragraphs, and count the words of the longest sentence. If the sentence count or the paragraph shape is not the one the scope names, add or cut before [FINAL]. Past 30 words in a sentence, split before [FINAL]. Then quote, for each sentence, the concrete thing a reader can see in it; rewrite any sentence that only states a condition or a feeling.
 13. **Would a parent buy it**: answer each of these with a quote from [FINAL].
 {BUY_CRITERION}
 A question with no quote to answer it means that part of [FINAL] gets rewritten until there is one. This is the last check, and it outranks the others: an idea that survives every check above and answers none of these is not worth printing.

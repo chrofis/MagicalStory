@@ -33,19 +33,37 @@ describe('story-idea templates — the round-10 slot list, in both siblings', ()
     expect(src).toContain('One thing in the idea is out of the ordinary');
   });
 
-  it.each(TEMPLATES)('%s labels and keeps setup, hook, promise and cost; cuts event and rule', (t) => {
+  // Owner, 2026-09-21: "act" joins the label list, a "cost" may stand anywhere,
+  // and the last sentence is the picture — not the cost line.
+  it.each(TEMPLATES)('%s labels and keeps setup, hook, promise, cost and act; cuts event and rule', (t) => {
     const src = read(t);
-    expect(src).toContain('"setup", "hook", "promise", "event", "rule" or "cost"');
+    expect(src).toContain('"setup", "hook", "promise", "event", "rule", "cost" or "act"');
     expect(src).toContain('Only "event" and "rule" are cut');
-    expect(src).toContain('Setup, hook, promise and cost are kept');
+    expect(src).toContain('Setup, hook, promise, cost and act are kept');
+    expect(src).toContain('A "cost" may stand anywhere and is kept');
+    expect(src).toContain('the last sentence is labelled "act" and kept');
+    expect(src).not.toContain('Setup, hook, promise and cost are kept');
   });
 
-  it.each(TEMPLATES)('%s asks for four to six sentences, at most one per slot', (t) => {
+  // Reversal of the 2026-09-14 fixed-length line: the count comes from
+  // {STORY_SCOPE}, so no template may carry a range of its own.
+  it.each(TEMPLATES)('%s defers the sentence count to the scope, with the 30-word bound kept', (t) => {
     const src = read(t);
-    expect(src).toMatch(/[Ff]our to six sentences/);
+    expect(src).not.toMatch(/[Ff]our to six sentences/);
     expect(src).not.toMatch(/[Tt]hree to five sentences/);
-    expect(src).toContain('at most one sentence per slot');
-    expect(src).toMatch(/Past six sentences, or past 30 words/);
+    expect(src).not.toContain('at most one sentence per slot');
+    expect(src).not.toMatch(/Past six sentences, or past 30 words/);
+    expect(src).toContain('the sentence count the scope names');
+    expect(src).toMatch(/No sentence runs past about 30 words/);
+    expect(src).toContain('{STORY_SCOPE}');
+  });
+
+  it.each(TEMPLATES)('%s ends on the picture and states the cost wherever it fits', (t) => {
+    const src = read(t);
+    expect(src).not.toContain('The last sentence states what failing costs. Nothing comes after it.');
+    expect(src).toContain('The idea names what failing costs, wherever it fits');
+    expect(src).toContain('The last sentence is the main character in the act, the picture a parent can see.');
+    expect(src).toContain('Every sentence carries one concrete thing a reader can see');
   });
 
   it.each(TEMPLATES)('%s keeps the hook and promise quoting checks', (t) => {
