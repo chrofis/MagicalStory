@@ -139,10 +139,20 @@ function stripSeedLists(guideText) {
  * model. Round 12 measured the turn supplying a PLACE (a ruin at dusk, a broken
  * wall, an outer hull) and peril's height class went 1 -> 4 on it, and a "turn"
  * asked of a five-sentence back cover is a middle to narrate.
+ *
+ * In the short band the centre IS the idea's one strange thing: a ten-page back
+ * cover that carries a world seed and a hook of its own reads as two ideas
+ * competing (round 20's pirate arm — a ship on a ruin, a parrot, a waiting
+ * island child and a boy alone on deck, in four sentences). So the line says so.
+ *
+ * @param {object|null} seeds @param {object} [opts] @param {number} [opts.pages]
  */
-function worldSeedInstruction(seeds) {
+function worldSeedInstruction(seeds, { pages } = {}) {
   if (!seeds) return '';
-  return `Someone in this idea: ${seeds.centre}. Build the want or the obstacle on them.`;
+  const only = (typeof pages === 'number' && pages <= 10)
+    ? ' This is the only strange thing in the idea.'
+    : '';
+  return `Someone in this idea: ${seeds.centre}. Build the want or the obstacle on them.${only}`;
 }
 
 const ANGLE_LABEL = 'STORY ANGLES:';

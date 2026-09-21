@@ -54054,3 +54054,89 @@ enable open + click tracking in the Resend dashboard, create a webhook pointing 
 the endpoint answers 500 by design.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-21 — The idea's cast is closed, the last sentence is a movement of the body, and a short book carries one strange thing
+
+**Context:** Round 20 (entry above) shipped eight ideas that all ended on an act
+and all held their band. Reading them for what was still wrong found three
+faults, one per band:
+
+1. **Cast leak.** Cell 10 arm 1 (25 pages) added a second dragon and a raven,
+   neither of them in the cast the wizard had declared. The long band's scope
+   line asks for "a second thread that crosses the main one" and says nothing
+   about whose thread it is, so the model staffed it.
+2. **Act leak.** An act sentence can be an act in grammar and a resolution in
+   substance: «hält den Beweis in der Hand, dass das Versprechen für ihn gemacht
+   worden ist» is the child HOLDING the thing that decides the outcome. The
+   ending rule said "what the child does now"; holding is something a child does.
+3. **Density.** In the short band the world seed and the hook compete. Round 20's
+   pirate arm carried a ship on a ruin, a parrot, a waiting island child and a boy
+   alone on deck — four strange things in four sentences, none of them given room.
+   Its own idea-level rule already says "One thing in the idea is out of the
+   ordinary", but the scope band and the injected seed line each add one more.
+
+**Decision:** three fixes, in the `story-idea-templates` sibling pair,
+`buildStoryScope` and `worldSeedInstruction`.
+
+1. **Cast.** Both templates gain, next to the existing "a character is in the
+   idea through what they want" rule: *"The idea's people are the cast. A
+   stranger, a creature or a keeper may stand in the way; a new companion,
+   helper or teller does not join."* The 21+ scope band gains *"The second
+   thread is the same cast in a new place; nobody joins the story who is not in
+   the cast."* and the 11-20 band *"The places are the same cast's places."*
+2. **Act.** The ending rule in both templates gains: *"The last sentence is a
+   movement of the child's body toward the want: a reach, a climb, a step, a
+   call. It is not the child holding, knowing or having the thing that decides
+   the outcome."* The CUT step's ending check gains a second pass over the same
+   sentence: *"Then quote the last sentence again: if the child holds, knows or
+   has what decides it, replace the sentence with the movement just before that."*
+3. **Density.** The ≤10 scope band gains *"One strange thing only: the creature
+   or thing the idea is built on. Nothing else in it is out of the ordinary."*
+   and `worldSeedInstruction(seeds, { pages })` — pages newly wired in from the
+   one call site that builds the per-arm lines — appends *"This is the only
+   strange thing in the idea."* at ten pages and under. Both templates' concrete-
+   thing rule gains *"A feeling is shown by what the body does, never named."*
+
+**Rationale.** All three are the same shape as the round-19 and round-20 fixes:
+the rule already existed somewhere and was contradicted somewhere else. The cast
+rule existed for who is IN the idea and not for who may be added; the ending rule
+named the grammar of the last sentence and not its substance; the one-strange-
+thing rule lived in the template while the scope band and the seed line each
+handed the model another. Nothing here is a new constraint — it is the same
+constraint reaching the three places that were overriding it.
+
+**Sibling set `story-idea-templates`:** both templates changed in the same
+commit (`check-sibling-paths.js --list` clean), every substitution applied under
+an exactly-once assertion.
+
+**Validated (rung 2 — real generation on the real builder, USD 0.55):** dry-run
+of cells 1 (10 pages) and 10 (25 pages) first — each band line present in its own
+band and absent from the other, the seed's "only strange thing" clause on cell 1
+and not on cell 10, all three template rules present, no unfilled placeholders.
+Then `node tests/manual/story-idea-rounds.js --round=21 --cells=1,3,7,10` — 8 ideas.
+**Eight of eight end on a movement of the body** (a run and a reach, a reach with
+seaweed held out, a reach through a tower hole, a kneel and a push into a hollow,
+hands through a fence, a crawl and a reach, a jump down and a reach, a hand out
+before the other child speaks). **Nobody outside the cast joins any of the eight:**
+every added figure is a creature standing in the way (a ghost, a leaf-creature, a
+crab, a hen, a pony, the dragon Soru, a hatchling and its mother), which the rule
+permits; round 20's second dragon plus raven has no counterpart. **Each ≤10-page
+idea carries one strange thing** (a map with a waiting child on it; a crab that
+will not leave the chest; a pony that comes to no one; a hen that lets no one
+near) against the pirate arm's four. **No feeling is named in any of the eight.**
+Every idea held its band exactly: 4 sentences at 10 pages (57/64/41/50 words),
+6 at 16 (105/91), 9 in two paragraphs at 25 (150/133). One German slip survives
+in cell 10 arm 1 ("streckt beiden Armen aus"), unrelated to these rules. No blind
+read was run: this entry records that the mechanism fires, not that it sells better.
+
+**Touched:** `prompts/generate-story-idea-single.txt`,
+`prompts/generate-story-ideas.txt` (sibling set `story-idea-templates`),
+`server/routes/storyIdeas.js` (`buildStoryScope`, the world-seed call site),
+`server/lib/worldSeeds.js` (`worldSeedInstruction` takes `pages`),
+`tests/unit/idea-scope-and-landmarks.test.ts`, `tests/unit/idea-turn-slot.test.ts`,
+`tests/unit/world-seeds.test.ts`,
+`tests/manual/story-idea-rounds/round-21.json` / `round-21.md`, `ideas-r21.html`.
+
+**Status:** ✅ active on `staging` only; not on master.

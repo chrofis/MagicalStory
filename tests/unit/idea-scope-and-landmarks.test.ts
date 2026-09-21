@@ -102,3 +102,33 @@ describe('idea landmarks section', () => {
     expect(buildIdeaLandmarksSection(undefined)).toBe('');
   });
 });
+
+// Round 21 (owner, 2026-09-21). Three defects measured on round 20: a 25-page
+// arm grew a second dragon and a raven nobody had cast; a last sentence ended on
+// the child HOLDING the proof; a ten-page arm carried a world seed and a hook of
+// its own and read as two ideas at once.
+describe('{STORY_SCOPE} — round-21 band lines', () => {
+  it('only the short band forbids a second strange thing', () => {
+    const short = buildStoryScope(10);
+    expect(short).toContain('One strange thing only: the creature or thing the idea is built on.');
+    expect(short).toContain('Nothing else in it is out of the ordinary.');
+    for (const pages of [16, 25]) {
+      expect(buildStoryScope(pages)).not.toContain('One strange thing only');
+    }
+  });
+
+  it('only the journey band keeps the places with the cast', () => {
+    expect(buildStoryScope(16)).toContain("The places are the same cast's places.");
+    for (const pages of [10, 25]) {
+      expect(buildStoryScope(pages)).not.toContain("The places are the same cast's places.");
+    }
+  });
+
+  it('only the world band binds the second thread to the cast', () => {
+    const world = buildStoryScope(25);
+    expect(world).toContain('The second thread is the same cast in a new place; nobody joins the story who is not in the cast.');
+    for (const pages of [10, 16]) {
+      expect(buildStoryScope(pages)).not.toContain('The second thread is the same cast in a new place');
+    }
+  });
+});

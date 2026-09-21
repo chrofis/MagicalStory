@@ -154,4 +154,20 @@ describe('story-idea templates — the worked examples end on the act', () => {
     expect(src).toContain('The last sentence is what the child does now. It does not begin with a condition and it does not say what happens if.');
     expect(src).toContain('Then quote the last sentence of the final: if it begins with a condition or says what happens if, move the cost earlier and end on the act.');
   });
+  // Round 21: three rules the round-20 ideas broke.
+  it.each(TEMPLATES)('%s keeps the cast closed', (t) => {
+    const src = read(t);
+    expect(src).toContain("The idea's people are the cast. A stranger, a creature or a keeper may stand in the way; a new companion, helper or teller does not join.");
+  });
+
+  it.each(TEMPLATES)('%s ends on a movement, not on holding what decides it', (t) => {
+    const src = read(t);
+    expect(src).toContain("The last sentence is a movement of the child's body toward the want: a reach, a climb, a step, a call. It is not the child holding, knowing or having the thing that decides the outcome.");
+    expect(src).toContain('Then quote the last sentence again: if the child holds, knows or has what decides it, replace the sentence with the movement just before that.');
+  });
+
+  it.each(TEMPLATES)('%s shows a feeling by the body and never names it', (t) => {
+    const src = read(t);
+    expect(src).toContain('A feeling is shown by what the body does, never named.');
+  });
 });

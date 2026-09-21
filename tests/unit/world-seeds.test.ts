@@ -78,6 +78,18 @@ describe('pickWorldSeeds', () => {
     expect(line).not.toContain(picked.turn);
     expect(line).not.toContain('Turn:');
   });
+
+  // Round 21: in the short band the centre IS the idea's one strange thing.
+  it('tells the short band the centre is its only strange thing', () => {
+    const picked = pickWorldSeeds({ ...input, arm: 0 });
+    for (const pages of [4, 10]) {
+      expect(worldSeedInstruction(picked, { pages })).toBe(`Someone in this idea: ${picked.centre}. Build the want or the obstacle on them. This is the only strange thing in the idea.`);
+    }
+    for (const pages of [11, 16, 25]) {
+      expect(worldSeedInstruction(picked, { pages })).not.toContain('only strange thing');
+    }
+    expect(worldSeedInstruction(picked)).not.toContain('only strange thing');
+  });
 });
 
 describe('stripSeedLists — the idea prompt sees the pick, never the menu', () => {

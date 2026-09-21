@@ -68,10 +68,10 @@ const SCOPE_TAIL = 'Write the sentence count this scope names, no more and no le
 
 function buildStoryScope(pages) {
   const band = pages <= 10
-    ? 'This is a short book. The back cover is four sentences in one paragraph: one place, one creature or thing, one want, one obstacle. The cast is beside the child.'
+    ? 'This is a short book. The back cover is four sentences in one paragraph: one place, one creature or thing, one want, one obstacle. The cast is beside the child. One strange thing only: the creature or thing the idea is built on. Nothing else in it is out of the ordinary.'
     : pages <= 20
-      ? 'This is a journey. The back cover is six sentences in one paragraph: the goal is somewhere else, two or three places named where the action is, one side character with a want of their own, one turn.'
-      : 'This is a world. The back cover is nine sentences in two paragraphs. The first paragraph is the home and the want. The second is the world: several places, days pass, two side characters with wants of their own, a second thread that crosses the main one, one turn.';
+      ? 'This is a journey. The back cover is six sentences in one paragraph: the goal is somewhere else, two or three places named where the action is, one side character with a want of their own, one turn. The places are the same cast\'s places.'
+      : 'This is a world. The back cover is nine sentences in two paragraphs. The first paragraph is the home and the want. The second is the world: several places, days pass, two side characters with wants of their own, a second thread that crosses the main one, one turn. The second thread is the same cast in a new place; nobody joins the story who is not in the cast.';
   return `${band}\n\n${SCOPE_TAIL}`;
 }
 
@@ -311,7 +311,7 @@ ${adventureGuideContent}`
   }
   const worldSeedLines = [0, 1].map(arm => (historicalAngles[arm]
     ? historicalAngleInstruction(historicalAngles[arm])
-    : worldSeedInstruction(worldSeeds[arm])));
+    : worldSeedInstruction(worldSeeds[arm], { pages })));
   // One concrete place per arm, from the guide's own setting line. Injected on
   // the FANTASY arm only (the location arm already has named landmarks), so the
   // value is computed here and the world is applied at the call site.
