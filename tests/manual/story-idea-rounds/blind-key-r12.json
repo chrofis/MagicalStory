@@ -1,0 +1,282 @@
+[
+ {
+  "id": "B01",
+  "round": "R12",
+  "cell": 5,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B02",
+  "round": "R12",
+  "cell": 2,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B03",
+  "round": "R1",
+  "cell": 9,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B04",
+  "round": "R1",
+  "cell": 8,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B05",
+  "round": "R1",
+  "cell": 10,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B06",
+  "round": "R1",
+  "cell": 3,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B07",
+  "round": "R1",
+  "cell": 9,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B08",
+  "round": "R12",
+  "cell": 8,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B09",
+  "round": "R12",
+  "cell": 1,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B10",
+  "round": "R12",
+  "cell": 1,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B11",
+  "round": "R1",
+  "cell": 3,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B12",
+  "round": "R1",
+  "cell": 2,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B13",
+  "round": "R1",
+  "cell": 7,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B14",
+  "round": "R1",
+  "cell": 10,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B15",
+  "round": "R12",
+  "cell": 10,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B16",
+  "round": "R12",
+  "cell": 9,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B17",
+  "round": "R12",
+  "cell": 4,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B18",
+  "round": "R12",
+  "cell": 5,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B19",
+  "round": "R1",
+  "cell": 4,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B20",
+  "round": "R12",
+  "cell": 6,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B21",
+  "round": "R12",
+  "cell": 9,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B22",
+  "round": "R1",
+  "cell": 5,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B23",
+  "round": "R12",
+  "cell": 2,
+  "arm": 2,
+  "world": "location"
+ },
+ {
+  "id": "B24",
+  "round": "R1",
+  "cell": 7,
+  "arm": 2,
+  "world": "location"
+ },
+ {
+  "id": "B25",
+  "round": "R1",
+  "cell": 6,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B26",
+  "round": "R12",
+  "cell": 7,
+  "arm": 2,
+  "world": "location"
+ },
+ {
+  "id": "B27",
+  "round": "R12",
+  "cell": 6,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B28",
+  "round": "R1",
+  "cell": 5,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B29",
+  "round": "R12",
+  "cell": 4,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B30",
+  "round": "R12",
+  "cell": 7,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B31",
+  "round": "R1",
+  "cell": 2,
+  "arm": 2,
+  "world": "location"
+ },
+ {
+  "id": "B32",
+  "round": "R12",
+  "cell": 8,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B33",
+  "round": "R1",
+  "cell": 1,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B34",
+  "round": "R12",
+  "cell": 3,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B35",
+  "round": "R1",
+  "cell": 6,
+  "arm": 1,
+  "world": "location"
+ },
+ {
+  "id": "B36",
+  "round": "R1",
+  "cell": 8,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B37",
+  "round": "R12",
+  "cell": 10,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B38",
+  "round": "R12",
+  "cell": 3,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B39",
+  "round": "R1",
+  "cell": 4,
+  "arm": 2,
+  "world": "fantasy"
+ },
+ {
+  "id": "B40",
+  "round": "R1",
+  "cell": 1,
+  "arm": 2,
+  "world": "fantasy"
+ }
+]

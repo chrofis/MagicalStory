@@ -52148,6 +52148,62 @@ should be defined by what is at stake rather than by which shapes are forbidden.
 `tests/manual/story-idea-rounds/round-11-defects.md`.
 Artefacts: `round-11.json` / `.md`, `blind-set-r11.md`, `blind-scores-r11.md`, `blind-key-r11.json`.
 
+**Follow-up (2026-09-21) — round 12: the world seed. The best contract mean of the series, the
+duplicate-arm class gone, and the buy axis down again to 3.30. R10's 3.90 still stands.**
+
+*What was changed* (`3068276de`), acting on R11's verdict that the next attempt at the buy axis
+should not be another peril, cast or cost rule — one change, in code, both sibling templates in
+step. Every adventure guide has carried two ten-item lists since `abf78b05d` (`Who lives here` /
+`What turns`). The model chose from them, which is why one cast produced the same story on both
+arms. **`server/lib/worldSeeds.js` now picks ONE centre and ONE turn per arm** — deterministic from
+the same seed `pickPremiseShapes` uses, guaranteed different between the arms on BOTH lists, handed
+over as a value for the same reason the premise shape is: the second idea call cannot see the first.
+Injected as `{WORLD_SEED}` (single template) / `{WORLD_SEED_1}`, `{WORLD_SEED_2}` (two-idea
+template), right beside the shape, declared in `applyReplacements` for every call site. A theme with
+no adventure guide returns null and nothing is injected — verified on the dry run for the historical
+cells and for theme `realistic`. The idea seed hash moved into `worldSeeds.js` as the one definition
+the shape pick, the place-class pick and the seed pick share; the picked centre and turn ride in the
+`idea_generated` telemetry `detail` (no schema change).
+
+*Result* (`round-12.json` / `.md`, 20 ideas, USD 1.1389; `round-12-defects.md`).
+**a 3.30 → 3.85** (the best of twelve rounds), c 4.35 → 4.40, g 4.30 → 4.35, h 5.00 → 4.75,
+f 4.00 → 4.30. Three fault classes the rule rounds never closed:
+- **Stated rule or gate leaked into the premise: 3 → 0.** A premise handed a centre and a turn has
+  somewhere to put its first two sentences and stops inventing a gate to fill them.
+- **Both arms tell the same story: 1 → 0, for the first time in the series.** Cell 7 was the standing
+  instance (two near-identical ideas in R10 and R11 from one cast); with a guaranteed-different
+  centre and turn it produced a pony and a hen.
+- **A cost that ends on never coming home: 2 → 0** — the class R11 explicitly could not move.
+The seed was visibly used in all 14 seeded arms, almost always as the opening image.
+
+*What it cost.* **Peril's height class went back up, 1 → 4.** The turns that carry urgency supply a
+place, and four of them put a child on a ruin at dusk, a broken wall, an outer hull, a rock ledge.
+The R11 quoting check is unchanged; the seed supplies the place faster than the check removes it.
+
+*And the blind buy read fell again.* R1 vs R12, 40 texts, ids shuffled, a fresh rater who saw no
+labels and no ratings file: **R1 3.50 (2:5 3:3 4:9 5:3), R12 3.30 (2:4 3:7 4:8 5:1), diff −0.20;
+R12 wins 3 arms, loses 6, ties 11.** Against R10's 3.90 that is −0.60. The rater's losing reasons
+are consistent and they are about population, not about any defect: «three wants competing, a
+three-year-old loses the thread», «five names tangled around a capsule», «a riddle, not a picture».
+A seeded premise is a more furnished premise, and on a back cover furniture reads as hard to follow.
+
+*Verdict.* 🟡 **KEPT on the defect axes, and the confirmation round was NOT run** (the gate was a
+blind mean ≥ 4.0; USD 1.26 of the 2.40 budget is unspent). The seed closes three classes no prompt
+rule reached in eleven rounds and ends the duplicate-arm defect outright, which is a product defect
+whatever the buy read says. But **R10 remains the best measured version on the buy axis (3.90)**,
+and this is now the third consecutive round in which a change that improves defect compliance costs
+buy score. Two standing items the seed did not touch, both already named by R11: the space guide's
+own machinery (cell 5 has scored 2.0 in three straight rounds for the same reason — Kanal sieben,
+Akku, Koordinaten), and the open question of whether a "loss the child can bear" should be defined
+by what is at stake rather than by which shapes are forbidden. A fourth rule round on the buy axis
+is not indicated by any of this evidence.
+
+**Touched:** `server/lib/worldSeeds.js` (new), `server/routes/storyIdeas.js`,
+`prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`tests/unit/world-seeds.test.ts` (new), `tests/manual/story-idea-rounds.js`, `docs/decisions.md`.
+Artefacts: `round-12.json` / `.md`, `round-12-defects.md`, `blind-set-r12.md`,
+`blind-scores-r12.md`, `blind-key-r12.json`.
+
 
 
 ---
