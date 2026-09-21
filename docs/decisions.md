@@ -361,6 +361,54 @@ the new verbatim path, which produces no plan. Both are in `tasks/BACKLOG.md`.
 
 ---
 
+## 2026-09-21 — The declared gaze reached no judge: `meta.characters` is an array of NAME STRINGS
+
+**Context:** `formatInteractionsBlock` takes the brief's `characters[]` and emits
+one `- <name> looks at <target>` line per declared `looksAt`. Its own comment
+says why: "so the judges enforce a DECLARED gaze instead of inferring one from
+what a character holds."
+
+`extractSceneMetadata` returns BOTH `characters` — an array of bare NAME STRINGS
+— and `fullData.characters`, the objects that actually carry `looksAt`. All
+three evaluators resolved it as `meta?.characters || meta?.fullData?.characters`.
+The string array is non-empty, so it always won; the builder then filters
+`c?.name && c.looksAt`, which no string satisfies, and every gaze line was
+dropped.
+
+**The declared gaze therefore reached NO judge, on any page of any story, since
+the feature was added** — the quality judge (`evalPipeline.js:784`), the batch
+evaluator (`:2338`) and the semantic judge (`sceneValidator.js:852`) all read the
+same wrong array.
+
+Measured on `job_1789853503332_riqncqg1i`: 2-4 characters parsed per page, **0**
+gaze lines emitted. Pages 2, 3 and 6 shipped at 100 / 100 / 85 carrying a gaze
+the brief declares and the picture does not give — p6 declares all four children
+looking at the egg and not one of them does.
+
+Found while A/B-testing an atomic gaze RULE in the Lab. The rule was inert on all
+five pages, in both arms. It was inert because there was nothing in the block for
+it to act on: the experiment was invalid, and checking why is what surfaced this.
+
+**Decision:** `gazeCharacters(meta)` in `vbIdGuard.js`, beside the builder it
+feeds, is the one resolver — it returns the first candidate array whose entries
+are objects with a name, `fullData.characters` first. All three evaluators call
+it. A unit test pins that no evaluator still carries the string-first expression.
+
+**Rationale:** Same shape as the `semanticResult.issues` bug fixed the day
+before: `a || b` where `a` is truthy and wrong. There it was an empty array being
+truthy; here an array of the wrong TYPE. Both were invisible because the wrong
+branch produces a plausible empty result rather than an error. One resolver per
+question removes the ordering, which is the only thing that decided the outcome.
+
+**NOT decided here:** whether the judges should be given a rule that ACTS on the
+gaze lines. They now receive them; no D-rule asks about them. That A/B can be run
+properly for the first time and is the open half of the under-charging question.
+
+**Touched:** `server/lib/vbIdGuard.js` (`gazeCharacters`),
+`server/lib/evalPipeline.js` ×2, `server/lib/sceneValidator.js`,
+`tests/unit/gaze-reaches-the-judges.test.ts`.
+**Status:** ✅ active
+
 ## 2026-09-21 — An angled page takes a plate DERIVED from the vantage's, not the vantage's own
 
 **Context:** A backdrop plate is painted once per vantage and every page of that

@@ -208,6 +208,33 @@ function scrubVbIds(text, visualBible = null, pageNumber = null) {
 // `characters` (optional): the brief's characters[]; each `looksAt` becomes a
 // gaze line, so the judges enforce a DECLARED gaze instead of inferring one
 // from what a character holds.
+/**
+ * THE CHARACTERS ARRAY THAT CARRIES PER-CHARACTER FIELDS.
+ *
+ * `extractSceneMetadata` returns BOTH `characters` (an array of bare NAME
+ * STRINGS) and `fullData.characters` (the objects, each with `looksAt`,
+ * `expression`, `position`). All three evaluators resolved it as
+ * `meta?.characters || meta?.fullData?.characters` — and the string array is
+ * non-empty, so it always won. `formatInteractionsBlock` then filtered
+ * `c?.name && c.looksAt`, which no string has, and every gaze line was dropped.
+ *
+ * So the declared gaze reached NO judge, on any page of any story, since the
+ * feature was added — the quality judge (evalPipeline), the semantic judge
+ * (sceneValidator) and the batch evaluator all read the same wrong array.
+ * Measured on job_1789853503332_riqncqg1i: 2-4 characters parsed per page, 0
+ * gaze lines emitted, and pages 2, 3 and 6 shipped at 100/100/85 with a gaze
+ * the brief declares and the picture does not give.
+ *
+ * Same shape as the `semanticResult.issues` bug fixed the day before: `a || b`
+ * where `a` is truthy and wrong.
+ */
+function gazeCharacters(meta) {
+  for (const candidate of [meta?.fullData?.characters, meta?.characters]) {
+    if (Array.isArray(candidate) && candidate.some(c => c && typeof c === 'object' && c.name)) return candidate;
+  }
+  return null;
+}
+
 function formatInteractionsBlock(interactions, visualBible = null, characters = null) {
   const list = Array.isArray(interactions) ? interactions : [];
   const gazes = (Array.isArray(characters) ? characters : [])
@@ -291,5 +318,6 @@ module.exports = {
   VB_ID_LEGITIMATE_LABELS,
   scrubVbIds,
   formatInteractionsBlock,
+  gazeCharacters,
   formatElementsBlock,
 };
