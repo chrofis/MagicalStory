@@ -39,6 +39,18 @@ const { log } = require('../utils/logger');
 
 // The ONE rule both sides receive. Generator and critic get the same sentence;
 // each block below adds only the page's own strings around it.
+// The AUTHORING rule. REQUIRED_TEXT_RULE above tells the ILLUSTRATOR and the
+// judges what to do with a string that was declared; this one tells the stage
+// that writes the Visual Bible WHEN to declare one at all. Until 2026-09-21 no
+// authoring template carried a trigger: `text` was an opt-out schema note, so
+// on job_1789945743706_8ayo2w19e p14 the element that had to carry an ordered
+// run declared `text: null`, p15 listed no text-carrying element at all, and
+// p3's recurring lettered class had no entry to hang a string on. Over-
+// declaring is the opposite defect — image-generation.txt bans lettering by
+// default and a string declared for a picture that needs none forces words
+// into it — so the rule names both directions and the recurring-class case.
+const REQUIRED_TEXT_AUTHORING_RULE = 'Lettering the reader must actually READ — a signpost a character reads, a labelled door, a numbered house, a name on a gift — is declared: the element carrying it gets an entry whose `text` is the exact characters in the order they must appear. Nothing else declares `text`: writing the story never asks anyone to read stays undeclared and its `description` calls it illegible. A page whose prose has someone read something cites an entry that declares the string, and an entry is written for it when none exists. Many instances of one lettered thing — a row of marked posts, a shelf of labelled jars — are ONE entry with a plural label whose `text` is the whole run in the order it must read across them, and such an entry is never `generic`.';
+
 const REQUIRED_TEXT_RULE = 'Each string listed above is painted on the element named, exactly those characters in that order, left to right, correctly spelled and legible. No other surface in the image carries lettering.';
 
 /**
@@ -170,6 +182,7 @@ function logRequiredTexts(items, pageNumber) {
 
 module.exports = {
   REQUIRED_TEXT_RULE,
+  REQUIRED_TEXT_AUTHORING_RULE,
   declaredText,
   collectRequiredTexts,
   buildRequiredTextBlock,

@@ -54311,3 +54311,42 @@ on them". Both are owner decisions, filed in `tasks/BACKLOG.md`.
 `tests/manual/story-idea-rounds/round-22.json` / `round-22.md`, `ideas-r22.html`.
 
 **Status:** ✅ active on `staging` only; not on master.
+
+## The Visual Bible AUTHORING stage is told WHEN to declare `text` (2026-09-21)
+**Context:** `e025d9fef` shipped the delivery half — a Visual Bible element's declared
+`text` reaches the page prompt (a `REQUIRED TEXT` block in the shrink-proof tail), the
+repair clause and all three judges, scored as `required_text` (D-33). It only carries
+what the bible DECLARED, and nothing told the authoring stage when to declare. Measured
+on production `job_1789945743706_8ayo2w19e`, whose plot turns on legible letters:
+p16's element declared its string and is fixed; p14's element declared `text: null` and
+rendered a scrambled run; p15 listed no text-carrying element at all and rendered the
+wrong pair **at 100/100**; p3 needed lettering on a recurring class of objects for which
+no entry existed at all. Replaying the real builder over the stored inputs confirmed all
+three emit no `REQUIRED TEXT` block.
+**Decision:** ONE constant, `REQUIRED_TEXT_AUTHORING_RULE` in `server/lib/requiredText.js`,
+injected as `{REQUIRED_TEXT_AUTHORING}` into **both** VB authoring sites
+(`scene-expansion-all.txt`, `story-trial.txt`) and into the critic that reviews their
+output (`scene-review.txt`). It states the trigger (lettering the reader must READ),
+the ban (nothing else declares `text`; undeclared writing is called illegible), the
+missing-entry case (a page whose prose has someone read something cites an entry that
+declares the string, and one is written when none exists) and the **recurring-class
+contract**: many instances of one lettered thing are ONE entry with a plural label whose
+`text` is the whole run in the order it must read across them, and such an entry is never
+`generic`. `scene-expansion-all`'s `text` schema note was widened from "the exact words, at
+most three" to "the exact characters, in the order they must appear — a few words, or a run
+of letters or digits"; `story-trial`'s artifacts schema gained `text` at all. Critic side:
+check 9g `[required_text_undeclared]`, a `# VISUAL BIBLE — DECLARED TEXT` block listing every
+possible text carrier and what it currently declares, and a `text` lane in
+`applyReviewBibleCorrections` so the correction can be adopted (it was states-only).
+**Rationale:** Over-declaring is the opposite defect — `image-generation.txt` bans lettering
+by default and a spurious string forces words into a picture that should have none — so the
+rule names both directions rather than only the trigger. The recurring class gets one entry
+because a per-instance entry per lamp-post is not authorable and a `generic` entry has no id,
+no cell and no way to carry a string. One constant rather than three copies, per the
+generator↔critic rule; the reviewer's correction had to become adoptable or its finding could
+not change anything (a text carrier usually has no `states[]`, which is all the channel took).
+**Touched:** `server/lib/requiredText.js`, `server/lib/promptBuilders.js`,
+`server/lib/beatsPipeline.js`, `prompts/scene-expansion-all.txt`, `prompts/story-trial.txt`,
+`prompts/scene-review.txt`, `tests/unit/required-text.test.ts`
+**Status:** ✅ active — authoring-side compliance is unproven offline; it needs a paid Lab
+run or a story to observe, and none was spent.

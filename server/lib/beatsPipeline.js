@@ -367,8 +367,24 @@ function applyReviewBibleCorrections(raw, visualBible, pageCount, citedHandles) 
     if (!id) { out.rejected.push({ id: '(none)', reason: 'entry has no id' }); continue; }
     const entry = byId.get(id);
     if (!entry) { out.rejected.push({ id, reason: 'no bible entry has that id' }); continue; }
+    // TEXT (check 9g). A correction may carry `text` alone: a signpost that has
+    // to spell a word usually has no states[] at all, and the entry's declared
+    // string is what reaches the page prompt, the repair and all three judges
+    // (server/lib/requiredText.js). Taken independently of states[] — a row
+    // with text and no states is a legal correction, and an empty/null `text`
+    // is the reviewer withdrawing an over-declaration.
+    if (Object.prototype.hasOwnProperty.call(row, 'text')) {
+      const before = typeof entry.text === 'string' ? entry.text : null;
+      const after = typeof row.text === 'string' && row.text.trim() ? row.text.trim() : null;
+      if (before !== after) {
+        entry.text = after;
+        out.applied.push({ id, name: '(text)', oldText: before, newText: after });
+      }
+    }
     if (!Array.isArray(row.states) || row.states.length === 0) {
-      out.rejected.push({ id, reason: 'correction carries no states[]' });
+      if (!Object.prototype.hasOwnProperty.call(row, 'text')) {
+        out.rejected.push({ id, reason: 'correction carries no states[] and no text' });
+      }
       continue;
     }
     const states = [];

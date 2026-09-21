@@ -171,3 +171,88 @@ describe('the scored type is registered', () => {
     expect(deductionPoints({ type: 'required_text', severity: 'major' })).toBeGreaterThan(0);
   });
 });
+
+/**
+ * THE AUTHORING SIDE (2026-09-21). The delivery half above only carries what
+ * the Visual Bible DECLARED. On the same production job p14's element declared
+ * `text: null`, p15 listed no text-carrying element at all, and p3's recurring
+ * lettered class had no entry — all three rendered wrong lettering, one of them
+ * at 100/100. ONE authoring rule now reaches both VB authoring sites and the
+ * critic that can fault a missing declaration.
+ *
+ * BEHAVIOUR, not wording: that the rule ARRIVES in each built prompt, that the
+ * critic can see what each element declares, and that the review's correction
+ * channel carries a `text` fix. The sentence may be reworded freely.
+ */
+describe('the authoring rule reaches every site that authors or judges a declaration', () => {
+  const STORY = {
+    childName: 'Main', characters: [{ name: 'Main', age: 7 }], language: 'en',
+    storyTheme: 'adventure', artStyle: 'watercolor', pageCount: 4,
+  };
+
+  it('is ONE constant, not a copy per template', () => {
+    const rule = rt.REQUIRED_TEXT_AUTHORING_RULE;
+    expect(typeof rule).toBe('string');
+    expect(rule.length).toBeGreaterThan(80);
+    // The three shapes the production failure had, all named by the one rule.
+    expect(rule).toMatch(/`text`/);
+  });
+
+  it('arrives in the BUILT all-pages Art Director prompt (the live beats path)', () => {
+    const built = PB.buildSceneExpansionAllPrompt(STORY, [{ pageNumber: 1, planLine: 'The child walks.' }], {});
+    expect(built).toBeTruthy();
+    expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
+    expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');
+  });
+
+  it('arrives in the BUILT trial writer prompt (the sibling VB authoring site)', () => {
+    const built = PB.buildTrialStoryPrompt(STORY, 4);
+    expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
+    expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');
+  });
+
+  it('arrives in the BUILT scene review prompt, the critic that can fault a missing declaration', () => {
+    const built = PB.buildSceneReviewPrompt(STORY, [{ pageNumber: 1, brief: 'A child at a signpost.' }], { visualBible: VB });
+    expect(built).toContain(rt.REQUIRED_TEXT_AUTHORING_RULE);
+    expect(built).not.toContain('{REQUIRED_TEXT_AUTHORING}');
+  });
+
+  it('shows the critic what each element declares — a null is visible as a null', () => {
+    const built = PB.buildSceneReviewPrompt(STORY, [{ pageNumber: 1, brief: 'A child at a signpost.' }], { visualBible: VB });
+    expect(built).toContain('VISUAL BIBLE — DECLARED TEXT');
+    expect(built).toMatch(/ART001[^\n]*text: "WXYZ"/);
+    expect(built).toMatch(/ART002[^\n]*text: \(none declared\)/);
+  });
+});
+
+describe('the scene review can correct a declaration', () => {
+  const { applyReviewBibleCorrections } = require('../../server/lib/beatsPipeline');
+
+  const bible = () => ({
+    artifacts: [{ id: 'ART001', name: 'signpost', description: 'a wooden signpost', text: null, states: [] }],
+    animals: [], vehicles: [], clothing: [], locations: [], secondaryCharacters: [],
+  });
+
+  it('adopts a text-only correction on an entry that has no states', () => {
+    const vb = bible();
+    const raw = '---VISUAL BIBLE---\n```json\n{"artifacts":[{"id":"ART001","text":"WXYZ"}]}\n```';
+    const out = applyReviewBibleCorrections(raw, vb, 4);
+    expect(vb.artifacts[0].text).toBe('WXYZ');
+    expect(out.rejected).toEqual([]);
+  });
+
+  it('adopts a withdrawal — an over-declaration is emptied, not left standing', () => {
+    const vb = bible();
+    vb.artifacts[0].text = 'WXYZ';
+    const raw = '---VISUAL BIBLE---\n```json\n{"artifacts":[{"id":"ART001","text":""}]}\n```';
+    applyReviewBibleCorrections(raw, vb, 4);
+    expect(vb.artifacts[0].text).toBe(null);
+  });
+
+  it('still rejects a correction carrying neither states[] nor text', () => {
+    const vb = bible();
+    const raw = '---VISUAL BIBLE---\n```json\n{"artifacts":[{"id":"ART001"}]}\n```';
+    const out = applyReviewBibleCorrections(raw, vb, 4);
+    expect(out.rejected.length).toBe(1);
+  });
+});

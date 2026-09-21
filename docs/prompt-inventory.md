@@ -56,6 +56,7 @@ left alone. (`docs/decisions.md`, 2026-09-21.)
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
 | vb-label-repair.txt | (new) Visual Bible label repair | One fed-back round to fix Visual Bible label faults |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
+| — | — | **Bible `text` field, AUTHORING contract (2026-09-21):** story-trial.txt, scene-expansion-all.txt and scene-review.txt all carry `{REQUIRED_TEXT_AUTHORING}` — the ONE `REQUIRED_TEXT_AUTHORING_RULE` from `server/lib/requiredText.js` saying WHEN an element declares `text` (and when it must not). scene-expansion-all's `text` schema note now allows a run of letters or digits, story-trial's artifacts schema gained `text`, and scene-review gained check 9g `[required_text_undeclared]` with a `# VISUAL BIBLE — DECLARED TEXT` block and a `text` lane in `applyReviewBibleCorrections` |
 | — | — | **Bible `label` field (2026-09-13):** story-trial.txt and scene-expansion-all.txt both author a `label` beside each element's `id` — the one English name every prompt uses for that element |
 | age-band-routine.txt | promptBuilders.js `buildAgeModeSection` → `{AGE_MODE}` in arc-create, arc-retell, story-arc-review, story-beats, story-trial, trial-idea, generate-story-idea(s) | Plot shape when the oldest MAIN character is 0–1: a day's rhythm, no plot, naming and repetition |
 | age-band-quest.txt | as above (`{AGE_MODE}`) | Oldest MAIN aged 2: one tiny goal, one search place per page, a repeated phrase, cosy close |

@@ -16,6 +16,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // significantEntityTokens is NOT imported here any more: its only consumer in
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
+const { REQUIRED_TEXT_AUTHORING_RULE, declaredText } = require('./requiredText');
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
@@ -2735,6 +2736,10 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
+    // ONE authoring contract for readable in-image lettering, shared by both
+    // Visual Bible authoring sites and the scene reviewer that faults a
+    // missing declaration — see REQUIRED_TEXT_AUTHORING_RULE.
+    REQUIRED_TEXT_AUTHORING: REQUIRED_TEXT_AUTHORING_RULE,
     // ONE entry-page contract for the same two bible-authoring sites — see
     // ELEMENT_ENTRY_PAGE_RULE.
     ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
@@ -3034,6 +3039,10 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     // ONE scale vocabulary for every Visual-Bible authoring site (the
     // all-pages Art Director and the trial writer) — see SCALE_CLASS_SPEC.
     SCALE_CLASS_SPEC,
+    // ONE authoring contract for readable in-image lettering, shared by both
+    // Visual Bible authoring sites and the scene reviewer that faults a
+    // missing declaration — see REQUIRED_TEXT_AUTHORING_RULE.
+    REQUIRED_TEXT_AUTHORING: REQUIRED_TEXT_AUTHORING_RULE,
     // ONE shot vocabulary for every stage that writes or reads a `shot` — the
     // beats planner produces it, planCounters counts it, and the image prompt
     // defines it. See server/lib/shotVocabulary.js.
@@ -9415,6 +9424,22 @@ function buildSceneReviewBibleBlock(visualBible) {
     }
   }
 
+  // DECLARED TEXT. Check 9g faults an element that must carry readable
+  // lettering and declares none, so the reviewer needs every element that
+  // COULD carry it and what it currently declares — the STATED OBJECTS block
+  // above lists only entries with states[], which a text-carrying sign
+  // usually has none of. Locations and secondary characters are not text
+  // carriers and stay out.
+  const textLines = [];
+  for (const key of ['artifacts', 'vehicles', 'clothing', 'animals']) {
+    for (const e of (Array.isArray(visualBible[key]) ? visualBible[key] : [])) {
+      if (!e || !e.id) continue;
+      const label = elementDisplayLabel(e) || e.name || String(e.id);
+      const declared = declaredText(e);
+      textLines.push(`- ${String(e.id).trim().toUpperCase()} (${key}) "${label}" — ${declared ? `text: "${declared}"` : 'text: (none declared)'}`);
+    }
+  }
+
   const blocks = [];
   if (lines.length > 0) {
     blocks.push([
@@ -9424,6 +9449,15 @@ function buildSceneReviewBibleBlock(visualBible) {
       '',
       ...lines,
     ].join('\n'));
+  }
+  if (textLines.length > 0) {
+    blocks.push([
+      '# VISUAL BIBLE — DECLARED TEXT',
+      '',
+      'Every element that could carry readable lettering, and the exact characters it currently declares.',
+      '',
+      ...textLines,
+    ].join(String.fromCharCode(10)));
   }
   if (plateLines.length > 0) {
     blocks.push([
@@ -9518,6 +9552,9 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     // character whose own moment no plan line stages — is nameable here and
     // nowhere else upstream of the finished book.
     TEXT_NOT_A_CHECKLIST: TEXT_NOT_A_CHECKLIST_RULE,
+    // ONE authoring contract for readable in-image lettering, shared with the
+    // two Visual Bible authoring templates — see REQUIRED_TEXT_AUTHORING_RULE.
+    REQUIRED_TEXT_AUTHORING: REQUIRED_TEXT_AUTHORING_RULE,
     // Check 7b, from the one constant the six generator sites are given and
     // planCounters.SHOT_CLOSEUP_BELOW_WAIST measures. It was the last site
     // still spelling the list out by hand, which is how the critic went on
@@ -9959,6 +9996,10 @@ The story takes place in ${inputData.userLocation.city}. Use real place names �
       // ONE scale vocabulary for every Visual-Bible authoring site — the trial
       // writer authors its own bible, so it declares the same placeholder.
       SCALE_CLASS_SPEC,
+    // ONE authoring contract for readable in-image lettering, shared by both
+    // Visual Bible authoring sites and the scene reviewer that faults a
+    // missing declaration — see REQUIRED_TEXT_AUTHORING_RULE.
+    REQUIRED_TEXT_AUTHORING: REQUIRED_TEXT_AUTHORING_RULE,
       // ...and the same entry-page contract, for the same reason.
       ELEMENT_ENTRY_PAGE: ELEMENT_ENTRY_PAGE_RULE,
       TRUE_RELATIVE_SIZE: TRUE_RELATIVE_SIZE_RULE,
