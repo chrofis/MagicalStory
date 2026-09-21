@@ -1288,7 +1288,7 @@
       "impact": "LIVE ON PRODUCTION since 2026-08-11. Every trial story-complete email: no claim link, no PDF. Fixing crypto alone would have started mailing \"claim your account\" links to the 14 of 17 trial-origin prod accounts that are already converted. Greeting defect affects story-complete, trial-story-complete, trial-reminder, story-failed, order-confirmation, order-shipped and order-failed in all four languages.",
       "status": "fixed",
       "fixedAt": "2026-09-21",
-      "fixedIn": "806a37fd97375d4dc9c5ca70cc75ee05000fbafe",
+      "fixedIn": "8c992616741bf65f84eab7c5b46b22395f2dfeef",
       "fix": "storyJobPipeline.js requires node crypto. Both claim-minting sites (storyJobPipeline.js unified completion mail, server/lib/trialEmail.js) gate the claim link on claim STATE — is_trial === true && has_set_password !== true — matching the gate trialReminders.js already used; the PDF stays gated on trial origin by design. Greeting resolution collapsed into one exported helper, email.resolveGreetingName(), which rejects any candidate containing \"@\"; the 56 template salutations became \"Hallo{greeting},\" so a nameless greeting renders bare, and order-failed's four gendered salutations (Dear / Liebe/r / Cher-Chère / Caro-Cara) became the neutral forms the other templates use. Pinned by tests/unit/email-greeting-and-claim-gate.test.ts."
     }
   ]
