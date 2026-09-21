@@ -366,16 +366,85 @@ function stripDialogueTypography(instruction) {
 }
 
 /**
- * @param {string} langCode
- * @param {object} [options]
- * @param {'story'|'idea'} [options.variant='story'] - 'idea' returns the same
- *   language, spelling and vocabulary rules WITHOUT the dialogue typography
- *   (guillemets, em-dash, spacing) and without the quotation hygiene rule: a
- *   back-cover idea contains no dialogue.
+ * The clause of an instruction that lists regional vocabulary, and the terms it
+ * names. A back-cover idea is four to six sentences of setup: handing it a list
+ * of regional nouns puts those nouns in front of the model with nothing to use
+ * them on, and round 19 duly produced a compound built out of one of them
+ * («Rueblinebel») in an idea that had no vegetable in it. The language, the
+ * spelling rules and the register are what an idea needs; the shopping list is
+ * not. Story generation still gets the whole instruction — this strips the SAME
+ * constant, so there is no second copy to drift.
  */
+const VOCAB_KEYWORD_RE = /vocabulary|anglicisms|Local terms/i;
+
+/** The index just past the end of the clause that starts at `from`. */
+function _clauseEnd(text, from) {
+  let depth = 0, quoted = false;
+  for (let i = from; i < text.length; i++) {
+    const c = text[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    else if (c === '"') quoted = !quoted;
+    else if (c === '.' && depth === 0 && !quoted) return i + 1;
+  }
+  return text.length;
+}
+
+/** The index where the clause containing `at` starts (after the previous sentence). */
+function _clauseStart(text, at) {
+  let start = 0, depth = 0, quoted = false;
+  for (let i = 0; i < at; i++) {
+    const c = text[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    else if (c === '"') quoted = !quoted;
+    else if (c === '.' && depth === 0 && !quoted) start = i + 1;
+  }
+  const marker = /^\s*(\(\d+\)\s*)?/.exec(text.slice(start));
+  return start + marker[0].length - (marker[1] ? marker[1].length : 0);
+}
+
+function stripVocabulary(instruction) {
+  let out = String(instruction);
+  const head = out.slice(0, out.search(/CORRECT:|RICHTIG:/) === -1 ? out.length : out.search(/CORRECT:|RICHTIG:/));
+  const terms = new Set();
+  let cursor = 0, body = head;
+  while (true) {
+    const m = VOCAB_KEYWORD_RE.exec(body.slice(cursor));
+    if (!m) break;
+    const at = cursor + m.index;
+    const start = _clauseStart(body, at);
+    const colon = body.indexOf(':', at);
+    const end = _clauseEnd(body, at);
+    if (colon === -1 || colon > end) { cursor = at + m[0].length; continue; }
+    const clause = body.slice(start, end);
+    for (const q of clause.match(/"[^"]*"/g) || []) {
+      for (const part of q.slice(1, -1).split('/')) {
+        const term = part.trim();
+        if (term.length > 2) terms.add(term);
+      }
+    }
+    body = body.slice(0, start) + body.slice(end);
+    cursor = start;
+  }
+  out = body + out.slice(head.length);
+
+  // Drop the whole CORRECT/WRONG (RICHTIG/FALSCH) list. It is a second copy of
+  // the vocabulary list in example form, and the spelling rules it illustrates
+  // are stated in full in the numbered rules that stay.
+  const at = out.search(/CORRECT:|RICHTIG:/);
+  if (at !== -1) out = out.slice(0, at).trim().replace(/[,|]$/, '');
+
+  // Renumber the CRITICAL RULES markers so a removal leaves no gap. Only a
+  // marker that opens a clause is one: "(70)" after a number word is not.
+  let n = 0;
+  out = out.replace(/(^|[.:]\s+)\(\d+\)(\s)/g, (_m, pre, post) => `${pre}(${++n})${post}`);
+  return out.replace(/\s{2,}/g, ' ').replace(/\s+([.,])/g, '$1').trim();
+}
+
 function getLanguageInstruction(langCode, { variant = 'story' } = {}) {
   const lang = LANGUAGES[langCode] || LANGUAGES.en;
-  if (variant === 'idea') return stripDialogueTypography(lang.instruction);
+  if (variant === 'idea') return stripVocabulary(stripDialogueTypography(lang.instruction));
   return lang.instruction + QUOTE_HYGIENE_RULE;
 }
 
@@ -457,6 +526,7 @@ module.exports = {
   LANGUAGES,
   getLanguageInstruction,
   stripDialogueTypography,
+  stripVocabulary,
   QUOTE_HYGIENE_RULE,
   getLanguageNote,
   getLanguageName,

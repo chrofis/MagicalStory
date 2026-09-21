@@ -53837,3 +53837,73 @@ a one-off `node -e` nobody could regenerate), `round-19.json` / `round-19.md`,
 idea-scope line, so there is nothing there to update.
 
 **Status:** ✅ active on `staging` only; not on master.
+
+## 2026-09-21 — The worked examples end on the act, the ending rule says so positively, and the idea prompt no longer carries the regional vocabulary list
+
+**Context:** Round 19 moved the ending from a cost line to the picture and six of
+eight ideas followed it — but the two that did not were cell 7's age-1 arms, and
+they had copied the shape of the three worked examples, which still ended on
+"If …". The same round produced «Rüeblinebel» in an idea with no vegetable in it:
+`getLanguageInstruction(code, { variant: 'idea' })` was handing a four-to-six
+sentence back cover the whole Swiss vocabulary list (Bub, Kappe, Rüebli, Velo,
+Poulet, Glace, Znüni…) plus a CORRECT/WRONG example list restating it. A list of
+regional nouns in front of a model with nothing to use them on gets used.
+
+**Decision:** three changes, all in the `story-idea-templates` sibling pair and
+`server/lib/languages.js`.
+
+1. **The three worked examples end on the child in the act,** present tense, no
+   condition, no "for ever". The cost moved earlier, into its own sentence, as a
+   loss the book could show on a page: the grandmother at a table with nothing of
+   her mother's on it; the bone staying in the gravel while the grandfather waits
+   on his bench with empty hands; the singing stopping at an empty table with the
+   candles back in the drawer. Each is still four to six sentences, generic, one
+   concrete thing per sentence.
+
+2. **The ending rule gains one positive clarification** in both templates: *"The
+   last sentence is what the child does now. It does not begin with a condition
+   and it does not say what happens if."* The CUT step's ending check gains:
+   *"Then quote the last sentence of the final: if it begins with a condition or
+   says what happens if, move the cost earlier and end on the act."*
+
+3. **The idea variant of the language instruction drops the vocabulary.** It
+   keeps the language, the spelling rules (ä/ö/ü, ss never ß) and the register,
+   and removes the regional vocabulary clause plus the whole CORRECT/WRONG
+   example list — which is the same list in example form. The numbered CRITICAL
+   RULES are renumbered so the removal leaves no gap. The **story** variant is
+   byte-identical (pinned by a test over every language code). Note the scope:
+   the strip keys off the vocabulary clause, so the `gsw-*` dialect instructions
+   — which are nothing but vocabulary and are never used for ideas — pass
+   through unchanged.
+
+**Rationale.** Round 19's "known tension" was the examples, and it was the right
+read: the rule won everywhere except the band where the model had least to go on
+and fell back hardest on the examples. Fixing the examples is cheaper and more
+general than another rule. On the vocabulary: the idea prompt is the one place
+where the vocabulary list can only do harm — there is no dialogue, no everyday
+scene, nothing for a Rüebli to be, so the model welds it into a noun instead.
+
+**Sibling set `story-idea-templates`:** both templates changed in the same
+commit, every substitution applied under an exactly-once assertion.
+
+**Validated (rung 2 — real generation on the real builder, USD 0.42):** dry-run
+of cells 1 and 7 first (new examples present, no vocabulary list, no CORRECT/WRONG,
+ending rule and ending check present, no unfilled placeholders), then
+`node tests/manual/story-idea-rounds.js --round=20 --cells=1,3,7,10` — 8 ideas.
+**Eight of eight end on an act; none opens its last sentence with a condition**
+(round 19: six of eight, with both age-1 arms on a "Wenn …"). Both cell-7 age-1
+arms now close on "Lena hält sich am Tor fest und ruft nach ihm" and "Lena kniet
+im Herbststroh und streckt beide Arme aus". Every idea stayed on its band: 4
+sentences at 10 pages (68/60/62/49 words), 6 at 16 (120/99), 9 in two paragraphs
+at 25 (163/135). **No Swiss vocabulary item appears in any of the eight, and no
+ß** — the spelling rule survived the strip that removed its examples ("grösser"
+appears in an idea). No blind read was run: this entry records that the mechanism
+fires, not that it sells better.
+
+**Touched:** `prompts/generate-story-idea-single.txt`,
+`prompts/generate-story-ideas.txt` (sibling set `story-idea-templates`),
+`server/lib/languages.js` (`stripVocabulary`, exported), `tests/unit/idea-turn-slot.test.ts`,
+`tests/unit/language-idea-variant.test.ts`,
+`tests/manual/story-idea-rounds/round-20.json` / `round-20.md`, `ideas-r20.html`.
+
+**Status:** ✅ active on `staging` only; not on master.

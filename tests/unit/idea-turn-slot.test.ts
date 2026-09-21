@@ -92,23 +92,66 @@ describe('story-idea templates — the round-10 cast and adult rules', () => {
   });
 });
 
-describe('story-idea templates — the round-10 examples', () => {
-  it.each(TEMPLATES)('%s carries the three round-10 examples, each ending on a cost', (t) => {
+describe('story-idea templates — the worked examples end on the act', () => {
+  // Owner, 2026-09-21: all three examples ended on a cost line, and round 19's
+  // two age-1 ideas copied that shape ("Wenn das Huhn den Kamm erreicht, …").
+  // The examples now end on the child in the act, present tense, with the cost
+  // standing earlier as a loss the book could show on a page.
+  const OPENERS = [
+    'A stone in the wall of a ruin sits loose',
+    'A bone as long as an arm lies half out of the gravel',
+    'A goat is standing on the kitchen table',
+  ];
+  const exampleOf = (src: string, opener: string) => {
+    const start = src.indexOf(opener);
+    expect(start).toBeGreaterThan(-1);
+    const nl = src.indexOf(String.fromCharCode(10), start);
+    return src.slice(start, nl === -1 ? undefined : nl).replace(/"$/, '');
+  };
+  const sentencesOf = (text: string) => text.split(/(?<=\.)\s+/).filter(Boolean);
+
+  it.each(TEMPLATES)('%s carries all three examples at four to six sentences', (t) => {
     const src = read(t);
-    for (const opener of [
-      'A stone in the wall of a ruin sits loose',
-      'A bone as long as an arm lies half out of the gravel',
-      'A goat is standing on the kitchen table',
-    ]) {
-      const start = src.indexOf(opener);
-      expect(start).toBeGreaterThan(-1);
-      const nl = src.indexOf('\n', start);
-      const text = src.slice(start, nl === -1 ? undefined : nl).replace(/"$/, '');
-      const sentences = text.split(/(?<=\.)\s+/).filter(Boolean);
-      expect(sentences.length).toBeGreaterThanOrEqual(4);
-      expect(sentences.length).toBeLessThanOrEqual(6);
-      expect(text).toMatch(/^If .*|.*\bIf \b.*$/);
-      expect(text).not.toMatch(/\b(reader|this book|the page|the picture)\b/i);
+    for (const opener of OPENERS) {
+      const sentences = sentencesOf(exampleOf(src, opener));
+      expect(sentences.length, opener).toBeGreaterThanOrEqual(4);
+      expect(sentences.length, opener).toBeLessThanOrEqual(6);
     }
+  });
+
+  it.each(TEMPLATES)('%s ends every example on an act, not on a condition', (t) => {
+    const src = read(t);
+    for (const opener of OPENERS) {
+      const sentences = sentencesOf(exampleOf(src, opener));
+      const last = sentences[sentences.length - 1];
+      expect(last, opener).toMatch(/^The child /);
+      expect(last, opener).not.toMatch(/^(If|When|Should|Unless)/);
+      expect(last, opener).not.toMatch(/if/i);
+      expect(last, opener).not.toMatch(/for ever|never again/i);
+    }
+  });
+
+  it.each(TEMPLATES)('%s states the cost earlier, before the last sentence', (t) => {
+    const src = read(t);
+    for (const opener of OPENERS) {
+      const sentences = sentencesOf(exampleOf(src, opener));
+      const earlier = sentences.slice(0, -1).join(' ');
+      // The loss is stated in one of the sentences before the act: someone is
+      // left with nothing, waits empty-handed, or the thing stays where it is.
+      expect(earlier, opener).toMatch(/nothing of her mother's on it|stays in the gravel|the singing stops/);
+    }
+  });
+
+  it.each(TEMPLATES)('%s never lets an example address the reader', (t) => {
+    const src = read(t);
+    for (const opener of OPENERS) {
+      expect(exampleOf(src, opener), opener).not.toMatch(/(reader|this book|the page|the picture)/i);
+    }
+  });
+
+  it.each(TEMPLATES)('%s states the ending rule positively and checks the last sentence', (t) => {
+    const src = read(t);
+    expect(src).toContain('The last sentence is what the child does now. It does not begin with a condition and it does not say what happens if.');
+    expect(src).toContain('Then quote the last sentence of the final: if it begins with a condition or says what happens if, move the cost earlier and end on the act.');
   });
 });
