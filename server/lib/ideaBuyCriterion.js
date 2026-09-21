@@ -27,4 +27,17 @@ const IDEA_BUY_QUESTIONS = `- What does the child get to do here that they canno
 - What is frightening here in the way a child likes being frightened?
 - Which sentence makes them ask for this book again tomorrow?`;
 
-module.exports = { IDEA_BUY_QUESTIONS };
+/**
+ * The parent's four questions for a book whose main character is two or under
+ * (see server/lib/ideaContract.js). A parent of a one-year-old does not buy a
+ * gasp or a fright: they buy the twenty minutes on the sofa the book gives them
+ * and the child together, so the four questions ask what the child says along,
+ * what they point at, what the two of them DO with the book, and which page is
+ * asked for again. Injected exactly the same way, twice per template.
+ */
+const IDEA_BUY_QUESTIONS_TODDLER = `- What will the child say along?
+- What will they point at?
+- What game do the parent and the child play with this book?
+- Which page will they want again?`;
+
+module.exports = { IDEA_BUY_QUESTIONS, IDEA_BUY_QUESTIONS_TODDLER };

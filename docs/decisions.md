@@ -54202,3 +54202,112 @@ change and was not in this scope.
 `tests/unit/required-text.test.ts`, `tests/unit/text-not-a-checklist-reach.test.ts`.
 
 **Status:** ✅ active
+
+---
+
+## 2026-09-21 — Ages 0-2 get a pattern contract, not a premise
+
+**Context:** Round 21's cell 7 (Lena, age 1, `going-outside`, ten pages) produced
+«Das Pony trippelt ans andere Ende der Koppel. Lena streckt die Hände durch den
+Zaun.» — a correctly built premise, every round-19/20/21 rule honoured, and one
+page rather than a book. Nine rounds of tuning had made the premise contract
+better and better at a thing a one-year-old's book is not. A premise — a want, a
+thing in the way, a cost, a picture — is the wrong OBJECT at that age. What a
+toddler book is instead is a PATTERN: one thing the child does, an answer from
+the world, a variation per page, one that resists, a refrain the child says
+along, and a landing.
+
+**Decision (owner):** a main character aged two or under gets a different idea
+contract, in five parts.
+
+1. **Two contracts, one placeholder.** `server/lib/ideaContract.js` holds
+   `IDEA_CONTRACT_PREMISE` (the existing slot list, its want/obstacle/cost rule,
+   its cost sentence and its CUT step, moved verbatim out of the templates) and
+   `IDEA_CONTRACT_PATTERN` (THE PATTERN / THE VARIATION / THE ONE THAT RESISTS /
+   THE REFRAIN / THE LANDING, one sentence each; no cost sentence; everything
+   nameable by pointing; one strange thing only; the last sentence still a
+   movement of the child's body; and its own check — quote each of the five
+   slots, add a missing one, and cut any sentence that says what the resisting
+   one finally does). Both sibling templates carry `{IDEA_CONTRACT}` exactly
+   once, and their review lists point at it by name rather than restating it, so
+   **neither template holds a line of age branching in prose**.
+2. **The buy criterion switches with it.** `IDEA_BUY_QUESTIONS_TODDLER` joins
+   `IDEA_BUY_QUESTIONS` in `server/lib/ideaBuyCriterion.js` — what will the child
+   say along, what will they point at, what game do parent and child play with
+   this book, which page will they want again — injected identically, twice per
+   template (the pinned exactly-twice test now runs over BOTH constants).
+3. **The scope stops being a page count.** `buildStoryScope(pages, { pattern })`
+   returns one band for a pattern book at every page count: four or five
+   sentences in one paragraph.
+4. **The band files state it too.** `prompts/age-band-routine.txt` (0-1) and
+   `prompts/age-band-quest.txt` (2) each gain two `[[premise]]` spans: "The book
+   is a pattern, not a plot" and "Nothing costs anything, and everything can be
+   pointed at".
+5. **A fourth worked example,** generic, in the pattern shape, ending on the
+   child's movement, in both templates.
+
+**Rationale.**
+- *The switch keys off the YOUNGEST main character's age, not `resolveAgeBand`*
+  (which keys off the OLDEST main). That is the same person the templates'
+  existing "aged two or under" rules already key off. The consequence is stated
+  rather than hidden: a cast with mains aged 8 and 2 gets the eight-year-old's
+  BAND text and the toddler's CONTRACT. Nobody has commissioned that cast yet;
+  when someone does, the band is the line to revisit, not the contract.
+- *One placeholder, not two insertion points.* The check text lives INSIDE each
+  contract, so the rule and its critic are the same string
+  (`axis: generator-vs-critic`) and the review list holds one age-free line.
+- *The band files are shared by construction.* `[[premise]]` is in the writer
+  view as well as in `premise-open`, so the two new spans reach the STORY writer
+  for ages 0-2 too. That is wanted: they restate what those band files already
+  say (a day's rhythm, a friendly no, nothing frightening) in the vocabulary the
+  idea now uses. No other span was touched, and the 3+ band files are untouched.
+
+**Sibling set `story-idea-templates`:** both templates changed in the same
+commit (`check-sibling-paths.js` clean), every substitution applied under an
+exactly-once assertion.
+
+**Validated (rung 2 — real generation on the real builder, USD 0.2107):**
+2,523-test suite plus the new `tests/unit/idea-contract.test.ts` (34 pins: the
+contract switches at 0/1/2 and not at 3/5/8/12/68, a toddler SIDE character does
+not switch it, the pattern slots are present and the premise slots absent for
+≤2 and the reverse for 3+, each contract carries its own CUT step, the templates
+hold the placeholder and no slot list in prose, the pattern scope band, the two
+band files with the spans and the three without). Three existing pin files now
+read the BUILT premise prompt (template + `IDEA_CONTRACT_PREMISE`) rather than
+the raw template, so they keep reading the rule instead of the placeholder.
+Dry-run of cells 1, 7 and 11 first: **cell 1 (age 3) keeps every premise rule
+verbatim** — the only content added to it is the fourth worked example; the slot
+list, the want/obstacle/cost rule, the cost sentence and the labelling check all
+still reach it, moved into the contract block a few lines earlier, and the review
+check 4 is a pointer at it. Cells 7 and 11 carry the pattern contract, the
+pattern scope band, the band spans, the toddler buy questions twice, no premise
+slot and no cost rule, and no unfilled placeholder. Then
+`node tests/manual/story-idea-rounds.js --round=22 --cells=7,11` — 4 ideas.
+**Four of four are pattern books**: a stated per-page pattern, a variation, one
+that resists (a brown pony twice, a brown hen, a duckling), a quoted refrain
+(«Komm her!», «Guck mal, Henne!», «Da! Da!», «Ente!»), and a landing that is a
+movement into an adult's arms. **None names a cost. None says what the resisting
+one finally does.** All four are 4-5 sentences in one paragraph.
+
+**One fault measured, unfixed:** cell 7 arm 1 is close to a translation of the
+new worked example (fence, animals answering, a brown pony at the far end,
+«Komm her!», running back into open arms). This is the round-19 hazard exactly —
+the band with least to go on copies the example hardest — and it is now the
+example rather than the rule that needs varying. Two further contradictions
+survive on the ≤2 path and were deliberately NOT touched, being outside the
+agreed change: `{PREMISE_SHAPE}` still hands a toddler cell a premise shape ("a
+lost thing that moves … the shape is a requirement"), which the routine band
+forbids outright, and `{WORLD_SEED}` still says "Build the want or the obstacle
+on them". Both are owner decisions, filed in `tasks/BACKLOG.md`.
+
+**Touched:** `server/lib/ideaContract.js` (new), `server/lib/ideaBuyCriterion.js`,
+`server/routes/storyIdeas.js` (`buildStoryScope`, `buildIdeasPromptContext`),
+`prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`
+(sibling set `story-idea-templates`), `prompts/age-band-routine.txt`,
+`prompts/age-band-quest.txt`, `tests/unit/idea-contract.test.ts` (new),
+`tests/unit/idea-buy-criterion.test.ts`, `tests/unit/idea-turn-slot.test.ts`,
+`tests/unit/idea-guide-shape.test.ts`, `tests/unit/idea-scope-and-landmarks.test.ts`,
+`tests/manual/story-idea-rounds.js` (cell 11),
+`tests/manual/story-idea-rounds/round-22.json` / `round-22.md`, `ideas-r22.html`.
+
+**Status:** ✅ active on `staging` only; not on master.

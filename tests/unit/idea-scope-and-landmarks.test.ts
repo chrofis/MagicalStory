@@ -6,8 +6,12 @@ const ROOT = path.resolve(__dirname, '../..');
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret-for-unit-tests-only';
 const { buildStoryScope, buildIdeaLandmarksSection } = require(path.join(ROOT, 'server/routes/storyIdeas'));
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { IDEA_CONTRACT_PREMISE } = require(path.join(ROOT, 'server/lib/ideaContract'));
+// The prompt a cast aged three and up actually receives: the template with its
+// ONE {IDEA_CONTRACT} placeholder filled with the premise contract (2026-09-21).
 const TEMPLATES = ['generate-story-idea-single.txt', 'generate-story-ideas.txt']
-  .map(f => [f, fs.readFileSync(path.join(ROOT, 'prompts', f), 'utf-8')] as [string, string]);
+  .map(f => [f, fs.readFileSync(path.join(ROOT, 'prompts', f), 'utf-8').split('{IDEA_CONTRACT}').join(IDEA_CONTRACT_PREMISE)] as [string, string]);
 
 describe('{STORY_SCOPE}', () => {
   it('short band (<=10 pages) is four sentences in one paragraph', () => {

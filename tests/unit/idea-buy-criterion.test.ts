@@ -11,7 +11,7 @@ import fs from 'fs';
 import path from 'path';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { IDEA_BUY_QUESTIONS } = require('../../server/lib/ideaBuyCriterion');
+const { IDEA_BUY_QUESTIONS, IDEA_BUY_QUESTIONS_TODDLER } = require('../../server/lib/ideaBuyCriterion');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { fillTemplate } = require('../../server/services/prompts');
 
@@ -38,19 +38,33 @@ describe('IDEA_BUY_QUESTIONS — the parent asks, the review answers with quotes
 
   it('the BUILT prompt carries the constant exactly twice: the draft rule and the last review check', () => {
     for (const t of TEMPLATES) {
-      const built = fillTemplate(read(t), { BUY_CRITERION: IDEA_BUY_QUESTIONS });
-      expect(built.split(IDEA_BUY_QUESTIONS).length - 1).toBe(2);
-      // The rule comes first, the check that grades it last.
-      const first = built.indexOf(IDEA_BUY_QUESTIONS);
-      const second = built.lastIndexOf(IDEA_BUY_QUESTIONS);
-      expect(built.slice(0, first)).toMatch(/answers these/);
-      expect(built.slice(second - 400, second)).toMatch(/answer each of these with a quote/);
+      // Both constants, injected identically: the toddler cast swaps the
+      // questions and nothing else about how they reach the model.
+      for (const questions of [IDEA_BUY_QUESTIONS, IDEA_BUY_QUESTIONS_TODDLER]) {
+        const built = fillTemplate(read(t), { BUY_CRITERION: questions });
+        expect(built.split(questions).length - 1).toBe(2);
+        // The rule comes first, the check that grades it last.
+        const first = built.indexOf(questions);
+        const second = built.lastIndexOf(questions);
+        expect(built.slice(0, first)).toMatch(/answers these/);
+        expect(built.slice(second - 400, second)).toMatch(/answer each of these with a quote/);
+      }
     }
+  });
+
+  it('the toddler questions ask what the two of them do with the book', () => {
+    expect(IDEA_BUY_QUESTIONS_TODDLER).toMatch(/say along/);
+    expect(IDEA_BUY_QUESTIONS_TODDLER).toMatch(/point at/);
+    expect(IDEA_BUY_QUESTIONS_TODDLER).toMatch(/game do the parent and the child play/);
+    expect(IDEA_BUY_QUESTIONS_TODDLER).toMatch(/want again/);
+    expect(IDEA_BUY_QUESTIONS_TODDLER).not.toMatch(/Baden|Limmat|Holzbrücke|Mia|Noah|Emma|Lena|Emil/);
   });
 
   it('the route declares BUY_CRITERION, so no call site can ship the placeholder unfilled', () => {
     const src = read('server/routes/storyIdeas.js');
-    expect(src).toContain("require('../lib/ideaBuyCriterion')");
-    expect(src).toMatch(/BUY_CRITERION:\s*IDEA_BUY_QUESTIONS/);
+    // Both constants reach the template through buildIdeaContract, spread into
+    // the replacement map — so BUY_CRITERION is declared for every cast.
+    expect(src).toContain("require('../lib/ideaContract')");
+    expect(src).toContain('...ideaContract,');
   });
 });

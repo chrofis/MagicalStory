@@ -99,9 +99,11 @@ describe('the idea templates carry none of the story writer\'s inputs', () => {
   });
 
   it('the CUT line points at the surviving back-cover check', () => {
+    // The back-cover labelling moved into {IDEA_CONTRACT} on 2026-09-21; the
+    // review list points at it by name, and the CUT line points at the same one.
     const t = read(TEMPLATES[0]);
-    const n = Number((t.match(/^(\d+)\. \*\*Back cover, not synopsis\*\*/m) || [])[1]);
-    expect(t).toContain(`cut by check ${n}`);
+    expect(t).toMatch(/^\d+\. \*\*The contract\*\*: run the CONTRACT CHECK the idea contract above names/m);
+    expect(t).toContain('every sentence the contract check cut');
   });
 });
 

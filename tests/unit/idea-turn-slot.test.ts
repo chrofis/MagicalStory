@@ -18,7 +18,15 @@ import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
 const TEMPLATES = ['prompts/generate-story-idea-single.txt', 'prompts/generate-story-ideas.txt'];
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+// Every pin below reads the prompt a cast aged three and up actually receives:
+// the template with its ONE {IDEA_CONTRACT} placeholder filled with the PREMISE
+// contract. The slot list and its CUT step moved into that constant on
+// 2026-09-21 so the templates hold no age branching (docs/decisions.md); pinning
+// the raw template instead would pin the placeholder and stop reading the rule.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { IDEA_CONTRACT_PREMISE } = require('../../server/lib/ideaContract');
+const withContract = (s: string) => s.split('{IDEA_CONTRACT}').join(IDEA_CONTRACT_PREMISE);
+const read = (p: string) => withContract(fs.readFileSync(path.join(ROOT, p), 'utf8'));
 
 describe('story-idea templates — the round-10 slot list, in both siblings', () => {
   // The single template numbers its slots; the two-idea template states the same

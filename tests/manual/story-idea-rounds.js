@@ -125,7 +125,7 @@ const ch = (name, age, gender, isMain, specialDetails) => ({
   ...(specialDetails ? { specialDetails } : {}),
 });
 
-// ---- The 10 cells. Fixed across every round; never edit between rounds. ----
+// ---- The 11 cells. Fixed across every round; never edit between rounds. ----
 // Exception, 2026-09-21: cell 10 went 20p -> 25p so the 21+ scope band (nine
 // sentences, two paragraphs) is exercised at all. Rounds before 19 ran it at 20p.
 const CELLS = [
@@ -173,6 +173,13 @@ const CELLS = [
   { id: 10, language: 'de', pages: 25, languageLevel: 'standard', storyCategory: 'life-challenge', storyTopic: 'managing-emotions', storyTheme: 'dragon',
     characters: [ch('Jonas', 8, 'male', true), ch('Mila', 8, 'female', true)],
     relationships: [{ character1: 'Jonas', character2: 'Mila', relationship: STRANGERS_DE }] },
+  // Added 2026-09-21 with the pattern contract (docs/decisions.md): the ONLY
+  // cell whose main character is two, and the only one with a 0-2 life-challenge
+  // topic. Cell 7 (age 1, going-outside) stays as it is — the two together are
+  // the whole 0-2 band, one cell per band file (routine and quest).
+  { id: 11, language: 'de', pages: 10, languageLevel: '1st-grade', storyCategory: 'life-challenge', storyTopic: 'first-words', storyTheme: 'farm',
+    characters: [ch('Emil', 2, 'male', true), ch('Nina', 4, 'female', false)],
+    relationships: [{ character1: 'Nina', character2: 'Emil', relationship: 'is the sister of' }] },
 ];
 
 // Verbatim from the route.

@@ -30,7 +30,11 @@ const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
 // parent buy this" is measured from the production click instead of from a
 // rater's proxy (migrations/039, docs/decisions.md 2026-09-21).
 const { recordIdeaEvent } = require('../lib/ideaEvents');
-const { IDEA_BUY_QUESTIONS } = require('../lib/ideaBuyCriterion');
+// What an idea IS — the slot list, its rules and its check — plus the parent's
+// four questions that go with it. ONE placeholder each, so neither sibling
+// template holds a line of age branching in prose: a main character aged two or
+// under gets the PATTERN contract (docs/decisions.md 2026-09-21).
+const { buildIdeaContract, IDEA_CONTRACT_PATTERN } = require('../lib/ideaContract');
 
 /**
  * Build the shared prompt context for story idea generation.
@@ -66,7 +70,15 @@ const { buildSeasonInstruction } = require('../lib/season');
  */
 const SCOPE_TAIL = 'Write the sentence count this scope names, no more and no less; the scope is the size of what stands behind them. No sentence runs past about 30 words.';
 
-function buildStoryScope(pages) {
+function buildStoryScope(pages, { pattern = false } = {}) {
+  // A pattern book has no scope: its size is the pattern, not the number of
+  // places the cast gets to. Four or five sentences in one paragraph at every
+  // page count (owner, 2026-09-21).
+  if (pattern) {
+    return `This is a pattern book. The back cover is four or five sentences in one paragraph: what happens on every page, what changes from page to page, the one that resists, the line that comes back, and where it lands. The cast is the child and whoever is beside them. One strange thing only, and it is nameable by pointing at it.
+
+${SCOPE_TAIL}`;
+  }
   const band = pages <= 10
     ? 'This is a short book. The back cover is four sentences in one paragraph: one place, one creature or thing, one want, one obstacle. The cast is beside the child. One strange thing only: the creature or thing the idea is built on. Nothing else in it is out of the ordinary.'
     : pages <= 20
@@ -323,7 +335,13 @@ ${adventureGuideContent}`
   // catalogue out of both idea templates — those are the story writer's inputs.
   const ageModeSection = buildAgeModeSection({ characters }, { bandView: 'premise-open' });
 
-  const storyScope = buildStoryScope(pages);
+  // The contract switches on the YOUNGEST main character's age — the same person
+  // the templates' existing "aged two or under" rules key off — not on
+  // resolveAgeBand, which keys off the OLDEST main.
+  const ideaContract = buildIdeaContract(characters);
+  const isPattern = ideaContract.IDEA_CONTRACT === IDEA_CONTRACT_PATTERN;
+
+  const storyScope = buildStoryScope(pages, { pattern: isPattern });
 
   // Load prompt templates
   const promptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-ideas.txt'), 'utf-8');
@@ -386,8 +404,9 @@ ${adventureGuideContent}`
     // The parent's own questions, ONE constant (server/lib/ideaBuyCriterion.js)
     // filled into both templates twice: once as a rule the draft answers, once
     // as the last review check, which answers each question with a quote. The
-    // rule and its critic cannot drift because they are the same string.
-    BUY_CRITERION: IDEA_BUY_QUESTIONS,
+    // rule and its critic cannot drift because they are the same string. The
+    // toddler cast gets the toddler four, injected identically.
+    ...ideaContract,
     PREMISE_SHAPE: premiseShapeInstruction(premiseShapes[0]),
     PREMISE_SHAPE_1: premiseShapeInstruction(premiseShapes[0]),
     PREMISE_SHAPE_2: premiseShapeInstruction(premiseShapes[1]),
