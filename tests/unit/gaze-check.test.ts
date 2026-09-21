@@ -11,9 +11,10 @@ import FIXTURE from './fixtures/gaze-declared-vs-observed-job_1789853503332_riqn
  * named `matches[]`, and the PROMPT-BLIND describer's `figures` + `interactions`
  * (Lab experiment 1376, unified arm). Nothing here is hand-written.
  *
- *   p2  two boys, both declared on the egg. Levin is holding it and looking
- *       STRAIGHT OUT OF THE PICTURE — the describer records `facing: "toward
- *       viewer"`. One finding, and it must name Levin.
+ *   p2  two boys, both declared on the egg. Levin IS looking straight out of
+ *       the picture — but no field in the blind inventory describes eyes on
+ *       their own, so nothing witnesses it. Silence, and the reason is a gap
+ *       (see the `facing` note in observedGaze), not a judgement.
  *   p5  the same two, declared looking at each other. The describer reports no
  *       gaze for either. Silence — an absent witness is never a finding.
  *   p6  four boys, all declared on the egg on the ground. The describer sees two
@@ -83,8 +84,10 @@ describe('what the blind describer is willing to witness', () => {
     expect(observedGaze(PAGES['5'].inventory, 'the young boy in yellow')).toBeNull();
   });
 
-  it('treats eyes meeting the camera as an observation', () => {
-    expect(observedGaze(PAGES['2'].inventory, 'the young boy in red')).toEqual({ kind: 'viewer' });
+  it('does NOT treat a body squared to camera as a gaze observation', () => {
+    // `facing: "toward viewer"` is the torso. The eyes have no field of their own.
+    expect(PAGES['2'].inventory.figures[0].facing).toBe('toward viewer');
+    expect(observedGaze(PAGES['2'].inventory, 'the young boy in red')).toBeNull();
   });
 
   it('says nothing about a figure it never mentions', () => {
@@ -94,19 +97,15 @@ describe('what the blind describer is willing to witness', () => {
 });
 
 describe('declared gaze vs observed gaze, on the pages it was measured against', () => {
-  it('p2: the boy holding the egg is looking at the reader instead', () => {
-    const f = run('2');
-    expect(f).toHaveLength(1);
-    expect(f[0].character).toBe('Levin');
-    expect(f[0].type).toBe('action_interaction');
-    expect(f[0].severity).toBe('MAJOR');
-    expect(f[0].source).toBe('gaze-check');
-    expect(f[0].description).toContain('the large warm egg');   // the noun, not ART001
-    expect(f[0].description).toContain('the eyes meet the viewer');
-  });
-
-  it('p2: says nothing about the boy whose eyes it could not read', () => {
-    expect(run('2').map((x: any) => x.character)).not.toContain('Julian');
+  it('p2: silent — a body square to camera is not a witness to where the eyes went', () => {
+    // Levin really is looking at the reader instead of at the egg in his hands,
+    // and this check does not catch it. It used to, by reading `facing:
+    // "toward viewer"` as gaze — but `facing` is a BODY field, and on this very
+    // page it read "toward viewer" for BOTH boys while only one of them meets
+    // the reader's eye (Julian's are cast down and to his left). One true
+    // finding and one false one from one signal; the false one would have
+    // bought a paid repair on a correct figure.
+    expect(run('2')).toEqual([]);
   });
 
   it('p5: stays silent — the witness reported no gaze at all', () => {
@@ -146,11 +145,11 @@ describe('the describer production actually runs (qwen3-vl, Lab 1377)', () => {
     resolveTarget,
   });
 
-  it('p2: the same single finding, against the same boy', () => {
-    const f = runQwen('2');
-    expect(f).toHaveLength(1);
-    expect(f[0].character).toBe('Levin');
-    expect(f[0].description).toContain('the eyes meet the viewer');
+  it('p2: the same silence, and for the same reason', () => {
+    // qwen reports one look — yellow -> red, a LOOK relation — but the brief
+    // sends the boy in yellow to the egg and the boy he is looking at is
+    // holding it, so the hands-full guard declines. Nothing else is a witness.
+    expect(runQwen('2')).toEqual([]);
   });
 
   it('p5: the same silence — here because the two witnesses AGREE', () => {

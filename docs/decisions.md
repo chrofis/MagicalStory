@@ -51217,6 +51217,48 @@ Art Director and iterate builders), `tests/unit/text-checklist-by-reader.test.ts
 **Touched:**   `server/lib/bookAudit.js` (`buildAuditPages` citations, starvation guard), `server/lib/objectScaleAudit.js` (`citedIds` third shape), `server/lib/repairPipeline.js` (bible passed in, `objectScale` stored on the round), `storyJobPipeline.js` (`finalChecksReport.objectScale`), `tests/unit/book-audit-scale-starvation.test.ts`
 **Status:**    ✅ active
 
+## 2026-09-22 — `facing` is a body field and was never evidence of gaze (corrects the entry above)
+
+**Context:** The comparison above shipped in a13848faa reading the blind
+inventory's `figures[].facing === "toward viewer"` as "the eyes meet the camera",
+used as a fallback witness where no LOOK relation was stated. The first run of
+the WIRED path (Lab 1378, the real `evaluateImageQuality`) returned TWO findings
+on p2 where the fixtures predicted one, so the page was pulled and looked at.
+
+Both boys stand squarely to camera, and the describer wrote `facing: "toward
+viewer"` for both. Only one of them — the one holding the egg — actually meets
+the reader's eye; the other's eyes are cast down and to his left. One true
+finding and one FALSE one out of a single signal, and the false one names a
+correct figure, which is what buys a paid repair that damages a good page.
+
+The prompt spec settles it: `facing` is listed among the figure's pose and
+garment attributes, its permitted values are body orientations (`left`, `right`,
+`toward <label>`), and the face has its own `expression` field. Nothing ever said
+it described the eyes. The claim in the original module header was mine, not the
+schema's.
+
+**Decision:** The `facing` fallback is DELETED as a positive signal. A LOOK
+relation the describer states outright in `interactions[]` is the whole of the
+evidence. `facing === "away from viewer"` stays, used ONLY to skip a figure whose
+face is not visible — a skip-only reading can never manufacture a finding.
+
+**Rationale:** A signal that fires identically on a true and a false case is not
+evidence, whatever its hit rate. The cost is real and is accepted: a character
+drawn looking OUT of the picture instead of at what the brief named is now
+invisible to this check, because no field in the blind inventory describes the
+eyes on their own. p6's four findings are unaffected — they rest on stated LOOK
+relations, and all four were verified against the image by eye.
+
+**Open, not built:** the blind inventory could be asked for a per-figure `gaze`
+field. That is NOT the experiment that failed on 2026-09-21 — that one added the
+field to the SIGHTED judge, which has the brief in the same call and echoed it.
+The blind describer has no brief to echo, which is the whole reason its
+`interactions` are trustworthy here. Needs an owner decision: it widens the
+inventory schema, which is a `[block]` sibling set (inventory-schema).
+
+**Touched:** `server/lib/gazeCheck.js`, `tests/unit/gaze-check.test.ts` (26).
+**Status:**    ✅ active
+
 ---
 
 ## 2026-09-20 — The hint pass answers to the ARC, and a hint may not contradict the settled arc anywhere it lands
@@ -54477,9 +54519,9 @@ of the validation ladder (~$0.01 of Lab calls):
 
 | page | declared | observed | findings |
 |------|----------|----------|----------|
-| p2 | both boys on the egg | the egg-holder's eyes meet the camera | 1 — Levin |
+| p2 | both boys on the egg | no LOOK relation stated | 0 — see the correction below |
 | p5 | mutual, boy to boy | mutual, boy to boy | 0 — the witnesses agree |
-| p6 | all four on the egg | two pairs looking at each other | 4 |
+| p6 | all four on the egg | two pairs looking at each other | 4 — all four verified by eye |
 
 Lab 1376 ran `gemini-2.5-flash`; Lab 1377 ran `qwen3-vl`, which is what production
 actually runs (`runtime.js` `inventoryModel`, every environment since 2026-09-19).

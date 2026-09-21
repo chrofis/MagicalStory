@@ -27,6 +27,13 @@
  * It classifies nothing from prose: the target comes from the inventory's
  * structured `to` field, and `observed` is consulted only to confirm the
  * relation is a LOOK rather than a reach or a touch.
+ *
+ * ONE WITNESS ONLY. A stated LOOK relation is the whole of the evidence. The
+ * figure-level `facing` field is NOT a second witness — it describes the body,
+ * and a body square to camera says nothing about where the eyes went (see
+ * observedGaze). So a character drawn looking out of the picture instead of at
+ * what the brief named goes unreported today: no field in the blind inventory
+ * describes the eyes on their own.
  */
 
 const { pairInventoryFiguresToNames } = require('./identityAgreement');
@@ -35,8 +42,6 @@ const { baseVbId } = require('./vbIdGuard');
 /** The relation words that make an interactions entry a GAZE rather than contact. */
 const LOOK_RELATION = /\b(?:look|looks|looking|gaze|gazes|gazing|watch|watches|watching|eyes on)\b/i;
 
-/** The inventory's own word for "the eyes meet the camera". */
-const TOWARD_VIEWER = 'toward viewer';
 /** The inventory's own word for "the eyes are not in the picture". */
 const AWAY_FROM_VIEWER = 'away from viewer';
 
@@ -45,7 +50,7 @@ const norm = (s) => String(s == null ? '' : s).trim().toLowerCase();
 /**
  * What the inventory says one figure's eyes rest on.
  *
- * @returns {{kind:'figure', label:string} | {kind:'viewer'} | null}
+ * @returns {{kind:'figure', label:string} | null}
  *   null when the inventory says nothing about this figure's gaze, which is a
  *   SKIP and never a finding.
  */
@@ -60,12 +65,19 @@ function observedGaze(inventory, figureLabel) {
     if (to) return { kind: 'figure', label: to };
   }
 
-  // `facing` is the fallback witness and carries only one gaze-bearing value:
-  // the eyes meeting the camera. Every other value describes the BODY, which a
-  // gaze can differ from, so nothing else here is evidence either way.
-  const fig = (Array.isArray(inventory?.figures) ? inventory.figures : [])
-    .find(f => norm(f?.label) === label);
-  if (fig && norm(fig.facing) === TOWARD_VIEWER) return { kind: 'viewer' };
+  // NO FALLBACK TO `facing` (2026-09-22 — it shipped for one run and produced a
+  // false finding on its first real page). `facing` is a BODY field: the
+  // inventory spec lists it among pose and garment attributes, its values are
+  // body orientations (`left`, `right`, `toward <label>`), and the face has its
+  // own field. On p2 of job_1789853503332_riqncqg1i both boys stand squarely to
+  // camera and `facing` read `toward viewer` for both — but only the one
+  // holding the egg meets the reader's eye; the other's eyes are cast down and
+  // to his left. One true finding and one false one out of the same signal.
+  //
+  // A signal that cannot separate the two cases is not evidence, so the only
+  // witness left is a LOOK relation the describer states outright. Nothing in
+  // the inventory reports eyes meeting the camera, so that defect is currently
+  // invisible here — under-reported, which is this module's chosen error.
   return null;
 }
 
@@ -144,10 +156,7 @@ function checkDeclaredGaze({ declared, inventory, matches, castNames, resolveTar
     const declaredIsCharacter = cast.includes(norm(targetName)) || cast.includes(norm(looksAt));
 
     let contradiction = null;
-    if (seen.kind === 'viewer') {
-      // The eyes meet the camera while the brief sends them somewhere else.
-      contradiction = 'the eyes meet the viewer';
-    } else {
+    {
       const seenCharacter = charAt.get(norm(seen.label));
       if (declaredIsCharacter) {
         // Both sides name a person, so the finding needs both names: an
