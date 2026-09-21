@@ -21,6 +21,65 @@ superseded and link forward.
 
 ---
 
+## 2026-09-21 — The no-images-in-JSONB rule is enforced per COLUMN, repaired by a tool that never deletes a byte, and staging cannot be repaired from a laptop
+
+**Context:** The daily sweep (`check-inline-images.js`) reports violations; nothing
+fixed them outside `characters.data` / `stories.data`. Measured 2026-09-21:
+staging 38 rows / 99.67 MB across `story_jobs.input_data`, `characters.metadata`,
+`testlab_experiments.results`+`.params` and `users.trial_data`; production 34 rows /
+33.76 MB across `characters.metadata` and `users.trial_data`. Each of those payloads
+is built from values that WERE offloaded elsewhere and then copies the inline
+fallbacks forward, so the leak travels between columns.
+
+**Decision:**
+1. `offloadJsonbColumn()` in `server/lib/dbHousekeeping.js` is the ONE offload, now
+   column-agnostic; `offloadInlineImages()` (the daily routine) is a two-line caller.
+   `scripts/admin/offload-jsonb-images.js` drives it on demand and shares the sweep's
+   candidate predicate, so a column the sweep flags is a column the tool can clean.
+2. **Nothing is ever deleted.** A value becomes a URL only after the object behind
+   that URL is fetched back and md5-matched against the value being replaced. Keys
+   are content-addressed (`…-<md5>.jpg`), which makes the run idempotent and lets an
+   existing object — or the SAME image already offloaded in a sibling column — be
+   PROVEN identical and reused instead of re-uploaded. On production, 93 of 153
+   images were reused from `characters.data`, which the 2026-09-01 migration had
+   already cleaned while `.metadata` kept the base64.
+3. All-or-nothing per row, in a transaction, with the pre-write `::text` as the
+   concurrency fingerprint. The snapshot must be the stored TEXT, not the parsed
+   value: the walker mutates the parsed tree in place, so a parsed snapshot compares
+   the row against its own post-offload state and refuses every row (that bug fired
+   on the first production run and is pinned in `tests/unit/jsonb-image-offload.test.ts`).
+4. The write paths now sweep before the write, through one generic never-throwing
+   wrapper `offloadJsonbImages(prefix, label, data)` — `offloadCharacterImages` is one
+   line of it. Test Lab diagnostics are OFFLOADED, never stripped: an entry keeps
+   every field, holding a URL.
+5. **The tool refuses to run against a database whose bucket it is not configured
+   for.** `.env` holds PRODUCTION R2 credentials; staging serves a different bucket
+   (`images-staging.magicalstory.ch`, verified by resolving a staging key against the
+   production bucket — absent). Offloading staging from a laptop would leave staging
+   rows pointing into the production bucket, where production's own R2 garbage
+   collection would eventually delete the only copy. Same guard, same reasoning as
+   `assertBucketMatchesDatabase` in `delete-user-data.js`.
+
+**Rationale:** The rule had been restated for months and enforced at one chokepoint.
+Enforcing it per COLUMN — discovered from `information_schema`, not from a list — is
+the only form that a new field cannot outrun. And the bytes in `users.trial_data` are
+the only copy of a real customer's uploaded photograph, so "verify, then replace" is
+not a nicety: a blind delete there is unrecoverable data loss.
+
+**Consequence, open:** production is clean (sweep: 0). **Staging cannot be cleaned
+without staging R2 credentials**, which exist only inside the staging Railway service.
+Two ways to close it: put staging's R2 variables in `.env` and re-run the tool, or
+deploy this branch to staging and let the daily housekeeping routine do it. Tracked in
+`tasks/BACKLOG.md`.
+
+**Touched:** `server/lib/dbHousekeeping.js`, `scripts/admin/offload-jsonb-images.js`,
+`server/services/database.js`, `server/routes/jobs.js`, `server/routes/trial.js`,
+`server/routes/admin/jobs.js`, `server/routes/admin/testlab.js`,
+`server/routes/avatars.js`, `server/routes/characters.js`,
+`scripts/admin/sibling-registry.json`, `tests/unit/no-inline-images-in-jsonb.test.ts`,
+`tests/unit/jsonb-image-offload.test.ts`.
+**Status:** ✅ active (production repaired; staging repair blocked on credentials)
+
 ## 2026-09-21 — The wardrobe review gets its own dev panel, and the saved-story route ships it without its prompt
 
 **Context.** `clothingReviewReport` (beats step 3b) runs on every story, is the last moment an
@@ -53532,3 +53591,61 @@ and the CUT line pointing at check 4 "Back cover, not synopsis".
 `tests/unit/idea-scope-and-landmarks.test.ts`,
 `tests/unit/language-idea-variant.test.ts`, `tests/unit/world-seeds.test.ts`,
 `tests/unit/idea-guide-shape.test.ts`.
+
+## Round 18 — the cleaned idea prompt is measurably tidier and measurably LESS wanted (2026-09-21)
+
+**Context:** round 17's cleanup (the entry above) removed six kinds of noise from
+the idea prompt. Round 18 re-ran all ten cells on it (20 ideas, USD 1.0924,
+`claude-sonnet-4-6`) and the result went into a single blind read with rounds 1
+and 10 — 60 texts, one shuffle, a fresh reader who saw no labels, no key and no
+earlier ratings file, anchored on `blind-scores.md`, with "a missing uploaded
+family member is a hard fault" and "a leading Rollen block is NOT a fault".
+
+**Measured (`blind-scores-r18.md`, `analyze-blind.js --rounds=1,10,18`):**
+
+| | R1 | R10 | R18 |
+|---|---|---|---|
+| mean, buy axis | 3.35 | **3.70** | **3.25** |
+| fives | 3 | 3 | 1 |
+| distribution | 1:3 2:2 3:3 4:9 5:3 | 1:0 2:1 3:7 4:9 5:3 | 1:0 2:3 3:10 4:6 5:1 |
+
+Paired by cell-arm, R18 beats R10 on 2, loses on 8, ties 10; against R1 it is
+7/7/6. Every breakdown moves the same way — adventure 4.13 → 3.75,
+life-challenge 3.13 → 2.88, historical 4.00 → 3.00, location 3.67 → 3.25,
+fantasy 3.75 → 3.25, age band 3-5 4.00 → 3.33, cast size 4 4.50 → 2.50 — so this
+is not one axis, it is the whole set drifting toward a 3.
+
+**And at the same time the mechanical defects fell** (`round-18-defects.md`):
+peril 10 → 5 → **4**, narrated middles 5 → 6 → **4**, a cast member missing from
+the text 2 → 1 → **0** (R18 is the first round where every idea names its whole
+cast), over-long sentences 4 → 1 → **1**, mean text length 606 → 572 → **543**.
+
+**Decision: record the split and change nothing yet.** The prompt is cleaner and
+the OUTPUT is safer, shorter and more complete, and the same reader in the same
+shuffle wants to buy it less. The plausible causes are not separated by this run
+and each points at a different undo, so no line is reverted on one round:
+1. the ideas got shorter (543 chars mean, and the reader's low scores say "only
+   one beat", "slight", "thin") — the `{STORY_SCOPE}` short-book band ("one
+   place, one want, one thing in the way") may be reading as permission to write
+   less story, not as a description of the book's size;
+2. the five-improvement scaffold, deleted as a quota that manufactures edits,
+   may have been doing real work — "list what you changed and why" lets the
+   model change nothing;
+3. review check 3 (Logic & Consistency) was deleted as unfailable by a
+   five-sentence text, and the reader's complaints on `c6/arm1` ("resolution
+   logic is confusing") and `c5/arm1` ("incoherent bolted-on cast") are exactly
+   logic faults.
+
+**Two faults that ARE new and are the round-17 change's own:**
+- `c5/arm1` puts half the cast "unten an der Ruine Stein" while the main
+  character is on an orbital station. The new location-arm frame says the real
+  landmark is where it starts and where it comes back to; on an off-Earth theme
+  the model satisfied that by splitting the cast across two worlds in one
+  paragraph. Scored 2, "incoherent bolted-on cast".
+- The narrated middle moved rather than disappeared: R18's four all hide inside
+  the COST sentence as a condition on the main character's own choice ("Wenn
+  Jonas schweigt, …"), which check 4 labels "cost" and keeps.
+
+**Touched files:** `tests/manual/story-idea-rounds/round-18.md`,
+`round-18-defects.md`, `blind-set-r18.md`, `blind-scores-r18.md`,
+`blind-key-r18.json`.
