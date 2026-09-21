@@ -54501,3 +54501,56 @@ handles gaze (`docs/SETTLED.md`).
 `server/lib/evalPipeline.js` (wiring + `sceneMeta` hoist),
 `tests/unit/gaze-check.test.ts` (27), fixture from Lab 1376 + 1377.
 **Status:** ✅ active
+
+---
+
+## 2026-09-22 — Most of the arc's cost is invisible thinking, and buying less of it buys a weaker story
+
+**Context:** Every Anthropic call in this codebase sends `{model, max_tokens,
+messages}` and nothing else. On Claude Opus 5 that means adaptive thinking runs
+BY DEFAULT at effort `high` — a change from Opus 4.8/4.7, where omitting the
+parameter meant no thinking — and thinking is billed inside `output_tokens`
+whatever `display` says, with `display` defaulting to `"omitted"`. So it is paid
+for and never returned. `arc_create` bills 30,674 output tokens against 14,305
+chars (~4,000 tokens) of stored text; the arc machine is $1.33 of a $4.57 story.
+
+**Measured** by Lab **#1375** (`arc_effort`, staging
+`job_1789853503332_riqncqg1i`, `claude-opus`, one shared challenge draw, each
+committed arc scored by claude-sonnet + grok-4.6):
+
+| effort | cost | output tok | not returned | judged |
+|---|---|---|---|---|
+| low | $0.264 | 8,862 | 66% | 5.68 |
+| medium | $0.297 | 10,179 | 63% | 5.93 |
+| high (current) | $0.779 | 29,451 | 84% | 6.39 |
+| xhigh | $0.942 | 35,993 | 86% | 6.68 |
+| max | $1.367 | 52,998 | 92% | 6.82 |
+
+Quality rises monotonically with effort and the loss is NOT spread evenly. At
+low/medium it concentrates in `change` (4.5 vs 7.5 at max) and `attempts` (4.5
+vs 6.0) — the structural spine — while texture dimensions (`lost`, `blockers`,
+`engaging`) barely move. Visible in the arcs: the low arc ends with the hero
+"saying he is happy"; the max arc ends with him leaving his hat behind as a
+blanket and walking home cold. Told versus shown.
+
+**Decision:** No change. The arc stays at the default `high`. The `effort`
+passthrough added to `textModels.js` is OPT-IN and no caller sets it, so
+production is byte-identical to before.
+
+**Rationale:** Medium would save ~$0.75/story (~16% of a story) across create +
+retell, but the arc is what every later stage builds on and the points are lost
+in exactly the two dimensions that carry a children's story. Cheaper arcs are a
+weaker spine propagated into every page. If effort is ever raised instead,
+`xhigh` is the better-value direction (+21% cost for +0.29) than `max` (+76% for
++0.43).
+
+**Caveats on the evidence:** n=1 story, one arc per arm. The judges disagree
+widely (sonnet 5.79-7.36, grok 5.57-6.29) and grok ranked medium BELOW low, so
+the low-vs-medium gap is inside judge noise; the low/medium vs high+ gap is what
+both judges agree on. Only `arc_create` was swept — `arc_retell` has the same
+shape and is unmeasured.
+
+**Touched:** `server/lib/textModels.js` (opt-in `effort`),
+`server/lib/testlab.js` (`arc_effort`)
+
+**Status:** ✅ active
