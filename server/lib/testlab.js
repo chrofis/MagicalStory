@@ -918,6 +918,14 @@ async function runQualityEvalStage(ctx, { promptOverride, experimentId, params =
     issuesSummary: result.issuesSummary || null,
     fixableIssues: result.fixableIssues || [],
     figures: (result.figures || []).map(f => ({ name: f.name, match: f.match, issues: f.issues })),
+    // THE JUDGE'S OWN INVENTORY, raw. `figures` above is the DETECTION list and
+    // carries name/match/issues; the judge returns its OWN figure objects —
+    // zone, hair, clothing, action, view, items_held — inside `reasoning`, and
+    // that is the only place a newly added schema field can be read back.
+    // Measured 2026-09-21: a `gaze` field added to the figure schema came back
+    // through `figures` as `{}` on all 13 figures, so the experiment could not
+    // be scored in either direction. Same reason complianceRaw exists below.
+    reasoning: result.reasoning || null,
     // The judge's parsed output as returned, BEFORE the fixable_issues mapper
     // and gates. Without it a rule the judge ignores and a finding a gate
     // dropped are indistinguishable in the Lab (2026-09-08, experiment 1057:
