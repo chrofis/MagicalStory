@@ -138,3 +138,48 @@ describe('buildIdeasPromptContext on the two contracts', () => {
     for (const line of ctx.worldSeedLines) expect(line).toContain('Build the want or the obstacle');
   }, 120000);
 });
+
+describe('round 24 — the seed is the mechanism, the topic is what the child does inside it', () => {
+  const { loadPatternSeeds } = require(path.join(ROOT, 'server/lib/patternSeeds'));
+  const { IDEA_CONTRACT_PATTERN } = require(path.join(ROOT, 'server/lib/ideaContract'));
+  const { getIdeaGuide } = require(path.join(ROOT, 'server/lib/promptBuilders'));
+
+  // shared/topic-age-windows.json — the complete 0-2 set. A new one here means
+  // a new [[idea]] block with its own "inside the pattern" line.
+  const BABY_TOPICS = ['bath-time', 'first-foods', 'first-steps', 'first-words', 'going-outside'];
+
+  it('the contract ranks the seed against the topic', () => {
+    expect(IDEA_CONTRACT_PATTERN).toContain(
+      'The pattern seed sets the mechanism of the book; the topic sets what the child does inside it; keep both.');
+  });
+
+  it('every 0-2 topic guide carries an idea block that says so', () => {
+    for (const topic of BABY_TOPICS) {
+      const guide = getIdeaGuide('life-challenge', topic);
+      expect(guide, topic).toContain('**Inside the pattern.**');
+      expect(guide, topic).toContain("The book's pattern comes from the pattern seed");
+      expect(guide, topic).toContain("The topic sets only what the child does inside it");
+      expect(guide, topic).toContain("The child's part");
+      // The block is the idea view, not the whole book brief.
+      expect(guide, topic).not.toContain('**What happens.**');
+      expect(guide, topic).not.toContain('**Ending.**');
+    }
+  });
+
+  it('first-words and going-outside name their own line', () => {
+    expect(getIdeaGuide('life-challenge', 'first-words')).toContain('the child gives the word');
+    expect(getIdeaGuide('life-challenge', 'going-outside')).toContain('the child takes each step out');
+  });
+
+  it('no seed variation is an enumeration the model can translate', () => {
+    for (const seed of loadPatternSeeds()) {
+      // Round 23: an arm copied seed 3's own list (boots, sleeve, button) into
+      // the idea. A variation names the KIND of change; a list has commas or
+      // a colon introducing one.
+      expect(seed.variation, `seed ${seed.id}`).not.toContain(':');
+      expect((seed.variation.match(/,/g) || []).length, `seed ${seed.id} reads as a list`).toBeLessThanOrEqual(1);
+      expect(seed.variation.split(' ').length, `seed ${seed.id}`).toBeLessThanOrEqual(16);
+    }
+  });
+});
+

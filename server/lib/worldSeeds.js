@@ -30,6 +30,19 @@ function ideaVariantSeed(seedInput) {
 }
 
 const CENTRE_LABEL = 'Who lives here (pick one):';
+
+/**
+ * A centre bullet may carry a trailing ` [grown-up]` tag, marking a centre that
+ * is an adult with a problem of their own — a person who needs the child, a
+ * keeper who is leaving, the cook nobody thanks. Marked by hand across all 32
+ * lists (owner, 2026-09-21) because a pattern book for a main aged two or under
+ * cannot be built on one: round 23's cell 11 drew "A grandfather who has worked
+ * this farm all his life and cannot manage the mornings now" into a book whose
+ * contract has no want, no obstacle and no cost. The tag is data for
+ * pickWorldSeeds; it never reaches a prompt — the idea path strips the lists
+ * whole, and getTeachingGuide strips the tag for the story path.
+ */
+const GROWNUP_TAG = '[grown-up]';
 const TURN_LABEL = 'What turns (pick one):';
 
 /** Bullets that follow `label`, up to the first non-bullet line. */
@@ -49,15 +62,19 @@ function _bulletsAfter(lines, label) {
 /**
  * Parse one world's guide text into its two seed lists.
  * @param {string} guideText - the guide body getAdventureGuide returns
- * @returns {{centres: string[], turns: string[]}|null} null when either list is absent
+ * @returns {{centres: string[], centreGrownUp: boolean[], turns: string[]}|null}
+ *   null when either list is absent. `centres` is the text WITHOUT the tag;
+ *   `centreGrownUp[i]` says whether centre i carried it.
  */
 function parseWorldSeeds(guideText) {
   if (!guideText || typeof guideText !== 'string') return null;
   const lines = guideText.replace(/\r/g, '').split('\n');
-  const centres = _bulletsAfter(lines, CENTRE_LABEL);
+  const rawCentres = _bulletsAfter(lines, CENTRE_LABEL);
   const turns = _bulletsAfter(lines, TURN_LABEL);
-  if (!centres || !turns) return null;
-  return { centres, turns };
+  if (!rawCentres || !turns) return null;
+  const centreGrownUp = rawCentres.map(c => c.endsWith(GROWNUP_TAG));
+  const centres = rawCentres.map(c => (c.endsWith(GROWNUP_TAG) ? c.slice(0, -GROWNUP_TAG.length).trim() : c));
+  return { centres, centreGrownUp, turns };
 }
 
 /** Two different indices into a list of length n, deterministic from h. */
@@ -74,13 +91,21 @@ function _twoIndices(h, n) {
  * @param {string} input.theme      the adventure theme id
  * @param {Array}  [input.characters] @param {string} [input.topic] @param {string} [input.language]
  * @param {number} input.arm        0 or 1; the two arms never share a centre or a turn
+ * @param {boolean} [input.pattern] a pattern book (a main aged two or under):
+ *   only centres NOT tagged ` [grown-up]` are eligible — creatures, things and
+ *   children. Every world keeps at least two such centres, so the two arms
+ *   still never share one. The 3+ pool and its index arithmetic are untouched.
  * @returns {{centre: string, turn: string}|null} null when the world has no lists
  */
-function pickWorldSeeds({ theme, characters, topic, storyTopic, language, arm = 0 } = {}) {
+function pickWorldSeeds({ theme, characters, topic, storyTopic, language, arm = 0, pattern = false } = {}) {
   if (!theme) return null;
   const { getAdventureGuide } = require(path.join(__dirname, 'promptBuilders'));
   const seeds = parseWorldSeeds(getAdventureGuide(theme));
   if (!seeds) return null;
+  const centrePool = pattern
+    ? seeds.centres.filter((_, i) => !seeds.centreGrownUp[i])
+    : seeds.centres;
+  if (!centrePool.length) return null;
   const h = ideaVariantSeed({
     characters,
     storyTopic: topic ?? storyTopic,
@@ -88,12 +113,12 @@ function pickWorldSeeds({ theme, characters, topic, storyTopic, language, arm = 
     language,
   });
   const idx = arm === 1 ? 1 : 0;
-  const [c1, c2] = _twoIndices(h, seeds.centres.length);
+  const [c1, c2] = _twoIndices(h, centrePool.length);
   // A second, independent offset for the turns, so a world's centre list and
   // turn list are not walked in lockstep across casts.
   const [t1, t2] = _twoIndices((h * 2654435761) >>> 0, seeds.turns.length);
   return {
-    centre: seeds.centres[idx === 0 ? c1 : c2],
+    centre: centrePool[idx === 0 ? c1 : c2],
     turn: seeds.turns[idx === 0 ? t1 : t2],
   };
 }
@@ -316,4 +341,4 @@ function worldPlaceInstruction(place) {
   return `The scene is ${place}. Name it where the action is; do not describe it.`;
 }
 
-module.exports = { parseWorldSeeds, stripSeedLists, stripAngleList, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, ideaVariantSeed };
+module.exports = { parseWorldSeeds, GROWNUP_TAG, stripSeedLists, stripAngleList, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, ideaVariantSeed };

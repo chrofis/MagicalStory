@@ -22,6 +22,23 @@ describe('parseWorldSeeds', () => {
     }
   });
 
+  it('records the ` [grown-up]` tag and strips it from the centre text', () => {
+    let tagged = 0;
+    for (const [id, text] of GUIDES) {
+      const seeds = parseWorldSeeds(text);
+      expect(seeds.centreGrownUp.length, `world ${id}`).toBe(10);
+      for (const c of seeds.centres) expect(c, `world ${id}`).not.toContain('[grown-up]');
+      tagged += seeds.centreGrownUp.filter(Boolean).length;
+      // Every world keeps at least two centres a toddler book can be built on,
+      // so the two pattern arms can still never share one.
+      const untagged = seeds.centreGrownUp.filter(x => !x).length;
+      expect(untagged, `world ${id} untagged centres`).toBeGreaterThanOrEqual(2);
+    }
+    // Marked by hand across all 32 lists (owner, 2026-09-21). Pinned so a new
+    // centre bullet cannot be added without deciding what it is.
+    expect(tagged).toBe(80);
+  });
+
   it('returns null when a guide carries no lists', () => {
     expect(parseWorldSeeds('COSTUME: none\n\nStory guidance:\n- be nice')).toBeNull();
     expect(parseWorldSeeds('')).toBeNull();
@@ -49,6 +66,43 @@ describe('pickWorldSeeds', () => {
         expect(a.centre, `${theme} centre`).not.toBe(b.centre);
         expect(a.turn, `${theme} turn`).not.toBe(b.turn);
       }
+    }
+  });
+
+  it('{ pattern: true } never picks a grown-up centre, in any world, on either arm', () => {
+    const toddler = [{ name: 'Emil', age: 2, isMain: true }];
+    for (const theme of [...GUIDES.keys()]) {
+      const seeds = parseWorldSeeds(GUIDES.get(theme));
+      const grownUp = seeds.centres.filter((_: string, i: number) => seeds.centreGrownUp[i]);
+      for (const arm of [0, 1]) {
+        const picked = pickWorldSeeds({ theme, characters: toddler, topic: 'first-words', language: 'de', arm, pattern: true });
+        expect(picked, theme).not.toBeNull();
+        expect(grownUp, `${theme} arm ${arm}`).not.toContain(picked.centre);
+      }
+      const a = pickWorldSeeds({ theme, characters: toddler, topic: 'first-words', language: 'de', arm: 0, pattern: true });
+      const b = pickWorldSeeds({ theme, characters: toddler, topic: 'first-words', language: 'de', arm: 1, pattern: true });
+      expect(a.centre, `${theme} arms share a centre`).not.toBe(b.centre);
+    }
+  });
+
+  it('the 3+ pick is unchanged by the tagging — same index arithmetic, same centre', () => {
+    // Cell 1 of tests/manual/story-idea-rounds.js, pinned to the value it had
+    // before the ` [grown-up]` tags existed.
+    const cell1 = { theme: 'pirate', characters: [{ name: 'Noah', age: 3, isMain: true }], topic: undefined, language: 'de' };
+    expect(pickWorldSeeds({ ...cell1, arm: 0 })).toEqual({
+      centre: 'A castaway child on an island who has waited a very long time',
+      turn: 'The tide turns, and what was easy to reach an hour ago is under water',
+    });
+    expect(pickWorldSeeds({ ...cell1, arm: 1 })).toEqual({
+      centre: 'A crab from the beach who has come aboard and will not be put back',
+      turn: 'The person who made the promise is the one who cannot keep it',
+    });
+  });
+
+  it('the tag never reaches a prompt — the story path strips it', () => {
+    const { getTeachingGuide } = require(path.join(ROOT, 'server/lib/promptBuilders'));
+    for (const id of [...GUIDES.keys()]) {
+      expect(getTeachingGuide('adventure', id), `world ${id}`).not.toContain('[grown-up]');
     }
   });
 

@@ -4,13 +4,15 @@
 # the premise shape uses for ages three and up; the two are mutually exclusive.
 # World-neutral on purpose: the world seed supplies the creature, the pattern seed the mechanism.
 # Format: id|name|the pattern|the variation|the one that resists|the refrain, in English, to be written in the output language
-1|the answering round|the child goes to one after another and asks, and each one answers in its own voice|a different creature and a different sound on every page|one of them stays quiet and gives no answer at all|What do you say?
-2|hide and find|the child lifts, opens or looks behind one thing after another, and finds somebody there each time|a different flap, door, lid or cloth on every page|one of them hides so well it is not found|Where are you?
-3|the going-out sequence|the child puts on or takes hold of one thing after another, in the order the way out needs them|a different piece of the going-out on every page: the boots, the coat, the bag, the door, the path|one thing will not go on however hard it is pulled|One more, and out!
-4|the naming walk|the child points at one thing after another and it is given its word|a different thing to point at on every page|one thing has no word yet and nobody can give it one|What is that?
-5|the goodnight round|the child says goodnight to one after another as the light goes|a different one to say goodnight to on every page|one of them is wide awake and will not lie down|Goodnight, you.
-6|follow the leader|somebody goes ahead and the child comes after, through one opening after another|a different gate, gap, step or turn on every page|one way is shut and will not open|Wait for me!
-7|too big, too small|the child tries one thing against themselves or against a space, and it is the wrong size|a different thing tried on every page|one thing is exactly the right size and fits|Not that one!
-8|the listening round|the child stops at one place after another and listens, and each place has its own noise|a different place and a different noise on every page|one place makes no noise at all|Can you hear it?
-9|give and take|the child holds something out to one after another, and each one takes what is offered|a different one to offer to on every page|one of them will not take it|Here, for you.
-10|where is it|the child looks for somebody in one place after another, calling as they go|a different place to look in on every page|one place is empty and nobody is there|Are you in there?
+# The variation field names the KIND of change only, never an enumeration: round 23 measured an
+# arm copying seed 3's own list (Stiefel, Ärmel, Knopf) into the idea almost word for word.
+1|the answering round|the child goes to one after another and asks, and each one answers in its own voice|who is asked, and the voice that answers|one of them stays quiet and gives no answer at all|What do you say?
+2|hide and find|the child lifts, opens or looks behind one thing after another, and finds somebody there each time|what is lifted or opened, and who is behind it|one of them hides so well it is not found|Where are you?
+3|the going-out sequence|the child puts on or takes hold of one thing after another, in the order the way out needs them|which part of getting out is done next, in the order it has to happen|one thing will not go on however hard it is pulled|One more, and out!
+4|the naming walk|the child points at one thing after another and it is given its word|what is pointed at, and the word that is given for it|one thing has no word yet and nobody can give it one|What is that?
+5|the goodnight round|the child says goodnight to one after another as the light goes|who is said goodnight to, and where they are settling|one of them is wide awake and will not lie down|Goodnight, you.
+6|follow the leader|somebody goes ahead and the child comes after, through one opening after another|which opening is gone through next|one way is shut and will not open|Wait for me!
+7|too big, too small|the child tries one thing against themselves or against a space, and it is the wrong size|what is held up against the child or the space, and how wrong the size is|one thing is exactly the right size and fits|Not that one!
+8|the listening round|the child stops at one place after another and listens, and each place has its own noise|where the child stops, and the noise that place makes|one place makes no noise at all|Can you hear it?
+9|give and take|the child holds something out to one after another, and each one takes what is offered|who is offered to, and what they do with what is held out|one of them will not take it|Here, for you.
+10|where is it|the child looks for somebody in one place after another, calling as they go|where the child looks next, and how the calling sounds there|one place is empty and nobody is there|Are you in there?

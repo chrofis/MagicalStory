@@ -1219,12 +1219,18 @@ function getTeachingGuide(category, topicId) {
   // guide whole, tags stripped, exactly as before they existed.
   const whole = (g) => (g ? g.replace(IDEA_TAG_RE, '').trim() : null);
 
+  // ` [grown-up]` marks an adventure centre that is an adult with a problem of
+  // their own. It is data for pickWorldSeeds (server/lib/worldSeeds.js) and
+  // must never reach a prompt; the idea path drops the bullet lists whole, the
+  // story path reads the guide entire, so the tag comes off here.
+  const untagged = (g) => (g ? g.replace(/ \[grown-up\]/g, '') : null);
+
   if (category === 'educational') {
     return whole(EDUCATIONAL_GUIDES.get(normalizedId)) || null;
   } else if (category === 'life-challenge') {
     return whole(LIFE_CHALLENGE_GUIDES.get(normalizedId)) || null;
   } else if (category === 'adventure') {
-    return ADVENTURE_GUIDES.get(normalizedId) || null;
+    return untagged(ADVENTURE_GUIDES.get(normalizedId)) || null;
   } else if (category === 'historical') {
     return HISTORICAL_GUIDES.get(normalizedId) || null;
   } else if (category === 'swiss-sagen') {

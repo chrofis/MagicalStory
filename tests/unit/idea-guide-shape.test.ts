@@ -47,9 +47,12 @@ describe('getIdeaGuide — life-challenge', () => {
     });
   }
 
+  // `going-outside` was the example here until 2026-09-21, when it and the four
+  // other 0-2 topics gained their own [[idea]] block (the pattern contract's
+  // "inside the pattern" line).
   it('a guide with no [[idea]] block falls back to the whole guide', () => {
-    expect(getIdeaGuide('life-challenge', 'going-outside'))
-      .toBe(getTeachingGuide('life-challenge', 'going-outside'));
+    expect(getIdeaGuide('life-challenge', 'potty-training'))
+      .toBe(getTeachingGuide('life-challenge', 'potty-training'));
   });
 
   it('an unknown topic is null, not a throw', () => {

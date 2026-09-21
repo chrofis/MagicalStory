@@ -45,6 +45,8 @@ const IDEA_CONTRACT_PATTERN = `This book is a pattern, not a premise. Generate a
 4. THE REFRAIN: the line that is said on every page and that the child learns to say along. Write the line itself, in the output language, short enough to say in one breath.
 5. THE LANDING: where it comes back to — the child going to a grown-up and to comfort, written as a movement of the body: a reach, a step, a climb into a lap. Never what the one that resists finally does.
 
+The pattern seed sets the mechanism of the book; the topic sets what the child does inside it; keep both.
+
 Nothing here names what failing costs; a book at this age has no such page. Everything in it can be pointed at in a picture and named with a plain noun, and one thing only is out of the ordinary. The want, where there is one, is something to reach, follow, touch, hold or get to.
 
 CONTRACT CHECK: quote each of the five slots from the final, one line each, and name which slot it is. A slot with nothing to quote is added to the final. Then quote any sentence that says what the one that resists finally does, and cut it. List every cut sentence, not one of them.`;

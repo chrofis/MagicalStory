@@ -13,7 +13,7 @@ Who lives here (pick one):
 - A castaway child on an island who has waited a very long time
 - A young sea turtle caught in a net at the edge of the shallows
 - A crab from the beach who has come aboard and will not be put back
-- An old sailor with a delivery to make and no memory of who it is for
+- An old sailor with a delivery to make and no memory of who it is for [grown-up]
 - A dolphin who swims ahead of the bow every single morning
 - A monkey who takes whatever the crew needs most that day
 - A stowaway smaller than the child, found among the barrels in the hold
@@ -61,8 +61,8 @@ Who lives here (pick one):
 - A squire the same size as the child, trusted with something they have lost
 - A stray dog who has decided this is a knight and follows accordingly
 - A young falcon who will come back to one hand and no other
-- The castle cook who feeds everyone and is thanked by nobody
-- A knight in old armour who is far less brave than the stories say
+- The castle cook who feeds everyone and is thanked by nobody [grown-up]
+- A knight in old armour who is far less brave than the stories say [grown-up]
 - A village child who wants the place in the procession and asks for it openly
 - A goat loose on the tournament ground who will not be driven out
 - A lamb stranded high on the castle wall
@@ -108,12 +108,12 @@ Who lives here (pick one):
 - A palace cat who knows every secret and trades them for kindnesses
 - A child from the kitchens who is the only one who says what is true
 - A swan on the lake who follows one person and no other
-- A grandmother who is losing the words to the song the whole kingdom dances to
-- A visitor who has come for one evening and can never come again
-- A nervous young helper who must speak in front of everyone
+- A grandmother who is losing the words to the song the whole kingdom dances to [grown-up]
+- A visitor who has come for one evening and can never come again [grown-up]
+- A nervous young helper who must speak in front of everyone [grown-up]
 - A puppy who thinks the crown is a toy
 - A shy creature living under the great staircase, never invited to anything
-- A gardener who has grown one flower for twenty years for someone who never saw it
+- A gardener who has grown one flower for twenty years for someone who never saw it [grown-up]
 
 What turns (pick one):
 - Two invitations are handed to the wrong two children
@@ -151,14 +151,14 @@ COSTUME: viking (mandatory for adventure scenes)
 
 Who lives here (pick one):
 - A seal pup on the shore whose mother has not come back with the tide
-- The village storyteller, who is forgetting the end of the only tale nobody else knows
+- The village storyteller, who is forgetting the end of the only tale nobody else knows [grown-up]
 - A raven who brings one small gift each morning
 - A shaggy pony who carries a load for no one else
 - A child from the next fjord who speaks differently
 - A sheepdog who herds everything, including people
-- A young sailor making a first crossing, frightened and hiding it
+- A young sailor making a first crossing, frightened and hiding it [grown-up]
 - A gull that must be carried aboard a boat already full
-- A grandmother weaving the last sail she will ever weave
+- A grandmother weaving the last sail she will ever weave [grown-up]
 - A whale that surfaces beside the longship on the same stretch of water every year
 
 What turns (pick one):
@@ -200,9 +200,9 @@ Who lives here (pick one):
 - A stray dog in the forum who has learned to beg in three languages
 - A young water-carrier on their first day
 - A temple goose who gets loose in the market
-- An old teacher whose pupils have all grown up
+- An old teacher whose pupils have all grown up [grown-up]
 - A kitten in a niche of the aqueduct, too high to reach from below
-- A visitor from far away who cannot ask for what they need
+- A visitor from far away who cannot ask for what they need [grown-up]
 - A builder's mule with one job left in him before he is sent away
 - A baker's child who knows every back street in the city
 - A statue that everyone walks past, and one person talks to
@@ -243,11 +243,11 @@ Who lives here (pick one):
 - A neighbour's dog who keeps arriving with something that belongs to someone else
 - A younger child who saw it happen and has promised not to tell
 - A cat who takes the same route every evening and stops at the same gate
-- An old neighbour who has lost something small and will not say what
+- An old neighbour who has lost something small and will not say what [grown-up]
 - A pet who disappears at the same hour each day and comes back happy
 - A bird who has been collecting shiny things from the whole street
 - A friend who has stopped speaking to the child, and has a reason
-- A shopkeeper who sees everything on the street and mentions none of it
+- A shopkeeper who sees everything on the street and mentions none of it [grown-up]
 - A new child on the street whom everybody has already decided about
 - A parcel with a name on it that nobody in the neighbourhood recognises
 
@@ -289,10 +289,10 @@ Who lives here (pick one):
 - A ranch dog who adopts the child on the first day
 - A new ranch hand the same age as the child, proud and getting it all wrong
 - A wild pony who allows one step closer each day
-- A neighbour who is moving away and has an animal she cannot take
+- A neighbour who is moving away and has an animal she cannot take [grown-up]
 - A hen who has hidden her whole clutch somewhere in the yard
-- A rider who has broken an arm the week of the drive
-- A cook at the chuck wagon who feeds forty people and talks to none of them
+- A rider who has broken an arm the week of the drive [grown-up]
+- A cook at the chuck wagon who feeds forty people and talks to none of them [grown-up]
 
 What turns (pick one):
 - The herd moves at dawn whether or not everything is found
@@ -334,12 +334,12 @@ Who lives here (pick one):
 - A scribe's apprentice who has ruined the one page that mattered
 - A donkey who carries water for the whole street and has gone lame
 - A crocodile hatchling far from the river
-- An old temple sweeper with a secret and nobody to tell it to
+- An old temple sweeper with a secret and nobody to tell it to [grown-up]
 - A sacred bird who escapes its keeper
 - A boat-builder's child who is frightened of the water
-- A traveller from upriver who is walking the wrong way and does not know it
-- A grandmother on the far bank expecting someone before the flood
-- A market seller who has been counting on one sale all month
+- A traveller from upriver who is walking the wrong way and does not know it [grown-up]
+- A grandmother on the far bank expecting someone before the flood [grown-up]
+- A market seller who has been counting on one sale all month [grown-up]
 
 What turns (pick one):
 - The river rises earlier than the year before
@@ -377,12 +377,12 @@ COSTUME: greek (mandatory for adventure scenes)
 
 Who lives here (pick one):
 - An owl who sits above the market every day
-- A young runner who has trained all year and cannot line up
+- A young runner who has trained all year and cannot line up [grown-up]
 - A hillside goat who has got into the temple
-- A philosopher who asks one question that cannot be put down
+- A philosopher who asks one question that cannot be put down [grown-up]
 - A lost child in the marketplace who cannot name their street
 - A stray dog who runs every race and belongs to nobody
-- An old potter with shaking hands and one piece left to finish
+- An old potter with shaking hands and one piece left to finish [grown-up]
 - A visiting child who speaks another language
 - A fisherman's daughter who knows the coast better than the charts do
 - A statue in the agora that someone leaves flowers for every morning
@@ -424,13 +424,13 @@ COSTUME: caveman (mandatory for adventure scenes)
 Who lives here (pick one):
 - A mammoth calf separated from the herd
 - A wolf pup at the edge of the firelight
-- An elder whose eyes are failing and who alone knows the way to the summer camp
+- An elder whose eyes are failing and who alone knows the way to the summer camp [grown-up]
 - A child from another family group who cannot speak the same words
 - A young saber-tooth cat with a thorn in its paw
 - A baby brother who has just learned to crawl
 - A bird with a broken wing who must be kept warm all night
 - An old hunting dog who can no longer keep up
-- The one who paints the cave wall and has run out of red
+- The one who paints the cave wall and has run out of red [grown-up]
 - A toddler who has picked up the fire-stick and thinks it is a toy
 
 What turns (pick one):
@@ -471,13 +471,13 @@ COSTUME: samurai (mandatory for adventure scenes)
 Who lives here (pick one):
 - A koi in the temple pond who comes to one hand only
 - A crane who lands in the garden every evening
-- An old teacher retiring with one pupil still unready
+- An old teacher retiring with one pupil still unready [grown-up]
 - A younger student failing in front of everyone
 - A temple kitten who sleeps where nothing may be moved
-- A traveller who arrives with nothing and explains nothing
+- A traveller who arrives with nothing and explains nothing [grown-up]
 - A horse who has carried a family for years and is led away tomorrow
 - A monkey from the hills who takes what is precious and waits to see what happens
-- A gardener who has raised one tree for forty years
+- A gardener who has raised one tree for forty years [grown-up]
 - A village child who practises alone where nobody watches
 
 What turns (pick one):
@@ -519,11 +519,11 @@ Who lives here (pick one):
 - A younger trainee who follows and cannot be shaken off
 - A guard dog on the route who has been fed once and now expects it
 - A friend who has been left out of the team and watches from the roof
-- A neighbour who cannot sleep and sits at the window every night
+- A neighbour who cannot sleep and sits at the window every night [grown-up]
 - A mouse, a firefly or a frog who is the only way past a locked door
-- A messenger who will not say who the message is for
+- A messenger who will not say who the message is for [grown-up]
 - A bird nesting in the one gap that was going to be climbed through
-- A market seller who notices everything and says nothing
+- A market seller who notices everything and says nothing [grown-up]
 - A rival trainee who is faster and has never been beaten
 
 What turns (pick one):
@@ -563,13 +563,13 @@ COSTUME: wizard (mandatory for adventure scenes)
 Who lives here (pick one):
 - A small creature that hatches from something nobody was supposed to touch
 - A ghost no bigger than a cat who attaches itself to one person
-- A grandmother who is forgetting her spells one by one
+- A grandmother who is forgetting her spells one by one [grown-up]
 - A talking book that answers everything except the thing that is asked
 - A familiar - an owl, a toad, a cat - who belongs to someone else and will not go back
 - A classmate whose magic never works and who has stopped trying
 - A plant given as a gift that grows a little every hour
 - A creature made by accident out of something ordinary
-- The keeper of the tower, who has not been outside it in years
+- The keeper of the tower, who has not been outside it in years [grown-up]
 - A broom, a lamp or a chair that has begun to behave like a pet
 
 What turns (pick one):
@@ -610,13 +610,13 @@ COSTUME: superhero (mandatory for adventure scenes)
 Who lives here (pick one):
 - A small stray animal who is the only one who knows the secret identity
 - A younger child who has worked out who the hero is
-- A neighbour everybody has stopped noticing
+- A neighbour everybody has stopped noticing [grown-up]
 - A rescued creature who now arrives at every emergency first
 - A friend whose own power has stopped working
 - A rival hero the same age who is better at everything
 - A little robot or toy come alive that keeps trying to help
-- A grandparent who needs the child on the day the city needs the hero
-- A shopkeeper who has been quietly fixing the street for years
+- A grandparent who needs the child on the day the city needs the hero [grown-up]
+- A shopkeeper who has been quietly fixing the street for years [grown-up]
 - A cat stuck somewhere that no power in the world is any use for
 
 What turns (pick one):
@@ -659,11 +659,11 @@ Who lives here (pick one):
 - A young octopus who hides everything and treats it as a game
 - A merchild new to the reef who sits at the edge of every group
 - A sea turtle who has made the same journey for fifty years
-- A grandmother of the reef who is the last to remember an old song
+- A grandmother of the reef who is the last to remember an old song [grown-up]
 - A fish caught in something that does not belong in the sea
 - A pet crab who refuses to stay behind
 - A whale calf calling all night
-- A keeper of the shallows who warns everyone and is never thanked
+- A keeper of the shallows who warns everyone and is never thanked [grown-up]
 - A shell that sings one note and belongs to somebody
 
 What turns (pick one):
@@ -704,13 +704,13 @@ COSTUME: firefighter (mandatory for adventure scenes)
 Who lives here (pick one):
 - A station dog who knows the bell better than anyone
 - A cat up a tree who has been fetched down four times this month
-- A very old neighbour who calls because there is nobody else to call
+- A very old neighbour who calls because there is nobody else to call [grown-up]
 - A child who has hidden during a drill and will not come out
 - A duckling family walking the wrong way down a busy street
-- A new firefighter on a first shift, more frightened than they will admit
+- A new firefighter on a first shift, more frightened than they will admit [grown-up]
 - A pony in a field that must be moved before the water rises
 - A hamster loose in a house everyone has been asked to leave
-- A grandmother who will not go outside without what she cannot carry
+- A grandmother who will not go outside without what she cannot carry [grown-up]
 - A small child whose toy is in the flooded cellar
 
 What turns (pick one):
@@ -754,13 +754,13 @@ Who lives here (pick one):
 - A child in the waiting room who is more frightened of the door than of anything behind it
 - A dog brought to the wrong kind of surgery who will not leave one side
 - A very small patient - a hamster, a kitten, a bird - nobody else takes seriously
-- A grandmother who tells everyone she is fine
+- A grandmother who tells everyone she is fine [grown-up]
 - A younger sibling who copies everything, including being brave
-- A new nurse on a first day who cannot find where anything is kept
+- A new nurse on a first day who cannot find where anything is kept [grown-up]
 - A teddy needing an operation, brought in by a very serious owner
 - A patient who cannot say where it hurts
 - A cat living behind the clinic who is fed by everyone and belongs to nobody
-- An old doctor on the last week before the surgery closes
+- An old doctor on the last week before the surgery closes [grown-up]
 
 What turns (pick one):
 - The bravest one in the room turns out to be the smallest
@@ -802,13 +802,13 @@ Who lives here (pick one):
 - A police dog who has failed every test
 - A lost dog wearing a collar with a name and no address
 - A child at the market who has let go of a hand
-- An old man who comes to the station every week to report the same thing
+- An old man who comes to the station every week to report the same thing [grown-up]
 - A younger child who has found something valuable and is finding it hard to hand in
 - A cat who rides in the patrol car and will not be put out
-- A neighbour the whole street has complained about
+- A neighbour the whole street has complained about [grown-up]
 - A parrot on a roof repeating an address
-- A new officer on a first patrol who is afraid of dogs
-- A market trader who sees everything from behind the stall
+- A new officer on a first patrol who is afraid of dogs [grown-up]
+- A market trader who sees everything from behind the stall [grown-up]
 
 What turns (pick one):
 - The one who is accused is the one who reported it
@@ -950,9 +950,9 @@ Who lives here (pick one):
 - A Pteranodon with a torn wing far below its cliff ledge
 - A nest where one egg keeps rolling out
 - Two hatchlings of different kinds who have decided they belong together
-- A palaeontologist who has dug for thirty years and has one day left on the site
+- A palaeontologist who has dug for thirty years and has one day left on the site [grown-up]
 - A dinosaur who is afraid of something much smaller than itself
-- A museum guard who talks to the skeletons when the hall is empty
+- A museum guard who talks to the skeletons when the hall is empty [grown-up]
 
 What turns (pick one):
 - The egg starts to move, and the mother is nowhere in sight
@@ -993,14 +993,14 @@ COSTUME: astronaut (mandatory for adventure scenes)
 Who lives here (pick one):
 - A small robot that follows one person everywhere
 - An alien child the same size who is lost and cannot say where home is
-- A crewmate who has been away from home longer than anyone and no longer mentions it
+- A crewmate who has been away from home longer than anyone and no longer mentions it [grown-up]
 - A creature no bigger than a hand, found aboard, that nobody remembers bringing
 - A plant grown on the station that turns toward whoever speaks to it
 - A voice on the radio that answers every night
 - A station cat who has learned to float
 - A crewmate the same age who is going home tomorrow
 - A visitor who can stay only while a door stands open
-- The engineer who keeps the oldest module working and is the only one who can
+- The engineer who keeps the oldest module working and is the only one who can [grown-up]
 
 What turns (pick one):
 - The robot stops, and the only thing that wakes it is a song
@@ -1045,11 +1045,11 @@ Who lives here (pick one):
 - A dolphin who swims beside the boat every morning
 - A seal pup on the beach whose mother is still out at sea
 - A younger child on the boat who is afraid of the water and has told nobody
-- A very old diver making a last dive
+- A very old diver making a last dive [grown-up]
 - A crab who came aboard in a bucket and cannot be found
 - A whale who follows the boat and turns away at the same place every time
 - A tiny fish living inside something that is about to be carried away
-- A harbour keeper who knows every boat and every tide
+- A harbour keeper who knows every boat and every tide [grown-up]
 
 What turns (pick one):
 - The tide turns, and the way back is now the long way
@@ -1093,7 +1093,7 @@ Who lives here (pick one):
 - An elephant calf walking the wrong way along the river
 - A sloth on a rope bridge who will not be hurried
 - A tree frog carried out of the forest by accident
-- A researcher who has waited years to see one animal and has one night left
+- A researcher who has waited years to see one animal and has one night left [grown-up]
 - A crate at the camp with air holes and something alive inside
 - A tiger who watches from the far bank and never comes closer
 - A young toucan fallen from a nest that is far too high
@@ -1141,11 +1141,11 @@ Who lives here (pick one):
 - A hen who has stopped laying and is about to be given away
 - An old sheepdog who cannot keep up and still goes to the gate every morning
 - A calf loose through a gap in the fence
-- A grandfather who has worked this farm all his life and cannot manage the mornings now
+- A grandfather who has worked this farm all his life and cannot manage the mornings now [grown-up]
 - A barn cat with kittens hidden somewhere in the hay
 - A pony bought for someone else who will let nobody else near
 - A goat who can open every latch on the farm
-- A neighbour who has come to help and does everything differently
+- A neighbour who has come to help and does everything differently [grown-up]
 
 What turns (pick one):
 - The storm comes before the hay is in
@@ -1188,12 +1188,12 @@ Who lives here (pick one):
 - A hedgehog who has made a nest in exactly the wrong place
 - An owl who calls from the same tree every night
 - A deer who has learned to trust one person and startles at everyone else
-- A ranger who has watched this wood for forty years and leaves at the end of the week
+- A ranger who has watched this wood for forty years and leaves at the end of the week [grown-up]
 - A fledgling out of the nest too early
 - A dog who has run off the path
 - A squirrel who has hidden something important along with all the nuts
 - A stranger's cat in the wood, wearing a collar
-- A woodcutter who lives alone and has not spoken to anyone for a week
+- A woodcutter who lives alone and has not spoken to anyone for a week [grown-up]
 
 What turns (pick one):
 - The light goes, and the path that was obvious is not
@@ -1232,16 +1232,16 @@ Story guidance:
 COSTUME: not needed - use standard or winter avatar
 
 Who lives here (pick one):
-- A grandmother who is forgetting the words to the song the family sings every year
-- A neighbour who will be alone on the evening and says she prefers it
+- A grandmother who is forgetting the words to the song the family sings every year [grown-up]
+- A neighbour who will be alone on the evening and says she prefers it [grown-up]
 - A stray cat at the door in the cold who has chosen this house
 - A small brother who has found the hidden presents
-- A visitor who has arrived unannounced and can stay one night
+- A visitor who has arrived unannounced and can stay one night [grown-up]
 - A bird at the feeder who comes every morning
 - A younger child who has written to someone who cannot answer
 - An old family decoration that belongs to someone who is coming today
-- The person who cooks for everyone and sits down last
-- A postman on the last round of the year with one parcel that has no address
+- The person who cooks for everyone and sits down last [grown-up]
+- A postman on the last round of the year with one parcel that has no address [grown-up]
 
 What turns (pick one):
 - The handmade thing goes wrong with no time left to start again
@@ -1280,15 +1280,15 @@ Story guidance:
 COSTUME: not needed - use standard or winter avatar
 
 Who lives here (pick one):
-- A grandparent who says this is the last year they will stay up
+- A grandparent who says this is the last year they will stay up [grown-up]
 - A friend who is moving away in the new year and has told nobody
 - An old dog frightened by the noise, hidden somewhere in the house
-- A neighbour whose windows are dark while the whole street is lit
+- A neighbour whose windows are dark while the whole street is lit [grown-up]
 - A younger sibling determined to stay awake
 - A cat who slips out of the door during the countdown
-- A visitor who has come a long way and must leave before the year turns
+- A visitor who has come a long way and must leave before the year turns [grown-up]
 - A letter written a year ago, to be opened tonight
-- The one who organises the party and never sees any of it
+- The one who organises the party and never sees any of it [grown-up]
 - A baby who is awake at midnight for the first and only time
 
 What turns (pick one):
@@ -1332,12 +1332,12 @@ Who lives here (pick one):
 - A nest of eggs found the morning of the hunt, in the middle of it
 - A younger child whose basket stays empty while everyone else's fills
 - A lamb in the field next door who has been left behind
-- A grandmother whose hands can no longer paint the eggs she has painted every year
+- A grandmother whose hands can no longer paint the eggs she has painted every year [grown-up]
 - A duckling who follows through the whole hunt and ruins every hiding place
 - A chick hatching in the kitchen on the morning everyone is due to leave
 - A neighbour's child who is never invited and watches over the hedge
 - One egg that is never found, and something small that has claimed it
-- The one who hides them all and never gets to look for any
+- The one who hides them all and never gets to look for any [grown-up]
 
 What turns (pick one):
 - The hidden thing is found by the wrong finder
@@ -1379,7 +1379,7 @@ Who lives here (pick one):
 - A small ghost who is more frightened of the dark than anyone
 - A skeleton who has mislaid a bone and cannot go home without it
 - A black cat on a wall at the end of the street
-- The old neighbour nobody visits, who has been making something all week
+- The old neighbour nobody visits, who has been making something all week [grown-up]
 - A child in a costume so good that nobody recognises them
 - A friend whose costume has fallen apart an hour before
 - A younger sibling who is frightened and insists on coming
@@ -1424,15 +1424,15 @@ Story guidance:
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
-- A mother who has been tired for weeks and keeps saying she is fine
-- A grandmother who is forgetting things, noticed first by the smallest person in the house
+- A mother who has been tired for weeks and keeps saying she is fine [grown-up]
+- A grandmother who is forgetting things, noticed first by the smallest person in the house [grown-up]
 - A younger sibling who cannot keep a secret and is trying very hard
 - A cat who takes the one thing the surprise depends on
-- A neighbour whose own children are far away
+- A neighbour whose own children are far away [grown-up]
 - A plant she has kept alive for years, now in somebody else's care
 - A friend at school who has no mother to make anything for
 - An old photograph of someone the child has never seen young
-- The one who does all the small invisible jobs in the house
+- The one who does all the small invisible jobs in the house [grown-up]
 - A baby who has learned to say one word and says it all day
 
 What turns (pick one):
@@ -1472,16 +1472,16 @@ Story guidance:
 COSTUME: not needed - use standard, summer or winter avatar
 
 Who lives here (pick one):
-- A father who has been promising to finish something for a year
-- A grandfather whose hands shake now and who will not be helped
+- A father who has been promising to finish something for a year [grown-up]
+- A grandfather whose hands shake now and who will not be helped [grown-up]
 - A half-built thing in the shed that has been waiting since last summer
 - A dog who is his dog and has started going to the child instead
 - A younger sibling who gives the secret away in the first hour
 - A skill he is good at that someone has been learning in secret
-- A neighbour with nobody to spend the day with, pretending to be busy
+- A neighbour with nobody to spend the day with, pretending to be busy [grown-up]
 - An old tool of his father's that is kept on a high shelf
 - A bicycle he taught someone to ride, now too small
-- The one who fixes everything and never asks for anything
+- The one who fixes everything and never asks for anything [grown-up]
 
 What turns (pick one):
 - The thing that was mended breaks in the wrong hands

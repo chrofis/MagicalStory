@@ -327,7 +327,7 @@ ${adventureGuideContent}`
   // One centre and one turn per arm, picked in code from the adventure guide's
   // two ten-item lists (server/lib/worldSeeds.js). null — and nothing injected —
   // for a theme with no adventure guide (custom, historical).
-  const worldSeeds = [0, 1].map(arm => pickWorldSeeds({ theme: effectiveTheme, characters, topic: storyTopic, language, arm }));
+  const worldSeeds = [0, 1].map(arm => pickWorldSeeds({ theme: effectiveTheme, characters, topic: storyTopic, language, arm, pattern: isPattern }));
   // Historical has no adventure guide and therefore no centre list. Its guide's
   // own STORY ANGLES block is the same material, so the historical arms get one
   // angle each, picked the same way, into the same {WORLD_SEED*} slot.
