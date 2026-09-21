@@ -11,31 +11,32 @@
 # =============================================================================
 
 [alphabet]
-Teach the 26 letters of the English alphabet (A-Z).
+Teach the letters of the alphabet of the language this book is written in: that language's own letter set, in its own order.
 Key learning points:
 - Introduce letters in memorable groups or through a journey
-- Show both uppercase (A, B, C) and lowercase (a, b, c) forms
-- Associate each letter with a word and object (A is for Apple, B is for Ball)
+- Show both uppercase and lowercase forms
+- Associate each letter with a word and object a child of this language already knows
+- Where the story names how many letters the alphabet has, use this language's own count, never another language's
+- A letter this language does not use belongs in the story only as a borrowed letter, said to be one
 - Include the alphabet song rhythm if natural to the story
 - Emphasize that letters combine to make words
 - Practice: Have characters find or collect letters during the adventure
 
 [vowels]
-Teach the 5 vowels: A, E, I, O, U (and sometimes Y).
+Teach the vowels of the language this book is written in: the vowel letters that language has, and no others.
 Key learning points:
 - Vowels are special letters that appear in every word
-- Each vowel makes different sounds (short and long)
-- Short sounds: a (cat), e (bed), i (sit), o (hot), u (cup)
-- Long sounds: a (cake), e (tree), i (bike), o (home), u (cute)
-- Memory trick: "A, E, I, O, U - and sometimes Y too!"
+- Give the sounds each vowel makes in THIS language, and only the distinctions this language draws
+- Every example word is a word of this language
+- Memory trick: a short chant that says the vowels aloud in order
 - Practice: Find vowels in character names during the story
 
 [rhyming]
-Teach rhyming words and sound patterns.
+Teach rhyming words and sound patterns in the language this book is written in.
 Key learning points:
-- Rhyming words end with the same sound (cat/hat, moon/spoon)
+- Rhyming words end with the same sound
 - Rhymes help us remember things and make language fun
-- Common rhyme families: -at, -an, -op, -ig, -ug, -ake, -ine
+- Every pair and every rhyme family is one that rhymes when read aloud in THIS language
 - Practice identifying "Which word rhymes with...?"
 - Create simple rhyming pairs throughout the story
 - Show how changing the first letter makes new rhyming words

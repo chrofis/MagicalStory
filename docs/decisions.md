@@ -21,6 +21,31 @@ superseded and link forward.
 
 ---
 
+## 2026-09-21 — A teaching guide states no fact that belongs to ONE language
+
+**Context:** Production `job_1789945743706_8ayo2w19e` (Italian, topic `alphabet`) closed on
+"cantò tutte e ventisei le lettere dell'alfabeto". The Italian alphabet has 21 letters; 26 is
+the English count. The number was not invented by the writer — `prompts/educational-guides.txt`
+`[alphabet]` opened with "Teach the 26 letters of the English alphabet (A-Z)", and the guide is
+injected verbatim into the idea call and the story path in every supported language. The leak is
+visible one stage earlier than the page: the stored `storyDetails` already reads "le ventisei
+lettere dell'alfabeto", so the idea call had it before a single page was written.
+
+**Decision:** A guide names no natural language and asserts no letter, vowel or rhyme count. The
+three literacy topics — `[alphabet]`, `[vowels]`, `[rhyming]` — now hand the fact to the language
+the book is written in ("use this language's own count, never another language's"), and their
+worked examples ("A is for Apple", `cat/hat`, the English vowel sounds) are gone.
+
+**Rationale:** The guides are language-blind by construction and there are five tongues behind
+34 language codes, so any fact of one is wrong in four. The whole CLASS was fixed rather than the
+`alphabet` instance: `[vowels]` carried English short/long sounds and "and sometimes Y", and
+`[rhyming]` carried English rhyme families. No per-language facts table was added — that is a new
+mechanism and an owner call; deleting the false fact needs none.
+
+**Touched:** `prompts/educational-guides.txt`, `tests/unit/teaching-guide-language-neutral.test.ts`
+
+**Status:** ✅ active
+
 ## 2026-09-21 — The no-images-in-JSONB rule is enforced per COLUMN, repaired by a tool that never deletes a byte, and staging cannot be repaired from a laptop
 
 **Context:** The daily sweep (`check-inline-images.js`) reports violations; nothing
