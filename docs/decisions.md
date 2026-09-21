@@ -54312,6 +54312,82 @@ on them". Both are owner decisions, filed in `tasks/BACKLOG.md`.
 
 **Status:** ✅ active on `staging` only; not on master.
 
+## 2026-09-21 — A toddler book's mechanism is picked in code, not copied from an example
+
+**Context:** round 22 shipped the pattern contract for a main character aged two or under and
+measured three faults it left open. (1) Cell 7 arm 1 came back as a translation of the new worked
+example — the same fence, the same answering animals, the same brown pony at the far end, the same
+«Komm her!». This is the round-19 hazard exactly: the band with least to go on copies the example
+hardest. (2) `{PREMISE_SHAPE}` still handed a toddler cell a premise shape ("a lost thing that
+moves … the shape is a requirement"), every one of which is a want-and-obstacle the pattern
+contract forbids outright. (3) `{WORLD_SEED}` still said "Build the want or the obstacle on them",
+naming the two things that contract says the book does not have.
+
+**Decision (owner), four parts:**
+1. **Ten pattern seeds, picked in code.** `prompts/pattern-seeds.txt` — a DATA file in the shape of
+   `premise-shapes.txt` (`id|name|pattern|variation|the one that resists|refrain`) — holds ten
+   distinct mechanisms for a 0-2 book: the answering round, hide and find, the going-out sequence,
+   the naming walk, the goodnight round, follow the leader, too big/too small, the listening round,
+   give and take, where is it. `server/lib/patternSeeds.js` picks ONE per arm with the same
+   deterministic hash the premise shapes and world seeds use — never the same seed on both arms —
+   and `patternSeedInstruction` injects it as `{PATTERN_SEED}`. The seeds are world-neutral by
+   construction: the world seed supplies the creature, the pattern seed the mechanism.
+2. **No premise shape for a pattern book.** `premiseShapeLines` is empty on that path.
+3. **A different world-seed line.** `worldSeedInstruction(seeds, { pattern: true })` reads
+   "Someone in this book: <centre>. They are the one that answers, or the one that resists." — and
+   drops the "only strange thing" clause, which the contract already states.
+4. **The toddler worked example is gone from both templates.** The three premise examples stay for
+   ages three and up.
+
+**Rationale.** The mechanism is handed over as a VALUE for the same reason every other idea pick
+is: the two arms run in parallel and cannot see each other, so a difference has to be a value, not
+an instruction to differ — and an example the model can copy is the weakest way to state a
+mechanism at the age with the least other material in the prompt. `{PATTERN_SEED*}` shares the
+template LINE with `{PREMISE_SHAPE*}` (`{PREMISE_SHAPE}{PATTERN_SEED}`) rather than taking a line
+of its own: exactly one of the two is ever non-empty, and sharing the line is what keeps a
+non-toddler prompt byte-for-byte what it was.
+
+**NOT done, and why:** the owner asked for the ≤2 centre to be filtered to creatures and things,
+if the guide lists mark which centres are an adult with a problem of their own. **They do not** —
+`prompts/adventure-guides.txt` carries ten unmarked bullets per world — so the filter was skipped
+rather than guessed at by pattern-matching the prose. It shows: cell 11 arm 1 drew "A grandfather
+who has worked this farm all his life and cannot manage the mornings now". Marking the lists is an
+owner decision, filed in `tasks/BACKLOG.md`.
+
+**Sibling set `story-idea-templates`:** both templates changed in the same commit
+(`check-sibling-paths.js` clean).
+
+**Validated (rung 2 — real generation on the real builder, USD 0.2186):** `tests/unit/pattern-seeds.test.ts`
+(13 pins: ten seeds with all six fields, unique ids and names, world-neutral, two different seeds
+per arm for six topics, determinism, the instruction's four parts, the pattern world-seed wording
+and the unchanged premise wording, the shared template slot in both siblings, the example gone, the
+three premise examples kept) plus the `idea-*`, `world-seeds`, `prompt*`, `language*`, `age-band*`
+and `sibling-parity` suites — 301 tests green. Dry-run of cells 1, 7 and 11 first: cells 7 and 11
+carry a pattern seed, a different one per arm, no shape line, the new toddler seed wording and no
+unfilled placeholder; **cell 1 (age 3) differs from its pre-commit build by exactly the deleted
+Example 4 block and nothing else** (490 bytes on each arm; the remainder is byte-identical, proved
+by reinserting that block into the after-prompt). Then
+`node tests/manual/story-idea-rounds.js --round=23 --cells=7,11` — 4 ideas, four different seeds,
+each with its refrain rendered in German («Hörst du es?», «Einmal noch, und raus!», «Warte auf
+mich!», «Wo bist du?»). **None is a copy of the deleted example.**
+
+**Faults measured, unfixed:** on cell 11 (topic `first-words`) the TOPIC overrode the seed's
+mechanism on both arms — `follow the leader` and `hide and find` were both written as a naming
+walk — so a seed and a topic that name different mechanisms are not yet ranked against each other.
+Cell 7 arm 2 borrows the going-out seed's own enumeration almost word for word (Stiefel, Ärmel,
+Knopf), i.e. the copying moved from the example to the seed's `variation` field. Two German word
+faults in cell 11 arm 2 («schnatschert», «die Katze spuckt»). Filed in `tasks/BACKLOG.md`.
+
+**Touched:** `prompts/pattern-seeds.txt` (new), `server/lib/patternSeeds.js` (new),
+`server/lib/worldSeeds.js`, `server/routes/storyIdeas.js`,
+`prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt` (sibling set
+`story-idea-templates`), `docs/prompt-inventory.md`, `tests/unit/pattern-seeds.test.ts` (new),
+`tests/unit/idea-contract.test.ts`, `tests/unit/world-seeds.test.ts`,
+`tests/manual/story-idea-rounds.js`, `tests/manual/story-idea-rounds/round-23.json` / `round-23.md`,
+`ideas-r23.html`.
+
+**Status:** ✅ active on `staging` only; not on master.
+
 ## The Visual Bible AUTHORING stage is told WHEN to declare `text` (2026-09-21)
 **Context:** `e025d9fef` shipped the delivery half — a Visual Bible element's declared
 `text` reaches the page prompt (a `REQUIRED TEXT` block in the shrink-proof tail), the

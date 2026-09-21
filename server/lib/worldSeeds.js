@@ -147,8 +147,16 @@ function stripSeedLists(guideText) {
  *
  * @param {object|null} seeds @param {object} [opts] @param {number} [opts.pages]
  */
-function worldSeedInstruction(seeds, { pages } = {}) {
+function worldSeedInstruction(seeds, { pages, pattern = false } = {}) {
   if (!seeds) return '';
+  // A pattern book (a main aged two or under) has no want and no obstacle to
+  // build anything on — the contract forbids both — so the centre is handed
+  // over as what it can actually be at that age: the one that answers, or the
+  // one that resists. Round 22 measured the old line reaching a toddler cell
+  // and contradicting the contract it sits next to (docs/decisions.md).
+  if (pattern) {
+    return `Someone in this book: ${seeds.centre}. They are the one that answers, or the one that resists.`;
+  }
   const only = (typeof pages === 'number' && pages <= 10)
     ? ' This is the only strange thing in the idea.'
     : '';

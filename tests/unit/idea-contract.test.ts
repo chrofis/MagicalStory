@@ -108,11 +108,16 @@ describe('the templates hold the placeholder, not the age branching', () => {
     expect(src).not.toContain('Label each one "setup", "hook", "promise"');
   });
 
-  it.each(TEMPLATES)('%s carries the toddler worked example, ending on a movement', (t) => {
+  // Round 22 measured the hazard the worked example carried: cell 7 arm 1 came
+  // back as a translation of it (the fence, the answering animals, the brown
+  // pony, «Komm her!»). The example is gone and the mechanism is handed over as
+  // a picked VALUE instead — prompts/pattern-seeds.txt, {PATTERN_SEED}
+  // (owner, 2026-09-21; tests/unit/pattern-seeds.test.ts).
+  it.each(TEMPLATES)('%s no longer carries a toddler worked example', (t) => {
     const src = read(t);
-    expect(src).toContain('A child walks along the fence and every animal answers back');
-    expect(src).toContain('«Come here!»');
-    expect(src).toContain('runs the whole way back to their grandmother');
+    expect(src).not.toContain('A child walks along the fence and every animal answers back');
+    expect(src).not.toContain('«Come here!»');
+    expect(src).toContain('{PATTERN_SEED');
   });
 });
 

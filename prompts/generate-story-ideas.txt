@@ -64,7 +64,7 @@ Each idea answers these:
 For EACH story idea, output these three stages:
 
 [DRAFT_1]
-{PREMISE_SHAPE_1}
+{PREMISE_SHAPE_1}{PATTERN_SEED_1}
 {WORLD_SEED_1}
 {WORLD_PLACE_1}
 
@@ -91,7 +91,7 @@ CUT_1: the numbers and the full text of every sentence the contract check cut, l
 Corrected final version of story 1.
 
 [DRAFT_2]
-{PREMISE_SHAPE_2}
+{PREMISE_SHAPE_2}{PATTERN_SEED_2}
 {WORLD_SEED_2}
 {WORLD_PLACE_2}
 
@@ -145,10 +145,6 @@ The reader already chose the town and the season. Do not open with an address. T
 A stone in the wall of a ruin sits loose, and behind it is a way into somewhere that is on no map. A child wants the carved animal their grandmother lost in there when she was small. Whoever keeps that gap says the animal belongs to him now. The evening bell is already ringing, and their grandmother sits down at a table with nothing of her mother's on it. The child pushes both shoulders through the wall and reaches into the dark.
 
 A bone as long as an arm lies half out of the gravel at the foot of a quarry. A child wants to carry it up to their grandfather, who is the only one who will know what animal it came from. An older brother says it is a stick and walks on, and the gate at the top of the path is locked when the sun goes down. Behind that gate the bone stays in the gravel and the grandfather waits on his bench with empty hands. The child kneels in the gravel and digs with both hands while the light turns orange.
-
-For a main character two or under, the pattern shape:
-
-A child walks along the fence and every animal answers back: the goat bleats, the duck flaps, the cat pushes its head into their hand. Behind every gate and every bucket there is a new one to meet. The brown pony stands at the far end and comes to nobody. On every page the child calls the same two words across the grass: «Come here!» At the end the child turns and runs the whole way back to their grandmother's open arms.
 
 A goat is standing on the kitchen table eating the birthday cake. A child wants that cake out in the garden, where everyone is already singing. The goat is bigger than the child and will not be pushed. Out in the garden the singing stops at an empty table and the candles go back in the drawer. The child stands in the doorway and holds out an apple in both hands.
 

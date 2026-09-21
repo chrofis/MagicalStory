@@ -35,6 +35,7 @@ const { recordIdeaEvent } = require('../lib/ideaEvents');
 // template holds a line of age branching in prose: a main character aged two or
 // under gets the PATTERN contract (docs/decisions.md 2026-09-21).
 const { buildIdeaContract, IDEA_CONTRACT_PATTERN } = require('../lib/ideaContract');
+const { pickPatternSeeds, patternSeedInstruction } = require('../lib/patternSeeds');
 
 /**
  * Build the shared prompt context for story idea generation.
@@ -302,7 +303,27 @@ ${adventureGuideContent}`
     : '';
 
   const { buildAgeModeSection } = require('../lib/promptBuilders');
+  // The contract switches on the YOUNGEST main character's age — the same person
+  // the templates' existing "aged two or under" rules key off — not on
+  // resolveAgeBand, which keys off the OLDEST main. Decided HERE, above the
+  // picks, because three of them read it: the premise shape (none on a pattern
+  // book), the world seed (a different line) and the pattern seed (only there).
+  const ideaContract = buildIdeaContract(characters);
+  const isPattern = ideaContract.IDEA_CONTRACT === IDEA_CONTRACT_PATTERN;
+
   const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language, storyCategory: effectiveCategory, perilYoungestMax });
+  // The mechanism a pattern book is built on, one per arm, the same determinism
+  // as the shapes and the world seeds (server/lib/patternSeeds.js). Only a
+  // pattern cast gets one; for every other cast the slot is empty and the
+  // premise shape stands in it.
+  const patternSeeds = isPattern
+    ? pickPatternSeeds({ characters, storyTopic, storyTheme, language })
+    : [null, null];
+  const patternSeedLines = patternSeeds.map(patternSeedInstruction);
+  // A pattern book gets NO premise shape: the shape line says "keep the shape;
+  // the shape is a requirement", and every shape is a want-and-obstacle the
+  // pattern contract forbids outright (owner, 2026-09-21).
+  const premiseShapeLines = [0, 1].map(arm => (isPattern ? '' : premiseShapeInstruction(premiseShapes[arm])));
   // One centre and one turn per arm, picked in code from the adventure guide's
   // two ten-item lists (server/lib/worldSeeds.js). null — and nothing injected —
   // for a theme with no adventure guide (custom, historical).
@@ -323,7 +344,7 @@ ${adventureGuideContent}`
   }
   const worldSeedLines = [0, 1].map(arm => (historicalAngles[arm]
     ? historicalAngleInstruction(historicalAngles[arm])
-    : worldSeedInstruction(worldSeeds[arm], { pages })));
+    : worldSeedInstruction(worldSeeds[arm], { pages, pattern: isPattern })));
   // One concrete place per arm, from the guide's own setting line. Injected on
   // the FANTASY arm only (the location arm already has named landmarks), so the
   // value is computed here and the world is applied at the call site.
@@ -334,12 +355,6 @@ ${adventureGuideContent}`
   // The same 2026-09-21 cut that took {SCENE_COMPLEXITY_GUIDE} and the challenge
   // catalogue out of both idea templates — those are the story writer's inputs.
   const ageModeSection = buildAgeModeSection({ characters }, { bandView: 'premise-open' });
-
-  // The contract switches on the YOUNGEST main character's age — the same person
-  // the templates' existing "aged two or under" rules key off — not on
-  // resolveAgeBand, which keys off the OLDEST main.
-  const ideaContract = buildIdeaContract(characters);
-  const isPattern = ideaContract.IDEA_CONTRACT === IDEA_CONTRACT_PATTERN;
 
   const storyScope = buildStoryScope(pages, { pattern: isPattern });
 
@@ -407,9 +422,15 @@ ${adventureGuideContent}`
     // rule and its critic cannot drift because they are the same string. The
     // toddler cast gets the toddler four, injected identically.
     ...ideaContract,
-    PREMISE_SHAPE: premiseShapeInstruction(premiseShapes[0]),
-    PREMISE_SHAPE_1: premiseShapeInstruction(premiseShapes[0]),
-    PREMISE_SHAPE_2: premiseShapeInstruction(premiseShapes[1]),
+    PREMISE_SHAPE: premiseShapeLines[0],
+    PREMISE_SHAPE_1: premiseShapeLines[0],
+    PREMISE_SHAPE_2: premiseShapeLines[1],
+    // {PATTERN_SEED*} shares the template line with {PREMISE_SHAPE*}: exactly
+    // one of the two is non-empty, so a cast on the premise contract builds a
+    // byte-identical prompt to the one it built before pattern seeds existed.
+    PATTERN_SEED: patternSeedLines[0],
+    PATTERN_SEED_1: patternSeedLines[0],
+    PATTERN_SEED_2: patternSeedLines[1],
     // The world seed, same per-arm shape as {PREMISE_SHAPE*}: the single-idea
     // template takes {WORLD_SEED} (overridden per arm by the caller), the
     // two-idea template {WORLD_SEED_1} / {WORLD_SEED_2}. All three declared so
@@ -437,6 +458,10 @@ ${adventureGuideContent}`
     // rebuilding it (the `seeds-soft` variant appends one line).
     adventureSettingGuide,
     premiseShapes,
+    premiseShapeLines,
+    patternSeeds,
+    patternSeedLines,
+    isPattern,
     worldSeeds,
     historicalAngles,
     worldSeedLines,
@@ -954,7 +979,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // with landmarks (requirements-1), 'fantasy' = direct start in the theme
     // world, no landmarks (requirements-2). Fantasy prompts get the location
     // and landmarks sections blanked so the real city cannot leak in.
-    const buildSinglePrompt = (world, variantInstruction, shape, seedLine, place) => {
+    const buildSinglePrompt = (world, variantInstruction, arm) => {
       const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
       const worldOverrides = world === 'fantasy'
         ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
@@ -962,9 +987,10 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
       return ctx.applyReplacements(ctx.singlePromptTemplate, {
         STORY_VARIANT_INSTRUCTION: variantInstruction,
         STORY_REQUIREMENTS: requirements,
-        PREMISE_SHAPE: premiseShapeInstruction(shape),
-        WORLD_SEED: seedLine,
-        WORLD_PLACE: world === 'fantasy' ? worldPlaceInstruction(place) : '',
+        PREMISE_SHAPE: ctx.premiseShapeLines[arm],
+        PATTERN_SEED: ctx.patternSeedLines[arm],
+        WORLD_SEED: ctx.worldSeedLines[arm],
+        WORLD_PLACE: world === 'fantasy' ? worldPlaceInstruction(ctx.worldPlaces[arm]) : '',
         ...worldOverrides
       });
     };
@@ -973,8 +999,8 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
     const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
 
-    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0], ctx.worldSeedLines[0], ctx.worldPlaces[0]);
-    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1], ctx.worldSeedLines[1], ctx.worldPlaces[1]);
+    const prompt1 = buildSinglePrompt(world1, firstInstruction, 0);
+    const prompt2 = buildSinglePrompt(world2, secondInstruction, 1);
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
     // wizard can label each card before/while the ideas stream in

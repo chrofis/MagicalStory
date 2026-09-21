@@ -173,11 +173,13 @@ describe('the seed line is injected once per arm, in both siblings', () => {
     expect(single.split('{WORLD_SEED}').length - 1).toBe(1);
     expect(single).toMatch(/\{ADVENTURE_SETTING_GUIDE\}\s*\n\s*\n\{WORLD_SEED\}/);
   });
+  // {PATTERN_SEED_n} shares the shape's line: exactly one of the two is ever
+  // non-empty (server/lib/patternSeeds.js), so the seed still follows it.
   it('the pair template carries one per draft block, beside the shape', () => {
     expect(pair.split('{WORLD_SEED_1}').length - 1).toBe(1);
     expect(pair.split('{WORLD_SEED_2}').length - 1).toBe(1);
-    expect(pair).toMatch(/\{PREMISE_SHAPE_1\}\n\{WORLD_SEED_1\}/);
-    expect(pair).toMatch(/\{PREMISE_SHAPE_2\}\n\{WORLD_SEED_2\}/);
+    expect(pair).toMatch(/\{PREMISE_SHAPE_1\}\{PATTERN_SEED_1\}\n\{WORLD_SEED_1\}/);
+    expect(pair).toMatch(/\{PREMISE_SHAPE_2\}\{PATTERN_SEED_2\}\n\{WORLD_SEED_2\}/);
   });
   it('the route still declares all three placeholders, from ONE per-arm value', () => {
     for (const k of ['WORLD_SEED:', 'WORLD_SEED_1:', 'WORLD_SEED_2:']) expect(route).toContain(k);
