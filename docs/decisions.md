@@ -51892,6 +51892,25 @@ historical arm comes from `prompts/story-idea-requirements-historical-1.txt` and
 wizard renders the idea text verbatim (`WizardStep6Summary.tsx`, `TrialIdeasStep.tsx`) and does not
 strip it, so it is visible to the reader on historical cells.
 
+**Follow-up (2026-09-21) — round 9: the prune is reverted, the criterion and the examples stay.**
+Round 9 was one prompt version carrying three changes into both sibling templates: the parent's four
+buy questions as one shared constant (`server/lib/ideaBuyCriterion.js`, filled twice per template via
+`{BUY_CRITERION}` — once as a rule the draft answers, once as the last review check), three examples
+rewritten to the standard of the blind 5s, and a prune of the checklist (15 checks to 10, the
+rule list folded, the sentence budget and the CUT step moved to a protected tail). Measured over the
+same fixed 10-cell harness (20 ideas, USD 1.1356, `tests/manual/story-idea-rounds/round-9-defects.md`):
+the prune regressed every class it touched — cast defects 5 → 14 of 20, format 12 → 20, contract
+12 → 18, and **six ideas dropped a commissioned character outright**, a class that had stood at 0 for
+eight rounds. The blind parent buy read did not move: 3.55, inside the noise of R1's own two reads.
+So the prune is reverted exactly — every rule and review check it removed is restored at its
+pre-prune position, the CUT step back before `[FINAL]` where it was, and the buy check appended as
+the new last check (15 single / 16 multi). The criterion and the examples are kept, because neither
+was implicated in the regression. **The measured fact this entry now records is the blind series:
+R1 3.55 / 3.45 across two reads, R7 3.60, R8 3.50, R9 3.55 — eight rounds of prompt rules did not
+move the blind buy mean.** Every round moved the contract axes the rater grades and left the axis a
+parent buys on where it started; the next attempt at the buy axis should therefore change something
+other than the rule list.
+
 ---
 
 ## 2026-09-21 — The figure detector is MASTER for identity; the witnesses may only deadlock it; an independent ARBITER resolves the deadlock
