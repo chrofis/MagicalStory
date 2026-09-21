@@ -8,6 +8,24 @@ const {
   splitArcBeats, parseArcAmend, checkAmendGuards, applyArcAmendment,
 } = require('../../server/lib/arcAmend');
 
+// The stage validates its models before spending anything, so a bad name costs
+// only a wasted run — but it cost one: the first bake-off named
+// 'claude-sonnet-4-6', which is the MODEL ID 'claude-sonnet' resolves to, not a
+// TEXT_MODELS key. Read from source, like the stage-id sync test, so the
+// default list cannot drift from the model registry.
+describe('the arc_amend default models are real TEXT_MODELS keys', () => {
+  it('every default resolves', () => {
+    const { readFileSync } = require('node:fs');
+    const { resolve } = require('node:path');
+    const { TEXT_MODELS } = require('../../server/config/models');
+    const src = readFileSync(resolve(__dirname, '../../server/lib/testlab.js'), 'utf8');
+    const m = src.match(/params\.models \|\| '([^']+)'/);
+    expect(m, 'arc_amend default model list not found in testlab.js').toBeTruthy();
+    const bad = m[1].split(',').map(s => s.trim()).filter(k => !(k in TEXT_MODELS));
+    expect(bad, `not TEXT_MODELS keys: ${bad.join(', ')}`).toEqual([]);
+  });
+});
+
 const ARC = [
   '1. The main character finds an egg between the roots.',
   '2. A bigger child takes it and rides away.',
