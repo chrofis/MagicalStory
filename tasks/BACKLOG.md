@@ -303,6 +303,15 @@ them by deleting an emotional or characterising sentence. Text refine alone: 14 
       could be the recompute path or a stale test, and a bugs.json entry blocks every push
       → `tests/unit/active-version-recompute.test.ts:113`
 
+- [x] **Trial page prompts lost the scene + cast blocks entirely — FIXED on staging 2026-09-21.** Prod
+      trial `job_1789975900382_dyc1g7wue` pages 4 and 5 rendered from a prompt with no scene prose, no
+      cast list, no AGE/WORN blocks; p5 never named the second character and drew the wrong moment.
+      Root cause: `sectionAwareCut` protected the `**REQUIRED OBJECTS` tail whole and paid the whole
+      overage out of the head, so an object-citing page kept the boilerplate and lost the page.
+      Fixed by `865f983f7`; pinned by `tests/unit/prompt-cut-protects-the-page.test.ts` (fails on the
+      deployed prod commit, passes on staging). **Still shipping in prod until master is updated.**
+      → `tasks/bugs.json` `trial-page-prompt-drops-scene-and-cast-blocks`
+
 ## Eval + scoring
 
 - [x] **The arc judge was briefed with the beats commission, not the arc's** — `buildBriefContext`
