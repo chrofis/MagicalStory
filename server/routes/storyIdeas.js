@@ -27,6 +27,7 @@ const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
 // parent buy this" is measured from the production click instead of from a
 // rater's proxy (migrations/039, docs/decisions.md 2026-09-21).
 const { recordIdeaEvent } = require('../lib/ideaEvents');
+const { IDEA_BUY_QUESTIONS } = require('../lib/ideaBuyCriterion');
 
 /**
  * Build the shared prompt context for story idea generation.
@@ -339,6 +340,11 @@ ${adventureGuideContent}`
     // caller); the two-idea template writes both ideas in ONE call and takes
     // {PREMISE_SHAPE_1} / {PREMISE_SHAPE_2}. All three are declared here so no
     // call site can ship an unfilled placeholder.
+    // The parent's own questions, ONE constant (server/lib/ideaBuyCriterion.js)
+    // filled into both templates twice: once as a rule the draft answers, once
+    // as the last review check, which answers each question with a quote. The
+    // rule and its critic cannot drift because they are the same string.
+    BUY_CRITERION: IDEA_BUY_QUESTIONS,
     PREMISE_SHAPE: premiseShapeInstruction(premiseShapes[0]),
     PREMISE_SHAPE_1: premiseShapeInstruction(premiseShapes[0]),
     PREMISE_SHAPE_2: premiseShapeInstruction(premiseShapes[1]),
