@@ -16,7 +16,7 @@
 
 const sharp = require('sharp');
 const { log } = require('../utils/logger');
-const { MODEL_DEFAULTS } = require('../config/models');
+const { MODEL_DEFAULTS, TEXT_MODELS } = require('../config/models');
 const r2Lib = require('./r2');
 const { canonicalName } = require('./castResolver');
 const { assertPromptFilled } = require('../services/prompts');
@@ -1465,6 +1465,166 @@ async function secondOpinionIdentity(imageDataUri, figures, expectedCharacters, 
   return { nameByFigure, model: som.model || null, attempts: som.attempts || [] };
 }
 
+/**
+ * THE IDENTITY ARBITER — the only witness allowed to overrule the detector.
+ *
+ * Asked on one shape of page: the detector named a figure one thing, and the
+ * quality evaluator AND the second Set-of-Mark witness both named it another.
+ * Two of those three answered the SAME badged-image question, so a third
+ * reading of that question is drawn from the same distribution and settles
+ * nothing. This call is built differently on purpose:
+ *
+ *   - it sees the whole page AND a tight crop of each contested figure, so the
+ *     garment it is asked about is legible at more than picture-book scale;
+ *   - it is given the CLOTHING CONTRACT of the candidate names — the thing
+ *     identity in this pipeline is actually made of — and their reference face
+ *     photos where the caller has them;
+ *   - it is told nothing about who claimed what, so it cannot side with a
+ *     witness it was never shown.
+ *
+ * Returns `{ nameByFigure, model, usage }` keyed by FIGURE INDEX, or null. A
+ * null is not a vote: the caller keeps the detector's names, because the
+ * detector is master until something overrules it.
+ *
+ * @param {string} imageDataUri     the page image every voter saw
+ * @param {Array}  figures          `bboxDetection.figures`
+ * @param {Array<number>} contestedIdx  the figure indices to rule on
+ * @param {Object} ctx
+ *   candidates  `[{ name, clothing, faceDataUri }]` — the names in play
+ *   pageLabel
+ * @returns {Promise<{nameByFigure: Map<number,string>, model: string, usage: Object}|null>}
+ */
+async function arbitrateIdentity(imageDataUri, figures, contestedIdx, ctx = {}) {
+  const key = process.env.OPENROUTER_API_KEY;
+  const pageLabel = ctx.pageLabel || '';
+  if (!key) { log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}skipped — OPENROUTER_API_KEY not set`); return null; }
+  const idx = (Array.isArray(contestedIdx) ? contestedIdx : []).filter(i => figures?.[i]);
+  const candidates = (ctx.candidates || []).filter(c => c && c.name);
+  if (idx.length === 0 || candidates.length < 2) {
+    log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}skipped — ${idx.length} contested figure(s), ${candidates.length} candidate(s)`);
+    return null;
+  }
+
+  const modelKey = MODEL_DEFAULTS.identityArbiter;
+  const modelId = TEXT_MODELS[modelKey]?.modelId;
+  // NO FALLBACK: an arbiter that is not configured is not an arbiter. Say so
+  // and let the detector stay master, rather than quietly asking a voter.
+  if (!modelId) { log.error(`❌ [IDENTITY-ARBITER] ${pageLabel}model key "${modelKey}" is not in TEXT_MODELS — no arbitration`); return null; }
+
+  // One tight crop per contested figure, labelled by the same number the answer
+  // is keyed on. Padded 8% so the whole garment is inside the crop.
+  const pageBuf = Buffer.from(r2Lib.stripDataUriPrefix(imageDataUri), 'base64');
+  let W, H;
+  try { const m = await sharp(pageBuf).metadata(); W = m.width; H = m.height; } catch (e) {
+    log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}skipped — image unreadable (${e.message})`); return null;
+  }
+  if (!W || !H) return null;
+
+  const crops = [];
+  for (const i of idx) {
+    const f = figures[i];
+    const b = Array.isArray(f.bodyBox) ? f.bodyBox : (Array.isArray(f.gdinoBox) ? f.gdinoBox : null);
+    if (!b || b.length !== 4) continue;                       // [ymin, xmin, ymax, xmax]
+    const pad = 0.08;
+    const left = Math.max(0, Math.round((b[1] - pad) * W));
+    const top = Math.max(0, Math.round((b[0] - pad) * H));
+    const right = Math.min(W, Math.round((b[3] + pad) * W));
+    const bottom = Math.min(H, Math.round((b[2] + pad) * H));
+    if (right - left < 8 || bottom - top < 8) continue;
+    try {
+      const buf = await sharp(pageBuf).extract({ left, top, width: right - left, height: bottom - top }).jpeg({ quality: 90 }).toBuffer();
+      crops.push({ figureIndex: i, b64: buf.toString('base64') });
+    } catch (e) {
+      log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}crop of figure ${i} failed (${e.message})`);
+    }
+  }
+  if (crops.length === 0) { log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}skipped — no usable crop`); return null; }
+
+  const roster = candidates.map(c => `- ${c.name}: ${c.clothing || '(no clothing on record)'}`).join('\n');
+  const prompt = [
+    'You decide which character each numbered crop shows.',
+    '',
+    'The first image is the whole page. Each following image is a tight crop of one figure from it, given in this order:',
+    crops.map(c => `crop ${crops.indexOf(c) + 1} = figure ${c.figureIndex}`).join(', ') + '.',
+    candidates.some(c => c.faceDataUri) ? 'The last images are reference photos, one per candidate, in roster order.' : '',
+    '',
+    'Candidates and the outfit each one wears in this story:',
+    roster,
+    '',
+    'Match on the CLOTHING first — garment type and colour are the decisive evidence. Use the face only to break a tie the clothing leaves open. Ignore where a figure stands on the page.',
+    'If a crop matches no candidate, answer "UNKNOWN" for it. Never give the same name to two figures.',
+    '',
+    `Answer with JSON only: {"<figure index>": "<name or UNKNOWN>"} for each of: ${crops.map(c => c.figureIndex).join(', ')}.`,
+  ].filter(Boolean).join('\n');
+
+  const content = [
+    { type: 'image_url', image_url: { url: imageDataUri.startsWith('data:') ? imageDataUri : `data:image/jpeg;base64,${imageDataUri}` } },
+    ...crops.map(c => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${c.b64}` } })),
+    ...candidates.filter(c => c.faceDataUri).map(c => ({ type: 'image_url', image_url: { url: c.faceDataUri } })),
+    { type: 'text', text: prompt },
+  ];
+
+  let j;
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: modelId, temperature: 0, messages: [{ role: 'user', content }] }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) { log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}HTTP ${res.status}`); return null; }
+    j = await res.json();
+  } catch (e) {
+    log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}call failed — ${e.message}`);
+    return null;
+  }
+  if (j?.error) { log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}error: ${String(j.error.message || j.error).slice(0, 140)}`); return null; }
+
+  const text = j?.choices?.[0]?.message?.content || '';
+  const nameByFigure = parseArbiterAnswer(text, idx, candidates.map(c => c.name));
+  if (!nameByFigure) { log.warn(`⚠️ [IDENTITY-ARBITER] ${pageLabel}unparseable answer: ${text.slice(0, 200)}`); return null; }
+
+  const usage = j?.usage
+    ? { input_tokens: j.usage.prompt_tokens || 0, output_tokens: j.usage.completion_tokens || 0 }
+    : null;
+  log.info(`⚖️ [IDENTITY-ARBITER] ${pageLabel}${modelKey}: ${[...nameByFigure.entries()].map(([i, n]) => `fig${i}=${n}`).join(' ')}`);
+  return { nameByFigure, model: modelKey, modelId, usage };
+}
+
+/**
+ * Parse the arbiter's JSON into `figureIndex → roster name`.
+ *
+ * Refuses the WHOLE answer when one name is claimed for two figures: unlike the
+ * SoM chain there is no second tier to fall through to, and the detector's
+ * naming — which is at least one-to-one — is the safer thing to keep.
+ * Exported for the unit tests; the parse is where a wrong overrule would come
+ * from, so it is pinned separately from the network call.
+ */
+function parseArbiterAnswer(text, contestedIdx, rosterNames) {
+  const m = String(text || '').match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  let obj;
+  try { obj = JSON.parse(m[0]); } catch { return null; }
+  if (!obj || typeof obj !== 'object') return null;
+
+  const out = new Map();
+  const claimed = new Set();
+  for (const i of contestedIdx) {
+    const raw = obj[String(i)] ?? obj[i];
+    if (raw == null) continue;
+    const said = String(raw).trim();
+    if (!said || /^unknown$/i.test(said)) continue;
+    const name = rosterNames.find(n => n === said)
+      || rosterNames.find(n => canonicalName(n) === canonicalName(said));
+    if (!name) continue;                                       // off-roster is not a vote
+    const canon = canonicalName(name);
+    if (claimed.has(canon)) return null;                       // two figures, one name
+    claimed.add(canon);
+    out.set(i, name);
+  }
+  return out.size > 0 ? out : null;
+}
+
 // Binary mask → white-on-transparent PNG (same encoding /figure-mask returns).
 async function _maskToPng(mask) {
   const raw = Buffer.alloc(mask.width * mask.height * 4);
@@ -2134,6 +2294,11 @@ module.exports = {
   // the evaluator and the detector name differently (identityAgreement.js).
   secondOpinionIdentity,
   SECOND_OPINION_START_TIER,
+  // The ARBITER — the only witness that may overrule the detector's names
+  // (identityAgreement.arbitrateVeto). Asked from evidence, not from the SoM
+  // question the other voters already answered.
+  arbitrateIdentity,
+  parseArbiterAnswer,
   // Raw DINO access for callers that supply their own identity signal instead
   // of the SOM naming pass. The scene composite is one: its figures are painted
   // in known palette colours, so the dominant hue inside a box names it

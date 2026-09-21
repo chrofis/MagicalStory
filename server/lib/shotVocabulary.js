@@ -157,6 +157,41 @@ const SHOT_POSITIONS = POSITION_SHOTS
  */
 const SHOT_DEFINITIONS = `**SHOT:** The scene description declares the shot. ${SHOTS.map(s => s.definition).join(' ')}`;
 
+/** The lead-in every SHOT block opens with, whichever definitions follow. */
+const SHOT_RULE_LEAD = '**SHOT:** The scene description declares the shot.';
+
+/**
+ * THE SHOT BLOCK FOR ONE PAGE — its declared shot's definition, nothing else.
+ *
+ * The full table is 1,223 characters for eight shots, and a page draws ONE.
+ * Measured on staging job_1789853503332_riqncqg1i (18 pages, grok cap 7,900):
+ * every page's built prompt ran 8.5-10.2k, the table was 16% of the whole
+ * budget, and `sectionAwareCut` paid for it by deleting AGE & PROPORTIONS,
+ * HEIGHT ORDER, the plate-vs-identity reference rule and the Composition block
+ * on all fifteen pages that stored a prompt. Seven definitions the page cannot
+ * use cost it four blocks it needs.
+ *
+ * Resolution order: the Art Director's own `shot` field first, then the shot
+ * word in the scene prose. Neither → '' and the caller logs it: a block that
+ * defines words nobody wrote is the waste this function exists to end, and
+ * printing all eight "just in case" is exactly the behaviour being removed.
+ *
+ * @param {string|null} shotHint - metadata.shot / fullData.shot
+ * @param {string|null} sceneText - the scene prose, searched when no field
+ * @returns {{ text: string, shot: string|null }}
+ */
+function buildShotDefinitions(shotHint, sceneText = null) {
+  const resolve = (s) => {
+    if (!s) return null;
+    for (const [id, pattern] of SHOT_PATTERNS) if (pattern.test(String(s))) return id;
+    return null;
+  };
+  const id = resolve(shotHint) || resolve(sceneText);
+  if (!id) return { text: '', shot: null };
+  const shot = SHOTS.find(s => s.id === id);
+  return { text: `${SHOT_RULE_LEAD} ${shot.definition}`, shot: id };
+}
+
 /**
  * HOW MANY PAGES OF EACH — the one declaration of the distribution, read by the
  * planner that WRITES the shots (prompts/story-beats.txt, via
@@ -439,6 +474,8 @@ module.exports = {
   SHOT_ENUM,
   SHOT_POSITIONS,
   SHOT_DEFINITIONS,
+  SHOT_RULE_LEAD,
+  buildShotDefinitions,
   MAX_MEDIUM_WIDE_SHARE,
   MID_DISTANCE_SHOTS,
   PEOPLELESS_SHARED_SHOT,

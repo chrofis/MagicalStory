@@ -225,6 +225,20 @@
       "severity": "block"
     },
     {
+      "id": "text-refine-vs-text-critics",
+      "axis": "generator-vs-critic",
+      "reason": "text-refine.txt is the ONE stage that rewrites shipped page prose, and it rewrites it from the findings story-text-audit.txt / story-text-audit-blind.txt / story-text-proofread.txt produce. Until 2026-09-21 it had no criteria of its own: it sliced them out of outline-analysis-imagefirst.txt, a checklist written for the outline reviewer, so it was told to read blocks it is never sent and to answer in a shape it cannot return (A7). Its criteria now live in its own template, which removes the accidental coupling and creates a real drift risk in its place: a prose rule a text auditor deducts for must be a rule the rewriter was given, or the audit reports a fault the only stage that could fix it has never heard of.",
+      "generators": [
+        "prompts/text-refine.txt"
+      ],
+      "critics": [
+        "prompts/story-text-audit.txt",
+        "prompts/story-text-audit-blind.txt",
+        "prompts/story-text-proofread.txt"
+      ],
+      "severity": "block"
+    },
+    {
       "id": "avatar-generator-vs-critic",
       "axis": "generator-vs-critic",
       "reason": "avatar-evaluation.txt gates avatars generated from avatar-main-prompt.txt; a criterion the judge rejects on must be an instruction the generator carries, or the retry loop burns paid calls chasing a rule nobody stated.",

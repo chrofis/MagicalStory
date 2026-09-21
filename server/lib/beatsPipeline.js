@@ -108,6 +108,7 @@ const {
   replanRank,
   convergenceMustFixCount,
   countsTowardConvergence,
+  replanRoundConverged,
   findingPages,
   buildClothingReviewPrompt,
   parseClothingReview,
@@ -1698,6 +1699,41 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         bestPagePlan = pagePlan;
         bestMustFix = stillConverging.length;
         if (stillMustFix.length === 0) break;
+        // A FURTHER ROUND MUST BE MOPPING UP, NOT RE-ROLLING (2026-09-21).
+        //
+        // The planner re-emits the whole division each round, so a round is only
+        // worth buying when the one before it was CONVERGING: strictly fewer
+        // cast/focal must-fix findings than it was given, and not one of them
+        // new. A recheck that names a fault the previous check did not is a
+        // round that moved sideways, and the next round is then re-rolling the
+        // same dice at ~$0.09 and ~160s a throw — which is exactly what the
+        // monotonic discard below then throws away.
+        //
+        // Measured by replaying this test over stored staging
+        // `beatsReviewReport` rows (28 books with a recheck in 45 days, zero
+        // paid calls): 6 rechecks are a strict subset and still buy a round; 22
+        // are not, 10 of them because the recheck minted a new cast/focal
+        // must-fix. Exactly 2 books ever ran a round 2 in that window, this test
+        // would have skipped both, and BOTH were discarded by the convergence
+        // rule below after they ran — i.e. no kept round 2 exists in the window.
+        //
+        // The identity of a finding is its code (a counter) or the check number
+        // that produced it (a model finding) plus the pages it names — never its
+        // prose, which this codebase forbids reading for meaning.
+        {
+          const conv = replanRoundConverged(pendingCheck, check2);
+          if (!conv.converged) {
+            const why = conv.minted.length
+              ? `the recheck names ${conv.minted.length} cast/focal must-fix finding(s) the check before it did not`
+              : `cast/focal must-fix ${conv.given} → ${conv.surviving} is not a reduction`;
+            log.warn(`⚠️ [BEATS] Round ${round} did not converge (${why}) — no further round; the division it produced ships`);
+            gl.info('beats_replan_no_further_round', `Round ${round} did not converge (${why}); no further re-plan round was bought and the division that round produced ships`, null, {
+              round, given: conv.given, surviving: conv.surviving,
+              minted: conv.minted.map(f => f.line),
+            });
+            break;
+          }
+        }
         if (round === MAX_REPLAN_ROUNDS) {
           // Ships with the fault named. A division is never withheld from a
           // paid run over a plan finding (gates are guidelines).
@@ -2385,19 +2421,15 @@ ${bibleBody}` : bibleBody;
   // inside the branch where the review template loaded, so a run that shipped
   // briefs unreviewed — precisely the run worth inspecting — would carry no
   // prompt at all.
-  const sceneExpansionReport = (() => {
-    const byPrompt = new Map();
-    for (const x of expansions) {
-      const key = `${x.modelId || ''}\u0000${x.prompt || ''}`;
-      if (!byPrompt.has(key)) byPrompt.set(key, { prompt: x.prompt || '', modelId: x.modelId || null, pages: [] });
-      byPrompt.get(key).pages.push(x.pageNumber);
-    }
-    return {
-      durationMs: meta.timings.sceneExpansionMs,
-      fallbackPages: missingBriefs.map(b => b.pageNumber),
-      prompts: [...byPrompt.values()].map(r => ({ ...r, pages: r.pages.sort((a, b) => a - b) })),
-    };
-  })();
+  // `prompts[]` is NOT built here. The prompt table is one story-wide object
+  // that every page references (server/lib/storyShape.js), so it has exactly
+  // one builder — `rollUpScenePrompts()`, called by the caller over the
+  // assembled scenes, which covers the unified (non-beats) path with the same
+  // code. This report carries only what beats alone knows.
+  const sceneExpansionReport = {
+    durationMs: meta.timings.sceneExpansionMs,
+    fallbackPages: missingBriefs.map(b => b.pageNumber),
+  };
 
   gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} in one call${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {
     pages: expansions.length, fallbackPages: missingBriefs.map(b => b.pageNumber), model: sceneModel,
@@ -2542,7 +2574,9 @@ ${bibleBody}` : bibleBody;
     expansions.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
     // Locked beats feed the review's check 5 (character in beat vs brief);
     // the bible feeds check 9f (a stated object's state page ranges).
-    { clothingFindings, briefFindings, beats, visualBible }
+    // clothingRequirements: the reviewer's CHARACTER DETAILS is the same cast
+    // block the Art Director wrote from, outfits included (check 3b/10c).
+    { clothingFindings, briefFindings, beats, visualBible, clothingRequirements }
   );
   if (!srPrompt) {
     log.warn('⚠️ [BEATS] scene-review template unavailable — scene briefs shipped unreviewed');
@@ -2832,7 +2866,7 @@ ${bibleBody}` : bibleBody;
             const wrPrompt = buildSceneReviewPrompt(
               inputData,
               subset.map(x => ({ pageNumber: x.pageNumber, brief: x.brief })),
-              { clothingFindings: renderClothing2(subsetByPage), beats },
+              { clothingFindings: renderClothing2(subsetByPage), beats, clothingRequirements },
             );
             const label = [...wornPages].sort((a, b) => a - b).join(', ');
             if (!wrPrompt) {
@@ -3022,7 +3056,13 @@ ${bibleBody}` : bibleBody;
         castRemovalAudit,
         failed: sceneReviewFailed,
         analysis: sceneReviewAnalysis,
-        pages: sceneDiffs,
+        // WITHOUT `before`: every one of those strings was byte-identical to
+        // the same page's entry in `briefsIn` below (17/17 pages, 32k of JSONB,
+        // job_1789853503332_riqncqg1i). `briefsIn` is the pre-review snapshot of
+        // EVERY page, changed or not, so it already holds each row's before —
+        // readers resolve it from there (storyMetrics.churnFromReport,
+        // StoryDisplay's diff panel).
+        pages: sceneDiffs.map(({ before, ...row }) => row), // eslint-disable-line no-unused-vars
         // Dev-mode inspection (owner request 2026-08-09): the exact prompt the
         // reviewer received, every brief as sent, and the clothing trail — so
         // "it rewrote nothing" can be diagnosed without the DB.

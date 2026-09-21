@@ -306,14 +306,23 @@ function buildBodyRowPrompt(costumeDescription, character = null, redress = fals
     : `Costume${named}: ${costumeDescription}`;
   const readsAs = costumeName ? `
 The figure reads as a ${costumeName} at a glance. Each garment is worn the way that costume wears it.` : '';
+  // Age has ONE source. When the declared age is known, declaredAgeBlock owns
+  // proportions outright and the "apparent age in Image 3" clauses are dropped —
+  // two contradictory instructions in one prompt ("match the photo" vs "the
+  // stated age outranks the photo") let the model pick, and it picks the photo.
+  const declaredAge = declaredAgeBlock(character);
+  const ageFromPhoto = declaredAge ? '' : " matching the person's apparent age in Image 3";
+  const proportionsRule = declaredAge
+    ? declaredAge.trimStart()
+    : "Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).";
   return `Image 1 indicates only the camera angle and facing direction in each cell — ignore its silhouette, body, and face. The output contains no arrows.
 ${bodyRef}
 
 ${outfitRule}${readsAs}${buildSeasonOutfitBlock(seasonOutfit, redress)}${hairBlock}
-Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions matching the person's apparent age in Image 3. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
+Render every cell as a REALISTIC reference — the same visual style as the source face photo in Image 3. Photographic / lifelike, natural proportions${ageFromPhoto}. No cartoon, no anime, no watercolour. This sheet is an identity anchor.
 
 Output a 1×4 grid: ONE row, four cells side by side, thin black vertical dividers, pure white background, same cell layout as Image 1.
-Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. Body proportions match the person's apparent age (an adult is roughly 7 to 8 heads tall).${declaredAgeBlock(character)}
+Each cell shows the SAME PERSON as Image 3 rendered as a COMPLETE FULL BODY from the very top of the head to the figure's lowest point, wearing the costume. Cell 1 front, cell 2 three-quarter, cell 3 profile, cell 4 is a REAR TURN: shoulders and body fully away from camera, but the head rotates back over the right shoulder toward camera so one eye and the near cheek are visible. Cell 4 is never a profile and never a flat back view with no face showing — Image 1's cell 4 is a plain reference silhouette only, ignore its exact head angle. Normally that lowest point is both feet with shoes, and the whole figure — head, hair, face, torso, legs, feet — sits inside its cell. When the costume replaces the legs (a tail, a fin, a single fused lower body), the figure has NO legs, NO feet and NO footwear: it ends at the tip of that form, which is then the lowest point. Never crop the head and never crop the lowest point; if the figure does not fit, scale it down until the whole figure is inside the cell, with white margin above and below. ${proportionsRule}
 ${buildFootwearRule(redress, seasonOutfit?.footwear)}
 ${buildGarmentRule()}
 The outfit is identical in all four cells, layers included. When the costume has an outer layer — vest, jacket, cardigan, coat, or overshirt — it stays on in the profile and back cells. Seen edge-on in the profile, its front opening runs as a vertical band down the side of the torso, with the shoulder seam, armhole, and the back panel visible behind the arm. No text, numbers, labels, arrows, or symbols anywhere.`;
@@ -417,10 +426,10 @@ function applyPoseHeadGate(bodies, poseHeads) {
 
 // Review the 1×4 body row on its own (it IS the bottom-body crop the eval wants,
 // so no split needed): pose head-check + Gemini bodies eval, merged by the gate.
-async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = null, model, usageTracker }) {
+async function reviewBodyRow(bodyRowData, { costumeDescription, costumeName = null, model, usageTracker, declaredAge = null }) {
   const [poseHeads, bodiesR] = await Promise.all([
     detectBodyRowHeads(bodyRowData),
-    evaluateSheetRow(bodyRowData, 'bodies', { costumeDescription, costumeName, model, usageTracker }),
+    evaluateSheetRow(bodyRowData, 'bodies', { costumeDescription, costumeName, model, usageTracker, declaredAge }),
   ]);
   const bodies = applyPoseHeadGate(bodiesR.report, poseHeads);
   return { valid: !!bodies.valid, score: bodies.finalScore ?? 0, bodies, promptUsed: bodiesR.promptUsed };
@@ -494,7 +503,7 @@ async function generateComposited2x4(character, { costumeDescription, costumeNam
     let review = { valid: true, score: null, evaluated: false, bodies: null };
     if (!skipReview) {
       try {
-        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker });
+        review = await reviewBodyRow(res.imageData, { costumeDescription, costumeName, model, usageTracker, declaredAge: character?.age });
       } catch (err) {
         // Keep the sheet. Losing the eval costs a quality gate; losing the
         // sheet costs the character its face on every page of the book, which
@@ -1207,14 +1216,23 @@ const inlinePartOf = (dataUri) => ({ inline_data: { mime_type: dataUri.match(/^d
 // / angles / clean); 'bodies' → sheet-row-bodies-eval (head-to-toe / angles /
 // outfit / proportions). Identity is a SEPARATE call — see evaluateIdentity.
 async function evaluateSheetRow(rowImageData, which, opts = {}) {
-  const { costumeDescription = '', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null } = opts;
+  const { costumeDescription = '', costumeName = null, model = 'gemini-2.5-flash', promptOverride = null, usageTracker = null, declaredAge = null } = opts;
   const tplKey = which === 'heads' ? 'sheetRowHeadsEval' : 'sheetRowBodiesEval';
   let prompt = promptOverride || PROMPT_TEMPLATES[tplKey];
   if (!prompt) throw new Error(`${tplKey} template not loaded`);
+  // CHARACTER_AGE (bodies only): the proportions task used to score against the
+  // figure's own apparent age, so the generator was anchored on the DECLARED age
+  // (declaredAgeBlock) while its critic was not — the judge could only confirm
+  // that the drawing looked like itself. Same fill as the identity and pass-2
+  // style evals. Unknown age → the prompt falls back to apparent age.
+  const ageNum = parseInt(declaredAge, 10);
   prompt = fillTemplate(prompt, {
     REQUESTED_OUTFIT: costumeDescription ? `REQUESTED_OUTFIT: ${costumeDescription}` : '',
     ...(which === 'bodies'
-      ? { REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '' }
+      ? {
+        REQUESTED_COSTUME: costumeName ? `REQUESTED_COSTUME: ${costumeName}` : '',
+        CHARACTER_AGE: `CHARACTER_AGE: ${Number.isFinite(ageNum) && ageNum >= 0 ? `${ageNum} years old` : 'unknown'}`,
+      }
       : {}),
   });
   const parts = [inlinePartOf(rowImageData), { text: prompt }];
@@ -1272,7 +1290,7 @@ async function evaluateSheetSplit(sheetImageData, opts = {}) {
     // does NOT judge head presence — a VLM hallucinates a head on a headless torso
     // (POPE-adversarial co-occurrence) — so the head axis is owned by pose
     // (detectBodyRowHeads) and merged in below. ONE source of truth per concept.
-    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, costumeName, model, promptOverride, usageTracker }),
+    evaluateSheetRow(bottomBody, 'bodies', { costumeDescription, costumeName, model, promptOverride, usageTracker, declaredAge }),
     hasRefs ? evaluateIdentity(topHeads, { sourcePhoto: facePhoto, avatarFaces, model, usageTracker, declaredAge }) : Promise.resolve(null),
     detectBodyRowHeads(bottomBody),
   ]);

@@ -516,6 +516,128 @@ function applyConflicts(evalLike, report, conflicts, opts = {}, vetoed = 0) {
 }
 
 /**
+ * THE DETECTOR IS MASTER; ONLY THE ARBITER MAY OVERRULE IT (owner, 2026-09-21).
+ *
+ * A veto tells us the evaluator and the second witness both reject the
+ * detector's names. It does NOT tell us they are right — the detector works
+ * from full-body masks and per-figure identity lines, and the measured prior
+ * still favours it (Lab set 66: detector 5, evaluator 1). So a veto never
+ * writes a name onto `figures[]`. What it does is send the page to an
+ * independent ARBITER, and the arbiter's verdict is the only thing that may
+ * rename a detector figure.
+ *
+ * Refuses to act unless the result is still one name per figure — the same
+ * guarantee `buildRenameMap` gives on the evaluation side, so a partial verdict
+ * cannot put one child on the page twice.
+ *
+ * @param {Array} detFigures  detector `figures[]` — mutated in place
+ * @param {Array} decisions   `[{ detIndex, from, to }]` the arbiter ruled on
+ * @param {string} model      the arbiter model id, stamped on each figure
+ * @returns {{renamed:number, byIndex:Object}|null} null when refused
+ */
+function applyArbiterNamesToDetection(detFigures, decisions, model = null) {
+  if (!Array.isArray(detFigures) || !Array.isArray(decisions) || decisions.length === 0) return null;
+  const { canonicalName } = require('./castResolver');
+
+  const byIndex = new Map();
+  for (const d of decisions) {
+    if (d.detIndex == null || !d.to) return null;               // nothing to aim at
+    if (!detFigures[d.detIndex]) return null;
+    if (byIndex.has(d.detIndex)) return null;                   // two claims on one figure
+    byIndex.set(d.detIndex, d.to);
+  }
+
+  // One name per figure AFTER the write, or nothing is written.
+  const resulting = detFigures.map((f, i) => (byIndex.has(i) ? byIndex.get(i) : (f && f.name)));
+  const seen = new Set();
+  for (const n of resulting) {
+    const canon = n ? canonicalName(n) : null;
+    if (!canon) continue;
+    if (seen.has(canon)) return null;
+    seen.add(canon);
+  }
+
+  const out = {};
+  for (const [i, to] of byIndex) {
+    const f = detFigures[i];
+    f.detectorName = f.name;
+    f.name = to;
+    f.identityCorrectedBy = model ? `arbiter:${model}` : 'arbiter';
+    out[i] = { from: f.detectorName || null, to };
+  }
+  return { renamed: byIndex.size, byIndex: out };
+}
+
+/**
+ * The entity report is built in PARALLEL with the evaluation, off the
+ * detector's names. Where the ARBITER has since overruled those names, every
+ * per-character verdict on that page was reached by judging one child's crop
+ * against another child's contract — it is not invertible (the grid is gone and
+ * re-judging costs a paid call), so it is VOIDED rather than re-attributed:
+ * "not judged", never a clean pass.
+ *
+ * A veto alone voids NOTHING. The detector is master until the arbiter rules
+ * against it, so a page whose arbiter backed the detector — or where no arbiter
+ * could be reached — keeps every entity finding it has.
+ *
+ * Only the overruled names on the overruled page are dropped: a third child on
+ * the same page was cropped under a name nobody disputed and their findings
+ * stand.
+ *
+ * @param {Object} entityReport  mutated in place — `{ characters: {name: {issues}} }`
+ * @param {Array}  evaluations   eval records carrying `pageNumber` + `identityAgreement`
+ * @returns {{voided:number, pages:Array<number>}}
+ */
+function voidEntityIssuesContestedByWitness(entityReport, evaluations) {
+  const result = { voided: 0, pages: [] };
+  if (!entityReport?.characters || !Array.isArray(evaluations)) return result;
+  const { canonicalName } = require('./castResolver');
+
+  // page → the canonical names whose detection labels the witness overturned
+  const contestedByPage = new Map();
+  for (const ev of evaluations) {
+    const ia = ev && ev.identityAgreement;
+    if (!ia?.identityArbiter?.renamed || ev.pageNumber == null) continue;
+    const names = new Set();
+    for (const d of ia.identityArbiter.decisions || []) {
+      for (const n of [d.from, d.to]) {
+        const canon = n ? canonicalName(n) : null;
+        if (canon) names.add(canon);
+      }
+    }
+    if (names.size) contestedByPage.set(ev.pageNumber, names);
+  }
+  if (contestedByPage.size === 0) return result;
+
+  const onPage = (issue, page) => issue.pages?.includes(page)
+    || issue.pagesToFix?.includes(page) || issue.pageNumber === page;
+
+  for (const charData of Object.values(entityReport.characters)) {
+    if (!Array.isArray(charData?.issues)) continue;
+    const kept = [];
+    for (const issue of charData.issues) {
+      // The name to test is the one the finding is ABOUT — the grid judged a
+      // crop under that label, and the label is what the witness overturned.
+      const canon = canonicalName(issue.affectedCharacter || issue.name || '');
+      const hit = canon && [...contestedByPage.entries()]
+        .find(([page, names]) => names.has(canon) && onPage(issue, page));
+      if (!hit) { kept.push(issue); continue; }
+      result.voided++;
+      if (!result.pages.includes(hit[0])) result.pages.push(hit[0]);
+    }
+    if (kept.length !== charData.issues.length) {
+      charData.issues = kept;
+      if (kept.length === 0) charData.consistent = true;
+    }
+  }
+  if (result.voided > 0) {
+    entityReport.totalIssues = Math.max(0, (entityReport.totalIssues || 0) - result.voided);
+    entityReport.identityVoided = { count: result.voided, pages: [...result.pages].sort((a, b) => a - b) };
+  }
+  return result;
+}
+
+/**
  * A THIRD WITNESS BREAKS THE TIE — AND MAY ONLY EVER WITHHOLD A CORRECTION.
  *
  * What survives the one-to-one pairing is a genuine who-is-who disagreement on
@@ -632,7 +754,99 @@ async function reconcileIdentityWithSecondWitness(evalLike, detFigures, opts = {
     model: (witness && witness.model) || null,
     votes, vetoed,
   };
-  return applyConflicts(evalLike, report, survivors, opts, vetoed);
+  const applied = applyConflicts(evalLike, report, survivors, opts, vetoed);
+
+  // A VETO IS A DEADLOCK, NOT A VERDICT (owner, 2026-09-21). The detector is
+  // master for identity; two witnesses rejecting its names does not make them
+  // wrong, it makes the page unresolved. Nothing is renamed here. The page goes
+  // to an independent ARBITER, and only the arbiter may overrule the detector.
+  const backedEvaluator = report.conflicts.filter((c, i) => votes[i] && votes[i].verdict === 'evaluator');
+  if (backedEvaluator.length > 0) {
+    await arbitrateVeto(applied, detFigures, backedEvaluator, opts);
+  }
+  return applied;
+}
+
+/**
+ * THE ARBITER — the only witness that may overrule the detector.
+ *
+ * Reached on exactly one shape of page: the detector says one thing, the
+ * evaluator and the second witness both say another. Two of the three voters
+ * have already answered from the detector's own Set-of-Mark question, so a
+ * third reading of THAT question buys nothing; the arbiter is handed the page
+ * image, the contested figures' boxes, the clothing contract for the contested
+ * names and their reference faces, and answers from the evidence instead.
+ *
+ * It decides, and it is the only thing that does:
+ *   sides with the DETECTOR  → nothing changes; the entity findings stand
+ *   sides with the WITNESSES → the detector figures are renamed BY THE ARBITER,
+ *                              and the entity findings those labels produced are
+ *                              voided as "not judged"
+ *   no arbiter wired, no answer, or a verdict that would duplicate a name
+ *                            → nothing changes; the detector's prior stands
+ *
+ * The last line is the important one: a missing or failed arbiter is NOT a
+ * licence for the witnesses to win. Master-by-default means the deadlock
+ * resolves to the detector.
+ *
+ * @param {Object} report      mutated — gains `identityArbiter`
+ * @param {Array}  detFigures  detector `figures[]`, mutated only on an overrule
+ * @param {Array}  contested   the conflicts both witnesses backed the evaluator on
+ * @param {Object} opts        `arbiter` async ({conflicts, figures}) =>
+ *                             { nameByFigure: Map, model } | Map | null
+ */
+async function arbitrateVeto(report, detFigures, contested, opts = {}) {
+  if (typeof opts.arbiter !== 'function') {
+    report.identityArbiter = { asked: false, reason: 'no arbiter wired', renamed: 0 };
+    return report;
+  }
+  const { canonicalName } = require('./castResolver');
+
+  let answer = null;
+  let failure = null;
+  try {
+    answer = await opts.arbiter({ conflicts: contested, figures: detFigures });
+  } catch (e) {
+    failure = `threw: ${e.message}`;
+  }
+  const nameByFigure = answer instanceof Map ? answer : (answer && answer.nameByFigure) || null;
+  if (!nameByFigure || typeof nameByFigure.get !== 'function') {
+    report.identityArbiter = { asked: true, answered: false, reason: failure || 'no answer', renamed: 0 };
+    log.warn(`[IDENTITY] arbiter gave no answer (${failure || 'no answer'}) — the detector stays master`);
+    return report;
+  }
+
+  const rulings = [];
+  const decisions = [];
+  for (const c of contested) {
+    const raw = c.detIndex != null ? nameByFigure.get(c.detIndex) : undefined;
+    const said = raw ? canonicalName(raw) : null;
+    let verdict;
+    if (said && said === canonicalName(c.detector)) verdict = 'detector';
+    else if (said && said === canonicalName(c.evaluator)) verdict = 'witnesses';
+    else verdict = said ? 'third-name' : 'silent';
+    rulings.push({ detIndex: c.detIndex, detector: c.detector, witnesses: c.evaluator, arbiter: raw || null, verdict });
+    // ONLY a clean "the witnesses are right" moves a name. A third name or
+    // silence is not an overrule — the detector keeps the figure.
+    if (verdict === 'witnesses') decisions.push({ detIndex: c.detIndex, from: c.detector, to: c.evaluator });
+  }
+
+  const model = (answer && answer.model) || null;
+  const base = { asked: true, answered: true, model, rulings, usage: (answer && answer.usage) || null };
+  if (decisions.length === 0) {
+    report.identityArbiter = { ...base, verdict: 'detector', renamed: 0, decisions: [] };
+    return report;
+  }
+
+  const applied = applyArbiterNamesToDetection(detFigures, decisions, model);
+  if (!applied) {
+    report.identityArbiter = { ...base, verdict: 'refused', renamed: 0, decisions: [], reason: 'not-one-name-per-figure' };
+    log.warn('[IDENTITY] arbiter overruled the detector but the rename would duplicate a name — figures left as detected');
+    return report;
+  }
+  report.identityArbiter = { ...base, verdict: 'witnesses', renamed: applied.renamed, decisions };
+  log.warn(`[IDENTITY] arbiter (${model || 'unknown'}) overruled the detector on ${applied.renamed} figure(s): ${decisions.map(d => `${d.from}→${d.to}`).join(', ')}`);
+  return report;
 }
 
 /*
@@ -647,6 +861,7 @@ async function reconcileIdentityWithSecondWitness(evalLike, detFigures, opts = {
 module.exports = {
   checkIdentityAgreement, describeIdentityAgreement, reconcileIdentity,
   reconcileIdentityWithSecondWitness,
+  applyArbiterNamesToDetection, arbitrateVeto, voidEntityIssuesContestedByWitness,
   // Exported for the unit tests: the assignment is the whole of the pairing
   // decision, and it is verified against exhaustive brute force.
   minCostAssignment, NAME_AGREEMENT_BONUS, HEAD_Y_FRACTION };

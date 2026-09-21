@@ -671,6 +671,53 @@ function buildRepetitionFindings(hits, pages) {
  * @param {Function} [opts.onProgress]   called with a snapshot after every step
  * @param {string} [opts.usageLabel]
  */
+/**
+ * A15 — pages whose refined text dropped a character its LOCKED PLAN LINE
+ * stages in frame.
+ *
+ * Free and mechanical: `whoColumn` + `namesIn` from planCounters, the same
+ * pair the plan counters and the re-plan guard use. A page is reported only
+ * when all three hold —
+ * the plan stages the name, the text BEFORE the refine carried it, and the
+ * text AFTER does not — which makes the refine the cause and rules out a page
+ * the plan and the writer never agreed on in the first place.
+ *
+ * This is a FLAG, not a repair: nothing re-derives the plan (the picture is
+ * already drawn from it). It exists so the stored record says where the plan
+ * and the shipped prose disagree instead of leaving it to be discovered by a
+ * reader of the finished book.
+ *
+ * @param {Object} storyData story record (characters)
+ * @param {Array<{pageNumber:number,text:string,planLine:string}>} original pre-refine pages
+ * @param {Array<{pageNumber:number,text:string}>} current post-refine pages
+ * @returns {Array<{pageNumber:number, dropped:string[], planLine:string}>}
+ */
+function computePlanTextDrift(storyData, original = [], current = []) {
+  const { namesIn, whoColumn } = require('./planCounters');
+  const { refineCast } = require('./promptBuilders');
+  // The SAME cast the refiner's own criteria enumerate — commissioned plus the
+  // story's invented secondaries. A drift check that counted only the
+  // commissioned roster would be blind to exactly the figures the plan most
+  // often stages and the prose most often drops.
+  const roster = refineCast(storyData || {}).names;
+  if (roster.length === 0) return [];
+  const afterByPage = new Map(current.map(p => [p.pageNumber, String(p.text || '')]));
+  const out = [];
+  for (const before of original) {
+    const planLine = String(before.planLine || '').trim();
+    if (!planLine) continue;                       // unified mode: no plan lines
+    const after = afterByPage.get(before.pageNumber);
+    if (after === undefined || after === String(before.text || '')) continue;  // untouched page
+    const staged = namesIn(whoColumn(planLine), roster);
+    if (staged.length === 0) continue;
+    const stillThere = new Set(namesIn(after, staged));
+    const wasThere = new Set(namesIn(String(before.text || ''), staged));
+    const dropped = staged.filter(n => wasThere.has(n) && !stillThere.has(n));
+    if (dropped.length > 0) out.push({ pageNumber: before.pageNumber, dropped, planLine });
+  }
+  return out;
+}
+
 async function refineStoryText(storyData, pages, opts = {}) {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
@@ -1396,8 +1443,26 @@ async function refineStoryText(storyData, pages, opts = {}) {
     .map((p, idx) => (p.text !== original[idx].text ? p.pageNumber : null))
     .filter(n => n !== null);
 
+  // A15 — PLAN vs SHIPPED TEXT, measured for free after the chain.
+  //
+  // The plan line is handed to the refiner as what the page's prose may not
+  // contradict, and it is NEVER re-derived afterwards: the picture is already
+  // drawn from it, so it must stay as it was. That is correct for the picture
+  // and silent for the record — a refined page can drop a character the plan
+  // stages in frame and nothing says so, leaving a stored plan line that
+  // disagrees with the text that ships beside it.
+  //
+  // No model call: the who-in-frame column of the plan line is re-counted with
+  // the same `namesIn` the plan counters use. A name the plan stages, the
+  // ORIGINAL text carried and the refined text no longer carries is reported.
+  // A page the refiner left alone can never appear here.
+  const planTextDrift = computePlanTextDrift(storyData, original, current);
+  if (planTextDrift.length > 0) {
+    log.warn(`⚠️ [TEXT-REFINE] plan/text drift on page(s) ${planTextDrift.map(d => d.pageNumber).join(', ')} — the stored plan line stages a character the refined text dropped; the plan is pre-refine by design and is not re-derived`);
+  }
+
   return {
-    pages: current, original, rounds, changed,
+    pages: current, original, rounds, changed, planTextDrift,
     audits, mergedFindings, mergeStats, findingLedger,
     proofread, lectorFindings, lectorApplied, lectorDropped,
     diffReview, diffFindings, diffApplied, diffDropped,
@@ -1652,6 +1717,10 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
       analysis: (r.analysis || '').slice(0, 15000),
     })),
     changedPages: changed,
+    // A15 — where the (deliberately pre-refine) plan line and the shipped text
+    // disagree. Computed free in the chain; projected here because a value the
+    // report drops is a measurement nobody can read back.
+    planTextDrift: usable.planTextDrift || [],
     repetition: usable.repetition || null,
     audits: (usable.audits || []).map(a => ({
       source: a.source,
@@ -1713,6 +1782,7 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
 module.exports = {
   refineStoryText,
   projectTextRefineReport,
+  computePlanTextDrift,
   extractRefinablePages,
   startBackgroundRefine,
   parseFaultLines,

@@ -17,7 +17,7 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 // this module was the prose worn-vs-held matcher deleted 2026-09-18. It stays
 // exported from visualBible.js for coverIterate.js, which still uses it.
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
-const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase } = require('./shotVocabulary');
+const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
@@ -796,7 +796,7 @@ function buildEraGuard(era) {
   if (!trimmed) return '';
   const lower = trimmed.toLowerCase();
   if (lower.includes('present day') || lower.includes('contemporary') || lower.includes('modern day')) return '';
-  return `**STORY ERA:** ${trimmed}. Every architectural and street element in the frame must match this era. No vehicles, traffic signs, road markings, street lamps, utility poles, power lines, billboards, modern signage, plastic objects, satellite dishes, air conditioners, or modern pedestrians — anywhere in the frame.`;
+  return `**STORY ERA:** ${trimmed}. Every architectural and street element in the frame must match this era. No vehicles, traffic signs, road markings, street lamps, utility poles, power lines, billboards, modern signage, plastic objects, satellite dishes, air conditioners, or modern pedestrians — anywhere in the frame. Any attached reference photo is present-day: exclude the modern elements it shows.`;
 }
 
 /**
@@ -823,13 +823,26 @@ function buildEraGuard(era) {
  *
  * @param {{name?: string, photoType?: string}|string|null} landmark - landmark
  *        object (any shape carrying `name`) or a bare name string. Null-safe.
+ * @param {{era?: string|null}} [opts] - `era` is the story era. The EXCLUDE
+ *        clause naming the STORY ERA rule is emitted only when that era
+ *        produces a guard (buildEraGuard); a present-day or absent era gets
+ *        no clause, because no such rule is in the prompt.
  * @returns {string} the fidelity block, or '' when no named landmark.
  */
-function buildLandmarkFidelityBlock(landmark) {
+function buildLandmarkFidelityBlock(landmark, opts = {}) {
   const name = typeof landmark === 'string'
     ? landmark.trim()
     : String(landmark?.name || '').trim();
   if (!name) return '';
+  // The EXCLUDE clause points at "the STORY ERA rule" — a rule that only
+  // exists in the prompt when buildEraGuard emitted one. On a present-day
+  // story the guard returns '' and the clause dangles: the model is told to
+  // obey a rule the prompt never states, on a story whose whole point is
+  // that modern elements belong. ONE era classifier decides, the same one
+  // landmarkProtection.js uses.
+  const eraClause = buildEraGuard(opts.era || null)
+    ? 'modern-era elements visible in the photo per the STORY ERA rule. '
+    : '';
   const photoType = typeof landmark === 'string' ? null : (landmark?.photoType || null);
   if (photoType === 'distant' || photoType === 'view-from') {
     // ⚠️ DRAFT WORDING — NOT OWNER-APPROVED (2026-09-14). The plumbing above is
@@ -843,7 +856,7 @@ function buildLandmarkFidelityBlock(landmark) {
 
 **CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the place into them. The scene may stand in a street or a yard of this place instead of looking at all of it from afar; the photo still governs what the buildings there are made of and look like.
 
-**EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space — never mounted on or overlapping the buildings.`;
+**EXCLUDE:** ${eraClause}Separate props sit in open space — never mounted on or overlapping the buildings.`;
   }
   return `**LANDMARK IN THIS SCENE: ${name}.** The attached reference photo shows this exact real-world landmark. The scene depicts this specific building (or part of it), not a generic version.
 
@@ -853,7 +866,7 @@ function buildLandmarkFidelityBlock(landmark) {
 
 **CONDITIONS (from the scene):** Camera angle, distance and framing, season, time of day, weather and light all come from the scene description — repaint the structure into them. The landmark still reads at page size: never a tiny speck against a wide cityscape.
 
-**EXCLUDE:** modern-era elements visible in the photo per the STORY ERA rule. Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure. Keep the landmark itself unchanged; only remove the modern surroundings.`;
+**EXCLUDE:** ${eraClause}Separate props sit in open space relative to the landmark — never mounted on or overlapping its structure.${eraClause ? ' Keep the landmark itself unchanged; only remove the modern surroundings.' : ''}`;
 }
 
 /**
@@ -2507,6 +2520,36 @@ function buildRecurringElementsText(visualBible, filterIds = new Set()) {
  * @param {number} [options.maxCharactersPerScene]
  * @returns {string|null} null when the template is unavailable
  */
+/**
+ * The CAST BLOCK the Art Director writes from and the scene review judges
+ * against — one numbered physical + clothing line per character.
+ *
+ * ONE builder for both sides (sibling set: generator-vs-critic). The review
+ * used to receive the STORY-PLANNING character block instead (age, gender,
+ * personality, strengths, flaws) — no hair, eyes, build or outfit — while its
+ * check 3b judges clothing completeness and check 10c forbids a brief from
+ * giving a character "an age, build or outfit that CHARACTER DETAILS does
+ * not". Both checks were therefore asking a critic to compare briefs against
+ * facts it had never been shown.
+ *
+ * @param {Array<Object>} characters
+ * @param {Object|null} clothingReqs - story clothing requirements (the contract)
+ * @param {string|null} primaryCategory - clothing category for the page, when known
+ * @returns {{ block: string, resolvedOutfits: number }}
+ */
+function buildExpansionCastBlock(characters, clothingReqs, primaryCategory = null) {
+  let resolvedOutfits = 0;
+  const block = (characters || [])
+    .map((char, idx) => {
+      const outfit = (primaryCategory ? resolveClothingForPage(char, primaryCategory, clothingReqs) : null)
+        || buildUsedClothingText(char, clothingReqs);
+      if (outfit) resolvedOutfits++;
+      return buildCharacterDescriptionForExpansion(char, outfit || null, idx + 1);
+    })
+    .join(String.fromCharCode(10));
+  return { block, resolvedOutfits };
+}
+
 function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
   const template = PROMPT_TEMPLATES.sceneExpansionAll;
   if (!template) {
@@ -2530,15 +2573,7 @@ function buildSceneExpansionAllPrompt(inputData, beats = [], options = {}) {
   // whole cast in it (job_1786484554633_crojok432: five characters, five
   // contract colours, one purple robe on all of them).
   const primaryCategory = options.primaryClothing || inputData.pageClothing?.primaryClothing || null;
-  let resolvedOutfits = 0;
-  const characterDescriptions = characters
-    .map((char, idx) => {
-      const outfit = (primaryCategory ? resolveClothingForPage(char, primaryCategory, clothingReqs) : null)
-        || buildUsedClothingText(char, clothingReqs);
-      if (outfit) resolvedOutfits++;
-      return buildCharacterDescriptionForExpansion(char, outfit || null, idx + 1);
-    })
-    .join('\n');
+  const { block: characterDescriptions, resolvedOutfits } = buildExpansionCastBlock(characters, clothingReqs, primaryCategory);
   if (!clothingReqs) {
     log.warn('[PROMPT] all-pages scene expansion has no clothingRequirements — the Art Director sees no outfit text and may write category keys into the prose');
   } else if (resolvedOutfits < characters.length) {
@@ -4458,6 +4493,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
     : (Array.isArray(metadata?.characters) ? metadata.characters : []);
   const exactPosesBlock = buildExactPosesBlock(metadata?.interactions, metaCharacters, visualBible, { language: inputData?.language });
   const eraGuard = buildEraGuard(metadata?.era);
+  // The page draws ONE shot: emit that one word's definition, not the table.
+  // The Art Director's field is authoritative; the prose is the second witness
+  // (it writes "Medium shot of …" into the brief). Neither resolving is a real
+  // defect — nothing downstream can tell the model what its framing means — so
+  // it is logged, not papered over with all eight definitions.
+  const shotBlock = buildShotDefinitions(
+    metadata?.shot || metadata?.fullData?.shot || null,
+    cleanSceneDescription || null
+  );
+  if (!shotBlock.text) {
+    log.warn(`[IMAGE PROMPT] Page ${pageNumber}: no shot declared and none readable from the scene prose — the illustrator gets no framing rule`);
+  }
   const sceneIntentLine = metadata?.sceneIntent
     ? `**THIS IMAGE DEPICTS:** ${String(metadata.sceneIntent).trim()}`
     : '';
@@ -4512,7 +4559,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // what its declared shot means. It sits at the END of the template now,
       // inside the tail shrinkPromptForModel never cuts, and comes from the same
       // constant the Art Director enum does (server/lib/shotVocabulary.js).
-      SHOT_DEFINITIONS
+      //
+      // ONLY THE DECLARED SHOT (2026-09-21). All eight definitions cost 1,223
+      // characters against a 7,900 cap, and the cut paid for the seven the page
+      // cannot use by deleting AGE & PROPORTIONS, HEIGHT ORDER, the
+      // plate-vs-identity rule and Composition on every over-cap page.
+      SHOT_DEFINITIONS: shotBlock.text
     })));
   }
 
@@ -5043,14 +5095,13 @@ const stripTextAspectMarkers = (s) => String(s || '').replace(/[ \t]*<!-- TEXT_A
 // section D (scene-hint mechanics). 'both' returns the body unchanged
 // (production behaviour). If the section headers can't be located the body is
 // returned intact (never silently blank).
-function sliceAnalysisAspect(body, aspect, opts = {}) {
-  // includeTail=false drops the FIXES REQUIRED block and its formatting rules,
-  // keeping only the CRITERIA. The text-refinement stage reuses the same review
-  // criteria but answers with rewritten pages instead of fix lines, so it must
-  // not inherit an output contract that contradicts its own.
-  const includeTail = opts.includeTail !== false;
+function sliceAnalysisAspect(body, aspect) {
+  // The `includeTail: false` option is gone (A7, 2026-09-21). Its only caller
+  // was buildTextRefinePrompt, which now carries its own criteria: the tail it
+  // dropped is the FIXES REQUIRED output contract, and a slice with no output
+  // contract is only ever wanted by a stage that answers in another shape.
   if (!body) return body;
-  if (aspect === 'both' && includeTail) return stripTextAspectMarkers(body);
+  if (aspect === 'both') return stripTextAspectMarkers(body);
   const idxA = body.indexOf('**A. ');
   const idxD = body.indexOf('**D. ');
   const idxE = body.indexOf('**E. ');
@@ -5062,7 +5113,7 @@ function sliceAnalysisAspect(body, aspect, opts = {}) {
   const secABC = body.slice(idxA, idxD); // A + B + C
   const secD = body.slice(idxD, idxE);   // D
   const secE = body.slice(idxE, idxFixes); // E (do-not-write verification)
-  const tail = includeTail ? body.slice(idxFixes) : '';  // FIXES REQUIRED + formatting rules
+  const tail = body.slice(idxFixes);  // FIXES REQUIRED + formatting rules
   const strip = stripTextAspectMarkers;
   if (aspect === 'both') return strip(preamble + secABC + secD + secE + tail);
   if (aspect !== 'text') return strip(preamble + secD + tail); // drop A/B/C/E (all text checks)
@@ -5208,6 +5259,51 @@ function buildOutlineReviewPrompt(inputData, writerOutput, sceneConsistencyIssue
  * @param {Array<{pageNumber:number,text:string,sceneIntent:string}>} pages
  * @returns {string|null} filled prompt, or null when the template is unavailable
  */
+/**
+ * THE CAST A REFINE-STAGE JUDGE MUST ACCOUNT FOR (A7, 2026-09-21).
+ *
+ * `inputData.characters` is the COMMISSIONED roster — the people the customer
+ * named. A story routinely invents its own figures on top of it (a rival, a
+ * neighbour, an antagonist), and the per-character section of the text-refine
+ * criteria was built from the commissioned list alone, so an invented figure
+ * carrying nine pages of a book was never probed once.
+ *
+ * The Visual Bible's `secondaryCharacters` is where those figures are
+ * canonically named — the Art Director, every image prompt and the scene
+ * review already read it — so it is the source here too. Psychological detail
+ * only: hair, face and build are the illustrations' business and are already
+ * locked, and putting them in front of a prose judge invites it to "fix"
+ * appearance the pictures have settled.
+ *
+ * ONE helper, two consumers: the prompt's cast line and the plan/text drift
+ * check in textRefine.js, which must count the same people.
+ *
+ * @param {Object} inputData story record (characters, visualBible)
+ * @param {string} [commissionedDetails] pre-rendered detail block for the commissioned cast
+ * @returns {{names: string[], details: string}}
+ */
+function refineCast(inputData, commissionedDetails = '') {
+  const secondaries = Array.isArray(inputData?.visualBible?.secondaryCharacters)
+    ? inputData.visualBible.secondaryCharacters.filter(sc => sc && sc.name)
+    : [];
+  const secondaryDetails = secondaries.map(sc => {
+    const pages = Array.isArray(sc.pages) && sc.pages.length > 0 ? sc.pages.join(', ') : null;
+    // The behavioural note the bible carries ("Signature: …"), never the rest
+    // of the visual description.
+    const signature = (String(sc.description || '').match(/Signature:\s*([^.]*)\./i) || [, ''])[1].trim();
+    return [
+      `**${sc.name}** (the story's own character, not commissioned):`,
+      sc.age ? `- Age: ${sc.age}` : null,
+      signature ? `- Signature: ${signature}` : null,
+      pages ? `- On page(s): ${pages}` : null,
+    ].filter(Boolean).join('\n');
+  });
+  return {
+    names: [...(inputData?.characters || []).map(c => c.name), ...secondaries.map(sc => sc.name)].filter(Boolean),
+    details: [commissionedDetails, ...secondaryDetails].filter(Boolean).join('\n\n') || '(no character details available)',
+  };
+}
+
 function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = '') {
   const template = PROMPT_TEMPLATES.textRefine;
   if (!template) {
@@ -5215,21 +5311,18 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
     return null;
   }
 
-  // The review CRITERIA are the outline reviewer's own text sections (A narrative,
-  // B character/dialogue, C prose, E do-not-write) — the exact slice
-  // `aspect: 'text'` uses. Reused rather than restated so the refiner and the
-  // reviewer can never judge text by different standards; the tail is dropped
-  // because that block dictates fix-line output and this stage returns pages.
-  const analysisBody = sliceAnalysisAspect(
-    PROMPT_TEMPLATES.outlineAnalysisImageFirst || '',
-    'text',
-    { includeTail: false }
-  );
-  if (!analysisBody) {
-    log.error('[PROMPT] outline analysis template missing — text refinement would run without criteria');
-    return null;
-  }
-
+  // CRITERIA LIVE IN text-refine.txt (A7, 2026-09-21). They used to be sliced
+  // out of outline-analysis-imagefirst.txt — a checklist written for the
+  // OUTLINE REVIEWER, a stage with different inputs and a different output
+  // contract. On every beats run this stage was therefore told to read
+  // `---STORY DRAFT---` and `---SCENE PAGES---` blocks it is never sent, to
+  // emit SCENE/METADATA fix lines and `FIXES REQUIRED` entries it cannot
+  // return, and to check a `characters[]` / `background` JSON it never
+  // receives. Sharing was meant to stop the refiner and the reviewer judging
+  // text by different standards; what it actually produced was a stage judging
+  // text by instructions for another document. The checks are restated in the
+  // template for THIS stage's inputs and THIS stage's answer — pages, not fix
+  // lines.
   // Prefer the full brief (METADATA already stripped by extractRefinablePages)
   // over the one-line intent: the refiner must not change events, and it cannot
   // avoid changing what it cannot see. Falls back to the intent for stored
@@ -5273,7 +5366,10 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
       line('Challenges', t.challenges),
       line('Special details', t.specialDetails),
     ].filter(Boolean).join('\n');
-  }).join('\n\n') || '(no character details available)';
+  }).join('\n\n');
+
+  // THE CAST THE PAGES ACTUALLY CARRY (A7) — see refineCast.
+  const cast = refineCast(inputData, characterDetails);
 
   // NO COMMISSION HERE. text-refine.txt carries no {STORY_BRIEF} placeholder,
   // and must not gain one: the refiner judges the finished text against the ARC,
@@ -5294,18 +5390,14 @@ function buildTextRefinePrompt(inputData, pages = [], auditFindings = '', arc = 
   // three, so the spelling, vocabulary and dialogue-typography rules are present
   // verbatim rather than implied by a label.
   const language = inputData.language || 'en';
-  // Inject the criteria BEFORE fillTemplate so their own placeholders
-  // ({CHARACTER_NAMES}, {MAX_CHARACTERS_PER_SCENE}) get filled too — same order
-  // buildOutlineReviewPrompt uses.
-  const templateWithAnalysis = template.replace('{ANALYSIS_INSTRUCTIONS}', () => analysisBody);
-  return fillTemplate(templateWithAnalysis, {
+  return fillTemplate(template, {
     LANGUAGE: getLanguageNameEnglish(language),
     LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
     LANGUAGE_NOTE: getLanguageNote(language),
     READING_LEVEL: getReadingLevel(inputData.languageLevel),
     PAGE_COUNT: pages.length,
-    CHARACTER_NAMES: (inputData.characters || []).map(c => c.name).join(', '),
-    CHARACTER_DETAILS: characterDetails,
+    CHARACTER_NAMES: cast.names.join(', '),
+    CHARACTER_DETAILS: cast.details,
     // The whole story — every fact it states belongs on some page. Read-only:
     // never a licence to add events the story does not carry.
     STORY_ARC: String(arc || '').trim() || '(no arc was recorded for this story)',
@@ -6782,6 +6874,40 @@ function countsTowardConvergence(finding) {
  */
 function convergenceMustFixCount(check) {
   return ((check && check.findings) || []).filter(countsTowardConvergence).length;
+}
+
+/**
+ * DID THIS ROUND CONVERGE? — the question "is a further re-plan round worth
+ * buying?" (2026-09-21), kept apart from `replanRank()` ("must the round address
+ * this?") and `convergenceMustFixCount()` ("did the round earn its keep?") in
+ * the same way those two are kept apart from each other.
+ *
+ * A round converged when its recheck's cast/focal must-fix findings are a STRICT
+ * SUBSET of the ones the check before it raised: strictly fewer, and not one of
+ * them new. A recheck naming a fault its predecessor did not is a round that
+ * moved sideways — the planner re-emits the whole division each round, so the
+ * next round would be re-rolling every page rather than mopping up.
+ *
+ * A finding's identity is its `code` (a counter) or the `check` number that
+ * produced it (a model finding), plus the pages it names. Never its prose.
+ */
+function replanFindingKey(finding) {
+  const f = finding || {};
+  const tag = f.code || (f.check != null ? `check${f.check}` : 'unranked');
+  return `${tag}|${findingPages(f).slice().sort((a, b) => a - b).join(',')}`;
+}
+
+function replanRoundConverged(givenCheck, recheck) {
+  const given = ((givenCheck && givenCheck.findings) || []).filter(countsTowardConvergence);
+  const surviving = ((recheck && recheck.findings) || []).filter(countsTowardConvergence);
+  const givenKeys = new Set(given.map(replanFindingKey));
+  const minted = surviving.filter(f => !givenKeys.has(replanFindingKey(f)));
+  return {
+    converged: minted.length === 0 && surviving.length < given.length,
+    given: given.length,
+    surviving: surviving.length,
+    minted,
+  };
 }
 
 /**
@@ -8312,6 +8438,12 @@ function buildArcPanelPrompt(inputData, committedBlock) {
     // was never told the allowance, so nobody but the author (grading itself in
     // the same call) could audit the invented cast.
     INVENTED_ALLOWANCE: arcInventedAllowance(inputData),
+    // A14: the REAL LANDMARKS block is one constant with three consumers
+    // (create, panel, retell). The panel is the only independent reader of the
+    // arc; without the list it cannot see a real place the arc invented, and
+    // the retell was told to keep landmarks "inside the commission's world"
+    // while never being shown which ones those are.
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
   });
 }
 
@@ -8337,6 +8469,8 @@ function buildArcRetellPrompt(inputData, pageCount, committedBlock, panelSolutio
     PANEL_SOLUTIONS: String(panelSolutions || '').trim(),
     ARC_CRITIQUE_SPEC: arcCritiqueSpec({ retell: true }),
     ARC_LENGTH: arcLengthRange(pageCount),
+    // A14: same block the creator got (see buildArcPanelPrompt).
+    AVAILABLE_LANDMARKS_SECTION: buildAvailableLandmarksSection(inputData.availableLandmarks, inputData.landmarkRetryNote),
   });
 }
 
@@ -9169,6 +9303,26 @@ function buildSceneReviewBibleBlock(visualBible) {
  * continuity are invisible to a per-scene reviewer, so the whole set goes in a
  * single call.
  */
+/**
+ * The critic's CHARACTER DETAILS: the same numbered physical + clothing lines
+ * the Art Director was given (buildExpansionCastBlock).
+ *
+ * The clothing contract is the outfit source, exactly as in the expansion
+ * builder. Missing, the critic cannot judge check 3b at all, so the gap is
+ * logged as an error rather than papered over with a category key.
+ */
+function buildSceneReviewCastBlock(inputData, options = {}) {
+  const characters = inputData.characters || [];
+  const clothingReqs = options.clothingRequirements || inputData.clothingRequirements || null;
+  const { block, resolvedOutfits } = buildExpansionCastBlock(characters, clothingReqs, null);
+  if (!clothingReqs) {
+    log.error('[PROMPT] scene review has no clothingRequirements - the reviewer sees no outfit text and cannot judge clothing completeness (check 3b)');
+  } else if (resolvedOutfits < characters.length) {
+    log.error(`[PROMPT] scene review resolved an outfit for only ${resolvedOutfits}/${characters.length} character(s) - clothing completeness is unjudgeable for the rest`);
+  }
+  return block || '(no character details available)';
+}
+
 function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
   const template = PROMPT_TEMPLATES.sceneReview;
   if (!template) {
@@ -9190,6 +9344,13 @@ function buildSceneReviewPrompt(inputData, scenes = [], options = {}) {
     .map(b => `Page ${b.pageNumber}: ${String(b.planLine).replace(/\s+/g, ' ').trim()}`);
   return fillTemplate(template, {
     ...buildStoryContextFields(inputData),
+    // THE SAME CAST BLOCK THE ART DIRECTOR WROTE FROM (buildExpansionCastBlock,
+    // sibling set generator-vs-critic). buildStoryContextFields' CHARACTER_DETAILS
+    // is the STORY-PLANNING block — age, gender, personality, strengths, flaws —
+    // with no hair, eyes, build or outfit in it, so check 3b (clothing
+    // completeness) and check 10c ("describe characters only from CHARACTER
+    // DETAILS") were judging briefs against facts the critic had never seen.
+    CHARACTER_DETAILS: buildSceneReviewCastBlock(inputData, options),
     PAGE_COUNT: scenes.length,
     ALL_SCENES: all,
     PAGE_PLAN_LINES: planLines.length ? planLines.join('\n') : '(no plan data)',
@@ -10089,6 +10250,7 @@ module.exports = {
   buildGroundingPrompt,
   estimateHeightFromAgeGender,
   buildCharacterDescriptionForExpansion,
+  buildExpansionCastBlock,
   buildCharacterPromptBlock,
   buildRelativeHeightDescription,
   buildCharacterRestriction,
@@ -10118,6 +10280,7 @@ module.exports = {
   stripReviewAspectMarkers,
   buildOutlineReviewPrompt,
   buildTextRefinePrompt,
+  refineCast,
   parseRefinedText,
   parseTitleBlock,
   BRIEF_TRAILING_MARKERS,
@@ -10196,6 +10359,8 @@ module.exports = {
   replanRank,
   countsTowardConvergence,
   convergenceMustFixCount,
+  replanRoundConverged,
+  replanFindingKey,
   REPLAN_CONVERGENCE_EXEMPT_CODES,
   findingPages,
   buildArcReviewPrompt,

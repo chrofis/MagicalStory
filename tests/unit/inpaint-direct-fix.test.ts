@@ -48,20 +48,59 @@ describe('inpaintPage: a lone name-free instruction skips consolidation', () => 
   it('sends that finding verbatim — no trim, no cap, no critique', () => {
     expect(src).toContain('editInstruction = `1. ${sanitizeIssueForInpaint(soleDirectFix)}`;');
     // It must be the FIRST branch, ahead of the consolidated-plan branch.
-    const direct = src.indexOf('if (soleDirectFix) {\n    // Verbatim.');
-    const plan = src.indexOf('} else if (consolidation?.plan && !consolidation.error) {');
+    // CRLF-tolerant: the repo checks out with \r\n.
+    const direct = src.search(/if \(soleDirectFix\) \{\r?\n\s*\/\/ Verbatim\./);
+    const plan = src.indexOf('consolidatedPlan = consolidation.plan;');
     expect(direct).toBeGreaterThan(-1);
     expect(plan).toBeGreaterThan(direct);
   });
 
   it('does not spend a consolidator call when it has nothing to consolidate', () => {
     const gate = src.indexOf('let consolidation = null;');
-    const call = src.indexOf('consolidation = await consolidateFeedback({');
     expect(gate).toBeGreaterThan(-1);
-    expect(call).toBeGreaterThan(gate);
-    // The call sits inside the else of the soleDirectFix gate.
-    expect(src.slice(gate, call)).toContain('if (soleDirectFix) {');
-    expect(src.slice(gate, call)).toContain('} else {');
+    // The soleDirectFix shortcut is the first branch of the decision.
+    expect(src.slice(gate, gate + 400)).toContain('if (soleDirectFix) {');
+  });
+});
+
+// ONE CONSOLIDATION PER EVALUATION (2026-09-21, finding B2).
+//
+// consolidatePageEval consolidates every evaluation when it lands and stores
+// the plan on the version; inpaintPage then called the consolidator AGAIN on
+// the same evaluation. Staging consolidator_calls rows for
+// job_1789853503332_riqncqg1i show p10/p12/p15 consolidated at round 0 and
+// again inside inpaint at round 1 — ~7k prompt tokens each — and the two plans
+// disagree, so the page was repaired from a plan nothing had scored against.
+describe('inpaintPage: the plan is an input, never recomputed', () => {
+  const src = read('../../server/lib/images.js');
+  const body = src.slice(src.indexOf('async function inpaintPage('),
+                         src.indexOf('async function inpaintPage(') + 30000);
+
+  it('never calls the consolidator itself', () => {
+    expect(body).not.toContain('consolidateFeedback({');
+  });
+
+  it('takes the plan from the options or from the evaluation it was scored with', () => {
+    expect(src).toContain('consolidatedPlan: consolidatedPlanIn = null,');
+    expect(src).toContain('const storedPlan = consolidatedPlanIn || evaluation?.consolidatedPlan || null;');
+  });
+
+  it('stops loudly when there is no plan — no re-consolidation, no legacy concat', () => {
+    expect(src).toContain("error: 'no consolidated plan on the evaluation'");
+    // The severity-ranked concat fallback is gone.
+    expect(src).not.toContain('fallback to top-');
+  });
+
+  it('the repair pipeline hands the stored plan to inpaint', () => {
+    const rp = read('../../server/lib/repairPipeline.js');
+    expect(rp).toContain('const planForInpaint = inpaintEval.consolidatedPlan');
+    expect(rp).toContain('consolidatedPlan: planForInpaint,');
+  });
+
+  it('the one surviving consolidation carries the page wardrobe', () => {
+    const rp = read('../../server/lib/repairPipeline.js');
+    expect(rp).toContain('resolveSceneClothingDescriptions({');
+    expect(rp).toContain('sceneClothing,');
   });
 });
 

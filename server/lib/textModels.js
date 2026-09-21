@@ -1026,6 +1026,24 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       let firstChunkTime = null;
       let upstream = null;      // which provider actually served this
       let actualCost = null;    // OpenRouter's real charge, when it reports one
+      // WHAT WAS BILLED, NOT WHAT WE SENT (2026-09-21).
+      //
+      // OpenRouter is OpenAI-compatible, so `completion_tokens` already
+      // INCLUDES the model's reasoning tokens and `prompt_tokens` already
+      // includes cached ones. Keeping only those two numbers made the ledger
+      // unreadable: plan_check recorded 19,159 output tokens for a 5.2k-char
+      // reply and 30,742 input tokens for a 13.7k-char prompt, with no field
+      // that could say why. These carry the breakdown OpenRouter reports, plus
+      // the raw usage object, so the next run answers the question instead of
+      // re-raising it. reasoning_tokens is INFORMATIONAL — it is a subset of
+      // completion_tokens, so pricing it again would double-charge (that is
+      // exactly what `thinking_tokens` does in calculateTextCost, which is why
+      // this is NOT written there).
+      let reasoningTokens = 0;
+      let cachedInputTokens = 0;
+      let totalTokens = 0;
+      let rawUsage = null;
+      let usageEvents = 0;
       let finishReason = null;  // 'stop' | 'length' (cut at max_tokens) | null when the upstream omits it
       // The UPSTREAM's own reason, unnormalised. OpenRouter is how DeepSeek,
       // Qwen and OpenAI reach this codebase, and its normalised enum is
@@ -1080,8 +1098,13 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
               if (event.choices?.[0]?.finish_reason) finishReason = event.choices[0].finish_reason;
               if (event.choices?.[0]?.native_finish_reason) nativeFinishReason = event.choices[0].native_finish_reason;
               if (event.usage) {
+                usageEvents++;
+                rawUsage = event.usage;
                 inputTokens = event.usage.prompt_tokens || inputTokens;
                 outputTokens = event.usage.completion_tokens || outputTokens;
+                reasoningTokens = event.usage.completion_tokens_details?.reasoning_tokens || reasoningTokens;
+                cachedInputTokens = event.usage.prompt_tokens_details?.cached_tokens || cachedInputTokens;
+                totalTokens = event.usage.total_tokens || totalTokens;
                 if (typeof event.usage.cost === 'number') actualCost = event.usage.cost;
               }
             } catch {
@@ -1099,10 +1122,25 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
       const tps = outputTokens > 0 ? (outputTokens / elapsedSec).toFixed(1) : '0';
       log.info(
         `📊 [OPENROUTER STREAM] ${modelId} via ${upstream || 'unknown'} — ` +
-        `in ${inputTokens.toLocaleString()}, out ${outputTokens.toLocaleString()}, ` +
-        `${elapsedSec.toFixed(1)}s (${tps} tok/s)` +
+        `in ${inputTokens.toLocaleString()}` +
+        (cachedInputTokens > 0 ? ` (${cachedInputTokens.toLocaleString()} cached)` : '') +
+        `, out ${outputTokens.toLocaleString()}` +
+        (reasoningTokens > 0 ? ` (${reasoningTokens.toLocaleString()} reasoning)` : '') +
+        `, ${elapsedSec.toFixed(1)}s (${tps} tok/s)` +
         (actualCost !== null ? `, $${actualCost.toFixed(4)} actual` : '')
       );
+      // The billed prompt is larger than the prompt we sent by more than any
+      // tokenizer accounts for (~1 token per 2 chars is already pessimistic for
+      // German). When that happens the number in the ledger is not a count of
+      // this prompt, and the raw usage object is the only thing that can say
+      // what it is — so print it once, here, rather than guessing later.
+      const sentChars = fullPrompt.length + (options.prefill ? options.prefill.length : 0);
+      if (inputTokens > 0 && sentChars > 0 && inputTokens > sentChars / 2) {
+        log.warn(
+          `⚠️ [OPENROUTER USAGE] ${options.usageLabel || 'text'}: billed ${inputTokens.toLocaleString()} prompt tokens for a ${sentChars.toLocaleString()}-char prompt ` +
+          `(${usageEvents} usage event(s), provider ${upstream || 'unknown'}) — raw usage: ${JSON.stringify(rawUsage)}`
+        );
+      }
 
       const responseText = options.prefill ? options.prefill + fullText : fullText;
       return {
@@ -1112,6 +1150,11 @@ async function callOpenRouterAPIStreaming(prompt, maxTokens, modelId, onChunk, o
         usage: {
           input_tokens: inputTokens,
           output_tokens: outputTokens,
+          // Subsets of the two above, never added to them. See the declaration.
+          reasoning_tokens: reasoningTokens,
+          cached_input_tokens: cachedInputTokens,
+          ...(totalTokens ? { total_tokens: totalTokens } : {}),
+          raw: rawUsage,
           // direct_cost is the existing channel for providers that report a real
           // charge (Grok, Runware); addUsage already accumulates it. Populating
           // it keeps the breakdown honest now that throughput routing can land on
@@ -1164,7 +1207,14 @@ async function callTextModel(prompt, maxTokens = null, modelOverride = null, opt
   let model = activeTextModel;
   let modelName = TEXT_MODEL;
 
-  if (modelOverride && TEXT_MODELS[modelOverride]) {
+  if (modelOverride) {
+    // An override is a TEXT_MODELS *key* ('claude-haiku'), never a provider
+    // model id ('claude-haiku-4-5-20251001'). Silently ignoring an unrecognised
+    // override used to leave the call on the global active model — a Haiku-priced
+    // translation ran on Sonnet for months. No fallbacks: fail loudly.
+    if (!TEXT_MODELS[modelOverride]) {
+      throw new Error(`Unknown text model override "${modelOverride}" — expected a TEXT_MODELS key, not a provider model id. Known keys: ${Object.keys(TEXT_MODELS).join(', ')}`);
+    }
     model = TEXT_MODELS[modelOverride];
     modelName = modelOverride;
     log.debug(`🔧 [TEXT] Using model override: ${modelOverride}`);
@@ -1232,7 +1282,11 @@ async function callTextModelStreaming(prompt, maxTokens = null, onChunk = null, 
   let model = activeTextModel;
   let modelName = TEXT_MODEL;
 
-  if (modelOverride && TEXT_MODELS[modelOverride]) {
+  if (modelOverride) {
+    // See callTextModel: an unknown override is a bug, not a reason to fall back.
+    if (!TEXT_MODELS[modelOverride]) {
+      throw new Error(`Unknown text model override "${modelOverride}" — expected a TEXT_MODELS key, not a provider model id. Known keys: ${Object.keys(TEXT_MODELS).join(', ')}`);
+    }
     model = TEXT_MODELS[modelOverride];
     modelName = modelOverride;
     log.debug(`🔧 [TEXT STREAM] Using model override: ${modelOverride}`);

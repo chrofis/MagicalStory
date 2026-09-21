@@ -151,7 +151,7 @@ describe('author and judge describe the same three dimensions', () => {
   it('one shared constant writes both sides', () => {
     const { GEOMETRY_DIMENSIONS, buildGeometryJudgeChecks } = geom();
     expect(GEOMETRY_DIMENSIONS.map((d: any) => d.key)).toEqual(['path', 'opening', 'lighting']);
-    const judge = buildGeometryJudgeChecks(5);
+    const judge = buildGeometryJudgeChecks(5, ['path', 'opening', 'lighting']);
     const author = build();
     for (const d of GEOMETRY_DIMENSIONS) {
       const dimension = d.author.split('—')[0].trim();   // e.g. "Lighting direction"
@@ -164,7 +164,64 @@ describe('author and judge describe the same three dimensions', () => {
 
   it('the judge asks about nothing the author was not told', () => {
     const { GEOMETRY_DIMENSIONS, buildGeometryJudgeChecks } = geom();
-    const letters = buildGeometryJudgeChecks(5).match(/^ {3}[a-j]\. /gm) || [];
+    const letters = buildGeometryJudgeChecks(5, ['path', 'opening', 'lighting']).match(/^ {3}[a-j]\. /gm) || [];
     expect(letters.length).toBe(GEOMETRY_DIMENSIONS.length);
+  });
+});
+
+describe('only the dimensions the prose actually states reach either side', () => {
+  // BEHAVIOUR PINNED 2026-09-21: every author line ends "named above", so a
+  // line for a dimension no fact was found for orders the plate to match a
+  // direction, a vanishing point or a light source the prompt never names.
+  // Measured on a stored 18-page story: all three lines on every page.
+  it('a lighting-only scene gets the lighting author line and no other', () => {
+    const p = build({ mainScenePrompt: 'Warm afternoon light falls from the left across the empty square.', castNames: [] });
+    expect(p).toContain('Lighting direction');
+    expect(p).not.toContain('Path / perspective direction');
+    expect(p).not.toContain('Vanishing point / opening position');
+  });
+
+  it('the judge asks exactly the dimensions the author was handed', () => {
+    const { selectGeometryFacts, buildGeometryJudgeChecks } = geom();
+    const prose = 'Warm afternoon light falls from the left across the empty square.';
+    const { dims } = selectGeometryFacts({ mainScenePrompt: prose, castNames: [] });
+    expect(dims).toEqual(['lighting']);
+    const judge = buildGeometryJudgeChecks(5, dims);
+    expect(judge).toContain('Lighting direction');
+    expect(judge).not.toContain('Path / perspective direction');
+    expect(judge).not.toContain('Vanishing point / opening position');
+  });
+
+  it('no dimension found means no author block and no judge block', () => {
+    const { selectGeometryFacts, buildGeometryJudgeChecks } = geom();
+    const prose = 'Mira hugs Tomas and the dog leaps between them.';
+    const { dims } = selectGeometryFacts({ mainScenePrompt: prose, castNames: [] });
+    expect(dims).toEqual([]);
+    expect(buildGeometryJudgeChecks(5, dims)).toBe('');
+  });
+
+  it('dims[] is required — the judge may never be built blind', () => {
+    const { buildGeometryJudgeChecks } = geom();
+    expect(() => buildGeometryJudgeChecks(5)).toThrow(/dims/);
+  });
+});
+
+describe('a garment clause is never geometry', () => {
+  // BEHAVIOUR PINNED 2026-09-21: "a light grey shirt" hits the lighting word
+  // list and names no person, so a costume clause reached an EMPTY plate.
+  it('drops a wardrobe sentence whose only geometry word is a colour', () => {
+    const out = geom().extractSceneGeometry({ mainScenePrompt: 'Wearing a yellow quilted gilet over a light grey shirt.', castNames: [] });
+    expect(out).toBe('');
+  });
+
+  it('keeps the geometry clause and drops the garment clause from one sentence', () => {
+    const out = geom().extractSceneGeometry({ mainScenePrompt: 'The steps descend steeply to the lower-left, and she is wearing a yellow gilet.', castNames: [] });
+    expect(out).toContain('lower-left');
+    expect(out).not.toMatch(/gilet|wearing/i);
+  });
+
+  it('a place word that merely contains a garment word survives', () => {
+    const out = geom().extractSceneGeometry({ mainScenePrompt: 'The road runs to the upper-right through the neighbourhood.', castNames: [] });
+    expect(out).toContain('upper-right');
   });
 });

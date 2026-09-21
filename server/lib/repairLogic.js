@@ -722,6 +722,8 @@ function selectCharRepairTasks(entityReport, options = {}) {
  * Decision order:
  *   1. Catastrophic visual / semantic break    → iterate (regenerate)
  *   2. Major/critical entity (character) issue → char-fix
+ *   2c. A CRITICAL no method owns (not inpaintable, no roster entry to
+ *       char-fix from) and nothing else to execute → iterate
  *   3. Has fixable quality / semantic content   → inpaint
  *   4. Otherwise                                → skip
  *
@@ -1008,6 +1010,69 @@ function decideRepairMethod(pageNumber, evaluation, entityReport, options = {}) 
         issueDescription,
         repairParams,
       };
+    }
+  }
+
+  // 2c. A CRITICAL NO METHOD OWNS GOES TO ITERATE (2026-09-20).
+  //
+  // Measured on staging job_1789853503332_riqncqg1i p10/p15: a CRITICAL
+  // `character_identity` on Silvan, a secondary the STORY invented (visual-bible
+  // CHR001, no uploaded roster entry, so no avatar and no face photo). Every
+  // route declined in turn and none of them was wrong on its own terms:
+  //   - gate 2 never saw it — the finding came from the quality judge, not the
+  //     entity report, whose own arithmetic correctly declines an identity claim
+  //     against a cast member it holds no reference image for
+  //     (evalPipeline: `unclaimed_cast_has_no_reference`),
+  //   - char-fix cannot paint a figure with no reference (charFixReferenceGap),
+  //   - `character_identity` is in NOT_INPAINTABLE_TYPES, so the consolidator
+  //     dropped it `requires_char_fix_not_inpaint` and the round's instruction
+  //     carried only the MODERATE pose note.
+  // The page shipped at 50 carrying the CRITICAL, and no log line said the
+  // defect had been orphaned rather than judged not worth fixing.
+  //
+  // Iterate is the ONLY method left: it rewrites the brief and re-renders the
+  // whole page from the visual bible, which is where an invented figure's
+  // appearance actually lives. So an orphan CRITICAL routes there.
+  //
+  // TWO NARROWING CONDITIONS, both deliberate:
+  //   - it fires only when the round has nothing else to execute. p10's own
+  //     round had an inpaintable MAJOR scale fault and inpainting it took the
+  //     page 15 → 70; spending that round on a regeneration gamble instead would
+  //     have thrown a working repair away. An executable finding wins the round
+  //     and the orphan claims the next one, exactly as gate 2b defers clothing.
+  //   - it does NOT reverse the 2026-09-04 ruling that MAJOR entity findings go
+  //     unrepaired, nor the critical-only char-fix gate: only CRITICAL reaches
+  //     here, and char-fix was not declined by policy but by the absence of a
+  //     reference.
+  // The salvage floor is deliberately not consulted, for the same reason a spec
+  // conflict and a CATASTROPHIC finding skip it: there is no local repair to
+  // prefer, the alternative is shipping the CRITICAL.
+  if (pageNumber > 0) {
+    const critical = severityIssues.filter(i => /^critical$/i.test(String(i?.severity || '')));
+    const orphan = critical.find((i) => {
+      const type = String(i?.type || '').toLowerCase();
+      if (!NOT_INPAINTABLE_TYPES.has(type)) return false;
+      const who = String(i?.character || '').trim();
+      if (!who) return false;
+      return !!charFixImpossible(who);
+    });
+    if (orphan) {
+      // An UNTYPED finding counts as executable, the same way `mayInpaint`
+      // leaves a typeless entry alone: older plans predate the field, and the
+      // conservative answer is the one that does not spend a regeneration.
+      const executable = severityIssues.some((i) => {
+        const type = String(i?.type || '').toLowerCase();
+        return !type || !NOT_INPAINTABLE_TYPES.has(type);
+      });
+      if (executable) {
+        log.info(`🪃 [REPAIR-DECIDE] page ${pageNumber}: CRITICAL ${orphan.type} on ${String(orphan.character).trim()} has no repair method (no roster entry, not inpaintable) — an executable finding takes this round, the regeneration waits for the next`);
+      } else {
+        const desc = require('./scoring').findingText(orphan).slice(0, 80);
+        return {
+          method: 'iterate',
+          reason: `CRITICAL ${orphan.type} on ${String(orphan.character).trim()} — no roster entry to char-fix from and not inpaintable, regeneration is the only method left: ${desc}`,
+        };
+      }
     }
   }
 
@@ -1303,5 +1368,29 @@ function buildPreserveClause(preserve) {
   return `\n\nStill true after the edit: ${items.join('; ')}.`;
 }
 
+/**
+ * The detection for one `retryHistory` entry.
+ *
+ * ONE DETECTION PER VERSION (2026-09-21, finding D3). Each retry entry IS a
+ * version of the page, and the detection lives on that version. Entries written
+ * before 2026-09-21 carry their own byte-identical copy; those are still read,
+ * which is why this is a resolver and not a property access.
+ *
+ * @param {Object} scene   a `sceneImages[]` entry (needs `imageVersions`)
+ * @param {Object} entry   one `retryHistory[]` entry
+ * @param {number} [index] the entry's index, when the caller has it and the
+ *                         entry predates `versionIndex`
+ * @returns {Object|null}
+ */
+function detectionForRetryEntry(scene, entry, index = null) {
+  if (!entry) return null;
+  if (entry.bboxDetection) return entry.bboxDetection;          // legacy copy
+  const versions = Array.isArray(scene?.imageVersions) ? scene.imageVersions : [];
+  const vi = entry.versionIndex ?? (index != null ? index
+    : (typeof entry.attempt === 'number' ? entry.attempt - 1 : null));
+  if (vi == null) return null;
+  return versions[vi]?.bboxDetection || null;
+}
+
 module.exports = {
-  repairAttemptFromResult, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };
+  repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

@@ -57,6 +57,7 @@ const {
   getElementReferenceImagesByIds,
   dedupeSecondaryCharacterIds
 } = require('./server/lib/visualBible');
+const { rollUpScenePrompts, projectSceneCast } = require('./server/lib/storyShape');
 const {
   prefetchLandmarkPhotos,
   getIndexedLandmarks,
@@ -575,6 +576,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage[provider].input_tokens += usage.input_tokens || 0;
       tokenUsage[provider].output_tokens += usage.output_tokens || 0;
       tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
+      // OpenAI-compatible providers (OpenRouter) fold reasoning into
+      // output_tokens and cached input into input_tokens. Recorded alongside,
+      // never added — adding would double-count what was already billed.
+      if (usage.reasoning_tokens) tokenUsage[provider].reasoning_tokens = (tokenUsage[provider].reasoning_tokens || 0) + usage.reasoning_tokens;
+      if (usage.cached_input_tokens) tokenUsage[provider].cached_input_tokens = (tokenUsage[provider].cached_input_tokens || 0) + usage.cached_input_tokens;
       tokenUsage[provider].calls += 1;
       // Accumulate direct_cost for providers that use it (Grok, Runware)
       if (usage.direct_cost != null && tokenUsage[provider].direct_cost !== undefined) {
@@ -590,6 +596,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage.byFunction[functionName].input_tokens += usage?.input_tokens || 0;
       tokenUsage.byFunction[functionName].output_tokens += usage?.output_tokens || 0;
       tokenUsage.byFunction[functionName].thinking_tokens += usage?.thinking_tokens || 0;
+      // See above: subsets of output_tokens / input_tokens, recorded not summed in.
+      if (usage?.reasoning_tokens) tokenUsage.byFunction[functionName].reasoning_tokens = (tokenUsage.byFunction[functionName].reasoning_tokens || 0) + usage.reasoning_tokens;
+      if (usage?.cached_input_tokens) tokenUsage.byFunction[functionName].cached_input_tokens = (tokenUsage.byFunction[functionName].cached_input_tokens || 0) + usage.cached_input_tokens;
       tokenUsage.byFunction[functionName].calls += 1;
       // Summed wall-clock across this function's calls. Stamped by the text
       // chokepoint (textModels.js), so a function is timed without timing itself.
@@ -2759,7 +2768,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // shortfall here NEVER fails the job (owner ruling 2026-09-05: "2 is a
     // strong guideline, not an iron rule") — it warns loudly, naming the
     // staged and offered landmarks, and stamps `landmarkMinimumShortfall` on
-    // the story data so the shortfall is visible in rating.
+    // the story data so the shortfall is visible in rating. Read it with
+    // `scripts/analysis/shipped-defects.js`.
     if (beatsMode && inputData.premiseNamedWorld === false && (inputData.availableLandmarks?.length || 0) > 0) {
       const staged = stagedRealLandmarks(new UnifiedStoryParser(unifiedResponse).extractVisualBible());
       if (staged.length >= 2) {
@@ -3495,6 +3505,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`📊 [UNIFIED] Streaming efficiency: ${pagesFromStreaming}/${storyPages.length} pages started during streaming`);
     }
 
+    // THE ART DIRECTOR PROMPT IS STORED ONCE (2026-09-21).
+    //
+    // The all-pages scene-expansion prompt is ~112 KB and identical for every
+    // page of a book. Stored inline per page it was 4.25 MB — 49% of a
+    // measured story row. It now lives once in `sceneExpansionReport.prompts[]`
+    // and each page carries the index. One builder for every mode: beats (one
+    // shared prompt), the per-page beats fallback and the unified streaming
+    // path (one prompt each) all roll up through the same call.
+    const { prompts: scenePromptTable, refByPage: scenePromptRefs } =
+      rollUpScenePrompts(expandedScenes);
+
     // Create allSceneDescriptions array for storage compatibility
     const allSceneDescriptions = expandedScenes.map(scene => {
       // Extract translatedSummary and imageSummary for edit modal display
@@ -3504,8 +3525,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         description: scene.sceneDescription,
         characterClothing: scene.characterClothing || {},
         outlineExtract: scene.outlineExtract || scene.sceneHint || '',
-        // Dev mode: Art Director prompt and model used
-        scenePrompt: scene.sceneDescriptionPrompt,
+        // Dev mode: Art Director prompt and model used. The prompt itself is
+        // stored once in sceneExpansionReport.prompts[]; this is the index.
+        // Read it with storyShape.resolveScenePrompt(storyData, pageNumber).
+        scenePromptRef: scenePromptRefs.has(scene.pageNumber)
+          ? scenePromptRefs.get(scene.pageNumber)
+          : null,
         textModelId: scene.sceneDescriptionModelId,
         // Pre-extracted summaries for edit modal (avoids JSON parsing on frontend)
         translatedSummary: sceneMetadata?.translatedSummary || null,
@@ -3579,7 +3604,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const langInstruction = getLanguageInstruction(lang);
           const translationPrompt = `Translate each scene summary below to the target language. Output ONLY the translations, one per line, in the same order. Keep it concise (1-2 sentences each).\n\nTarget language: ${langInstruction}\n\n${summaries}`;
           const { callTextModelStreaming } = require('./server/lib/textModels');
-          const transResult = await callTextModelStreaming(translationPrompt, null, null, 'claude-haiku-4-5-20251001', { usageLabel: 'scene_translation' });
+          const transResult = await callTextModelStreaming(translationPrompt, null, null, 'claude-haiku', { usageLabel: 'scene_translation' });
           if (transResult?.text) {
             const translations = transResult.text.trim().split('\n').filter(l => l.trim());
             let tIdx = 0;
@@ -3676,6 +3701,55 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       return result;
+    }
+
+    // ── TEXT REFINEMENT — KICKED OFF THE MOMENT PAGE TEXT IS FINAL ────────
+    // Its only inputs are `expandedScenes` (final at the beats return above —
+    // nothing rewrites page text after it) and the Visual Bible. It used to be
+    // started ~400 lines further down, AFTER the landmark-fetch race and the
+    // `await referenceSheetPromise`, so the chain that the whole repair phase
+    // later joins on began only once the reference sheet had finished:
+    // measured on job_1789853503332_riqncqg1i, page text was final at 22:09:50
+    // CH and `text_refine_start` fired at 22:10:49 — 59 s of the join's wait
+    // bought nothing. The refiner needs neither landmark photos nor reference
+    // sheets, so it starts here.
+    // TRIAL SKIPS REFINEMENT (owner 2026-08-15): a trial renders all 5 pages in
+    // ~15s and has no repair phase behind which the chain could run, so a
+    // minutes-long polish pass would be added wholesale to a ~230s run.
+    const refineEnabled = process.env.TEXT_REFINE !== 'false' && !inputData.trialMode;
+    let textRefinePromise = null;
+    // Per-page before/after, filled at the join so dev mode can show WHAT the
+    // refiner changed rather than only that it ran.
+    let textRefineReport = null;
+    // Latest snapshot the refiner published (audit, then after each round).
+    let textRefinePartial = null;
+    if (refineEnabled) {
+      const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
+      const refinablePages = extractRefinablePages(expandedScenes);
+      if (refinablePages.length > 0) {
+        genLog.info('text_refine_start', `Refining text for ${refinablePages.length} page(s) in parallel with images`);
+        // THE BIBLE RIDES ALONG (A7, 2026-09-21). `inputData` is the job's
+        // stored input: the commissioned roster and nothing the story invented.
+        // The refiner's per-character checks and its plan/text drift check both
+        // enumerate the cast through `refineCast`, which reads
+        // `visualBible.secondaryCharacters` — the canonical home of a figure the
+        // STORY created. Without this the live path probes the commissioned
+        // names only, exactly the blind spot that let an invented character
+        // carry nine pages unexamined. The Lab's own call sites pass a stored
+        // story, which already carries the bible.
+        textRefinePromise = startBackgroundRefine({ ...inputData, visualBible }, refinablePages, {
+          // The whole story, read-only, for the refiner's judgment (beats mode
+          // only — the unified path records no arc).
+          arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || '',
+          // No `rounds`: the chain is fixed at two parallel audits → one repair
+          // → one lector (owner ruling 2026-09-03). There is no loop to bound.
+          usageLabel: 'text_refine',
+          // Latest completed state, so the join below can salvage the audit and
+          // any finished round if the chain FAILS partway. (It is no longer a
+          // deadline fallback — the join has no deadline.)
+          onProgress: (snap) => { textRefinePartial = snap; },
+        });
+      }
     }
 
     // PHASE 4: Start cover images await (runs PARALLEL with page images)
@@ -3828,11 +3902,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     timing.pagesStart = Date.now();
 
     // ── TEXT REFINEMENT, IN PARALLEL WITH IMAGES ──────────────────────────
-    // Scenes are locked at this point, so image generation and prose polishing
-    // are independent: the refiner receives the scene outlines READ-ONLY and may
-    // only rewrite page prose, never events. Running it here hides most of its
-    // wall-clock behind the phases that follow, whereas a pass started after
-    // them would add its full duration to the total.
+    // Scenes are locked before the kickoff, so image generation and prose
+    // polishing are independent: the refiner receives the scene outlines
+    // READ-ONLY and may only rewrite page prose, never events. Starting it as
+    // early as its inputs allow hides as much of its wall-clock as possible
+    // behind the phases that follow, whereas a pass started after them would
+    // add its full duration to the total.
     // WHAT THE NUMBERS ACTUALLY ARE (corrected 2026-09-14). An older version of
     // this comment — and the commit that moved the join, 2beda5425 — claimed
     // "images take ~25 min". They do not: PURE page generation is ~55s (Grok,
@@ -3850,13 +3925,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // text was DISCARDED — the wait, plus two rounds of tokens, for nothing.
     // The cap is gone now, which makes the trial exclusion MORE important, not
     // less: without it the trial would wait out the whole chain.
-    const refineEnabled = process.env.TEXT_REFINE !== 'false' && !inputData.trialMode;
-    let textRefinePromise = null;
-    // Per-page before/after, filled at the join so dev mode can show WHAT the
-    // refiner changed rather than only that it ran.
-    let textRefineReport = null;
-    // Latest snapshot the refiner published (audit, then after each round).
-    let textRefinePartial = null;
+    // (The chain itself is kicked off further up, the moment page text is
+    // final — see "TEXT REFINEMENT — KICKED OFF THE MOMENT PAGE TEXT IS FINAL".)
 
     // ── TEXT-REFINE JOIN — RUNS ONCE, BEFORE ANYTHING READS THE PAGE TEXT ──
     // Idempotent: the first call joins the refiner and rewrites the page text
@@ -4048,7 +4118,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const clothingReviewReport = beatsResult?.clothingReviewReport || null;
     const sceneReviewReport = beatsResult?.sceneReviewReport || null;
     // The prompt that WROTE the briefs, next to the one that reviewed them.
-    const sceneExpansionReport = beatsResult?.sceneExpansionReport || null;
+    // Beats contributes the timings and which pages fell back to a per-page
+    // call; `prompts[]` is the story-wide prompt table every page references
+    // (see the roll-up above) and is the ONLY copy of the Art Director prompt.
+    const sceneExpansionReport = {
+      ...(beatsResult?.sceneExpansionReport || {}),
+      prompts: scenePromptTable,
+    };
     // The page-text writer's own call (beats mode). storyTextPrompts is the
     // EXISTING home for "the prompt that wrote the pages + its raw reply" and
     // the dev-mode "Full API Output (Story Text)" panel already renders it —
@@ -4067,26 +4143,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         usage: beatsResult.meta.storyTextCall.usage,
       }]
       : [];
-    if (refineEnabled) {
-      const { extractRefinablePages, startBackgroundRefine } = require('./server/lib/textRefine');
-      const refinablePages = extractRefinablePages(expandedScenes);
-      if (refinablePages.length > 0) {
-        genLog.info('text_refine_start', `Refining text for ${refinablePages.length} page(s) in parallel with images`);
-        textRefinePromise = startBackgroundRefine(inputData, refinablePages, {
-          // The whole story, read-only, for the refiner's judgment (beats mode
-          // only — the unified path records no arc).
-          arc: arcReviewReport?.finalArc || beatsReviewReport?.arc || '',
-          // No `rounds`: the chain is fixed at two parallel audits → one repair
-          // → one lector (owner ruling 2026-09-03). There is no loop to bound.
-          usageLabel: 'text_refine',
-          // Latest completed state, so the join below can salvage the audit and
-          // any finished round if the chain FAILS partway. (It is no longer a
-          // deadline fallback — the join has no deadline.)
-          onProgress: (snap) => { textRefinePartial = snap; },
-        });
-      }
-    }
-
     let allImages;
     let pipelineEntityReport = null;
     let pipelineEntityHistory = null;
@@ -4658,7 +4714,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 // Named fidelity block whenever a landmark photo is attached
                 // below — '' otherwise (was trial-only; paid stories shipped
                 // the generic unnamed plate prompt).
-                landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0]),
+                landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0], { era: repPageData.sceneMetadata?.era || null }),
                 referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
                 visualBible,
                 pageNumber: repPageData.pageNumber,
@@ -4744,7 +4800,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                     description: emptySceneDesc + fixHint,
                     characterSpace,
                     eraGuard,
-                    landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0]),
+                    landmarkFidelity: buildLandmarkFidelityBlock(landmarkPhotos[0], { era: repPageData.sceneMetadata?.era || null }),
                     referenceKind: landmarkPhotos.length > 0 ? 'landmark' : (emptySceneVbGrid ? 'element' : null),
                     visualBible,
                     pageNumber: repPageData.pageNumber,
@@ -4976,7 +5032,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Named fidelity block whenever this page attaches a landmark
             // photo — '' otherwise (was trial-only).
             const { buildLandmarkFidelityBlock } = require('./server/lib/storyHelpers');
-            const pageLandmarkFidelity = buildLandmarkFidelityBlock(pageData.landmarkPhotos?.[0]);
+            const pageLandmarkFidelity = buildLandmarkFidelityBlock(pageData.landmarkPhotos?.[0], { era: sceneMetadata?.era || null });
 
             // Build a FILTERED VB grid for empty-scene generation: vehicles + non-landmark
             // locations only. Characters, animals, and artifacts are excluded — they should
@@ -6138,7 +6194,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // (see the page-record comment above). Persisted so a repair rerun
           // from the stored story evaluates against the sent description too.
           compressedScene: img.compressedScene || null,
-          sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
+          // sceneDescriptionPrompt is NOT stored per page (2026-09-21). It was a
+          // second inline copy of the ~112 KB Art Director prompt, with no reader
+          // anywhere; the one copy lives in sceneExpansionReport.prompts[] and
+          // sceneDescriptions[].scenePromptRef points at it.
           sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
           thinkingText: img.thinkingText || null,
           referencePhotos: img.characterPhotos,
@@ -6490,7 +6549,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // (see the page-record comment above). Persisted so a repair rerun
           // from the stored story evaluates against the sent description too.
           compressedScene: img.compressedScene || null,
-          sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
+          // sceneDescriptionPrompt is NOT stored per page (2026-09-21). It was a
+          // second inline copy of the ~112 KB Art Director prompt, with no reader
+          // anywhere; the one copy lives in sceneExpansionReport.prompts[] and
+          // sceneDescriptions[].scenePromptRef points at it.
           sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
           qualityScore: img.qualityScore,
           // The canonical single score (picked version's finalScore). This
@@ -7046,9 +7108,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // A page or cover that reaches persistence with no image bytes is a
     // SHIPPED DEFECT — the story must say so instead of looking complete
-    // (2026-08-29). `missingImages` is a plain list the admin/audit surfaces
-    // and any future check can read; the matching genLog error is written here,
-    // before generationLog is snapshotted into storyData below.
+    // (2026-08-29). `missingImages` is a plain list; the matching genLog error
+    // is written here, before generationLog is snapshotted into storyData
+    // below. The reader is `scripts/analysis/shipped-defects.js` (added
+    // 2026-09-21 — until then the promised "admin/audit surface" did not
+    // exist and these markers were written for nobody).
     const missingImages = (allImages || [])
       .filter(img => img && img.pageNumber > 0 && !img.imageData)
       .map(img => img.pageNumber)
@@ -7459,6 +7523,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       styledAvatarGeneration: getStyledAvatarGenerationLog(),
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(),
       sceneDescriptions: allSceneDescriptions,
+      // The Art Director prompt table sceneDescriptions[].scenePromptRef
+      // indexes into. One ~112 KB copy, not one per page.
+      sceneExpansionReport,
       sceneImages: allImages,
       coverImages,
       tokenUsage,
@@ -7508,8 +7575,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         return { ...locMeta, hasPhoto: !!referencePhotoData };
       })
     } : resultData.visualBible;
+    // WHAT story_jobs.result_data IS FOR (2026-09-21).
+    //
+    // It is the payload of the job-status poll and nothing else. The client
+    // gate is storyService.getJobStatus()'s explicit field mapping — a field it
+    // does not copy is undefined in the UI however faithfully we store it.
+    // Three fields were stored for nobody: `outlineReview`, `tokenUsage` and
+    // `generationMode` are never forwarded by that mapping, and the wizard's
+    // real copies of the first two come from stories.data via
+    // getStoryMetadata(). `estimatedCost` stays — it has no client reader
+    // either, but server/lib/storyMetrics.js queries
+    // result_data->>'estimatedCost' directly.
+    //
+    // This column is NOT a second home for the story: `stories.data` is, and
+    // anything a reader needs later belongs there. It is deliberately a
+    // projection, which is why it is built by subtraction from resultData
+    // rather than sharing its shape.
+    const { outlineReview: _unusedOutlineReview, tokenUsage: _unusedTokenUsage,
+            generationMode: _unusedGenerationMode, ...resultDataStorable } = resultData;
     const resultDataForStorage = {
-      ...resultData,
+      ...resultDataStorable,
       visualBible: strippedVisualBible,
       sceneImages: allImages.map(stripImageData),
       coverImages: coverImages ? {
@@ -7951,6 +8036,9 @@ async function _processStoryJobImpl(jobId) {
         tokenUsage[provider].input_tokens += usage.input_tokens || 0;
         tokenUsage[provider].output_tokens += usage.output_tokens || 0;
         tokenUsage[provider].thinking_tokens += usage.thinking_tokens || 0;
+        // Subsets of output_tokens / input_tokens — recorded, never summed in.
+        if (usage.reasoning_tokens) tokenUsage[provider].reasoning_tokens = (tokenUsage[provider].reasoning_tokens || 0) + usage.reasoning_tokens;
+        if (usage.cached_input_tokens) tokenUsage[provider].cached_input_tokens = (tokenUsage[provider].cached_input_tokens || 0) + usage.cached_input_tokens;
         tokenUsage[provider].calls += 1;
       }
     }
@@ -7964,6 +8052,8 @@ async function _processStoryJobImpl(jobId) {
       func.input_tokens += usage.input_tokens || 0;
       func.output_tokens += usage.output_tokens || 0;
       func.thinking_tokens += usage.thinking_tokens || 0;
+      if (usage.reasoning_tokens) func.reasoning_tokens = (func.reasoning_tokens || 0) + usage.reasoning_tokens;
+      if (usage.cached_input_tokens) func.cached_input_tokens = (func.cached_input_tokens || 0) + usage.cached_input_tokens;
       func.direct_cost = (func.direct_cost || 0) + (usage.direct_cost || 0);
       func.calls += 1;
       // Summed wall-clock, stamped by the text chokepoint (textModels.js).

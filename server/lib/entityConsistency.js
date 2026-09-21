@@ -1837,7 +1837,11 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
     // Debug logging for entity collection
     if (!bboxDetection) {
-      log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: No bboxDetection found in retryHistory (entries: ${img.retryHistory?.length || 0})`);
+      // Names what was actually looked at: resolveActiveVersionData reads the
+      // shared pre-step detection, the active version's own, then the page's.
+      // retryHistory has never been consulted here, and since 2026-09-21 (D3)
+      // it holds no detection of its own at all.
+      log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: no bboxDetection on the shared pre-step, the active version (${versionIndex}) or the page`);
     } else {
       const identifiedFigures = figures.filter(f => f.name && f.name !== 'UNKNOWN');
       log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: ${figures.length} figures, ${identifiedFigures.length} identified: ${identifiedFigures.map(f => f.name).join(', ')}`);

@@ -16,17 +16,24 @@ Three loading mechanisms feed these templates:
 3. **Direct reads in feature modules** — the `*-guides.txt`, `art-styles.txt`,
    `generate-story-idea*`, `story-idea-requirements-*`, `grid-repair.txt`.
 
+**Maintainer notes are a `#!` block (2026-09-21).** A template may open with notes for whoever
+edits it — which pipeline sends it, what parses its output. Write them as consecutive lines
+starting with `#!` at the very top of the file, ended by a blank line: `loadPromptTemplates()`
+strips that block so it never reaches the model. A bare `#` heading is prompt structure and is
+left alone. (`docs/decisions.md`, 2026-09-21.)
+
+
 ## Story text & ideas
 
 | Template | Consumer | Stage |
 |---|---|---|
-| outline-analysis-imagefirst.txt | promptBuilders.js `buildOutlineReviewPrompt` + `buildTextRefinePrompt` | Shared ANALYSIS instruction body. LIVE on the beats path: `buildTextRefinePrompt` slices its review CRITERIA out of it on every beats run. Fed the deleted unified writers too until 2026-09-15 |
+| outline-analysis-imagefirst.txt | promptBuilders.js `buildOutlineReviewPrompt` | ANALYSIS instruction body for the split outline reviewer — its ONE consumer since 2026-09-21. `buildTextRefinePrompt` sliced its criteria out of it until then (A7); the refiner now carries its own, in text-refine.txt. Fed the deleted unified writers too until 2026-09-15 |
 | outline-review.txt | storyHelpers.js `buildOutlineReviewPrompt`; server.js split-review seam | External outline review (split mode, default ON): Opus receives the writer's full output + the same analysis instructions + REVIEW HINTS (deterministic scene-consistency findings) and emits ANALYSIS + FIXES REQUIRED + STORY PAGES patches; owns all SEMANTIC scene-consistency judgment (decisions.md 2026-07-31) |
 | story-beats.txt | storyHelpers.js `buildBeatsPrompt` | Beats-first pipeline step 1 (`pipelineMode: 'beats'`) + Test Lab `beats_scenes`: the PAGE PLAN, one plan line per page (no beat prose since 2026-09-02) |
 | plan-check.txt | storyHelpers.js `buildPlanCheckPrompt` | Beats-first step 2: the ONE model call over a page division — emotional highlights, entrances, 3+-cast justifications. Counters (server/lib/planCounters.js) do the arithmetic |
 | arc-create.txt | promptBuilders.js `buildArcCreatePrompt` | Arc machine step 1 (beats pipeline, 2026-08-30): the creator writes TWO arcs, each with a blunt numbered self-critique, and commits to one ("Stronger: Arc N") |
-| arc-panel.txt | promptBuilders.js `buildArcPanelPrompt` | Arc machine step 2: each panel model (arcPanelModels) proposes EXACTLY ONE solution on the committed arc + critique; advisory, parallel |
-| arc-retell.txt | promptBuilders.js `buildArcRetellPrompt` | Arc machine step 3: the SAME creator re-tells the story whole (FINAL ARC + Challenges taken + Used + fresh CRITIQUE); the critique feeds story-beats.txt `{ARC_WEAK_POINTS}` |
+| arc-panel.txt | promptBuilders.js `buildArcPanelPrompt` | Arc machine step 2: each panel model (arcPanelModels) proposes EXACTLY ONE solution on the committed arc + critique; advisory, parallel. Carries `{AVAILABLE_LANDMARKS_SECTION}` since 2026-09-21 so the critic sees the list the creator got |
+| arc-retell.txt | promptBuilders.js `buildArcRetellPrompt` | Arc machine step 3: the SAME creator re-tells the story whole (FINAL ARC + Challenges taken + Used + fresh CRITIQUE); the critique feeds story-beats.txt `{ARC_WEAK_POINTS}`. Carries `{AVAILABLE_LANDMARKS_SECTION}` since 2026-09-21 |
 | arc-hints.txt | promptBuilders.js `buildArcHintsPrompt`; called from beatsPipeline.js (`usageLabel: 'arc_hints'`, model `MODEL_DEFAULTS.arcHintsModel` = grok-4.6) | Arc machine step 4, the GROK HINT PASS (owner 2026-09-01): ONE outside look at the approved arc, emitting `ISSUE: … → CHANGE: …` lines parsed by `parseArcHints`. Never another re-telling round — the hints travel forward into story-beats.txt and story-text-from-beats.txt as `{ARC_HINTS}`. Advisory: any failure clears the hints and the run proceeds |
 | story-arc-review.txt | promptBuilders.js `buildArcReviewPrompt`; testlab.js `runArcRoundsStage` | Lab-only arc review round: the arc plus optional audit findings in, a revised arc out (`parseArcReview`). The production arc stage is the arc machine (arc-create / arc-panel / arc-retell / arc-hints) |
 | challenge-catalogue.txt | read directly (`fs`) by promptBuilders.js `buildChallengeIdeasSection`, storyIdeas.js `buildIdeasPromptContext`, testlab.js | A DATA file, not an instruction template: the obstacle catalogue, sampled at random per run (~5x oversupplied, filtered by age band / peril / category cap) so the same brief rerun does not reach for the model's default obstacle. Column 5 holds the age bands |
@@ -44,7 +51,7 @@ Three loading mechanisms feed these templates:
 | scene-expansion-all.txt | promptBuilders.js `buildSceneExpansionAllPrompt` | Beats-first step 4, ONE call over ALL pages: `---VISUAL BIBLE---` + `---COVER SCENE HINTS---` ahead of page 1, then a brief per page. One author owns what is in each picture and what each thing looks like, so no page can cite an id nobody declared. Parsed by `extractBibleSections(raw, AD_BIBLE_MARKERS)` + `parseRefinedText(raw, pages, 'SCENES')` |
 | clothing-review.txt | storyHelpers.js `buildClothingReviewPrompt` | Beats-first step 3b: wardrobe review over the bible's clothing contract, BEFORE the styled-avatar kickoff. Emits `---ANALYSIS---` + `---CLOTHING---`, parsed by `parseClothingReview` |
 | story-text-from-beats.txt | storyHelpers.js `buildStoryTextFromBeatsPrompt` | Beats-first step 5: page TEXT written from the FINAL ARC + the locked plan lines. Emits `---TITLE---` + `---ANALYSIS---` + `---STORY TEXT---` so `parseRefinedText` reads it |
-| text-refine.txt | storyHelpers.js `buildTextRefinePrompt` | Post-image text refinement (both pipelines) |
+| text-refine.txt | storyHelpers.js `buildTextRefinePrompt` | Post-image text refinement (both pipelines). Carries its OWN review criteria (sections A-E) since 2026-09-21; rewrites are scoped to the pages AUDIT FINDINGS names |
 | story-trial.txt | storyHelpers.js `buildTrialStoryPrompt` | Trial story call |
 | vb-label-repair.txt | (new) Visual Bible label repair | One fed-back round to fix Visual Bible label faults |
 | trial-idea.txt | trial.js `POST /generate-ideas-stream` | Trial idea generation |
@@ -195,7 +202,7 @@ was deliberately deleted — callers guard and fall back to `imageEvaluation`. B
 | sheet-2x4-evaluation.txt | character2x4Sheet.js `evaluateSheetWithGemini` | 2×4 sheet eval (pass 1) |
 | sheet-2x4-style-eval.txt | character2x4Sheet.js `evaluateStyledSheetWithGemini` | 2×4 styled sheet eval (pass 2) |
 | sheet-row-heads-eval.txt | character2x4Sheet.js `evaluateSheetRow(row, 'heads')` (`sheetRowHeadsEval`) | SPLIT sheet eval, call 1 of 3 — STRUCTURE of the heads row (heads-only / angles / clean), judged on the crop ALONE. No reference images by design: with the photo in context the judge answered "is the head visible" from the reference and scored a headless crop 8 |
-| sheet-row-bodies-eval.txt | character2x4Sheet.js `evaluateSheetRow(row, 'bodies')` (`sheetRowBodiesEval`) | SPLIT sheet eval, call 2 of 3 — STRUCTURE of the bodies row (head-to-toe / angles / outfit / proportions), crop alone. Fills `{REQUESTED_OUTFIT}` + `{REQUESTED_COSTUME}` |
+| sheet-row-bodies-eval.txt | character2x4Sheet.js `evaluateSheetRow(row, 'bodies')` (`sheetRowBodiesEval`) | SPLIT sheet eval, call 2 of 3 — STRUCTURE of the bodies row (head-to-toe / angles / outfit / proportions), crop alone. Fills `{REQUESTED_OUTFIT}` + `{REQUESTED_COSTUME}` + `{CHARACTER_AGE}` (the declared age TASK 4 scores proportions against) |
 | sheet-row-identity-eval.txt | character2x4Sheet.js `evaluateIdentity` (`sheetRowIdentityEval`) | SPLIT sheet eval, call 3 of 3 — IDENTITY, the only one that sees the reference faces (source photo + avatar faces) and only against the HEADS crop. `CHARACTER_AGE` is substituted in code, not via fillTemplate. Shared by production `generateCharacter2x4Sheet` and the Lab through `evaluateSheetSplit` |
 | styled-costumed-avatar.txt | **DEAD in prod** — loaded but only tests/manual + scripts use it; superseded by hardcoded 2×4 sheet pipeline | — |
 | styled-costumed-avatar-2x4.txt | **Never loaded** — scripts/test-costumed-2x4.js only | — |
@@ -215,6 +222,8 @@ These act like templates but can only be edited in code:
 | `sceneComposite.js` `buildPopulatedPlatePrompt` | Coloured-silhouette plate for the page composite (hardcoded, not a template) |
 | `sceneComposite.js` `buildDepopulatePrompt` | Removes the silhouettes to leave a clean background plate (hardcoded) |
 | `sceneComposite.js` `buildBlendEditPrompt` | The composite BLEND prompt: goal + scene overview + cast (clothing/action) + interactions + emotions from metadata. **Never the page prompt** — that relocates characters (decisions.md 2026-08-15). Built from `buildBlendMetadata` (hardcoded) |
+| `figureDetection.js` `_somIdentifyFigures()` | Set-of-Mark who-is-who: badged page + sanitised identity lines. Asked twice — the primary detection pass and, from a later tier, the second witness (`secondOpinionIdentity`) |
+| `figureDetection.js` `arbitrateIdentity()` | **Identity ARBITER** — the only call allowed to overrule the detector's figure names. Page + a tight crop per contested figure + the candidate names' clothing contract and reference faces; deliberately NOT the SoM question the other two voters already answered, and it is never told who claimed what. Model: `MODEL_DEFAULTS.identityArbiter` (decisions.md 2026-09-21, detector-is-master) |
 | `premiseWorld.js` `detectPremiseNamedWorld()` | YES/NO utility-model classification: does the premise name its own world/location (other than the reader's home town)? Fallback rung only — structured wizard signals (`ideaWorld`, `selectedIndex`) are consulted first (decisions.md 2026-08-31, named location binding) |
 
 

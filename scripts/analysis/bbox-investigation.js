@@ -107,10 +107,13 @@ function bufferFromDataUri(dataUri) {
       sceneDescription: (si.sceneDescription || '').slice(0, 300),
       imageFile: path.basename(outPath),
       activeBboxDetection: activeVersion.bboxDetection || null,
-      retryBboxes: retryHistory.map(h => ({
+      retryBboxes: retryHistory.map((h, i) => ({
         attempt: h.attempt,
         source: h.source,
-        bboxDetection: h.bboxDetection || null,
+        // The detection lives on the version this attempt IS (D3); pre-2026-09-21
+        // entries carry their own copy.
+        bboxDetection: require('../../server/lib/repairLogic')
+          .detectionForRetryEntry(si, h, i),
       })),
     };
     recorded.pages.push(pageRecord);

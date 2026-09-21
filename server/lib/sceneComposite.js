@@ -972,18 +972,60 @@ async function splitSheetByEdgeDetection(sheetBuf) {
  * unreachable). The split result is memoised per sheetBuf so all 8 cells share
  * a single Python call, and a rejected split is rejected once for all 8.
  */
-const _sheetSplitCache = new WeakMap();
-async function cropSheetCell(sheetBuf, cellIdx) {
-  if (!_sheetSplitCache.has(sheetBuf)) {
-    try {
-      const cells = await splitSheetByEdgeDetection(sheetBuf);
-      _sheetSplitCache.set(sheetBuf, cells);
-    } catch (err) {
-      log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop`);
-      _sheetSplitCache.set(sheetBuf, null);
-    }
+// Keyed on the sheet's CONTENT, not on the Buffer object. The cache was a
+// WeakMap keyed on sheetBuf, and every caller re-fetches its own Buffer from the
+// sheet's R2 URL (bytesFromAnyImage, no HTTP cache), so the identity key never
+// hit: a 4-character 18-page story split the same 4 sheets ~50 times — ~50
+// analyzer round-trips and ~50 × 392 KB of R2 traffic. Content-keyed, the same
+// sheet splits once for the whole process. Bounded FIFO so a long-lived process
+// holding many stories' sheets cannot grow without limit; an entry is only ever
+// valid for the bytes that produced it, so a changed sheet is a different key.
+const SHEET_CACHE_MAX = 32;
+const _sheetSplitCache = new Map(); // sheetKey -> Promise<cells|null>
+const _sheetBytesCache = new Map(); // sheetKey -> Promise<Buffer|null>
+let _sheetSplitCalls = 0;           // test counter: real splitSheetByEdgeDetection calls
+
+function _cacheSet(cache, key, value) {
+  cache.set(key, value);
+  while (cache.size > SHEET_CACHE_MAX) cache.delete(cache.keys().next().value);
+  return value;
+}
+
+/** Stable content key for a sheet input (Buffer, data URI, raw base64, or URL). */
+function sheetKeyOf(sheet) {
+  const crypto = require('crypto');
+  if (Buffer.isBuffer(sheet)) return 'b:' + crypto.createHash('md5').update(sheet).digest('hex');
+  const str = String(sheet ?? '');
+  if (str.length <= 512) return 'u:' + str; // http(s) URL — the sheet's identity
+  return 'd:' + crypto.createHash('md5').update(str).digest('hex');
+}
+
+/** Resolve sheet input to bytes, memoised per sheet key (one R2 GET per sheet). */
+async function sheetBytes(sheet) {
+  const key = sheetKeyOf(sheet);
+  if (!_sheetBytesCache.has(key)) _cacheSet(_sheetBytesCache, key, bytesFromAnyImage(sheet));
+  try {
+    return { key, buf: await _sheetBytesCache.get(key) };
+  } catch (err) {
+    _sheetBytesCache.delete(key); // never cache a failed fetch
+    throw err;
   }
-  const cells = _sheetSplitCache.get(sheetBuf);
+}
+
+async function cropSheetCell(sheetBuf, cellIdx, sheetKey = null) {
+  const key = sheetKey || sheetKeyOf(sheetBuf);
+  if (!_sheetSplitCache.has(key)) {
+    _cacheSet(_sheetSplitCache, key, (async () => {
+      _sheetSplitCalls++;
+      try {
+        return await splitSheetByEdgeDetection(sheetBuf);
+      } catch (err) {
+        log.warn(`[SCENE COMPOSITE] edge-detection split failed: ${err.message} — falling back to fixed-math crop`);
+        return null;
+      }
+    })());
+  }
+  const cells = await _sheetSplitCache.get(key);
   if (cells && cells[cellIdx - 1]) return cells[cellIdx - 1];
   return cropSheetCellFixed(sheetBuf, cellIdx);
 }
@@ -1073,14 +1115,14 @@ async function cropAvatarCell(sheet, opts = {}) {
   // Pre-R2-migration this was a bare base64 decode, which turned stored R2
   // URLs into ~80 bytes of garbage and silently broke cell refs for every
   // DB-reloaded story.
-  const sheetBuf = await bytesFromAnyImage(sheet);
+  const { key: sheetKey, buf: sheetBuf } = await sheetBytes(sheet);
   if (!sheetBuf) {
     const preview = Buffer.isBuffer(sheet) ? '<Buffer>' : String(sheet).slice(0, 80);
     throw new Error(`cropAvatarCell: could not resolve sheet input to image bytes (input: "${preview}")`);
   }
 
   const bodyIdx = POSE_CELL[pose] || POSE_CELL.threeQuarter;
-  let body = await cropSheetCell(sheetBuf, bodyIdx);
+  let body = await cropSheetCell(sheetBuf, bodyIdx, sheetKey);
   if (headOnly) {
     const bMeta = await sharp(body).metadata();
     body = await sharp(body)
@@ -1091,7 +1133,7 @@ async function cropAvatarCell(sheet, opts = {}) {
   let face = null;
   if (includeFace) {
     const faceIdx = FACE_CELL[pose] || FACE_CELL.threeQuarter;
-    face = await cropSheetCell(sheetBuf, faceIdx);
+    face = await cropSheetCell(sheetBuf, faceIdx, sheetKey);
   }
 
   // When stack=true and face is included, vertically combine face (top) +
@@ -4611,6 +4653,11 @@ module.exports = {
     sizeFigure,
     buildAgeTargets,
     cropSheetCell,
+    sheetKeyOf,
+    // Test counters/reset for the split memo (B4): how many REAL analyzer
+    // splits ran, so a test can pin "4 sheets → 4 splits" over many pages.
+    sheetSplitCalls: () => _sheetSplitCalls,
+    resetSheetCaches: () => { _sheetSplitCache.clear(); _sheetBytesCache.clear(); _sheetSplitCalls = 0; },
     judgeSheetColumnSplit,
     SHEET_COLUMN_WIDTH_TOLERANCE,
     removeBackground,

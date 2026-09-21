@@ -172,8 +172,8 @@
   <td><code>inpaintPage(imageData, evaluation, options)</code></td>
   <td><code>server/lib/images.js:5750</code></td>
   <td>Grok edit (via <code>editImageWithPrompt</code>)</td>
-  <td>Source image + evaluation report (fixable issues) + options (visualBible, entityReport, aspectRatio, textPosition, coverText, …).</td>
-  <td>LIVE inpaint entry for the unified pipeline's round loop. Consolidates all issue sources into ONE edit instruction, then calls <code>editImageWithPrompt()</code>. Backend comes from <code>IMAGE_MODELS[MODEL_DEFAULTS.pageImage].backend</code> — not <code>inpaintBackend</code>. The other live inpaint path is the manual <code>POST /:id/repair/image/:pageNum</code> route, which also converges on <code>editImageWithPrompt()</code>.</td>
+  <td>Source image + evaluation report (fixable issues) + options (visualBible, <b><code>consolidatedPlan</code> &mdash; REQUIRED</b>, aspectRatio, textPosition, coverText, &hellip;).</td>
+  <td>LIVE inpaint entry for the unified pipeline's round loop. It does <b>not</b> consolidate: the plan is produced once where the evaluation is scored (<code>repairPipeline.consolidatePageEval</code>) and handed in, or read off <code>evaluation.consolidatedPlan</code>. No plan and no single self-describing finding &rarr; it stops with <code>error: 'no consolidated plan on the evaluation'</code> (2026-09-21, decisions.md). It builds ONE edit instruction from the plan, then calls <code>editImageWithPrompt()</code>. Backend comes from <code>IMAGE_MODELS[MODEL_DEFAULTS.pageImage].backend</code> — not <code>inpaintBackend</code>. The other live inpaint path is the manual <code>POST /:id/repair/image/:pageNum</code> route, which also converges on <code>editImageWithPrompt()</code>.</td>
 </tr>
 
 <tr>

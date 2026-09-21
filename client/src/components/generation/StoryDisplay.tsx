@@ -3,7 +3,7 @@ import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Sav
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import { wordDiff, diffStats } from '@/utils/wordDiff';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection, ReviewDiffReport } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport, BboxSceneDetection, ReviewDiffReport, SceneExpansionReport } from '@/types/story';
 import type { LanguageLevel, UILanguage } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { ObjectDetectionDisplay, EvalTestingPanel, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
@@ -15,6 +15,7 @@ import { TestModelsPanel } from './TestModelsPanel';
 import { EntityConsistencyView } from './EntityConsistencyView';
 import { IMAGE_REGENERATION_COST, COVER_REGENERATION_COST, TITLE_PAINT_COST, CHARACTER_REPAIR_COST } from '@/constants/credits';
 import { findingText } from '../../utils/findingText';
+import { resolveScenePrompt } from '../../utils/scenePrompt';
 
 interface StoryTextPrompt {
   batch: number;
@@ -214,6 +215,8 @@ interface StoryDisplayProps {
   visualBible?: VisualBible;
   sceneImages: SceneImage[];
   sceneDescriptions?: SceneDescription[];
+  /** The Art Director prompt table sceneDescriptions[].scenePromptRef indexes into. */
+  sceneExpansionReport?: SceneExpansionReport | null;
   coverImages?: CoverImages;
   regeneratingCovers?: Set<string>;  // Track which covers are being regenerated
   editingPages?: Set<number>;  // Track which pages are being edited (-1/-2/-3 for covers)
@@ -384,6 +387,7 @@ export function StoryDisplay({
   visualBible,
   sceneImages,
   sceneDescriptions = [],
+  sceneExpansionReport = null,
   coverImages,
   regeneratingCovers = new Set(),  // Track which covers are being regenerated
   editingPages = new Set(),  // Track which pages are being edited
@@ -1622,14 +1626,16 @@ export function StoryDisplay({
     if (pageNumber === 1 && scene) {
       console.log('[StoryDisplay] Page 1 scene keys:', Object.keys(scene));
       console.log('[StoryDisplay] Page 1 has outlineExtract:', !!scene.outlineExtract);
-      console.log('[StoryDisplay] Page 1 has scenePrompt:', !!scene.scenePrompt);
+      console.log('[StoryDisplay] Page 1 has scenePrompt:', !!getScenePrompt(1));
     }
     return scene?.outlineExtract;
   };
 
-  // Helper to get scene prompt (Art Director prompt) for a page
+  // Helper to get scene prompt (Art Director prompt) for a page. The prompt is
+  // stored once per story in sceneExpansionReport.prompts[]; the scene carries
+  // the index (resolveScenePrompt also reads the pre-2026-09-21 inline shape).
   const getScenePrompt = (pageNumber: number): string | undefined => {
-    return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.scenePrompt;
+    return resolveScenePrompt(sceneDescriptions, sceneExpansionReport, pageNumber);
   };
 
   // Character repair button + inline popover for selecting character and face/body target
@@ -2657,6 +2663,12 @@ export function StoryDisplay({
               const pages = rep?.pages || [];
               const analysis = (rep?.analysis || '').trim();
               const briefsIn = rep?.briefsIn || [];
+              // A row's `before` IS its briefsIn entry — the scene review stopped
+              // storing the second copy (2026-09-21). Rows written before that
+              // still carry one, and it is used when the snapshot has no entry.
+              const sentByPage = new Map(briefsIn.map(b => [b.pageNumber, b.brief]));
+              const beforeOf = (pg: { pageNumber: number; before?: string }) =>
+                sentByPage.get(pg.pageNumber) ?? pg.before ?? '';
               const unfixed = rep?.clothingUnfixed || [];
               // WHAT NOTHING CLOSED. The ledger and the dropped corrections have
               // been stored since the chain was built and rendered by nothing —
@@ -2865,7 +2877,7 @@ export function StoryDisplay({
                   )}
                   <div className="mt-3 space-y-3">
                     {pages.map(pg => {
-                      const ops = wordDiff(pg.before, pg.after);
+                      const ops = wordDiff(beforeOf(pg), pg.after);
                       const { added, removed } = diffStats(ops);
                       return (
                         <div key={pg.pageNumber} className={c.card}>
@@ -5092,10 +5104,10 @@ export function StoryDisplay({
                         </div>
                       )}
                       {/* Scene Prompt (Art Director) */}
-                      {scene.scenePrompt && (
+                      {getScenePrompt(scene.pageNumber) && (
                         <div className="bg-indigo-50 p-2 rounded text-xs">
                           <span className="font-semibold text-indigo-700">Scene Prompt:</span>
-                          <p className="text-gray-700 mt-1 whitespace-pre-wrap break-words">{scene.scenePrompt}</p>
+                          <p className="text-gray-700 mt-1 whitespace-pre-wrap break-words">{getScenePrompt(scene.pageNumber)}</p>
                         </div>
                       )}
                       {/* Scene Description */}

@@ -211,7 +211,7 @@ describe('wiring — the Lab replay stages call through the resolver', () => {
     expect(refineLadders.length).toBe(2);
     const prod = fs.readFileSync(
       path.join(__dirname, '..', '..', 'storyJobPipeline.js'), 'utf8');
-    expect(prod).toContain("arc: arcReviewReport?.finalArc || beatsReviewReport?.arc || ''");
+    expect(prod).toContain("arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || ''");
   });
 });
 

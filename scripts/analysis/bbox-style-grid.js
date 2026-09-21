@@ -174,10 +174,10 @@ async function fetchExpectedCharacters(storyId, pageNumber) {
   const r = rows[0];
   if (!r) return [];
   const pageEntry = (r.s || []).find(p => p.pageNumber === pageNumber);
-  for (const h of (pageEntry?.retryHistory || [])) {
-    if (h?.bboxDetection?.expectedCharacters?.length > 0) {
-      return h.bboxDetection.expectedCharacters;
-    }
+  const { detectionForRetryEntry } = require('../../server/lib/repairLogic');
+  for (let i = 0; i < (pageEntry?.retryHistory || []).length; i++) {
+    const det = detectionForRetryEntry(pageEntry, pageEntry.retryHistory[i], i);
+    if (det?.expectedCharacters?.length > 0) return det.expectedCharacters;
   }
   // Fallback: try the page's own scene.characters[] cross-referenced against
   // the story's character list.
@@ -209,9 +209,12 @@ async function processOne(style, idx, storyId, pageEntry) {
 
   // Pipeline-stored
   let pipelineFigs = [];
-  for (let i = (pageEntry.retryHistory || []).length - 1; i >= 0; i--) {
-    const h = pageEntry.retryHistory[i];
-    if (h?.bboxDetection?.figures?.length) { pipelineFigs = h.bboxDetection.figures; break; }
+  {
+    const { detectionForRetryEntry } = require('../../server/lib/repairLogic');
+    for (let i = (pageEntry.retryHistory || []).length - 1; i >= 0; i--) {
+      const det = detectionForRetryEntry(pageEntry, pageEntry.retryHistory[i], i);
+      if (det?.figures?.length) { pipelineFigs = det.figures; break; }
+    }
   }
   findings.pipelineStored = pipelineFigs.map(f => ({ name: f.name, faceBox: f.faceBox, _geminiFaceBox: f._geminiFaceBox, _cascadeFace: f._cascadeFace }));
   const pipeBoxes = pipelineFigs.filter(f => f.faceBox).map((f, i) => ({

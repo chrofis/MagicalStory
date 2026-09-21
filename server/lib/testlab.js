@@ -796,7 +796,7 @@ async function runEmptySceneStage(ctx, { promptOverride, experimentId, params = 
       ? buildTextZoneInstruction(ctx.textPosition, meta.textZoneDescription || null, 'a quarter of the frame', { isEmptyScene: true })
       : '',
     eraGuard: buildEraGuard(meta.era),
-    landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null),
+    landmarkFidelity: buildLandmarkFidelityBlock(ctx.landmarkPhotos[0] || null, { era: meta.era }),
     // Tells the model what the attached reference IS. Without it the Lab tested
     // a DIFFERENT prompt than production, which passes it at every plate call
     // site (storyJobPipeline.js vantage plate + retry, the per-page 5a-pre path,
@@ -4378,7 +4378,7 @@ async function runBeatsScenesStage(target, { params = {}, promptOverride = null 
       }
       // finalBeats feeds the review's check 5 (character in beat vs brief),
       // same as the production callsite in beatsPipeline.js.
-      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings, visualBible: vb });
+      const srPrompt = buildSceneReviewPrompt(storyData, okScenes.map(x => ({ pageNumber: x.pageNumber, brief: x.fromBeats })), { beats: finalBeats, briefFindings, visualBible: vb, clothingRequirements: storyData.clothingRequirements || null });
       if (srPrompt) {
         const reviewOnce = async (srModel) => {
           const t2 = Date.now();
@@ -4800,8 +4800,25 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
   const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
   const evaluation = params.evaluation || storedEvalFromScene(ctx.scene);
 
+  // inpaintPage takes the consolidated plan as an INPUT (2026-09-21, B2): in
+  // production it is produced once where the evaluation is scored. The Lab
+  // stage starts from a stored eval, so it produces the plan here — one
+  // consolidator call, exactly as before, just made visible at the call site.
+  const { consolidateEvaluation } = require('./feedbackConsolidator');
+  const consolidated = await consolidateEvaluation({
+    evalResult: evaluation,
+    sceneDescription: ctx.scene.sceneDescription || '',
+    characters: storyData.characters || [],
+    storyId: ctx.storyId,
+    pageNumber: ctx.pageNumber,
+    visualBible: ctx.visualBible,
+    landmarkPhotos: ctx.scene.landmarkPhotos || null,
+    era: require('./landmarkProtection').resolveSceneEra(ctx.scene.sceneMetadata),
+  });
+
   const t0 = Date.now();
   const result = await inpaintPage(imageData, evaluation, {
+    consolidatedPlan: params.consolidatedPlan || consolidated.plan || null,
     visualBible: ctx.visualBible,
     characters: storyData.characters || [],
     pageNumber: ctx.pageNumber,
@@ -7323,6 +7340,7 @@ async function runSceneReviewReplayStage(target, { params = {}, promptOverride =
       briefFindings: briefFindingsBlock,
       beats: outlineBeats,
       visualBible: storyData.visualBible,
+      clothingRequirements: storyData.clothingRequirements || null,
     });
   } finally {
     PROMPT_TEMPLATES.sceneReview = orig;

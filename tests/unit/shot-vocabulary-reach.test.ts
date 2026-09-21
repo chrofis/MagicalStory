@@ -28,7 +28,7 @@ const PB = require_('../../server/lib/promptBuilders');
 const { loadPromptTemplates } = require_('../../server/services/prompts');
 const images = require_('../../server/lib/images');
 const { IMAGE_MODELS, resolveGrokImageModel } = require_('../../server/config/models');
-const { SHOT_TYPES, SHOT_ENUM, SHOT_DEFINITIONS, SHOT_PATTERNS } = require_('../../server/lib/shotVocabulary');
+const { SHOT_TYPES, SHOT_ENUM, SHOT_DEFINITIONS, SHOT_PATTERNS, SHOTS, buildShotDefinitions } = require_('../../server/lib/shotVocabulary');
 
 const CAP: number = IMAGE_MODELS[resolveGrokImageModel(null).key]?.maxPromptLength || 7900;
 
@@ -106,12 +106,16 @@ describe('one shot vocabulary reaches every stage that uses the word', () => {
     }
   });
 
-  it('the built image prompt defines every shot the Art Director may declare', () => {
+  it('the built image prompt defines the shot the page declared, and only that one', () => {
     const prompt = PB.buildImagePrompt(brief('The main character crosses the flats.'), inputData, null, VISUAL_BIBLE, 1, null, {});
     expect(prompt).toContain(SHOT_MARKER);
     expect(prompt).not.toContain('{SHOT_DEFINITIONS}');
-    for (const shot of SHOT_TYPES) {
-      expect(prompt, `the illustrator is never told what \`${shot}\` means`).toContain(shot);
+    // ONE definition, not eight (2026-09-21). The table cost 1,223 characters
+    // of a 7,900-char budget and the cut paid for it with the page's own facts.
+    const declared = SHOTS.find((x: any) => x.id === 'ultra-wide');
+    expect(prompt, 'the declared shot lost its definition').toContain(declared.definition);
+    for (const other of SHOTS.filter((x: any) => x.id !== 'ultra-wide')) {
+      expect(prompt, `\`${other.id}\` is defined on a page that does not use it`).not.toContain(other.definition);
     }
   });
 
@@ -126,10 +130,10 @@ describe('one shot vocabulary reaches every stage that uses the word', () => {
   });
 });
 
-describe('the shot rule survives an over-cap prompt', () => {
-  // The shape of the four pages that lost it: a long head, the Composition
-  // block, then the protected tail. Built from the real template so the drop
-  // order under test is the production one.
+describe('an over-cap prompt keeps the page facts and pays with generic guidance', () => {
+  // The shape of the fifteen pages of staging job_1789853503332_riqncqg1i that
+  // stored a prompt: a long head, the Composition block, then the tail. Built
+  // from the real template so the drop order under test is the production one.
   const overCapPrompt = () => {
     const prompt = PB.buildImagePrompt(brief('The main character crosses the flats.'), inputData, null, VISUAL_BIBLE, 1, null, {});
     const objIdx = prompt.indexOf('**REQUIRED OBJECTS');
@@ -137,41 +141,73 @@ describe('the shot rule survives an over-cap prompt', () => {
     const head = prompt.slice(0, tailStart);
     const tail = prompt.slice(tailStart);
     // Pad the SCENE PROSE — the part a real page grows — until the whole thing
-    // is comfortably over the model's cap, as p1 (9,088 chars) was.
-    const filler = Array.from({ length: 60 },
+    // is over the model's cap, as every page of that book was.
+    const filler = Array.from({ length: 26 },
       (_, i) => `Figure ${i} stands near landmark ${i} wearing garment ${i} in colour ${i}.`).join(' ');
-    return `${head}\n${filler}\n${tail}`;
+    return `${head}
+${filler}
+${tail}`;
   };
 
-  it('is over the cap and still loses the Composition block to the cut', async () => {
+  it('fits, and the page-specific blocks are the ones that survive', async () => {
     const built = overCapPrompt();
     expect(built.length).toBeGreaterThan(CAP);
-    // No LLM in this path: shrinkPromptForModel only compresses when a text
-    // model is reachable, and the deterministic section-aware cut is the
-    // guarantee branch. Either way the assertion below holds.
     const out = await images.shrinkPromptForModel(built, CAP, 'TEST', null, null);
     expect(out.length).toBeLessThanOrEqual(CAP);
-    // The reproduction: the head block really is the one that goes.
-    expect(out).not.toContain('**Composition:**');
+    // The four blocks the old ranking took first, on every over-cap page.
+    expect(out, 'the Composition block went again').toContain('**Composition:**');
+    expect(out, 'the plate-vs-identity reference rule went again').toContain('When the FIRST reference photo');
+    expect(out, 'the shot rule went again').toContain(SHOT_MARKER);
   }, 30000);
 
-  it('keeps the shot rule anyway, because it is no longer in the head', async () => {
+  it('drops the generic rule paragraphs first, least load-bearing first', async () => {
     const built = overCapPrompt();
     const out = await images.shrinkPromptForModel(built, CAP, 'TEST', null, null);
-    expect(out, 'the shot rule was cut with the head block again').toContain(SHOT_MARKER);
-    for (const shot of SHOT_TYPES) {
-      expect(out, `\`${shot}\` lost its definition to the cut`).toContain(shot);
+    // COUNTS is rank 1 and identical on every page of every book; Composition
+    // carries this page's own staging. Whatever else survived, the generic one
+    // can never outlive the page-specific one.
+    if (!out.includes('**Composition:**')) expect(out).not.toContain('**COUNTS:**');
+    expect(out.includes('**COUNTS:**') && !out.includes('**Composition:**')).toBe(false);
+  }, 30000);
+
+  it('makes no paid call to fit a prompt', async () => {
+    const textModels = require_('../../server/lib/textModels');
+    const orig = textModels.callTextModel;
+    let calls = 0;
+    textModels.callTextModel = async (...args: any[]) => { calls++; return orig(...args); };
+    try {
+      await images.shrinkPromptForModel(overCapPrompt(), CAP, 'TEST', null, null);
+    } finally {
+      textModels.callTextModel = orig;
     }
+    // 34 deepseek calls on one story, none of whose output reached a prompt.
+    expect(calls, 'the shrinker called a text model again').toBe(0);
   }, 30000);
+});
 
-  it('keeps the other tail rules it shares the tail with', async () => {
-    const built = overCapPrompt();
-    const out = await images.shrinkPromptForModel(built, CAP, 'TEST', null, null);
-    // The blocks that survived on all five investigated pages. Adding the shot
-    // rule to the tail must not have pushed any of them out.
-    expect(out).toContain('**REQUIRED CAST:**');
-    expect(out).toContain('**DEPTH AND SIZE:**');
-    expect(out).toContain('**ART STYLE:**');
+describe('a cover keeps its cast block through the cut', () => {
+  // The front cover of job_1789853503332_riqncqg1i shipped with no cast block
+  // at all — no garment, no age, no height. The cut removed the
+  // plate-vs-identity rule by scanning forward to the next entry of a
+  // hand-kept marker list, and the cast headers were not on it, so the whole
+  // cast went with it. Blocks are removed by their exact text now.
+  it('the block after a dropped one is never swallowed with it', async () => {
+    const CAST = '**CHARACTERS IN THIS IMAGE (each person, then what that person wears):**\n'
+      + '- Mira, a girl of eight, brown hair, wears a red coat and grey boots.\n'
+      + '- Tobias, a boy of five, black hair, wears a blue jumper and brown shoes.\n';
+    const prompt = PB.buildImagePrompt(brief('The main character crosses the flats.'), inputData, null, VISUAL_BIBLE, 1, null, {
+      characterReferenceListOverride: `
+${CAST}`,
+    });
+    const filler = Array.from({ length: 45 },
+      (_, i) => `Figure ${i} stands near landmark ${i} wearing garment ${i}.`).join(' ');
+    const built = prompt.replace('**ART STYLE:**', `${filler}
+
+**ART STYLE:**`);
+    expect(built.length).toBeGreaterThan(CAP);
+    const out = await images.shrinkPromptForModel(built, CAP, 'TEST-COVER', null, null);
+    expect(out, 'the cover lost its cast block to a neighbouring drop').toContain(CAST.trim().split('\n')[0]);
+    expect(out).toContain('wears a red coat and grey boots');
   }, 30000);
 });
 

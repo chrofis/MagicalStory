@@ -1138,10 +1138,23 @@ async function extractInlineImagesToR2(storyId, data) {
    * @param {string} key    — R2 object key.
    * @param {(url:string)=>void} apply — writes URL back into the blob.
    */
+  // Slots whose bytes another task already owns: not uploaded again, just
+  // pointed at the owner's URL once the queue drains.
+  const aliasApplies = [];
   const upload = (input, key, apply) => {
     if (!looksLikeBytes(input)) return;
+    // CONTENT dedupe across walkers (2026-09-21, finding D5). Measured on
+    // job_1789853503332_riqncqg1i: the finished styled reference sheet was PUT
+    // four times per character under four different keys — the styled-avatar
+    // debug entry, a page's ref-photo-N-orig, the styledAvatars slot, and the
+    // pass-1 aux copy — because each walker queued its own task for the same
+    // md5. The guard existed but only the generic sweep consulted it. The
+    // artefact is NOT dropped: every field still gets a URL, they just share
+    // the one object. Diagnostics stay complete; the duplicate bytes go.
+    const owner = queuedInputs.get(input);
+    if (owner) { aliasApplies.push({ apply, owner }); return; }
     const task = { input, key, apply, url: null };
-    if (!queuedInputs.has(input)) queuedInputs.set(input, task);
+    queuedInputs.set(input, task);
     tasks.push(task);
   };
 
@@ -1616,6 +1629,10 @@ async function extractInlineImagesToR2(storyId, data) {
   for (const a of aliasSlots) {
     if (a.owner.url && a.parent[a.key] === a.input) a.parent[a.key] = a.owner.url;
   }
+  // …and the walker slots that shared bytes with an earlier walker's task.
+  for (const a of aliasApplies) {
+    if (a.owner.url) a.apply(a.owner.url);
+  }
 }
 
 /**
@@ -1708,6 +1725,22 @@ function stripInlineImagesFromStoryData(data, { keepDisplayBytes = false } = {})
       c.avatars.bodyThumbnailsUrl = undefined;
       c.avatars.faceThumb = undefined;
       c.avatars.bodyThumb = undefined;
+      // Avatar PROVENANCE, not bytes, and the second-largest duplicate in the
+      // blob after the images themselves (2026-09-21): measured on
+      // job_1789853503332_riqncqg1i, `prompts` is 12.2 KB and `storyHistory`
+      // 9.7 KB per character — and sceneImages[].sceneCharacters repeats the
+      // whole record on EVERY page, so 41 snapshots carried 0.90 MB of these
+      // two fields alone, 10% of an 8.7 MB story row.
+      //
+      // Both are owned by the characters table: storyHistory is written there
+      // by jsonb_set (server/lib/storyAvatars.js appendStoryHistory — `data`
+      // AND the light `metadata` copy), and prompts is the avatar-generation
+      // record the character dev panel renders. Their only readers
+      // (client CharacterForm / CharacterHistoryPanel) read the characters
+      // API, never stories.data. The copy here is a mid-run snapshot with no
+      // reader at all.
+      c.avatars.prompts = undefined;
+      c.avatars.storyHistory = undefined;
       // DO NOT strip c.avatars.styledAvatars — per-story data, no other source.
       // DO NOT strip c.avatars.costumed   — per-story data, no other source.
     }

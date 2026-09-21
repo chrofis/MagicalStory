@@ -998,6 +998,43 @@ function convertClothingToCurrentFormat(clothingRequirements) {
   return converted;
 }
 
+/**
+ * Per-scene clothing descriptions for the feedback consolidator.
+ *
+ * The consolidator must read the variant the scene actually uses (e.g.
+ * costumed:mittelalterlich) rather than the character's default (modern)
+ * clothing — otherwise it writes fixes like "redress figure in grey hoodie"
+ * for a medieval page. The story-level spec is merged in first so
+ * resolveClothingDescription finds THIS story's clothing before falling back
+ * to stale cross-story avatars.clothing.
+ *
+ * Single source of truth: moved out of images.js inpaintPage when the
+ * consolidator collapsed to one call per evaluation (2026-09-21, B2).
+ *
+ * @param {Object} args
+ * @param {Object} args.characterClothing - {name: 'costumed:x'} for this page
+ * @param {Object} args.clothingRequirements - story-level clothing spec
+ * @param {Array}  args.characters
+ * @param {string} args.artStyle
+ * @returns {Object} {characterName: clothingDescription}
+ */
+function resolveSceneClothingDescriptions({ characterClothing, clothingRequirements, characters, artStyle } = {}) {
+  const out = {};
+  const charReqs = {};
+  for (const [name, variant] of Object.entries(characterClothing || {})) {
+    const storyReqs = resolveCharacterReqs(clothingRequirements, name);
+    charReqs[name] = {
+      ...(storyReqs && typeof storyReqs === 'object' ? storyReqs : {}),
+      _currentClothing: variant,
+    };
+  }
+  const photos = getCharacterPhotoDetails(characters || [], null, artStyle || 'watercolor', charReqs);
+  for (const p of photos) {
+    if (p?.name && p?.clothingDescription) out[p.name] = p.clothingDescription;
+  }
+  return out;
+}
+
 // ============================================================================
 // PAGE TEXT HELPERS
 // ============================================================================
@@ -1016,5 +1053,6 @@ module.exports = {
   resolveClothingForPage,
   buildUsedClothingText,
   buildAvailableAvatarsForPrompt,
-  convertClothingToCurrentFormat
+  convertClothingToCurrentFormat,
+  resolveSceneClothingDescriptions
 };

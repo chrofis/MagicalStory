@@ -68,11 +68,14 @@ describe('wiring: the compressed scene block is produced, carried and consumed',
 
   it('shrinkPromptForModel publishes its compressed HEAD, never the assembled prompt', () => {
     expect(images).toMatch(/shrinkPromptForModel\(prompt, maxPromptLength, logLabel, modelName = null, meta = null\)/);
-    expect(images).toContain('if (meta) meta.compressedScene = newHead;');
+    // Both surviving branches stamp it through ONE accessor (the paid LLM
+    // branch that used to stamp `newHead` was deleted 2026-09-21).
+    expect(images).toContain('if (meta) meta.compressedScene = sceneHeadOf(out) || undefined;');
+    expect(images).toContain('if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;');
     // The head is taken from strictly before the REQUIRED OBJECTS / ART STYLE
     // tail split — that split is WHY the block can never carry a style section.
-    expect(images).toContain("const o = out.indexOf('**REQUIRED OBJECTS');");
-    expect(images).toContain('let head = out.slice(0, tailStart);');
+    expect(images).toContain("const o = prompt.indexOf('**REQUIRED OBJECTS');");
+    expect(images).toContain('return tailStart > 0 ? prompt.slice(0, tailStart).trim()');
     // Not a second copy of the whole prompt (storage cost + IRON RULE hygiene).
     expect(images).not.toContain('meta.compressedScene = assembled');
   });

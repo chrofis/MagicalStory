@@ -26,8 +26,13 @@ const require = createRequire(import.meta.url);
 const { validateEmptyScene } = require('../../server/lib/evalPipeline.js');
 const sharp = require('sharp');
 
+// Since 2026-09-21 the judge asks only about dimensions the PROSE states, so
+// a fixture that wants all three judged has to name all three (path, opening,
+// lighting). The reserved-corner clause is what this file rules out, and it is
+// absent whatever the prose says.
 const MAIN_SCENE =
   'The main character stands on the pier while a path stretches to the right background, '
+  + 'the harbour mouth opens as a gap at the far right, low dusk light comes from the left, '
   + 'and a tiny figure waits in the far upper-right corner.';
 
 let sentPrompt = '';

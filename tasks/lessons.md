@@ -931,3 +931,20 @@ an observation, never a finding.
 - **Rule**: in this tree, **never `--amend`**. HEAD is not yours between two commands.
   Add a follow-up commit instead, and address it by SHA. If an amend is truly needed,
   verify `git rev-parse HEAD` equals the SHA you intend *in the same command* as the amend.
+
+## Windows: a script that rewrites a file must pass newline=''
+
+Measured 2026-09-19. A Python helper using `io.open(f,'w')` newline-translates LF to CRLF on this
+machine. It silently corrupted 11 files and produced 5 test failures in files the agent had never
+touched (`book-audit-whole-book`, `built-prompt-values`) whose diffs printed as IDENTICAL STRINGS —
+the only difference was invisible line endings. Any file rewritten from a script here needs
+`newline=''` (Python) or an explicit LF write. If a diff shows two strings that look the same,
+check the line endings before anything else.
+
+## 2026-09-21 — Detector (SAM/DINO figure detection) is the MASTER for identity
+A fix renamed the detector's figures from the evaluator's votes when the second witness vetoed
+a conflict. Owner: that bypasses the rule — the detection is the master for identity; witnesses
+do not overwrite it. When witnesses and detector disagree, the resolution is a TIE-BREAK call
+to an independent model, not a rename by either side. Before building any conflict handler:
+(1) audit how often the case occurs across stored stories, (2) then design the arbiter.
+Pattern: never let a downstream judge overwrite an upstream master record; add an arbiter.

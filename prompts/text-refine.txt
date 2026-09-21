@@ -55,7 +55,9 @@ Nothing in the story or its pictures is dangerous enough that it could lead to d
 
 # YOUR TASK
 
-Find the pages that are weak and rewrite only those. If no early page states plainly what must happen and why, rewrite the earliest fitting page so a character says it. Rewrite any page that carries an abbreviation or acronym: name the thing the way a child says it. A page that already works stays as it is. The story must still deliver the brief above.
+A page is rewritable when AUDIT FINDINGS names it, and otherwise not. Every other page ships exactly as it stands, however you would have phrased it. Four cases add a page to that set and no others: a MISMATCH move needs its destination page; no early page states plainly what must happen and why, which is fixed on the earliest fitting page; a page carries an abbreviation or acronym, which is named the way a child says it; a page carries a banned dash. Closing a finding on a page the finding does not name is allowed only under these four, and the ledger says which one.
+
+The checks below are how you READ the pages, not a licence to rewrite them: a check that finds something on a page AUDIT FINDINGS does not name is reported in the analysis and the page is left alone. A clean analysis section is a real answer.
 
 Return only the pages you rewrote. Omit every page you left alone. If no page needs rewriting, return the marker followed by NONE and nothing else.
 
@@ -64,8 +66,6 @@ Do not rewrite a page for small stylistic preference. Rewrite it when it has a r
 Never use an em-dash (—) or an en-dash (–), anywhere, for any purpose. Replace every one you find with a comma, a full stop, a colon, or parentheses, and recast the sentence if none of those fit.
 
 Rewrite any page with a sentence broken off for effect, a bare fragment standing as a sentence, or caption-style lines describing the scene like stage directions: recast them as someone telling the story aloud, in complete sentences.
-
-Unless the reading level asks for very short sentences, rewrite any page where several short sentences run in a row or consecutive sentences open with the same subject and verb: merge some so a short sentence sits among longer ones.
 
 No rhetorical set-pieces: no paired negations, no coined sayings or incantations, no one-sentence paragraphs for drama. Rewrite every occurrence as plain narration.
 
@@ -85,9 +85,68 @@ A sentence naming what a character feels, notices, or almost does is never the s
 
 A rewritten page keeps everything the fix does not touch: no fact of the page is dropped, changed or contradicted, and every pronoun and name still lands on the person, thing and moment it did before.
 
-Where a check tells you to emit a fix in FIXES REQUIRED, apply that fix directly in the rewritten page instead. A page also counts as flagged if it contradicts its scene outline or still carries a dash from the rule above.
+A page that contradicts its scene outline, or that still carries a banned dash, is rewritable on that ground alone.
 
-{ANALYSIS_INSTRUCTIONS}
+# THE CHECKS
+
+Read the pages in # CURRENT TEXT against # THE STORY, # THE PAGE PLAN and # SCENE OUTLINES. Every answer names a specific page and quotes the line it is about. An answer with no page and no quote is not an answer.
+
+The pictures are locked. Where a page's text names or implies something its scene outline does not show — a figure, an object, an action, a detail of the place — the TEXT is what moves. There is no way to change a picture from here.
+
+Priority: sections A and B first and at length, C after them, D and E last.
+
+---
+
+**A. NARRATIVE & PLOT**
+
+1. **Plot holes** — Name the weakest causal link. What happens because the plot needs it to rather than because the earlier pages forced it?
+2. **Cause and effect** — Does each page's event follow from the page before? Name the transition that reads most arbitrary.
+3. **Pacing** — Name the slowest page and the most rushed one, with word counts or beat density. Say what would be cut from one and expanded in the other.
+4. **Stakes** — Name the beat where the stakes read weakest. If they are stated and not felt, that is a show-vs-tell failure and belongs in section B.
+5. **Resolution** — Is the ending earned by the pages before it? Name one element that could be stronger.
+6. **The forcing figure on the page** — Wherever a page plays out a coerced action — a punishment, a forced choice, a rule imposed, something taken — that page's TEXT names the character forcing it or carries their words. What the picture shows does not count. Name any such page where the forcing figure is absent from the words.
+
+---
+
+**B. CHARACTER & DIALOGUE (per-character, by name)**
+
+For EACH of {CHARACTER_NAMES} write one line — none may be skipped, including a character the commission did not name who the pages carry anyway. If all five axes hold, write `none found`; never invent a weakness to fill the line.
+
+Format A (all five axes hold):
+- **[Name]**: consistency ✓, voice ✓, show-not-tell ✓, motivation ✓, growth ✓ — none found.
+
+Format B (at least one fails):
+- **[Name]**: consistency [✓/✗], voice [✓/✗], show-not-tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Weakest moment: Page X, "[quoted line]" — [one sentence why]. Fix: [the concrete change].
+
+Mark an axis ✗ only where you can name the page and the line that fails it.
+
+7. **Consistency** — Any moment out of character, any trait established early and contradicted later, any ability or fear the pages break?
+8. **Voice** — Does this character sound different from the others in dialogue? Two characters whose lines could swap unnoticed is a voice failure: name both and the page.
+9. **Show vs tell** — Find one emotion written as a label ("he was proud") for this character and say what action would show it instead.
+10. **Motivation** — Is it clear from the pages alone WHY this character acts as they do on their busiest page? Motivation that exists only in the character details and never reaches a page fails.
+11. **Growth** (main characters only) — Do they end in a different emotional or knowledge state, and on which page does the shift become visible? A shift told rather than shown fails.
+
+---
+
+**C. PROSE QUALITY**
+
+12. **Reading level** — Name one word or sentence off-register for the target level and what replaces it.
+13. **Repetition** — List any word (names, articles and pronouns excluded) used four or more times across the pages, and any sentence shape repeated on three consecutive pages. Name the replacements.
+14. **Flow** — Name the most awkward sentence and rewrite it.
+15. **Passive voice** — List passive constructions in narration and their active forms. Dialogue is exempt.
+
+---
+
+**D. TEXT VS THE LOCKED PICTURE**
+
+16. **The moment** — Does each page's text narrate the moment its scene outline stages? Name every page where it narrates a different one.
+17. **Figures acting on the page** — For each page, find the verbs aimed AT a main character: chasing, catching, holding back, freeing, guarding, surrounding, threatening, mocking, accusing, blocking, rescuing. Where such a verb has a named or implied doer that the page's scene outline does not stage, the picture stays as it is and the text moves: the doer's action goes off the page (already done, heard, remembered) or the moment is retold as what the picture shows. A figure mentioned in passing needs nothing.
+
+---
+
+**E. DO-NOT-WRITE LIST**
+
+18. **Verification** — Confirm the pages honour the DO-NOT-WRITE LIST below: banned gestures, banned phrases, banned trait labels, banned buzzwords, the gesture re-use cap, banned plot formulas, banned page-1 openings. Name the page and the line for anything that slipped in. If nothing did, write `clean`.
 
 {DO_NOT_WRITE_SECTION}
 
@@ -96,7 +155,7 @@ Where a check tells you to emit a fix in FIXES REQUIRED, apply that fix directly
 Both blocks, in this order, nothing before or after.
 
 ---ANALYSIS---
-<your answers to A, B, C and E, in that order, using the formats each section specifies>
+<your answers to A, B, C, D and E, in that order, in the formats those sections specify, then the ledger>
 
 ---STORY TEXT---
 ## Page <number>

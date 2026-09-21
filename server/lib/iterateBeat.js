@@ -512,6 +512,12 @@ const REINSTATE_TYPES = new Set(['cast_unlisted']);
 const INTRODUCED_TYPES = new Set([
   'cast_id_unresolved', 'interaction_multiple_actions', 'interaction_object_shared_hands',
   'interaction_actor_unknown', 'vb_element_overflow', 'vb_state_contradicted',
+  // A rewrite INHERITS `population` (images.js carries the field forward, since
+  // scene-iteration.txt does not emit it), so a rewrite that newly peoples the
+  // prose contradicts a field it never wrote and the page is billed for the
+  // surplus. Introduced-only: a parent that already contradicted itself is the
+  // scene review's fault, not this rewrite's.
+  'population_contradicted',
 ]);
 
 /**

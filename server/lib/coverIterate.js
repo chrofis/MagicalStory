@@ -2018,18 +2018,17 @@ async function buildCoverReferences({
  * @param {Object} visualBible - story.visualBible (for landmark + artifact name lookup)
  * @param {Array<Object>} characters - scene characters with physical traits
  * @param {Object} [opts]
- * @param {string} [opts.language] - STORY language. Image-facing cover prompts
- *   are English-only: the hint's free-text `Mood:` is model-authored in the
- *   story language, so it is only emitted verbatim when the story language is
- *   English — for any other language it is dropped (the cover templates carry
- *   their own atmosphere lines). Deterministic; see docs/decisions.md.
+ * @param {string} [opts.language] - STORY language. Unused by the SCENE prose,
+ *   which is English whatever the story language: the Art Director writes every
+ *   metadata field in English (scene-expansion-all.txt, "All output in English.
+ *   Prose and all metadata fields must be in English."), so the hint's `Mood:`
+ *   is already English and is emitted for every story. Kept in the signature
+ *   because callers pass it. See docs/decisions.md 2026-09-21.
  * @returns {string} SCENE prose ready to drop into the cover prompt template
  */
 function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   if (!hint) return '';
 
-  const language = String(opts.language || 'en').trim().toLowerCase();
-  const isEnglish = language === 'en' || language.startsWith('en-') || language === 'english';
 
   // Resolve the backdrop from the first LOC### in objects. The bare location
   // name is story-language and — for invented locations — carries zero visual
@@ -2117,9 +2116,9 @@ function buildCoverSceneFromHint(hint, visualBible, characters, opts = {}) {
   });
 
   // Mood at the front; landmark behind everything; per-character sentences.
-  // English-only guard: the hint's mood is model-authored in the STORY
-  // language — only paste it when the story language is English.
-  const moodPhrase = (hint.mood && isEnglish) ? `${hint.mood[0].toUpperCase()}${hint.mood.slice(1)}.` : '';
+  // The hint's mood is authored in English on every story (the Art Director's
+  // "all metadata fields must be in English" rule), so it is always emitted.
+  const moodPhrase = hint.mood ? `${hint.mood[0].toUpperCase()}${hint.mood.slice(1)}.` : '';
   // Scale the composition phrase to the actual cast. "Group portrait" with only
   // one or two named characters makes the model invent extra strangers to fill
   // out the "group" — so only say "group" for 3+; otherwise state the exact

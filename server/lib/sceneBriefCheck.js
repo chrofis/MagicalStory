@@ -9,7 +9,7 @@
  * metadata still gets trusted — nothing reconciles them, so the contradiction
  * ships.
  *
- * Seven checks, all computed from the brief itself, all free — no API call, no
+ * Eight checks, all computed from the brief itself, all free — no API call, no
  * image. Four are contradictions between the two halves (A, B, E and the id
  * variant), three are declared limits the brief exceeds (C, D, G). Only the
  * types in REVIEWABLE reach a prompt.
@@ -33,6 +33,12 @@
  *                       numeric ids and `secondaryCharacters` was empty — the
  *                       Art Director invented CHR ids for main characters, who
  *                       are referred to by name.
+ *   population_contradicted  the metadata declares `population: cast_only`
+ *                       while the prose orders unnamed figures into the frame.
+ *                       Staging `job_1789853503332_riqncqg1i` p1: three boys on
+ *                       scooters and unnamed adults at the chess boards, on a
+ *                       page declared to hold nobody but its two-person cast.
+ *                       They were drawn, then counted as surplus cast.
  *   shot_widened        the page plan asked for a `close-up`, the brief's
  *                       `shot` came back wider, and the plan line staged
  *                       nothing below the waist that would have forced it.
@@ -241,6 +247,111 @@ function objectHandles(metadata) {
     if (m) out.push({ base: m[1] + m[2], handle });
   }
   return out;
+}
+
+// ── H — the prose peoples a setting the metadata declares empty ──────────────
+//
+// `population` is a DECLARATION the whole downstream pipeline trusts: the
+// evaluator's SETTING POPULATION line (N-09) and the presence arithmetic
+// (evalPipeline.derivePresenceFinding) both read it, and neither ever infers it
+// from prose — by design, so that a figure count is arithmetic and not a second
+// reading of the brief. That design only holds while the two halves of the
+// brief agree.
+//
+// Measured on job_1789853503332_riqncqg1i p1: `population: "cast_only"` while
+// the same brief's prose orders "three older boys on metal scooters" past the
+// wall and "unnamed adults" at the chess boards. The image model drew what the
+// prose ordered, the arithmetic counted them against a cast of two and billed a
+// CRITICAL `extra_character`, the consolidator's answer ("remove five figures")
+// was refused as un-inpaintable, and the semantic judge scored the same page
+// 100 with those same figures in `expected.characters`. The page shipped at 45.
+//
+// So this is a BRIEF fault, caught where every other prose-vs-metadata
+// disagreement in this file is caught, and fixed where briefs are fixed — the
+// scene review sets `population` to the state its own prose describes, or drops
+// the background figures out of the prose. Nothing here infers a population:
+// the check REPORTS the contradiction and never rewrites the field, exactly as
+// the module header promises.
+//
+// TWO SIGNALS IN ONE CLAUSE, never a people-noun alone. Measured over the 18
+// briefs of job_1789853503332_riqncqg1i: a plural people-noun with no cast name
+// beside it fired on 5 pages and 4 of them were the CAST being framed — "the two
+// boys", "the boys huddled out of the wind", "the four boys kneel". Prose names
+// the cast collectively all the time, and a clause is too short a window to tell
+// a collective noun from a stranger. So the clause must ALSO place those people
+// away from the cast — in the background or midground, in the distance, across
+// the space — or say outright that they are nobody the story names.
+const BACKGROUND_PEOPLE = /\b(?:people|persons|adults|grown-?ups|grownups|children|kids|boys|girls|men|women|teenagers|teens|passers-?by|passersby|bystanders|onlookers|spectators|pedestrians|shoppers|tourists|visitors|villagers|townsfolk|townspeople|customers|commuters|students|workers|labourers|laborers|strangers|riders|cyclists|walkers|joggers|skaters)\b/i;
+
+// Either half is enough: a figure the prose calls unnamed is not cast whatever
+// its depth, and a figure the prose puts in the background is not cast whatever
+// it is called.
+const NOT_THE_CAST = /\b(?:unnamed|anonymous|nameless|passers-?by|passersby|bystanders|onlookers|spectators|strangers|townsfolk|townspeople|villagers|other people|more people)\b|\b(?:a|the|one|dense|thick|large|whole|surrounding)[ ]crowds?\b|\bcrowds?[ ]of\b/i;
+const AWAY_FROM_THE_CAST = /\b(?:background|midground|mid-ground|far side|far end|in the distance)\b/i;
+
+// A DEFINITE COLLECTIVE IS THE CAST. "the two boys", "all four boys", "both
+// children" is how every brief refers to its own roster without naming it, and
+// a background marker elsewhere in the same sentence ("far in the background
+// behind them, the tower…") then made the roster read as strangers — 7 of the
+// 31 clauses this check first raised over the stored corpus. An explicit
+// anonymity word outranks it: "the anonymous adults" is not the cast.
+const CAST_COLLECTIVE = /\b(?:the|both|all|our|his|her|their|these|those)[ ](?:\w+[ ]){0,2}(?:boys|girls|children|kids|friends|siblings|twins|companions|group)\b/i;
+
+const PEOPLE_NEGATED = /\b(?:no|not|none|nobody|never|without|empty|free|devoid|deserted|absent|lacking)\b/i;
+
+/** Split prose into clauses a cast name can be looked for in. */
+function proseClauses(text) {
+  return String(text || '')
+    .split(/(?<=[.!?;:])\s+|\s+—\s+|\n+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+/**
+ * The prose halves a brief states people in: the illustrator-facing prose, and
+ * the two metadata fields that are themselves prose (`sceneIntent` is the
+ * page's instant, `imageSummary` is what the image prompt is built from).
+ */
+function populatedProse(brief, metadata) {
+  const body = String(brief || '').split(/---\s*METADATA\s*---/i)[0] || '';
+  const full = (metadata && metadata.fullData) || {};
+  return [body, full.sceneIntent || '', full.imageSummary || ''].join('\n');
+}
+
+function checkPopulationContradiction(page, metadata, castNames = []) {
+  const { normalisePopulation } = require('./sceneMetadata');
+  const full = (metadata && metadata.fullData) || {};
+  const declared = normalisePopulation(
+    metadata?.population || full.population || null,
+    metadata?.crowdExpected === true || full.crowdExpected === true,
+  );
+  if (declared !== 'cast_only') return null;
+
+  const names = (castNames || []).map(n => String(n || '').trim()).filter(Boolean);
+  const hits = [];
+  for (const clause of proseClauses(populatedProse(page && page.brief, metadata))) {
+    if (!BACKGROUND_PEOPLE.test(clause)) continue;
+    if (!NOT_THE_CAST.test(clause) && !AWAY_FROM_THE_CAST.test(clause)) continue;
+    if (CAST_COLLECTIVE.test(clause) && !NOT_THE_CAST.test(clause)) continue;
+    if (PEOPLE_NEGATED.test(clause)) continue;
+    if (names.some(n => clause.toLowerCase().includes(n.toLowerCase()))) continue;
+    const quoted = clause.length > 120 ? `${clause.slice(0, 117)}…` : clause;
+    // The same sentence reaches here twice on most briefs (the prose body and
+    // `imageSummary` restate each other); a finding quoting it twice reads as
+    // two faults.
+    if (!hits.includes(quoted)) hits.push(quoted);
+  }
+  if (hits.length === 0) return null;
+
+  return {
+    pageNumber: page.pageNumber,
+    type: 'population_contradicted',
+    clauses: hits,
+    detail: `\`population\` is \`cast_only\` — "this page holds the EXPECTED CAST and no other people" — while the prose puts unnamed figures in the frame: `
+      + hits.map(h => `"${h}"`).join('; ')
+      + `. The evaluator and the figure count both read that field, so the people the prose orders are drawn and then billed as surplus cast. `
+      + `Set \`population\` to \`ambient\` if the setting is a public place that simply has people in it, or to \`crowd\` if the page is written around them — or take the unnamed figures out of the prose and keep \`cast_only\`.`,
+  };
 }
 
 /**
@@ -698,6 +809,12 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
     }
   }
 
+  // H — prose peoples a setting the metadata declares empty. Cast names are the
+  // same roster check A compares against, so a clause naming one of them is the
+  // cast being staged, never the setting's own people.
+  const populated = checkPopulationContradiction(page, metadata, castNames);
+  if (populated) findings.push(populated);
+
   // F — R4, the text half only. The depth-mismatch half of the old check 24b
   // is deliberately not restored (owner ruling, rule-survival audit 2026-09-03).
   if (opts && opts.textZoneRules) {
@@ -882,6 +999,9 @@ const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_
   // already rewrites briefs, so restoring a forfeited close-up costs no extra
   // round — which is why this reports to the reviewer rather than forcing one.
   'shot_widened',
+  // The review owns `population` the same way it owns every other metadata
+  // field it rewrites, and the fix is one field or one clause — no extra round.
+  'population_contradicted',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They
@@ -918,4 +1038,5 @@ module.exports = {
   checkObjectStateContradiction, checkObjectStateBase, statedEntries,
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
   checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition,
+  checkPopulationContradiction,
 };

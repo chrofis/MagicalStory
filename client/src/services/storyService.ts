@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection, IdeaWorld, IdeaWorldMode } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneExpansionReport, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection, IdeaWorld, IdeaWorldMode } from '@/types/story';
 
 /**
  * Normalize a cover value from the API to always be CoverImageData | null.
@@ -1982,6 +1982,8 @@ export const storyService = {
       generationLog?: GenerationLogEntry[];
       finalChecksReport?: FinalChecksReport;
       sceneDescriptions: SceneDescription[];
+      /** Art Director prompt table; sceneDescriptions[].scenePromptRef indexes into it. */
+      sceneExpansionReport?: SceneExpansionReport | null;
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
     };
@@ -2064,6 +2066,7 @@ export const storyService = {
         generationLog?: GenerationLogEntry[];
         finalChecksReport?: FinalChecksReport;
         sceneDescriptions?: SceneDescription[];
+        sceneExpansionReport?: SceneExpansionReport | null;
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
       };
@@ -2140,6 +2143,7 @@ export const storyService = {
         generationLog?: GenerationLogEntry[];
         finalChecksReport?: FinalChecksReport;
         sceneDescriptions?: SceneDescription[];
+        sceneExpansionReport?: SceneExpansionReport | null;
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
       };
@@ -2172,6 +2176,9 @@ export const storyService = {
         costumedAvatarGeneration: resultData.costumedAvatarGeneration,
         generationLog: resultData.generationLog,
         sceneDescriptions: resultData.sceneDescriptions || [],
+        // The Art Director prompt table sceneDescriptions[].scenePromptRef
+        // indexes into — one ~112 KB copy per story instead of one per page.
+        sceneExpansionReport: resultData.sceneExpansionReport || null,
         sceneImages: resultData.sceneImages || [],
         coverImages: resultData.coverImages,
       } : undefined,

@@ -93,3 +93,28 @@ describe('the age block reaches the builders generateComposited2x4 actually call
     expect(buildHeadRowPrompt({ name: 'A' }, 'x')).not.toMatch(/years old/);
   });
 });
+
+/**
+ * A9 (2026-09-21): the body-row prompt asserted BOTH "natural proportions
+ * matching the person's apparent age in Image 3" and the declared-age block's
+ * "that stated age outranks any impression of age taken from the photo". Two
+ * contradictory age instructions in one prompt let the model choose, and it
+ * chooses the photograph. Age now has one source per prompt.
+ */
+describe('the body row states the age ONCE', () => {
+  it('a declared age removes the photo-age clauses entirely', () => {
+    const p = buildBodyRowPrompt('a red hoodie', { age: 3 });
+    expect(p).toMatch(/3 years old/);
+    expect(p).not.toMatch(/apparent age/);
+  });
+
+  it('with no declared age, the photo remains the yardstick', () => {
+    const p = buildBodyRowPrompt('a red hoodie', { name: 'A' });
+    expect(p).toMatch(/apparent age in Image 3/);
+    expect(p).toMatch(/7 to 8 heads tall/);
+  });
+
+  it('the declared block replaces the adult-yardstick sentence, not just appends to it', () => {
+    expect(buildBodyRowPrompt('x', { age: 3 })).not.toMatch(/7 to 8 heads tall/);
+  });
+});

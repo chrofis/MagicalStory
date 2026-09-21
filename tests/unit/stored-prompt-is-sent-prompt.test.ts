@@ -72,10 +72,9 @@ const genOpts = {
 
 describe('the stored page prompt is the prompt the model received', () => {
   it('returns the post-shrink string the provider was handed, under the model cap', async () => {
-    // >500 chars: shorter rewrites are rejected as a collapsed stub and the
-    // shrinker falls through to its section-aware cut.
-    const compressedHead = 'Figures stand near the landmarks in their named garments. '.repeat(12).trim();
-    textModels.callTextModel = async () => ({ text: compressedHead, usage: {} });
+    // The shrinker is deterministic since 2026-09-21: dedupe, then ranked
+    // block drops. If it ever calls a text model again this blows up.
+    textModels.callTextModel = async () => { throw new Error('the shrinker made a paid call'); };
 
     const built = buildPrompt(CAP + 4000);
     expect(built.length).toBeGreaterThan(CAP);
@@ -88,8 +87,11 @@ describe('the stored page prompt is the prompt the model received', () => {
     // …and the sent value really is within the model's cap.
     expect(res.prompt.length).toBeLessThanOrEqual(CAP);
     expect(res.prompt.length).toBeLessThan(built.length);
-    // Bug B: the scene block the model actually received is recorded.
-    expect(res.compressedScene).toBe(compressedHead);
+    // Bug B: the scene block the model actually received is recorded — the
+    // post-cut head, taken from before the protected tail.
+    expect(res.compressedScene).toBeTruthy();
+    expect(res.prompt).toContain(res.compressedScene);
+    expect(res.compressedScene).not.toMatch(/\*\*ART STYLE/);
   }, 30000);
 
   it('records the sent scene block even when dedupe alone brings the prompt under the cap', async () => {

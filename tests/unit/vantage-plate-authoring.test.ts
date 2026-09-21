@@ -118,6 +118,21 @@ describe('resolvePagePlate', () => {
     expect(r).toEqual({ text: stored, source: 'page', vantageId: 'LOC001.1' });
   });
 
+  // BEHAVIOUR PINNED 2026-09-21. `reuseEmptyScene: false` on a page brief does
+  // NOT promote that page's plate over the vantage's. The field belongs to the
+  // scene-ITERATION contract (prompts/scene-iteration*.txt, read at
+  // images.js); the all-pages Art Director is never asked for it or for a
+  // per-page plate, and one plate per vantage is the owner's ruling of
+  // 2026-09-17. A brief that volunteers both is logged and discarded.
+  it('a brief declining reuse still loses to the vantage plate', () => {
+    const r = resolvePagePlate({
+      pageNumber: 1,
+      sceneMetadata: { objects: ['LOC001'], emptyScenePrompt: 'a volunteered per-page plate', reuseEmptyScene: false },
+      visualBible: singleViewpoint,
+    });
+    expect(r.source).toBe('vantage');
+    expect(r.text).toBe('The wide square under autumn light.');
+  });
   it('prefers the vantage plate when a transitional brief carries both', () => {
     const r = resolvePagePlate({
       pageNumber: 1,

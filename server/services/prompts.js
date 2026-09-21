@@ -172,6 +172,34 @@ const STYLE_SCOPED_REPAIR_TEMPLATES = new Set([
   'characterRepairInpaint',
 ]);
 
+/**
+ * MAINTAINER COMMENT BLOCK.
+ *
+ * A prompt file may open with notes for whoever edits it — which pipeline
+ * sends it, what parses its output, what must not be merged. Those notes are
+ * for us, not for the model, and they used to ship verbatim on every call
+ * (scene-expansion-all.txt spent 1.1k characters telling Gemini about
+ * beatsPipeline.js).
+ *
+ * The convention is `#!` at the very start of the file: consecutive lines
+ * beginning with `#!`, ending at the first line that does not. `#!` — never a
+ * bare `# ` — because a bare `#` heading is prompt STRUCTURE in a dozen
+ * templates (`# Entity Consistency Check`) and in the parsed data files
+ * (art-styles.txt, adventure-guides.txt), and stripping those would delete
+ * content the model or the parser needs.
+ *
+ * @param {string} text
+ * @returns {string} the template with its leading `#!` block removed
+ */
+function stripMaintainerComment(text) {
+  if (typeof text !== 'string' || !text.startsWith('#!')) return text;
+  const lines = text.split('\n');
+  let i = 0;
+  while (i < lines.length && lines[i].startsWith('#!')) i++;
+  while (i < lines.length && lines[i].trim() === '') i++;
+  return lines.slice(i).join('\n');
+}
+
 async function loadPromptTemplates() {
   const promptsDir = path.join(__dirname, '../../prompts');
   // Per-key load wrapper. If one file is missing, log the specific failure
@@ -186,7 +214,7 @@ async function loadPromptTemplates() {
   const failures = [];
   const load = async (key, filename) => {
     try {
-      PROMPT_TEMPLATES[key] = await fs.readFile(path.join(promptsDir, filename), 'utf-8');
+      PROMPT_TEMPLATES[key] = stripMaintainerComment(await fs.readFile(path.join(promptsDir, filename), 'utf-8'));
     } catch (err) {
       failures.push({ key, filename, message: err.message });
     }
@@ -260,13 +288,12 @@ async function loadPromptTemplates() {
     // from production (rule-survival audit 2026-09-03, item M2). That template
     // is gone (2026-09-15); the list is a file of its own, so it cannot recur.
     ['doNotWriteList', 'do-not-write-list.txt'],
-    // The shared ANALYSIS instruction body — injected into the external
-    // reviewer prompt (split outline review) and sliced by buildTextRefinePrompt.
-    // LIVE ON THE BEATS PATH: buildTextRefinePrompt slices its review CRITERIA
-    // out of this body on every beats run (sliceAnalysisAspect, aspect 'text'),
-    // so deleting this file strips the refiner's criteria and it returns null.
-    // Verified 2026-09-03, re-verified 2026-09-15 when the unified writer
-    // templates it also fed were deleted.
+    // The ANALYSIS instruction body for the external reviewer prompt (split
+    // outline review) — its ONE consumer since 2026-09-21. buildTextRefinePrompt
+    // used to slice its criteria out of this body as well; it does not any more
+    // (A7), because those checks are written for the reviewer's inputs and
+    // output contract and the refiner has neither. The refiner's criteria live
+    // in text-refine.txt.
     ['outlineAnalysisImageFirst', 'outline-analysis-imagefirst.txt'],
     ['outlineReview', 'outline-review.txt'],
     // Iterative text refinement (Lab): full text in, full text out, one round
@@ -868,6 +895,7 @@ module.exports = {
   PROMPT_TEMPLATES,
   withTemplates,
   loadPromptTemplates,
+  stripMaintainerComment,
   fillTemplate,
   promptSections,
   buildEmptyScenePrompt,

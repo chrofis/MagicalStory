@@ -127,8 +127,21 @@ const round2 = (n) => (n == null || !Number.isFinite(n)) ? null : Math.round(n *
  */
 function churnFromReport(report, totalPages) {
   if (!report || !Array.isArray(report.pages) || !totalPages) return null;
+  // `before` is the PRE-REVIEW brief, and `briefsIn` already holds it for every
+  // page — changed or not. The scene review stopped duplicating it into each
+  // row (2026-09-21, 32k of JSONB per story); rows written before that still
+  // carry their own copy, which is read when the snapshot has no entry.
+  const sentByPage = new Map(
+    (Array.isArray(report.briefsIn) ? report.briefsIn : [])
+      .filter(b => b && b.pageNumber != null)
+      .map(b => [Number(b.pageNumber), String(b.brief ?? b.text ?? '')])
+  );
+  const beforeOf = (p) => {
+    const sent = sentByPage.get(Number(p.pageNumber));
+    return String((sent !== undefined ? sent : p.before) ?? '');
+  };
   const changed = report.pages.filter(p =>
-    String(p.before ?? '').trim() !== String(p.after ?? '').trim()
+    beforeOf(p).trim() !== String(p.after ?? '').trim()
   ).length;
   return round2((changed / totalPages) * 100);
 }

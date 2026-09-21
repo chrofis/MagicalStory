@@ -18,7 +18,7 @@ TASK 3b: COSTUME READS
 Only when REQUESTED_COSTUME is given below. Ignoring the item list, judge whether a reader seeing this figure alone would name that costume. Every garment is worn the way that costume wears it. A figure carrying the right items that still reads as everyday clothing scores ≤4. costumeReadsScore 1-10. When no REQUESTED_COSTUME is given, score 10.
 
 TASK 4: PROPORTIONS
-Body proportions match the person's apparent age — no oversized head on a small body, no adult shrunk to child proportions. Score 1-10.
+Body proportions match the age stated as CHARACTER_AGE below — that stated age decides this score and outranks any impression of age read off the figure's face; when CHARACTER_AGE is unknown, judge against the figure's own apparent age instead. No oversized head on a small body, no adult shrunk to child proportions, and a figure drawn older or taller than the stated age scores ≤4. Score 1-10.
 
 TASK 5: SINGLE SUBJECT — ONE FIGURE PER CELL
 Each cell shows exactly ONE figure: the same single character in every cell. Any second figure anywhere in the row — another person, a partial body, a face in the margin, a figure of a different age or sex — is a defect. This includes faint, ghosted, semi-transparent or sketched-in figures, and figures overlapping or blended into the character. Cells must read as four separate figures with space between them, not a merged group. Any extra figure, or figures merged across cells = 1-3; one clean figure per cell = 9-10. soloScore 1-10.
@@ -30,6 +30,7 @@ finalScore = lowest of fullBodyScore, anglesScore, outfitScore, costumeReadsScor
 
 {REQUESTED_OUTFIT}
 {REQUESTED_COSTUME}
+{CHARACTER_AGE}
 
 Return EXACTLY this JSON:
 {
@@ -38,7 +39,7 @@ Return EXACTLY this JSON:
   "outfit": {"outfitScore": 9, "reason": "Every figure wears the requested items, consistent across cells"},
   "costumeReads": {"costumeReadsScore": 9, "reason": "Reads as the requested costume; 10 when none was requested"},
   "solo": {"soloScore": 10, "reason": "One figure per cell, four separate figures, no extra or ghosted person"},
-  "proportions": {"score": 9, "reason": "Proportions match the person's apparent age"},
+  "proportions": {"score": 9, "reason": "Proportions match the stated age"},
   "background": {"backgroundScore": 10, "reason": "Plain white background in every cell"},
   "finalScore": 8,
   "valid": true,

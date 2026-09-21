@@ -189,8 +189,23 @@ export interface SceneDescription {
   translatedSummary?: string;  // Pre-extracted translated summary (user's language)
   imageSummary?: string;       // Pre-extracted image summary (English)
   outlineExtract?: string;     // Short scene description from outline
-  scenePrompt?: string;        // Art Director prompt used to generate description
+  /**
+   * Index into `SceneExpansionReport.prompts[]` — the Art Director prompt that
+   * wrote this page's brief. The prompt is ~112 KB and identical for every page
+   * of a book, so it is stored once per story, not once per page.
+   * Resolve with `resolveScenePrompt()` in `utils/scenePrompt.ts`.
+   */
+  scenePromptRef?: number | null;
+  /** Inline Art Director prompt — stories written before 2026-09-21 only. */
+  scenePrompt?: string;
   textModelId?: string;        // Text model used to generate the scene description
+}
+
+/** The Art Director's own prompt(s), rolled up by distinct prompt. */
+export interface SceneExpansionReport {
+  prompts?: Array<{ prompt: string; modelId: string | null; pages: number[] }>;
+  durationMs?: number;
+  fallbackPages?: number[];
 }
 
 // Semantic fidelity evaluation result (parallel check for action/relationship accuracy)
@@ -380,6 +395,11 @@ export interface GridRepairData {
 
 export interface RetryAttempt {
   attempt: number;
+  // Which imageVersions[] entry this attempt IS (2026-09-21). The repair
+  // pipeline writes one retry entry per version; the detection lives on the
+  // version, and this is the link to it. Absent on stories generated before
+  // that date, which carry their own `bboxDetection` copy instead.
+  versionIndex?: number;
   type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed' | 'grid_repair' | 'grid_repair_failed' | 'bbox_detection_only';
   imageData?: string;
   score?: number;
@@ -1076,7 +1096,12 @@ export interface ReviewDiffReport {
   durationMs?: number;
   changedPages?: number[];
   analysis?: string;
-  pages?: { pageNumber: number; before: string; after: string }[];
+  /**
+   * The rewritten pages. `before` is no longer written (2026-09-21): it was a
+   * byte-identical copy of the page's `briefsIn` entry. Still present on rows
+   * stored before that date.
+   */
+  pages?: { pageNumber: number; before?: string; after: string }[];
   /** Pages the analysis faulted but never rewrote (surfaced in dev mode). */
   namedButNotRewritten?: number[];
   /** The exact prompt this reviewer received — dev-mode inspection. */

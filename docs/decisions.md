@@ -52075,3 +52075,154 @@ answers it on the next staging run at zero cost.
 `storyJobPipeline.js` (`scene_translation` key, both `addUsage` definitions),
 `tests/unit/replan-round-convergence-gate.test.ts`,
 `tests/unit/text-model-override-key.test.ts`.
+
+## 2026-09-21 — The text-refine chain starts when page text is final, not when the reference sheet is done
+
+**Context:** the refine chain is the long pole in front of the whole repair phase — every stage
+after page generation joins on it (`buildEvalInputs` passes `pageText` to the first eval, the
+text-space gate sizes the calm zone from the page's word count, the mid-loop book audit reads the
+shipped prose). Its own inputs are the page text and the Visual Bible, both final at the beats
+return. The kickoff nevertheless sat ~400 lines below that, after the bounded landmark-photo race
+and after `await referenceSheetPromise` — two things the refiner does not read. Measured on
+`job_1789853503332_riqncqg1i` (staging, 18 pages): page text final 22:09:50 CH, reference sheet
+22:09:58 → 22:10:49, `text_refine_start` 22:10:49, `generation_complete` 22:12:31,
+`text_refine_complete` 22:22:19. The join waited 588 s and 59 s of it was the reference sheet.
+
+**Decision:** the kickoff moves up, to immediately after the text-only early return and before the
+cover/landmark/reference-sheet block. The join, the report projection and the trial exclusion are
+unchanged. Pinned by `tests/unit/text-refine-kickoff-order.test.ts` (source-order pin — the pipeline
+is one ~8k-line function with no free way to execute it).
+
+**Rationale / what was NOT done:** the rest of the 588 s is not recoverable by hoisting the repair
+phase in front of the join, which was the shape the review proposed. Every candidate stage reads the
+final text: `ensureCalmZone` sizes the calm polygon from `countWords(text)` and REWRITES the page
+bytes when the gate fails, so DINO/SAM detection — which must run on the bytes that ship — cannot
+precede it, and the first eval already carries `pageText`. Running detection ahead of the join would
+mean either sizing the text zone from prose the book will not contain or detecting twice (a second
+degraded path — NO FALLBACKS). With the kickoff at the earliest point its inputs allow, the chain is
+now the critical path from page text onward and nothing else in that window can be overlapped.
+
+**Touched files.** `storyJobPipeline.js`, `tests/unit/text-refine-kickoff-order.test.ts`.
+
+## A story row stores the Art Director prompt once, not once per page (2026-09-21)
+**Context:** `stories.data` for job_1789853503332_riqncqg1i measured 8.68 MB. Two
+fields held the same string: `sceneDescriptions[].scenePrompt` and
+`sceneImages[].sceneDescriptionPrompt` were each an inline copy of the
+111,798-char all-pages scene-expansion prompt, which is identical for every page
+of a book. 18 pages x 2 fields = 4.11 MB, **47% of the row** — and
+`sceneExpansionReport.prompts[]` already held a deduped copy (114 KB) with the
+page list each prompt produced. The saved-story metadata endpoint selected
+`sceneDescriptions` wholesale, so it shipped 2.06 MB of the same 112 KB string to
+the browser on every load.
+**Decision:** `sceneExpansionReport.prompts[]` is the one copy. Pages carry
+`sceneDescriptions[].scenePromptRef`, an index into it.
+`sceneImages[].sceneDescriptionPrompt` is not written at all — it had no reader
+anywhere (see the shipped-defect entry below for the review that found it). The
+roll-up has exactly ONE builder, `rollUpScenePrompts()` in
+`server/lib/storyShape.js`, called by `storyJobPipeline` over the assembled
+scenes — so the beats all-pages call, the beats per-page fallback and the
+unified streaming path all dedupe through the same code. `beatsPipeline` no
+longer builds `prompts[]`; it contributes only `durationMs` and `fallbackPages`.
+**Rationale:** the prompt is a property of the RUN, not of a page — storing it
+per page is a fan-out of a constant. Keeping the report as the owner means the
+value already had a home with the right cardinality; only the pointer was
+missing. The alternative, resolving server-side before serving, would have put
+the 2 MB back on the wire, which is the cost that mattered.
+**Read-compat:** `resolveScenePrompt()` (server) and `utils/scenePrompt.ts`
+(client) read the inline `scenePrompt` when a row has one. That is STORED LEGACY
+DATA, not a live second write path — nothing writes the inline shape any more,
+and a ref the table cannot answer logs an error and returns null rather than a
+wrong prompt.
+**Measured:** replaying the new shape over the stored row: 8.68 MB -> 3.59 MB
+(-58.6%, which includes the cast change below). All 18 pages resolve
+byte-identical to their old inline prompt.
+**Touched:** server/lib/storyShape.js (new), server/lib/beatsPipeline.js,
+storyJobPipeline.js, server/routes/stories.js, client/src/utils/scenePrompt.ts
+(new), client/src/types/story.ts, client/src/services/storyService.ts,
+client/src/pages/StoryWizard.tsx,
+client/src/components/generation/StoryDisplay.tsx,
+tests/unit/story-shape.test.ts, tests/unit/scene-expansion-report.test.ts
+**Status:** ✅ active
+
+## Avatar provenance is stripped from the story snapshot — the characters table owns it (2026-09-21)
+**Context:** `sceneImages[].sceneCharacters` stores a snapshot of each page's
+photo-backed cast, and `unionPageCast()` returns the `stories.data.characters`
+records themselves, so every page carried a full copy. Measured on the same row:
+1.11 MB across 41 snapshots, of which `avatars` was 1.04 MB — and within that,
+`avatars.prompts` (12.2 KB/char) plus `avatars.storyHistory` (9.7 KB/char) were
+0.90 MB, **10% of the whole row**, repeated once per page per character.
+**Decision:** `stripCharSnapshot()` (server/services/database.js), which already
+strips the snapshot's photo and avatar BYTES on save because the characters table
+owns them, now also clears `avatars.prompts` and `avatars.storyHistory`. It runs
+over both the page cast and the top-level `data.characters`.
+**Rationale:** both fields are written to the `characters` table — `storyHistory`
+by `appendStoryHistory()` via jsonb_set into `characters.data` AND the light
+`characters.metadata` copy, `prompts` as the avatar-generation record — and their
+only readers (`CharacterForm`, `CharacterHistoryPanel`) read the characters API,
+never `stories.data`. The copy in the story blob is a mid-run snapshot with no
+reader. This extends the existing single-purpose strip rather than adding a
+mechanism. `styledAvatars` and `costumed` are still preserved: they are per-story
+and have no other home.
+**Not done, and why:** reducing the stored cast to `{id, name}` and resolving
+full records through an accessor would recover the remaining ~0.13 MB, but a
+reader inventory found 15 read-of-stored sites and two that need the FULL record
+(`buildPageCast` in charRepairTarget.js via regeneration.js, and
+`buildImagePrompt`'s height/age-cue blocks via the Test Lab rebuild path), plus
+`.age`, which `evalPipeline` reads for the judge's expected-ages block.
+`projectSceneCast()` / `resolveSceneCast()` are built and tested in
+server/lib/storyShape.js so the migration is a call-site change, but the cutover
+is an owner decision, not a free win.
+**Measured:** 0.98 MB off the stored row (0.90 MB page snapshots + 0.08 MB
+top-level roster).
+**Touched:** server/services/database.js, server/lib/storyShape.js,
+tests/unit/scene-expansion-report.test.ts, tests/unit/story-shape.test.ts
+**Status:** ✅ active
+
+## story_jobs.result_data is the status payload, not a second copy of the story (2026-09-21)
+**Context:** `result_data` was a near-complete duplicate of `stories.data`
+(7.83 MB raw / 3.36 MB `pg_column_size` on the measured job), written once per
+story and returned in full on every job-status poll.
+**Decision:** the column stores only what a consumer reads. Three fields are
+dropped by subtraction at the storage boundary: `outlineReview`, `tokenUsage` and
+`generationMode`. `estimatedCost` stays.
+**Rationale:** the real gate is `storyService.getJobStatus()`'s explicit field
+mapping — a field it does not copy is `undefined` in the UI however faithfully we
+store it, and it never copies those three. StoryWizard reads `outlineReview` and
+`tokenUsage` off the job result, but its live values come from `stories.data` via
+`getStoryMetadata()`, so nothing changes observably. `estimatedCost` has no
+client reader either but `server/lib/storyMetrics.js` queries
+`result_data->>'estimatedCost'` straight off the column.
+**The honest size finding:** this trim is worth only ~10 KB. `result_data`'s bulk
+was the two duplicated-prompt fields and the cast snapshots — the decisions
+above — which flow into it automatically: 7.83 MB -> 2.93 MB (-62.6%) on replay.
+Going further (dropping `sceneImages` / `sceneDescriptions` in favour of the
+metadata endpoint the wizard already calls) is a real client rewrite and an
+owner decision, not a safe unilateral trim.
+**Touched:** storyJobPipeline.js, tests/unit/scene-expansion-report.test.ts
+**Status:** ✅ active
+
+## Shipped-defect markers get the reader they were written for (2026-09-21)
+**Context:** three fields on `stories.data` record a defect a run decided to SHIP
+rather than fail on: `missingImages` / `missingCovers` (2026-08-29, pages and
+covers persisted with no image bytes) and `landmarkMinimumShortfall` (2026-09-05,
+fewer than two real landmarks staged). Each was added with a comment promising a
+reader — "the admin/audit surfaces and any future check can read", "visible in
+rating" — and none existed. A review flagged all three as fields with no reader
+anywhere.
+**Decision:** they are DIAGNOSTICS, not leftovers, and keep being written.
+`scripts/analysis/shipped-defects.js` is the reader: a free, read-only query that
+lists flagged stories and the rate per marker, per environment. The comments at
+the write sites now name it instead of promising a surface that did not exist.
+**Rationale:** each marker is the queryable form of a `genLog` alert the run
+already writes, and each is `null` on a clean story — 4 bytes to say nothing. The
+cost of keeping them is zero and the cost of losing the ability to ask "how often
+do we ship an imageless page" is not (memory: diagnostics are a research asset).
+Deleting a field because the promised reader was never built is the wrong half of
+the fix.
+**Still open (owner's call):** `clothingReviewReport` (15 KB) has no reader
+either, and its three siblings — `arcReviewReport`, `beatsReviewReport`,
+`sceneReviewReport` — are all shipped to the dev panel. It cannot reuse
+`renderDiffPanel`: it has no `pages[]`, only `{changed, analysis, outfitsIn}`, so
+surfacing it needs a panel of its own.
+**Touched:** scripts/analysis/shipped-defects.js (new), storyJobPipeline.js
+**Status:** ✅ active

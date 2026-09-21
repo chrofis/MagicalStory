@@ -612,10 +612,38 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     })
   ]);
 
+  // THE TWO HALVES OF THAT Promise.all CAN NAME THE SAME FIGURES DIFFERENTLY.
+  //
+  // The detector is master for identity, so nothing the evaluation's witnesses
+  // say moves a name. But where the evaluator AND the second witness both
+  // rejected the detector's labels, an independent ARBITER was asked, and where
+  // it overruled the detector the figures were renamed by it
+  // (identityAgreement.arbitrateVeto). The entity check ran in PARALLEL and
+  // could only ever see the pre-arbiter labels, so on such a page it judged
+  // each child's crop against another child's contract. Those verdicts are not
+  // invertible — the grid is gone and re-judging is a paid call — so they are
+  // voided here as "not judged", BEFORE the report is stamped onto the run,
+  // before getEntityPenaltyAndIssues charges for them and before any character
+  // fix is routed at them. Measured on a stored page: seven MAJOR findings that
+  // were nothing but the swap restated, quality 95 shipped as 55, and a
+  // character fix aimed at the wrong figure which the face gate refused.
+  const identityVoided = require('./identityAgreement')
+    .voidEntityIssuesContestedByWitness(entityReport, evaluations);
+  if (identityVoided.voided > 0) {
+    log.warn(`⚖️ [UNIFIED PIPELINE] Voided ${identityVoided.voided} entity issue(s) on page(s) ${identityVoided.pages.join(', ')}: the identity arbiter overruled the detector's names those crops were judged under`);
+  }
+
   // Track usage
   for (const evalResult of evaluations) {
     if (evalResult.usage && usageTracker) {
       usageTracker('gemini_quality', evalResult.usage, 'page_quality', evalResult.modelId);
+    }
+    // The arbiter is a paid call made inside the evaluation task, on the rare
+    // deadlocked page. Its own byFunction key so its cost is never hidden
+    // inside page_quality — it is the one call that can rename a figure.
+    const arb = evalResult.identityAgreement?.identityArbiter;
+    if (arb?.usage && usageTracker) {
+      usageTracker('openrouter', arb.usage, 'identity_arbiter', arb.model || null);
     }
   }
   if (entityReport?.tokenUsage && usageTracker) {
@@ -794,9 +822,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const consolidatePageEval = async (ev, entityIssues, pageNumber, round, sceneDescriptionOverride = null) => {
     try {
       const orig = rawImages.find(i => i.pageNumber === pageNumber);
+      // The variant this page actually wears. Inpaint used to resolve this for
+      // its own (now deleted) consolidator call; with one consolidation per
+      // evaluation the single call must carry it, or the consolidator writes
+      // modern-wardrobe fixes for a costumed page.
+      const { parseCharacterClothing, resolveSceneClothingDescriptions } = require('./clothingResolve');
+      const sceneClothing = resolveSceneClothingDescriptions({
+        characterClothing: parseCharacterClothing(orig?.sceneDescription || orig?.description || '') || {},
+        clothingRequirements: storyData?.clothingRequirements || null,
+        characters: characters || [],
+        artStyle: storyData?.artStyle || artStyle || null,
+      });
       const res = await consolidateEvaluation({
         evalResult: ev,
         entityIssues,
+        sceneClothing,
         readerFindings: readerFindingsByPage.get(pageNumber) || [],
         // A repaired version is consolidated against ITS OWN contract (an
         // iterate rewrite resolves spec conflicts — checking the ORIGINAL
@@ -1238,10 +1278,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         }
       }
     }
+    // THE PLAN THIS EVALUATION WAS SCORED WITH (B2). consolidatePageEval ran it
+    // once when the eval landed; the version carries it and roundEvalPages
+    // mirrors it onto the eval object. Inpaint no longer consolidates.
+    const planForInpaint = inpaintEval.consolidatedPlan
+      || bestSoFar?.consolidatedPlan
+      || null;
     const result = await images().inpaintPage(inputImage, inpaintEval, {
       visualBible: storyData?.visualBible || null,
       characters: storyData?.characters || characters || null,
-      entityReport: currentEntityReport,
+      consolidatedPlan: planForInpaint,
       pageNumber: img.pageNumber,
       sceneDescription: img.sceneDescription || img.description || '',
       artStyle: storyData?.artStyle || artStyle || null,
@@ -2050,7 +2096,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             objectScale: audit.objectScale || null,
           });
           const record = bookAuditRounds[bookAuditRounds.length - 1];
-          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → next round's consolidator`);
+          // SAY WHERE THE FAULTS ACTUALLY GO (2026-09-21, finding B8). This
+          // line read "→ next round's consolidator" unconditionally, which is
+          // only true when a next round exists. On a one-pass environment
+          // (`repairMaxPasses` = 1 on staging/local) the budget gate in
+          // planBookAuditRound can never grant one, so the audit is a
+          // MEASUREMENT pass and its faults are evidence in the stored record —
+          // not an input to anything. The log now names which of the two it is,
+          // so a reader of the log stops diagnosing a dead route.
+          const auditRouteNote = auditPlan.mayGrantExtraRound
+            ? "next round's consolidator"
+            : (finalRound === true || round >= roundLimit)
+              ? 'the stored audit record only — no further repair round is available'
+              : "next round's consolidator";
+          log.info(`📖 [BOOK-AUDIT] Round ${round}: ${audit.byRoute.IMG.length} IMG fault(s) on ${readerFindingsByPage.size} page(s) → ${auditRouteNote}`);
 
           // FINAL AUDIT → ONE EXTRA ROUND. Severity decides admission and
           // nothing else; the fault lines reach the consolidator unread by code.
@@ -3833,12 +3892,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     // can see who was targeted, what bbox was crosshatched, and where the
     // bbox came from. Without these the dev panel showed source=char-fix-N
     // for both v2 and v3 of a page with no way to tell them apart.
+    // ONE DETECTION PER VERSION (2026-09-21, finding D3). Every entry here is
+    // version `idx` of the same page, and `imageVersions[idx]` already stores
+    // that version's detection (`detectionForVersion`). Storing it a third time
+    // — scene, version, retry — cost 147 KB of the 8.6 MB stored for
+    // job_1789853503332_riqncqg1i, byte-identical to the version copy. The link
+    // replaces the copy: `versionIndex` says which version this attempt IS, so
+    // a reader resolves `imageVersions[versionIndex].bboxDetection`. Stored
+    // stories written before this keep their own copy and readers still accept
+    // it (read-compat), so nothing has to be rewritten.
     const retryHistory = versions.map((v, idx) => ({
       attempt: idx + 1,
+      versionIndex: idx,
       type: 'unified_pipeline',
       source: v.source,
       score: v.score,
-      bboxDetection: images().detectionForVersion(v),
       bboxOverlayImage: v.evaluation?.bboxOverlayImage,
       charName: v.charName || null,
       targetBbox: v.targetBbox || null,

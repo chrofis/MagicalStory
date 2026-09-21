@@ -26,7 +26,7 @@ import { INITIAL_USER_CREDITS, IMAGE_REGENERATION_COST, COVER_REGENERATION_COST 
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion, IdeaWorld, IdeaWorldMode } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneExpansionReport, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion, IdeaWorld, IdeaWorldMode } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
@@ -494,6 +494,9 @@ export default function StoryWizard() {
   const [generationLog, setGenerationLog] = useState<GenerationLogEntry[]>([]); // Generation log (dev mode)
   const [finalChecksReport, setFinalChecksReport] = useState<FinalChecksReport | null>(null); // Final consistency checks report (dev mode)
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
+  // The Art Director prompt table sceneDescriptions[].scenePromptRef indexes
+  // into. Stored once per story (~112 KB) instead of inline on every page.
+  const [sceneExpansionReport, setSceneExpansionReport] = useState<SceneExpansionReport | null>(null);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
   const [storyId, setStoryId] = useState<string | null>(null);
@@ -750,9 +753,10 @@ export default function StoryWizard() {
       console.log('[StoryWizard] Dev metadata sceneDescriptions:', scenes.length, 'entries');
       console.log('[StoryWizard] First scene keys:', Object.keys(scenes[0] || {}));
       console.log('[StoryWizard] First scene has outlineExtract:', !!scenes[0]?.outlineExtract);
-      console.log('[StoryWizard] First scene has scenePrompt:', !!scenes[0]?.scenePrompt);
+      console.log('[StoryWizard] First scene has scenePromptRef:', scenes[0]?.scenePromptRef ?? null);
       // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
       setSceneDescriptions(devMetadata.sceneDescriptions);
+      setSceneExpansionReport((devMetadata as any).sceneExpansionReport || null);
     }
 
     // Load visual bible from dev metadata
@@ -1132,6 +1136,7 @@ export default function StoryWizard() {
             setArcReviewReport((fullMeta as any).arcReviewReport || null);
             setBeatsReviewReport((fullMeta as any).beatsReviewReport || null);
             setSceneReviewReport((fullMeta as any).sceneReviewReport || null);
+            setSceneExpansionReport((fullMeta as any).sceneExpansionReport || null);
             setStoryTextPrompts(fullMeta.storyTextPrompts || []);
             setStyledAvatarGeneration(fullMeta.styledAvatarGeneration || []);
             setCostumedAvatarGeneration(fullMeta.costumedAvatarGeneration || []);
@@ -3978,6 +3983,7 @@ export default function StoryWizard() {
     setStoryTitle('');
     setSceneImages([]);
     setSceneDescriptions([]);
+    setSceneExpansionReport(null);
     setProgressiveStoryData(null);
     storyTextReceivedRef.current = false;
     setCompletedPageImages({});
@@ -4318,6 +4324,7 @@ export default function StoryWizard() {
           setGeneratedStory(status.result.story);
           setOriginalStory(status.result.story); // Store original for restore functionality
           setSceneDescriptions(status.result.sceneDescriptions || []);
+          setSceneExpansionReport((status.result as any).sceneExpansionReport || null);
           // result_data has scene metadata but no imageData (stripped for performance)
           // Merge with any imageData from progressive display or loadSavedStory
           const resultSceneImages = status.result.sceneImages || [];
@@ -4868,6 +4875,7 @@ export default function StoryWizard() {
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}
               sceneDescriptions={progressiveStoryData?.sceneDescriptions || sceneDescriptions}
+              sceneExpansionReport={sceneExpansionReport}
               characters={storyCharacters || characters.filter(c => !excludedCharacters.includes(c.id))}
               // Progressive mode props - active when generating (even before story text arrives)
               progressiveMode={isGenerating}
@@ -5145,6 +5153,7 @@ export default function StoryWizard() {
                 setGeneratedStory('');
                 setStoryTitle('');
                 setSceneDescriptions([]);
+                setSceneExpansionReport(null);
                 setSceneImages([]);
                 setCoverImages({ frontCover: null, initialPage: null, backCover: null });
 

@@ -627,13 +627,27 @@ const MODEL_DEFAULTS = {
   // open on every single call.
   repairFaceCheck: 'gemini-2.5-flash',
 
-  // Image-prompt compression — the head rewrite in shrinkPromptForModel when a
-  // page prompt exceeds the backend's char budget. NOT a utility call: what it
-  // deletes never reaches the image model. Flash was measured returning 2,130
-  // chars against a 5,452 allowance on p9 of job_1786484554633 (39% of what it
-  // was given, a 71% cut of the prose when 26% would have fit) — four of five
-  // characters lost their hats. Owner decision 2026-08-12: DeepSeek V4 Pro.
-  promptCompress: process.env.PROMPT_COMPRESS_MODEL || 'deepseek-v4-pro',
+  // IDENTITY ARBITER — the only witness allowed to overrule the figure detector
+  // on who-is-who (identityAgreement.arbitrateVeto, 2026-09-21).
+  //
+  // It is reached on one shape of page only: the detector says one thing and
+  // BOTH the quality evaluator and the second Set-of-Mark witness say another.
+  // Measured trigger over the whole stored corpus: 1 of 588 evaluated staging
+  // pages and 0 of 86 production pages, so this is a rare, cheap call.
+  //
+  // WHY THIS VENDOR. The three voters are Google twice (the detector's SoM pass
+  // and the Gemini quality evaluator) and Qwen once (`qwen-vl-full`, the second
+  // witness tier). An arbiter drawn from either of those is not independent of
+  // the answers it is being asked to judge, so it comes from a third vendor.
+  // Named here rather than inlined at the call site so the choice can be
+  // re-pointed without touching the reconciler — and so a bake-off has a knob.
+  // Vision capability is vendor-confirmed for this id (it is already the
+  // beatsAudit model and takes interleaved images).
+  //
+  // NOT YET BAKED OFF against the alternatives (grok-4.6, kimi-k2.6,
+  // qwen3-vl-32b): the trigger is too rare to have produced a corpus to test
+  // on. Env: IDENTITY_ARBITER_MODEL.
+  identityArbiter: process.env.IDENTITY_ARBITER_MODEL || 'gpt-5.6-sol',
 
   // Utility models (inspection, visual bible, etc.)
   utility: 'gemini-2.5-flash',         // Fast utility tasks. 2.0-flash RETIRED by Google
@@ -1599,7 +1613,6 @@ function resolveSceneIterationModel() { return guardModel(MODEL_DEFAULTS.sceneIt
 function resolveBriefCorrectionModel() { return guardModel(MODEL_DEFAULTS.briefCorrectionModel, 'BRIEF CORRECTION MODEL'); }
 function resolveSceneValidationModel() { return guardModel(MODEL_DEFAULTS.sceneValidationRepair, 'SCENE VALIDATION MODEL'); }
 function resolveSceneRewriteModel() { return guardModel(MODEL_DEFAULTS.sceneRewrite, 'SCENE REWRITE MODEL'); }
-function resolvePromptCompressModel() { return guardModel(MODEL_DEFAULTS.promptCompress, 'PROMPT COMPRESS MODEL'); }
 
 /**
  * The model's own output ceiling, for the few direct provider calls that
@@ -1630,7 +1643,6 @@ module.exports = {
   resolveBriefCorrectionModel,
   resolveSceneValidationModel,
   resolveSceneRewriteModel,
-  resolvePromptCompressModel,
   IMAGE_MODELS,
   resolveGrokImageModel,
   emptyScenePlateRouting,

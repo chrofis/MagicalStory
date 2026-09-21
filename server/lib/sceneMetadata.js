@@ -1944,7 +1944,21 @@ function resolvePagePlate({ pageNumber = null, sceneMetadata = null, visualBible
     emptyScenePrompt: sceneMetadata?.emptyScenePrompt || '',
   });
   const fromVantage = String(v?.emptyScenePrompt || '').trim();
-  if (fromVantage) return { text: fromVantage, source: 'vantage', vantageId: v.vantageId || null };
+  if (fromVantage) {
+    // A page plate that loses to a vantage plate is dead prose. The all-pages
+    // Art Director prompt never asks for one ("a plate is written once for the
+    // pages that share it, never once per page", owner ruling 2026-09-17), so
+    // when a brief carries one anyway the model volunteered an undeclared
+    // field — measured 2026-09-21 on a stored 18-page story: page 1 only,
+    // 652 chars, `reuseEmptyScene: false`, never rendered. Said out loud
+    // rather than silently dropped, so a brief drifting away from the schema
+    // is visible without re-reading stored JSON.
+    const orphan = String(sceneMetadata?.emptyScenePrompt || '').trim();
+    if (orphan && orphan !== fromVantage) {
+      log.warn(`⚠️ [PLATE] P${pageNumber ?? '?'}: brief carries its own emptyScenePrompt (${orphan.length} chars, reuseEmptyScene=${sceneMetadata?.reuseEmptyScene}) — discarded, ${v.vantageId || 'vantage'} plate wins (one plate per vantage)`);
+    }
+    return { text: fromVantage, source: 'vantage', vantageId: v.vantageId || null };
+  }
   const fromPage = String(sceneMetadata?.emptyScenePrompt || '').trim();
   if (fromPage) return { text: fromPage, source: 'page', vantageId: v?.vantageId || null };
   return { text: '', source: 'missing', vantageId: v?.vantageId || null };

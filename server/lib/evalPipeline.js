@@ -453,8 +453,17 @@ function buildEmptySceneQcPrompt({ sceneDescription = '', storyEra = null, chara
   // (GEOMETRY_DIMENSIONS, server/lib/sceneGeometry.js), so the two
   // sides name the same dimensions in the same words. A fourth check
   // belongs in that constant, never inline here.
+  // Only the dimensions the plate AUTHOR was handed. `selectGeometryFacts`
+  // runs the same scan `extractSceneGeometry` runs for the generator, over
+  // the same prose and the same cast, so a dimension the prose never states
+  // is asked of neither side. Grading a dimension the author was not given
+  // is exactly the blind grade sceneGeometry.js was built to end.
+  const { selectGeometryFacts, buildGeometryJudgeChecks } = require('./sceneGeometry');
   const geometryCheck = mainScenePrompt
-    ? require('./sceneGeometry').buildGeometryJudgeChecks(5)
+    ? buildGeometryJudgeChecks(5, selectGeometryFacts({
+        mainScenePrompt,
+        castNames: Array.isArray(characterPlacements) ? characterPlacements.map(c => c && c.name).filter(Boolean) : [],
+      }).dims)
     : '';
   return fillTemplate(qc.BODY, {
     SCENE_CTX: sceneCtx,

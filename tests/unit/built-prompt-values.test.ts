@@ -407,6 +407,32 @@ describe('evaluateSheetRow hands the judge the real outfit, not the token', () =
     expect(promptUsed).not.toContain('CHARACTER_AGE');
     expect(promptUsed).not.toContain('8 years old');
   });
+
+  // A9: the bodies judge scores PROPORTIONS — the one axis the declared age
+  // decides — but only the identity and pass-2 style judges were handed
+  // CHARACTER_AGE, so the critic could only confirm the drawing looked like
+  // itself while the generator was anchored on the declared age.
+  it('the bodies judge is told the declared age', async () => {
+    stubJudge();
+    const { promptUsed } = await sheet.evaluateSheetRow(ROW, 'bodies', { declaredAge: 3 });
+    expect(promptUsed).toContain('CHARACTER_AGE: 3 years old');
+    expect(unfilled(promptUsed)).toEqual([]);
+  });
+
+  it('…and "unknown" when no age is declared, never a bare placeholder', async () => {
+    stubJudge();
+    const { promptUsed } = await sheet.evaluateSheetRow(ROW, 'bodies', {});
+    expect(promptUsed).toContain('CHARACTER_AGE: unknown');
+    expect(promptUsed).not.toContain('years old');
+    expect(unfilled(promptUsed)).toEqual([]);
+  });
+
+  it('the heads row does not get the age line — it does not score proportions', async () => {
+    stubJudge();
+    const { promptUsed } = await sheet.evaluateSheetRow(ROW, 'heads', { declaredAge: 3 });
+    expect(promptUsed).not.toContain('CHARACTER_AGE');
+    expect(unfilled(promptUsed)).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

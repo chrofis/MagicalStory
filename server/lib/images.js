@@ -777,72 +777,129 @@ function dedupeIdenticalBullets(prompt) {
   return lines.filter(l => l !== null).join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
-// Blocks this cut may drop, least load-bearing first. The scene prose and the
-// reference-card colour map are NOT on the list: the prose IS the page, and the
-// colour map is what pairs each baked card with a name.
-const CUT_DROP_ORDER = [
-  '**Composition:**',
-  '**HEIGHT ORDER',
-  'AGE & PROPORTIONS',
-  'When the FIRST reference photo',
-  'Generate a SINGLE illustration',
-];
-const CUT_BLOCK_MARKERS = [...CUT_DROP_ORDER, 'REFERENCE CARD COLOURS', '**THIS IMAGE DEPICTS'];
+// THE CUT DROPS EXACT BLOCKS, RANKED — GENERIC GUIDANCE BEFORE PAGE FACTS.
+//
+// Two faults, both reproduced on staging job_1789853503332_riqncqg1i (18 pages,
+// grok cap 7,900):
+//
+//   1. Every page's built prompt ran 8.5-10.2k, and the four blocks at the top
+//      of the old order — Composition, HEIGHT ORDER, AGE & PROPORTIONS and the
+//      plate-vs-identity reference rule — were deleted on all fifteen pages
+//      that stored a prompt. Those four are PAGE FACTS: who is how tall, how
+//      old, which attached photo is a place and which is a person. The blocks
+//      that survived were the generic rule paragraphs, byte-identical on every
+//      page of every book. The ranking was upside down, so it is inverted
+//      here: when a page does not fit, generic guidance yields to the facts of
+//      that page (docs/decisions.md, 2026-09-21).
+//   2. A block's extent was found by scanning forward to the next marker in a
+//      HAND-KEPT list. Any block header missing from that list was swallowed by
+//      the drop in front of it: the front cover of the same story lost its
+//      whole cast block — every garment, age and height — because the
+//      `**CHARACTERS IN THIS IMAGE` header was not a marker. Blocks are now
+//      removed by their EXACT text, read from the template that emitted them,
+//      so there is no range to overrun and no list to keep in sync.
+//
+// The scene prose, the reference-card colour map, the cast blocks, REQUIRED
+// OBJECTS, ART STYLE, the season, the text area, the shot rule and EXACT POSES
+// are not droppable at all: the prose IS the page, the colour map is what pairs
+// each baked card with a name, and the rest is what the page was commissioned
+// with.
+const { NO_CHARACTER_MARKING_RULE, HANDS_HOLD_ONLY_NAMED_RULE } = require('./promptBuilders');
 
+/**
+ * A literal paragraph of prompts/image-generation.txt, by its opening text.
+ * Reading the rule from the template it was emitted from is what keeps this
+ * list from going stale: a reworded rule stops matching HERE, loudly, instead
+ * of leaving a drop that silently never fires.
+ */
+const IMAGE_GENERATION_TEMPLATE_ON_DISK = fs.readFileSync(path.join(LOCAL_PROMPTS_DIR, 'image-generation.txt'), 'utf-8');
+
+function templateParagraph(prefix) {
+  // The loaded template when the loader has run, the file on disk otherwise —
+  // ONE source either way (services/prompts loads this same file; a DB override
+  // only ever replaces its content). Non-image callers of the shrinker (the
+  // Grok edit body, the composite blend prompt) reach this before any template
+  // is loaded, and they carry none of these blocks, so a missing paragraph in
+  // the ON-DISK copy is the only thing that means the list has gone stale.
+  const tpl = PROMPT_TEMPLATES.imageGeneration || IMAGE_GENERATION_TEMPLATE_ON_DISK;
+  const para = tpl.split(/\n{2,}/).map(x => x.trim()).find(x => x.startsWith(prefix));
+  if (!para) {
+    throw new Error(`prompt-shrink: prompts/image-generation.txt has no paragraph starting "${prefix}" — the drop list is stale`);
+  }
+  return para;
+}
+
+/**
+ * The droppable blocks, LEAST LOAD-BEARING FIRST. Built lazily (the templates
+ * are loaded asynchronously at boot) and cached.
+ */
+let CUT_BLOCKS = null;
+function cutBlocks() {
+  if (CUT_BLOCKS) return CUT_BLOCKS;
+  CUT_BLOCKS = [
+    // Generic rules, identical on every page of every book.
+    { label: 'COUNTS', text: templateParagraph('**COUNTS:**') },
+    { label: 'DEPTH AND SIZE', text: templateParagraph('**DEPTH AND SIZE:**') },
+    { label: 'HANDS', text: HANDS_HOLD_ONLY_NAMED_RULE },
+    { label: 'NO MARKS', text: NO_CHARACTER_MARKING_RULE },
+    { label: 'REQUIRED CAST', text: templateParagraph('**REQUIRED CAST:**') },
+    // Page facts. Last to go, and in practice never reached once the shot block
+    // carries one definition instead of eight.
+    { label: 'Composition', text: templateParagraph('**Composition:**') },
+    { label: 'HEIGHT ORDER', re: /^\*\*HEIGHT ORDER[^\n]*\n/m },
+    { label: 'AGE & PROPORTIONS', re: /^AGE & PROPORTIONS[\s\S]*?(?=\n\n|$)/m },
+    { label: 'reference-photo rule', text: templateParagraph('When the FIRST reference photo') },
+    { label: 'single-illustration rule', text: templateParagraph('Generate a SINGLE illustration') },
+  ];
+  return CUT_BLOCKS;
+}
+
+/**
+ * @returns {{ text: string, dropped: string[], proseCut: number }}
+ */
 function sectionAwareCut(prompt, maxLen, logLabel) {
-  // Keep the tail sections (REQUIRED OBJECTS + ART STYLE) whole.
-  const objIdx = prompt.indexOf('**REQUIRED OBJECTS');
-  const styleIdx = prompt.indexOf('**ART STYLE');
-  const tailStart = objIdx >= 0 ? objIdx : styleIdx;
-  if (tailStart < 0) return truncatePromptForModel(prompt, maxLen, logLabel);
-  const tail = prompt.slice(tailStart);
-  const headBudget = maxLen - tail.length - 5;
-  if (headBudget < 500) return truncatePromptForModel(prompt, maxLen, logLabel); // tail alone ~fills the budget
-
-  // DROP WHOLE BLOCKS, NEVER A CHARACTER INDEX (owner, 2026-08-17). The head is
-  // written in reading order — the scene prose describes character 1, then 2,
-  // then 3 — so slicing at a byte offset deletes the LAST-described characters
-  // outright: outfit, position and action gone, while the evaluator still scores
-  // the render against a contract they were cut out of. Measured on a real page:
-  // a 5,000-char budget removed a whole character mid-sentence. Dropping ranked
-  // blocks costs generic guidance instead of a person.
-  let head = prompt.slice(0, tailStart);
+  let out = prompt;
   const dropped = [];
-  const blockRange = (text, marker) => {
-    const start = text.indexOf(marker);
-    if (start < 0) return null;
-    let end = text.length;
-    for (const m of CUT_BLOCK_MARKERS) {
-      if (m === marker) continue;
-      const i = text.indexOf(m, start + marker.length);
-      if (i >= 0 && i < end) end = i;
-    }
-    return { start, end };
-  };
-  for (const marker of CUT_DROP_ORDER) {
-    if (head.length <= headBudget) break;
-    const r = blockRange(head, marker);
-    if (!r) continue;
-    head = (head.slice(0, r.start) + head.slice(r.end)).replace(/\n{3,}/g, '\n\n');
-    dropped.push(marker.replace(/\*|:/g, '').trim());
+  for (const block of cutBlocks()) {
+    if (out.length <= maxLen) break;
+    const before = out.length;
+    out = (block.re ? out.replace(block.re, '') : out.split(block.text).join(''))
+      .replace(/\n{3,}/g, '\n\n');
+    if (out.length < before) dropped.push(block.label);
   }
 
-  // Still over: trim the prose at a SENTENCE boundary rather than mid-word, so
-  // whatever survives is at least a complete statement.
   let proseCut = 0;
-  if (head.length > headBudget) {
+  if (out.length > maxLen) {
+    // Nothing droppable is left and the page still does not fit. Trim the SCENE
+    // PROSE at a sentence boundary — never mid-word, never a character index
+    // (owner, 2026-08-17): the head is written in reading order, so slicing at
+    // a byte offset deletes the LAST-described characters outright while the
+    // evaluator still scores the render against a contract they were cut from.
+    const objIdx = out.indexOf('**REQUIRED OBJECTS');
+    const tailStart = objIdx >= 0 ? objIdx : out.indexOf('**ART STYLE');
+    if (tailStart < 0) {
+      const truncated = truncatePromptForModel(out, maxLen, logLabel);
+      return { text: truncated, dropped, proseCut: out.length - truncated.length };
+    }
+    const tail = out.slice(tailStart);
+    const headBudget = maxLen - tail.length - 5;
+    if (headBudget < 500) {
+      const truncated = truncatePromptForModel(out, maxLen, logLabel);
+      return { text: truncated, dropped, proseCut: out.length - truncated.length };
+    }
+    let head = out.slice(0, tailStart);
     const keep = head.slice(0, headBudget);
     const lastStop = Math.max(keep.lastIndexOf('. '), keep.lastIndexOf('.\n'));
     const cut = lastStop > headBudget * 0.5 ? lastStop + 1 : headBudget;
     proseCut = head.length - cut;
     head = head.slice(0, cut);
+    out = head.trimEnd() + '\n' + tail;
   }
 
-  log.warn(`✂️ [${logLabel}] Section-aware cut: ${tailStart}→${head.length} chars`
+  log.warn(`✂️ [${logLabel}] Section-aware cut: ${prompt.length}→${out.length} chars`
     + (dropped.length ? `, dropped ${dropped.join(' + ')}` : '')
-    + (proseCut ? `, AND ${proseCut} chars of scene prose — a character may be missing` : '')
-    + ', tail sections kept whole');
-  return head.trimEnd() + '\n' + tail;
+    + (proseCut ? `, AND ${proseCut} chars of scene prose — a character may be missing` : ''));
+  return { text: out, dropped, proseCut };
 }
 
 /**
@@ -857,21 +914,29 @@ function sceneHeadOf(prompt) {
 }
 
 /**
+ * FIT A BUILT IMAGE PROMPT INTO THE MODEL'S CHARACTER CAP.
+ *
+ * Two deterministic steps, in order: merge duplicated bullet bodies, then drop
+ * ranked blocks (sectionAwareCut). There is no third, paid step. A deepseek
+ * head-rewrite lived between them until 2026-09-21; measured over staging
+ * job_1789853503332_riqncqg1i it made 34 calls ($0.13, ~180 s) whose output
+ * appears in ZERO stored prompts — on pages the head budget was under its own
+ * 1,500-char floor so it never ran, and on covers it ran, was rejected for
+ * overshooting, and the cut ran anyway. See docs/decisions.md 2026-09-21.
+ *
  * @param {Object|null} meta - optional out-param. Whenever this function
  *   actually CHANGES the prompt, `meta.compressedScene` receives the SCENE
  *   BLOCK OF THE STRING IT RETURNS — the scene prose the image model really
- *   got. That is the LLM-rewritten head on the compression branch, and the
- *   post-dedupe / post-cut head on the other two. Stamping only the LLM branch
- *   was measured leaving the field null on the one over-cap page of staging
- *   job_1789348171785_9oxos7dwv (p7, 8,002 chars against grok-imagine-image-2.0's
- *   7,900 cap): dedupe alone brought it to 7,242, so the compression branch
- *   never ran and nothing recorded that the sent prose differed from the built
- *   prose at all. The
- *   batch image eval judges the render against that description rather than the
- *   pre-shrink one (sceneMetadata.resolveEvalSceneDescription). It is the head
- *   ALONE: taken from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE`
- *   tail split, so it carries no ART STYLE block, and it is not a second copy
- *   of the whole prompt.
+ *   got. Stamping only the (now deleted) LLM branch was measured leaving the
+ *   field null on the one over-cap page of staging job_1789348171785_9oxos7dwv
+ *   (p7, 8,002 chars against grok-imagine-image-2.0's 7,900 cap): dedupe alone
+ *   brought it to 7,242, so nothing recorded that the sent prose differed from
+ *   the built prose at all. The batch image eval judges the render against that
+ *   description rather than the pre-shrink one
+ *   (sceneMetadata.resolveEvalSceneDescription). It is the head ALONE: taken
+ *   from strictly before the `**REQUIRED OBJECTS` / `**ART STYLE` tail split,
+ *   so it carries no ART STYLE block, and it is not a second copy of the whole
+ *   prompt.
  */
 async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName = null, meta = null) {
   if (!prompt || prompt.length <= maxPromptLength) return prompt;
@@ -880,113 +945,41 @@ async function shrinkPromptForModel(prompt, maxPromptLength, logLabel, modelName
   let out = dedupeIdenticalBullets(prompt);
   if (out.length <= maxPromptLength) {
     log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${out.length} chars via dedupe (budget ${maxPromptLength})`);
+    recordPromptShrink({ logLabel, modelName, branch: 'dedupe', before: prompt.length, after: out.length,
+      cap: maxPromptLength, dropped: [], proseCut: 0 });
     if (meta) meta.compressedScene = sceneHeadOf(out) || undefined;
     return out;
   }
 
-  // 2. LLM compression — of the HEAD ONLY. The protected tail (REQUIRED
-  // OBJECTS + ART STYLE) is held back and reattached verbatim, so style and
-  // object specs survive by construction, not by model obedience. Full-prompt
-  // rewrites were measured failing every way: qwen ignores budgets (asked
-  // 800 words, returned 8.9k chars), flash overshoots (asked 4.5k, wrote
-  // 8.1k) or — given a threatening budget line — collapses to a 0.7k stub.
-  // Compressing 7k of prose to ~5k is the modest ask a model actually does.
-  const tailStart = (() => {
-    const o = out.indexOf('**REQUIRED OBJECTS');
-    return o >= 0 ? o : out.indexOf('**ART STYLE');
-  })();
-  if (tailStart > 0) {
-    const tail = out.slice(tailStart);
-    let head = out.slice(0, tailStart);
-    // The frame-colour map binds the baked card frames to characters — its
-    // exact "<COLOUR> frame = <Name>" pairs must survive verbatim (the
-    // compressor was measured silently dropping the whole block). Pull the
-    // paragraph out before compression, reattach after.
-    let frameBlock = '';
-    const fm = head.match(/^REFERENCE CARD COLOURS[\s\S]*?scene\.\s*$/m);
-    if (fm) {
-      frameBlock = fm[0];
-      head = head.replace(fm[0], '');
-    }
-    // Same for the static rendering rules (single edge-to-edge illustration /
-    // no panel borders / no written characters on surfaces) — the compressor
-    // was measured dropping them, and border-injection + text-leakage are
-    // exactly the failure modes those paragraphs exist to prevent.
-    let rulesBlock = '';
-    const rm = head.match(/^Generate a SINGLE illustration[\s\S]*?(?:\n\n|$)(?:All surfaces in the scene[\s\S]*?(?:\n\n|$))?/m);
-    if (rm) {
-      rulesBlock = rm[0].trim();
-      head = head.replace(rm[0], '\n\n');
-    }
-    const headBudget = maxPromptLength - tail.length - frameBlock.length - rulesBlock.length - 40;
-    if (headBudget >= 1500) {
-      try {
-        const { callTextModel } = require('./textModels');
-        const { resolvePromptCompressModel } = require('../config/models');
-        const compressModel = resolvePromptCompressModel();
-        // TWO targets, both computed from this page (owner, 2026-08-12): the
-        // RELATIVE cut, which tells the model how hard to squeeze, and the
-        // ABSOLUTE cap in characters, which is the unit that actually binds
-        // (the backend limit is a char limit). A word target alone was measured
-        // missing in both directions — flash returned 39% of its allowance and
-        // deleted four characters' hats, deepseek 126% and then 139%. A model
-        // asked to "shorten by 26%" has a size to aim at; "at most N chars"
-        // alone reads as advice.
-        // WHAT to cut, in order — not just how much. And the preservation rule
-        // asks for the MAIN POINTS, not every fact (owner, 2026-08-12): "keep
-        // every fact" plus "cut 26%" has no solution on a five-character page —
-        // the text is a list of people, garments, positions and props with
-        // almost no filler — so flash resolved the contradiction by deleting
-        // four hats and deepseek by returning a near-copy (7,374 of 7,410
-        // chars, a 0.5% cut, even given the percentage, size, cap and word
-        // count). Naming the main points and ranking the rest lets the model
-        // shorten wording instead of choosing between silence and disobedience.
-        const cutPct = Math.max(5, Math.round((1 - headBudget / head.length) * 100));
-        const capWords = Math.floor(headBudget / 6.5);
-        const buildInstruction = (over) => (over
-          ? `Your previous version was ${over} characters — still over the ${headBudget} limit. Cut deeper this time. `
-          : '')
-          + `Shorten the scene description below to at most ${headBudget} characters (roughly ${capWords} words). It is ${head.length} characters now, so about ${cutPct}% has to go. `
-          + `Keep all the main points: every character with their age band and body proportions (e.g. kindergarten-age about 5 heads tall, adult about 7.5-8 heads tall), what each one wears down to the colour of each garment, where each one is, what each one is doing, and every object named. Say them in fewer words. `
-          + `Cut in this order, and stop as soon as it fits: 1. mood, atmosphere and lighting adjectives; 2. background and setting detail; 3. repeated wording. `
-          + `Same format, same section headers. Output ONLY the rewritten description.\n\n${head}`;
-        // reasoning:{enabled:false} is REQUIRED, not an optimisation. With it on,
-        // deepseek-v4-pro spent all 12,001 output tokens thinking and returned an
-        // EMPTY string, so compression silently fell back to blunt truncation
-        // (job_1786484554633 p9, Lab #530). Off: 6,847 chars in 9.7s for $0.008.
-        // The 12k budget stays for models that ignore the flag.
-        const callOpts = { usageLabel: 'prompt_compress', temperature: 0, reasoning: { enabled: false } };
-        let newHead = '';
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          const over = attempt === 1 ? 0 : newHead.length;
-          const res = await callTextModel(buildInstruction(over), null, compressModel, callOpts);
-          newHead = (res?.text || '').trim();
-          if (newHead.length > 500 && newHead.length <= headBudget) break;
-          log.warn(`✂️ [${logLabel}] Compression attempt ${attempt} by ${compressModel}: ${newHead.length} chars vs ${headBudget} allowed`);
-        }
-        if (newHead.length > 500 && newHead.length <= headBudget) {
-          const assembled = newHead + (rulesBlock ? '\n\n' + rulesBlock : '') + (frameBlock ? '\n\n' + frameBlock : '') + '\n\n' + tail;
-          // The description the model really received — the one string the
-          // batch eval needs and nothing stored today holds.
-          if (meta) meta.compressedScene = newHead;
-          // The head/allowance ratio is the number that matters: a model that
-          // writes far under its allowance silently deletes scene facts, and
-          // nothing downstream can tell that from a legitimately terse rewrite.
-          log.info(`✂️ [${logLabel}] Prompt ${prompt.length}→${assembled.length} chars via head compression by ${compressModel} (head ${head.length}→${newHead.length} of ${headBudget} allowed = ${Math.round((newHead.length / headBudget) * 100)}%, budget ${maxPromptLength}, tail ${tail.length} + rules + frame map kept verbatim)`);
-          return assembled;
-        }
-        log.warn(`✂️ [${logLabel}] Head compression unusable after 2 attempts (${newHead.length} chars vs budget ${headBudget}) — falling back to section-aware cut`);
-      } catch (err) {
-        log.warn(`✂️ [${logLabel}] Head compression failed (${err.message}) — falling back to section-aware cut`);
-      }
-    }
-  }
-
-  // 3. Guarantee: section-aware cut that never drops the tail sections.
+  // 2. Guarantee: drop ranked blocks, generic guidance before page facts.
   const cut = sectionAwareCut(out, maxPromptLength, logLabel);
-  if (meta) meta.compressedScene = sceneHeadOf(cut) || undefined;
-  return cut;
+  recordPromptShrink({ logLabel, modelName, branch: 'cut', before: prompt.length, after: cut.text.length,
+    cap: maxPromptLength, dropped: cut.dropped, proseCut: cut.proseCut });
+  if (meta) meta.compressedScene = sceneHeadOf(cut.text) || undefined;
+  return cut.text;
 }
+
+/**
+ * THE SHRINK IS A GENERATION EVENT, NOT A LOG LINE.
+ *
+ * Which blocks a page lost, and whether its prose was trimmed, decides what the
+ * illustrator was actually asked for — and the judges score the render against
+ * it. That was visible only as a `log.warn` in a Railway stream nobody reads
+ * per page, so a whole book could ship with AGE & PROPORTIONS missing from
+ * every prompt and nothing in the story record said so.
+ */
+function recordPromptShrink({ logLabel, modelName, branch, before, after, cap, dropped, proseCut }) {
+  const genLog = getCurrentLogger();
+  if (!genLog) return;  // not in a generation context (ad-hoc Lab / script call)
+  const details = { label: logLabel, model: modelName || null, branch, before, after, cap,
+    charsCut: before - after, dropped, proseCut };
+  const msg = `${logLabel}: ${before}→${after} chars (cap ${cap}) via ${branch}`
+    + (dropped.length ? `, dropped ${dropped.join(' + ')}` : '')
+    + (proseCut ? `, ${proseCut} chars of scene prose trimmed` : '');
+  if (dropped.length || proseCut) genLog.warn('prompt_shrink', msg, null, details);
+  else genLog.info('prompt_shrink', msg, null, details);
+}
+
 
 /**
  * Collect the data:image reference URLs from a characterPhotos array (each
@@ -2747,6 +2740,28 @@ async function evaluateImageBatch(images, options = {}) {
             // The tier that already answered is not a second witness.
             { excludeModel: bboxDetection.gdinoDiag?.identity?.model || null },
           ),
+          // THE ARBITER — reached only when the detector, the evaluator and the
+          // second witness deadlock (detector alone against the other two). The
+          // detector is master for identity, so this is the ONE call allowed to
+          // rename one of its figures. It is deliberately not another SoM
+          // reading: it gets the page, a tight crop per contested figure, and
+          // the contested names' clothing contract + reference face, because
+          // clothing is what identity in this pipeline is made of.
+          arbiter: ({ conflicts }) => require('./figureDetection').arbitrateIdentity(
+            img.imageData,
+            bboxDetection.figures,
+            conflicts.map(c => c.detIndex),
+            {
+              pageLabel: `PAGE ${img.pageNumber}: `,
+              // Both claims are candidates — the arbiter is never told which
+              // side claimed which, so it cannot side with a witness.
+              candidates: [...new Set(conflicts.flatMap(c => [c.detector, c.evaluator]))]
+                .map(name => {
+                  const ref = (refsForEval || []).find(r => r && r.name === name);
+                  return { name, clothing: ref?.clothingDescription || null, faceDataUri: ref?.photoUrl || null };
+                }),
+            },
+          ),
         });
         if (identityAgreement?.conflicts?.length) {
           log.warn(describeIdentityAgreement(identityAgreement, `PAGE ${img.pageNumber}: `));
@@ -2887,7 +2902,6 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   const {
     visualBible = null,
     characters = null,
-    entityReport = null,
     pageNumber = null,
     sceneDescription = '',
     artStyle = null,
@@ -2920,6 +2934,10 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     // The page's scene metadata, so an element cited in a state (ART002.4)
     // resolves to the cell for the state THIS page needs.
     sceneMetadata = null,
+    // The consolidated repair plan for THIS evaluation, produced once where the
+    // evaluation was scored (see the B2 note below). Required — inpaint never
+    // consolidates on its own.
+    consolidatedPlan: consolidatedPlanIn = null,
   } = options;
 
   // Resolve the current-page clothing category for a character. Case-insensitive.
@@ -3003,44 +3021,16 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   }
 
   // ---------------------------------------------------------------------------
-  // NEW: Haiku consolidation — translates names to visual identifiers and
-  // splits per-character fixes from scene fixes.
+  // ONE CONSOLIDATION PER EVALUATION (2026-09-21, finding B2). The repair
+  // pipeline consolidates every evaluation the moment it lands and stores the
+  // plan on the version (repairPipeline.consolidatePageEval → version
+  // .consolidatedPlan, mirrored onto the eval object it hands to the repair).
+  // Inpaint used to call the consolidator AGAIN on the same evaluation: staging
+  // consolidator_calls rows show p10/p12/p15 consolidated at round 0 and again
+  // inside inpaint at round 1, ~7k tokens each, with differing plans — so the
+  // page was repaired from a plan nothing else had scored against.
+  // The plan is an INPUT here now. NO FALLBACKS: an inpaint without one stops.
   // ---------------------------------------------------------------------------
-  const { consolidateFeedback } = require('./feedbackConsolidator');
-
-  // Resolve per-scene clothing descriptions so the consolidator reads the
-  // variant the scene actually uses (e.g. costumed:mittelalterlich) instead
-  // of the character's default (modern) clothing. Without this the
-  // consolidator writes fixes like "redress figure in grey hoodie" for a
-  // medieval scene.
-  const sceneClothing = {};
-  try {
-    const helpers = getStoryHelpers();
-    const charReqs = {};
-    for (const [name, variant] of Object.entries(characterClothing || {})) {
-      // Merge the story-level spec so resolveClothingDescription finds
-      // clothingRequirements[name][category].signature/description (this
-      // story's clothing) before falling back to stale avatars.clothing.
-      const storyReqs = require('./clothingCategories').resolveCharacterReqs(clothingRequirements, name);
-      charReqs[name] = {
-        ...(storyReqs && typeof storyReqs === 'object' ? storyReqs : {}),
-        _currentClothing: variant,
-      };
-    }
-    const photos = helpers.getCharacterPhotoDetails(characters || [], null, artStyle || 'watercolor', charReqs);
-    for (const p of photos) {
-      if (p?.name && p?.clothingDescription) sceneClothing[p.name] = p.clothingDescription;
-    }
-  } catch (err) {
-    log.debug(`[INPAINT PAGE] scene-clothing resolve failed: ${err.message}`);
-  }
-
-  // Pass full character objects so the consolidator can build authoritative
-  // physical descriptions (with glasses, facial hair, etc.) — which override
-  // any stale/incomplete scene descriptions or false eval flags.
-  // Text-only consolidator: no image. Sonnet's job is to dedupe / sort / trim
-  // evaluator findings, not to run its own vision pass. Without this, Sonnet
-  // would invent fixes (e.g. "Replace the face") that no evaluator flagged.
   // ONE CLEAN FINDING NEEDS NO CONSOLIDATION (owner, 2026-09-20). The
   // consolidator exists to dedupe findings across evaluators, split per-character
   // from scene work, strip character names, and cap at 3. When a single issue
@@ -3062,33 +3052,28 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     return fix;
   })();
 
+  // The plan produced when this evaluation was scored. The pipeline mirrors it
+  // onto the eval object (repairPipeline roundEvalPages) and also passes it
+  // explicitly; both name the same object.
+  const storedPlan = consolidatedPlanIn || evaluation?.consolidatedPlan || null;
+
   let consolidation = null;
   if (soleDirectFix) {
     log.info(`[INPAINT PAGE] P${pageNumber}: one name-free finding with its own instruction — sent verbatim, no consolidation`);
+  } else if (storedPlan) {
+    consolidation = { plan: storedPlan, error: null };
+    log.info(`[INPAINT PAGE] P${pageNumber}: using the plan consolidated with this evaluation (no second consolidator call)`);
   } else {
-    consolidation = await consolidateFeedback({
-      sceneDescription,
-      evaluation,
-      entityReport,
-      pageNumber,
-      characters: characters || [],
-      sceneClothing,
-      storyId,
-      round,
-      landmarkPhotos,
-      era,
-      // The consolidator's INPUT carries the scene brief's ---METADATA--- block
-      // (raw VB ids) and the evaluators' findings; its OUTPUT instruction fields
-      // are merged into the Grok edit instruction below. Both sides need the
-      // bible to resolve those ids -- see feedbackConsolidator.buildFeedbackInput.
-      visualBible,
-    });
+    // A repair with no plan and no single self-describing finding has nothing
+    // to send Grok. Re-consolidating here is what B2 deleted; degrading to the
+    // legacy issue-concat is a fallback. Stop, loudly.
+    log.error(`❌ [INPAINT PAGE] P${pageNumber}: no consolidated plan on the evaluation — inpaint cannot run (the plan is produced where the evaluation is scored)`);
+    return { imageData: null, repaired: false, instruction: null, usage: null, error: 'no consolidated plan on the evaluation' };
   }
 
-  // Decide the instruction to send Grok.
-  // - If consolidator produced a plan: use scene_fix.instruction + attach avatars
-  //   of any character referenced in per_character_fixes (Grok now KNOWS who to fix).
-  // - Else fall back to the legacy concat instruction.
+  // Decide the instruction to send Grok: scene_fix.instruction + avatars of any
+  // character referenced in per_character_fixes (Grok now KNOWS who to fix).
+  // There is no second path — a missing plan already returned above.
   let editInstruction;
   // What must still be TRUE after the edit (scene_fix.preserve), as opposed to
   // what the edit DOES. Built in the plan branch, appended below.
@@ -3101,7 +3086,7 @@ async function inpaintPage(imageData, evaluation, options = {}) {
   if (soleDirectFix) {
     // Verbatim. No trim, no critique, no cap — there was nothing to consolidate.
     editInstruction = `1. ${sanitizeIssueForInpaint(soleDirectFix)}`;
-  } else if (consolidation?.plan && !consolidation.error) {
+  } else {
     consolidatedPlan = consolidation.plan;
 
     // SAFETY NET — Haiku is told never to use character names in fix
@@ -3260,30 +3245,6 @@ async function inpaintPage(imageData, evaluation, options = {}) {
       const issueText = d.issue || d.description || JSON.stringify(d);
       log.debug(`[INPAINT PAGE] P${pageNumber}: deferred to next round — "${issueText}"`);
     }
-  } else {
-    // Fallback (consolidation returned no plan — usually its JSON was truncated
-    // at the output cap on a busy page). Do NOT concatenate every issue: that
-    // sent Grok a 4-issue blob it cannot execute atomically (observed on
-    // job_1783845868262 P4). Rank by severity, keep the top few, and emit a
-    // numbered atomic list — same shape and ≤3 cap as the plan path.
-    // CATASTROPHIC included: the `?? 2` fallback ranked it as MODERATE, so
-    // with >3 issues the .slice(0, 3) below could drop the CATASTROPHIC one
-    // from the repair instruction while keeping lesser fixes.
-    const SEV = { CATASTROPHIC: 5, CRITICAL: 4, MAJOR: 3, MODERATE: 2, MINOR: 1, NONE: 0 };
-    const ranked = inpaintableIssues
-      .filter(i => i.description)
-      .sort((a, b) => (SEV[String(b.severity || 'MODERATE').toUpperCase()] ?? 2) - (SEV[String(a.severity || 'MODERATE').toUpperCase()] ?? 2))
-      .slice(0, 3);
-    // AN INSTRUCTION, OR NOTHING. `fix` is what the evaluator wrote for the
-    // repairer; `description` is what it wrote for a human reading a report. A
-    // page whose issues carry no `fix` yields no instruction rather than a
-    // diagnosis Grok cannot execute.
-    const withFix = ranked.filter(it => it.fix && String(it.fix).trim());
-    for (const it of ranked) {
-      if (!it.fix) log.info(`[INPAINT PAGE] P${pageNumber}: no fix instruction for "${String(it.description).slice(0, 60)}" — not sent`);
-    }
-    editInstruction = withFix.map((it, i) => `${i + 1}. ${sanitizeIssueForInpaint(it.fix)}`).join('\n');
-    log.warn(`[INPAINT PAGE] Consolidator failed (${consolidation?.error || 'no plan'}), fallback to top-${ranked.length} of ${combinedIssues.length} issues by severity`);
   }
 
   // References BY ID. The semantic judge is shown PAGE ELEMENTS (id — name)
@@ -4613,7 +4574,7 @@ async function iteratePageCore(imageData, pageNumber, storyData, options = {}) {
           description: iterateSceneMetadata.emptyScenePrompt,
           textAreaInstruction: textPos ? buildTextZoneInstruction(textPos, iterateTextZoneDesc, (storyData?.languageLevel === '1st-grade' ? '10%' : storyData?.languageLevel === 'advanced' ? '40%' : '30%'), { isEmptyScene: true }) : '',
           eraGuard: buildEraGuard(iterateEra),
-          landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0]),
+          landmarkFidelity: buildLandmarkFidelityBlock(pageLandmarkPhotos?.[0], { era: iterateEra }),
           // Tells the model what the attached reference IS (prompts.js
           // REFERENCE line). Same expression every other plate call site uses —
           // without it the repaired page's fresh plate got the landmark photo

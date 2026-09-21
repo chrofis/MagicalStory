@@ -215,8 +215,10 @@ async function toBuffer(imageData) {
 
     // 1. What the pipeline stored
     const pipelineFigs = [];
-    const latestRetry = (pageEntry.retryHistory || []).slice(-1)[0];
-    for (const f of (latestRetry?.bboxDetection?.figures || [])) {
+    const { detectionForRetryEntry } = require('../../server/lib/repairLogic');
+    const rh = pageEntry.retryHistory || [];
+    const latestDetection = detectionForRetryEntry(pageEntry, rh[rh.length - 1], rh.length - 1);
+    for (const f of (latestDetection?.figures || [])) {
       if (f.faceBox) pipelineFigs.push({ label: `PIPE: ${f.name || 'UNK'}`, color: '#ff0000', box: Array.isArray(f.faceBox) ? f.faceBox : [f.faceBox.y, f.faceBox.x, f.faceBox.y + f.faceBox.height, f.faceBox.x + f.faceBox.width] });
     }
     findings.pipelineStored = pipelineFigs;

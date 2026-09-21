@@ -432,7 +432,13 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'location', data::jsonb->'location',
             'season', data::jsonb->'season',
             'userLocation', data::jsonb->'userLocation',
-            'sceneDescriptions', data::jsonb->'sceneDescriptions'
+            'sceneDescriptions', data::jsonb->'sceneDescriptions',
+            -- The Art Director prompt table. sceneDescriptions[].scenePromptRef
+            -- indexes into .prompts[]; the dev panel resolves it with
+            -- client/src/utils/scenePrompt.ts. Before 2026-09-21 the prompt was
+            -- inline on every scene, so this endpoint shipped ~2 MB of the same
+            -- 112 KB string on every saved-story load.
+            'sceneExpansionReport', data::jsonb->'sceneExpansionReport'
           ) as base_data,
           COALESCE(jsonb_array_length(data::jsonb->'sceneImages'), 0) as scene_count,
           (SELECT jsonb_agg(jsonb_build_object('id', c->>'id', 'name', c->>'name'))
@@ -2682,10 +2688,15 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                 if (blobVersion) {
                   mergeFields(scene.imageVersions[i], blobVersion);
                 }
-                // Fallback: retryHistory has per-attempt bboxDetection
+                // Pre-2026-09-21 stories carry a per-attempt copy of the
+                // detection on retryHistory; newer ones link to the version
+                // instead (`versionIndex`) and the version's own copy is the
+                // only one. Take the legacy copy only when it EXISTS —
+                // assigning `|| null` unconditionally wiped the detection that
+                // `mergeFields` had just merged in from the version.
                 const retryEntry = blobScene.retryHistory?.[dbVersionIdx];
-                if (retryEntry && !scene.imageVersions[i].fixTargets?.length) {
-                  scene.imageVersions[i].bboxDetection = retryEntry.bboxDetection || null;
+                if (retryEntry?.bboxDetection && !scene.imageVersions[i].fixTargets?.length) {
+                  scene.imageVersions[i].bboxDetection = retryEntry.bboxDetection;
                 }
               }
             }

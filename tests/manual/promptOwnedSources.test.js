@@ -73,7 +73,7 @@ const readPrompt = f => fs.readFileSync(path.join(ROOT, 'prompts', f), 'utf8');
   console.log('\n── M1: the text slice carries section D\'s TEXT-fix checks ──');
   {
     const body = PROMPT_TEMPLATES.outlineAnalysisImageFirst;
-    const text = norm(PB.sliceAnalysisAspect(body, 'text', { includeTail: false }));
+    const text = norm(PB.sliceAnalysisAspect(body, 'text'));
     const scene = norm(PB.sliceAnalysisAspect(body, 'scene'));
     const both = norm(PB.sliceAnalysisAspect(body, 'both'));
 
@@ -103,12 +103,16 @@ const readPrompt = f => fs.readFileSync(path.join(ROOT, 'prompts', f), 'utf8');
       assert.ok(!/TEXT_ASPECT/.test(text + scene + both)));
     ok("'both' still returns the whole body (markers aside)", () =>
       assert.strictEqual(both, norm(body).replace(/[ \t]*<!-- TEXT_ASPECT_(BEGIN|END) -->\n?/g, '')));
-    ok('the refiner prompt builds and carries the criteria', () => {
+    // The refiner stopped slicing this body on 2026-09-21 (A7): its criteria
+    // are written for its own inputs and its own answer, in text-refine.txt.
+    // What it still OWNS from here is the shared do-not-write list.
+    // tests/unit/text-refine-own-criteria.test.ts pins the criteria themselves.
+    ok('the refiner prompt builds and carries the shared do-not-write list', () => {
       const p = norm(PB.buildTextRefinePrompt(
         { characters: [{ name: 'A', gender: 'female', age: 8 }], language: 'de', languageLevel: '1st-grade', pages: 12 },
         [{ pageNumber: 1, text: 'Ein Text.', sceneBrief: 'a brief' }], '', 'the arc'));
-      assert.ok(/24c\. \*\*Agents in TEXT/.test(p), 'D TEXT check missing from the refiner');
       assert.ok(p.includes('# DO-NOT-WRITE LIST'), 'do-not-write section missing from the refiner');
+      assert.ok(!p.includes('FIXES REQUIRED'), 'the reviewer output contract leaked into the refiner');
     });
   }
 

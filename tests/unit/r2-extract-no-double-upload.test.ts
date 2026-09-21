@@ -119,3 +119,68 @@ describe('extractInlineImagesToR2 — explicit walker vs generic sweep', () => {
     expect(data.b.y).toMatch(/^https:\/\/r2\.example\//);
   });
 });
+
+/**
+ * D5 (job_1789853503332_riqncqg1i, 2026-09-21): the finished styled 2x4 sheet
+ * was PUT to R2 four times per character under four different keys — the
+ * styled-avatar debug entry's `output`, a page reference photo's
+ * `originalPhotoUrl`, the character's `styledAvatars` slot, and the pass-1
+ * copy — plus its inputs (face photo, standard avatar) again, all byte
+ * identical (md5-verified). The dedupe guard existed but only the generic
+ * sweep read it, so two explicit walkers still queued two tasks for one image.
+ *
+ * Deduplicate, never delete: every diagnostic field still resolves to a URL,
+ * they just share the one object.
+ */
+describe('one object per distinct image, however many walkers claim it', () => {
+  it('the styled sheet in four slots is uploaded once and all four resolve to it', async () => {
+    const sheet = bytes('S');
+    const facePhoto = bytes('F');
+    const data: any = {
+      characters: [{
+        name: 'Max',
+        avatars: { styledAvatars: { pixar: { standard: sheet } } },
+      }],
+      sceneImages: [{
+        pageNumber: 3,
+        referencePhotos: [{ name: 'Max', photoUrl: sheet, originalPhotoUrl: sheet, photoData: facePhoto }],
+      }],
+      styledAvatarGeneration: [{
+        inputs: { facePhoto: { imageData: facePhoto }, standardAvatar: { imageData: sheet } },
+        output: { imageData: sheet },
+        passes: { pass1: { imageData: sheet } },
+      }],
+    };
+
+    await extractInlineImagesToR2('story_d5', data);
+
+    // Two distinct images in the blob → exactly two objects in R2.
+    expect(keysUploaded()).toHaveLength(2);
+    expect(new Set(keysUploaded()).size).toBe(2);
+
+    const sheetUrl = data.characters[0].avatars.styledAvatars.pixar.standard.imageUrl
+      || data.characters[0].avatars.styledAvatars.pixar.standard;
+    expect(String(sheetUrl)).toMatch(/^https:\/\/r2\.example\//);
+    // Every diagnostic slot survives — pointing at the same object. (The
+    // styled-avatar walkers move imageData → imageUrl by design.)
+    const sheetSlots = [
+      data.sceneImages[0].referencePhotos[0].photoUrl,
+      data.sceneImages[0].referencePhotos[0].originalPhotoUrl,
+      data.styledAvatarGeneration[0].output.imageUrl,
+      data.styledAvatarGeneration[0].passes.pass1.imageData,
+      data.styledAvatarGeneration[0].inputs.standardAvatar.imageUrl,
+      String(sheetUrl),
+    ];
+    for (const slot of sheetSlots) {
+      expect(String(slot)).toMatch(/^https:\/\/r2\.example\//);
+      expect(String(slot)).not.toContain('base64');
+    }
+    // …and they all point at the SAME object: one sheet, one upload.
+    expect(new Set(sheetSlots.map(String)).size).toBe(1);
+    // The face photo is its own image and keeps its own object.
+    expect(String(data.styledAvatarGeneration[0].inputs.facePhoto.imageUrl))
+      .toMatch(/^https:\/\/r2\.example\//);
+    expect(String(data.styledAvatarGeneration[0].inputs.facePhoto.imageUrl))
+      .not.toBe(String(sheetUrl));
+  });
+});
