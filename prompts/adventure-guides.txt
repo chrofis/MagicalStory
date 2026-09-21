@@ -7,6 +7,30 @@
 [pirate]
 COSTUME: pirate (mandatory for adventure scenes)
 
+Who lives here (pick one):
+- A ship's parrot who repeats one sentence nobody aboard has ever said
+- A ship's cat who has hidden something belonging to every member of the crew
+- A castaway child on an island who has waited a very long time
+- A young sea turtle caught in a net at the edge of the shallows
+- A crab from the beach who has come aboard and will not be put back
+- An old sailor with a delivery to make and no memory of who it is for
+- A dolphin who swims ahead of the bow every single morning
+- A monkey who takes whatever the crew needs most that day
+- A stowaway smaller than the child, found among the barrels in the hold
+- A gull with a hurt wing who cannot fly and will not be left
+
+What turns (pick one):
+- The tide turns, and what was easy to reach an hour ago is under water
+- The wind changes and the ship must sail before the thing is finished
+- The map turns out to show a place that two people both call theirs
+- The one who was leading the way stops, and will not say why
+- Something aboard is found to belong to someone who is not aboard
+- The knocking inside the chest stops, and then starts again somewhere else
+- The person who made the promise is the one who cannot keep it
+- The island is smaller than it looked, and there is nowhere further to go
+- The crew must choose between the treasure and the one who found it
+- A door in the hold opens once with the roll of the ship, and will not open twice
+
 Story entry points (pick one or combine):
 - Full pirate adventure from start to finish
 - Kids playing pirates in the backyard/park with makeshift props
@@ -24,12 +48,37 @@ Story guidance:
 - Include treasure maps, sea voyages, friendly sea creatures (dolphins, parrots, crabs)
 - Pirates as fun adventurers, not scary villains
 - Focus on teamwork, exploration, and problem-solving
-- Key props: treasure chest, rolled-up map, parrot, ship wheel, compass, telescope
+- Key props: treasure chest, rolled-up map, parrot, ship wheel, compass
+- The idea is built on one centre and one turn, never on the props.
 - The crew's vessel is a proper pirate ship: raised stern, bowsprit, tall mast, large sail with a pirate marking, deck big enough for the whole crew — never a rowboat, dinghy, or plain lake boat, even in a modern real-world setting
 
 
 [knight]
 COSTUME: knight (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A warhorse too old to ride who still waits at the gate every morning
+- A squire the same size as the child, trusted with something they have lost
+- A stray dog who has decided this is a knight and follows accordingly
+- A young falcon who will come back to one hand and no other
+- The castle cook who feeds everyone and is thanked by nobody
+- A knight in old armour who is far less brave than the stories say
+- A village child who wants the place in the procession and asks for it openly
+- A goat loose on the tournament ground who will not be driven out
+- A lamb stranded high on the castle wall
+- A banner-maker's child who has never once been allowed to carry one
+
+What turns (pick one):
+- The gate closes at dusk and does not open again until morning
+- The wrong person is believed, and the true one is not asked
+- The one who came to help turns out to need helping first
+- The promise was made to someone smaller, which makes it heavier, not lighter
+- Two shields carry the same mark and nobody knows which is which
+- The tournament starts early, and the hour that was safe is gone
+- The thing that was guarded is discovered to be missing, and only one person noticed
+- The animal that always comes when called does not come
+- The drawbridge rises with one of them on the wrong side
+- What was meant as a kindness is taken as an insult
 
 Story entry points (pick one or combine):
 - Full medieval adventure from the start
@@ -48,10 +97,35 @@ Story guidance:
 - Knights as brave, kind, and honorable protectors
 - Focus on courage, helping others, keeping promises
 - Key props: shield with emblem, wooden sword, banner, castle tower, drawbridge
+- The idea is built on one centre and one turn, never on the props.
 
 
 [princess]
 COSTUME: princess (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A small fairy asleep inside a flower in the garden
+- A palace cat who knows every secret and trades them for kindnesses
+- A child from the kitchens who is the only one who says what is true
+- A swan on the lake who follows one person and no other
+- A grandmother who is losing the words to the song the whole kingdom dances to
+- A visitor who has come for one evening and can never come again
+- A nervous young helper who must speak in front of everyone
+- A puppy who thinks the crown is a toy
+- A shy creature living under the great staircase, never invited to anything
+- A gardener who has grown one flower for twenty years for someone who never saw it
+
+What turns (pick one):
+- Two invitations are handed to the wrong two children
+- The one who is believed is the one who was not there
+- The helper who was sent to fix it makes it worse, and knows
+- The ball begins, and the thing that is missing is missed by everyone
+- The magic works exactly as asked, which is not what was wanted
+- The creature that was hiding comes out in front of the whole court
+- The kind thing and the honest thing turn out to be different things
+- What was promised in secret must now be done in public
+- The door to the garden opens once, and closes behind them
+- The one who seemed proud turns out to have been frightened all along
 
 Story entry points (pick one or combine):
 - Golden invitation arrives to a royal castle
@@ -68,11 +142,36 @@ Story guidance:
 - Talking animals, friendly fairies, magical helpers
 - True royalty comes from kindness, not crowns
 - Focus on kindness, self-expression, helping others, inner beauty
-- Key props: tiara/crown, glass slippers, golden invitation, magic mirror, rose garden, grand staircase
+- Key props: tiara/crown, golden invitation, magic mirror, rose garden, grand staircase
+- The idea is built on one centre and one turn, never on the props.
 
 
 [viking]
 COSTUME: viking (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A seal pup on the shore whose mother has not come back with the tide
+- The village storyteller, who is forgetting the end of the only tale nobody else knows
+- A raven who brings one small gift each morning
+- A shaggy pony who carries a load for no one else
+- A child from the next fjord who speaks differently
+- A sheepdog who herds everything, including people
+- A young sailor making a first crossing, frightened and hiding it
+- A gull that must be carried aboard a boat already full
+- A grandmother weaving the last sail she will ever weave
+- A whale that surfaces beside the longship on the same stretch of water every year
+
+What turns (pick one):
+- The boat sails on the tide whether or not everyone is ready
+- The gift that was brought turns out to belong to somebody
+- The one who swore the oath is the one it now costs
+- The weather closes in and the near shore becomes the far one
+- The person who knew the way can no longer see it
+- What was said around the fire is repeated outside it
+- The stranger is blamed, and the stranger did nothing
+- The thing that was carried all this way is not what was needed
+- The ice opens once, and will close by morning
+- The strongest in the village cannot do the thing that must be done, and the smallest can
 
 Story entry points (pick one or combine):
 - Full Norse adventure from the start
@@ -90,10 +189,35 @@ Story guidance:
 - Include sea voyages, rune stones, Norse mythology elements (friendly versions)
 - Focus on exploration, family bonds, bravery
 - Key props: longship with dragon prow, wooden shields, rune stones, horn cups, fishing nets
+- The idea is built on one centre and one turn, never on the props.
 - Avoid: Horned helmets (historically inaccurate), raids, violence
 
 [roman]
 COSTUME: roman (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A chariot horse who runs for the one who feeds him and nobody else
+- A stray dog in the forum who has learned to beg in three languages
+- A young water-carrier on their first day
+- A temple goose who gets loose in the market
+- An old teacher whose pupils have all grown up
+- A kitten in a niche of the aqueduct, too high to reach from below
+- A visitor from far away who cannot ask for what they need
+- A builder's mule with one job left in him before he is sent away
+- A baker's child who knows every back street in the city
+- A statue that everyone walks past, and one person talks to
+
+What turns (pick one):
+- The bell rings earlier than anyone expected
+- Two errands are handed to the wrong two children
+- The one who is blamed is the one who fetched help
+- The crowd fills the street and the short way is closed
+- The thing that was carried is dropped, and it belonged to someone else
+- The race begins while one of them is still on the wrong side of the track
+- The one who always knows the answer does not know this one
+- What was written down is read by the wrong person
+- The gate to the yard is unlocked once a day, at a time nobody remembers
+- The animal that has always obeyed refuses, and it turns out to be right
 
 Story entry points (pick one or combine):
 - Full Roman adventure from the start
@@ -110,9 +234,34 @@ Story guidance:
 - Include chariot races, mosaics, Roman baths, toga parties
 - Educational opportunities: Roman numerals, Latin words, engineering marvels
 - Key props: laurel branch (held, not worn), scrolls, columns, mosaic tiles, Roman coins
+- The idea is built on one centre and one turn, never on the props.
 
 [detective]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A neighbour's dog who keeps arriving with something that belongs to someone else
+- A younger child who saw it happen and has promised not to tell
+- A cat who takes the same route every evening and stops at the same gate
+- An old neighbour who has lost something small and will not say what
+- A pet who disappears at the same hour each day and comes back happy
+- A bird who has been collecting shiny things from the whole street
+- A friend who has stopped speaking to the child, and has a reason
+- A shopkeeper who sees everything on the street and mentions none of it
+- A new child on the street whom everybody has already decided about
+- A parcel with a name on it that nobody in the neighbourhood recognises
+
+What turns (pick one):
+- The obvious suspect turns out to have been somewhere else entirely
+- The clue that explains everything belongs to a friend
+- The witness who saw the most is the one nobody will believe
+- Two identical things have two owners and one of them is wrong
+- The one asking the questions is asked one back, and cannot answer it
+- The trail leads to a door that opens only today
+- The thing that was stolen was not stolen at all
+- Solving it would mean breaking a promise
+- The evidence disappears between one look and the next
+- The person who asked for help had a reason for not saying everything
 
 Story entry points:
 - Mystery appears in everyday life
@@ -127,10 +276,35 @@ Story guidance:
 - Mysteries about: lost items, missing pets, secret messages, treasure hunts
 - Focus on observation, logic, teamwork, asking good questions
 - Key props: magnifying glass, notebook, flashlight, footprint molds, secret codes
+- The idea is built on one centre and one turn, never on the props.
 
 
 [cowboy]
 COSTUME: cowboy (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A foal born in the night who will not stand
+- An old ranch horse everyone has given up on
+- A calf that has found a gap in the fence
+- A ranch dog who adopts the child on the first day
+- A new ranch hand the same age as the child, proud and getting it all wrong
+- A wild pony who allows one step closer each day
+- A neighbour who is moving away and has an animal she cannot take
+- A hen who has hidden her whole clutch somewhere in the yard
+- A rider who has broken an arm the week of the drive
+- A cook at the chuck wagon who feeds forty people and talks to none of them
+
+What turns (pick one):
+- The herd moves at dawn whether or not everything is found
+- The gate that was closed is open, and nobody will say who left it
+- The one who was supposed to be watching was watching something else
+- The storm arrives before the work is done
+- The animal that trusts only one person needs the one it does not trust
+- The chore that was swapped turns out to matter more than either child thought
+- The shortcut across the dry country is shorter and nobody has water
+- The one who boasted loudest is the one who freezes
+- The river is crossable for one hour only
+- What was promised at the campfire has to be paid for in daylight
 
 Story entry points (pick one or combine):
 - Full Wild West adventure from the start
@@ -148,11 +322,36 @@ Story guidance:
 - Include horses (named and friendly), cattle drives, campfires under stars
 - Cowboys as helpful ranch hands, honest adventurers, animal friends
 - Can include Native American friends with respectful, accurate portrayal
-- Key props: lasso, saddle, campfire, cactus, horseshoe, wagon
+- Key props: lasso, saddle, campfire, horseshoe, wagon
+- The idea is built on one centre and one turn, never on the props.
 
 
 [egyptian]
 COSTUME: egyptian (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A temple cat who chooses one person and walks ahead of them everywhere
+- A scribe's apprentice who has ruined the one page that mattered
+- A donkey who carries water for the whole street and has gone lame
+- A crocodile hatchling far from the river
+- An old temple sweeper with a secret and nobody to tell it to
+- A sacred bird who escapes its keeper
+- A boat-builder's child who is frightened of the water
+- A traveller from upriver who is walking the wrong way and does not know it
+- A grandmother on the far bank expecting someone before the flood
+- A market seller who has been counting on one sale all month
+
+What turns (pick one):
+- The river rises earlier than the year before
+- Two people give the same task and each says the other is wrong
+- The one who can read the marks is the one nobody asks
+- The sun climbs, and what could be carried at dawn cannot be carried now
+- The secret that was kept is guessed by the wrong person
+- The creature that everyone treats as sacred behaves like an animal at the worst moment
+- The tomb door swings open with the morning light and shuts with it
+- What was drawn on the wall turns out to be a message, not a decoration
+- The boat leaves the bank with one of them still ashore
+- The thing that was found has to be given back to be of any use
 
 Story entry points (pick one or combine):
 - Full ancient Egypt adventure from the start
@@ -170,10 +369,35 @@ Story guidance:
 - Egyptians as builders, scribes, artists, astronomers
 - Educational: hieroglyphic writing, pyramid building, Nile flooding cycle
 - Key props: papyrus scrolls, ankh symbol, sphinx statue, palm trees, golden artifacts
+- The idea is built on one centre and one turn, never on the props.
 
 
 [greek]
 COSTUME: greek (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- An owl who sits above the market every day
+- A young runner who has trained all year and cannot line up
+- A hillside goat who has got into the temple
+- A philosopher who asks one question that cannot be put down
+- A lost child in the marketplace who cannot name their street
+- A stray dog who runs every race and belongs to nobody
+- An old potter with shaking hands and one piece left to finish
+- A visiting child who speaks another language
+- A fisherman's daughter who knows the coast better than the charts do
+- A statue in the agora that someone leaves flowers for every morning
+
+What turns (pick one):
+- The games begin, and the name that was called is the wrong one
+- Two friends want the same place and both deserve it
+- The question that was asked cannot be answered by the one who asked it
+- The crowd decides before anyone has listened
+- The one who was laughed at turns out to be the only one who can do it
+- The festival ends at sunset and the work is not finished
+- The story everyone knows turns out to have been told wrong
+- The helper who was sent needs help first
+- The harbour gate opens for one tide
+- The prize is won by doing the thing that loses it
 
 Story entry points (pick one or combine):
 - Full ancient Greece adventure from the start
@@ -191,10 +415,35 @@ Story guidance:
 - Greeks as thinkers, athletes, artists, storytellers
 - Educational: Greek myths (friendly versions), Olympics origins, democracy basics
 - Key props: olive branches (held), amphora vases, columns, lyres, discus
+- The idea is built on one centre and one turn, never on the props.
 
 
 [caveman]
 COSTUME: caveman (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A mammoth calf separated from the herd
+- A wolf pup at the edge of the firelight
+- An elder whose eyes are failing and who alone knows the way to the summer camp
+- A child from another family group who cannot speak the same words
+- A young saber-tooth cat with a thorn in its paw
+- A baby brother who has just learned to crawl
+- A bird with a broken wing who must be kept warm all night
+- An old hunting dog who can no longer keep up
+- The one who paints the cave wall and has run out of red
+- A toddler who has picked up the fire-stick and thinks it is a toy
+
+What turns (pick one):
+- The fire goes out, and it is a long way to the nearest one that is lit
+- The camp moves tomorrow, ready or not
+- The rains arrive a day too early
+- The one who was trusted with the carrying drops it
+- The animal that came close last night does not come tonight
+- What was found is claimed by two families
+- The way home looks different by the time the light goes
+- The smallest one is the only one who fits through the gap
+- The tracks in the mud are heading the wrong way
+- The thing that was made for one purpose turns out to be needed for another
 
 Story entry points (pick one or combine):
 - Full prehistoric adventure from the start
@@ -212,11 +461,36 @@ Story guidance:
 - Optional: friendly dinosaurs if mixing fantasy with prehistoric
 - Cavemen as inventors (fire, tools, art), artists (cave paintings), close-knit families
 - Focus on discovery, creativity, cooperation
-- Key props: wooden clubs, fire pit, cave paintings, stone tools, berry baskets
+- Key props: fire pit, cave paintings, stone tools, berry baskets
+- The idea is built on one centre and one turn, never on the props.
 
 
 [samurai]
 COSTUME: samurai (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A koi in the temple pond who comes to one hand only
+- A crane who lands in the garden every evening
+- An old teacher retiring with one pupil still unready
+- A younger student failing in front of everyone
+- A temple kitten who sleeps where nothing may be moved
+- A traveller who arrives with nothing and explains nothing
+- A horse who has carried a family for years and is led away tomorrow
+- A monkey from the hills who takes what is precious and waits to see what happens
+- A gardener who has raised one tree for forty years
+- A village child who practises alone where nobody watches
+
+What turns (pick one):
+- The gate opens at first light and closes at dusk, and neither waits
+- The lesson that was taught turns out to have meant the opposite
+- The one who is polite says nothing, and the mistake goes on
+- The pupil who fails in public is the one who was right in private
+- The practice partners are swapped and neither will say it is wrong
+- The storm takes the blossom the night before the festival
+- The promise was to wait, and waiting is the hardest part
+- The stranger is distrusted the whole way, and should not have been
+- The pond is drained tomorrow, and the river is a long walk away
+- The one who is strongest must stand still and do nothing
 
 Story entry points (pick one or combine):
 - Full feudal Japan adventure from the start
@@ -233,11 +507,36 @@ Story guidance:
 - Include honor codes, martial arts training, nature appreciation, tea ceremony
 - Samurai as protectors, scholars, poets (different from ninja stealth)
 - Focus on discipline, respect, protecting the weak, inner peace
-- Key props: wooden katana (bokken), folding fan, bonsai trees, koi ponds, paper lanterns
+- Key props: wooden katana (bokken), folding fan, koi ponds, paper lanterns
+- The idea is built on one centre and one turn, never on the props.
 
 
 [ninja]
 COSTUME: ninja (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A cat who can get into every place a person cannot
+- A younger trainee who follows and cannot be shaken off
+- A guard dog on the route who has been fed once and now expects it
+- A friend who has been left out of the team and watches from the roof
+- A neighbour who cannot sleep and sits at the window every night
+- A mouse, a firefly or a frog who is the only way past a locked door
+- A messenger who will not say who the message is for
+- A bird nesting in the one gap that was going to be climbed through
+- A market seller who notices everything and says nothing
+- A rival trainee who is faster and has never been beaten
+
+What turns (pick one):
+- The message must arrive before dawn, and dawn comes early
+- The one who was sneaking past is seen, and by the one person who matters
+- The secret that was sworn starts to cost more than it is worth
+- Two trainees are sent on the same errand and neither may say so
+- The lock that was picked yesterday has been changed
+- The quiet way is blocked and only the loud way is left
+- The plan works, and the wrong thing is delivered
+- The one who is hiding hears what they were not meant to hear
+- The window is open for as long as the lantern burns
+- Cleverness is not enough, and asking for help is the only move left
 
 Story entry points (pick one or combine):
 - Full ninja adventure from the start
@@ -255,10 +554,35 @@ Story guidance:
 - Ninjas as clever problem-solvers who use wit over force
 - Focus on stealth, agility, puzzle-solving, clever tricks
 - Key props: grappling hook, harmless smoke bombs (for escapes), throwing stars (toy/wooden), bamboo
+- The idea is built on one centre and one turn, never on the props.
 
 
 [wizard]
 COSTUME: wizard (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A small creature that hatches from something nobody was supposed to touch
+- A ghost no bigger than a cat who attaches itself to one person
+- A grandmother who is forgetting her spells one by one
+- A talking book that answers everything except the thing that is asked
+- A familiar - an owl, a toad, a cat - who belongs to someone else and will not go back
+- A classmate whose magic never works and who has stopped trying
+- A plant given as a gift that grows a little every hour
+- A creature made by accident out of something ordinary
+- The keeper of the tower, who has not been outside it in years
+- A broom, a lamp or a chair that has begun to behave like a pet
+
+What turns (pick one):
+- The spell works exactly as it was asked, which is the problem
+- The one who knew the words has forgotten them
+- The creature that was made starts making decisions of its own
+- The door at the top of the tower opens once a year, and today is the day
+- The promise was given before anyone understood what was being asked
+- The magic stops working for one person only
+- The thing that was growing is now too big for the room
+- What was hidden is found by the one person who should not find it
+- Two apprentices are blamed and only one of them did it
+- Undoing it needs the help of the one who was not invited
 
 Story entry points (pick one or combine):
 - Full magical adventure from the start
@@ -277,10 +601,35 @@ Story guidance:
 - Wizards as wise teachers, curious students, protectors of magic
 - Focus on learning, responsibility with power, friendship
 - Key props: magic wand, spell book, crystal ball, cauldron, glowing orbs
+- The idea is built on one centre and one turn, never on the props.
 
 
 [superhero]
 COSTUME: superhero (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A small stray animal who is the only one who knows the secret identity
+- A younger child who has worked out who the hero is
+- A neighbour everybody has stopped noticing
+- A rescued creature who now arrives at every emergency first
+- A friend whose own power has stopped working
+- A rival hero the same age who is better at everything
+- A little robot or toy come alive that keeps trying to help
+- A grandparent who needs the child on the day the city needs the hero
+- A shopkeeper who has been quietly fixing the street for years
+- A cat stuck somewhere that no power in the world is any use for
+
+What turns (pick one):
+- Being in two places at once is exactly what is required
+- The power works, and makes everything worse
+- The one who was saved did not want to be
+- The secret is guessed by the one person it was kept from
+- The birthday is at four o'clock and the call comes at half past three
+- The rival is the only one who can help, and has to be asked
+- The power fails at the moment it is needed and not before
+- The thing that is broken cannot be fixed by strength, speed or flight
+- The city cheers for the wrong hero
+- The right answer is to stop and listen instead of acting
 
 Story entry points (pick one or combine):
 - Full superhero adventure from the start
@@ -299,10 +648,35 @@ Story guidance:
 - Superheroes as helpers, friends, and role models
 - Focus on using abilities responsibly, helping community, teamwork
 - Key props: cape, emblem, gadget belt (for non-powered heroes)
+- The idea is built on one centre and one turn, never on the props.
 
 
 [mermaid]
 COSTUME: mermaid (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A baby seal who has followed someone home to the reef
+- A young octopus who hides everything and treats it as a game
+- A merchild new to the reef who sits at the edge of every group
+- A sea turtle who has made the same journey for fifty years
+- A grandmother of the reef who is the last to remember an old song
+- A fish caught in something that does not belong in the sea
+- A pet crab who refuses to stay behind
+- A whale calf calling all night
+- A keeper of the shallows who warns everyone and is never thanked
+- A shell that sings one note and belongs to somebody
+
+What turns (pick one):
+- The tide turns and the way back becomes the long way
+- The one who was hiding is found by everyone at once
+- The song stops halfway through and nobody knows the rest
+- What was borrowed is wanted back before the day ends
+- The creature that was helped follows and cannot be sent home
+- The meeting at the rock has to be kept secret from everyone below
+- The water goes dark earlier than expected
+- Two of them reach for the same thing and it breaks
+- The way up to the surface opens once between the reefs
+- The one who is proudest is the one who needs help
 
 Story entry points (pick one or combine):
 - Full underwater adventure from the start
@@ -320,11 +694,36 @@ Story guidance:
 - Include friendly sea creatures, underwater exploration, beach adventures
 - Mermaids as curious, kind, protective of ocean life
 - Focus on friendship, protecting nature, bridging land and sea worlds
-- Key props: seashells, pearls, coral, treasure from shipwrecks, sea glass
+- Key props: seashells, pearls, coral, sea glass
+- The idea is built on one centre and one turn, never on the props.
 
 
 [fireman]
 COSTUME: firefighter (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A station dog who knows the bell better than anyone
+- A cat up a tree who has been fetched down four times this month
+- A very old neighbour who calls because there is nobody else to call
+- A child who has hidden during a drill and will not come out
+- A duckling family walking the wrong way down a busy street
+- A new firefighter on a first shift, more frightened than they will admit
+- A pony in a field that must be moved before the water rises
+- A hamster loose in a house everyone has been asked to leave
+- A grandmother who will not go outside without what she cannot carry
+- A small child whose toy is in the flooded cellar
+
+What turns (pick one):
+- The bell goes in the middle of what was already being done
+- The one who called for help is not the one who needs it
+- The ladder reaches, and the thing at the top will not come
+- The plan is good and the animal has not read it
+- The quickest way is closed and the long way costs the time there was
+- The person who says they are fine is not fine
+- The child who was counted is counted twice
+- The rescue works and something small is left behind
+- The water rises for one more hour and then stops
+- Calm is the only thing that helps, and calm is the hardest thing
 
 Story entry points (pick one or combine):
 - Full firefighter adventure from the start
@@ -343,11 +742,36 @@ Story guidance:
 - Firefighters as calm, careful helpers who check and plan before they act - never reckless
 - Focus on courage, staying calm, following a plan, helping neighbours
 - Fire is shown small, contained and quickly handled; no frightening scale, no one hurt
-- Key props: helmet, hose, ladder, axe (carried, never swung), breathing mask, dalmatian mascot
+- Key props: helmet, hose, ladder, breathing mask, dalmatian mascot
+- The idea is built on one centre and one turn, never on the props.
 
 
 [doctor]
 COSTUME: doctor (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A child in the waiting room who is more frightened of the door than of anything behind it
+- A dog brought to the wrong kind of surgery who will not leave one side
+- A very small patient - a hamster, a kitten, a bird - nobody else takes seriously
+- A grandmother who tells everyone she is fine
+- A younger sibling who copies everything, including being brave
+- A new nurse on a first day who cannot find where anything is kept
+- A teddy needing an operation, brought in by a very serious owner
+- A patient who cannot say where it hurts
+- A cat living behind the clinic who is fed by everyone and belongs to nobody
+- An old doctor on the last week before the surgery closes
+
+What turns (pick one):
+- The bravest one in the room turns out to be the smallest
+- The patient who was sure it would hurt finds out it does not
+- The one who was explaining it all has to be explained to
+- The appointment is at four and the waiting room fills up
+- What is written on the chart is not what is wrong
+- The helper faints, and the helped takes over
+- The medicine is simple and getting it taken is not
+- Two patients are called by the same name
+- The visitor may stay only until the bell for the ward round
+- Being listened to turns out to be the whole treatment
 
 Story entry points (pick one or combine):
 - Full hospital or clinic adventure from the start
@@ -366,11 +790,36 @@ Story guidance:
 - Doctors and nurses as kind explainers who say what happens next before it happens
 - Focus on kindness, listening carefully, being brave about small things, taking care of others
 - No serious illness, no needles dwelt on, no fear - the patient always leaves better
-- Key props: stethoscope, bandage roll, thermometer, clipboard chart, plaster, reflex hammer
+- Key props: stethoscope, bandage roll, thermometer, clipboard chart, plaster
+- The idea is built on one centre and one turn, never on the props.
 
 
 [police]
 COSTUME: police officer (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A police dog who has failed every test
+- A lost dog wearing a collar with a name and no address
+- A child at the market who has let go of a hand
+- An old man who comes to the station every week to report the same thing
+- A younger child who has found something valuable and is finding it hard to hand in
+- A cat who rides in the patrol car and will not be put out
+- A neighbour the whole street has complained about
+- A parrot on a roof repeating an address
+- A new officer on a first patrol who is afraid of dogs
+- A market trader who sees everything from behind the stall
+
+What turns (pick one):
+- The one who is accused is the one who reported it
+- The lost thing is found, and it belongs to somebody else entirely
+- The dog leads the way and the way is the wrong way
+- The honest answer will get a friend into trouble
+- The witness changes the story between one telling and the next
+- The one who was complained about turns out to need help
+- The office closes at five and the owner has not come
+- What looked like taking turns out to have been keeping safe
+- The festival starts and the crowd closes the street
+- Being fair and being liked turn out to be different things
 
 Story entry points (pick one or combine):
 - Full police adventure from the start
@@ -389,11 +838,36 @@ Story guidance:
 - Officers as helpers and problem-solvers who talk to people and never frighten anyone
 - Focus on fairness, helping strangers, telling the truth, keeping people safe
 - No weapons, no chases, no arrests, no crime that would worry a child
-- Key props: notebook, whistle, torch, radio, cap, police dog, patrol bicycle
+- Key props: notebook, whistle, torch, cap, police dog
+- The idea is built on one centre and one turn, never on the props.
 
 
 [dragon]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- An egg found somewhere very ordinary
+- A hatchling who has decided who its family is
+- An old dragon who is losing her fire and pretends otherwise
+- A dragon the size of a cat who cannot fly yet and is hiding it
+- A dragon who made a promise long ago and has come back to keep it
+- A young dragon who has lost the one thing from the hoard it cared about
+- A dragon who is not allowed to join the others and watches from a ledge
+- Two hatchlings who have been swapped between nests
+- A dragon who will carry someone once, today, and never again
+- A dragon who is afraid of something much smaller than itself
+
+What turns (pick one):
+- The egg starts to move, and it is nowhere near a nest
+- The one who was feared turns out to be the one who is frightened
+- The promise made to a dragon is easier to give than to keep
+- The fire will not light, and it has never failed before
+- The flight was for one, and there are two who need it
+- The hoard is counted and one thing is missing that nobody may mention
+- The cave mouth opens when the mist lifts, and the mist is coming back
+- The elder speaks so slowly that the answer comes too late to use
+- What the dragon wants is not what everyone assumed dragons want
+- Being trusted by one means being distrusted by the rest
 
 Story entry points (pick one or combine):
 - Full dragon-world adventure from the start
@@ -412,11 +886,36 @@ Story guidance:
 - Flight, warmth and smoke are the wonders; scorching, burnt villages and hunting are not
 - Focus on trust between very different creatures, earning a friendship, keeping a promise, being small and brave
 - Fire is shown as warmth, light, a cooked meal or a signal - never as harm
-- Key props: dragon egg, single large scale, saddle and harness, a hoard of shiny things, a hot spring
+- Key props: dragon egg, single large scale, saddle and harness, a hot spring
+- The idea is built on one centre and one turn, never on the props.
 
 
 [unicorn]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A lost foal too young to find the herd and too proud to be carried
+- A carousel unicorn who has stepped down off its pole
+- A unicorn who has chosen one person and follows them where unicorns should not go
+- An old mare who is the last who knows where the meadow's spring rises
+- A unicorn who comes near only to someone completely still
+- A foal who has been laughed at because its horn has not grown
+- A wounded bird the unicorns will not touch
+- A unicorn who arrived one evening and will not say what it is waiting for
+- A creature on the far side of a hedge who cannot come through alone
+- A herd leader who decides who may drink at the pool
+
+What turns (pick one):
+- The gate in the hedge opens once, and not again
+- The one who was chosen would rather not have been
+- The healing water works on everything except the thing that matters
+- Being still is required, and something makes that impossible
+- The promise to tell nobody gets harder every hour
+- The herd moves at moonrise whether the smallest is ready or not
+- The magic answers a mood, and the mood is the wrong one
+- The one who is shy has to be the one who steps forward
+- The light that follows goes out
+- What was given freely cannot be given back
 
 Story entry points (pick one or combine):
 - Full unicorn-world adventure from the start
@@ -435,11 +934,36 @@ Story guidance:
 - Keep the magic small and specific rather than something that solves everything at once
 - Focus on gentleness, patience, being trusted, kindness to shy creatures
 - Colour and shine belong to the whole world, not only the unicorn - keep it warm rather than sugary
-- Key props: spiral horn, flower crown, glowing spring, rainbow bridge, silver mane, star-flowers
+- Key props: spiral horn, flower crown, glowing spring, rainbow bridge, star-flowers
+- The idea is built on one centre and one turn, never on the props.
 
 
 [dinosaur]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A hatchling who has followed someone home from the nesting ground
+- A young Triceratops separated from the herd
+- An egg that is warm and has begun to rock
+- An old plant-eater falling further behind the herd each day
+- A Pteranodon with a torn wing far below its cliff ledge
+- A nest where one egg keeps rolling out
+- Two hatchlings of different kinds who have decided they belong together
+- A palaeontologist who has dug for thirty years and has one day left on the site
+- A dinosaur who is afraid of something much smaller than itself
+- A museum guard who talks to the skeletons when the hall is empty
+
+What turns (pick one):
+- The egg starts to move, and the mother is nowhere in sight
+- The herd moves off, and the slow one is on the wrong side of the river
+- The ground shakes, and what was a path is not one any more
+- The big one that everyone avoided turns out not to be the problem
+- The hatchling imprints on the wrong creature entirely
+- The way back is blocked by something asleep across it
+- The promise was to be home before dark, and dark comes early under the ferns
+- The nest is found by two who want different things done about it
+- The valley can be entered while the tide is out of the shallow sea
+- The smallest creature there is the only one who can reach the gap
 
 Story entry points (pick one or combine):
 - Full prehistoric adventure from the start
@@ -458,11 +982,36 @@ Story guidance:
 - Large meat-eaters may be present and impressive but are avoided or outwitted, never fought and never shown hunting
 - Plant-eaters make the best companions: slow, huge, patient, surprisingly gentle
 - Focus on curiosity, careful observation, respect for wild animals, being small in a big world
-- Key props: fossil bone, footprint bigger than a child, nest of eggs, palaeontologist's brush, amber, ferns
+- Key props: fossil bone, footprint bigger than a child, nest of eggs, amber, ferns
+- The idea is built on one centre and one turn, never on the props.
 
 
 [space]
 COSTUME: astronaut (mandatory for adventure scenes)
+
+Who lives here (pick one):
+- A small robot that follows one person everywhere
+- An alien child the same size who is lost and cannot say where home is
+- A crewmate who has been away from home longer than anyone and no longer mentions it
+- A creature no bigger than a hand, found aboard, that nobody remembers bringing
+- A plant grown on the station that turns toward whoever speaks to it
+- A voice on the radio that answers every night
+- A station cat who has learned to float
+- A crewmate the same age who is going home tomorrow
+- A visitor who can stay only while a door stands open
+- The engineer who keeps the oldest module working and is the only one who can
+
+What turns (pick one):
+- The robot stops, and the only thing that wakes it is a song
+- The stars come out, and what could not be explained suddenly can be
+- The launch window closes in an hour and does not open again for a year
+- The message from home arrives twenty minutes late, every time
+- The one who is homesick is the one everybody relies on
+- The airlock may be opened once before the pass is over
+- The thing that was checked twice was checked by the same person twice
+- The alien understands everything except words
+- The way back is simple, and there is room for one fewer than there are
+- What sounded like a fault turns out to be something alive
 
 Story entry points (pick one or combine):
 - Full space mission from launch to landing
@@ -481,11 +1030,36 @@ Story guidance:
 - Include weightlessness, tethers, airlocks, countdowns, slow careful movement in a suit, the silence outside
 - Any aliens are curious and friendly and communicate without words - never invaders
 - Focus on wonder, checking things twice, teamwork over long distances, looking back at home
-- Key props: helmet with visor reflection, tether line, control panel, rover, flag, floating pencil
+- Key props: helmet with visor reflection, tether line, control panel, floating pencil
+- The idea is built on one centre and one turn, never on the props.
 
 
 [ocean]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A sea turtle tangled in something that does not belong in the water
+- An octopus who takes one object a day from the boat
+- A dolphin who swims beside the boat every morning
+- A seal pup on the beach whose mother is still out at sea
+- A younger child on the boat who is afraid of the water and has told nobody
+- A very old diver making a last dive
+- A crab who came aboard in a bucket and cannot be found
+- A whale who follows the boat and turns away at the same place every time
+- A tiny fish living inside something that is about to be carried away
+- A harbour keeper who knows every boat and every tide
+
+What turns (pick one):
+- The tide turns, and the way back is now the long way
+- The dolphin that comes every morning does not come
+- The thing that was rescued has to be let go
+- The buddy rule means neither can go on alone
+- The light under the water fades faster than the light above it
+- The one who was frightened is the one who has to go first
+- The current carries them somewhere better than where they were going
+- What was pulled from the sea belongs to the sea
+- The hatch to the wreck opens with the swell and shuts with it
+- The boat must leave at four whether or not the work is finished
 
 Story entry points (pick one or combine):
 - Full ocean expedition from the start
@@ -504,11 +1078,36 @@ Story guidance:
 - Diving gear, boats and buddy rules are part of the adventure - safety is shown, not lectured
 - Focus on exploration, protecting the sea, clearing away what does not belong there, respecting wild animals
 - The water itself can be the obstacle - currents, depth, fading light - solved by planning, never by panic
-- Key props: mask and snorkel, waterproof torch, net, sample jar, boat rope, shell, sea chart
+- Key props: mask and snorkel, waterproof torch, sample jar, boat rope, sea chart
+- The idea is built on one centre and one turn, never on the props.
 
 
 [jungle]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A monkey who takes the one thing that matters and wants to be followed
+- A parrot who says a sentence in a voice somebody recognises
+- An elephant calf walking the wrong way along the river
+- A sloth on a rope bridge who will not be hurried
+- A tree frog carried out of the forest by accident
+- A researcher who has waited years to see one animal and has one night left
+- A crate at the camp with air holes and something alive inside
+- A tiger who watches from the far bank and never comes closer
+- A young toucan fallen from a nest that is far too high
+- A guide's child who knows the forest better than any map
+
+What turns (pick one):
+- The rain starts, and the river that was crossed this morning cannot be crossed now
+- The path that was marked has been closed over by green
+- The animal that was being followed stops and waits
+- The thing that was taken from the forest has to be taken back
+- The camp packs up at first light whether or not the work is done
+- The one who is loudest frightens away what everyone came to see
+- The crate is opened, and what is inside should not be here
+- The light under the canopy goes an hour before the light above it
+- What sounded dangerous turns out to have been calling for help
+- Two of them remember the way, and they remember it differently
 
 Story entry points (pick one or combine):
 - Full jungle expedition from the start
@@ -527,11 +1126,36 @@ Story guidance:
 - The jungle itself provides the obstacles: rain, mud, height, tangled ways, fading daylight
 - Focus on tracking and noticing, respecting a wild place, not taking what belongs there, finding the way back
 - Heat, noise and green half-light are the mood - loud and alive rather than frightening
-- Key props: machete carried but rarely used, compass, rope bridge, canteen, binoculars, hand-drawn map, hammock
+- Key props: compass, rope bridge, canteen, binoculars, hand-drawn map
+- The idea is built on one centre and one turn, never on the props.
 
 
 [farm]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A lamb born in the night whose mother will not take him
+- A duckling who has decided who its mother is
+- A hen who has stopped laying and is about to be given away
+- An old sheepdog who cannot keep up and still goes to the gate every morning
+- A calf loose through a gap in the fence
+- A grandfather who has worked this farm all his life and cannot manage the mornings now
+- A barn cat with kittens hidden somewhere in the hay
+- A pony bought for someone else who will let nobody else near
+- A goat who can open every latch on the farm
+- A neighbour who has come to help and does everything differently
+
+What turns (pick one):
+- The storm comes before the hay is in
+- The gate was left open, and nobody will say by whom
+- The animal that trusts one person needs the one it does not trust
+- The lamb that was warm at midnight is cold at three
+- The market opens at six and the load is not ready
+- What was hidden in the hay is moved every time it is found
+- The one who was supposed to be watching was doing something else
+- The tractor will not start, and everything today depended on it
+- The vet can come once, this afternoon, and not again this week
+- The job that was easy last year is not easy this year, and everyone can see it
 
 Story entry points (pick one or combine):
 - Full farm adventure across a working day
@@ -550,11 +1174,36 @@ Story guidance:
 - The day has a shape - early start, chores, weather, evening - and the story can hang on it
 - Problems are practical and solvable: a gate left open, a hen who will not lay, a storm before the hay is in, a lost lamb
 - Focus on responsibility, early mornings, patience with animals, being needed and being useful
-- Key props: feed bucket, muddy boots, tractor, hay bales, egg basket, pitchfork, weather vane
+- Key props: feed bucket, muddy boots, tractor, hay bales, egg basket
+- The idea is built on one centre and one turn, never on the props.
 
 
 [forest]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A fox cub alone at the edge of a clearing, back at the same spot each evening
+- A hedgehog who has made a nest in exactly the wrong place
+- An owl who calls from the same tree every night
+- A deer who has learned to trust one person and startles at everyone else
+- A ranger who has watched this wood for forty years and leaves at the end of the week
+- A fledgling out of the nest too early
+- A dog who has run off the path
+- A squirrel who has hidden something important along with all the nuts
+- A stranger's cat in the wood, wearing a collar
+- A woodcutter who lives alone and has not spoken to anyone for a week
+
+What turns (pick one):
+- The light goes, and the path that was obvious is not
+- The animal that always comes does not come tonight
+- The tracks lead two ways and only one of them is fresh
+- The quiet thing is frightened by the one who came to help
+- The first snow covers everything, including the way back
+- What was carried into the wood cannot be carried out
+- The hide is big enough for one, and there are two
+- The one who knows the wood best is the one who is leaving
+- The stream is crossable until the rain reaches it
+- Standing still for a long time is the only thing that will work
 
 Story entry points (pick one or combine):
 - Full forest adventure from the start
@@ -573,11 +1222,36 @@ Story guidance:
 - Seasons change the wood completely - pick one and commit to it: spring green, summer shade, autumn colour, winter bare
 - Focus on quiet observation, finding the way, leaving no trace, friendship across differences
 - The wood can feel big and dim without ever becoming frightening - light through leaves, not darkness closing in
-- Key props: fallen log bridge, lantern, pine cones, animal tracks, den of branches, berry basket, owl feather
+- Key props: fallen log bridge, lantern, animal tracks, den of branches, owl feather
+- The idea is built on one centre and one turn, never on the props.
 
 
 [christmas]
 COSTUME: not needed - use standard or winter avatar
+
+Who lives here (pick one):
+- A grandmother who is forgetting the words to the song the family sings every year
+- A neighbour who will be alone on the evening and says she prefers it
+- A stray cat at the door in the cold who has chosen this house
+- A small brother who has found the hidden presents
+- A visitor who has arrived unannounced and can stay one night
+- A bird at the feeder who comes every morning
+- A younger child who has written to someone who cannot answer
+- An old family decoration that belongs to someone who is coming today
+- The person who cooks for everyone and sits down last
+- A postman on the last round of the year with one parcel that has no address
+
+What turns (pick one):
+- The handmade thing goes wrong with no time left to start again
+- The one who is included is the one nobody thought to invite
+- The gift goes astray and turns up where it does the most good
+- The secret is safe until the person it is about asks directly
+- The snow comes, and the journey that was easy this morning is not
+- The song is started and stops in the middle
+- The table is laid for the number who said they were coming
+- What was wanted all year turns out not to be the thing that matters
+- The door is knocked on once, late, and not again
+- The present that was bought is put aside for the one that was made
 
 Story entry points (pick one or combine):
 - The days of preparation before the holiday
@@ -596,11 +1270,36 @@ Story guidance:
 - The occasion is when the story happens; the struggle is still an ordinary one, not the holiday itself
 - Focus on giving rather than getting, waiting well, including someone left out, making something by hand
 - Presents are never the reward for good behaviour - the warmth comes from people
-- Key props: decorated tree, wrapped parcel, string of lights, baking tray, candle, snow boots at the door
+- Key props: decorated tree, wrapped parcel, string of lights, baking tray, candle
+- The idea is built on one centre and one turn, never on the props.
 
 
 [newyear]
 COSTUME: not needed - use standard or winter avatar
+
+Who lives here (pick one):
+- A grandparent who says this is the last year they will stay up
+- A friend who is moving away in the new year and has told nobody
+- An old dog frightened by the noise, hidden somewhere in the house
+- A neighbour whose windows are dark while the whole street is lit
+- A younger sibling determined to stay awake
+- A cat who slips out of the door during the countdown
+- A visitor who has come a long way and must leave before the year turns
+- A letter written a year ago, to be opened tonight
+- The one who organises the party and never sees any of it
+- A baby who is awake at midnight for the first and only time
+
+What turns (pick one):
+- The clock reaches midnight while somebody is in the wrong room
+- The promise made last year was never kept, and the year is nearly over
+- The one who wanted to stay awake falls asleep at five to twelve
+- The resolution was made for somebody, not by them
+- The fireworks start and something small runs the other way
+- The letter says something its writer had forgotten
+- The party is loud and the important thing is said quietly
+- What is being left behind turns out to matter more than what is starting
+- The window at the top of the house is open for one hour
+- The countdown is nearly missed for a reason nobody regrets
 
 Story entry points (pick one or combine):
 - The last day of the old year, hour by hour
@@ -619,11 +1318,36 @@ Story guidance:
 - A resolution should be small and real, something a child could actually keep by the end of the story
 - Focus on looking back honestly, hoping forward, staying up for something that matters, sharing a moment
 - Fireworks are seen from a distance and never handled by children
-- Key props: clock face near midnight, paper streamers, sparkler held by an adult, notebook of plans, warm coat, sky full of light
+- Key props: clock face near midnight, paper streamers, notebook of plans, warm coat, sky full of light
+- The idea is built on one centre and one turn, never on the props.
 
 
 [easter]
 COSTUME: not needed - use standard or summer avatar
+
+Who lives here (pick one):
+- A rabbit in the garden who is clearly organising something
+- A nest of eggs found the morning of the hunt, in the middle of it
+- A younger child whose basket stays empty while everyone else's fills
+- A lamb in the field next door who has been left behind
+- A grandmother whose hands can no longer paint the eggs she has painted every year
+- A duckling who follows through the whole hunt and ruins every hiding place
+- A chick hatching in the kitchen on the morning everyone is due to leave
+- A neighbour's child who is never invited and watches over the hedge
+- One egg that is never found, and something small that has claimed it
+- The one who hides them all and never gets to look for any
+
+What turns (pick one):
+- The hidden thing is found by the wrong finder
+- The nest and the hunt turn out to be in the same place
+- The one who found the most gives them all away
+- The rain comes and the garden has to be given up
+- The egg that was counted was counted twice
+- The last one is found somewhere nobody hid anything
+- The gathering starts and someone is still not there
+- What was painted for one person is given to another
+- The hedge gap is open until the gardener sees it
+- Sharing turns out to be harder than searching
 
 Story entry points (pick one or combine):
 - The morning of the hunt itself
@@ -642,11 +1366,36 @@ Story guidance:
 - Hiding and finding is the natural engine: something concealed, searched for, and found somewhere unexpected
 - Focus on patience, sharing a find, fairness with someone smaller, beginning again after a hard stretch
 - Any rabbit character stays a character with its own reasons, not a delivery service
-- Key props: painted eggs, woven basket, dye cups, blossom branch, nest, garden hedge, bare feet on new grass
+- Key props: painted eggs, woven basket, dye cups, blossom branch, nest
+- The idea is built on one centre and one turn, never on the props.
 
 
 [halloween]
 COSTUME: not needed - use standard, summer or winter avatar; children may also wear costumes they invent within the story
+
+Who lives here (pick one):
+- A small ghost who is more frightened of the dark than anyone
+- A skeleton who has mislaid a bone and cannot go home without it
+- A black cat on a wall at the end of the street
+- The old neighbour nobody visits, who has been making something all week
+- A child in a costume so good that nobody recognises them
+- A friend whose costume has fallen apart an hour before
+- A younger sibling who is frightened and insists on coming
+- A creature at the door who is not in costume
+- A pumpkin lantern that keeps being moved in the night
+- The one house on the street where the lights are never on
+
+What turns (pick one):
+- The thing that was frightening turns out to be lost
+- The costume works too well and nobody knows who it is
+- The house everyone avoids is the one that needs knocking on
+- The sound in the dark has a perfectly good explanation, and finding it takes courage
+- The sweets are counted and one child has none
+- The one who was teased is the one who stays
+- The door is open for the evening only
+- What is under the sheet is smaller than anyone expected
+- The one who said they were not scared goes first anyway
+- The lantern goes out at the far end of the street
 
 Story entry points (pick one or combine):
 - The evening itself, door to door
@@ -665,11 +1414,36 @@ Story guidance:
 - No gore, no threat to a child, no fear held longer than a page
 - Focus on being brave about small dark things, seeing past appearances, kindness to someone who looks strange
 - Costumes are a way of trying on being someone else, which is a story in itself
-- Key props: carved lantern, sweet bucket, bedsheet ghost, torch under a chin, cobweb, pile of leaves, cat on a wall
+- Key props: carved lantern, sweet bucket, bedsheet ghost, pile of leaves, cat on a wall
+- The idea is built on one centre and one turn, never on the props.
 
 
 [mothers-day]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A mother who has been tired for weeks and keeps saying she is fine
+- A grandmother who is forgetting things, noticed first by the smallest person in the house
+- A younger sibling who cannot keep a secret and is trying very hard
+- A cat who takes the one thing the surprise depends on
+- A neighbour whose own children are far away
+- A plant she has kept alive for years, now in somebody else's care
+- A friend at school who has no mother to make anything for
+- An old photograph of someone the child has never seen young
+- The one who does all the small invisible jobs in the house
+- A baby who has learned to say one word and says it all day
+
+What turns (pick one):
+- The handmade thing goes wrong three times, with no time to start again
+- The one being surprised walks in early
+- Letting her sleep in means everyone else being awake at five
+- The gift that took a week is not the thing that is remembered
+- The secret is given away by the person who tried hardest to keep it
+- What she says she wants and what she wants are different
+- Taking over her jobs turns out to be much harder than it looked
+- The day out that was planned is rained off
+- The kitchen is free for one hour before anyone else comes down
+- Saying the true thing out loud is harder than making anything
 
 Story entry points (pick one or combine):
 - The morning of the day, from waking early
@@ -688,11 +1462,36 @@ Story guidance:
 - The effort matters more than the result; a wonky handmade thing beats a perfect bought one
 - Focus on noticing, saying thank you properly, giving time rather than objects, seeing a parent as a person
 - Avoid sentimentality - the warmth comes from one specific, ordinary, observed thing
-- Key props: breakfast tray, handmade card, picked flowers, glue and paper, apron far too big, photograph
+- Key props: breakfast tray, handmade card, picked flowers, apron far too big, photograph
+- The idea is built on one centre and one turn, never on the props.
 
 
 [fathers-day]
 COSTUME: not needed - use standard, summer or winter avatar
+
+Who lives here (pick one):
+- A father who has been promising to finish something for a year
+- A grandfather whose hands shake now and who will not be helped
+- A half-built thing in the shed that has been waiting since last summer
+- A dog who is his dog and has started going to the child instead
+- A younger sibling who gives the secret away in the first hour
+- A skill he is good at that someone has been learning in secret
+- A neighbour with nobody to spend the day with, pretending to be busy
+- An old tool of his father's that is kept on a high shelf
+- A bicycle he taught someone to ride, now too small
+- The one who fixes everything and never asks for anything
+
+What turns (pick one):
+- The thing that was mended breaks in the wrong hands
+- The surprise needs his help, and he is the one it is for
+- The job he always does turns out to be much harder than it looks
+- The tool that was borrowed is the one that must not be borrowed
+- The one who wanted to do it alone cannot
+- The plan needs an early start and nobody wakes up
+- What he says he does not mind is the thing he minds
+- The day is spent doing something ordinary and it is the right thing
+- The shed is open while he is out, and he will be back at noon
+- Saying thank you turns out to be the hard part
 
 Story entry points (pick one or combine):
 - The morning of the day, from waking early
@@ -711,4 +1510,5 @@ Story guidance:
 - The effort matters more than the result; something made together beats something bought
 - Focus on noticing, saying thank you properly, giving time rather than objects, seeing a parent as a person
 - Avoid sentimentality - the warmth comes from one specific, ordinary, observed thing
-- Key props: toolbox, handmade card, half-built thing, two mugs, bicycle pump, old photograph, workbench
+- Key props: toolbox, handmade card, half-built thing, bicycle pump, workbench
+- The idea is built on one centre and one turn, never on the props.

@@ -52576,6 +52576,42 @@ surfacing it needs a panel of its own.
 **Touched:** scripts/analysis/shipped-defects.js (new), storyJobPipeline.js
 **Status:** ✅ active
 
+## World guides carry ten living centres and ten turns each; an idea is built on a seed, never on props (2026-09-21)
+
+**Context:** the round-10 blind reads (`tests/manual/story-idea-rounds/blind-scores-r10.md`, key
+`blind-key-r10.json`) split cleanly on what an idea was anchored to. Ideas built out of a world
+guide's PROPS came back as machinery — the space arm (rover, cockpit, control panel, launch
+window) was rated 2, "cold, procedural, nobody to care about". Ideas anchored on a living centre
+scored 5: a dinosaur egg that starts to move in a child's hands (round-10 cell 6), a ghost that has
+attached itself to the boy plus a grandmother who will forget every story she ever told (cell 3).
+The guide is what the model actually builds from — the idea template is roughly 4% of the prompt —
+and every adventure guide offered a `Key props:` line and no cast at all.
+
+**Decision:** each of the 32 sections in `prompts/adventure-guides.txt` now carries two labelled
+ten-item lists, meant to be combined and picked from in code: `Who lives here (pick one):` — ten
+living centres for that world (a creature, a companion, a person who needs the child, a thing that
+acts alive), with no turn baked in; and `What turns (pick one):` — ten world-flavoured
+complications, with no protagonist baked in, so any centre can take any turn. With the
+premise-shape catalogue already chosen per arm in code, an idea now has three independent axes.
+Every `Key props:` line is trimmed to five or fewer, and each guide's guidance ends with
+`The idea is built on one centre and one turn, never on the props.` Costume lines, entry points and
+the rest of each guide's guidance are unchanged.
+
+**Rationale:** props describe a set; a centre gives the reader someone to lose. Two independent
+lists rather than one list of finished seeds, so the two ideas a customer is shown can differ on
+either axis alone and the pairing stays the model's work rather than a fixed menu of twenty
+premises. Peril stays at picture-book level throughout — frightening is fine, nothing that can kill
+or injure a child — and the historical worlds keep their era texture while still centring on a
+person or a creature.
+
+**Touched:** prompts/adventure-guides.txt
+**Validation:** `npx vitest run tests/unit/teaching-guide-parser tests/unit/prompt` (26 passed; the
+206-topic and no-banner pins still hold), plus a dry run requiring `server/lib/promptBuilders` and
+printing `getAdventureGuide('space')`, which returns both labelled lists intact. A script check
+confirms 32/32 guides with exactly ten items per list and `Key props:` at five or fewer.
+**Status:** ✅ active
+
+
 ## The production click is the buy metric; the rater proxy is not (idea_events)
 
 **Context:** the story-idea quality series (see "Story-idea premise contract:
