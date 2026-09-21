@@ -1,0 +1,451 @@
+{
+  "seeds": [
+    "kinderbuch gefühle",
+    "bilderbuch mut",
+    "kinderbuch geschwisterstreit"
+  ],
+  "maxCpc": 0.2,
+  "rows": [
+    {
+      "text": "bilderbuch mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch geschwisterstreit",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch gefühle ab 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch emotionen",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch gefühle ab 3",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch wut",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch gefühle ab 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbücher über wut",
+      "vol": 30,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch über wut",
+      "vol": 30,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch über wut ab 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch wut ab 3",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch gefühle ab 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch gefühle kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch gefühle grundschule",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch emotionen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch gefühle ab 4",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch fisch gefühle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch fische emotionen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch gefühle krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch jim ist mies drauf",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch thema angst",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch thema gefühle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch thema mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch thema wut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch zum thema gefühle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbücher zum thema angst",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbücher zum thema glück",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "buch gefühle kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "fisch gefühle bilderbuch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "gefühle fische kinderbuch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "jim ist mies drauf bilderbuch über gefühle und schlechte laune",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch fisch gefühle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch fische emotionen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch gefühle fisch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch gefühle monster",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch wohin mit meiner wut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch zum thema mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch über mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbücher thema gefühle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbücher thema mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbücher zum thema gefühle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbücher zum thema mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbücher über mut",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "mut bilderbuch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "mut kinderbuch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "sophias sorge bilderbuch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wut bilderbuch",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wut im bauch kinderbuch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    }
+  ]
+}

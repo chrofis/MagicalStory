@@ -1,0 +1,2386 @@
+{
+  "seeds": [
+    "trotzphase",
+    "trotzphase kind",
+    "wutanfall kind"
+  ],
+  "maxCpc": 0.2,
+  "rows": [
+    {
+      "text": "trotzphase",
+      "vol": 170,
+      "comp": "?",
+      "low": 0.038598,
+      "high": 0.872716,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "autonomiephase",
+      "vol": 210,
+      "comp": "?",
+      "low": 0.010623,
+      "high": 1.231949,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3",
+      "vol": 20,
+      "comp": "?",
+      "low": 0.010276,
+      "high": 0.272901,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzphase 2 jahre",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.012735,
+      "high": 0.471985,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 4",
+      "vol": 20,
+      "comp": "?",
+      "low": 0.01,
+      "high": 1.231949,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "das gewünschteste wunschkind trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase ab wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.011607,
+      "high": 0.553478,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "1 5 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "1 trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "16 monate trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "18 monate trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "2 1 2 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "2 5 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "2 jahre trotzphase",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "2 jähriger trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "2 trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "2.5 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "20 monate trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "21 monate trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "22 monate trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "3 1 2 jähriger trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "3 5 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "3 jahre trotzphase",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "3 jähriger sohn trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "3 jähriger trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "3 lebensjahr trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "3.5 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "4 5 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "4 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "4 jähriger trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "5 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "5 jähriger trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "6 jahre trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann autonomiephase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann beginnt die trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann beginnt die trotzphase bei kleinkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann beginnt trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann fängt die trotzphase an",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.011607,
+      "high": 0.553478,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "ab wann trotzphase bei kleinkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann wutanfälle bei kleinkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "alter trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 3 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.120877,
+      "high": 1.114356,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 4 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 4 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase 7 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase alter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase bei kindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase bei kleinkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase mit 4",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase umgang",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase was ist das",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "autonomiephase wie reagieren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bedürfnisorientierte erziehung trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "beginn autonomiephase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "beginn trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bücher trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "die trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "dreijährige trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "elternratgeber trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ende der trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "entwicklungspsychologie trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "erste trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "erziehung in der trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "erziehung trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "extreme trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "extreme trotzphase mit 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "extreme trotzphase mit 2 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "extreme trotzphase mit 3",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "extreme trotzphase mit 4",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "extreme wutanfälle 2 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "heftige trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "hilfe trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindererziehung trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "mein gewünschtestes wunschkind trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "mit trotzphase richtig umgehen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nein phase bei kindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ratgeber trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schlimme trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schlimme trotzphase mit 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schlimme trotzphase mit 3",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "starke trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "swissmom trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotz phase",
+      "vol": 170,
+      "comp": "?",
+      "low": 0.038598,
+      "high": 0.872716,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotz und autonomiephase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotz und wut bei kleinkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter",
+      "vol": 30,
+      "comp": "?",
+      "low": 0.116861,
+      "high": 0.570155,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzalter 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.020369,
+      "high": 0.747382,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzalter 4 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter ab wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter bei kindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter mit 3 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter mit 7 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzalter wie verhalten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall 1 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.011521,
+      "high": 0.614209,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzanfall 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall 4 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall 4 jährige",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfall wie reagieren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfälle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzanfälle mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzkind was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 1 1 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 1 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 10 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 12 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 14 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 16 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 17 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 18 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 18 monate wie reagieren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 19 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 2 1 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 2 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 2 jähriger",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 2.5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 20 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 21 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 22 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 26 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 3",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 3 1 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 3 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 3 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 3 jahre",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 3 jahre was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 3 jähriger",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 4 1 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 4 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 4 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 5 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 6 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 7 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 8 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase 9 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase ab 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase ab welchem alter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase alter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase autonomiephase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase beginn",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei 2 jährigen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei 3 jährigen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei 4 jährigen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei 5 jährigen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei babys",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei kindern 3 jährige",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei kindern mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bei kleinkindern",
+      "vol": 170,
+      "comp": "?",
+      "low": 0.012301,
+      "high": 0.605443,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzphase bis wann",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase bücher",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase entwicklungspsychologie",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase erziehung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase extrem",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase hilfe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase in welchem alter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase jungs",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase kleinkinder",
+      "vol": 170,
+      "comp": "?",
+      "low": 0.012301,
+      "high": 0.605443,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 1",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 1 1 2 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 1 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 1 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 1.5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 10 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 10 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 12 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 14 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 16 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 17 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 18 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 18 monaten was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 2 1 2 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 2 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 2 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 2 jahren",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 2 was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 2 wie reagieren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 20 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 21 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 22 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3 1 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3 1 2 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3 jahren",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3 was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 3 wie reagieren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 4 1 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 4 5",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 4 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 4 was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 5 1 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 5 jahren normal",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 6",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 6 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 6 jahren normal",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 6 jahren was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 7",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 7 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 8",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 9 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit 9 monaten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit einem jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase mit fast 6 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase ratgeber",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase richtig reagieren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase tipps",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase umgang",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase von wann bis wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase vorschulalter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase wann",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase wann beginnt",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.010236,
+      "high": 0.430057,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "trotzphase was hilft",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase was ist das",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase was ist noch normal",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase was ist normal",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase welches alter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase wie reagiere ich richtig",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase wie reagieren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase wie umgehen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase wie verhalten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase wutanfälle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphase überstehen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trotzphasen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "umgang mit bockigen kindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "umgang mit der trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "umgang mit kindern in der trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "umgang mit trotzanfällen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "umgang mit trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "umgang trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wunschkind trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wut und trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle 2 jähriger",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle bei 2 jährigen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle bei kindern 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle bei kleinkindern 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle bei kleinkindern 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle mit 3 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "wutanfälle mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "zweite trotzphase",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    }
+  ]
+}

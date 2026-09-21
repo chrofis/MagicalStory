@@ -1,0 +1,1153 @@
+{
+  "seeds": [
+    "eingewöhnung kindergarten",
+    "erster kindergartentag",
+    "kindergartenstart kind"
+  ],
+  "maxCpc": 0.2,
+  "rows": [
+    {
+      "text": "eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.181781,
+      "high": 0.847417,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kita",
+      "vol": 70,
+      "comp": "?",
+      "low": 0.051556,
+      "high": 1.049627,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung",
+      "vol": 50,
+      "comp": "?",
+      "low": 0.100306,
+      "high": 1.146309,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung tipps",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.181781,
+      "high": 0.847417,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kinderkrippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung in der krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten eingewöhnung tipps",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann eingewöhnung kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bedürfnisorientierte eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "beobachtungsbogen eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "berliner eingewöhnungsmodell kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "berliner eingewöhnungsmodell kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "berliner modell eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "berliner modell eingewöhnung kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "berliner modell kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "berliner modell kindergarten eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "berliner modell kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "checkliste eingewöhnung krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "der erste kindergartentag",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "die eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "die eingewöhnung in der kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung aus sicht des kindes",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung berliner modell kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung im kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0.181781,
+      "high": 0.847417,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung im kindergarten berliner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung im kindergarten ideen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung in den kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung in der kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung in die kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung in kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung in krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kindergarten berliner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kindergarten konzeption",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kindergarten tipps für eltern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kita berliner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kita konzeption",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kita kosten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kita münchner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kita tipps",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung kita u3",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung krippe tipps für eltern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung montessori kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung spielgruppe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnung und beziehungsaufbau in krippe und kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungsbericht",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungsbericht kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungskonzept krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungskonzepte kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungsmodell berliner",
+      "vol": 70,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungsmodell krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungsmodelle",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungsphase im kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungsphase kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungszeit im kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "eingewöhnungszeit kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "erste kindergarten tag",
+      "vol": 20,
+      "comp": "?",
+      "low": 0.17091,
+      "high": 1.274076,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "erste kindergartentag",
+      "vol": 20,
+      "comp": "?",
+      "low": 0.17091,
+      "high": 1.274076,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "erste trennung kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "erstgespräch kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "fragen kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ideen eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ideen für den ersten kindergartentag",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten berliner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten eingewöhnung 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten eingewöhnung berliner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten eingewöhnung mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten eingewöhnungszeit",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten heute eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten ohne eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kindergarten trennung erleichtern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderkrippe eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung 18 monate",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung erleichtern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung erste trennung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung kosten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung mit 1 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung mit 3 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung münchner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung nach berliner modell",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung ohne eltern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung tipps für eltern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung trennung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung trennungsangst",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung wann erste trennung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita eingewöhnung was beachten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita ohne eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita start erleichtern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita trennung erleichtern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kita wechsel eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "konzeption eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "krippe eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "krippe eingewöhnung tipps",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "krippen eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "lerngeschichte eingewöhnung krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "lerngeschichten beispiele eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "mein erster kindergartentag",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "mein erster kindergartentag portfolio",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "münchner modell kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "peer group kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "portfolio erster kindergartentag",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "portfolio krippe eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "portfolio mein erster kindergartentag",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "sanfte ablösung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schlechter schlaf kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schwere eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schwierige eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schwierige eingewöhnung kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schwierige eingewöhnung krippe",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schwierige kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "thema eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps eingewöhnung kindergarten",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps eingewöhnung kita",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps für kindergarten eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps für kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps kindergarten eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsschmerz kita eingewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "zum ersten kindergartentag",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    }
+  ]
+}

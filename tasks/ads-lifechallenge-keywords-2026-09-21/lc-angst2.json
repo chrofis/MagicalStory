@@ -1,0 +1,442 @@
+{
+  "seeds": [
+    "trennungsangst",
+    "angst vor dem dunkeln",
+    "kinderängste"
+  ],
+  "maxCpc": 0.2,
+  "rows": [
+    {
+      "text": "trennungsangst",
+      "vol": 50,
+      "comp": "?",
+      "low": 0.195462,
+      "high": 0.280715,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "angst vor dem dunkeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderängste",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schulphobie",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst erwachsene",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schulphobie was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst alleine im dunkeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln alleine",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln draußen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln erwachsene",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln loswerden",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln schlafen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln was tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln zu schlafen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln zu schlafen erwachsene",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst im dunkeln überwinden",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angst vorm dunkeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "angstzustände im dunkeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ich habe angst im dunkeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderangst",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderängste mit 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderängste verstehen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "panische angst im dunkeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schulphobie trennungsangst",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schulphobie was können eltern tun",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "taff trennungsangst",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst 6 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst behandeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst bei jugendlichen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst bei kleinkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst bei schulkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst im kindesalter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst jugendalter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst mit 10 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst mutter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst pubertät",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst schulkind",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangst symptome",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangststörung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangststörung behandeln",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsangststörung erwachsene",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsängste",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "trennungsängste bei kleinkindern",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "typische kinderängste",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "verlassenheitspanik und trennungsangst",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "verlust und trennungsängste",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "verlustangst bei kindern nach trennung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    }
+  ]
+}

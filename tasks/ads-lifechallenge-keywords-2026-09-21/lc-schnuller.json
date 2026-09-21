@@ -1,0 +1,1089 @@
+{
+  "seeds": [
+    "schnuller abgewöhnen",
+    "nuggi abgewöhnen"
+  ],
+  "maxCpc": 0.2,
+  "rows": [
+    {
+      "text": "schnuller abgewöhnen",
+      "vol": 110,
+      "comp": "?",
+      "low": 0.043457,
+      "high": 0.237561,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "nuggi abgewöhnen",
+      "vol": 140,
+      "comp": "?",
+      "low": 0.095068,
+      "high": 0.246537,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "daumen nuckeln abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen buch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckel abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "buch schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller entwöhnung",
+      "vol": 20,
+      "comp": "?",
+      "low": 0.040001,
+      "high": 0.201427,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "daumen abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "buch schnuller weg",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bücher schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller zum abgewöhnen",
+      "vol": 110,
+      "comp": "?",
+      "low": 0.043457,
+      "high": 0.237561,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen mit 3 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "abgewöhnung schnuller",
+      "vol": 110,
+      "comp": "?",
+      "low": 0.043457,
+      "high": 0.237561,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "schnuller entwöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuggi entwöhnung",
+      "vol": 30,
+      "comp": "?",
+      "low": 0.1618,
+      "high": 0.24735,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "ab wann den schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann nuckel abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann nuggi abgewöhnen",
+      "vol": 20,
+      "comp": "?",
+      "low": 0.024526,
+      "high": 0.332495,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "ab wann schnuller abgewöhnen",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann schnuller entwöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann schnuller wegnehmen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab wann sollte man den schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "ab welchem alter schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "alternative zum schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "bilderbuch schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "brust nuckeln abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "brust zur beruhigung abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "buch nuckel abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "buch schnullerentwöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "buch zum schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "dauernuckeln abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "dauernuckeln an der brust abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "daumen entwöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "dentistar schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "einschlafstillen abgewöhnen ohne schnuller",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "entwöhnung schnuller",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbuch schnuller weg",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "kinderbücher schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nachts schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckel abgewöhnen 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckel abgewöhnen ab wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckel entwöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckel nachts abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckel zum abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckelflasche abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckeln abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckeln am daumen abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckeln an brust abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckeln an der brust abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckeln brust abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuckeln daumen abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuggi abgewöhnen ab wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuggi abgewöhnen mit 3",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuggi abgewöhnen mit 4",
+      "vol": 30,
+      "comp": "?",
+      "low": 0.189349,
+      "high": 0.388164,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "nuggi abgewöhnen tipps",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuggi abgewöhnen wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuggi entwöhnung wie lange",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuggi entzug",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "nuki abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "saugverwirrung schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schlaf nuckel assoziation abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller ab wann abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller ab wann weg",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen 2 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen 4 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen ab wann",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen alter",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen apotheke",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen bis wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen dauer",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen entzugserscheinungen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen ersatz",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen geschichte",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen klappt nicht",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen mit 1 jahr",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen mit 2",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen mit 5 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen mit 6 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen mittel",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen nachts",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen radikal",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen schlafen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen tipps",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen tricks",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen wann",
+      "vol": 20,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen wie",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller abgewöhnen wie lange",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller beim schlafen abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller entwöhnen 3 jahre",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller entwöhnen ab wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller entwöhnen buch",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller entwöhnen wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller entwöhnung dauer",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller in der nacht abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller nachts abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller sanft abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller tagsüber abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller wann abgewöhnen",
+      "vol": 110,
+      "comp": "?",
+      "low": 0.043457,
+      "high": 0.237561,
+      "unbid": false,
+      "have": false
+    },
+    {
+      "text": "schnuller weg",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller weg ab wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller weg wann",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller zum einschlafen abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller zum entwöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnuller zum schlafen abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnullerabgewöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnullerentwöhnung erfahrungen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnullerentwöhnung mit 2 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnullerentwöhnung mit 4 jahren",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnullerentwöhnung nachts",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnullerentwöhnung wie lange",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "schnullerentzug",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps schnullerentwöhnung",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "tipps zum schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "vom schnuller abgewöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    },
+    {
+      "text": "vom schnuller entwöhnen",
+      "vol": 10,
+      "comp": "?",
+      "low": 0,
+      "high": 0,
+      "unbid": true,
+      "have": false
+    }
+  ]
+}
