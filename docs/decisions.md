@@ -51952,6 +51952,66 @@ first thing a parent reads. Not re-rated blind — one regeneration was the mand
 client/src/pages/wizard/WizardStep6Summary.tsx, client/src/pages/trial/TrialIdeasStep.tsx,
 prompts/age-band-journey.txt, prompts/life-challenge-guides.txt
 
+**Follow-up (2026-09-21) — round "two": the model drafts TWO premises and ships one, in the same
+call. Measured, and it does not pay.**
+
+*Design.* Owner decision, after "the next attempt at the buy axis should change something other than
+the rule list": no judge call and no second call — the same generation writes `[DRAFT_A]` and
+`[DRAFT_B]`, two premises for the same brief (a different thing out of the ordinary and a different
+event the book contains; the injected premise shape, cast and topic stay the same in both), then one
+`[REVIEW]` that opens with a PICK step — the four buy questions (`{BUY_CRITERION}`, the constant that
+was already in the template) answered with a quote from each draft, then `CHOSEN: A` / `CHOSEN: B`
+for the draft that answers more, a tie going to the one whose quotes name something picturable. The
+existing 15 checks and the CUT step then run on the chosen draft ONLY, and the old last check becomes
+"ask the four questions of [FINAL] again — a question the chosen draft answered and [FINAL] no longer
+does means a check above cut the wrong words". `[FINAL]` is unchanged, so `parseFinal` and the
+streaming client are untouched; the two-idea sibling gets the same shape per idea
+(`[DRAFT_1A]/[DRAFT_1B]` … `[DRAFT_2A]/[DRAFT_2B]`), and the only code change is the non-streaming
+`[FINAL_1]` terminator in `server/routes/storyIdeas.js`, widened from `\[DRAFT_2\]` to
+`\[DRAFT_2[AB]?\]`. The buy constant still appears exactly twice per built prompt — once as a rule,
+once in the review — the review now applying it to two drafts.
+
+*Latency, the reason this was measured before anything else.* Predicted from round 9: mean output
+2622 tokens at 51.3 tok/s, so a second draft at ~150-250 tokens predicted +3-5 s. **Measured: mean
+output 3265 tokens (+643, not +200) and mean wall clock 51.2 s → 64.9 s, +13.7 s per arm (+27 %),
+range 46.0-85.9 s.** The prediction was wrong because the second draft is the cheap half: the PICK
+step costs four quoted answers per draft, eight quotes the review did not write before. Cost per
+20-idea round USD 1.1356 → 1.3715 (+21 %).
+
+*Result.* Blind read of R1 vs round two, 40 texts, ids shuffled, fresh rater who never saw round
+labels (`blind-set-two.md` / `blind-scores-two.md`, anchored on `blind-scores.md`): **R1 3.45, round
+two 3.20, diff −0.25; round two wins 3 arms, loses 7, ties 10, and produced ZERO 5s against R1's
+three.** R1 reads 3.55 / 3.45 / 3.55 / 3.45 across four independent reads, so the anchor is stable
+and the instrument's noise is about ±0.1: relative to R1 in the same read, round 9 sat at ±0.00 and
+round two sits at −0.25. Drafting two and picking one is the first change in the series that made the
+blind mean measurably WORSE.
+
+*Why — the self-pick has no discriminating power.* For six arms the unchosen draft was extracted from
+the raw reply and scored blind alongside the finals (`blind-extra-two.md`). Chosen-final vs
+unchosen-draft: **five ties and one loss, zero wins.** The model's own buy-question quoting cannot
+tell its two drafts apart, because it writes both, and it can always find four quotes in either. It
+is the same failure as the yes/no review checks of rounds 1-5, one level up: a model that wrote a
+flat idea rubber-stamps its own flat idea, and quoting only helps when the words being quoted come
+from somewhere the model cannot also author on demand. What the extra step did buy is a *second*
+opportunity for the review to normalise: the two drafts converge toward the safe middle before a
+single check has run, which is where the missing 5s went.
+
+*Confound, stated.* Round two ran against a working tree that also carried the three product fixes of
+the follow-up above (`age-band-journey.txt`, `life-challenge-guides.txt`, the `Rollen:` display
+split, which the harness does not render). Cells 5 and 7 therefore differ from round 9 for reasons
+that are not this design. The R1-anchored comparison is unaffected in direction — those fixes were
+improvements — which makes −0.25 a lower bound on the cost of the two-draft step, not an upper one.
+
+*Verdict.* ❌ The two-draft/one-review shape is NOT recommended: +13.7 s on the wizard's critical
+path and +21 % cost for a measured −0.25 on the only axis it was built for, with a self-pick that
+agrees with a blind reader on nothing. Kept on the branch as measured evidence; reverting both
+templates to their pre-round-two shape is the owner's call.
+
+**Touched:** `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`server/routes/storyIdeas.js` (the `[FINAL_1]` terminator only).
+Artefacts: `tests/manual/story-idea-rounds/round-two.json` / `.md`, `blind-set-two.md`,
+`blind-scores-two.md`, `blind-key-two.json`, `blind-extra-two.md`, `blind-extra-key-two.json`.
+
 ---
 
 ## 2026-09-21 — The figure detector is MASTER for identity; the witnesses may only deadlock it; an independent ARBITER resolves the deadlock

@@ -45,7 +45,7 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 **{LANGUAGE_INSTRUCTION}**
 
 Your entire output must be in the language specified above.
-- All text in [DRAFT], [REVIEW], and [FINAL] sections must be in this language
+- All text in [DRAFT_A], [DRAFT_B], [REVIEW] and [FINAL] sections must be in this language
 - Don't write in English unless English was specified
 - Don't mix languages
 - This is a hard requirement - outputs in the wrong language are unusable
@@ -107,13 +107,21 @@ Example 3: "A goat is standing on the kitchen table eating the birthday cake. A 
 
 ## GENERATION PROCESS:
 
-Output all three stages:
+Output all four stages:
 
-[DRAFT]
-Create your initial story outline following all guidelines above.
+[DRAFT_A]
+Your first story idea, following all guidelines above.
+
+[DRAFT_B]
+A second story idea for the same brief. A different thing out of the ordinary and a different event the book contains, so the two are not one story told twice. The shape, the cast and the topic you were given are the same in both.
 
 [REVIEW]
-List exactly 5 improvements, even if the draft seems good. Never say "no issues" - always find ways to make it better.
+
+PICK: answer each of these with a quote from [DRAFT_A], then answer the same four with a quote from [DRAFT_B].
+{BUY_CRITERION}
+A question with no quote to answer it is unanswered for that draft. Write "CHOSEN: A" or "CHOSEN: B" for the draft that answers more of them; on a tie take the one whose quotes name things that can be pointed at in a picture. Everything below is about the chosen draft only. The other draft is dropped: none of its words reach [FINAL].
+
+Then list exactly 5 improvements to the chosen draft, even if it seems good. Never say "no issues" - always find ways to make it better.
 
 FIRST CHECK - LANGUAGE: Is the entire draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is an error that must be fixed in [FINAL].
 
@@ -140,9 +148,7 @@ Check and critique:
 12. **Shape**: name the shape you were given and quote the words in [FINAL] that carry it. If it is not there, rewrite [FINAL] to the shape.
 13. **Opening**: quote the first sentence. If it states where and when rather than showing the hook or the main character, rewrite it.
 14. **Length**: count the sentences of [FINAL] and the words of the longest one. Past six sentences, or past 30 words, split or cut before [FINAL].
-15. **Would a parent buy it**: answer each of these with a quote from [FINAL].
-{BUY_CRITERION}
-A question with no quote to answer it means that part of [FINAL] gets rewritten until there is one. This is the last check, and it outranks the others: an idea that survives every check above and answers none of these is not worth printing.
+15. **The buy questions again**: ask the four questions of PICK of [FINAL], with a quote each. A question the chosen draft answered and [FINAL] no longer does means a check above cut the wrong words: put them back. This is the last check and it outranks the others: an idea that survives every check above and answers none of these is not worth printing.
 
 List your 5 improvements (be specific):
 1. [improvement]

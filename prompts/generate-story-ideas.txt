@@ -45,7 +45,7 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 **{LANGUAGE_INSTRUCTION}**
 
 Your entire output must be in the language specified above.
-- All text in [DRAFT], [REVIEW], and [FINAL] sections must be in this language
+- All text in [DRAFT_nA], [DRAFT_nB], [REVIEW_n] and [FINAL_n] sections must be in this language
 - Don't write in English unless English was specified
 - Don't mix languages
 - This is a hard requirement - outputs in the wrong language are unusable
@@ -67,25 +67,32 @@ Each idea answers these:
 
 ## GENERATION PROCESS
 
-For EACH story idea, output these three stages:
+For EACH story idea, output these four stages: two drafts, one review that picks between them, one final.
 
-[DRAFT_1]
+[DRAFT_1A]
 {PREMISE_SHAPE_1}
 
 Write your first story idea, set in the child's own town and at the real local landmarks listed
 above. A costume or theme shows in what they wear and what they play, never in travelling somewhere
 else. Where no landmarks are listed, use the town's own everyday places.
 
+[DRAFT_1B]
+A second idea for the same brief and the same shape. A different thing out of the ordinary and a
+different event the book contains, so the two are not one story told twice.
+
 [REVIEW_1]
-List exactly 5 improvements. Never say "no issues" - always find ways to make it better.
+
+PICK: answer each of these with a quote from [DRAFT_1A], then answer the same four with a quote from [DRAFT_1B].
+{BUY_CRITERION}
+A question with no quote to answer it is unanswered for that draft. Write "CHOSEN_1: A" or "CHOSEN_1: B" for the draft that answers more of them; on a tie take the one whose quotes name things that can be pointed at in a picture. Everything below is about the chosen draft only. The other draft is dropped: none of its words reach [FINAL_1].
+
+Then list exactly 5 improvements to the chosen draft. Never say "no issues" - always find ways to make it better.
 
 First check - language: Is the entire draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is an error that must be fixed.
 
 Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits, no sentence past about 30 words, no dash holding two clauses together in one sentence? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) Characters: for each name, quote the words that give them a stake. Living with, coming along with, or waiting for the others is not a stake. A name with no such words is not in the story yet. (5) Complexity matches scene count? (6) Back cover, not synopsis: number the sentences of the final. Label each one "setup", "hook", "promise", "event", "rule" or "cost". A "promise" names an event the book contains, in the story's voice, and does not say whether they manage it. A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Only "event" and "rule" are cut: every sentence marked "event" other than the last, and every sentence marked "rule". Setup, hook, promise and cost are kept. List every cut sentence, not one of them. (7) Peril: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in the final. A historical event keeps the danger it really had: tell it at a child's level, never remove it. (8) Can you name the one thing they want, the thing against it, and what failing costs, in three words each? (9) Topic: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it. (10) Hook: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to the final. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them. (11) The child acts: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in the final. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have. (12) Promise: quote the sentence that names an event the book contains. If there is nothing to quote, add one to the final. If it says whether they manage it, or what decides it, rewrite it. Then quote any words that address the reader or name the reader, the book, the page or the picture, and cut them. (13) Shape: name the shape this idea was given and quote the words in the final that carry it. If it is not there, rewrite the final to the shape. (14) Opening: quote the first sentence. If it states where and when rather than showing the hook or the main character, rewrite it. (15) Length: count the sentences of the final and the words of the longest one. Past six sentences, or past 30 words, split or cut before the final.
 
-(16) **Would a parent buy it**: answer each of these with a quote from the final.
-{BUY_CRITERION}
-A question with no quote to answer it means that part of the final gets rewritten until there is one. This is the last check, and it outranks the others: an idea that survives every check above and answers none of these is not worth printing.
+(16) **The buy questions again**: ask the four questions of PICK of the final, with a quote each. A question the chosen draft answered and the final no longer does means a check above cut the wrong words: put them back. This is the last check and it outranks the others: an idea that survives every check above and answers none of these is not worth printing.
 
 5 improvements:
 1. [specific improvement]
@@ -99,15 +106,21 @@ CUT_1: the numbers and the full text of every sentence cut by check 6, listed on
 [FINAL_1]
 Corrected final version of story 1.
 
-[DRAFT_2]
+[DRAFT_2A]
 {PREMISE_SHAPE_2}
 
 Write a DIFFERENT story idea, set in a make-believe world. It opens where the child really is —
 dressing up, or starting to play — and the make-believe follows from that, so the reader sees where
 it began and where it will come back to.
 
+[DRAFT_2B]
+A second make-believe idea for the same brief and the same shape. A different thing out of the
+ordinary and a different event the book contains.
+
 [REVIEW_2]
-Same process - first check language, then list exactly 5 improvements:
+Same process: PICK between [DRAFT_2A] and [DRAFT_2B] with the four buy questions answered by a quote
+from each, write "CHOSEN_2: A" or "CHOSEN_2: B", then run checks (1) to (16) on the chosen draft only
+and list exactly 5 improvements:
 1. [specific improvement]
 2. [specific improvement]
 3. [specific improvement]
@@ -160,4 +173,4 @@ A goat is standing on the kitchen table eating the birthday cake. A child wants 
 
 ---
 
-NOW GENERATE: Output [DRAFT_1], [REVIEW_1], [FINAL_1], [DRAFT_2], [REVIEW_2], [FINAL_2] in order.
+NOW GENERATE: Output [DRAFT_1A], [DRAFT_1B], [REVIEW_1], [FINAL_1], [DRAFT_2A], [DRAFT_2B], [REVIEW_2], [FINAL_2] in order.
