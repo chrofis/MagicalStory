@@ -68,9 +68,16 @@ describe('parseTeachingGuideFile', () => {
     expect(crlf.get('t')).toBe(lf.get('t'));
   });
 
-  it('adventure guides parse all 15 themes regardless of checkout line endings', () => {
+  it('every selectable adventure theme has a guide, whatever the checkout line endings', () => {
+    // Pinned against the theme register rather than a count: 17 of the 32
+    // themes (every profession, every place-world, every occasion) shipped with
+    // NO section, so {ADVENTURE_SETTING_GUIDE} in the story-idea prompt and the
+    // beats TOPIC GUIDE were both empty for them.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { THEME_PLAY } = require('../../server/config/storyThemes.js');
     const guides = parseTeachingGuideFile(path.join(PROMPTS_DIR, 'adventure-guides.txt'));
-    expect(guides.size).toBe(15);
+    const missing = Object.keys(THEME_PLAY).filter((id) => !guides.get(id));
+    expect(missing, `themes with no adventure guide: ${missing.join(', ')}`).toEqual([]);
     expect(guides.get('pirate')).toBeTruthy();
   });
 
@@ -86,7 +93,7 @@ describe('parseTeachingGuideFile', () => {
         expect(banner, `${f} [${id}] has banner pollution`).toBeUndefined();
       }
     }
-    expect(total).toBe(189);
+    expect(total).toBe(206);
   });
 
   it('every life-challenge guide is in the band register — no advice voice left', () => {
