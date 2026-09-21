@@ -54596,3 +54596,86 @@ shape and is unmeasured.
 `server/lib/testlab.js` (`arc_effort`)
 
 **Status:** ✅ active
+
+## 2026-09-22 — Round 24/25 follow-up: the pattern seed outranks the topic, and a toddler centre is never a grown-up
+
+**Context:** round 23 shipped the ten pattern seeds and measured three faults it left open
+(`38067bd6b`): on cell 11 the TOPIC overrode the seed's mechanism on both arms (`follow the
+leader` and `hide and find` were each written as a naming walk, because the topic is
+`first-words`); cell 7 arm 2 copied seed 3's own `variation` enumeration almost word for word
+(Stiefel, Ärmel, Knopf); and the owner's centre filter had been skipped because
+`prompts/adventure-guides.txt` carries ten UNMARKED bullets per world, so cell 11 arm 1 drew
+"A grandfather who has worked this farm all his life and cannot manage the mornings now" into a
+book whose contract has no want, no obstacle and no cost.
+
+**Decision (owner), three parts, all in `8a198a050`:**
+
+1. **The seed is the mechanism; the topic is what the child does inside it.**
+   `IDEA_CONTRACT_PATTERN` gains one sentence saying exactly that, and each of the five 0-2
+   topics in `shared/topic-age-windows.json` — `bath-time`, `first-foods`, `first-steps`,
+   `first-words`, `going-outside` — gains an `[[idea]]` block whose first paragraph repeats it
+   and names the child's part (first-words: *the child gives the word*; going-outside: *the
+   child takes each step out*). Those five guides had carried no idea block at all, so the idea
+   call was reading a whole book brief — "What happens / Ending" and, on `going-outside`, a
+   want-and-obstacle engine the pattern contract forbids.
+2. **` [grown-up]` marks a centre that is an adult with a problem of their own.** 80 of the 320
+   `Who lives here` bullets, marked BY HAND across all 32 lists — a person who needs the child,
+   a keeper who is leaving, someone away from home too long, the cook nobody thanks.
+   `parseWorldSeeds` strips the tag from the text and records it in `centreGrownUp`;
+   `pickWorldSeeds({ pattern: true })` picks only untagged centres. Every world keeps at least
+   two (smallest: `christmas`, 5), so the two arms still never share one.
+3. **Every seed's `variation` names the KIND of change, never an enumeration.** The other five
+   fields are untouched.
+
+**Rationale.** The tag is DATA and never prompt text: the idea path already drops both bullet
+lists whole (`stripSeedLists`), and `getTeachingGuide` strips it for the story path — the idea
+view of all 32 guides is byte-identical before and after the marking, which is the proof that
+no 3+ prompt moved. Marking by hand rather than by regex is the point: "adult with a problem of
+their own" is not a string property, and a pattern-matched filter is exactly what round 23
+refused to guess at. The `[[idea]]` block was reused rather than a new `[[idea-pattern]]` span
+invented, because narrowing the guide to the idea-shaped part is what that span already means,
+and a second span would need `isPatternContract` plumbed into `getIdeaGuide` for no gain.
+
+**Validated (rung 2 — real generation on the real builder, USD 2.08 over both rounds):** 317
+tests, with new pins for the 80 tags, the ≥2 untagged floor per world, the toddler pick never
+being tagged, cell 1's 3+ pick being byte-identical to its pre-tag value, the tag never reaching
+a prompt, the contract sentence, the five idea blocks, and no `variation` reading as a list.
+Dry-run of cells 1, 7 and 11 first. Then `--round=24 --cells=7,11` (USD 0.2217): **cell 11's two
+arms each write their own seed** — arm 1 follow-the-leader (Nina ahead, door to door, one door
+shut, «Wart auf mich!»), arm 2 hide-and-find (a straw bale lifted, a duckling that hides, «Wo
+bist du?») — **while both still carry the first-words topic** (Emil calls each animal with his
+word). No grown-up centre, no seed enumeration, no invented German word.
+
+**Then the full blind round (`--round=25`, all 11 cells, USD 1.8568)** and a pooled blind read of
+R1 + R10 + R25 (62 texts, one shuffle) by a reader that saw only `blind-set-r25.md` and the
+`blind-scores.md` anchor. `make-blind.js` now pools rounds with DIFFERENT cell sets (R1 and R10
+are cells 1-10, R25 is 1-11): the per-round check is two arms per cell rather than a fixed total,
+and `analyze-blind.js` pairs the intersection and breaks out by pages as well.
+
+**What the read says.** R25 overall **3.55** against R10's 3.90 and R1's 3.65, and zero 5s — but
+the **0-2 band is 4.00 (n=4), the highest band in the round**, with all four toddler arms at 4 and
+the reader, label-blind, calling them "a board book with a refrain and a payoff" and "the whole
+toddler morning in five lines". R1's toddler arms were 3.00. The regression is elsewhere and is
+not from this commit: cells 1-10 have absorbed fifteen rounds of scope-band and contract work
+since R10, and the losses concentrate on cell 1 arm 1 (4→2, "dreamlike and incoherent"), cell 4
+arm 2 (5→2, "quiet and static") and the 3-5 band (4.00→3.17). **That is the open question for the
+next round, and it is not the 0-2 path.**
+
+**Defects measured (`tests/manual/story-idea-rounds/round-25-defects.md`):** 22/22 ideas sit
+exactly on their scope band's sentence and paragraph count — a first. Zero cast omissions across
+all 22, including the six-character cell. Two cast JOINS (cell 1 arm 1 gives Noah a father; cell
+7 arm 2 gives Lena a neighbour where arm 1 correctly writes "jemand hält ihre Hand"). Two act
+lines end on holding the thing that decides the outcome (cells 4/2 and 9/2). One named feeling
+(cell 10 arm 1). One narrated middle out of band (cell 1 arm 1, in a four-sentence book). Three
+mild perils, none severe. One invented word («Scheunenkatz»), and — on all four 0-2 arms — the
+refrain set bare after a colon instead of in Swiss guillemets. All filed in `tasks/BACKLOG.md`.
+
+**Touched:** `prompts/adventure-guides.txt`, `prompts/pattern-seeds.txt`,
+`prompts/life-challenge-guides.txt`, `server/lib/worldSeeds.js`, `server/lib/promptBuilders.js`,
+`server/lib/ideaContract.js`, `server/routes/storyIdeas.js`, `tests/unit/world-seeds.test.ts`,
+`tests/unit/pattern-seeds.test.ts`, `tests/unit/idea-guide-shape.test.ts`,
+`tests/manual/story-idea-rounds/make-blind.js`, `.../analyze-blind.js`, `.../round-24.json` /
+`.md`, `.../round-25.json` / `.md`, `.../round-25-defects.md`, `.../blind-set-r25.md`,
+`.../blind-key-r25.json`, `.../blind-scores-r25.md`, `.../ideas-r25.html`.
+
+**Status:** ✅ active on `staging` only; not on master.

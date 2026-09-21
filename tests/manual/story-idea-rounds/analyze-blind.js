@@ -54,6 +54,7 @@ table('arm', x => 'arm ' + x.arm, ['arm 1', 'arm 2']);
 table('world', x => x.world, ['location', 'fantasy']);
 table('age band', x => x.ageBand, ['0-2', '3-5', '6-9', '10-12']);
 table('cast size', x => x.castSize);
+table('pages', x => x.pages);
 
 // ---- paired by cell+arm ----
 const pair = {};
@@ -61,7 +62,7 @@ for (const x of rows) {
   const pk = x.cell + '-' + x.arm;
   (pair[pk] = pair[pk] || {})[x.round] = x.score;
 }
-console.log(`\n### paired by cell-arm\ncell-arm  ${rounds.join('  ')}`);
+console.log(`\n### paired by cell-arm (intersection of the rounds cell sets)\ncell-arm  ${rounds.join('  ')}`);
 const tally = Object.fromEntries(rounds.slice(0, -1).map(r => [r, { w: 0, l: 0, t: 0 }]));
 for (const pk of Object.keys(pair).sort((a, b) => {
   const [x, y] = a.split('-').map(Number), [u, v] = b.split('-').map(Number);

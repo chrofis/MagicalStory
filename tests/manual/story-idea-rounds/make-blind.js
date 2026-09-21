@@ -40,6 +40,7 @@ function cellFacts(cell) {
     mainAge,
     ageBand: ageBand(mainAge),
     castSize: chars.length,
+    pages: cell.pages || null,
   };
 }
 
@@ -65,8 +66,20 @@ function roundArms(n) {
   return arms;
 }
 
-const all = rounds.flatMap(roundArms);
-if (all.length !== 20 * rounds.length) throw new Error(`expected ${20 * rounds.length} arms, got ` + all.length);
+// Rounds may run DIFFERENT cell sets — R1 and R10 are cells 1-10, R25 is 1-11
+// (cell 11, the toddler cell, was added with the pattern contract). Pooling them
+// is still one shuffle over every text; what the cell sets decide is only which
+// cell-arms analyze-blind.js can pair, and it pairs the intersection. So the
+// check is per round — two arms per cell, nothing missing — not a fixed total.
+const perRound = rounds.map(n => ({ n, arms: roundArms(n) }));
+for (const { n, arms } of perRound) {
+  const cells = [...new Set(arms.map(a => a.cell))];
+  if (!arms.length || arms.length !== 2 * cells.length) {
+    throw new Error(`round ${n}: ${arms.length} arms over ${cells.length} cells — expected two per cell`);
+  }
+}
+const all = perRound.flatMap(r => r.arms);
+for (const r of perRound) console.log(`R${r.n}: ${r.arms.length} arms, cells ${[...new Set(r.arms.map(a => a.cell))].sort((x, y) => x - y).join(",")}`);
 
 // Deterministic shuffle: mulberry32 with a fixed seed.
 function mulberry32(a) {
@@ -92,7 +105,7 @@ let md = `# Blind set — ${all.length} story-idea back-cover texts\n\nRate each
 all.forEach((a, i) => {
   const id = 'B' + String(i + 1).padStart(2, '0');
   key.push({ id, round: a.round, cell: a.cell, arm: a.arm, world: a.world,
-    category: a.category, theme: a.theme, topic: a.topic, mainAge: a.mainAge, ageBand: a.ageBand, castSize: a.castSize });
+    category: a.category, theme: a.theme, topic: a.topic, mainAge: a.mainAge, ageBand: a.ageBand, castSize: a.castSize, pages: a.pages });
   md += `## ${id}\n\n${a.text}\n\n`;
 });
 
