@@ -24,6 +24,25 @@ describe('the arc_amend default models are real TEXT_MODELS keys', () => {
     const bad = m[1].split(',').map(s => s.trim()).filter(k => !(k in TEXT_MODELS));
     expect(bad, `not TEXT_MODELS keys: ${bad.join(', ')}`).toEqual([]);
   });
+
+  // Same trap, other stages: every model-ish default literal in testlab.js must
+  // be a key. 'claude-opus-5' / 'claude-sonnet-4-6' are model IDS and are not
+  // addressable — arc_amend shipped with one and burned a run.
+  it('no stage default names a model id instead of a key', () => {
+    const { readFileSync } = require('node:fs');
+    const { resolve } = require('node:path');
+    const { TEXT_MODELS } = require('../../server/config/models');
+    const src = readFileSync(resolve(__dirname, '../../server/lib/testlab.js'), 'utf8');
+    const ids = new Set(Object.values(TEXT_MODELS).map((m: any) => m && m.modelId).filter(Boolean));
+    const offenders: string[] = [];
+    for (const m of src.matchAll(/params\.(?:model|models|judgeModel|judgeModels)\s*\|\|\s*(?:MODEL_DEFAULTS\.\w+\s*\|\|\s*)?'([^']+)'/g)) {
+      for (const k of m[1].split(',').map(s => s.trim())) {
+        if (!(k in TEXT_MODELS) && ids.has(k)) offenders.push(`${k} (a model id, not a key)`);
+        else if (!(k in TEXT_MODELS)) offenders.push(`${k} (unknown)`);
+      }
+    }
+    expect(offenders, offenders.join('; ')).toEqual([]);
+  });
 });
 
 const ARC = [

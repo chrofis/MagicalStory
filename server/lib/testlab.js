@@ -8128,6 +8128,123 @@ async function runWriterCompareStage(target, { params = {} }) {
  *   draft's input tokens, where N review rounds pay the input twice per round.
  */
 /**
+ * arc_effort — does the arc still hold at medium or low effort?
+ *
+ * Every Anthropic call in this codebase sends `{model, max_tokens, messages}`
+ * and nothing else. On Claude Opus 5 that means adaptive thinking runs BY
+ * DEFAULT at effort `high`, thinking is billed inside output_tokens whatever
+ * `display` says, and display defaults to "omitted" — so it is paid for and
+ * never returned. Measured over 40 stories: arc_create bills 30,674 output
+ * tokens against ~4,000 tokens of visible text, and the arc machine is $1.33 of
+ * a $4.57 story. Effort is the only lever on that half.
+ *
+ * This runs the SAME create prompt at each effort, commits the same way
+ * production does (parseArcCreate), and scores each committed arc with the
+ * same judges arc_rounds uses. Cost and quality land side by side.
+ *
+ * params: { efforts, model, judgeModels }   target: { storyId }
+ */
+async function runArcEffortStage(target, { params = {}, promptOverride = null }) {
+  const { loadPromptTemplates, PROMPT_TEMPLATES } = require('../services/prompts');
+  await loadPromptTemplates();
+  const { buildArcCreatePrompt, parseArcCreate, drawChallengeIdeas } = require('./storyHelpers');
+  const { callTextModelStreaming } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+  const sc = require('./storyScorecard');
+
+  const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
+  const pageCount = (storyData.sceneImages || []).length || storyData.pages || 10;
+  const efforts = String(params.efforts || 'high,medium,low').split(',').map(s => s.trim()).filter(Boolean);
+  // The arc CREATOR, not the reviewer — production reads MODEL_DEFAULTS.arcCreatorModel
+  // (beatsPipeline.js:833), and the whole point of this stage is that model's thinking bill.
+  // 'claude-opus' is the TEXT_MODELS KEY; 'claude-opus-5' is the model id it
+  // resolves to and is not addressable here (the arc_amend default got this
+  // wrong and burned a run).
+  const model = params.model || MODEL_DEFAULTS.arcCreatorModel || 'claude-opus';
+  if (!TEXT_MODELS[model]) throw new Error(`Unknown model "${model}"`);
+  const judges = String(params.judgeModels || 'claude-sonnet,grok-4.6')
+    .split(',').map(s => s.trim()).filter(Boolean);
+  for (const j of judges) if (!TEXT_MODELS[j]) throw new Error(`Unknown judge "${j}"`);
+
+  // Production draws the challenge ideas fresh and passes the section through
+  // (beatsPipeline.js:889/947); omitting it would build a prompt production
+  // never sends. Drawn ONCE so every effort arm sees the identical prompt —
+  // the arms differ in effort and nothing else.
+  const draw = drawChallengeIdeas(storyData, {});
+  const saved = PROMPT_TEMPLATES.arcCreate;
+  let prompt;
+  try {
+    if (promptOverride) PROMPT_TEMPLATES.arcCreate = promptOverride;
+    prompt = buildArcCreatePrompt(storyData, pageCount, { challengeIdeas: draw.section });
+  } finally { PROMPT_TEMPLATES.arcCreate = saved; }
+  if (!prompt) throw new Error('arc-create prompt could not be built');
+
+  const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
+  if (!judgeTemplate) throw new Error('story-arc-judge template unavailable');
+  const context = sc.buildBriefContext({ ...storyData, pages: pageCount }, { arc: true });
+  const costOf = r => r.usage?.direct_cost ?? calculateTextCost(r.modelId || '', r.usage || {});
+
+  const scoreArc = async (arcText) => {
+    const input = `# BRIEF (the commission — context only, not scored)\n${context}\n\n===\n\n# ARC\n${arcText}`;
+    const draws = await Promise.all(judges.map(async (j) => {
+      try {
+        const r = await callTextModelStreaming(`${judgeTemplate}\n\n---\n\n${input}`, null, null, j, { usageLabel: 'testlab_arc_effort_judge' });
+        const dims = sc.parseJudgeJson(r.text)?.arc?.dims || {};
+        const keys = sc.ARC_RUBRIC.arc.filter(k => { const n = Number(dims[k]); return Number.isFinite(n) && n >= 1 && n <= 10; });
+        return keys.length
+          ? { judge: j, score: keys.reduce((s, k) => s + Number(dims[k]), 0) / keys.length, dims, cost: costOf(r) }
+          : { judge: j, score: null, cost: costOf(r) };
+      } catch (e) { return { judge: j, score: null, error: String(e.message || e) }; }
+    }));
+    const ok = draws.filter(d => Number.isFinite(d.score));
+    return { draws, mean: ok.length ? ok.reduce((s, d) => s + d.score, 0) / ok.length : null };
+  };
+
+  // Serial: these are large Opus calls and the point is a clean per-arm cost.
+  const arms = [];
+  for (const effort of efforts) {
+    const t = Date.now();
+    try {
+      const res = await callTextModelStreaming(prompt, null, null, model, { usageLabel: 'testlab_arc_effort', effort });
+      const visible = String(res.text || '');
+      let commit = null, parseError = null;
+      try { commit = parseArcCreate(visible); } catch (e) { parseError = String(e.message || e); }
+      const arcText = commit?.arc || commit?.chosen || visible;
+      const scored = commit ? await scoreArc(arcText) : { draws: [], mean: null };
+      const out = res.usage?.output_tokens || 0;
+      // The gap IS the finding: billed output minus what came back as text.
+      const visibleTokens = Math.round(visible.length / 3.5);
+      arms.push({
+        effort, ok: true, parseError,
+        cost: costOf(res), elapsedMs: Date.now() - t,
+        inputTokens: res.usage?.input_tokens || 0,
+        outputTokens: out,
+        visibleChars: visible.length,
+        visibleTokensApprox: visibleTokens,
+        invisibleShare: out ? Number((1 - visibleTokens / out).toFixed(2)) : null,
+        score: scored.mean,
+        judgeDraws: scored.draws,
+        judgeCost: scored.draws.reduce((s, d) => s + (d.cost || 0), 0),
+        arc: arcText,
+      });
+    } catch (err) {
+      arms.push({ effort, ok: false, error: String(err.message || err), elapsedMs: Date.now() - t });
+    }
+  }
+
+  const base = arms.find(a => a.effort === 'high' && a.ok);
+  return {
+    storyId: target.storyId, model, judges, pageCount, promptChars: prompt.length,
+    arms,
+    summary: arms.map(a => a.ok
+      ? `${a.effort}: $${a.cost.toFixed(4)} | out ${a.outputTokens} tok (${a.invisibleShare != null ? Math.round(a.invisibleShare * 100) : '?'}% not returned) | score ${a.score == null ? 'n/a' : a.score.toFixed(2)}`
+        + (base && a !== base ? ` | ${(((a.cost - base.cost) / base.cost) * 100).toFixed(0)}% cost vs high` : '')
+        + (a.parseError ? ` | PARSE FAILED: ${a.parseError}` : '')
+      : `${a.effort}: FAILED ${a.error}`),
+  };
+}
+
+/**
  * arc_amend — the bake-off for repairing the arc in place.
  *
  * Today's hint pass emits a DIRECTIVE against a frozen arc: the planner obeys
@@ -9606,6 +9723,7 @@ const STORY_STAGES = {
   vb_element_cell: runVbElementCellStage,
   arc_rounds: runArcRoundsStage,
   arc_amend: runArcAmendStage,
+  arc_effort: runArcEffortStage,
   cover: runCoverStage,
   cover_title_paintin: runCoverTitlePaintinStage,
   style_check: runStyleCheckStage,

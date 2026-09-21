@@ -583,6 +583,11 @@ export const TESTLAB_STAGES = [
   // damaged. `issueWasReal: false` is the signal — a model that invented a
   // problem and edited a good beat to fix it.
   { id: 'arc_amend', label: 'Arc amend bake-off (models repair the stored arc in place, each beat judged)', producesImage: false, overridable: true, storyLevel: true },
+  // Does the arc still hold at medium or low effort? Every Anthropic call sends
+  // no output_config, so Opus 5 runs adaptive thinking at effort `high` and bills
+  // it inside output_tokens — measured 30,674 output tokens against ~4,000 of
+  // visible text. Same prompt each arm, judged by the arc judges.
+  { id: 'arc_effort', label: 'Arc effort sweep (high/medium/low thinking, cost vs judged arc quality)', producesImage: false, overridable: true, storyLevel: true },
   // Re-judge stored rounds with a DIFFERENT judge (params.scoreIds + params.judgeModel).
   // Nothing is rewritten — it measures the judge, so two judges' scores of the
   // identical text sit side by side on the Scores page.

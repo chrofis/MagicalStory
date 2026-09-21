@@ -185,6 +185,14 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
       body: JSON.stringify({
         model: modelId,
         max_tokens: maxTokens,
+        // Thinking is ON BY DEFAULT on Claude Opus 5 (unlike Opus 4.8/4.7, where
+        // omitting the parameter meant no thinking), and `effort` defaults to
+        // `high`. Thinking is billed inside output_tokens whatever `display`
+        // says, and display defaults to "omitted" — so the reasoning is paid for
+        // and never returned. Measured on the arc: 30,674 billed output tokens
+        // against ~4,000 tokens of visible text. This is the lever on that, and
+        // it stays OPT-IN: no caller's cost or quality moves unless it asks.
+        ...(options.effort ? { output_config: { effort: options.effort } } : {}),
         messages
       }),
       signal: AbortSignal.timeout(timeoutMs)
@@ -288,6 +296,8 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
         model: modelId,
         max_tokens: maxTokens,
         stream: true,
+        // See the note on the non-streaming call: opt-in only.
+        ...(options.effort ? { output_config: { effort: options.effort } } : {}),
         messages
       }),
       signal: controller.signal
