@@ -222,6 +222,7 @@ ${adventureGuideContent}`
   // all, so there is nothing to sample for — challengeCatalogueBands returns an
   // empty list for them, and picks the bands for every other age.
   const { buildAgeModeSection, resolveAgeBand, challengeCatalogueBands } = require('../lib/promptBuilders');
+  const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language });
   const ageModeSection = buildAgeModeSection({ characters });
   const bands = challengeCatalogueBands({ characters });
 
@@ -328,6 +329,14 @@ ${adventureGuideContent}`
     CHALLENGE_CATALOGUE: challengeCatalogueSection,
     AGE_MODE: ageModeSection,
     LANGUAGE_INSTRUCTION: languageInstruction,
+    // One premise shape per idea arm, picked in code (pickPremiseShapes). The
+    // single-idea template takes {PREMISE_SHAPE} (overridden per arm by the
+    // caller); the two-idea template writes both ideas in ONE call and takes
+    // {PREMISE_SHAPE_1} / {PREMISE_SHAPE_2}. All three are declared here so no
+    // call site can ship an unfilled placeholder.
+    PREMISE_SHAPE: premiseShapeInstruction(premiseShapes[0]),
+    PREMISE_SHAPE_1: premiseShapeInstruction(premiseShapes[0]),
+    PREMISE_SHAPE_2: premiseShapeInstruction(premiseShapes[1]),
     ...extraReplacements,
   });
 
@@ -338,6 +347,7 @@ ${adventureGuideContent}`
     relationshipDescriptions,
     sceneCount,
     promptTemplate,
+    premiseShapes,
     singlePromptTemplate,
     storyRequirements1,
     storyRequirements2,
@@ -409,6 +419,59 @@ function ideaVariantSeed(seedInput) {
   return h;
 }
 
+/**
+ * The premise-shape catalogue (prompts/premise-shapes.txt).
+ *
+ * Seven rating rounds moved every defect axis and left the buy axis at 3.35-3.65.
+ * The contract said what a premise may NOT contain and never said what it is BUILT
+ * on, so both arms kept reaching for the same shapeless "a child wants a thing and
+ * something is in the way". The shape is picked HERE, in code, and handed to the
+ * model as a requirement — the same reason buildVariantInstructions hands over
+ * values rather than an instruction to differ: the second call cannot see the first.
+ */
+let PREMISE_SHAPES = null;
+function loadPremiseShapes() {
+  if (PREMISE_SHAPES) return PREMISE_SHAPES;
+  const raw = require('fs').readFileSync(path.join(__dirname, '../../prompts', 'premise-shapes.txt'), 'utf-8');
+  PREMISE_SHAPES = raw.replace(/\r/g, '').split('\n')
+    .filter(l => l.trim() && !l.startsWith('#'))
+    .map(l => l.split('|'))
+    .filter(f => f.length >= 4)
+    .map(f => ({ id: Number(f[0]), name: f[1].trim(), definition: f[2].trim(), minAge: Number(f[3]) }));
+  if (PREMISE_SHAPES.length < 4) throw new Error('premise-shapes.txt: fewer than four usable shapes');
+  return PREMISE_SHAPES;
+}
+
+// Shape 10 is between the two main characters and is nonsense with one main.
+// Encoded here rather than as a fifth column: it is the only shape with a cast
+// precondition, and a column that is blank on eleven of twelve lines teaches
+// nothing.
+const SHAPE_NEEDS_TWO_MAINS = new Set([10]);
+
+/**
+ * One shape per arm, DETERMINISTIC from the same seed buildVariantInstructions
+ * uses, always two different shapes, and never a shape above the youngest
+ * character's age. Exported for the unit test and the rating harness.
+ */
+function pickPremiseShapes(seedInput = {}) {
+  const chars = seedInput?.characters || [];
+  const ages = chars.map(c => parseInt(c?.age, 10)).filter(Number.isFinite);
+  const youngest = ages.length ? Math.min(...ages) : 8;
+  const mains = chars.filter(c => c?.isMain).length;
+  const pool = loadPremiseShapes()
+    .filter(s => youngest >= s.minAge)
+    .filter(s => mains >= 2 || !SHAPE_NEEDS_TWO_MAINS.has(s.id));
+  if (pool.length < 2) throw new Error(`premise-shapes: only ${pool.length} shape(s) for youngest age ${youngest}`);
+  const h = ideaVariantSeed(seedInput);
+  const i1 = h % pool.length;
+  const i2 = (i1 + 1 + (Math.floor(h / pool.length) % (pool.length - 1))) % pool.length;
+  return [pool[i1], pool[i2]];
+}
+
+function premiseShapeInstruction(shape) {
+  return `This idea has the shape: ${shape.name} — ${shape.definition}. Keep the shape; the shape is a requirement, not a choice.`;
+}
+
 function buildVariantInstructions(world1, world2, seedInput = {}) {
   const first = world1 === 'fantasy'
     ? 'Start directly in the adventure world. Avoid local landmarks - use the theme setting instead.'
@@ -420,8 +483,7 @@ function buildVariantInstructions(world1, world2, seedInput = {}) {
   } else if (bothLocation) {
     const h = ideaVariantSeed(seedInput);
     const place = IDEA_PLACE_CLASSES[h % IDEA_PLACE_CLASSES.length];
-    const event = IDEA_EVENT_CLASSES[Math.floor(h / IDEA_PLACE_CLASSES.length) % IDEA_EVENT_CLASSES.length];
-    second = `Create a DIFFERENT story than the first one. These are requirements, not choices: this story plays ${place}; what makes it hard is ${event}; and whoever is responsible for the youngest character is a different person from the obvious one, or nobody is. Use local landmarks if available.`;
+    second = `Create a DIFFERENT story than the first one. These are requirements, not choices: this story plays ${place}; and whoever is responsible for the youngest character is a different person from the obvious one, or nobody is. Use local landmarks if available.`;
   } else {
     second = 'Create a DIFFERENT story than the first one: different local places, a different approach to the conflict, and a different story structure. Use local landmarks if available.';
   }
@@ -754,7 +816,7 @@ ${landmarkEntries}`;
     // with landmarks (requirements-1), 'fantasy' = direct start in the theme
     // world, no landmarks (requirements-2). Fantasy prompts get the location
     // and landmarks sections blanked so the real city cannot leak in.
-    const buildSinglePrompt = (world, variantInstruction) => {
+    const buildSinglePrompt = (world, variantInstruction, shape) => {
       const requirements = world === 'fantasy' ? ctx.storyRequirements2 : ctx.storyRequirements1;
       const worldOverrides = world === 'fantasy'
         ? { USER_LOCATION_INSTRUCTION: '', AVAILABLE_LANDMARKS: '' }
@@ -762,6 +824,7 @@ ${landmarkEntries}`;
       return ctx.applyReplacements(ctx.singlePromptTemplate, {
         STORY_VARIANT_INSTRUCTION: variantInstruction,
         STORY_REQUIREMENTS: requirements,
+        PREMISE_SHAPE: premiseShapeInstruction(shape),
         ...worldOverrides
       });
     };
@@ -770,8 +833,8 @@ ${landmarkEntries}`;
     const world2 = ideaWorlds ? ideaWorlds[1].world : 'fantasy';
     const [firstInstruction, secondInstruction] = buildVariantInstructions(world1, world2, { characters, storyTopic, storyTheme, language });
 
-    const prompt1 = buildSinglePrompt(world1, firstInstruction);
-    const prompt2 = buildSinglePrompt(world2, secondInstruction);
+    const prompt1 = buildSinglePrompt(world1, firstInstruction, ctx.premiseShapes[0]);
+    const prompt2 = buildSinglePrompt(world2, secondInstruction, ctx.premiseShapes[1]);
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
     // wizard can label each card before/while the ideas stream in
@@ -864,3 +927,5 @@ module.exports = router;
 module.exports.buildIdeasPromptContext = buildIdeasPromptContext;
 module.exports.resolveIdeaWorlds = resolveIdeaWorlds;
 module.exports.buildVariantInstructions = buildVariantInstructions;
+module.exports.pickPremiseShapes = pickPremiseShapes;
+module.exports.premiseShapeInstruction = premiseShapeInstruction;

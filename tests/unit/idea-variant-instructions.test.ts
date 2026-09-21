@@ -11,11 +11,13 @@ describe('buildVariantInstructions', () => {
     expect(second).not.toBe(first);
   });
 
-  it('states the second location arm place class and event class as values, not as a choice', () => {
+  it('states the second location arm place class as a value, not as a choice', () => {
     const [, second] = buildVariantInstructions('location', 'location', { characters: [{ name: 'Mia', age: 5 }], storyTopic: 'making-friends' });
     expect(second).toMatch(/requirements, not choices/i);
     expect(second).toMatch(/this story plays (indoors|outdoors|at home|in a public place)/i);
-    expect(second).toMatch(/what makes it hard is \S/i);
+    // The EVENT class moved out on 2026-09-21: the premise shape (pickPremiseShapes)
+    // now owns what makes the story hard, and two sources for it contradicted.
+    expect(second).not.toMatch(/what makes it hard is/i);
     expect(second).toMatch(/responsible for the youngest character/i);
     // no open-ended "pick a different X" phrasing left for the model to resolve
     expect(second).not.toMatch(/a different class of place/i);

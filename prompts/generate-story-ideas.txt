@@ -65,6 +65,8 @@ STORY LENGTH: {STORY_LENGTH_CATEGORY}
 For EACH story idea, output these three stages:
 
 [DRAFT_1]
+{PREMISE_SHAPE_1}
+
 Write your first story idea, set in the child's own town and at the real local landmarks listed
 above. A costume or theme shows in what they wear and what they play, never in travelling somewhere
 else. Where no landmarks are listed, use the town's own everyday places.
@@ -74,7 +76,7 @@ List exactly 5 improvements. Never say "no issues" - always find ways to make it
 
 First check - language: Is the entire draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is an error that must be fixed.
 
-Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits, no sentence past about 30 words, no dash holding two clauses together in one sentence? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) Characters: for each name, quote the words that give them a stake. Living with, coming along with, or waiting for the others is not a stake. A name with no such words is not in the story yet. (5) Complexity matches scene count? (6) Back cover, not synopsis: number the sentences of the final. For each one after the first, write "setup", "event", or "rule". A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Every sentence marked "event" other than the last is cut, and every sentence marked "rule" is cut. The last sentence states what failing costs: that is not a rule, and it is kept. List every cut sentence, not one of them. (7) Peril: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in the final. A historical event keeps the danger it really had: tell it at a child's level, never remove it. (8) Can you name the one thing they want, the thing against it, and what failing costs, in three words each? (9) Topic: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it. (10) Hook: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to the final. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them. (11) The child acts: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in the final. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have. (12) Length: count the sentences of the final and the words of the longest one. Past five sentences, or past 30 words, split or cut before the final.
+Check: (1) Is entire output in correct language (not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits, no sentence past about 30 words, no dash holding two clauses together in one sentence? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) Characters: for each name, quote the words that give them a stake. Living with, coming along with, or waiting for the others is not a stake. A name with no such words is not in the story yet. (5) Complexity matches scene count? (6) Back cover, not synopsis: number the sentences of the final. Label each one "setup", "hook", "promise", "event", "rule" or "cost". A "promise" says what the reader will get to see and does not say whether they manage it. A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Only "event" and "rule" are cut: every sentence marked "event" other than the last, and every sentence marked "rule". Setup, hook, promise and cost are kept. List every cut sentence, not one of them. (7) Peril: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in the final. A historical event keeps the danger it really had: tell it at a child's level, never remove it. (8) Can you name the one thing they want, the thing against it, and what failing costs, in three words each? (9) Topic: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it. (10) Hook: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to the final. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them. (11) The child acts: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in the final. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have. (12) Promise: quote the sentence that says what the reader will get to see. If there is nothing to quote, add one to the final. If it says whether they manage it, or what decides it, rewrite it. (13) Shape: name the shape this idea was given and quote the words in the final that carry it. If it is not there, rewrite the final to the shape. (14) Opening: quote the first sentence. If it states where and when rather than showing the hook or the main character, rewrite it. (15) Length: count the sentences of the final and the words of the longest one. Past six sentences, or past 30 words, split or cut before the final.
 
 5 improvements:
 1. [specific improvement]
@@ -89,6 +91,8 @@ CUT_1: the numbers and the full text of every sentence cut by check 6, listed on
 Corrected final version of story 1.
 
 [DRAFT_2]
+{PREMISE_SHAPE_2}
+
 Write a DIFFERENT story idea, set in a make-believe world. It opens where the child really is —
 dressing up, or starting to play — and the make-believe follows from that, so the reader sees where
 it began and where it will come back to.
@@ -110,9 +114,9 @@ Corrected final version of story 2.
 
 ## OUTPUT FORMAT (FOLLOW EXACTLY)
 
-Each story idea must be PLAIN TEXT PARAGRAPHS:
-- Paragraph 1: Setting (location and time)
-- Paragraph 2: Who is there, what they want, what is in the way, and what failing costs
+Each story idea is ONE PLAIN TEXT PARAGRAPH holding, in this order: who is there and what they want; what stands in the way; what the reader will get to see; what failing costs.
+
+The reader already chose the town and the season. Do not open with an address. The place is the scene the action happens in, named where the action is, never a sentence that states where and when.
 
 **Forbidden - do not use:**
 - No **bold** or *italic* (no asterisks ever)
@@ -128,25 +132,22 @@ Each story idea must be PLAIN TEXT PARAGRAPHS:
 - The want is the main character's own want, stated as theirs, and they are the one who sets out after it. An errand an adult handed them is not their want. For a main character aged two or under the want is something to reach, follow, touch, hold or get to, never an object to fetch back and never an arrangement to sort out.
 - One thing in the idea is out of the ordinary and can be pointed at in a picture: a thing, a creature, a place or an event, named with a plain noun. It stands in the first or second sentence and belongs to the setup or to the obstacle, never to what decides the outcome. It is named and never explained: not what it does, not what it opens, not who it obeys, not why it is as it is.
 - The want is one a child would have for themselves: something to reach, to keep, to get into, to be first at, to give to someone, or to be allowed. A submission, a measurement, a permit, a set of numbers, or a repair an adult is paid to do is not one.
+- One sentence says what the reader will get to see: an event this book contains, which can be pictured. Never whether they manage it, and never what decides it. It stands after the obstacle.
 - The last sentence states what failing costs. Nothing comes after it.
 - The final holds the idea text only: no notes, no headings, no second version, no commentary.
 - Never write how it ends, and never write the middle: no naming the object, gate, figure or trick that decides the outcome, no test the characters will have to pass, and no pairing of a character's trait with the obstacle it will meet. Say who they are, not what each of them will do about it.
 - The want, the obstacle and the cost are each a concrete thing the reader can name: one thing to reach, fetch, mend or be in time for, a stated force or condition against it, and a stated loss. Wanting to find out what something is, an unnamed something standing in the way, or more than they can see, are none of the three.
 - Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 
-**LENGTH:** three to five sentences, whatever the page count ({STORY_LENGTH_CATEGORY}). The page count sets how much story gets written later, never how much of it is given away here. No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
+**LENGTH:** four to six sentences, whatever the page count ({STORY_LENGTH_CATEGORY}), and at most one sentence per slot. The page count sets how much story gets written later, never how much of it is given away here. No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
 
 ## EXAMPLES (correct format):
 
 [DRAFT_1]
-The story takes place on the high seas, traveling from the North Pole to Africa during summer.
-
-Pirates are hunting a chest that has been out of reach for a hundred years. Another crew is already ahead of them. Whoever arrives second goes home with nothing.
+A chest has been out of reach for a hundred years, and a crew of pirates wants it. Another crew is already ahead of them across the same water. Before this is over the chest comes up out of the sea. Whoever arrives second goes home with nothing.
 
 [DRAFT_2]
-The story is set in a medieval castle during a cold winter when snow covers the land.
-
-The kitchen runs out of firewood and the cook sends her daughter into the forest to bring some back before dark. The forest belongs to someone who does not give anything away for free, and the castle stays cold until she is home.
+A bird with one white feather lands on the castle wall and will not be sent away. The cook's daughter wants to keep it, and the kitchen it roosts in has run out of firewood. The forest where the wood is belongs to someone who does not give anything away for free. The reader gets to see her walk in among those trees with the bird on her shoulder. If she comes back empty, the bird goes.
 
 ---
 

@@ -1,0 +1,16 @@
+# Premise shapes — the structure a back-cover premise is built on.
+# Picked in code (server/routes/storyIdeas.js, pickPremiseShapes), one per idea arm,
+# never the same shape on both arms of one request. Injected as {PREMISE_SHAPE}.
+# Format: id|name|definition|min age
+1|race against time|something must happen before a moment that is already set, and the moment does not move|3
+2|rescue|someone or something is stuck, held or lost, and the main character is the one who goes after them|3
+3|a secret kept|the main character knows something they have not told, and carrying it is what makes the book hard|6
+4|an unwanted companion|somebody or something attaches itself to the main character and will not be sent back|1
+5|a swap or a mix-up|two things, or two people, are taken for each other, and everyone acts on the wrong one|4
+6|a lost thing that moves|what the main character is after does not stay where it was left|1
+7|a promise to keep|the main character has given their word, and keeping it costs more than they thought|5
+8|a visitor who will not leave|something arrives where the main character lives and stays there|1
+9|a door that opens once|a way in, a way out or a chance is there for a stretch of time and then it is not|5
+10|a contest between the two mains|the two main characters want the same one thing and only one of them can have it|5
+11|a thing that grows|something small in the main character's care gets bigger, and what it needs grows with it|1
+12|a message to deliver|something must be carried, said or handed to someone who is not here|4

@@ -54,10 +54,15 @@ Your entire output must be in the language specified above.
 
 {AGE_MODE}
 
+{PREMISE_SHAPE}
+
 Generate a story idea that includes:
-1. LOCATION and TIME: Where and when does the story take place?
-2. THE SETUP: who is there and what they want.
-3. WHAT STANDS IN THE WAY and what it costs them to fail.
+1. THE SETUP: who is there and what they want.
+2. WHAT STANDS IN THE WAY.
+3. THE PROMISE: one thing the reader will get to see happen in this book.
+4. WHAT IT COSTS THEM TO FAIL.
+
+The reader already chose the town and the season. Do not open with an address. The place is the scene the action happens in, named where the action is, never a sentence that states where and when.
 
 The want, the obstacle and the cost are each a concrete thing the reader can name: one thing to reach, fetch, mend or be in time for, a stated force or condition against it, and a stated loss. Wanting to find out what something is, an unnamed something standing in the way, or more than they can see, are none of the three.
 
@@ -69,7 +74,8 @@ The page count sets how much story gets written later, never how much of it is g
 
 RULES:
 - No adjectives allowed. Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
-- Three to five sentences, whatever the page count. A longer text turns into a plot summary.
+- Four to six sentences, whatever the page count, and at most one sentence per slot. A longer text turns into a plot summary.
+- One sentence says what the reader will get to see: an event this book contains, which can be pictured. Never whether they manage it, and never what decides it. It stands after the obstacle.
 - No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
 - The last sentence states what failing costs. Nothing comes after it.
 - [FINAL] holds the idea text only: no notes, no headings, no second version, no commentary.
@@ -86,11 +92,11 @@ RULES:
 
 EXAMPLES of good story ideas:
 
-Example 1: "Pirates sail from the North Pole toward Africa in summer, hunting a chest that has been out of reach for a hundred years. Another crew is already ahead of them. Whoever arrives second goes home with nothing."
+Example 1: "A chest has been out of reach for a hundred years, and a crew of pirates wants it. Another crew is already ahead of them across the same water. Before this is over the chest comes up out of the sea. Whoever arrives second goes home with nothing."
 
-Example 2: "In a castle in medieval times, in the middle of winter, the kitchen runs out of firewood. The cook's daughter goes into the forest to bring some back before dark, and the forest belongs to someone who does not give anything away for free."
+Example 2: "A bird with one white feather lands on the castle wall and will not be sent away. The cook's daughter wants to keep it, and the kitchen it roosts in has run out of firewood. The forest where the wood is belongs to someone who does not give anything away for free. The reader gets to see her walk in among those trees with the bird on her shoulder. If she comes back empty, the bird goes."
 
-Example 3: "In a forest where animals talk, a rabbit cannot find her way home. The owl who knows the path will not simply say it, and the fox who offers to lead her wants her to keep following him. She needs to get home before the light goes."
+Example 3: "A rabbit cannot find her way home, and the light is going. The owl who knows the path will not simply say it, and the fox who offers to lead her wants her to keep following him. Somewhere in this book she stands at the mouth of a burrow that is not hers. If she is still out when it is dark, she stays out."
 
 ---
 
@@ -120,12 +126,15 @@ Check and critique:
    - Is the timeline coherent?
 4. **Characters**: for each name, quote the words that give them a stake. Living with, coming along with, or waiting for the others is not a stake. A name with no such words is not in the story yet.
 5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
-6. **Back cover, not synopsis**: number the sentences of [FINAL]. For each one after the first, write "setup", "event", or "rule". A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Every sentence marked "event" other than the last is cut, and every sentence marked "rule" is cut. The last sentence states what failing costs: that is not a rule, and it is kept. List every cut sentence, not one of them.
+6. **Back cover, not synopsis**: number the sentences of [FINAL]. Label each one "setup", "hook", "promise", "event", "rule" or "cost". A "promise" says what the reader will get to see and does not say whether they manage it. A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Only "event" and "rule" are cut: every sentence marked "event" other than the last, and every sentence marked "rule". Setup, hook, promise and cost are kept. List every cut sentence, not one of them.
 7. **Peril**: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in [FINAL]. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 8. **Topic**: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
 9. **Hook**: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to [FINAL]. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them.
 10. **The child acts**: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in [FINAL]. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have.
-11. **Length**: count the sentences of [FINAL] and the words of the longest one. Past five sentences, or past 30 words, split or cut before [FINAL].
+11. **Promise**: quote the sentence that says what the reader will get to see. If there is nothing to quote, add one to [FINAL]. If it says whether they manage it, or what decides it, rewrite it.
+12. **Shape**: name the shape you were given and quote the words in [FINAL] that carry it. If it is not there, rewrite [FINAL] to the shape.
+13. **Opening**: quote the first sentence. If it states where and when rather than showing the hook or the main character, rewrite it.
+14. **Length**: count the sentences of [FINAL] and the words of the longest one. Past six sentences, or past 30 words, split or cut before [FINAL].
 
 List your 5 improvements (be specific):
 1. [improvement]
