@@ -51742,155 +51742,50 @@ dash habit (11/20, one round old), theme-in-name-only (3/20), and whether the mo
 extra character (a mother, a captain, a dragon-keeper — in R5 all three supply the responsible
 adult the RULES line demands) is wanted or not.
 
----
+**Follow-up (2026-09-21): the buy axis.** Two more rounds (R6, R7) on the same ten cells, same
+rubric, same rater, USD 1.6806. The series above raised every defect axis and left axis (i),
+"would an adult buy this", at 3.25 → 3.35. **Diagnosis:** the five rounds fixed defect axes, and
+the contract has slots for setting, want, obstacle and cost and none for the hook. The three worst
+ideas on (i) were fully compliant with everything the contract asks: cell 2 arm 2 and both arms of
+cell 7 at i=2, with nothing picturable in the premise, the child not acting, and a one-year-old's
+"want" reduced to mitten logistics. **Two levers, chosen by the owner, not loosening the premise
+contract (no middle, no ending stays):** (1) a HOOK slot — one concrete picturable thing out of the
+ordinary, named with a plain noun, in sentence 1 or 2, part of the setup or the obstacle and never
+the decider, with a review check that quotes it or adds one; (2) CHILD ACTS — the want is the main
+child's own and they set out after it, an adult's errand is not their want, and for a main
+character aged two or under the want is something to reach, follow, touch, hold or get to, with a
+matching quoting check. R7 then targeted R6's three worst buy-axis classes: the want that is an
+adult's job, the hook that pulls an explanation in behind it, and the length regression R6 caused.
 
-## 2026-09-21 — A second-witness veto renames the DETECTOR's figures too, and voids the entity findings the overturned labels produced
+**i before and after: 3.35 (R5) → 3.65 (R6) → 3.55 (R7).** The R6 move is the largest single-round
+gain on (i) in the series and the first time it left the 3.15-3.35 band it had sat in for five
+rounds. Per-cell evidence: cell 7, worst pair in five rounds, went 2/2 → 3/4 when a one-year-old
+*follows a duck* instead of having a mitten arranged for her, and its two arms differed for the
+first time; cell 1's fantasy arm 3 → 4 (a parrot takes the map, the toddler wants to *get to* the
+chest); cell 3's location arm 3 → 4 (a spell book replaces machinery); cell 9's location arm 3 → 4
+(a banner she sewed replaces her brother's condition); cell 6's fantasy arm 3 → 5 on a hatchling
+that follows a four-year-old, the best idea of the seven rounds. In R7, cell 2 — one idea in both
+arms for six rounds — finally split, and its weak arm went 2 → 4. **Both-arms-identical fell 4/20
+→ 2/20 and stayed**, after three shapes of the variety instruction had failed to move it at all;
+the hook, not the variety instruction, is what separated the arms.
 
-**Context.** `reconcileIdentityWithSecondWitness` asks a third model who-is-who on the pages
-where the evaluator and the figure detector disagree and the detector is about to overwrite the
-evaluator. Where the witness backs the evaluator the rewrite is withheld — and that was the whole
-of it. The detector's `figures[]` kept the names two witnesses had just rejected, and every
-consumer that reads a FIGURE rather than a MATCH went on believing them. The entity-consistency
-check is the worst of these: it runs in `Promise.all` alongside the evaluation
-(`repairPipeline.js`), crops figure N and judges it against the contract of whoever the detector
-named. Measured on `job_1789853503332_riqncqg1i` p14 — two boys wearing each other's outfits,
-evaluator and witness both said the labels were swapped, veto fired, nothing renamed: 7 MAJOR
-entity findings that are nothing but the swap restated, quality 95 shipped as 55, and a character
-fix routed at the wrong figure which the face gate then refused.
+**Regressions.** R6's hook slot costs a sentence's worth of material inside a 3-5 sentence budget:
+a 3.65 → 3.15, f 3.90 → 3.35 (two ideas at six sentences, six past 35 words), g 4.65 → 4.30 (the
+Apollo lander returned after R5 closed it). The hook itself became the decider in 2/20 (a missing
+page that opens a lock; a rock passage only the main character fits through). R7's "named and never
+explained" clause fixed that — no R7 hook is a decider, the rule/gate leak fell to 4/20, its lowest
+— and R7's length check **backfired**: asking the reviewer to name what it cut put review self-talk
+inside [FINAL] in both cell-6 arms, once as an English sentence inside a German text. That is the
+only finding in seven rounds that a paying user would read as a broken product, and it costs those
+two ideas i=2 each; without them R7's i is 3.75 and f 3.90.
 
-**Decision.** (1) A veto now writes the evaluator's names onto the detector figures
-(`applyEvaluatorNamesToDetection`), recording `detectorName` / `identityCorrectedBy` on each and
-`detectorRenamed` on the report. It refuses unless the result is still one name per figure, so a
-partial veto cannot put one child on the page twice. (2) Immediately after the `Promise.all`, and
-therefore before the report is stamped, before `getEntityPenaltyAndIssues` charges for it and
-before any repair is routed, `voidEntityIssuesContestedByWitness` drops that page's entity
-findings about the contested names. A third child on the same page, cropped under a name nobody
-disputed, keeps their findings.
-
-**Rationale.** This does not reverse the settled veto rule ("the witness may only ever WITHHOLD",
-2026-09-18): the witness still cannot cause a rename of the EVALUATION, and the number of
-evaluation renames is unchanged on every path. It makes the withholding mean the same thing on
-both sides of the page instead of shipping two contradictory namings. The entity verdicts are
-VOIDED rather than re-attributed because they are not invertible — the grid is gone and
-re-judging the crops costs a paid call, so "we judged the wrong child" is honestly recorded as
-"not judged", never as a clean pass.
-
-**Touched:** `server/lib/identityAgreement.js` (`applyEvaluatorNamesToDetection`,
-`voidEntityIssuesContestedByWitness`, the veto tail of
-`reconcileIdentityWithSecondWitness`), `server/lib/repairPipeline.js` (void call after the
-eval/entity `Promise.all`), `tests/unit/identity-second-witness.test.ts`.
-Siblings ruled out: `server/routes/regeneration.js` and `server/lib/entityConsistency.js` read the
-PERSISTED `bboxDetection.figures`, which now already carry the corrected names (the rename happens
-in `images.js` before the detection is stored), and they run sequentially over stored data — there
-is no parallel window for them to race.
-
-**Status:** ✅ active
-
----
-
-## 2026-09-21 — The reference-sheet chain states an age once, splits a sheet once, and stores an image once (pipeline review A9 / B4 / D5)
-
-**Context.** Three findings from the review of `job_1789853503332_riqncqg1i` all sit on the
-character-reference chain. (A9) The bodies judge scores PROPORTIONS — the one axis the declared
-age decides — but only the identity and pass-2 style judges were ever handed `CHARACTER_AGE`, so
-the generator was anchored on the declared age while its critic could only confirm the drawing
-looked like itself; the same pass-1 body prompt also asserted both "natural proportions matching
-the person's apparent age in Image 3" and the declared block's "that stated age outranks any
-impression of age taken from the photo". (B4) `cropSheetCell` memoised the analyzer's
-`/split-reference-sheet` call in a `WeakMap` keyed on the sheet Buffer, while every caller
-re-fetched its own Buffer from the sheet's R2 URL — the key never hit, so a 4-character 18-page
-story split the same 4 sheets ~50 times (~50 analyzer round-trips, ~50 × 392 KB of R2 traffic).
-(D5) The finished styled sheet was PUT to R2 four times per character under four keys, all
-byte-identical, because `extractInlineImagesToR2`'s content-dedupe map was consulted only by the
-generic Phase-1.5 sweep and not by the explicit walkers.
-
-**Decision.**
-1. `evaluateSheetRow('bodies', …)` takes `declaredAge` and fills `{CHARACTER_AGE}` in
-   `sheet-row-bodies-eval.txt` (same fill the identity and style evals use); TASK 4 scores against
-   that stated age and treats a figure drawn older/taller than it as a defect. Unknown age → the
-   prompt judges apparent age, as before. The heads row is not given it — it scores no proportions.
-2. `buildBodyRowPrompt` states the age ONCE: when the declared block is present, the two
-   photo-age clauses are removed rather than left to contradict it.
-3. The sheet-split memo is keyed on the sheet's CONTENT (Buffer md5 / URL), not the Buffer
-   object, and the URL→bytes fetch is memoised under the same key. Bounded FIFO (32 sheets).
-4. `extractInlineImagesToR2`'s `upload()` aliases identical bytes: the first task uploads, every
-   later slot holding the same bytes gets that task's URL. Nothing is deleted — every diagnostic
-   field still resolves to a URL, they just share one object.
-
-**Rationale.** (1)+(2) are the generator-vs-critic pair for age: a rule the judge deducts for is a
-rule the generator was given, and two contradictory age instructions in one prompt let the model
-pick the photo. (3) is a pure memo-key bug — the fix is the key, not a second cache. (4) follows
-"diagnostics are a research asset": deduplicate the object, never drop the artefact.
-
-**Not done, needs an owner call.** The same sheet is also uploaded by `storyAvatars.sheetToR2`
-(`characters/<user>/<char>/story-sheets/<job>-<slot>.jpg`, the per-user story history) and by the
-characters-row offload. Those are different rows with different lifetimes — the history is meant
-to outlive the story — so collapsing them onto the story blob's object is a durability decision,
-not a cleanup.
-
-**Touched:** `prompts/sheet-row-bodies-eval.txt`, `server/lib/character2x4Sheet.js`,
-`server/lib/sceneComposite.js`, `server/services/database.js`, `tests/unit/sheet-split-memo.test.ts`,
-`tests/unit/built-prompt-values.test.ts`, `tests/unit/avatar-sheet-declared-age.test.ts`,
-`tests/unit/r2-extract-no-double-upload.test.ts`
-**Status:** ✅ active
-
-## 2026-09-21 — One consolidation per evaluation: `inpaintPage` takes the plan, it does not make one
-
-**Context:** the repair pipeline consolidates every evaluation the moment it lands
-(`repairPipeline.consolidatePageEval` → `consolidateEvaluation`), stores the plan on the version as
-`consolidatedPlan`, scores the version against it, and mirrors it onto the eval object
-(`roundEvalPages`). `inpaintPage` then called `consolidateFeedback` **again** on that same
-evaluation. Measured on staging `job_1789853503332_riqncqg1i`: of 21 `consolidator_calls` rows, p10,
-p12 and p15 each hold **two** round-1 calls — ~29k prompt chars apiece — and the two plans for a page
-differ in wording. The page was therefore repaired from a plan nothing had scored against, and the
-number in `finalScore` came from the other one.
-
-**Decision:** the plan is an **input** to `inpaintPage` (`options.consolidatedPlan`, falling through
-to `evaluation.consolidatedPlan`, which is the same object). `executeInpaintAction` passes the plan
-of the version it is repairing. An inpaint that arrives with **no** plan and no single
-self-describing finding **stops** and returns `error: 'no consolidated plan on the evaluation'` — it
-does not re-consolidate, and the legacy severity-ranked issue-concat branch is **deleted** (NO
-FALLBACKS). The `soleDirectFix` shortcut (owner, 2026-09-20) stays the first branch, untouched.
-The one surviving consolidation now carries the page's wardrobe: the scene-clothing resolve that
-lived inside `inpaintPage` moved to `clothingResolve.resolveSceneClothingDescriptions` and is called
-by `consolidatePageEval`, so the single call is no poorer than the two it replaces. The Test Lab
-`inpaint` stage produces the plan at its own call site (same one call as before, now visible).
-
-**Rationale:** two consolidations of one evaluation are two answers to one question, and the repair
-executed the one the score did not. Saving is a by-product: 3 of 21 calls on the reference story,
-~87k prompt chars.
-
-**Touched:** `server/lib/images.js` (`inpaintPage`), `server/lib/repairPipeline.js`,
-`server/lib/clothingResolve.js`, `server/lib/testlab.js`,
-`tests/unit/inpaint-direct-fix.test.ts`
-**Status:** ✅ active
-
-## 2026-09-21 — A `retryHistory` entry links to its version instead of copying its detection
-
-**Context:** `stories.data` for `job_1789853503332_riqncqg1i` is 8.59 MB, and the same
-`bboxDetection` object is stored three times per page: on the scene (152 KB total), on
-`imageVersions[]` (147 KB) and on `retryHistory[]` (147 KB). The retry array is built by
-`versions.map((v, idx) => …)` — entry *idx* **is** version *idx* — so the third copy carries no
-information the second does not.
-
-**Decision:** a retry entry stamps `versionIndex: idx` and no `bboxDetection`. Readers resolve it
-through `repairLogic.detectionForRetryEntry(scene, entry, index)`, which returns the entry's own copy
-when it has one (every story written before today), then the linked version's. Measured by replaying
-the store shape over the reference story: **147,404 bytes, 1.72%** of `stories.data` — and again in
-`story_jobs.result_data`, which is a second copy of it. No stored row is rewritten.
-
-A latent bug fell out of the inventory and is fixed in the same edit: the version-merge path in
-`server/routes/stories.js` assigned `scene.imageVersions[i].bboxDetection = retryEntry.bboxDetection
-|| null`, so a retry entry without a detection **wiped** the detection `mergeFields` had just merged
-in from the version. It now takes the legacy copy only when one exists.
-
-**Rationale:** the link is the same fact as the copy, and the copy is the one that goes stale.
-
-**Touched:** `server/lib/repairPipeline.js`, `server/lib/repairLogic.js`,
-`server/routes/stories.js`, `server/lib/entityConsistency.js` (a log line that named
-`retryHistory` as the source it never read), `client/src/types/story.ts`,
-`scripts/analysis/bbox-style-grid.js`, `scripts/analysis/bbox-multi-style.js`,
-`scripts/analysis/bbox-investigation.js`, `tests/unit/retry-history-detection-link.test.ts`
-**Status:** ✅ active — the other two D3 halves (version `prompt` byte-equal to the page prompt;
-scene-level eval fields byte-identical to the picked version's) were NOT done: both reverse
-deliberate recent decisions and need an owner call. See the report / `tasks/BACKLOG.md`.
+**Verdict.** The hook slot and the child's own want are kept: they moved the axis five rounds of
+defect fixes could not, and they broke the duplication class as a side effect. The "want is one a
+child would have" rule is kept but **did not take on cell 5** — two rounds of rules aimed at a
+school-exhibition slot and a module calibration moved it zero; another rule in the same list is not
+the next lever. **The length check's "and name what you cut" clause should be reverted and the
+counting kept** — that is the one change in R6-R7 that made an output worse. Open, unchanged:
+cell 7 is now the only duplicated pair; the Apollo lander is a six-of-seven-rounds peril miss, and
+check 7 never reads the closing cost sentence, where R7's other peril miss lives.
+Ratings: `tests/manual/story-idea-rounds/round-6-ratings.md`, `round-7-ratings.md`.
+Commits: `34ab9a230` (R6), `3b53ba824` (R7).
