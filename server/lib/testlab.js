@@ -8162,7 +8162,10 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
 
   const { storyData } = await loadStoryDataFull(target.storyId, { rehydrate: false });
   const pageCount = (storyData.sceneImages || []).length || storyData.pages || 10;
-  const efforts = String(params.efforts || 'high,medium,low').split(',').map(s => s.trim()).filter(Boolean);
+  // Every level Opus 5 takes. xhigh and max cost MORE than the current default
+  // (`high`), so the sweep prices both directions: what medium/low save, and
+  // what the top of the range would cost if the arc turns out to want it.
+  const efforts = String(params.efforts || 'low,medium,high,xhigh,max').split(',').map(s => s.trim()).filter(Boolean);
   // The arc CREATOR, not the reviewer — production reads MODEL_DEFAULTS.arcCreatorModel
   // (beatsPipeline.js:833), and the whole point of this stage is that model's thinking bill.
   // 'claude-opus' is the TEXT_MODELS KEY; 'claude-opus-5' is the model id it
@@ -8179,12 +8182,14 @@ async function runArcEffortStage(target, { params = {}, promptOverride = null })
   // never sends. Drawn ONCE so every effort arm sees the identical prompt —
   // the arms differ in effort and nothing else.
   const draw = drawChallengeIdeas(storyData, {});
-  const saved = PROMPT_TEMPLATES.arcCreate;
-  let prompt;
-  try {
-    if (promptOverride) PROMPT_TEMPLATES.arcCreate = promptOverride;
-    prompt = buildArcCreatePrompt(storyData, pageCount, { challengeIdeas: draw.section });
-  } finally { PROMPT_TEMPLATES.arcCreate = saved; }
+  // withTemplates, not `PROMPT_TEMPLATES.x = override` + finally: that global
+  // mutation is what kept the Lab single-flight, because a second experiment's
+  // override is what this builder would read (prompts.js, 2026-08-25).
+  const { withTemplates } = require('../services/prompts');
+  const prompt = withTemplates(
+    { arcCreate: promptOverride },
+    () => buildArcCreatePrompt(storyData, pageCount, { challengeIdeas: draw.section }),
+  );
   if (!prompt) throw new Error('arc-create prompt could not be built');
 
   const judgeTemplate = PROMPT_TEMPLATES.storyArcJudge;
@@ -8291,13 +8296,13 @@ async function runArcAmendStage(target, { params = {}, promptOverride = null }) 
     if (!TEXT_MODELS[m]) throw new Error(`Unknown model "${m}"`);
   }
 
-  const template = promptOverride || PROMPT_TEMPLATES.arcAmend;
-  if (!template) throw new Error('arc-amend template unavailable');
-  const prompt = (() => {
-    const saved = PROMPT_TEMPLATES.arcAmend;
-    try { PROMPT_TEMPLATES.arcAmend = template; return buildArcAmendPrompt(storyData, arc); }
-    finally { PROMPT_TEMPLATES.arcAmend = saved; }
-  })();
+  if (!promptOverride && !PROMPT_TEMPLATES.arcAmend) throw new Error('arc-amend template unavailable');
+  // withTemplates, not a global assign + finally — see the note in arc_effort.
+  const { withTemplates } = require('../services/prompts');
+  const prompt = withTemplates(
+    { arcAmend: promptOverride },
+    () => buildArcAmendPrompt(storyData, arc),
+  );
   if (!prompt) throw new Error('arc-amend prompt could not be built');
 
   const judgeTemplate = PROMPT_TEMPLATES.arcAmendJudge;
