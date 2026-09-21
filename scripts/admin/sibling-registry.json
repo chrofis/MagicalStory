@@ -552,6 +552,18 @@
         "server/lib/storyViews.js"
       ],
       "severity": "block"
+    },
+    {
+      "id": "outbound-mail-greeting-and-claim-gate",
+      "axis": "pipeline completion mail vs deferred trial mail vs reminder sweep",
+      "reason": "three senders build the SAME two things by hand — the greeting name and the claim link. storyJobPipeline.js (unified completion mail), server/lib/trialEmail.js (deferred mail on claim) and server/lib/trialReminders.js (the day5/day25 sweep) each resolved a first name and each decided whether to mint a claim token. The reminder sweep already gated on claim STATE while the other two gated on trial ORIGIN, and the greeting expression was copied at all three plus email.js — which is how every mail greeted users by their email address and how a missing require(\"crypto\") killed the claim link on one path only. Greeting resolution now lives once in email.resolveGreetingName(); a change to who may be greeted, or to when a claim token may be minted, belongs at every member.",
+      "members": [
+        "email.js",
+        "storyJobPipeline.js",
+        "server/lib/trialEmail.js",
+        "server/lib/trialReminders.js"
+      ],
+      "severity": "block"
     }
   ],
   "withinFile": [

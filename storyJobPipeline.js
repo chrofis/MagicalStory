@@ -10,6 +10,7 @@
    savePartialStoryFromCheckpoints (always undefined at module scope, so the
    costume projection resolves to null); moved verbatim, not a new defect. */
 
+const crypto = require('crypto');
 const { log } = require('./server/lib/serverLog');
 const pLimit = require('p-limit');
 const email = require('./email');
@@ -7856,7 +7857,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         return resultData;
       }
       const userResult = await dbPool.query(
-        'SELECT email, username, shipping_first_name, preferred_language, is_trial, claim_token, (trial_data IS NOT NULL) AS has_trial_data FROM users WHERE id = $1',
+        'SELECT email, username, shipping_first_name, preferred_language, is_trial, has_set_password, claim_token, (trial_data IS NOT NULL) AS has_trial_data FROM users WHERE id = $1',
         [userId]
       );
       if (userResult.rows.length > 0 && userResult.rows[0].email) {
@@ -7873,7 +7874,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           return resultData;
         }
 
-        const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
+        const firstName = email.resolveGreetingName(user);
         // Prefer story language over DB default (DB defaults to 'English' for trial users)
         const emailLanguage = inputData.language || user.preferred_language || 'English';
 
@@ -7889,17 +7890,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // (observed for amandatavaresfo2@gmail.com on 2026-05-23).
         if (user.is_trial || user.has_trial_data) {
           try {
-            // Generate a claim token if user doesn't have one
-            let claimToken = user.claim_token;
-            if (!claimToken) {
-              claimToken = crypto.randomBytes(32).toString('hex');
-              const claimExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-              await dbPool.query(
-                'UPDATE users SET claim_token = $1, claim_token_expires = $2 WHERE id = $3',
-                [claimToken, claimExpires, userId]
-              );
+            // The claim link is gated on claim STATE, not on trial ORIGIN. All
+            // four conversion routes (auth.js set-password, trial.js link-google,
+            // claim/set-password, claim/link-google) clear is_trial, so
+            // `is_trial AND NOT has_set_password` is the unclaimed account.
+            // `password IS NOT NULL` is NOT a conversion signal — trial accounts
+            // are created with a random placeholder password (trial.js).
+            // The PDF stays gated on trial ORIGIN above: a user who converted
+            // mid-generation still wants their trial PDF, just not a "claim your
+            // account" link to an account they already own.
+            if (user.is_trial === true && user.has_set_password !== true) {
+              let claimToken = user.claim_token;
+              if (!claimToken) {
+                claimToken = crypto.randomBytes(32).toString('hex');
+                const claimExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+                await dbPool.query(
+                  'UPDATE users SET claim_token = $1, claim_token_expires = $2 WHERE id = $3',
+                  [claimToken, claimExpires, userId]
+                );
+              }
+              emailOptions.claimUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
             }
-            emailOptions.claimUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
 
             // Generate a view PDF to attach to the email
             // Fetch the full story data with images (rehydrate from story_images table)
@@ -8629,7 +8640,7 @@ async function _processStoryJobImpl(jobId) {
           await email.sendAdminStoryFailureAlert(jobId, userId, user.username, user.email || 'N/A', error.message);
           // Notify customer
           if (user.email) {
-            const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
+            const firstName = email.resolveGreetingName(user);
             // Prefer story language over DB default (DB defaults to 'English' for trial users)
             const emailLanguage = user.preferred_language || 'en';
             await email.sendStoryFailedEmail(user.email, firstName, emailLanguage);

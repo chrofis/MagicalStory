@@ -53,7 +53,7 @@ async function fetchLatestStoryTitle(dbPool, userId) {
 
 async function sendOne(dbPool, log, row, reminderType) {
   const claimUrl = buildClaimUrl(row.claim_token);
-  const firstName = row.shipping_first_name || row.username?.split(' ')[0] || null;
+  const firstName = email.resolveGreetingName(row);
   const language = row.preferred_language || 'English';
   const storyTitle = await fetchLatestStoryTitle(dbPool, row.id);
   const daysLeft = reminderType === 'day25' ? daysUntil(row.claim_token_expires) : null;

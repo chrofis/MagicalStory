@@ -28,7 +28,7 @@ async function sendTrialCompletionEmailIfDeferred(userId) {
     // Check user state: real email, no prior send, has a completed trial story.
     const userRes = await pool.query(
       `SELECT id, email, username, shipping_first_name, preferred_language,
-              claim_token, trial_completion_email_sent_at
+              is_trial, has_set_password, claim_token, trial_completion_email_sent_at
          FROM users WHERE id = $1`,
       [userId]
     );
@@ -72,19 +72,24 @@ async function sendTrialCompletionEmailIfDeferred(userId) {
       log.warn(`[TRIAL-EMAIL] PDF too large (${pdfSizeMB.toFixed(2)}MB) — sending without attachment`);
     }
 
-    // Reuse / generate a claim token so the email's claim link works.
-    let claimToken = user.claim_token;
-    if (!claimToken) {
-      claimToken = crypto.randomBytes(32).toString('hex');
-      const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-      await pool.query(
-        'UPDATE users SET claim_token = $1, claim_token_expires = $2 WHERE id = $3',
-        [claimToken, expires, userId]
-      );
+    // The claim link is gated on claim STATE, not on trial ORIGIN — this helper
+    // usually runs right AFTER a conversion, and mailing "claim your account" to
+    // someone who just claimed it is wrong. `is_trial AND NOT has_set_password`
+    // is the unclaimed account; every conversion route clears is_trial.
+    if (user.is_trial === true && user.has_set_password !== true) {
+      let claimToken = user.claim_token;
+      if (!claimToken) {
+        claimToken = crypto.randomBytes(32).toString('hex');
+        const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        await pool.query(
+          'UPDATE users SET claim_token = $1, claim_token_expires = $2 WHERE id = $3',
+          [claimToken, expires, userId]
+        );
+      }
+      emailOptions.claimUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
     }
-    emailOptions.claimUrl = `${process.env.FRONTEND_URL || process.env.BASE_URL || 'https://magicalstory.ch'}/claim/${claimToken}`;
 
-    const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
+    const firstName = email.resolveGreetingName(user);
     const language = storyData.language || user.preferred_language || 'English';
     const title = storyData.title || storyData.metadata?.title || 'Your story';
 

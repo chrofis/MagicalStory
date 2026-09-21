@@ -167,14 +167,35 @@ function fillTemplate(template, values) {
   return result;
 }
 
-// Extract first name from full name for greeting
-function getGreetingName(fullName) {
-  if (!fullName || typeof fullName !== 'string') {
-    return 'there';
+// Resolve the name a mail may greet someone by — the ONE place that decides.
+//
+// `users.username` is set to the email address on Google link and on trial
+// conversion, so a username is not automatically a name: anything containing
+// '@' is an address and must never be printed in a greeting. When no real name
+// is available the mail greets bare ("Hallo," / "Ciao,") — never by address,
+// never by the protagonist's name.
+//
+// Accepts either a user row (shipping_first_name preferred, then username) or a
+// plain name string, and returns a first name or null.
+function resolveGreetingName(source) {
+  const candidates = typeof source === 'string' || source == null
+    ? [source]
+    : [source.shipping_first_name, source.username];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'string') continue;
+    const trimmed = candidate.trim();
+    if (!trimmed || trimmed.includes('@')) continue;
+    const first = trimmed.split(/\s+/)[0];
+    if (first) return first;
   }
-  // Get the first word (first name) from the full name
-  const firstName = fullName.trim().split(/\s+/)[0];
-  return firstName || 'there';
+  return null;
+}
+
+// Templates read `Hallo{greeting},` — the leading space belongs to the value so
+// a nameless greeting renders "Hallo," with no stray gap before the comma.
+function greetingValue(source) {
+  const name = resolveGreetingName(source);
+  return name ? ` ${name}` : '';
 }
 
 // Check if email is configured
@@ -263,7 +284,7 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
   const coverUrl = options.coverUrl || await getCoverPublicUrl(storyId);
 
   const values = {
-    greeting: firstName || 'there',
+    greeting: greetingValue(firstName),
     title: storyTitle,
     storyUrl: storyUrl,
     claimUrl: options.claimUrl || '',
@@ -326,7 +347,7 @@ async function sendStoryFailedEmail(userEmail, firstName, language = 'English') 
 
   // Fill in placeholders
   const values = {
-    greeting: firstName || 'there'
+    greeting: greetingValue(firstName)
   };
 
   try {
@@ -472,7 +493,7 @@ async function sendTrialReminderEmail(userEmail, firstName, claimUrl, language =
   const body = fillTemplate(copy.body, variantValues);
 
   const values = {
-    greeting: firstName || 'there',
+    greeting: greetingValue(firstName),
     claimUrl,
     subject,
     headline,
@@ -598,7 +619,7 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
     || await getCoverPublicUrl(orderDetails.storyId);
 
   const values = {
-    greeting: getGreetingName(customerName),
+    greeting: greetingValue(customerName),
     orderId: orderDetails.orderId,
     amount: orderDetails.amount,
     currency: orderDetails.currency,
@@ -658,7 +679,7 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
     || await getCoverPublicUrl(trackingDetails.storyId);
 
   const values = {
-    greeting: getGreetingName(customerName),
+    greeting: greetingValue(customerName),
     orderId: trackingDetails.orderId || 'N/A',
     trackingNumber: trackingDetails.trackingNumber || 'N/A',
     trackingUrl: trackingDetails.trackingUrl || '#',
@@ -708,7 +729,7 @@ async function sendOrderFailedEmail(customerEmail, customerName, errorMessage, l
   }
 
   const values = {
-    greeting: getGreetingName(customerName),
+    greeting: greetingValue(customerName),
   };
 
   try {
@@ -1346,6 +1367,8 @@ module.exports = {
   validateEmailAddress,
   // Config check
   isEmailConfigured,
+  // Greeting resolution — the single source of truth for "what name may we print"
+  resolveGreetingName,
   // Customer emails
   sendStoryCompleteEmail,
   sendStoryFailedEmail,
