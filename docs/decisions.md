@@ -52067,6 +52067,88 @@ prompt: blind 3.90, and every defect class except contract and peril at or bette
 **Touched by this follow-up:** `docs/decisions.md`, `tests/manual/story-idea-rounds/round-10-defects.md`.
 Artefacts: `round-10.json` / `.md`, `blind-set-r10.md`, `blind-scores-r10.md`, `blind-key-r10.json`.
 
+**Follow-up (2026-09-21) — round 11: peril is fixed, the buy mean falls to 3.50. The two axes are
+now measurably in tension, and 3.90 stands as the best version.**
+
+*What was changed*, acting on R10's verdict that peril (8 of 20, the worst reading of the series)
+was the next class to fix — three fixes, both sibling templates in step (`6e0032049`):
+1. **Peril.** Check 7 gets the quoting treatment for the two shapes that slipped: quote any words
+   that leave a child alone at a height or on an edge, and any words in the cost sentence that end on
+   a child not coming home or not returning; replace the place, and replace that cost with a loss the
+   child can bear. The historical exemption is unchanged, verbatim. The RULES peril bullet names the
+   two shapes in one sentence. In code, `rescue` is withheld from a cast whose youngest is five or
+   under (`SHAPE_PERIL_PRONE` in `server/routes/storyIdeas.js`, encoded as a Set like
+   `SHAPE_NEEDS_TWO_MAINS` rather than as a column blank on eleven of twelve lines).
+   **The shape trace that justifies it, from `round-10.json`:** `rescue` drew 3 of its 4 arms into a
+   peril fault (#4 a five-year-old up a ruin wall, #7 a nine-year-old at the controls with the fuel
+   going, #9 a child left in orbit as the cost), 2 of 2 on the casts with a youngest of five or
+   under, and it is the only shape with more than one hit — the other five peril faults sit on five
+   different shapes (`an unwanted companion`, `a thing that grows`, `a message to deliver`,
+   `a swap or a mix-up`, `a secret kept`). Peril is therefore mostly NOT shape-driven; the filter is
+   the one narrow piece of it that is.
+2. **The cold 10-12 fantasy arm** (cell 5-2, blind 2: "a promise to himself and an unresponsive
+   joystick"). The dry-run showed the `[[premise]]` stake rule of `age-band-journey.txt` WAS in the
+   fantasy arm's built prompt — the arm's requirements file and the space guide were not overriding
+   it; the rule simply did not cover a promise made to oneself, nor say anything about the strange
+   thing being operated rather than held. One edit in the same band file, which the idea arm and the
+   story-side beats prompt share by construction: what is at risk is a person or a creature they care
+   about, never a promise made to themselves, a recording or a machine's state; the thing out of the
+   ordinary is one they hold or touch, never one they operate.
+3. **Felt cost and the idle adult.** RULES: the cost is a loss the child feels, never the end of an
+   afternoon, an outing or a visit; every named adult does one thing, and being present, waiting,
+   watching or driving is not one. Echoed into the existing cast check and the existing "cost" label
+   of check 6 — no new checks.
+
+*Result (`round-11.json` / `.md`, 20 ideas, USD 1.0840; `round-11-defects.md`).* Every defect axis
+improved or held: **a 2.95 → 3.30, c 4.10 → 4.35, g 3.50 → 4.30, h 4.75 → 5.00, f 4.10 → 4.00.**
+Peril over the line **8 → 5**, and the height class **4 → 1**. Not one cost in twenty is the end of
+an afternoon or an outing. Topic-bolted-on and theme-in-name-only stay at 0, cast omission at 0.
+
+**And the blind buy read fell.** R1 vs R11, 40 texts, ids shuffled, a fresh rater who saw no labels
+and no ratings file (`blind-set-r11.md` / `blind-scores-r11.md` / `blind-key-r11.json`):
+**R1 3.55 (2:4 3:4 4:9 5:3), R11 3.50 (2:2 3:6 4:12 5:0), diff −0.05; R11 wins 4 arms, loses 4, ties
+12.** Against R10's 3.90 on an identically-reading R1 anchor (3.55 in both reads, 3.45-3.55 across
+six independent reads) that is **−0.40, and R11 produced ZERO 5s where R10 produced three.**
+
+*What did not work, stated plainly.*
+- **The never-coming-home class did not move (2 → 2).** Both survivors are arms where a fuel or
+  battery countdown makes that cost feel inevitable; the model quoted the peril as asked, then wrote
+  the same cost anyway.
+- **The adult-does-one-thing rule did not land (2 of 20).** A father who stands at the wheel and
+  calls, a mother who waits at the foot of a tower and counts the minutes: both are the shapes the
+  rule names, and both survive a check that asks for the one thing to be QUOTED, because calling and
+  counting are quotable. Quoting only works where the quoted words are self-evidently the fault;
+  where the fault is that the action is empty, the model can always find words.
+- **Cell 5 got worse, not better.** The band rule reached the object and the risk — the joystick is
+  gone, the strange thing is an antenna arm reached for by hand, the stake is a crew that cannot get
+  home — but the register did not move: the rater scored BOTH arms 2 ("cold engineering",
+  "procedural, nobody to care about"), the location arm having been a 4 in R10. What the rater is
+  reading is the space guide's own machinery (Sektor, Akku, Panel, Koordinaten), which no premise
+  rule touches.
+
+*The finding.* **Defect compliance and the parent's buy axis are now pulling in opposite
+directions, and this round measures the trade directly.** R11's losses are three arms where R10
+scored 4 or 5 on a bigger, less-hedged premise; its wins are the historical and emotion cells. The
+likeliest reading is that a peril rule stated as two forbidden SHAPES trims the top of the
+distribution as well as the bottom — an idea that would have ended on a real, frightening loss now
+ends on a bearable one, and a bearable loss is not what earns a 5. This is consistent with the
+already-recorded fact that the blind rater does not punish narrated middles at all.
+
+*Verdict.* 🟡 The fixes are KEPT — a five-year-old alone on a ruin wall is a product defect whatever
+the buy read says, and the height class is the one the owner named. But **the R10 state remains the
+best measured version on the buy axis (3.90), and no rule-list change has ever improved that axis;
+the two that moved it were product changes.** The next attempt at the buy axis should not be another
+peril, cast or cost rule. Two candidates the data points at: the space adventure guide's prop list
+(the only thing cell 5 scores on), and the tension above — whether a "loss the child can bear"
+should be defined by what is at stake rather than by which shapes are forbidden.
+
+**Touched:** `prompts/generate-story-idea-single.txt`, `prompts/generate-story-ideas.txt`,
+`prompts/age-band-journey.txt`, `server/routes/storyIdeas.js`,
+`tests/unit/idea-premise-shapes.test.ts`, `docs/decisions.md`,
+`tests/manual/story-idea-rounds/round-11-defects.md`.
+Artefacts: `round-11.json` / `.md`, `blind-set-r11.md`, `blind-scores-r11.md`, `blind-key-r11.json`.
+
+
 
 ---
 
