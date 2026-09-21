@@ -52311,3 +52311,82 @@ either, and its three siblings — `arcReviewReport`, `beatsReviewReport`,
 surfacing it needs a panel of its own.
 **Touched:** scripts/analysis/shipped-defects.js (new), storyJobPipeline.js
 **Status:** ✅ active
+
+## The production click is the buy metric; the rater proxy is not (idea_events)
+
+**Context:** the story-idea quality series (see "Story-idea premise contract:
+five rating rounds…") spent eight rounds moving a RATER's score for "would a
+parent buy this". A blind re-rate showed that proxy is unreliable — the same
+premise scored differently depending on which round it was shown in — so the
+whole series was optimising a number that does not track the thing it names.
+The thing it names was meanwhile happening in production several times a day and
+was recorded nowhere: the wizard shows two ideas, and the customer either clicks
+one or presses "Generate new ideas". A click is a buy vote. A regeneration
+rejects BOTH arms.
+
+What existed before, and why none of it could answer the question:
+- `stories.idea_source / idea_original / idea_used` (migration 027) — provenance
+  of a story that WAS created. A regenerated-away idea never becomes a story, so
+  this cannot see a rejection.
+- `stories.data.ideaWorld` — the world of the chosen arm, but not WHICH arm and
+  not the premise shape it was built on.
+- `trial_events` (migration 024) has `ideas_generated` / `idea_selected`, but it
+  is visit-scoped with a UNIQUE `(visit_id, step)` index, so it records at most
+  one idea generation per visit BY CONSTRUCTION. It cannot count regenerations,
+  and it does not cover the authenticated wizard at all.
+- There is no generic `activity_log` table in this database, despite CLAUDE.md
+  naming one. The only event logs that exist are `trial_events` and
+  `failure_log`, and neither can hold this.
+
+**Decision:** a new table `idea_events` (migration 039) with two event slugs:
+`idea_generated` (one row per idea-generation call, from BOTH endpoints in
+`server/routes/storyIdeas.js`) and `idea_picked` (one row per create-story, from
+`server/routes/jobs.js`). Each row carries the request shape the funnel slices by
+— category, topic, theme, language, pages, cast size, youngest age, `worldMode`,
+the attempt counter, the per-arm `ideaWorld`s and the per-arm premise shapes,
+plus model id and computed cost. The pick also lands on `stories.data.ideaPick`
+(`{index, world, shape, worldMode, attempt}`) beside the existing `ideaWorld`,
+so the buy signal is queryable straight off the story row without a join.
+`scripts/admin/idea-funnel.js` is the read: generations, regeneration rate, and
+pick rate per arm / world / shape / category / language / world mode / age band /
+attempt, plus a cross-check of the two storage paths against each other.
+No UI.
+
+**Rationale:**
+- *A table, not a column.* Generation happens before any story exists; a
+  regenerated-away pair leaves no row anywhere else. The alternative — infer
+  rejections from stories that were never created — is not inferable.
+- *Not `trial_events`.* Its unique index makes counting regenerations
+  impossible, and widening it would break the one-row-per-step guarantee the
+  trial funnel's percentages depend on.
+- *`regenerated` is DERIVED from the attempt counter*, not taken from the
+  client's boolean, so a client that mis-sets the flag cannot forge a first ask.
+  The flag is only the fallback when no counter arrived.
+- *The shape travels from the server and back*, rather than being recomputed at
+  create-story time: `pickPremiseShapes` seeds off the cast, and the customer can
+  exclude a character between seeing the ideas and pressing create, which would
+  silently recompute a DIFFERENT shape than the one they actually read.
+- *Best-effort writes.* `recordIdeaEvent` never throws, never blocks and is never
+  awaited, exactly like `recordFailure` — telemetry must not be able to fail an
+  idea generation a customer is watching stream in. The funnel script therefore
+  cross-checks against `stories.data` and says so when the two disagree.
+- *Shapes are stored as `{id, name}` only.* The definition is a paragraph of
+  prompt text and belongs in `prompts/premise-shapes.txt`, not in every row.
+
+**Known gap (not built, deliberately):** the trial path (`/api/trial/generate-
+ideas-stream` + `TrialIdeasStep.tsx`) has the same two-card UI and the same
+"Generate new ideas" button, and its regenerations are equally invisible for the
+`trial_events` reason above. It was left out of this change because its idea
+builder has no `worldMode` and no premise shapes, so half the dimensions would be
+NULL, and because the agreed scope was the authenticated wizard. Tracked in
+`tasks/BACKLOG.md`.
+
+**Touched:** migrations/039_idea_events.sql (new), server/lib/ideaEvents.js
+(new), scripts/admin/idea-funnel.js (new), tests/unit/idea-funnel-events.test.ts
+(new), server/routes/storyIdeas.js, server/routes/jobs.js, storyJobPipeline.js,
+client/src/pages/StoryWizard.tsx, client/src/services/storyService.ts,
+client/src/types/story.ts
+**Status:** ✅ active — code committed on `staging`; **the migration is NOT
+applied to any database yet** (owner's call: `node
+scripts/admin/apply-migration.js 039_idea_events.sql [--staging]`). Until it is,
+`recordIdeaEvent` logs a debug line per dropped insert and nothing else breaks.

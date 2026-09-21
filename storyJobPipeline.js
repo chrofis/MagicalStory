@@ -7153,6 +7153,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // categories without the split (historical). The pipeline uses this to
       // honor the chosen world ("named location is binding").
       ideaWorld: inputData.ideaWorld || null,
+      // WHICH of the two offered ideas the customer clicked, beside the world
+      // it plays in: { index, world, shape, worldMode, attempt }. index null =
+      // they wrote their own premise. The same pick is written to idea_events
+      // (server/lib/ideaEvents.js) at job creation; it lives HERE as well so the
+      // buy signal is queryable straight off stories.data without a join, the
+      // way ideaWorld already is. Owner, 2026-09-21: the production click is the
+      // buy metric, the rater proxy is not.
+      ideaPick: inputData.ideaPick || null,
       trialMode: !!inputData.trialMode,
       artStyle: inputData.artStyle || 'pixar',
       language: inputData.language || 'en',

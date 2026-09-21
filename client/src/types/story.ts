@@ -40,6 +40,26 @@ export interface IdeaWorld {
   location: { city: string | null; region?: string | null; country: string | null } | null;
 }
 
+// The premise shape an idea arm was built on, picked in code server-side
+// (pickPremiseShapes in server/routes/storyIdeas.js from prompts/premise-shapes.txt)
+// and echoed back so the wizard can report which shape the customer clicked.
+// The shape's definition stays in the prompt file; only the reference travels.
+export interface IdeaShapeRef {
+  id: number;
+  name: string;
+}
+
+// What the customer actually clicked: the buy signal the idea-rating series was
+// proxying for (owner, 2026-09-21). Sent on create-story, persisted on
+// stories.data.ideaPick and logged to idea_events.
+export interface IdeaPick {
+  index: number | null;          // 0 | 1; null = wrote their own premise
+  world: IdeaWorld | null;
+  shape: IdeaShapeRef | null;
+  worldMode: IdeaWorldMode;
+  attempt: number;               // 1 = the first pair; >1 = after regenerating
+}
+
 // Steering for idea (re)generation: auto = 1 location + 1 fantasy idea
 export type IdeaWorldMode = 'auto' | 'location' | 'fantasy';
 

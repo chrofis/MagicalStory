@@ -204,6 +204,35 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
       log.debug(`📝 [JOB INPUT] ideaGeneration: model=${inputData.ideaGeneration.model}, selectedIndex=${inputData.ideaGeneration.selectedIndex}, ideas=${inputData.ideaGeneration.output?.length || 0}`);
     }
 
+    // The idea funnel's second half: WHICH of the two cards the customer clicked.
+    // The pick is the buy vote the rating series was proxying for (owner,
+    // 2026-09-21) — see server/lib/ideaEvents.js and migrations/039.
+    // armIndex null means they wrote or pasted their own premise instead, which
+    // is its own verdict on the pair, so the event is recorded either way as
+    // long as ideas were actually offered.
+    if (inputData.ideaGeneration || inputData.ideaPick) {
+      const pick = inputData.ideaPick || null;
+      const armIndex = pick ? pick.index : inputData.ideaGeneration?.selectedIndex;
+      require('../lib/ideaEvents').recordIdeaEvent({
+        event: 'idea_picked',
+        userId,
+        storyId: jobId,
+        category: inputData.storyCategory,
+        topic: inputData.storyTopic,
+        theme: inputData.storyTheme,
+        language: inputData.language,
+        pages: inputData.pages,
+        characters: inputData.characters,
+        worldMode: pick?.worldMode,
+        attempt: pick?.attempt,
+        armIndex: armIndex === null || armIndex === undefined ? null : armIndex,
+        worlds: pick?.world || inputData.ideaWorld || null,
+        shapes: pick?.shape || null,
+        model: inputData.ideaGeneration?.model,
+        detail: { ideasOffered: inputData.ideaGeneration?.output?.length || 0 },
+      });
+    }
+
     // Check email verification (skip for admins and impersonating admins)
     const isImpersonating = req.user.impersonating === true;
     if (req.user.role !== 'admin' && !isImpersonating && STORAGE_MODE === 'database') {

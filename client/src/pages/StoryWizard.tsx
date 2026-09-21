@@ -26,7 +26,7 @@ import { INITIAL_USER_CREDITS, IMAGE_REGENERATION_COST, COVER_REGENERATION_COST 
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneExpansionReport, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion, IdeaWorld, IdeaWorldMode } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneExpansionReport, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion, IdeaWorld, IdeaWorldMode, IdeaShapeRef } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
@@ -339,6 +339,14 @@ export default function StoryWizard() {
   const [ideaWorlds, setIdeaWorlds] = useState<IdeaWorld[] | null>(null);
   // User steering for the next idea (re)generation: auto = 1 location + 1 fantasy
   const [ideaWorldMode, setIdeaWorldMode] = useState<IdeaWorldMode>('auto');
+  // Per-idea premise shapes (server-picked, echoed back), so the create-story
+  // payload can say WHICH shape the clicked card was built on.
+  const [ideaShapes, setIdeaShapes] = useState<IdeaShapeRef[] | null>(null);
+  // How many idea pairs this wizard session has asked for. 1 = the first ask;
+  // every value above it is a regeneration, i.e. the customer looked at the
+  // previous pair and rejected BOTH. This is the rejection half of the buy
+  // signal (docs/decisions.md, 2026-09-21) and nothing counted it before.
+  const [ideaAttempt, setIdeaAttempt] = useState(0);
   // Store the input parameters used for idea generation (for later analysis)
   const [ideaGenerationInput, setIdeaGenerationInput] = useState<{
     storyType: string;
@@ -3800,9 +3808,12 @@ export default function StoryWizard() {
     setIsGeneratingIdea2(true);
     setGeneratedIdeas([]);
     setIdeaWorlds(null);
+    setIdeaShapes(null);
     setLastIdeaPrompt(null);
     setLastIdeaFullResponse('');
     setSelectedIdeaIndex(null);  // Reset selection when regenerating
+    const attempt = ideaAttempt + 1;
+    setIdeaAttempt(attempt);
 
     // Get characters in story (not excluded)
     const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
@@ -3854,6 +3865,8 @@ export default function StoryWizard() {
         userLocation: userLocation || undefined,
         season,
         worldMode: ideaWorldMode,
+        attempt,
+        regenerate: attempt > 1,
       },
       {
         onStatus: (_status, prompt, model) => {
@@ -3863,6 +3876,9 @@ export default function StoryWizard() {
         },
         onWorlds: (worlds) => {
           setIdeaWorlds(worlds);
+        },
+        onShapes: (shapes) => {
+          setIdeaShapes(shapes);
         },
         onStory1: (story1) => {
           setGeneratedIdeas(prev => {
@@ -4139,6 +4155,15 @@ export default function StoryWizard() {
         // World of the selected idea — persisted on stories.data.ideaWorld so
         // the pipeline can honor the chosen world (location vs fantasy)
         ideaWorld: (selectedIdeaIndex !== null && ideaWorlds) ? (ideaWorlds[selectedIdeaIndex] ?? null) : null,
+        // The click itself. Recorded even when the customer wrote their own
+        // premise (index null) — that is a verdict on the pair too.
+        ideaPick: generatedIdeas.length > 0 ? {
+          index: selectedIdeaIndex,
+          world: (selectedIdeaIndex !== null && ideaWorlds) ? (ideaWorlds[selectedIdeaIndex] ?? null) : null,
+          shape: (selectedIdeaIndex !== null && ideaShapes) ? (ideaShapes[selectedIdeaIndex] ?? null) : null,
+          worldMode: ideaWorldMode,
+          attempt: ideaAttempt,
+        } : null,
       });
 
       setJobId(newJobId);

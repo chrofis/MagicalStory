@@ -23,6 +23,11 @@ const { fillTemplate } = require('../services/prompts');
 // invisible to the story pipeline.
 const { resolveAvailableLandmarks } = require('../lib/landmarkPhotos');
 
+// The idea funnel: one row per idea generation and one per pick, so "would a
+// parent buy this" is measured from the production click instead of from a
+// rater's proxy (migrations/039, docs/decisions.md 2026-09-21).
+const { recordIdeaEvent } = require('../lib/ideaEvents');
+
 /**
  * Build the shared prompt context for story idea generation.
  * Used by both the authenticated endpoints and the trial endpoint.
@@ -468,6 +473,25 @@ function pickPremiseShapes(seedInput = {}) {
   return [pool[i1], pool[i2]];
 }
 
+/**
+ * USD for one idea call, from the usage object the text-model layer returns.
+ * The ideas route runs outside a job's usage sink (there is no job yet), so the
+ * cost is computed here rather than read off a tracker. Returns null when the
+ * provider gave no usage - a wrong number is worse than no number.
+ */
+function ideaCallCost(modelId, usage) {
+  if (!usage || !modelId) return null;
+  try {
+    const { calculateTextCost } = require('../config/models');
+    const cost = calculateTextCost(modelId, {
+      inputTokens: usage.input_tokens || 0,
+      outputTokens: usage.output_tokens || 0,
+      thinkingTokens: usage.thinking_tokens || 0,
+    });
+    return Number.isFinite(cost) && cost > 0 ? cost : null;
+  } catch { return null; }
+}
+
 function premiseShapeInstruction(shape) {
   return `This idea has the shape: ${shape.name} — ${shape.definition}. Keep the shape; the shape is a requirement, not a choice.`;
 }
@@ -520,7 +544,7 @@ function resolveIdeaWorlds({ storyCategory, storyTheme, location, worldMode = 'a
 // Generate story ideas endpoint - FREE, no credits
 router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async (req, res) => {
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode, attempt, regenerate } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}${worldMode && worldMode !== 'auto' ? ` (worldMode: ${worldMode})` : ''}`);
 
@@ -664,12 +688,31 @@ ${landmarkEntries}`;
 
     log.debug(`  Generated ${storyIdeas.length} idea(s)`);
 
+    // The idea funnel. Fire-and-forget; see server/lib/ideaEvents.js.
+    recordIdeaEvent({
+      event: 'idea_generated',
+      userId: req.user.id,
+      category: ctx.effectiveCategory, topic: storyTopic, theme: ctx.effectiveTheme,
+      language, pages, characters, worldMode,
+      attempt, regenerate,
+      worlds: ideaWorlds ? ideaWorlds.map(w => w.world) : null,
+      shapes: ctx.premiseShapes,
+      model: result.modelId || modelToUse,
+      costUsd: ideaCallCost(result.modelId || modelToUse, result.usage),
+      detail: { streaming: false, ideasParsed: storyIdeas.length },
+    });
+
     // Return ideas array, prompt and model for dev mode display
     // Also include legacy storyIdea field for backwards compatibility
     res.json({
       storyIdeas,
       storyIdea: storyIdeas[0], // backwards compatibility
       ideaWorlds,
+      // The premise shape each arm was built on (code-picked, deterministic -
+      // pickPremiseShapes). The wizard echoes the chosen arm's shape back on
+      // create-story so the pick is queryable by shape without recomputing a
+      // seed that may have moved (an excluded character changes it).
+      premiseShapes: ctx.premiseShapes.map(sh => ({ id: sh.id, name: sh.name })),
       prompt,
       model: modelToUse
     });
@@ -692,7 +735,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
   res.flushHeaders();
 
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season, worldMode, attempt, regenerate } = req.body;
 
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}${worldMode && worldMode !== 'auto' ? ` (worldMode: ${worldMode})` : ''}`);
 
@@ -838,9 +881,14 @@ ${landmarkEntries}`;
 
     // Send initial event with prompt info for dev mode + per-idea worlds so the
     // wizard can label each card before/while the ideas stream in
-    res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse, ideaWorlds })}\n\n`);
+    res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse, ideaWorlds, premiseShapes: ctx.premiseShapes.map(sh => ({ id: sh.id, name: sh.name })) })}\n\n`);
 
     // Track state for both stories
+    // Usage per arm: the two calls are independent, so the funnel's cost is
+    // their sum, not one of them.
+    let usage1 = null;
+    let usage2 = null;
+    let streamModelId = null;
     let fullResponse1 = '';
     let fullResponse2 = '';
     let lastStory1Length = 0;
@@ -862,7 +910,9 @@ ${landmarkEntries}`;
           story1Started = true;
         }
       }
-    }, modelToUse).then(() => {
+    }, modelToUse).then((streamResult) => {
+      usage1 = streamResult?.usage || null;
+      streamModelId = streamResult?.modelId || streamModelId;
       // Send final story 1 content (extract [FINAL] if present for clean output)
       const extractedFinal = parseFinal(fullResponse1);
       const finalContent = extractedFinal || fullResponse1.trim();
@@ -889,7 +939,9 @@ ${landmarkEntries}`;
           story2Started = true;
         }
       }
-    }, modelToUse).then(() => {
+    }, modelToUse).then((streamResult) => {
+      usage2 = streamResult?.usage || null;
+      streamModelId = streamResult?.modelId || streamModelId;
       // Send final story 2 content (extract [FINAL] if present for clean output)
       const extractedFinal = parseFinal(fullResponse2);
       const finalContent = extractedFinal || fullResponse2.trim();
@@ -906,6 +958,20 @@ ${landmarkEntries}`;
 
     // Wait for both to complete
     await Promise.all([streamStory1, streamStory2]);
+
+    recordIdeaEvent({
+      event: 'idea_generated',
+      userId: req.user.id,
+      category: ctx.effectiveCategory, topic: storyTopic, theme: ctx.effectiveTheme,
+      language, pages, characters, worldMode,
+      attempt, regenerate,
+      worlds: ideaWorlds ? ideaWorlds.map(w => w.world) : null,
+      shapes: ctx.premiseShapes,
+      model: streamModelId || modelToUse,
+      costUsd: (ideaCallCost(streamModelId || modelToUse, usage1) || 0)
+             + (ideaCallCost(streamModelId || modelToUse, usage2) || 0),
+      detail: { streaming: true, chars1: fullResponse1.length, chars2: fullResponse2.length },
+    });
     log.debug('  Both stories complete, sending done event...');
 
     // Send completion with full responses for dev mode

@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneExpansionReport, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection, IdeaWorld, IdeaWorldMode } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneExpansionReport, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, RepairAttemptFrame, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData, BboxSceneDetection, IdeaWorld, IdeaWorldMode, IdeaShapeRef, IdeaPick } from '@/types/story';
 
 /**
  * Normalize a cover value from the API to always be CoverImageData | null.
@@ -1673,6 +1673,11 @@ export const storyService = {
       season?: string;
       // Steer which world the two ideas play in (auto = 1 location + 1 fantasy)
       worldMode?: IdeaWorldMode;
+      // Which pair this is for this wizard session: 1 = the first, >1 = the
+      // customer looked at the previous pair and rejected BOTH. The server
+      // needs it to tell a regeneration from a first ask (idea_events).
+      attempt?: number;
+      regenerate?: boolean;
     },
     callbacks: {
       onStory1?: (story: string) => void;
@@ -1680,6 +1685,8 @@ export const storyService = {
       onStatus?: (status: string, prompt?: string, model?: string) => void;
       // Per-idea worlds, sent with the initial event (null = no world split)
       onWorlds?: (worlds: IdeaWorld[] | null) => void;
+      // Per-idea premise shapes, sent with the same initial event
+      onShapes?: (shapes: IdeaShapeRef[] | null) => void;
       onError?: (error: string) => void;
       onDone?: (fullResponse?: string) => void;
     }
@@ -1751,6 +1758,9 @@ export const storyService = {
                 }
                 if ('ideaWorlds' in eventData) {
                   callbacks.onWorlds?.(eventData.ideaWorlds ?? null);
+                }
+                if ('premiseShapes' in eventData) {
+                  callbacks.onShapes?.(eventData.premiseShapes ?? null);
                 }
                 if (eventData.story1) {
                   callbacks.onStory1?.(eventData.story1);
@@ -1873,6 +1883,9 @@ export const storyService = {
     // World of the SELECTED idea (persisted on stories.data.ideaWorld so the
     // pipeline can honor it); null for custom/user-written ideas
     ideaWorld?: IdeaWorld | null;
+    // WHICH card was clicked, with the world and premise shape it carried.
+    // This is the buy signal (docs/decisions.md, 2026-09-21).
+    ideaPick?: IdeaPick | null;
   }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries
     const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1914,6 +1927,8 @@ export const storyService = {
       ideaGeneration: data.ideaGeneration,
       // World of the selected idea (location vs fantasy)
       ideaWorld: data.ideaWorld,
+      // Which arm was clicked, plus its world and premise shape
+      ideaPick: data.ideaPick,
     });
     return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },
