@@ -855,6 +855,26 @@ function cutBlocks() {
 }
 
 /**
+ * Collapsing `\n{3,}` after a removal legitimately costs a few characters more
+ * than the block itself. This is the allowance for that, and nothing else.
+ */
+const BLANK_RUN_SLACK = 64;
+
+/**
+ * How many characters `block` occupies in `text` — the sum of every occurrence
+ * for an exact-text block, the matched length for a regex one (String.replace
+ * without /g replaces exactly one). 0 when the block is not present.
+ */
+function blockExtent(text, block) {
+  if (block.re) {
+    const m = text.match(block.re);
+    return m ? m[0].length : 0;
+  }
+  const occurrences = text.split(block.text).length - 1;
+  return occurrences * block.text.length;
+}
+
+/**
  * @returns {{ text: string, dropped: string[], proseCut: number }}
  */
 function sectionAwareCut(prompt, maxLen, logLabel) {
@@ -863,9 +883,29 @@ function sectionAwareCut(prompt, maxLen, logLabel) {
   for (const block of cutBlocks()) {
     if (out.length <= maxLen) break;
     const before = out.length;
+    // What this drop is ENTITLED to remove: its own text, every occurrence of
+    // it, and nothing else. Measured before the removal so the check below has
+    // a number rather than a hope.
+    const entitled = blockExtent(out, block);
     out = (block.re ? out.replace(block.re, '') : out.split(block.text).join(''))
       .replace(/\n{3,}/g, '\n\n');
-    if (out.length < before) dropped.push(block.label);
+    const removed = before - out.length;
+    if (removed > entitled + BLANK_RUN_SLACK) {
+      // A DROP THAT REACHES PAST ITS OWN BLOCK IS A DELETED PAGE, NOT A SHRINK.
+      // This is the 2026-09-21 production failure made unreintroducible: the
+      // cut of the day found a block's extent by scanning forward to the next
+      // header in a hand-kept list, so `AGE & PROPORTIONS` on a page whose
+      // following headers were not in that list swallowed WORN ITEMS, the scene
+      // prose, the per-character lines, Setting/Camera/Depth and the character
+      // reference list in one slice — ~5k chars reported as one dropped block.
+      // Trial job_1789975900382_dyc1g7wue shipped pages 4 and 5 that way, the
+      // illustrator never told what the page was. Exact-text removal makes that
+      // impossible today; this makes it impossible to bring back, and it throws
+      // rather than degrades: a prompt that does not state the page is not a
+      // cheaper prompt, it is the wrong picture (CLAUDE.md — no fallbacks).
+      throw new Error(`prompt-shrink: dropping "${block.label}" removed ${removed} chars but that block is only ${entitled} — the cut reached past it into the page's own facts`);
+    }
+    if (removed > 0) dropped.push(block.label);
   }
 
   let proseCut = 0;

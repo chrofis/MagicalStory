@@ -143,3 +143,44 @@ describe('shrinkPromptForModel — an over-cap page keeps its own facts', () => 
     expect(headEnd).toBeGreaterThan(1500);
   });
 });
+
+// A DROP REMOVES ITS OWN BLOCK AND NOTHING ELSE.
+//
+// The production failure was not "the wrong block was ranked first" — it was a
+// drop that reached PAST the block it named. `AGE & PROPORTIONS` was removed by
+// scanning forward to the next header in a hand-kept list, and on a page whose
+// following headers were not in that list the scan ran to the end of the head:
+// WORN ITEMS, the scene prose, the per-character lines, Setting/Camera/Depth
+// and the character reference list all went with it, logged as one dropped
+// block. Reproduced from job_1789975900382_dyc1g7wue's stored p5 brief: the
+// historical cut against that page's budget returned exactly the two opening
+// rule paragraphs plus the tail, byte-for-byte the shape stored in production.
+//
+// This pins the accounting rather than the block order: whatever is spent, the
+// prompt that comes back is the prompt that went in MINUS the named blocks.
+describe('shrinkPromptForModel — a drop is confined to the block it names', () => {
+  it('everything the cut did not name survives byte-identically', async () => {
+    // Just over the cap: the cut spends whole blocks and stops.
+    const out: string = await shrinkPromptForModel(
+      PROMPT, PROMPT.length - 400, 'TEST confinement', null
+    );
+
+    const droppable = ['**COUNTS:**', '**DEPTH AND SIZE:**', '**REQUIRED CAST:**', '**Composition:**'];
+    const spent = droppable.filter((d) => !out.includes(d));
+    expect(spent.length).toBeGreaterThan(0);
+
+    // Removing exactly what was named from the INPUT reproduces the output,
+    // modulo the blank runs the removal collapses. Nothing else moved — in the
+    // production failure this difference was thousands of characters of page.
+    const squeeze = (s: string) => s.replace(/\s+/g, ' ').trim();
+    let rebuilt = PROMPT;
+    for (const prefix of spent) rebuilt = rebuilt.split(templateParagraph(prefix)).join('');
+    expect(squeeze(out)).toBe(squeeze(rebuilt));
+
+    // And the page itself is untouched by a drop this small.
+    expect(out).toContain('SENTINEL_SECOND_CHARACTER');
+    expect(out).toContain('SENTINEL_WORN_GARMENT');
+    expect(out).toContain('SENTINEL_SETTING');
+    expect(out).toContain('AGE & PROPORTIONS');
+  });
+});
