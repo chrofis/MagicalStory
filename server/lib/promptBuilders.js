@@ -19,6 +19,10 @@ const { commissionedChildBand, buildChildAgeBandNote, secondaryAgeCues } = requi
 const { SCALE_CLASS_SPEC, buildVisualBiblePrompt, englishEntityRef, englishLocationRef, clauseRef, objectStates, resolveObjectState, elementScaleNote } = require('./visualBible');
 const { SHOT_ENUM, SHOT_POSITIONS, DISTANCE_SHOTS, SHOT_DEFINITIONS, CLOSEUP_BELOW_WAIST_PHRASE, shotDistributionPhrase, buildShotDefinitions } = require('./shotVocabulary');
 const { labelOf } = require('./vbLabel');
+// REQUIRED IN-IMAGE TEXT: one source for the generator block, the repair
+// clause and the judges' TEXT RULES block. Safe as a top-level require --
+// requiredText.js requires promptBuilders LAZILY.
+const requiredTextLib = require('./requiredText');
 const { baseVbId } = require('./vbIdGuard');
 const { getPhysical } = require('./characterPhysical');
 const { getTraits } = require('./characterTraits');
@@ -4161,6 +4165,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
   // OPTIMIZATION: Scene description already selects which visual bible elements are needed
   // and outputs them in JSON metadata. We use ONLY those elements instead of the entire bible.
   let requiredObjectsSection = '';
+  // The page's REQUIRED TEXT block ('' when no element declares a string --
+  // fillTemplate then strips the placeholder and the prompt is byte-identical
+  // to before). Built from the same pass that builds the checklist above.
+  let requiredTextSection = '';
   let hasRequiredObjects = false;
   if (vbObjectCitations.length > 0 && visualBible) {
     const requiredObjects = [];
@@ -4362,6 +4370,19 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
           .map(id => String(id || '').toUpperCase()).filter(Boolean)
       );
       const gridRefNames = [];
+      // REQUIRED TEXT (2026-09-21). An element's bible `text` -- "words that
+      // must be READABLE on the object" -- had no path into the built prompt:
+      // it rendered only into the VB reference CELL, so the glyphs arrived as
+      // pixels and the spelling and ORDER were never stated anywhere. Collected
+      // here, beside the checklist, against the SAME label the bold lead emits,
+      // and emitted as its own quoted block (server/lib/requiredText.js).
+      // This does not re-open the NAME ONLY ruling below: a required string is
+      // not the element's LOOK, it is a literal the model has to reproduce.
+      const requiredTextRows = [];
+      const pushRequiredText = (entry, label) => {
+        if (!requiredTextLib.declaredText(entry)) return;
+        requiredTextRows.push({ entry, label });
+      };
       for (const obj of promptObjects) {
         // A worn removable item is omitted here ONLY when an attached reference
         // demonstrably shows it on its wearer — a `wornAs`-linked item on its
@@ -4376,6 +4397,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         const wornState = wornById.get(String(obj.id || '').toUpperCase());
         if (wornState && wornState.state === 'worn' && referenceCarriesItem(wornState)) {
           log.info(`[WORN] Page ${pageNumber}: ${obj.id} omitted from REQUIRED OBJECTS — ${wornState.owner} is wearing it`);
+          // A worn item omitted from the CHECKLIST is still in the picture, so
+          // a required string on it is still required.
+          pushRequiredText(obj.entry, elementLeadLabel(obj.entry, { language, type: obj.type }));
           continue;
         }
         // Note: obj.id exists for Visual Bible tracking but is not included in image prompts
@@ -4493,6 +4517,14 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
         // `obj.state` is null too, so no dangling dash reaches the line.
         const stateNote = (obj.state && obj.stateDelta) ? ` — ${trimStateClause(obj.stateDelta, obj.state)}` : '';
         requiredObjectsSection += `* ${lead}${sizeNote}${stateNote}${wornSuffix}${wornOn}${offWhere}\n`;
+        pushRequiredText(refEntry, refName);
+      }
+      requiredTextSection = requiredTextLib.buildRequiredTextBlock(
+        requiredTextLib.collectRequiredTexts({ entries: requiredTextRows })
+      );
+      if (requiredTextSection) {
+        requiredTextLib.logRequiredTexts(
+          requiredTextLib.collectRequiredTexts({ entries: requiredTextRows }), pageNumber);
       }
       if (gridRefNames.length > 0) {
         // Plain line (no "* **" prefix) so parseVisualBibleObjects' entry
@@ -4634,6 +4666,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, v
       // the protected tail.
       NO_CHARACTER_MARKING: NO_CHARACTER_MARKING_RULE,
       HANDS_HOLD_ONLY_NAMED: HANDS_HOLD_ONLY_NAMED_RULE,
+      // REQUIRED TEXT. In the protected tail, beside the other two rule
+      // constants: shrinkPromptForModel drops head blocks first, and a page
+      // over the Grok cap losing the only statement of what its signpost has
+      // to read is the defect this block exists to fix.
+      REQUIRED_TEXT: requiredTextSection,
       // The shot rule lived in the droppable **Composition:** head block — first
       // in CUT_DROP_ORDER — so every over-cap page lost the only statement of
       // what its declared shot means. It sits at the END of the template now,

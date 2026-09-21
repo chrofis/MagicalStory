@@ -54140,3 +54140,65 @@ read was run: this entry records that the mechanism fires, not that it sells bet
 `tests/manual/story-idea-rounds/round-21.json` / `round-21.md`, `ideas-r21.html`.
 
 **Status:** ✅ active on `staging` only; not on master.
+
+## 2026-09-21 — A Visual Bible element's declared `text` reaches the page prompt, the repair and all three judges
+
+**Context:** A VB artifact may declare `text` — "words that must be READABLE on the object"
+(`visualBible.js`). Until today that field had exactly ONE consumer,
+`referenceSheets.elementTextSentence`, which renders the VB reference CELL. So the glyphs reached
+the illustrator as PIXELS in a reference image and never as a STRING in the prompt: the REQUIRED
+OBJECTS block is NAME ONLY by the 2026-09-02 ruling, so a signpost that had to carry four letters
+was listed as `* **crossroads letters** (object) — fills an open hand`. Three failures followed
+from the one gap. (1) `prompts/image-generation.txt` banned all lettering with an exception for
+"text the Visual Bible explicitly specifies", which the model could not resolve because nothing in
+the prompt quoted the specified string. (2) `REPAIR_TEXT_GUARD` banned lettering in every repaint,
+so a repair round could never converge on a page whose defect WAS the lettering. (3) No judge
+checked a required string at all: D-23 `rendered_text` only penalises lettering nobody asked for,
+its allow-list escape came from a `TEXT RULES` block emitted for COVERS only, and
+`image-prompt-compliance.txt` counts a string as asked-for only when the prompt QUOTES it — so a
+CORRECTLY spelled sign was a MAJOR defect. Measured on production
+`job_1789945743706_8ayo2w19e`, an Italian alphabet story: p14 required an ordered letter run and
+rendered a scrambled one, p15 rendered the wrong pair while scoring 100/100, p16 had to spell a
+four-letter word and rendered its letters scattered.
+
+**Decision:** One module, `server/lib/requiredText.js`, owns the whole mechanism and is the single
+source for four consumers. It exports ONE rule sentence, `REQUIRED_TEXT_RULE`, injected into the
+generator template AND all three judge templates, plus one item builder feeding four blocks:
+* a `**REQUIRED TEXT:**` block at `{REQUIRED_TEXT}` in `image-generation.txt`, placed in the tail
+  `sectionAwareCut` never cuts (it sits after `**REQUIRED OBJECTS`), quoting each string against
+  the same bold label the checklist emits;
+* a repair clause appended to `inpaintPage`'s instruction, with `REPAIR_TEXT_GUARD` reworded to
+  carry the matching exception ("text this prompt quotes as words to paint is painted");
+* a `{TEXT_RULES}` allow-list built ONCE in `evaluateImageQuality` and handed to the quality,
+  semantic and compliance judges — the same shape as the cover mechanism in
+  `cover-evaluation-notes.txt`, now reaching interior pages;
+* a new scored type, `required_text` (image-evaluation **D-33**), for a required string that is
+  absent, misspelled or out of order.
+
+**Rationale:** The generator and the critics had to be moved together — a judge told to score
+lettering the illustrator was never asked for is a guaranteed deduction, and the inverse (an
+illustrator painting letters a judge still reads as unrequested) was already costing MAJORs.
+One JS constant into both sides instead of two hand-kept copies, per the
+`syncing-generator-and-critic` skill. `required_text` is its OWN bucket, never an alias of
+`rendered_text`: that bucket is the opposite defect, is PAGE_SCOPED in `scoring.js` (so aliasing
+would make a second misspelled sign free) and repairs with a full regen, while repainting letters
+is an inpaint. Severity is stated in the judge templates (MAJOR absent/misspelled/out of order,
+MINOR merely rough letterforms) and NOT capped in code — classification and severity belong to
+the prompt (docs/SETTLED.md). NO FALLBACK: a declared string that cannot be resolved to a label
+throws, and the eval path records `notEvaluated('required_text', ...)` rather than reporting clean.
+
+**Known limit, deliberately not closed here:** this carries a string that the Visual Bible
+DECLARED. On the motivating story only ART004/005/007 declared `text`; p14's and p15's own
+elements (`ART006` "alphabet letters", `ART003` a scarf) declared none, and p3 listed no artifact
+at all, so those pages emit no REQUIRED TEXT block and are unchanged. Making the authoring side
+declare `text` whenever a page's plot turns on legible lettering is a scene-expansion / VB-authoring
+change and was not in this scope.
+
+**Touched:** `server/lib/requiredText.js` (new), `server/lib/promptBuilders.js`,
+`server/lib/evalPipeline.js`, `server/lib/images.js`, `server/lib/evalBuckets.js`,
+`server/lib/sceneValidator.js`, `server/services/prompts.js`, `prompts/image-generation.txt`,
+`prompts/image-evaluation.txt`, `prompts/image-semantic.txt`,
+`prompts/image-prompt-compliance.txt`, `prompts/feedback-consolidator.txt`,
+`tests/unit/required-text.test.ts`, `tests/unit/text-not-a-checklist-reach.test.ts`.
+
+**Status:** ✅ active

@@ -122,6 +122,16 @@ const BUCKETS = {
   // copy out is the targeted fix; a full regen is the expensive wrong answer.
   duplicate_object:     { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   rendered_text:        { owner: 'quality',  kind: 'binary', repair: 'regen' },
+  // A string the page's Visual Bible declared as READABLE lettering that came
+  // out absent, misspelled or out of order (image-evaluation D-33, 2026-09-21).
+  // Its own bucket, NOT an alias of `rendered_text`: that bucket is the
+  // opposite defect (lettering nobody asked for), it is PAGE_SCOPED in
+  // scoring.js, and its repair is a full regen. Two signs misspelled on one
+  // page are two subjects, and the fix here is to repaint the letters, which
+  // is an inpaint - a regen throws away a page that is right in every other
+  // respect. Graded: a required string that is absent is not the same defect
+  // as one whose letterforms are merely rough.
+  required_text:        { owner: 'quality',  kind: 'graded', repair: 'inpaint' },
   character_marking:    { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   anachronism:          { owner: 'quality',  kind: 'binary', repair: 'inpaint' },
   naturalness:          { owner: 'quality',  kind: 'graded', repair: 'regen' },
@@ -178,6 +188,7 @@ const TYPE_TO_BUCKET = {
   duplicate_object: 'duplicate_object', duplicated_object: 'duplicate_object',
   duplicate_prop: 'duplicate_object', object_duplication: 'duplicate_object',
   rendered_text: 'rendered_text', text: 'rendered_text',
+  required_text: 'required_text', missing_text: 'required_text', misspelled_text: 'required_text',
   character_marking: 'character_marking', marking: 'character_marking',
   anachronism: 'anachronism',
   naturalness: 'naturalness', artifact: 'naturalness',

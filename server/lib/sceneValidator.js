@@ -793,6 +793,10 @@ function buildSemanticPrompt(template, { storyText, sceneHint, imagePrompt, inte
     // (landmarkProtection.buildLandmarkContextBlock). '(none)' when the caller
     // supplies no landmark, so no path is left with a hole in the prompt.
     LANDMARK_CONTEXT: evalContext.landmarkContext || '(none)',
+    // Same REQUIRED TEXT allow-list the quality and compliance judges get,
+    // from the one builder (requiredText.js). '' when the page declares no
+    // readable lettering.
+    TEXT_RULES: evalContext.textRules || '',
     // ONE rule for every template that authors or judges a page against its
     // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). The
     // CHARACTER AUTHORITY paragraph in image-semantic.txt used to state the

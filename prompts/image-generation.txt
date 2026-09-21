@@ -1,6 +1,6 @@
 {SCENE_INTENT}
 
-Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception: text the Visual Bible explicitly specifies for an element is painted exactly as specified. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
+Generate a SINGLE illustration filling the canvas, bleeding off all four edges — no borders, frames, margins, white edges, panel keylines, split screens, grids, or collages. No lettering on any surface — no words, names or letters anywhere in the image. The only exception is a REQUIRED TEXT block below; with no such block, nothing in the image is lettered. Bracketed names like `[CharacterA]` and object ids are identifiers only — never painted into the image. Draw exactly one of each named object.
 
 When the FIRST reference photo shows a real location (architecture, landscape, no characters), render the scene IN it — copy its setting, geography and light direction, not its rendering: if it looks photographic, the ART STYLE below still governs. All OTHER reference photos define character IDENTITY only — face, hair, skin tone, build, clothing — never pose, framing, or composition. Each character's position, action, body direction and size come from the scene description and the COMPOSITION rules below.
 
@@ -34,6 +34,8 @@ When the FIRST reference photo shows a real location (architecture, landscape, n
 **COUNTS:** An exact number the scene states for a group of like things is three or fewer, and exactly that many are drawn. A group given as more than three, a cluster, a row, a few or several is drawn with no countable exact number.
 
 {NO_CHARACTER_MARKING}
+
+{REQUIRED_TEXT}
 
 {HANDS_HOLD_ONLY_NAMED}
 

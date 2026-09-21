@@ -450,7 +450,12 @@ describe('the quality judge is deliberately NOT a consumer', () => {
     // The tripwire for the one change that would reverse this decision. Wiring
     // page text in means adding a placeholder for it; when that happens the
     // rule has to come back in the same commit.
+    // `{TEXT_RULES}` is exempt by name (2026-09-21): it is the page's REQUIRED
+    // TEXT allow-list — the strings that must be painted INTO the picture —
+    // not the page's prose. It carries no narration, so it cannot re-open the
+    // text-as-checklist question this guard protects.
     const stray = [...new Set(EVAL_TPL().match(/\{[A-Z][A-Z0-9_]*\}/g) || [])]
+      .filter((p: string) => p !== '{TEXT_RULES}')
       .filter((p: string) => /(STORY|PAGE)_TEXT|^\{TEXT_/.test(p));
     expect(stray, 'the quality judge now receives page text — re-add the rule (it was dropped only because it could never fire)')
       .toEqual([]);

@@ -142,7 +142,7 @@ function repairStyleGuard(artStyle) {
 // a shipped page acquired an English caption during a repair pass. Same
 // load-time token mechanism as the style guard above, for the same reason:
 // six parallel templates cannot be kept in sync by hand.
-const REPAIR_TEXT_GUARD = 'Add no text of any kind: no caption, watermark, label, signature, or letters, numbers and symbols on any surface in the repainted area. Object names in this prompt say what to draw — never paint a name as lettering. Lettering already present in the untouched part of the image stays exactly as it is.';
+const REPAIR_TEXT_GUARD = 'Add no text of any kind: no caption, watermark, label, signature, or letters, numbers and symbols on any surface in the repainted area. Object names in this prompt say what to draw — never paint a name as lettering. Lettering already present in the untouched part of the image stays exactly as it is. The one exception: text this prompt quotes as words to paint is painted, exactly as quoted.';
 
 /**
  * Substitute the shared repair guards into a template string (load-time).
@@ -882,6 +882,13 @@ function buildEvaluationPrompt(opts = {}) {
     // template is also built by the Test Lab and the re-evaluate route, and an
     // unfilled placeholder would be stripped with a warning instead.
     LANDMARK_CONTEXT: opts.landmarkContext || '(none)',
+    // The page's REQUIRED TEXT allow-list, built by the SAME builder the
+    // semantic and compliance judges get it from (requiredText.js) and by the
+    // same builder that wrote the generator's REQUIRED TEXT block, so the
+    // illustrator and the judge quote identical strings. '' when the page
+    // declares no readable lettering: D-23's plain no-lettering rule then
+    // applies unchanged, which is the behaviour every page had before.
+    TEXT_RULES: opts.textRules || '',
     // NO TEXT_NOT_A_CHECKLIST here, deliberately (owner, 2026-09-18). That rule
     // goes to every template that judges a page against its TEXT; this judge is
     // handed no page text on any path — all three call sites pass a brief as

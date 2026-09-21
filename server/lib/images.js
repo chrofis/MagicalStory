@@ -3449,7 +3449,26 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     const { sanitizeVbIdsInPrompt } = require('./storyHelpers');
     preserveClause = sanitizeVbIdsInPrompt(sanitizeIssueForInpaint(preserveClause), visualBible, pageNumber);
   }
-  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}`;
+  // REQUIRED TEXT (2026-09-21). A repaint whose defect IS the lettering could
+  // never converge: the instruction arrived glyph-free ("replace the single
+  // letter with a letter pair") and REPAIR_TEXT_GUARD forbade painting letters
+  // at all. Same builder as the page prompt and the judges, so the repair is
+  // asked for the exact string the page was asked for and is scored against.
+  // Resolved from the page's own scene metadata ids, never from the prose.
+  let requiredTextClause = '';
+  try {
+    const requiredTextLib = require('./requiredText');
+    const pageObjectIds = Array.isArray(sceneMetadata && sceneMetadata.objects)
+      ? sceneMetadata.objects
+      : [];
+    requiredTextClause = requiredTextLib.buildRequiredTextRepairClause(
+      requiredTextLib.collectRequiredTexts({ objectIds: pageObjectIds, visualBible })
+    );
+  } catch (err) {
+    // Loud: a declared string that cannot be resolved must not be swallowed.
+    log.error(`[INPAINT PAGE] Page ${pageNumber}: required-text clause could not be built - ${err.message}`);
+  }
+  const fullInstruction = `Fix these issues in this children's book illustration:\n${editInstruction}${preserveClause}${quietZoneSuffix}${requiredTextClause}`;
   log.info(`[INPAINT PAGE] Inpainting (refs: ${referenceImages.length}): ${editInstruction.substring(0, 200)}`);
 
   try {

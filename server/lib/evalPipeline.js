@@ -752,6 +752,11 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
     // Resolves raw VB ids out of the INTERACTIONS_BLOCK below. Optional: a
     // caller without a bible still gets the ids replaced by generic nouns.
     visualBible = null,
+    // REQUIRED TEXT allow-list, built ONCE in evaluateImageQuality and handed
+    // to all three judges (requiredText.buildRequiredTextRulesBlock). Empty
+    // when the page declares no readable lettering -- the templates then keep
+    // the plain no-lettering rule. Never a second hand-written copy.
+    textRules = '',
   } = options;
   const { computeLandmarkProtection, buildLandmarkContextBlock, filterProtectedRemovals } = require('./landmarkProtection');
   const landmarkProtection = computeLandmarkProtection({ landmarkPhotos, era });
@@ -883,6 +888,7 @@ async function evaluateThreeStage(imageData, imagePrompt, sceneHint, options = {
       INTERACTIONS_BLOCK: interactionsBlock,
       STORY_TEXT: (storyText || '(not provided)').substring(0, 2000),
       LANDMARK_CONTEXT: buildLandmarkContextBlock(landmarkProtection) || '(none)',
+      TEXT_RULES: textRules || '',
       // ONE rule for every template that authors or judges a page against its
       // text (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, 2026-09-18). This
       // judge's STORY_TEXT DECLARES NOTHING block already covered a character
@@ -2021,6 +2027,30 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
     });
     const requiredObjectsBlock = requiredObjects.block;
+    // REQUIRED TEXT allow-list (2026-09-21), fourth member of the
+    // ART_STYLE / CLOTHING_CONTRACT / REQUIRED_OBJECTS family and built for the
+    // same reason: the page's declared in-image strings are not readable out of
+    // ORIGINAL_PROMPT on every path. ONE builder for all three judges
+    // (requiredText.js), exactly like buildLandmarkContextBlock. Empty when the
+    // page declares none, which is the honest default -- the templates then
+    // apply the plain no-lettering rule unchanged.
+    let requiredTextBlock = '';
+    try {
+      const requiredTextLib = require('./requiredText');
+      const ids = Array.isArray(evalOptions.sceneMetadata?.objects) ? evalOptions.sceneMetadata.objects : [];
+      requiredTextBlock = requiredTextLib.buildRequiredTextRulesBlock(
+        requiredTextLib.collectRequiredTexts({
+          objectIds: ids,
+          visualBible: evalOptions.visualBible || null,
+          language: evalOptions.language || evalOptions.storyMeta?.language || 'en',
+        })
+      );
+    } catch (err) {
+      // Loud, and recorded on the result: a page whose declared string could
+      // not be resolved was NOT judged for it -- never silently clean.
+      log.error(`[EVAL] ${pageContext || 'page'}: required-text rules could not be built - ${err.message}`);
+      notEvaluated.record('required_text', 'required_text_build_failed', err.message);
+    }
     if (!requiredObjectsBlock && (evaluationType === 'scene' || evaluationType === 'cover')) {
       notEvaluated.record('held_objects', 'no_required_objects',
         'No REQUIRED OBJECTS list could be resolved - held-object swaps (D-16b) were not judged');
@@ -2123,6 +2153,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // THE LANDMARK BLOCK (2026-09-18). This judge had none, and it is the
         // judge that produced the one landmark removal that reached production.
         landmarkContext: landmarkContextBlock,
+        // Same REQUIRED TEXT allow-list the other two judges get.
+        textRules: requiredTextBlock,
       });
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
@@ -2234,6 +2266,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           // no protection, i.e. unchanged behaviour.
           landmarkPhotos: evalOptions.landmarkPhotos || null,
           era: evalOptions.era || null,
+          // Same REQUIRED TEXT allow-list the other two judges get. Without it
+          // this judge scores a correctly spelled required string as
+          // unrequested lettering: its own rule counts a string as asked-for
+          // only when the prompt QUOTES it.
+          textRules: requiredTextBlock,
         });
         log.debug(`📊 [QUALITY] Starting parallel three-stage evaluation`);
       }
@@ -2359,6 +2396,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           sceneIntent: sceneIntentBlock,
           clothingContract: clothingContractBlock,
           requiredObjects: requiredObjectsBlock,
+          textRules: requiredTextBlock,
           expectedCast: expectedCast.block,
           // THE LANDMARK BLOCK (2026-09-18) — same block the other two judges
           // get, from the same builder.
@@ -2579,6 +2617,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             sceneIntent: sceneIntentBlock,
             clothingContract: clothingContractBlock,
             requiredObjects: requiredObjectsBlock,
+            textRules: requiredTextBlock,
             expectedCast: expectedCast.block,
             template: evalOptions.evalTemplateOverride || undefined,
           })
