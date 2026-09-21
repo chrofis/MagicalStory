@@ -116,7 +116,7 @@ async function buildIdeasPromptContext({
     categoryInstructions = `IMPORTANT: This is a LIFE SKILLS story about "${storyTopic}".
 The story should help children understand and cope with this topic.
 Show the characters facing this challenge and learning to handle it.
-What stands in the way is this skill being hard, met in one outside event — never a feeling on its own.
+What stands in the way is a person, a creature or a thing that answers back.
 ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Keep the setting realistic and relatable.'}`;
   } else if (effectiveCategory === 'educational') {
     categoryInstructions = `IMPORTANT: This is an EDUCATIONAL story teaching about "${storyTopic}".
@@ -130,12 +130,14 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
     const historicalGuide = getHistoricalGuide('historical', storyTopic);
 
     if (historicalEvent && historicalGuide) {
+      // The guide itself reaches the prompt ONCE, through {TOPIC_GUIDE} below —
+      // and on the idea path it is the idea-shaped view of the sheet, not the
+      // sheet (getIdeaGuide). Until 2026-09-21 this block embedded the full
+      // sheet AND {TOPIC_GUIDE} repeated it verbatim, so every historical idea
+      // prompt carried two copies of the same fact sheet.
       categoryInstructions = `IMPORTANT: This is a HISTORICAL story about "${historicalEvent.name}" (${historicalEvent.year}).
 
-**HISTORICAL ACCURACY REQUIRED**
-Use ONLY the verified information provided. Do NOT invent historical facts.
-
-${historicalGuide}`;
+**HISTORICAL ACCURACY REQUIRED** Use ONLY the verified information provided. Do NOT invent historical facts.`;
     } else {
       categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
     }
@@ -209,15 +211,16 @@ Follow the user's vision closely while keeping the story age-appropriate and eng
   }
 
   // Get teaching guide for the topic if available
-  const { getTeachingGuide, getSceneComplexityGuide, getAdventureGuide } = require('../lib/storyHelpers');
-  const teachingGuide = getTeachingGuide(effectiveCategory, storyTopic);
+  // getIdeaGuide, not getTeachingGuide: a topic guide is a BOOK brief and a
+  // historical guide is a fact SHEET; the idea call gets the idea-shaped view of
+  // each (server/lib/promptBuilders.js). The STORY path still reads the guide
+  // whole through getTeachingGuide.
+  const { getIdeaGuide, getAdventureGuide } = require('../lib/storyHelpers');
+  const teachingGuide = getIdeaGuide(effectiveCategory, storyTopic);
   const topicGuideText = teachingGuide
     ? `**TOPIC GUIDE for "${storyTopic}":**
 ${teachingGuide}`
     : '';
-
-  // Get scene complexity guide based on page count
-  const sceneComplexityGuide = getSceneComplexityGuide(sceneCount);
 
   // Always get adventure guide for setting/costume context
   const adventureGuideContent = getAdventureGuide(effectiveTheme);
@@ -226,71 +229,18 @@ ${teachingGuide}`
 ${adventureGuideContent}`
     : '';
 
-  // A sample of the challenge catalogue (prompts/challenge-catalogue.txt), so the
-  // generator stops reaching for the same five obstacles (a stream, a boulder, a
-  // locked gate, a refusing guard, a storm — catalogue ids 29, 1, 67, 78, 51).
-  // Filtered by the cast's ages, peril-free when a young child is in the cast,
-  // and sampled ACROSS categories with the five AI-default categories (A, C, D,
-  // F, G) capped, so variety comes from the sample itself. ~40 entries is ~900
-  // tokens (~$0.003/call); a fresh sample per call varies a customer's stories.
-  // The three simple bands (routine/quest/tries) carry no budgeted challenge at
-  // all, so there is nothing to sample for — challengeCatalogueBands returns an
-  // empty list for them, and picks the bands for every other age.
-  const { buildAgeModeSection, resolveAgeBand, challengeCatalogueBands } = require('../lib/promptBuilders');
+  const { buildAgeModeSection } = require('../lib/promptBuilders');
   const premiseShapes = pickPremiseShapes({ characters, storyTopic, storyTheme, language, perilYoungestMax });
   // One centre and one turn per arm, picked in code from the adventure guide's
   // two ten-item lists (server/lib/worldSeeds.js). null — and nothing injected —
   // for a theme with no adventure guide (custom, historical).
   const worldSeeds = [0, 1].map(arm => pickWorldSeeds({ theme: effectiveTheme, characters, topic: storyTopic, language, arm }));
-  const ageModeSection = buildAgeModeSection({ characters });
-  const bands = challengeCatalogueBands({ characters });
-
-  let challengeCatalogueSection = '';
-  if (!bands.length) {
-    log.debug(`[IDEAS] ${resolveAgeBand({ characters })} band — challenge catalogue skipped`);
-  } else try {
-    const rawCat = await fs.readFile(path.join(__dirname, '../../prompts', 'challenge-catalogue.txt'), 'utf-8');
-    const ages = (characters || []).map(c => parseInt(c.age, 10)).filter(Number.isFinite);
-    const youngest = ages.length ? Math.min(...ages) : 8;
-    const entries = rawCat.split('\n')
-      .filter(l => l && !l.startsWith('#'))
-      .map(l => l.split('|'))
-      .filter(f => f.length >= 6)
-      .filter(f => bands.some(b => f[4].startsWith(b)))
-      .filter(f => youngest > perilYoungestMax || f[5].trim() !== '1');
-    const byCat = new Map();
-    for (const f of entries) {
-      if (!byCat.has(f[1])) byCat.set(f[1], []);
-      byCat.get(f[1]).push(`- ${f[2]} (tests: ${f[3]})`);
-    }
-    const DEFAULT_ZONE = new Set(['A', 'C', 'D', 'F', 'G']);
-    const picked = [];
-    const cats = [...byCat.keys()].sort(() => Math.random() - 0.5);
-    let round = 0;
-    while (picked.length < 40 && round < 8) {
-      for (const c of cats) {
-        if (picked.length >= 40) break;
-        const cap = DEFAULT_ZONE.has(c) ? 1 : 2; // the default zone gets one pick, ever
-        const used = picked.filter(x => x.cat === c).length;
-        if (used >= cap * (DEFAULT_ZONE.has(c) ? 1 : round + 1)) continue;
-        const pool = byCat.get(c);
-        if (!pool.length) continue;
-        const i = Math.floor(Math.random() * pool.length);
-        picked.push({ cat: c, line: pool.splice(i, 1)[0] });
-      }
-      round++;
-    }
-    if (picked.length) {
-      challengeCatalogueSection = [
-        '## CHALLENGE IDEAS (a sample from a catalogue of classic trials)',
-        'When the story needs an obstacle, prefer one of these — or one in their spirit — over the usual stream, boulder, locked gate, refusing guard or storm. Pick what fits the characters and the world; vary the kind.',
-        '',
-        ...picked.map(x => x.line),
-      ].join('\n');
-    }
-  } catch (err) {
-    log.warn(`[IDEAS] challenge catalogue unavailable: ${err.message}`);
-  }
+  // `premise-open` (promptBuilders BAND_VIEW_KEEPS), not the writer's whole band
+  // file: the idea call is writing a back-cover premise, so it gets the band's
+  // [[premise]] rules and not its per-page craft or its page-count arithmetic.
+  // The same 2026-09-21 cut that took {SCENE_COMPLEXITY_GUIDE} and the challenge
+  // catalogue out of both idea templates — those are the story writer's inputs.
+  const ageModeSection = buildAgeModeSection({ characters }, { bandView: 'premise-open' });
 
   // Calculate story length category for output length limits
   const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 6 sentences max per idea' :
@@ -332,7 +282,6 @@ ${adventureGuideContent}`
     CHARACTER_DESCRIPTIONS: characterDescriptions,
     RELATIONSHIP_DESCRIPTIONS: relationshipDescriptions || 'No specific relationships defined.',
     READING_LEVEL_DESCRIPTION: readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'],
-    SCENE_COMPLEXITY_GUIDE: sceneComplexityGuide,
     CATEGORY_INSTRUCTIONS: categoryInstructions,
     TOPIC_GUIDE: topicGuideText,
     ADVENTURE_SETTING_GUIDE: adventureSettingGuide,
@@ -345,7 +294,6 @@ ${adventureGuideContent}`
     SEASON_INSTRUCTION: seasonInstruction,
     AVAILABLE_LANDMARKS: availableLandmarksSection,
     STORY_LENGTH_CATEGORY: storyLengthCategory,
-    CHALLENGE_CATALOGUE: challengeCatalogueSection,
     AGE_MODE: ageModeSection,
     LANGUAGE_INSTRUCTION: languageInstruction,
     // One premise shape per idea arm, picked in code (pickPremiseShapes). The

@@ -1128,16 +1128,96 @@ ${teachingGuide ? `**SPECIFIC GUIDANCE for "<user_input>${storyTopic}</user_inpu
 ${teachingGuide}` : ''}`;
 }
 
+/**
+ * The IDEA-shaped part of a topic guide, when the guide marks one.
+ *
+ * A topic guide is a BOOK BRIEF — "What the book is / What happens / Ending" —
+ * written for the writer of the finished story. Handed to the idea call it is
+ * read as a synopsis to compress, which is how the life-challenge arm sat at
+ * 3.63 on the blind buy axis while adventure sat at 4.25 (round 10,
+ * tests/manual/story-idea-rounds/blind-scores-r10.md).
+ *
+ * A guide may therefore carry an `[[idea]] ... [[/idea]]` block in the shape
+ * `[going-outside]` models: what the child wants, what answers back, the child
+ * moves. That block — and nothing else from the guide — is what the idea call
+ * receives. A guide with no block yields the whole guide, unchanged.
+ *
+ * Historical guides are fact SHEETS rather than book briefs and carry no block;
+ * their idea-side shape is built from the sheet's own labelled parts by
+ * buildHistoricalIdeaGuide below.
+ */
+const IDEA_BLOCK_RE = /\[\[idea\]\]([\s\S]*?)\[\[\/idea\]\]/;
+const IDEA_TAG_RE = /^[ \t]*\[\[\/?idea\]\][ \t]*\n?/gm;
+
+// The raw, still-tagged guide maps. getTeachingGuide strips the `[[idea]]`
+// markers for the story path, so the block has to be read from the map itself.
+const RAW_GUIDE_MAPS = {
+  educational: () => EDUCATIONAL_GUIDES,
+  'life-challenge': () => LIFE_CHALLENGE_GUIDES,
+  adventure: () => ADVENTURE_GUIDES,
+  historical: () => HISTORICAL_GUIDES,
+  'swiss-sagen': () => SWISS_SAGEN_GUIDES,
+};
+
+function getIdeaGuide(category, topicId) {
+  if (category === 'historical') {
+    const sheet = getTeachingGuide(category, topicId);
+    return sheet ? buildHistoricalIdeaGuide(sheet) : null;
+  }
+  const map = RAW_GUIDE_MAPS[category];
+  const raw = map && topicId ? map().get(String(topicId).toLowerCase().replace(/\s+/g, '-')) : null;
+  const m = raw ? raw.match(IDEA_BLOCK_RE) : null;
+  if (m) return m[1].trim();
+  return getTeachingGuide(category, topicId);
+}
+
+/**
+ * The idea-side view of a historical guide (prompts/historical-guides.txt).
+ *
+ * Keeps the four parts an idea is built FROM — the event, one sentence of
+ * context, who was really there, and the story angles, which are the seeds —
+ * and drops the four the STORY prompt needs and an idea does not: PERIOD
+ * COSTUMES, HISTORICAL DETAILS, LOCATION_REFERENCES and THEMES. Handed the whole
+ * sheet, the idea call wrote the fact sheet back as a plot (round 10, cells 4
+ * and 8: "engineering-dry", "stuffed with roles and hardware").
+ */
+const HISTORICAL_IDEA_SECTIONS = ['KEY FIGURES', 'STORY ANGLES'];
+
+function buildHistoricalIdeaGuide(sheet) {
+  const text = String(sheet).replace(/\r/g, '');
+  const section = (label) => {
+    const re = new RegExp('^' + label + ':[ \\t]*\\n([\\s\\S]*?)(?=\\n[A-Z][A-Z _]+:|(?![\\s\\S]))', 'm');
+    const m = text.match(re);
+    return m ? m[1].trim() : '';
+  };
+  const eventLine = (text.match(/^EVENT:.*$/m) || [''])[0].trim();
+  const contextBody = section('HISTORICAL CONTEXT');
+  const firstSentence = contextBody
+    ? (contextBody.replace(/\n/g, ' ').match(/^.*?[.!?](?=\s|$)/) || [contextBody])[0].trim()
+    : '';
+  const parts = [eventLine, firstSentence].filter(Boolean);
+  for (const label of HISTORICAL_IDEA_SECTIONS) {
+    const body = section(label);
+    if (body) parts.push(label + ':\n' + body);
+  }
+  parts.push("The idea is one child's day inside this event: what they want from a person here, and what stands in the way. Facts from the sheet stay true; the sheet is not the story.");
+  return parts.join('\n\n');
+}
+
 function getTeachingGuide(category, topicId) {
   if (!topicId) return null;
 
   // Normalize the topic ID (handle display names that might be passed)
   const normalizedId = topicId.toLowerCase().replace(/\s+/g, '-');
 
+  // The `[[idea]]` markers are for getIdeaGuide alone; the story path reads the
+  // guide whole, tags stripped, exactly as before they existed.
+  const whole = (g) => (g ? g.replace(IDEA_TAG_RE, '').trim() : null);
+
   if (category === 'educational') {
-    return EDUCATIONAL_GUIDES.get(normalizedId) || null;
+    return whole(EDUCATIONAL_GUIDES.get(normalizedId)) || null;
   } else if (category === 'life-challenge') {
-    return LIFE_CHALLENGE_GUIDES.get(normalizedId) || null;
+    return whole(LIFE_CHALLENGE_GUIDES.get(normalizedId)) || null;
   } else if (category === 'adventure') {
     return ADVENTURE_GUIDES.get(normalizedId) || null;
   } else if (category === 'historical') {
@@ -10217,6 +10297,7 @@ module.exports = {
   getAgeCategoryIndex,
   clampApparentAge,
   parseTeachingGuideFile,
+  getIdeaGuide,
   PROMPTS_DIR,
   EDUCATIONAL_GUIDES,
   LIFE_CHALLENGE_GUIDES,
