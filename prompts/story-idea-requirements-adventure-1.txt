@@ -2,5 +2,4 @@
 
 - USE the user's location if provided (blend real-world setting into the adventure)
 - If AVAILABLE LANDMARKS are provided, one of them is the scene the action happens at, not a place named in passing
-- Start in NORMAL LIFE, then transition into the adventure world
-- Example: Characters are at home/school/park, then discover a portal/magic item/hidden entrance
+- The world of the theme is reached from the child's real town in whatever way the idea needs: the theme showing in what they wear and play, a dream at the landmark, a door or a thing found, or the world arriving in the town. The real landmark is where it starts and where it comes back to.

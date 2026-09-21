@@ -322,8 +322,60 @@ LANGUAGES['de'] = LANGUAGES['de-ch'];
 const QUOTE_HYGIENE_RULE =
   ' QUOTATION MARKS: never open one of a kind inside another of the same kind, and never leave one unclosed.';
 
-function getLanguageInstruction(langCode) {
+// The dialogue-typography clause of an instruction, and the CORRECT/WRONG
+// examples that carry guillemets or em-dashes. A story has dialogue; a
+// back-cover idea has none, so the idea call was being handed a paragraph of
+// quotation-mark rules it can never use. This strips that ONE clause off the
+// SAME constant every other path reads — no second copy of the vocabulary and
+// spelling rules to drift.
+const DIALOGUE_CLAUSE_RE = /(?:\(\d+\)\s*)?DIALOGUE TYPOGRAPHY[\s\S]*?(?=CORRECT:)/;
+const TYPOGRAPHY_CHARS = /[«»—]/;
+
+/** Split on commas that are not inside (), "" or «». */
+function _splitExamples(text) {
+  const out = [];
+  let depth = 0, quoted = false, guill = 0, cur = '';
+  for (const c of text) {
+    if (c === '(') depth++;
+    else if (c === ')') depth = Math.max(0, depth - 1);
+    else if (c === '"') quoted = !quoted;
+    else if (c === '«') guill++;
+    else if (c === '»') guill = Math.max(0, guill - 1);
+    if (c === ',' && depth === 0 && !quoted && guill === 0) { out.push(cur); cur = ''; } else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+function stripDialogueTypography(instruction) {
+  let out = String(instruction).replace(DIALOGUE_CLAUSE_RE, '');
+  const at = out.indexOf('CORRECT:');
+  if (at !== -1) {
+    const head = out.slice(0, at);
+    const tail = out.slice(at)
+      .split('|')
+      .map(side => _splitExamples(side)
+        .filter(item => !TYPOGRAPHY_CHARS.test(item))
+        .join(',')
+        .trim()
+        .replace(/[,.]$/, ''))
+      .join(' | ');
+    out = head + tail + '.';
+  }
+  return out.replace(/\s{2,}/g, ' ').trim();
+}
+
+/**
+ * @param {string} langCode
+ * @param {object} [options]
+ * @param {'story'|'idea'} [options.variant='story'] - 'idea' returns the same
+ *   language, spelling and vocabulary rules WITHOUT the dialogue typography
+ *   (guillemets, em-dash, spacing) and without the quotation hygiene rule: a
+ *   back-cover idea contains no dialogue.
+ */
+function getLanguageInstruction(langCode, { variant = 'story' } = {}) {
   const lang = LANGUAGES[langCode] || LANGUAGES.en;
+  if (variant === 'idea') return stripDialogueTypography(lang.instruction);
   return lang.instruction + QUOTE_HYGIENE_RULE;
 }
 
@@ -404,6 +456,7 @@ function getAvailableLanguages() {
 module.exports = {
   LANGUAGES,
   getLanguageInstruction,
+  stripDialogueTypography,
   QUOTE_HYGIENE_RULE,
   getLanguageNote,
   getLanguageName,

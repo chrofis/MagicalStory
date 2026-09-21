@@ -53458,3 +53458,77 @@ decision rather than a guard. The guard reports them every morning until then.
 **Touched:** server/lib/dbHousekeeping.js, scripts/admin/check-inline-images.js
 (new), tests/unit/no-inline-images-in-jsonb.test.ts (new)
 **Status:** ✅ active
+
+## Round 17 cleanup — the idea prompt stops repeating itself, and the page count becomes a scope instead of a sentence budget (2026-09-21)
+
+**Context:** rounds 14-16 shrank the idea prompt by removing inputs the idea call
+does not use. What was left still carried five kinds of noise, all measured on
+the sent prompts (`dry-run-1-4-5-7.json`, cells 1/4/5/7, both arms): a page-count
+line stating a sentence cap the four-to-six-sentence rule already sets, a persona
+paragraph and a "your strengths" list, a "list exactly 5 improvements, never say
+no issues" scaffold that manufactures five edits whether or not there are five, a
+logic/plot-hole check that a five-sentence back cover cannot fail, up to ten
+landmarks with their full Wikipedia extracts, the whole STORY ANGLES list beside
+the one angle already picked in code, and the language instruction's dialogue
+typography — guillemets, em-dash rules, spacing — for a text that contains no
+dialogue.
+
+**Decision (owner, one cleanup commit touching every category):**
+
+1. **Scope, not length.** `{STORY_LENGTH_CATEGORY}` ("MEDIUM (11-20 pages) - 8
+   sentences max per idea") is deleted from both templates and replaced by
+   `{STORY_SCOPE}`, built by `buildStoryScope(pages)` in `storyIdeas.js`, which
+   states what the story HOLDS and never events or beats: ≤10 pages "a short
+   book: one place, one want, one thing in the way"; 11-20 "a journey: the goal is
+   somewhere else … one side character wants something of their own"; 21+ "a
+   world: several places, days pass, and a second thread crosses the main one".
+   One tail line in every band keeps the back cover at four to six sentences.
+   Pinned by `tests/unit/idea-scope-and-landmarks.test.ts`.
+2. **Location-arm frame.** `story-idea-requirements-adventure-1.txt`'s "Start in
+   NORMAL LIFE, then transition… Example: portal/magic item/hidden entrance" and
+   the pair template's narrower "[DRAFT_1]" framing ("a costume or theme shows in
+   what they wear and what they play, never in travelling somewhere else") both
+   become the same four options: the theme in what they wear and play, a dream at
+   the landmark, a door or a thing found, or the world arriving in the town — and
+   the real landmark is where it starts and where it comes back to.
+3. **Deletions, both templates.** The Oxford-professor persona paragraph and the
+   "Your strengths" bullets → one sentence, "You write the back cover of a
+   children's picture book"; the NO QUESTIONS block trimmed to one line; "List
+   exactly 5 improvements, never say 'no issues'" and the 1-5 scaffold → "List
+   what you changed and why, one line each"; review check 3 (Logic & Consistency)
+   deleted and the remaining checks renumbered 1..13 (single) / (1)..(14) inline
+   (pair), with the CUT back-reference moved from check 5 to check 4 in BOTH —
+   the pair template had that reference wrong once before. "The outline should
+   focus on the main characters" → "The idea centres on the main characters".
+4. **Landmarks.** `buildIdeaLandmarksSection()` replaces three hand-copied
+   blocks (pair endpoint, streaming endpoint, rating harness) and gives the idea
+   prompt at most TWO landmarks, one line each — name, type, first sentence of
+   the description — under "LOCAL LANDMARKS (use one or two)". The resolver is
+   shared and untouched, so the STORY path still sees every landmark whole.
+5. **Historical angles.** `stripAngleList()` (`worldSeeds.js`, factored out of
+   `stripSeedLists` so both use one block-stripper) removes the STORY ANGLES list
+   from the idea-side guide once one angle has been picked into `{WORLD_SEED}`.
+   EVENT, the context sentence and KEY FIGURES stay. Same argument as the
+   adventure side: printing the menu beside the pick is what the model answered.
+6. **Language.** `getLanguageInstruction(lang, { variant: 'idea' })` returns the
+   same language, spelling and vocabulary constants with the dialogue-typography
+   clause and its guillemet/em-dash examples removed — one strip over the SAME
+   string, no second copy to drift. The story variant is byte-identical to
+   before, pinned by `tests/unit/language-idea-variant.test.ts`.
+
+**Measured (sent prompts, cells 1/4/5/7 both arms, vs the round-15 sent
+prompts):** cell 1 22,909 → 16,577 and 18,716 → 15,807; cell 4 (historical)
+18,275 → 16,394 and 17,889 → 16,576; cell 5 24,048 → 18,561 and 19,857 → 17,755;
+cell 7 25,169 → 19,004 and 25,393 → 19,226. Templates: single 11,772 → 10,460,
+pair 12,600 → 11,552. Every sent prompt: no unfilled placeholder, no "STORY
+LENGTH", no guillemet or em-dash text, no STORY ANGLES list, ≤2 landmark lines,
+and the CUT line pointing at check 4 "Back cover, not synopsis".
+
+**Touched files:** `prompts/generate-story-idea-single.txt`,
+`prompts/generate-story-ideas.txt`,
+`prompts/story-idea-requirements-adventure-1.txt`,
+`server/routes/storyIdeas.js`, `server/lib/worldSeeds.js`,
+`server/lib/languages.js`, `tests/manual/story-idea-rounds.js`,
+`tests/unit/idea-scope-and-landmarks.test.ts`,
+`tests/unit/language-idea-variant.test.ts`, `tests/unit/world-seeds.test.ts`,
+`tests/unit/idea-guide-shape.test.ts`.

@@ -93,9 +93,9 @@ describe('the idea templates carry none of the story writer\'s inputs', () => {
     expect(read(TEMPLATES[0])).not.toContain('Be specific about locations and time periods');
   });
 
-  it('the review checks are numbered 1..14 with no gap (single)', () => {
+  it('the review checks are numbered 1..13 with no gap (single)', () => {
     const nums = [...read(TEMPLATES[0]).matchAll(/^(\d+)\. \*\*/gm)].map(m => Number(m[1]));
-    expect(nums).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+    expect(nums).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
   });
 
   it('the CUT line points at the surviving back-cover check', () => {

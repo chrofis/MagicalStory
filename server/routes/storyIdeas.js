@@ -19,7 +19,7 @@ const { log } = require('../utils/logger');
 const { fillTemplate } = require('../services/prompts');
 // Per-arm world seeds (a centre and a turn from the adventure guide's two lists)
 // and the shared idea seed hash.
-const { pickWorldSeeds, worldSeedInstruction, stripSeedLists, pickHistoricalAngle, historicalAngleInstruction, pickWorldPlace, worldPlaceInstruction, ideaVariantSeed } = require('../lib/worldSeeds');
+const { pickWorldSeeds, worldSeedInstruction, stripSeedLists, stripAngleList, pickHistoricalAngle, historicalAngleInstruction, pickWorldPlace, worldPlaceInstruction, ideaVariantSeed } = require('../lib/worldSeeds');
 
 // Landmark resolution — one shared resolver + cache in landmarkPhotos.js.
 // This route once kept a PRIVATE cache here, so landmarks it discovered were
@@ -52,6 +52,57 @@ const { IDEA_BUY_QUESTIONS } = require('../lib/ideaBuyCriterion');
  * @returns {Promise<Object>} { promptReplacements, storyRequirements1, storyRequirements2, singlePromptTemplate }
  */
 const { buildSeasonInstruction } = require('../lib/season');
+
+/**
+ * What the page count means to a back cover: the SIZE of what stands behind the
+ * idea, never a sentence budget and never a beat count. The old
+ * {STORY_LENGTH_CATEGORY} handed the model "MEDIUM (11-20 pages) - 8 sentences
+ * max per idea", which is a limit the four-to-six-sentence rule already sets,
+ * stated in a unit the back cover does not use.
+ *
+ * @param {number} pages @returns {string} the {STORY_SCOPE} block
+ */
+const SCOPE_TAIL = 'The back cover stays four to six sentences whatever the scope; the scope is the size of what stands behind them.';
+
+function buildStoryScope(pages) {
+  const band = pages <= 10
+    ? 'This is a short book: one place, one want, one thing in the way. The cast is beside the child. It fits in an afternoon.'
+    : pages <= 20
+      ? 'This is a journey: the goal is somewhere else, the story passes through two or three places, and one side character wants something of their own.'
+      : 'This is a world: several places, days pass, and a second thread crosses the main one.';
+  return `${band}\n\n${SCOPE_TAIL}`;
+}
+
+/**
+ * The landmarks section of an IDEA prompt: at most two, one line each.
+ *
+ * One builder for all three callers (the pair endpoint, the streaming endpoint
+ * and the rating harness) — the same block was hand-copied three times. The
+ * STORY path is untouched: the resolver is shared, only this section is
+ * trimmed. An idea needs a name to set the scene at, not an encyclopaedia
+ * entry, so the description is cut to its first sentence.
+ *
+ * @param {Array} landmarks - resolveAvailableLandmarks() rows
+ * @returns {string} the {AVAILABLE_LANDMARKS} block, '' when there are none
+ */
+function buildIdeaLandmarksSection(landmarks) {
+  const rows = (landmarks || []).slice(0, 2);
+  if (!rows.length) return '';
+  const lines = rows.map(l => {
+    let entry = `- ${l.name}`;
+    if (l.type) entry += ` (${l.type})`;
+    const description = l.wikipediaExtract || l.photoDescription;
+    if (description) {
+      // The lookbehind skips abbreviation dots ("445 m ü. M.", "ca. 1200"), which
+      // otherwise end the "first sentence" mid-measurement.
+      const flat = String(description).replace(/\s+/g, ' ').trim();
+      const first = (flat.match(/^.*?(?<!\s[A-Za-zÄÖÜäöü]{1,2})[.!?](?=\s|$)/) || [flat])[0].trim();
+      entry += `: ${first}`;
+    }
+    return entry;
+  });
+  return `**LOCAL LANDMARKS (use one or two)**\n${lines.join('\n')}`;
+}
 
 async function buildIdeasPromptContext({
   storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
@@ -217,7 +268,9 @@ Follow the user's vision closely while keeping the story age-appropriate and eng
   // whole through getTeachingGuide.
   const { getIdeaGuide, getAdventureGuide } = require('../lib/storyHelpers');
   const teachingGuide = getIdeaGuide(effectiveCategory, storyTopic);
-  const topicGuideText = teachingGuide
+  // `let`, not `const`: once an angle has been picked out of the guide below,
+  // the guide the PROMPT sees drops the angle list (stripAngleList).
+  let topicGuideText = teachingGuide
     ? `**TOPIC GUIDE for "${storyTopic}":**
 ${teachingGuide}`
     : '';
@@ -249,6 +302,11 @@ ${adventureGuideContent}`
   // ONE line per arm, whichever kind it is. Every call site fills {WORLD_SEED*}
   // from here so the streaming endpoint, the pair endpoint and the rating
   // harness cannot each build their own.
+  // One angle was picked in code and goes into {WORLD_SEED}; the other five stay
+  // out of the prompt, exactly as stripSeedLists does on the adventure side.
+  if (historicalAngles[0] && teachingGuide) {
+    topicGuideText = `**TOPIC GUIDE for "${storyTopic}":**\n${stripAngleList(teachingGuide)}`;
+  }
   const worldSeedLines = [0, 1].map(arm => (historicalAngles[arm]
     ? historicalAngleInstruction(historicalAngles[arm])
     : worldSeedInstruction(worldSeeds[arm])));
@@ -263,10 +321,7 @@ ${adventureGuideContent}`
   // catalogue out of both idea templates — those are the story writer's inputs.
   const ageModeSection = buildAgeModeSection({ characters }, { bandView: 'premise-open' });
 
-  // Calculate story length category for output length limits
-  const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 6 sentences max per idea' :
-                              pages <= 20 ? 'MEDIUM (11-20 pages) - 8 sentences max per idea' :
-                                            'LONG (21+ pages) - 10 sentences max per idea';
+  const storyScope = buildStoryScope(pages);
 
   // Load prompt templates
   const promptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-ideas.txt'), 'utf-8');
@@ -285,13 +340,17 @@ ${adventureGuideContent}`
   const storyCategoryLabel = effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure';
   const storyTypeNameLabel = effectiveCategory === 'custom' ? 'custom' : effectiveTheme;
   const storyTopicLabel = storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None');
-  const languageInstruction = getLanguageInstruction(language);
+  // The idea variant: same language, spelling and vocabulary constants, without
+  // the dialogue-typography paragraph (guillemets, em-dash, spacing). A
+  // back-cover idea has no dialogue.
+  const languageInstruction = getLanguageInstruction(language, { variant: 'idea' });
 
   // Fill templates via the shared fillTemplate (services/prompts.js) —
   // global replacement, $-escaped values, WARN + strip on unfilled
   // {UPPERCASE} placeholders. The old hand-rolled chained String.replace
-  // was first-occurrence only (the SECOND {STORY_LENGTH_CATEGORY} in
-  // generate-story-ideas.txt shipped to the model literally) and
+  // was first-occurrence only (a placeholder appearing TWICE in
+  // generate-story-ideas.txt shipped to the model literally the second time)
+  // and
   // interpreted $-sequences in user-derived values (characterDescriptions,
   // customThemeText), silently mangling them.
   // extraReplacements keys are bare placeholder names (no braces), same as
@@ -314,7 +373,7 @@ ${adventureGuideContent}`
     // "in einem Sommer vor langer Zeit".
     SEASON_INSTRUCTION: seasonInstruction,
     AVAILABLE_LANDMARKS: availableLandmarksSection,
-    STORY_LENGTH_CATEGORY: storyLengthCategory,
+    STORY_SCOPE: storyScope,
     AGE_MODE: ageModeSection,
     LANGUAGE_INSTRUCTION: languageInstruction,
     // One premise shape per idea arm, picked in code (pickPremiseShapes). The
@@ -638,18 +697,7 @@ router.post('/generate-story-ideas', authenticateToken, storyIdeasLimiter, async
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
-      const landmarkEntries = availableLandmarks
-        .slice(0, 10)
-        .map(l => {
-          let entry = `- ${l.name}`;
-          if (l.type) entry += ` (${l.type})`;
-          const description = l.wikipediaExtract || l.photoDescription;
-          if (description) entry += `: ${description}`;
-          return entry;
-        })
-        .join('\n');
-      availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
-${landmarkEntries}`;
+      availableLandmarksSection = buildIdeaLandmarksSection(availableLandmarks);
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
@@ -836,18 +884,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, storyIdeasLimiter
     // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
     if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
-      const landmarkEntries = availableLandmarks
-        .slice(0, 10)
-        .map(l => {
-          let entry = `- ${l.name}`;
-          if (l.type) entry += ` (${l.type})`;
-          const description = l.wikipediaExtract || l.photoDescription;
-          if (description) entry += `: ${description}`;
-          return entry;
-        })
-        .join('\n');
-      availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
-${landmarkEntries}`;
+      availableLandmarksSection = buildIdeaLandmarksSection(availableLandmarks);
       const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
@@ -1030,6 +1067,8 @@ ${landmarkEntries}`;
 
 module.exports = router;
 module.exports.buildIdeasPromptContext = buildIdeasPromptContext;
+module.exports.buildStoryScope = buildStoryScope;
+module.exports.buildIdeaLandmarksSection = buildIdeaLandmarksSection;
 module.exports.resolveIdeaWorlds = resolveIdeaWorlds;
 module.exports.buildVariantInstructions = buildVariantInstructions;
 module.exports.pickPremiseShapes = pickPremiseShapes;

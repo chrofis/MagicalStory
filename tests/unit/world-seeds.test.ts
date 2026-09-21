@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import path from 'path';
 
 const ROOT = path.resolve(__dirname, '../..');
-const { parseWorldSeeds, stripSeedLists, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction } = require(path.join(ROOT, 'server/lib/worldSeeds'));
+const { parseWorldSeeds, stripSeedLists, stripAngleList, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction } = require(path.join(ROOT, 'server/lib/worldSeeds'));
 const { parseTeachingGuideFile, getAdventureGuide } = require(path.join(ROOT, 'server/lib/promptBuilders'));
 
 const GUIDES = parseTeachingGuideFile(path.join(ROOT, 'prompts', 'adventure-guides.txt'));
@@ -260,5 +260,28 @@ describe('worldPlaceInstruction', () => {
   it('is empty when there is no place', () => {
     expect(worldPlaceInstruction(null)).toBe('');
     expect(worldPlaceInstruction('')).toBe('');
+  });
+});
+
+describe('stripAngleList', () => {
+  const { getIdeaGuide } = require(path.join(ROOT, 'server/lib/promptBuilders'));
+
+  it('drops the STORY ANGLES block and keeps EVENT, context and KEY FIGURES', () => {
+    const guide = getIdeaGuide('historical', 'moon-landing');
+    expect(guide).toContain('STORY ANGLES:');
+    expect(parseHistoricalAngles(guide)!.length).toBeGreaterThan(3);
+
+    const stripped = stripAngleList(guide);
+    expect(stripped).not.toContain('STORY ANGLES');
+    expect(parseHistoricalAngles(stripped)).toBeNull();
+    expect(stripped).toContain('EVENT:');
+    expect(stripped).toContain('KEY FIGURES:');
+    expect(stripped.length).toBeLessThan(guide.length);
+  });
+
+  it('leaves a guide with no angle list alone', () => {
+    const plain = ['EVENT: something', '', 'KEY FIGURES:', '- someone'].join(String.fromCharCode(10));
+    expect(stripAngleList(plain)).toContain('KEY FIGURES');
+    expect(stripAngleList('')).toBe('');
   });
 });

@@ -110,14 +110,14 @@ function pickWorldSeeds({ theme, characters, topic, storyTopic, language, arm = 
  *
  * @param {string} guideText @returns {string} the guide without the two lists
  */
-function stripSeedLists(guideText) {
+function _stripBulletBlocks(guideText, labels) {
   if (!guideText || typeof guideText !== 'string') return guideText;
   const lines = guideText.replace(/\r/g, '').split('\n');
   const out = [];
   let skipping = false;
   for (const line of lines) {
     const t = line.trim();
-    if (t === CENTRE_LABEL || t === TURN_LABEL) { skipping = true; continue; }
+    if (labels.includes(t)) { skipping = true; continue; }
     if (skipping) {
       if (line.startsWith('- ') || !t) continue;
       skipping = false;
@@ -125,6 +125,10 @@ function stripSeedLists(guideText) {
     out.push(line);
   }
   return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function stripSeedLists(guideText) {
+  return _stripBulletBlocks(guideText, [CENTRE_LABEL, TURN_LABEL]);
 }
 
 /**
@@ -178,6 +182,21 @@ function pickHistoricalAngle({ sheet, characters, topic, storyTopic, language, a
   });
   const [a1, a2] = _twoIndices(h, angles.length);
   return angles[arm === 1 ? a2 : a1];
+}
+
+/**
+ * The historical idea guide as the IDEA prompt should see it: its own angle,
+ * not the menu. Exactly the reason stripSeedLists exists on the adventure side —
+ * one angle is picked here in code and injected as {WORLD_SEED}, and printing
+ * the other five beside it hands the model a list to answer instead. The STORY
+ * path reads the sheet whole (getTeachingGuide), and getIdeaGuide still builds
+ * the block WITH its angles so pickHistoricalAngle can read them; this strip
+ * runs after the pick, where the prompt's topic-guide section is assembled.
+ *
+ * @param {string} guideText @returns {string} the block without STORY ANGLES
+ */
+function stripAngleList(guideText) {
+  return _stripBulletBlocks(guideText, [ANGLE_LABEL]);
 }
 
 /** The prompt line for a historical arm. Same slot as worldSeedInstruction. */
@@ -279,4 +298,4 @@ function worldPlaceInstruction(place) {
   return `The scene is ${place}. Name it where the action is; do not describe it.`;
 }
 
-module.exports = { parseWorldSeeds, stripSeedLists, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, ideaVariantSeed };
+module.exports = { parseWorldSeeds, stripSeedLists, stripAngleList, parseWorldPlaces, pickWorldPlace, worldPlaceInstruction, pickWorldSeeds, worldSeedInstruction, parseHistoricalAngles, pickHistoricalAngle, historicalAngleInstruction, ideaVariantSeed };

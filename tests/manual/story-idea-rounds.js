@@ -23,7 +23,7 @@ const ROOT = path.resolve(__dirname, '../..');
 
 require(path.join(ROOT, 'server/services/database')).initializePool();
 const { resolveAvailableLandmarks } = require(path.join(ROOT, 'server/lib/landmarkPhotos'));
-const { buildIdeasPromptContext, resolveIdeaWorlds, buildVariantInstructions, premiseShapeInstruction } = require(path.join(ROOT, 'server/routes/storyIdeas'));
+const { buildIdeasPromptContext, resolveIdeaWorlds, buildVariantInstructions, premiseShapeInstruction, buildIdeaLandmarksSection } = require(path.join(ROOT, 'server/routes/storyIdeas'));
 // The server loads every prompts/*.txt at boot (server.js). Without this call
 // PROMPT_TEMPLATES is empty here, so buildAgeModeSection returned NO age-band
 // plot-shape rules and rounds 1-7 rated a prompt production never sends.
@@ -206,17 +206,8 @@ async function buildCellPrompts(cell) {
   }
   const seasonInstruction = effectiveCategory === 'historical' ? '' : buildSeasonInstruction({});
 
-  let availableLandmarksSection = '';
-  if (availableLandmarks.length && effectiveCategory !== 'historical') {
-    const landmarkEntries = availableLandmarks.slice(0, 10).map(l => {
-      let entry = `- ${l.name}`;
-      if (l.type) entry += ` (${l.type})`;
-      const description = l.wikipediaExtract || l.photoDescription;
-      if (description) entry += `: ${description}`;
-      return entry;
-    }).join('\n');
-    availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):\n${landmarkEntries}`;
-  }
+  const availableLandmarksSection = (availableLandmarks.length && effectiveCategory !== 'historical')
+    ? buildIdeaLandmarksSection(availableLandmarks) : '';
 
   const ctx = await buildIdeasPromptContext({
     storyCategory, storyTopic, storyTheme, storyTypeName: undefined, customThemeText: undefined,
