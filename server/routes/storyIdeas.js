@@ -459,6 +459,17 @@ function loadPremiseShapes() {
 // nothing.
 const SHAPE_NEEDS_TWO_MAINS = new Set([10]);
 
+// Shapes withheld from a cast whose youngest is five or under, because they
+// invite the two peril shapes the round-10 read counted (a child alone at a
+// height, and a cost that ends on a child never coming home). Traced on
+// round-10.json: `rescue` drew 3 of its 4 arms into a peril fault, 2 of 2 on
+// the casts with a youngest of five or under, and it is the only shape with
+// more than one hit — every other peril fault sits on a different shape. Same
+// encoding as the set above: a column blank on eleven of twelve lines teaches
+// nothing.
+const SHAPE_PERIL_PRONE = new Set([2]);
+const SHAPE_PERIL_MAX_YOUNGEST = 5;
+
 /**
  * One shape per arm, DETERMINISTIC from the same seed buildVariantInstructions
  * uses, always two different shapes, and never a shape above the youngest
@@ -471,7 +482,8 @@ function pickPremiseShapes(seedInput = {}) {
   const mains = chars.filter(c => c?.isMain).length;
   const pool = loadPremiseShapes()
     .filter(s => youngest >= s.minAge)
-    .filter(s => mains >= 2 || !SHAPE_NEEDS_TWO_MAINS.has(s.id));
+    .filter(s => mains >= 2 || !SHAPE_NEEDS_TWO_MAINS.has(s.id))
+    .filter(s => youngest > SHAPE_PERIL_MAX_YOUNGEST || !SHAPE_PERIL_PRONE.has(s.id));
   if (pool.length < 2) throw new Error(`premise-shapes: only ${pool.length} shape(s) for youngest age ${youngest}`);
   const h = ideaVariantSeed(seedInput);
   const i1 = h % pool.length;

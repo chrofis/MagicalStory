@@ -50,3 +50,20 @@ describe('pickPremiseShapes', () => {
     expect(text).toMatch(/requirement, not a choice/);
   });
 });
+
+describe('peril-prone shapes', () => {
+  it('withholds rescue from a cast whose youngest is five or under', () => {
+    for (const topic of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']) {
+      const picked = pickPremiseShapes({ characters: cast(['Mia', 5, true], ['Leo', 8]), storyTopic: topic });
+      expect(picked.some((s: any) => s.name === 'rescue')).toBe(false);
+    }
+  });
+
+  it('keeps rescue available above that age', () => {
+    const seen = new Set<string>();
+    for (const topic of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l']) {
+      for (const s of pickPremiseShapes({ characters: cast(['Finn', 10, true]), storyTopic: topic })) seen.add(s.name);
+    }
+    expect(seen.has('rescue')).toBe(true);
+  });
+});
