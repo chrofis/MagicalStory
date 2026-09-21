@@ -2075,15 +2075,19 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             // IMG faults verbatim — the evidence for what the next round was
             // told.
             imgFaults: audit.byRoute.IMG,
-            // TEXT faults verbatim. NOTHING REPAIRS THEM, and that is not what
-            // this field is for: the only prose-editing stage in the pipeline
-            // (joinTextRefinement) has already run by the time this audit
-            // happens, so a TEXT route arrives after its fixer has gone home.
-            // Storing the count alone made the route unauditable — measured
-            // 2026-09-19 over 13 staging stories / 23 rounds: 527 IMG against
-            // ONE TEXT, and the single TEXT line could not be read back to tell
-            // a broken route from a pointless one. The lines are evidence; keep
-            // them next to the IMG lines they were routed against.
+            // TEXT faults verbatim — and since 2026-09-21 (owner, finding A8)
+            // they are also the INPUT to a fixer. The pipeline reads these
+            // lines after the repair loop and runs ONE corrective text round
+            // scoped to the pages they name (textRefine.runPostAuditTextRound,
+            // called from storyJobPipeline); its record lands in
+            // textRefineReport.postAuditRound. Until then nothing read the
+            // route at all: the refine chain had joined long before this audit,
+            // so a TEXT fault arrived after its fixer had gone home. Storing
+            // the count alone made the route unauditable — measured 2026-09-19
+            // over 13 staging stories / 23 rounds: 527 IMG against ONE TEXT,
+            // and that single line could not be read back to tell a broken
+            // route from a pointless one. The lines are the evidence AND the
+            // brief; keep them next to the IMG lines they were routed against.
             textFaults: audit.byRoute.TEXT,
             pagesRead: audit.pagesRead,
             pagesSkipped: audit.pagesSkipped,

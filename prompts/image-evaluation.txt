@@ -5,7 +5,7 @@ Report only defects a reader would notice. Rule codes (N-xx, D-xx) exist so a fi
 **INPUTS**
 1. GENERATED_IMAGE — the illustration to evaluate
 2. USER_PROMPT: "{ORIGINAL_PROMPT}"
-3. REF_IMAGES — character reference photos
+3. REF_IMAGES — labelled character references. Each is either a photograph or a drawn visual-bible cell, and its label says which. Both are identity references only: read face, hair and build from them, and never file the reference's own medium, framing or pose as a difference.
 4. DECLARED INTERACTIONS: {INTERACTIONS_BLOCK}
 5. SCENE INTENT: {SCENE_INTENT}
 6. ART STYLE (the commissioned medium — empty if not supplied): {ART_STYLE}

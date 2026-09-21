@@ -6518,6 +6518,84 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         pipelineSurvivingCriticals = survivingCriticals || null;
         pipelineNotEvaluated = pipelineNotEvaluatedRollup || null;
 
+        // ── THE BOOK AUDIT'S TEXT ROUTE, ANSWERED (A8, owner 2026-09-21) ─────
+        //
+        // The audit reads the book that ships — each page's final picture beside
+        // its final text — and routes a fault to TEXT when different prose would
+        // fix it. Nothing read that route: the refine chain runs before the
+        // repair loop and joined long ago, so a TEXT fault was stored evidence
+        // and nothing else (measured 2026-09-19: 527 IMG against ONE TEXT over
+        // 13 staging stories, unauditable because only the count was kept).
+        //
+        // ONE call, and only when a TEXT fault exists — a clean book pays
+        // nothing. Scoped to the pages the faults name, and the pictures are
+        // final by now, so the round may not move a passage between pages
+        // (runPostAuditTextRound's scope note and its code-side scope gate).
+        if (pipelineBookAuditRounds) {
+          const auditTextFaults = [];
+          const seenFaultLines = new Set();
+          for (const r of pipelineBookAuditRounds) {
+            for (const f of r.textFaults || []) {
+              const line = String(f?.line || '').trim();
+              // The same fault can survive into a later round's audit; it is one
+              // fault, and sending it twice would ask for the page twice.
+              if (!line || seenFaultLines.has(line)) continue;
+              seenFaultLines.add(line);
+              auditTextFaults.push(f);
+            }
+          }
+          if (auditTextFaults.length > 0) {
+            const { extractRefinablePages, runPostAuditTextRound } = require('./server/lib/textRefine');
+            // The pages as they SHIP: expandedScenes carries the refined text
+            // (the join above wrote it there) and the scene briefs the refine
+            // template reads.
+            const finalPages = extractRefinablePages(expandedScenes);
+            genLog.info('text_post_audit_start', `The book audit routed ${auditTextFaults.length} fault(s) to TEXT — one corrective text round on the pages they name`);
+            const postAudit = await runPostAuditTextRound(
+              { ...inputData, visualBible },
+              finalPages,
+              auditTextFaults,
+              {
+                arc: beatsResult?.arcReviewReport?.finalArc || beatsResult?.beatsReviewReport?.arc || '',
+                usageLabel: 'text_refine_post_audit',
+              }
+            );
+            if (postAudit) {
+              // The report carries the round even when it changed nothing or
+              // failed: a TEXT fault that reached its fixer and was not closed
+              // is exactly the record that was missing before.
+              textRefineReport = { ...(textRefineReport || {}), postAuditRound: postAudit.entry };
+              if (postAudit.entry.changedPages.length > 0) {
+                const byPage = new Map(postAudit.pages.map(p => [p.pageNumber, p.text]));
+                for (const scene of expandedScenes) {
+                  const t = byPage.get(scene.pageNumber);
+                  if (t) scene.text = t;
+                }
+                // The page objects the save path reads: rawImages is what the
+                // repair pipeline was handed, pipelineResult what it returned
+                // and what allImages is mapped from below.
+                for (const list of [rawImages, pipelineResult]) {
+                  for (const img of list || []) {
+                    const t = byPage.get(img.pageNumber);
+                    if (t) img.text = t;
+                  }
+                }
+                // data.story / data.storyText, assembled from the page text and
+                // persisted as-is (same third store as the refine join).
+                fullStoryText = storyPages.map(page =>
+                  `--- Page ${page.pageNumber} ---\n${byPage.get(page.pageNumber) || page.text}`
+                ).join('\n\n');
+                genLog.info('text_post_audit_complete', `The corrective text round rewrote page(s) ${postAudit.entry.changedPages.join(', ')} on ${auditTextFaults.length} audit TEXT fault(s)`, null, { changedPages: postAudit.entry.changedPages, faults: auditTextFaults.length });
+              } else if (postAudit.entry.ok) {
+                genLog.warn('text_post_audit_nochange', `The corrective text round rewrote nothing — ${auditTextFaults.length} audit TEXT fault(s) ship as they were found`);
+              } else {
+                genLog.error('text_post_audit_failed', `The corrective text round failed (${postAudit.entry.error}) — ${auditTextFaults.length} audit TEXT fault(s) ship unanswered`);
+              }
+            }
+          }
+        }
+
+
         // Map pipeline results to allImages format. Index rawImages by
         // pageNumber so per-page intermediates that the pipeline drops
         // (compositeDebug, etc.) can be re-attached from the original

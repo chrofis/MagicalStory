@@ -27680,7 +27680,13 @@ different image would fix it, `FAULT[TEXT]` when different prose would.
   no longer true of the pipeline. Nothing is repainted. The finding is
   stored on the page as `page.bookAuditFaults[]` so the dev panel and the repair
   endpoints can see it, and on `data.bookAuditReport` / `finalChecksReport.bookAudit`.
-- **TEXT route gets ONE corrective round** — the FAULT lines go into
+- **TEXT route gets ONE corrective round** — 🗄 **superseded 2026-09-21** (see
+  "The book audit's TEXT route has a fixer again" at the end of this file): the
+  final audit this round hung off was deleted with the mid-loop audit's arrival,
+  and the route then went unread for weeks. It is rebuilt on the surviving
+  mid-loop audit, scoped to the pages the faults name and forbidden to move a
+  passage between pages. The original design, for the record: the FAULT lines go
+  into
   `buildTextRefinePrompt` as its findings block (same shape the text audit
   produces), the model returns only pages it rewrote, and the rewrites land in
   **all three** stores the refine join writes: `expandedScenes[].text`,
@@ -52390,3 +52396,121 @@ client/src/types/story.ts
 applied to any database yet** (owner's call: `node
 scripts/admin/apply-migration.js 039_idea_events.sql [--staging]`). Until it is,
 `recordIdeaEvent` logs a debug line per dropped insert and nothing else breaks.
+
+
+## 2026-09-21 — The book audit's TEXT route has a fixer again: ONE scoped, picture-locked text round after the repair loop (A8)
+
+**Context:** `prompts/book-audit.txt` asks the reader of the finished book to
+route every fault by its fix — `FAULT[IMG]` when a different image would fix it,
+`FAULT[TEXT]` when different prose would. The IMG route feeds the consolidator
+and can buy an extra repair round. The TEXT route fed **nothing**:
+`runBookAuditRound` (`server/lib/repairPipeline.js`) stored
+`textFaults = audit.byRoute.TEXT` and no reader existed. The corrective round
+the 2026-08-26 entry above describes hung off the FINAL audit, which was deleted
+when the mid-loop audit took over; the surviving audit runs after
+`joinTextRefinement`, so a TEXT fault arrived after the only prose-editing stage
+had gone home. Measured 2026-09-19 over 13 staging stories / 23 rounds: 527 IMG
+faults against ONE TEXT — and with only the count stored, a broken route could
+not be told from a pointless one (that measurement is what put the lines in the
+record in the first place).
+
+**Decision (owner, 2026-09-21):** after the repair loop, **when and only when**
+the audit produced a TEXT fault, run ONE text-refine call —
+`textRefine.runPostAuditTextRound`, called from `storyJobPipeline.js` right
+after `runUnifiedRepairPipeline` returns.
+
+- **Zero extra calls on a clean book.** No TEXT fault, no call: happy-path
+  latency is sacred. One call, never a loop, never a second chain.
+- **The faults are the brief.** The audit's own `FAULT[TEXT][WEIGHT]: p<N> — …`
+  lines go in verbatim as the template's `AUDIT FINDINGS`, read by the same
+  `parseFaultLines` the text audits feed, and resolved through the same
+  `resolveFindingOutcomes` ledger — every fault in, exactly one outcome out.
+  Duplicate lines across rounds are one fault.
+- **IMAGE-FIRST IS ENFORCED, NOT REQUESTED.** `text-refine.txt` permits ONE
+  structural move — a MISMATCH passage may move to the page whose picture shows
+  it — which is safe on the pre-image path and wrong here: the destination
+  page's picture is already drawn. The findings block therefore carries
+  `POST_AUDIT_SCOPE_NOTE` ("never move a passage between pages; fix each fault
+  inside the page it names"), and code drops any returned page no fault named
+  (`outOfScopePages`). The whole book is still shown to the model — a page
+  cannot be judged in isolation — but only the named pages may change.
+- **The rewrite lands in all the stores the refine join writes:**
+  `expandedScenes[].text`, `rawImages`/`pipelineResult` (and so `allImages`),
+  and the rebuilt `fullStoryText` — before the final save.
+- **The round is recorded** as `textRefineReport.postAuditRound` (faults,
+  scoped pages, changed pages, out-of-scope drops, finding outcomes, prompt,
+  raw reply), stored even when it changed nothing or failed: a fault that
+  reached its fixer and was not closed is exactly the record that was missing.
+- **Never throws.** It runs after the book is paid for; a failure logs at
+  `error` and the text ships as audited.
+
+**Siblings:** the trial path skips refinement entirely (owner, 2026-08-15) and
+has no repair phase, so it has no book audit to answer. The Lab's `book_audit`
+stage is a measurement stage — it returns the audit and repairs nothing — and is
+unchanged. `prompts/book-audit.txt` needs no edit: it describes the routing, not
+the reader. Registry: `prompts/book-audit.txt` joins the
+`text-refine-vs-text-critics` set as a critic, since its TEXT faults are now
+findings `text-refine.txt` must be able to answer.
+
+**Validation (rung 1 — replay over stored data, no paid call):** staging holds
+exactly ONE story whose audit ever routed a TEXT fault
+(`job_1789506283204_3kxqshifx`, round 1: 17 IMG / 1 TEXT) and it predates
+`textFaults` being stored, so the line itself is gone; prod has none. The new
+round's builder was therefore replayed over that story's real pages and cast
+with a stand-in fault line, printing the prompt it would send and the pages it
+would touch, and behaviour is pinned by
+`tests/unit/text-post-audit-round.test.ts` with a stubbed model — no paid call.
+
+**Touched:** `server/lib/textRefine.js` (`runPostAuditTextRound`,
+`POST_AUDIT_SCOPE_NOTE`), `storyJobPipeline.js`,
+`server/lib/repairPipeline.js` (the `textFaults` comment),
+`scripts/admin/sibling-registry.json`,
+`tests/unit/text-post-audit-round.test.ts`.
+**Status:** 🟡 conditional — in the working tree, not yet deployed; unexercised
+by a live story until an audit routes a TEXT fault.
+
+---
+
+## 2026-09-21 — A Visual Bible secondary is judged against her reference-sheet CELL, not skipped for identity (A5)
+
+**Context.** The page eval's reference list is assembled from the uploaded roster only —
+`buildWholeCastReferencePhotos` reads `characters[]` avatars and face photos. A character the
+STORY invented has a VB entry (`CHR001`), a rendered reference-sheet cell and no roster row, so
+she joined the EXPECTED CAST with no image attached. The judge could then only answer
+`unmatched` for the figure that is her; `derivePresenceFinding` correctly declined to bill an
+identity CRITICAL against a name it held no reference for
+(`unclaimed_cast_has_no_reference`), and char-fix declined for the same absence
+(`charFixReferenceGap`). Measured on staging `job_1789853503332_riqncqg1i`: VB CHR001 Silvan had
+a `vb_reference_sheet` cell, p10 attached references `[Julian]` and p15 `[Max, Kiaan]` — zero for
+her — and the run counted `presence_reconciled_unclaimed_cast_has_no_reference` 3 times.
+
+**Decision.** Owner, 2026-09-21: *"Secondaries have a VB entry and are compared with that."*
+A cast name that resolves to a VB secondary with a rendered cell is handed THAT CELL as its
+identity reference, at ONE site — `evaluateImageQuality`, after the EXPECTED CAST is built, so
+every caller (page eval, cover eval, the Lab's eval stages, the regeneration routes, trial) gets
+the same roster with no second assembly to drift. The attached cell is labelled as a drawn
+visual-bible cell rather than a photograph, and `image-evaluation.txt`'s REF_IMAGES input line
+says both kinds are identity references only — medium, framing and pose are never a difference.
+She is therefore reference-backed for the presence reconciliation, whose identity branch now has
+a NAME to claim instead of reconciling the pair away.
+
+Char-fix stays photo-only and is NOT widened: its reference is an avatar or a face photo, and a
+sheet cell is neither. The CRITICAL such a figure now earns is owned by the 2026-09-20 gate 2c in
+`repairLogic.js`, which routes an orphan CRITICAL on a roster-less character to **iterate** — the
+method that re-renders the page from the Visual Bible, which is where an invented figure's
+appearance actually lives.
+
+**Rationale.** The alternative was to keep declaring these figures unjudgeable (a `notEvaluated`
+for no-reference cast). That throws away a reference the pipeline already rendered and paid for,
+and leaves the most commonly mis-drawn figure on the page — the one with no photo anchor — the
+only one nobody grades. Giving the eval the cell costs nothing per page (one more compressed
+reference image) and makes the finding repairable through an existing route.
+
+**Touched:** `server/lib/evalPipeline.js` (`vbCellReferencesForCast`, its wiring after the
+EXPECTED CAST build, the `vbCell` label in the reference attach loop, the stale
+`unclaimed_cast_has_no_reference` comment), `prompts/image-evaluation.txt` (REF_IMAGES input
+line), `tests/unit/eval-vb-secondary-reference.test.ts`.
+
+**Status:** 🟡 conditional — in the working tree, validated by replay over the stored pages of
+`job_1789853503332_riqncqg1i` (references before/after) and by unit tests; not yet exercised by a
+live story.

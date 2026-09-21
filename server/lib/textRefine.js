@@ -656,6 +656,154 @@ function buildRepetitionFindings(hits, pages) {
   }).join('\n');
 }
 
+// ─────────────────── POST-AUDIT TEXT ROUND (A8, 2026-09-21) ───────────────────
+
+/**
+ * The scope note the book audit's findings carry into the refine template.
+ *
+ * WHY IT IS NEEDED. Every other caller of that template runs BEFORE the
+ * pictures exist, so its one permitted structural move — a MISMATCH finding
+ * lets a passage move to the page whose picture shows it — is safe there. Here
+ * it is not: this round runs after the repair loop, on the book that ships, so
+ * a moved passage lands under a picture already drawn for something else. The
+ * picture cannot answer back any more, so the text may only change inside the
+ * page the fault names.
+ */
+const POST_AUDIT_SCOPE_NOTE = [
+  "These findings come from a reader of the FINISHED book: each page's shipped picture read beside its shipped text.",
+  'The pictures are final and no illustration round follows this one, so every fault below is fixed in the words.',
+  'Rewrite only the pages these findings name. Never move a passage from one page to another — the destination page\'s picture is already drawn and does not show it. Fix each fault inside the page it names, or say in the ledger why it stands.',
+].join('\n');
+
+/**
+ * ONE corrective text round on the book audit's TEXT route.
+ *
+ * WHY (owner decision 2026-09-21, finding A8). The audit routes a fault to
+ * TEXT when different prose would fix it, and nothing read that route: the only
+ * prose-editing stage (the chain above) runs before the repair loop and has
+ * gone home by the time the audit happens, so a TEXT fault was stored evidence
+ * and nothing else. This is the fixer the route always named.
+ *
+ * WHAT IT IS NOT: a loop, and not a second refine chain. ONE call, and only
+ * when the audit produced a TEXT fault — happy-path latency is sacred, so a
+ * book with no TEXT fault makes no extra model call at all.
+ *
+ * SCOPE IS ENFORCED IN CODE, not merely asked for. A returned page that no
+ * finding names is RECORDED and DROPPED: every page's picture is final here,
+ * and a rewrite of a page the audit passed buys nothing worth the risk.
+ *
+ * Never throws — it runs after the whole book is already paid for.
+ *
+ * @param {Object} storyData      story record (characters, language, visualBible …)
+ * @param {Array<{pageNumber:number,text:string}>} pages  the FINAL pages (extractRefinablePages)
+ * @param {Array<{page:number|null,severity:string|null,line:string}>} textFaults
+ *        the audit's TEXT route, verbatim (bookAudit.parseRoutes)
+ * @param {Object} [opts] {model, arc, usageLabel}
+ * @returns {Promise<{pages:Array, entry:Object}|null>} null when there is nothing to do
+ */
+async function runPostAuditTextRound(storyData, pages, textFaults = [], opts = {}) {
+  const { loadPromptTemplates } = require('../services/prompts');
+  const { buildTextRefinePrompt, parseRefinedText, stripTrailingSeparator } = require('./storyHelpers');
+  const { callTextModelStreaming, describeTruncation } = require('./textModels');
+  const { TEXT_MODELS, MODEL_DEFAULTS, calculateTextCost } = require('../config/models');
+
+  const lines = (textFaults || []).map(f => String(f?.line || '').trim()).filter(Boolean);
+  if (lines.length === 0) return null;          // the only silent exit: nothing was routed here
+  if (!Array.isArray(pages) || pages.length === 0) {
+    log.error('❌ [TEXT-POST-AUDIT] the audit routed TEXT fault(s) and no page text was passed — they go unanswered');
+    return null;
+  }
+  await loadPromptTemplates();
+
+  // The audit's own FAULT lines, read by the SAME parser the text audits feed.
+  const findings = parseFaultLines(lines.join('\n'), 'book-audit');
+  const known = new Set(pages.map(p => p.pageNumber));
+  const scope = [...new Set(findings.map(f => f.pageNumber).filter(n => n != null && known.has(n)))].sort((a, b) => a - b);
+  const fail = (error, prompt = '') => ({
+    pages,
+    entry: {
+      kind: 'post_audit', ok: false, error, faults: lines, scopedPages: scope,
+      findingOutcomes: resolveFindingOutcomes(findings, pages, []),
+      changedPages: [], outOfScopePages: [], prompt, rawResponse: '',
+    },
+  });
+  if (scope.length === 0) {
+    log.error(`❌ [TEXT-POST-AUDIT] ${lines.length} TEXT fault(s) name no page this book has — nothing can be scoped, they go unanswered`);
+    return fail('no fault names a page of this book');
+  }
+
+  const model = opts.model || MODEL_DEFAULTS.textRefineModel;
+  if (!TEXT_MODELS[model]) {
+    log.error(`❌ [TEXT-POST-AUDIT] unknown model "${model}" — ${lines.length} TEXT fault(s) go unanswered`);
+    return fail(`unknown model "${model}"`);
+  }
+
+  // The WHOLE book goes into the prompt — a page cannot be judged for what the
+  // pages around it established if it is shown alone. What is scoped is the
+  // REWRITE, not the reading.
+  const findingsText = `${POST_AUDIT_SCOPE_NOTE}\n\n${lines.join('\n')}`;
+  const prompt = buildTextRefinePrompt(storyData, pages, findingsText, String(opts.arc || '').trim());
+  if (!prompt) {
+    log.error('❌ [TEXT-POST-AUDIT] text-refine template unavailable — the TEXT route goes unanswered');
+    return fail('text-refine template unavailable');
+  }
+
+  const t0 = Date.now();
+  try {
+    // null = the model's own limit (owner rule: no output caps).
+    const r = await callTextModelStreaming(prompt, null, null, model, { usageLabel: opts.usageLabel || 'text_refine_post_audit' });
+    if (r.truncation?.suspected) throw new Error(`reply ${describeTruncation(r.truncation)} — rewrites unusable`);
+    const parsed = parseRefinedText(r.text || '', pages.map(p => p.pageNumber));
+    const returnedPages = parsed.pages.map(p => p.pageNumber);
+    // SCOPE, ENFORCED. A page no finding names keeps the text it shipped with.
+    const outOfScopePages = returnedPages.filter(n => !scope.includes(n));
+    const byPage = new Map(parsed.pages.filter(p => scope.includes(p.pageNumber)).map(p => [p.pageNumber, stripTrailingSeparator(p.text)]));
+    const next = pages.map(p => ({ ...p, text: byPage.get(p.pageNumber) || p.text }));
+    const changedPages = next.filter((p, idx) => p.text !== pages[idx].text).map(p => p.pageNumber);
+    const findingOutcomes = resolveFindingOutcomes(findings, pages, changedPages, returnedPages);
+    for (const f of unresolvedFindings(findingOutcomes)) {
+      log.warn(`⚠️ [TEXT-POST-AUDIT] UNANSWERED p${f.pageNumber ?? '?'} — ${f.reason}: ${f.text}`);
+    }
+    if (outOfScopePages.length) {
+      log.warn(`⚠️ [TEXT-POST-AUDIT] the pass returned page(s) ${outOfScopePages.join(', ')} that no TEXT fault names — dropped, their pictures are final`);
+    }
+    const elapsedMs = Date.now() - t0;
+    log.info(`📖✍️  [TEXT-POST-AUDIT] ${model}: ${lines.length} TEXT fault(s) on page(s) ${scope.join(', ')} → rewrote page(s) ${changedPages.join(', ') || 'none'} in ${(elapsedMs / 1000).toFixed(0)}s`);
+    const beforeByPage = new Map(pages.map(p => [p.pageNumber, p.text]));
+    return {
+      pages: next,
+      entry: {
+        kind: 'post_audit',
+        ok: true,
+        modelKey: model,
+        modelId: r.modelId || TEXT_MODELS[model].modelId,
+        elapsedMs,
+        usage: { input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0 },
+        cost: r.usage?.direct_cost ?? calculateTextCost(r.modelId || TEXT_MODELS[model].modelId, r.usage || {}),
+        faults: lines,
+        scopedPages: scope,
+        returnedPages,
+        outOfScopePages,
+        changedPages,
+        findingOutcomes,
+        unresolvedCount: unresolvedFindings(findingOutcomes).length,
+        prompt,
+        rawResponse: String(r.text || '').slice(0, 40000),
+        analysis: (parsed.analysis || '').slice(0, 40000),
+        pages: next
+          .filter(p => changedPages.includes(p.pageNumber))
+          .map(p => ({ pageNumber: p.pageNumber, before: beforeByPage.get(p.pageNumber) || '', after: p.text })),
+      },
+    };
+  } catch (e) {
+    log.error(`❌ [TEXT-POST-AUDIT] failed (${e.message}) — ${lines.length} TEXT fault(s) ship unanswered`);
+    const f = fail(e.message, prompt);
+    f.entry.modelKey = model;
+    f.entry.elapsedMs = Date.now() - t0;
+    return f;
+  }
+}
+
 // ───────────────────────────────── THE CHAIN ──────────────────────────────────
 
 /**
@@ -1781,6 +1929,8 @@ function projectTextRefineReport(usable, beforeByPage = new Map()) {
 
 module.exports = {
   refineStoryText,
+  runPostAuditTextRound,
+  POST_AUDIT_SCOPE_NOTE,
   projectTextRefineReport,
   computePlanTextDrift,
   extractRefinablePages,

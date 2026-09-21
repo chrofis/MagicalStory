@@ -1094,6 +1094,60 @@ function sanitizeForGemini(text, level = 'light') {
 const isBlockedResponse = (responseData) => assessImageResponse(responseData).blocked;
 
 /**
+ * THE IDENTITY REFERENCE FOR A CHARACTER THE STORY INVENTED (owner, 2026-09-21:
+ * "Secondaries have a VB entry and are compared with that").
+ *
+ * A page's reference list is built from the uploaded roster's avatars and face
+ * photos, so a Visual Bible secondary — a character with a VB entry and a
+ * rendered reference-sheet cell but no `characters[]` row — reached the judge
+ * with no image at all. The judge could then only answer `unmatched` for the
+ * figure that is her, the presence derivation dropped the pair as
+ * `unclaimed_cast_has_no_reference`, and the defect had no owner.
+ * Measured on staging job_1789853503332_riqncqg1i p10/p15: VB CHR001 had a
+ * reference-sheet cell and the page eval attached ZERO references for it.
+ *
+ * The cell IS the reference such a character is drawn from, so it is what she
+ * is judged against. It is a DRAWING, not a photograph, and the attach loop
+ * labels it as one — an identity reference, never evidence about rendering
+ * medium.
+ *
+ * @param {string[]} castNames    the page's EXPECTED CAST names
+ * @param {Object|null} visualBible
+ * @param {Object|null} castIndex the resolver index already built for this page
+ * @param {Array} existing        references already composed, by name
+ * @returns {Array<{name:string, photoUrl:string, vbId:string, vbCell:true}>}
+ */
+function vbCellReferencesForCast({ castNames = [], visualBible = null, castIndex = null, existing = [] } = {}) {
+  if (!visualBible || !Array.isArray(castNames) || castNames.length === 0) return [];
+  const { canonicalName, resolveEntity } = getCastResolver();
+  const { hasElementReference, elementRefCell } = require('./visualBible');
+  const have = new Set(
+    (Array.isArray(existing) ? existing : [])
+      .map(r => canonicalName(String((typeof r === 'object' && r && r.name) || '')))
+      .filter(Boolean)
+  );
+  const out = [];
+  for (const raw of castNames) {
+    const name = String(raw || '').trim();
+    if (!name) continue;
+    const canon = canonicalName(name);
+    if (!canon || have.has(canon)) continue;
+    const hit = castIndex ? resolveEntity(name, castIndex) : null;
+    // Only a VB-authored secondary. A main-cast name resolves to the roster
+    // (kind 'cast') and already carries its avatar; an animal is judged by the
+    // non-human path, not by figure identity.
+    if (!hit || hit.kind !== 'secondary' || !hit.entry) continue;
+    if (!hasElementReference(hit.entry)) continue;
+    const { cell } = elementRefCell(hit.entry);
+    const photoUrl = cell?.referenceImageUrl || cell?.referenceImageData || null;
+    if (!photoUrl) continue;
+    have.add(canon);
+    out.push({ name: hit.name || name, photoUrl, vbId: String(hit.id || ''), vbCell: true });
+  }
+  return out;
+}
+
+/**
  * EXPECTED CAST — the roster the quality evaluator judges figure COUNT against
  * (owner, 2026-09-10). The judge used to receive only ORIGINAL_PROMPT prose and
  * reference photos: on the front cover of job_1788903616404_iqvhj4l8m it saw
@@ -1667,9 +1721,12 @@ function derivePresenceFinding({ figures, matches, cast, detectedFigureCount, de
   // (2026-09-13). `matches[]` is produced by comparing each figure to the
   // labelled `Reference: <name>` images attached to the critique — the page's
   // photo-backed cast. A Visual Bible secondary joins this roster from the
-  // brief and carries NO such image, so the only answer the evaluator can give
-  // for the figure that is her is `unmatched`, whether she was drawn right or
-  // wrong. Billing a CRITICAL on that is a false positive by construction:
+  // brief and used to carry NO such image, so the only answer the evaluator
+  // could give for the figure that is her was `unmatched`, whether she was
+  // drawn right or wrong. Since 2026-09-21 a secondary WITH a rendered
+  // reference-sheet cell is handed that cell (vbCellReferencesForCast), so she
+  // is reference-backed and her name IS claimable here; what remains below is
+  // the cast entry that reached the judge with no image of any kind. Billing a CRITICAL on that is a false positive by construction:
   // job_1789207854566_l43qgl34w p3 (one figure, roster [Frau Amrein], zero
   // references attached) and p4/p13 (roster [Fiona, Frau Amrein], Fiona
   // matched, the second figure unmatched because she is the secondary).
@@ -2030,6 +2087,25 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug(`👥 [EVAL] ${pageContext}: expected cast (${expectedCast.count}) ${expectedCast.names.join(', ')}`);
     }
 
+    // EVERY CAST MEMBER IS JUDGED AGAINST A REFERENCE. The roster-backed ones
+    // arrive as avatars/face photos from the caller; a Visual Bible secondary
+    // brings her own reference-sheet cell. One site, so every caller of this
+    // function — page eval, cover eval, the Lab stage, the regeneration routes
+    // — gets the same roster, and the presence derivation's identity branch
+    // has a reference-backed name to claim. See vbCellReferencesForCast.
+    {
+      const vbRefs = vbCellReferencesForCast({
+        castNames: expectedCast.names,
+        visualBible: evalOptions.visualBible || null,
+        castIndex: castIdx,
+        existing: referenceImages || [],
+      });
+      if (vbRefs.length > 0) {
+        referenceImages = [...(referenceImages || []), ...vbRefs];
+        log.info(`🧬 [EVAL] ${pageContext}: attaching ${vbRefs.length} visual-bible reference cell(s) as identity reference(s) — ${vbRefs.map(r => `${r.name}${r.vbId ? ` [${r.vbId}]` : ''}`).join(', ')}`);
+      }
+    }
+
     // Start semantic evaluation in parallel when we have a reference (page prose
     // or cover brief).
     if (!runFidelity && (evaluationType === 'scene' || isCover)) {
@@ -2318,6 +2394,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // Handle both formats: string URL or {name, photoUrl} object
         const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
         const charName = typeof refImg === 'object' ? refImg?.name : null;
+        const isVbCell = typeof refImg === 'object' && !!refImg?.vbCell;
         if (!photoUrl || typeof photoUrl !== 'string') { skippedCount++; continue; }
         try {
           // Cache key: hash of the source string (data URI payload or URL) — stable per ref
@@ -2345,7 +2422,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
           // Add label with character name so Gemini can identify by name (not just "Reference 1")
           if (charName) {
-            parts.push({ text: `Reference: ${charName}` });
+            // A VB cell is a DRAWING of the character, not a photograph of
+            // one. The judge is told which it is holding so it reads identity
+            // from face, hair and build and never files the rendering medium
+            // as a difference.
+            parts.push({ text: isVbCell
+              ? `Reference: ${charName}
+(drawn visual-bible reference cell, not a photo - judge identity by face, hair and build only)`
+              : `Reference: ${charName}` });
           }
           parts.push({
             inline_data: {
@@ -3362,6 +3446,7 @@ module.exports = {
   buildEvalClothingContract,
   buildEvalRequiredObjects,
   buildExpectedCastBlock,
+  vbCellReferencesForCast,
   resolveExpectedCastNames,
   reconcileDetectorCast,
   parseFixableIssues,
