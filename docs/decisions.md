@@ -51869,6 +51869,23 @@ first round whose prompt matches what `POST /generate-story-ideas-stream` sends.
 `tests/unit/idea-variant-instructions.test.ts`, `docs/prompt-inventory.md`,
 `tasks/story-idea-rounds-2026-09-20.md`.
 
+*Correction, 2026-09-21 — the promise slot ships in stage-direction voice.* 18 of the 20 round-8
+ideas address the reader in the promise sentence («Irgendwo in diesem Buch…», «Der Leser darf sehen,
+wie…», «Der Leser sieht», «In diesem Buch sieht man…», «Die Leserin darf sehen»). A back cover shows
+the scene; those announce that a scene exists. The cause is the examples, which override rules: both
+templates modelled the slot as «The reader gets to see her walk in among those trees» and «Somewhere
+in this book she stands at the mouth of a burrow». Fixed in both templates of the
+`story-idea-templates` sibling set: the slot is now defined as an event the book contains, written in
+the story's voice, never addressing or naming the reader, the book, the page or the picture; check 11
+(single) / check 12 (multi) now also quotes any reader-address words and cuts them; and the promise
+sentences of all three examples were rewritten to the new voice («The chest comes up out of the
+sea.», «She walks in among those trees with the bird on her shoulder.», «She stands at the mouth of a
+burrow that is not hers.»). Re-run of cells 2, 7 and 8 only (`round-8b.json` / `.md`, USD 0.2858, six
+ideas): **0 reader-address markers**, against 18/20 before. The `Rollen:` block that opens the
+historical arm comes from `prompts/story-idea-requirements-historical-1.txt` and is unchanged; the
+wizard renders the idea text verbatim (`WizardStep6Summary.tsx`, `TrialIdeasStep.tsx`) and does not
+strip it, so it is visible to the reader on historical cells.
+
 ---
 
 ## 2026-09-21 — The figure detector is MASTER for identity; the witnesses may only deadlock it; an independent ARBITER resolves the deadlock
