@@ -51789,3 +51789,289 @@ cell 7 is now the only duplicated pair; the Apollo lander is a six-of-seven-roun
 check 7 never reads the closing cost sentence, where R7's other peril miss lives.
 Ratings: `tests/manual/story-idea-rounds/round-6-ratings.md`, `round-7-ratings.md`.
 Commits: `34ab9a230` (R6), `3b53ba824` (R7).
+
+**Correction (2026-09-21): the self-talk clause is reverted.** The "and name what you cut" half of
+the R7 length check is removed from both `generate-story-idea-single.txt` (check 11) and
+`generate-story-ideas.txt` (check 12); the sentence and longest-word counting stays. Naming the cut
+moved the cutting out of [REVIEW] and into the answer, which is how both cell-6 arms shipped
+revision talk inside [FINAL]. Both templates also gain one format rule — [FINAL] holds the idea
+text only: no notes, no headings, no second version, no commentary — so the failure shape is named
+where the contract is stated, not only removed where it was caused. Re-ran cell 6 alone (round 7b,
+USD 0.0798, `round-7b.json` / `.md`): both arms are clean idea text, no heading, no second version,
+no English inside the German, the hook material intact (a dinosaur bone at the Teufelskeller; a
+picture book between a Triceratops's feet) and both at five sentences.
+
+---
+
+## 2026-09-21 — The figure detector is MASTER for identity; the witnesses may only deadlock it; an independent ARBITER resolves the deadlock
+
+**Context.** Three parties name the figures on a page. The GroundingDINO/SAM detector names each
+person box from full-body masks plus per-figure identity lines (the Set-of-Mark pass). The quality
+evaluator names each figure it matches to a reference photo. Since 2026-09-18 a second Set-of-Mark
+witness is asked on the pages where those two disagree and the detector is about to overwrite the
+evaluator; where that witness backs the evaluator, the rewrite is withheld ("the veto").
+
+The veto left the page in a contradictory state. It stopped the EVALUATION being relabelled and did
+nothing else, so the detector's `figures[]` kept the names, and every consumer that reads a FIGURE
+rather than a MATCH went on believing them. The entity-consistency check is the worst of these: it
+runs in `Promise.all` alongside the evaluation (`repairPipeline.js`), crops figure N and judges it
+against the clothing contract of whoever the detector named. Measured on staging
+`job_1789853503332_riqncqg1i` p14 — two boys wearing each other's outfits; the image was downloaded
+and read against `clothingRequirements`, and the detector's own `seedTrace` independently agrees (the
+figure it called Julian found no yellow garment, the one it called Levin found no red one). Evaluator
+and witness both said swapped, the veto fired, nothing was renamed: 7 MAJOR entity findings that are
+nothing but the swap restated, quality 95 shipped as 55, and a character fix routed at the wrong
+figure which the face gate refused.
+
+An audit of every stored story carrying `identityAgreement` framed the decision. Staging: 588
+evaluated pages/covers across 41 stories, 33 with a detector-vs-evaluator conflict (5.6%), and the
+witness has been asked exactly ONCE — that one page, which vetoed. Production: 86 evaluated pages,
+1 conflict (1.2%), witness never asked. Version-level records do not exist
+(`imageVersions[].identityAgreement` is 0 of 1,253 staging and 0 of 225 prod); the report is only
+persisted at scene and cover level. Six conflict pages were pulled and judged on the pixels against
+their clothing contracts: the detector was right on 4, clearly wrong on 1 (the veto page), and
+partly wrong on 1 (`job_1789681157795_wkt20ckod` p12, where its boxes themselves are muddled) —
+consistent with Lab set 66 (detector 5, evaluator 1).
+
+**Decision.** The detector is master for identity. Nothing the evaluator or the second witness says
+may rename one of its figures.
+
+1. A veto is a DEADLOCK, not a verdict. `reconcileIdentityWithSecondWitness` renames nothing on the
+   detection and sends the page to an independent ARBITER (`identityAgreement.arbitrateVeto` →
+   `figureDetection.arbitrateIdentity`).
+2. The arbiter is a different vendor from every voter. The voters are Google twice (the detector's
+   SoM pass, the Gemini quality evaluator) and Qwen once (`qwen-vl-full`). The model is a named
+   config key, `MODEL_DEFAULTS.identityArbiter` (env `IDENTITY_ARBITER_MODEL`), currently
+   `gpt-5.6-sol` — never a hardcoded id at the call site.
+3. It is asked a DIFFERENT question from the one the other two answered. It gets the whole page, a
+   tight padded crop of each contested figure, and the candidate names' clothing contract plus
+   reference faces — and is told nothing about who claimed what, so it cannot side with a witness it
+   was never shown. Clothing first, face only to break a tie, position ignored.
+4. Its ruling decides, and nothing else does. Backs the detector → nothing changes and the entity
+   findings stand. Backs the witnesses → the figures are renamed BY THE ARBITER (`detectorName` and
+   `identityCorrectedBy: "arbiter:<model>"` on each figure), and the entity findings those labels
+   produced are voided as "not judged" before the report is stamped, before the entity penalty is
+   charged and before any repair is routed. No arbiter wired, no answer, a third name, or a ruling
+   that would duplicate a name → nothing changes.
+5. The outcome is stored as data on the version at `identityAgreement.identityArbiter`
+   (`asked/answered/model/verdict/rulings/decisions/renamed/usage`), and the call is billed under its
+   own `byFunction` key `identity_arbiter`, never folded into `page_quality`.
+
+**Rationale.** The measured prior favours the detector but does not make it safe to treat as final:
+on the one page where both other parties dissented it was wrong, and acting on that dissent without
+a tie-break would have let the weaker witnesses overwrite the master on the strength of a vote drawn
+from the detector's own question. The entity verdicts are VOIDED rather than re-attributed because
+they are not invertible — the grid is gone and re-judging the crops costs a paid call — so "we
+judged the wrong child" is recorded as *not judged*, never as a clean pass. Every failure mode
+resolves to the detector by construction: master-by-default means a missing or broken arbiter is not
+a licence for the witnesses to win. The trigger is 1 page in 588 on staging and 0 in 86 on
+production, so the cost is negligible; it also means the arbiter cannot be validated by volume, and
+its model has NOT been baked off against grok-4.6 / kimi-k2.6 / qwen3-vl-32b.
+
+**Supersedes** nothing on `docs/SETTLED.md`. The 2026-09-18 rule — "the second witness may only ever
+WITHHOLD, never cause a rename" — is unchanged and now strictly stronger: the witness still cannot
+rename anything, on either side of the page.
+
+**Touched:** `server/config/models.js` (`MODEL_DEFAULTS.identityArbiter`),
+`server/lib/figureDetection.js` (`arbitrateIdentity`, `parseArbiterAnswer`),
+`server/lib/identityAgreement.js` (`arbitrateVeto`, `applyArbiterNamesToDetection`,
+`voidEntityIssuesContestedByWitness`), `server/lib/images.js` (arbiter closure at the reconcile call
+site), `server/lib/repairPipeline.js` (void call after the eval/entity `Promise.all`; the
+`identity_arbiter` usage key), `tests/unit/identity-second-witness.test.ts`.
+Siblings ruled out: `server/routes/regeneration.js` and `server/lib/entityConsistency.js` read the
+PERSISTED `bboxDetection.figures`, which already carry any arbiter rename (it happens in `images.js`
+before the detection is stored), and they run sequentially over stored data — there is no parallel
+window for them to race. The four `expectedCharacters` builders are untouched: the arbiter is asked
+from the stored figures and the evaluator's reference photos, not from a cast assembly.
+
+**Status:** ✅ active
+
+---
+
+## 2026-09-21 — The text-refine stage owns its criteria; it no longer slices the outline reviewer's checklist (A7)
+
+**Context.** `buildTextRefinePrompt` filled `{ANALYSIS_INSTRUCTIONS}` from a slice of
+`prompts/outline-analysis-imagefirst.txt` (`sliceAnalysisAspect`, aspect `text`,
+`includeTail: false`). That body is written for the OUTLINE REVIEWER, a stage with
+different inputs and a different answer, so on every beats run the refiner was told to:
+read `---STORY DRAFT---` and `---SCENE PAGES---` blocks it is never sent (the sections it
+gets are `# CURRENT TEXT` and `# SCENE OUTLINES`); emit `FIXES REQUIRED` entries and
+`SCENE/METADATA` fix lines it cannot return; check a `characters[]` / `background` JSON
+it never receives; and answer "A, B, C and E" while D was in the slice. The mandate
+contradicted itself on top of that — "rewrite only pages with findings, not for stylistic
+preference" against "if your section verdict is all fine you didn't probe hard enough" —
+and a blanket "rewrite any page where several short sentences run in a row" sat over a
+1st-grade book whose own reading level asks for exactly that ("keep sentences short, one
+idea each"). Measured on `job_1789853503332_riqncqg1i`: 17 of 18 pages rewritten, 7 of
+them with no finding against them; `storyJobPipeline.js` records 97% across 12 stories.
+
+**Decision.**
+1. The criteria are written for THIS stage, in `prompts/text-refine.txt`. The slice is
+   gone, and with it the `includeTail` option, whose only caller this was.
+2. The rewritable set is the pages `AUDIT FINDINGS` names, plus four stated exceptions
+   (a MISMATCH move's destination, the earliest page that can state what must happen,
+   a page carrying an abbreviation, a page carrying a banned dash). A check that finds
+   something on an unnamed page is REPORTED, not acted on. "A clean analysis section is a
+   real answer" replaces the probe-harder instruction.
+3. The sentence-rhythm trigger is deleted. `standard` and `advanced` already carry
+   "Never string several short sentences in a row" in their own `LANGUAGE_LEVELS.pacing`,
+   which the refiner receives through `READING_LEVEL`; `1st-grade` carries the opposite.
+   One source, the reading level.
+4. The per-character section enumerates the cast the PAGES carry, not the commissioned
+   roster: `refineCast()` adds `visualBible.secondaryCharacters`. On the story above that
+   is the difference between probing 4 characters and probing the 5 the book has — the
+   fifth being an invented figure on 9 pages. The live pipeline now passes the bible into
+   `startBackgroundRefine` (the Lab's call sites already pass a stored story, which has it).
+
+**Rationale.** Sharing the reviewer's body was meant to stop the refiner and the reviewer
+judging text by different standards. What it produced instead was a stage judging text by
+instructions for another document — the coupling could not be kept, because the two stages
+do not share an output contract. The real drift risk (a prose rule an auditor deducts for
+that the rewriter never got) is now covered where it belongs, by a sibling-registry set:
+`text-refine-vs-text-critics`, generator `text-refine.txt` against the three text critics.
+
+**Validated:** replayed `buildTextRefinePrompt` over the stored inputs of
+`job_1789853503332_riqncqg1i` and diffed the built prompt against the SENT one — all eight
+dead references gone, the invented secondary present in the cast line and the details block,
+no unfilled placeholder. The behaviour effect (how many pages a run rewrites) needs a paid
+story and has NOT been measured.
+
+**Touched:** `prompts/text-refine.txt`, `server/lib/promptBuilders.js`
+(`buildTextRefinePrompt`, new `refineCast`, `sliceAnalysisAspect` loses `includeTail`),
+`server/services/prompts.js` (comment), `storyJobPipeline.js` (bible into the refine),
+`scripts/admin/sibling-registry.json`, `tests/unit/text-refine-own-criteria.test.ts`,
+`tests/manual/promptOwnedSources.test.js`.
+**Status:** ✅ active
+
+---
+
+## 2026-09-21 — Plan lines stay pre-refine by design; the disagreement they can leave is MEASURED, never re-planned (A15)
+
+**Context.** The refiner is handed the locked `PLAN_LINES` as what a page's prose may not
+contradict, and nothing re-derives them afterwards. On
+`job_1789853503332_riqncqg1i` the shipped `---BEATS---` line for p3 still described two
+characters as friends after the refine had rewritten them into strangers.
+
+**Decision.** The plan is NOT re-derived and no re-plan call is added: the page's picture
+was already drawn from that line, so a plan line that changed after the pictures exist
+would describe a book that does not exist. `computePlanTextDrift` (`server/lib/textRefine.js`)
+measures the disagreement for free instead — the who-in-frame column of each plan line is
+re-counted with the same `whoColumn` / `namesIn` the plan counters use, and a page is
+reported only where the plan stages a name, the pre-refine text carried it, and the refined
+text does not. It is stored as `textRefineReport.planTextDrift` and logged as a warning.
+It fires no repair.
+
+**Rationale.** Three consumers read plan lines after the refine, and all three want the
+PRE-refine line: `iterateBeat` / `images.js` stage the picture's cast from it, and the Lab
+replay harnesses rebuild the prompts a run actually sent. The mid-loop book audit reads the
+FINAL text (`buildAuditPages`), not the plan. So there is nothing to correct — only
+something to record. The p3 instance itself (a relationship word, "friends", contradicted by
+prose) is deliberately NOT detected: recognising that in code means pattern-matching finding
+prose, which the eval-logic rule forbids, and a model check would be a paid call on the happy
+path. Cast drift is the part that can be counted, so it is the part that is counted.
+
+**Touched:** `server/lib/textRefine.js` (`computePlanTextDrift`, projection field),
+`tests/unit/text-refine-own-criteria.test.ts`.
+**Status:** ✅ active
+
+---
+
+## 2026-09-21 — The REAL LANDMARKS block is one constant with three consumers: arc create, panel and re-tell (A14)
+
+**Context.** `buildArcCreatePrompt` filled `{AVAILABLE_LANDMARKS_SECTION}`; the panel and
+the re-tell prompts had no such placeholder and were never given the list. The re-tell is
+nevertheless instructed to keep landmarks inside the commission's world, and on
+`job_1789853503332_riqncqg1i` it introduced a real place that was never offered. The panel,
+the only INDEPENDENT reader of the arc, could not catch it: it had not seen the list either.
+
+**Decision.** `buildAvailableLandmarksSection(...)` — including the photo-vantage rule —
+is passed to all three builders, and both templates declare the placeholder. The panel's
+turn-by-turn probe list gains a LANDMARK question so the critic can measure the arc against
+the same list the generator was given.
+
+**Rationale.** A rule a critic enforces must be a rule the generator was given, and a
+constraint the re-teller is told to honour must be one it can read. `fillTemplate` drops
+undeclared keys silently, so the placeholder and the builder key ship together or the block
+is invisible.
+
+**Validated:** replayed all three builders — the landmark, the photo-vantage rule and no
+unfilled placeholder in each; negative control with no landmarks leaves all three clean.
+`tests/unit/arc-landmark-three-consumers.test.ts`.
+
+**Touched:** `prompts/arc-panel.txt`, `prompts/arc-retell.txt`,
+`server/lib/promptBuilders.js` (`buildArcPanelPrompt`, `buildArcRetellPrompt`),
+`tests/unit/arc-landmark-three-consumers.test.ts`.
+**Status:** ✅ active
+
+## 2026-09-21 — A further re-plan round is bought only after a converging one; an unknown text-model override throws; OpenRouter usage records what was billed
+
+**Context:** A review of staging `job_1789853503332_riqncqg1i` found three
+accounting/spend faults in the beats and text-model paths.
+
+**Decision 1 — the re-plan loop stops unless the previous round converged.**
+`server/lib/beatsPipeline.js` now asks `replanRoundConverged(pendingCheck, check2)`
+before buying another round. A round converged when its recheck's cast/focal
+must-fix findings are a STRICT SUBSET of the ones the check before it raised:
+strictly fewer, and not one of them new. The predicate lives in
+`promptBuilders.js` beside `replanRank()` and `countsTowardConvergence()`, so the
+three questions ("must the round answer this?", "did the round earn its keep?",
+"is another round worth buying?") stay separate and none is hand-copied.
+
+*Rationale / measured:* the planner re-emits the whole division each round
+(~29.5k chars of planner prompt + ~9.3k of RE-DIVIDE section, ~$0.09 and ~160s
+with its recheck). On the reviewed job, round 2 rewrote 17 of 18 pages, was
+discarded by the monotonic rule, and `plan_recheck_r2` changed nothing that
+shipped. Replayed over stored staging `beatsReviewReport` rows — 28 books with a
+recheck in 45 days, rung 1, zero paid calls: 6 rechecks are a strict subset (a
+round is still bought), 22 are not, 10 of those because the recheck minted a
+cast/focal must-fix the check never raised. Exactly 2 books ran a round 2 in
+that window, this gate skips both, and **both were discarded after running** —
+no kept round 2 exists in the window. The reserved `&& round > 1` clause (see
+the 2026-09-20 convergence-class entry, "the owner should decide it separately")
+is untouched; this is a different lever and does not make round 1 discardable.
+Model-behaviour effect is unvalidated without a paid run.
+
+*Not done, owner's call:* making a further round a DELTA prompt. Measured on the
+stored round data, a re-plan prompt is ~38.9k chars, of which ~29.5k (76%) is the
+first-plan planner body re-sent verbatim; `buildReplanSection` already tells the
+round to return only the pages it changes. Dropping the planner body would save
+~7.4k input tokens a round but takes the story and the division rules away from
+the model that is re-dividing them — a prompt-shape change to a heavily tuned
+builder that no free rung can validate.
+
+**Decision 2 — an unknown text-model override throws.** `callTextModel` /
+`callTextModelStreaming` took a TEXT_MODELS *key*; `if (modelOverride &&
+TEXT_MODELS[modelOverride])` meant an unrecognised value silently left the call
+on the globally active model. `storyJobPipeline.js` passed the provider id
+`'claude-haiku-4-5-20251001'` for `scene_translation`, which therefore ran on
+Sonnet at $0.041 against the comment's "~$0.001". The key is corrected and the
+lookup now throws (NO FALLBACKS). Every other literal override key in the repo
+was swept and resolves.
+
+**Decision 3 — OpenRouter usage records the billed breakdown.** The streaming
+OpenRouter path kept only `prompt_tokens` / `completion_tokens`, which are
+OpenAI semantics: reasoning is already inside completion_tokens and cached input
+inside prompt_tokens. `plan_check` therefore read 19,159 output tokens for a
+5.2k-char reply and 30,742 input for a 13.7k-char prompt with no field able to
+say why. It now also captures `completion_tokens_details.reasoning_tokens`,
+`prompt_tokens_details.cached_tokens`, `total_tokens` and the raw usage object,
+logs them, and WARNs with the raw usage whenever the billed prompt exceeds half
+the sent characters in tokens. They are recorded as `reasoning_tokens` /
+`cached_input_tokens`, **never** as `thinking_tokens` — `calculateTextCost` adds
+thinking on top of output, so writing them there would double-charge a number
+that was already billed once.
+
+*Still open:* the cause of the 30,742 figure is not determinable from stored
+data. The recorded `direct_cost` is OpenRouter's own charge and is consistent
+with those token counts at the model's published price (~$0.20/$1.20 per 1M,
+fitted $0.158/$1.249 across the four stored OpenRouter calls), so the counts are
+what was billed — but nothing stored says whether the excess is cached tokens, a
+reasoning re-submission or multiple upstream generations. The logging above
+answers it on the next staging run at zero cost.
+
+**Touched:** `server/lib/beatsPipeline.js`, `server/lib/promptBuilders.js`
+(`replanRoundConverged`, `replanFindingKey`, exports),
+`server/lib/storyHelpers.js` (facade), `server/lib/textModels.js`,
+`storyJobPipeline.js` (`scene_translation` key, both `addUsage` definitions),
+`tests/unit/replan-round-convergence-gate.test.ts`,
+`tests/unit/text-model-override-key.test.ts`.

@@ -72,6 +72,7 @@ RULES:
 - Three to five sentences, whatever the page count. A longer text turns into a plot summary.
 - No sentence runs past about 30 words. A sentence that needs a dash to hold two clauses together is two sentences.
 - The last sentence states what failing costs. Nothing comes after it.
+- [FINAL] holds the idea text only: no notes, no headings, no second version, no commentary.
 - Nothing in the story or its pictures is dangerous enough that it could lead to death — for anyone. Frightening is the right level. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 - Be specific about locations and time periods.
 - The outline should focus on the main characters
@@ -124,7 +125,7 @@ Check and critique:
 8. **Topic**: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
 9. **Hook**: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to [FINAL]. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them.
 10. **The child acts**: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in [FINAL]. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have.
-11. **Length**: count the sentences of [FINAL] and the words of the longest one. Past five sentences, or past 30 words, split or cut before [FINAL] and name what you cut.
+11. **Length**: count the sentences of [FINAL] and the words of the longest one. Past five sentences, or past 30 words, split or cut before [FINAL].
 
 List your 5 improvements (be specific):
 1. [improvement]
