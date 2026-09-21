@@ -54426,3 +54426,78 @@ not change anything (a text carrier usually has no `states[]`, which is all the 
 `prompts/scene-review.txt`, `tests/unit/required-text.test.ts`
 **Status:** ✅ active — authoring-side compliance is unproven offline; it needs a paid Lab
 run or a story to observe, and none was spent.
+
+## 2026-09-21 — Declared gaze is checked by COMPARING two witnesses, not by asking the sighted judge again
+
+**Context:** The owner reported p6 of the dragon run (`job_1789853503332_riqncqg1i`)
+by eye: four boys declared looking at an egg on the ground, all four drawn looking
+at each other. The quality judge scored that page 85 with zero findings. Adding a
+judging rule did not help — the same rule was inert at 40 rules AND at 1 (Lab
+experiments 1368-1372, five densities, five pages, zero gaze findings at every
+density), so rule crowding was not the cause.
+
+The cause is structural. The quality evaluator receives the brief and the picture
+in ONE call, so its observation cannot contradict the declaration. Given a `gaze`
+field to fill (Lab 1373) it answered "down at the large warm egg" for all four
+figures of p6 — including the two it had itself recorded as `view: back`, whose
+eyes are not in the frame. It was reading the brief back. There was never an
+independent observation to compare against: the figure schema records `view`
+(body facing) and `action` (a terse verb), and nothing recorded where eyes point.
+
+**Decision:** No new judge, no new rule, no new model call. A code comparison
+between two things already computed on every page:
+
+- the CLAIM — `characters[].looksAt` from the brief;
+- the WITNESS — the prompt-blind inventory's `interactions[].observed`/`to` and
+  `figures[].facing`, produced by a call that never sees the brief and is
+  therefore *capable* of disagreeing with it.
+
+`server/lib/gazeCheck.js` emits `action_interaction` / MAJOR only on a confident
+contradiction. It runs on SCENES ONLY — on a cover the gaze is code-owned and
+always at the viewer (`docs/SETTLED.md`).
+
+Joining the two sides is the hard part, and it does not get a second
+implementation: the blind inventory's figure IDs are meaningless outside the list
+that issued them (P1 has been recorded seeing five figures on a page the
+evaluator parsed as three), and the blind side carries no names at all. Both
+sides do emit `body_bbox` on the same contract, so the two are paired on
+POSITION, by `pairInventoryFiguresToNames` — the same one-to-one Hungarian
+assignment and the same 0.15 gate that already pairs the evaluator with the
+detector. Only the name bonus is inert, because only one side has names.
+
+Under-reporting is the chosen error. Every uncertainty is a skip: no observation,
+no pairing, eyes turned from the camera, an unresolvable Visual Bible id, or eyes
+that landed on a person who is HOLDING something (a gaze declared at an object and
+observed on its carrier is two true descriptions of one picture, not a defect).
+A false finding buys a paid repair, and a repair acting on a false finding damages
+a correct page.
+
+**Rationale:** Validated on three real pages, through BOTH describers, at rung 2
+of the validation ladder (~$0.01 of Lab calls):
+
+| page | declared | observed | findings |
+|------|----------|----------|----------|
+| p2 | both boys on the egg | the egg-holder's eyes meet the camera | 1 — Levin |
+| p5 | mutual, boy to boy | mutual, boy to boy | 0 — the witnesses agree |
+| p6 | all four on the egg | two pairs looking at each other | 4 |
+
+Lab 1376 ran `gemini-2.5-flash`; Lab 1377 ran `qwen3-vl`, which is what production
+actually runs (`runtime.js` `inventoryModel`, every environment since 2026-09-19).
+The two models share no figure vocabulary ("the child in red" vs "the young boy in
+red") and not even a box scale (qwen returns mixed 0-1 / 0-1000, normalised by
+`inventoryBoxes.js`), and they produce the SAME three verdicts and the same
+figure→name pairing. That is the evidence the join is geometric rather than
+lexical — nothing in the check reads a label except to print it.
+
+The generator was already told this rule (`LOOKS_AT_FIELD_RULE`: "There is no
+value for the viewer: a figure never meets the reader's eye"), so no
+generator-vs-critic pair is opened. `action_interaction` is an existing scored
+type and is inpaintable, so these findings route to repair — and Grok inpaint
+handles gaze (`docs/SETTLED.md`).
+
+**Touched:** `server/lib/gazeCheck.js` (new), `server/lib/identityAgreement.js`
+(`pairInventoryFiguresToNames`), `server/lib/compositeCastBuilder.js`
+(`resolveLooksAt` exported — one resolver, two callers),
+`server/lib/evalPipeline.js` (wiring + `sceneMeta` hoist),
+`tests/unit/gaze-check.test.ts` (27), fixture from Lab 1376 + 1377.
+**Status:** ✅ active

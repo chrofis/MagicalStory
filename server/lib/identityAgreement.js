@@ -321,6 +321,67 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
   };
 }
 
+/**
+ * Which NAME is the prompt-blind inventory's figure N?
+ *
+ * The blind inventory (eval stage 1) never names anybody — it is prompt-blind by
+ * design, so it has no cast, no clothing contract and no declared positions, and
+ * it describes each figure only as "the young boy in red". The evaluator does
+ * name them. Anything that wants to hold a blind OBSERVATION against a declared
+ * claim about a named character needs the two sides joined.
+ *
+ * The figure NUMBERS cannot do it: ids are only meaningful inside the list that
+ * issued them, and the two producers number differently — P1 has been recorded
+ * seeing five figures on a page whose evaluator parse saw three. Position can:
+ * both sides emit `body_bbox` on the same `[x1,y1,x2,y2]` 0-1 contract, and the
+ * measured spread between them for the SAME person is a median centre distance
+ * of 0.05 of the frame (inventoryBoxes.js, Lab 1053) — the same order as the
+ * evaluator-vs-detector agreement this module already gates at 0.15.
+ *
+ * So it is the pairing above, unchanged: same distance, same one-to-one
+ * assignment, same gate. The name bonus cannot apply, because only one side has
+ * names; each inventory figure gets a `canon` nothing can equal.
+ *
+ * @param {Array} evalMatches       evaluator `matches[]` — { reference, body_bbox }
+ * @param {Array} inventoryFigures  blind inventory `figures[]` — { label, body_bbox }
+ * @param {Object} [opts] maxCentreDistance, as above
+ * @returns {Map<string,string>} lower-cased figure label -> character name.
+ *   A figure the assignment left unpaired is simply absent: the caller must
+ *   treat a missing entry as "unknown", never as a guess.
+ */
+function pairInventoryFiguresToNames(evalMatches, inventoryFigures, opts = {}) {
+  const { maxCentreDistance = 0.15 } = opts;
+  const { canonicalName } = require('./castResolver');
+
+  const evs = (evalMatches || [])
+    .filter(m => m && m.reference && (evalCentre(m.body_bbox) || evalCentre(m.face_bbox)))
+    .map(m => ({
+      name: String(m.reference),
+      canon: canonicalName(m.reference),
+      body: evalCentre(m.body_bbox),
+      head: evalCentre(m.face_bbox) || evalHead(m.body_bbox),
+      on: m.body_bbox ? 'body' : 'face',
+    }));
+  // Both lists speak the evaluator's box contract, so the SAME centre helpers
+  // read both — never the detector's transposed one.
+  const figs = (inventoryFigures || [])
+    .filter(f => f && f.label && (evalCentre(f.body_bbox) || evalCentre(f.face_bbox)))
+    .map((f, i) => ({
+      label: String(f.label),
+      canon: `\u0000inv${i}`,          // unique: the name bonus can never fire here
+      body: evalCentre(f.body_bbox),
+      head: evalCentre(f.face_bbox) || evalHead(f.body_bbox),
+    }));
+
+  const out = new Map();
+  if (!evs.length || !figs.length) return out;
+
+  for (const { ev, det } of assignFigures(evs, figs, maxCentreDistance)) {
+    if (det) out.set(det.label.trim().toLowerCase(), ev.name);
+  }
+  return out;
+}
+
 /** One-line summary for the run log. */
 function describeIdentityAgreement(report, pageLabel = '') {
   if (!report) return null;
@@ -860,6 +921,7 @@ async function arbitrateVeto(report, detFigures, contested, opts = {}) {
 
 module.exports = {
   checkIdentityAgreement, describeIdentityAgreement, reconcileIdentity,
+  pairInventoryFiguresToNames,
   reconcileIdentityWithSecondWitness,
   applyArbiterNamesToDetection, arbitrateVeto, voidEntityIssuesContestedByWitness,
   // Exported for the unit tests: the assignment is the whole of the pairing

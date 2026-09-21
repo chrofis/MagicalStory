@@ -647,4 +647,7 @@ async function buildCoverCompositeCast(characters, coverHint, storyData, deps = 
   return buildCompositeCast(fakePageData, fakeInputData, deps);
 }
 
-module.exports = { buildCompositeCast, resolveStyledSheetSlot, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds, unreferencedSecondaryCreatures };
+module.exports = { buildCompositeCast, resolveStyledSheetSlot, buildCoverCompositeCast, splitCastByStratum, secondaryCastSeeds, unreferencedSecondaryCreatures,
+  // The one place a `looksAt` turns into a name. Also read by the
+  // declared-vs-observed gaze comparison, which must not print a raw id.
+  resolveLooksAt };

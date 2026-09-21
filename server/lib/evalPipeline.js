@@ -2366,9 +2366,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Same shared builder as the compliance stage — `i.object` is a raw VB id.
     let interactionsBlock = '(none declared)';
     let sceneIntentBlock = '(none declared)';
+    // Hoisted: the declared-gaze comparison below reads the same brief,
+    // and re-parsing it would be a second chance to disagree with this one.
+    let declaredSceneMeta = null;
     try {
       const interactionSource = sceneHint || originalPrompt;
       const sceneMeta = getStoryHelpers().extractSceneMetadata(interactionSource);
+      declaredSceneMeta = sceneMeta;
       const interactions = sceneMeta?.interactions
         || (Array.isArray(sceneMeta?.fullData?.interactions) ? sceneMeta.fullData.interactions : null);
       interactionsBlock = require('./vbIdGuard')
@@ -3134,6 +3138,41 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             // to break, and an honest figure list still beats none.
             if (p1Result.figures?.length && matches.length === 0) figures = p1Result.figures;
             p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
+
+            // DECLARED GAZE vs OBSERVED GAZE. The one thing P1 can settle
+            // that the evaluator structurally cannot: it saw the picture
+            // WITHOUT the brief, so its answer is capable of contradicting
+            // the brief. The evaluator's cannot — asked for a per-figure
+            // gaze on p6 of job_1789853503332_riqncqg1i it echoed the
+            // declaration for all four children, two of whom it had itself
+            // recorded as seen from behind. See gazeCheck.js.
+            //
+            // Only the two lists cross here; P1's figure ids still never
+            // touch the evaluator's, exactly as above. The two sides are
+            // joined on WHERE each figure stands, by the same one-to-one
+            // assignment that pairs the evaluator with the detector.
+            // SCENES ONLY. On a cover the gaze is code-owned and always at the
+            // viewer (docs/SETTLED.md; `gazes at:` is banned from cover hints), so
+            // eyes meeting the camera there is the contract being kept, not broken.
+            // A cover brief carries no `looksAt` today and the check would find
+            // nothing to compare — but that is the hint's shape, not a rule, and
+            // the rule is what this branch has to obey.
+            try {
+              const gaze = evaluationType !== 'scene' ? [] : require('./gazeCheck').checkDeclaredGaze({
+                declared: require('./vbIdGuard').gazeCharacters(declaredSceneMeta),
+                inventory: p1Result,
+                matches,
+                castNames: expectedCast.names,
+                resolveTarget: (t) => require('./compositeCastBuilder')
+                  .resolveLooksAt(t, evalOptions.visualBible || null),
+              });
+              for (const f of gaze) {
+                fixableIssues.push(f);
+                log.info(`👁️ [GAZE] ${pageContext || 'page'}: ${f.description}`);
+              }
+            } catch (e) {
+              log.warn(`⚠️ [GAZE] ${pageContext || 'page'}: comparison failed — ${e.message}`);
+            }
           }
         } catch (e) {
           log.warn(`⚠️ [QUALITY P1] Figure check failed: ${e.message}`);
