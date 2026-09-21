@@ -79,7 +79,8 @@ RULES:
 - A character is in the idea through what they want or what they are answerable for, never through a list of who came along.
 - The youngest main character does something in the idea, and whoever is responsible for them is named.
 - The want is the main character's own want, stated as theirs, and they are the one who sets out after it. An errand an adult handed them is not their want. For a main character aged two or under the want is something to reach, follow, touch, hold or get to, never an object to fetch back and never an arrangement to sort out.
-- One thing in the idea is out of the ordinary and can be pointed at in a picture: a thing, a creature, a place or an event, named with a plain noun. It stands in the first or second sentence and belongs to the setup or to the obstacle, never to what decides the outcome.
+- One thing in the idea is out of the ordinary and can be pointed at in a picture: a thing, a creature, a place or an event, named with a plain noun. It stands in the first or second sentence and belongs to the setup or to the obstacle, never to what decides the outcome. It is named and never explained: not what it does, not what it opens, not who it obeys, not why it is as it is.
+- The want is one a child would have for themselves: something to reach, to keep, to get into, to be first at, to give to someone, or to be allowed. A submission, a measurement, a permit, a set of numbers, or a repair an adult is paid to do is not one.
 - Follow the SCENE COMPLEXITY guide above - match story complexity to the number of scenes
 
 EXAMPLES of good story ideas:
@@ -121,8 +122,9 @@ Check and critique:
 6. **Back cover, not synopsis**: number the sentences of [FINAL]. For each one after the first, write "setup", "event", or "rule". A "rule" is any sentence that says what only happens if, what opens only when, what resets, or what someone will not do — the condition a reader would use to work out the ending. Every sentence marked "event" other than the last is cut, and every sentence marked "rule" is cut. The last sentence states what failing costs: that is not a rule, and it is kept. List every cut sentence, not one of them.
 7. **Peril**: name the youngest character and their age, then quote the words that put them at a height, in deep or rising water, in the dark underground, or in a vehicle with a supply running out. Replace that place in [FINAL]. A historical event keeps the danger it really had: tell it at a child's level, never remove it.
 8. **Topic**: quote the words where the topic is what stands in the way. If the idea reads the same with the topic removed, rewrite it.
-9. **Hook**: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to [FINAL]. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle.
-10. **The child acts**: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in [FINAL]. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to.
+9. **Hook**: quote the noun that names the one thing out of the ordinary, and say which sentence it stands in. If there is nothing to quote, add one to [FINAL]. If the quoted thing is what decides the outcome, replace it with one that belongs to the setup or to the obstacle. Then quote any words that say what it does, what it opens, who it obeys, or why it is as it is, and cut them.
+10. **The child acts**: quote the words where the main character wants, and the words where they set out after it. If the want is an adult's errand, or the words show them carried, brought or minded, rewrite both in [FINAL]. For a main character aged two or under the quoted want is something to reach, follow, touch, hold or get to. Say in one word what the child gets out of it. If the want is a submission, a measurement, a permit, a set of numbers or a repair, replace it with one a child would have.
+11. **Length**: count the sentences of [FINAL] and the words of the longest one. Past five sentences, or past 30 words, split or cut before [FINAL] and name what you cut.
 
 List your 5 improvements (be specific):
 1. [improvement]
