@@ -51911,6 +51911,47 @@ move the blind buy mean.** Every round moved the contract axes the rater grades 
 parent buys on where it started; the next attempt at the buy axis should therefore change something
 other than the rule list.
 
+**Follow-up (2026-09-21) — three PRODUCT fixes for the three cells that capped the blind mean by
+construction.** Acting on the line above (change something other than the rule list): the blind reads
+docked the same three cells every round for reasons no prompt rule could reach.
+(1) *The `Rollen:` block on the back cover* (historical cells 4 and 8, docked by every reader —
+"opens with a ROLES block that breaks the back-cover illusion"). The block is asked for by
+`prompts/story-idea-requirements-historical-1.txt` and it has to keep being asked for: the chosen
+idea text becomes `storyDetails` whole, and that is the ONLY place the casting reaches the writer,
+the beats chain and the premise-aware scorecard judges (`server/lib/storyScorecard.js` briefs its
+judge on `"ROLES: <child>: <historical figure>"`). Nothing parses the block out of the idea text —
+verified: the only `ROLES` hits in `server/` and `storyJobPipeline.js` are those comments. So this is
+a DISPLAY fix, not a prompt one: `client/src/utils/ideaRoles.ts` splits a leading role block (a
+heading word in any language alone on its line, then `Name: Role (…)` lines) off the blurb, both idea
+renderers show the blurb as the idea and the roles as a small cast list under it in the world badge's
+styling, and `rolesBlock + blurb` is byte-identical to the original so the create-story payload is
+unchanged. Applied to both siblings (`WizardStep6Summary.tsx`, `TrialIdeasStep.tsx`).
+(2) *Ages 10-12 produced school-project premises* (cell 5: an exhibition slot, "Modul neu
+kalibrieren", docking protocols; blind 2-3 every round). The `not-giving-up` guide already forbade
+school-set work, so the gap was in the shape band: `prompts/age-band-journey.txt` had no rule about
+WHOSE the stake is or what kind of thing may stand in the way. One `[[premise]]` rule added there —
+the stake belongs to the main character's own life, never an assignment, submission, competition
+entry or a place to be won in a selection, and the obstacle is something they can reach out and touch
+or someone who wants the opposite, never a procedure, a schedule or a system. The band file is shared
+by the idea arm and the story-side beats prompt by construction (`buildAgeModeSection`), so this is
+ONE edit that reaches both — deliberately not forked.
+(3) *Under-2 life-challenge produced mitten logistics with the child acted upon* (cell 7, every
+round). The `going-outside` guide named the mitten itself as the one thing that goes wrong, and
+opened with "Being taken out and brought back". Rewritten: the engine is one sensory want (reach,
+follow, touch, get to) and one small world-thing that answers or resists; the grown-up is present and
+the doing is the child's; a lost mitten, hat or toy is explicitly never what the book is about.
+**Regenerated cells 4, 5, 7, 8 on the fixed harness (8 ideas, USD 0.5913,
+`tests/manual/story-idea-rounds/round-cells.md`).** Cell 7 lost the mitten entirely — both ideas are
+now a want with legs (a duck that stays one step ahead across the yard; a goat on a cart that shifts
+just out of reach), with Lena walking after it. Cell 5 lost the school and the competition: the stake
+is now a friend shut behind an airlock and, in the fantasy arm, a recording about to erase itself —
+the space theme's own machinery remains, which is its guide's doing, not the band's. Cells 4 and 8
+still emit the role block, by design; it is now casting metadata behind the blurb rather than the
+first thing a parent reads. Not re-rated blind — one regeneration was the mandate.
+**Touched:** client/src/utils/ideaRoles.ts (new), tests/unit/idea-roles-split.test.ts (new),
+client/src/pages/wizard/WizardStep6Summary.tsx, client/src/pages/trial/TrialIdeasStep.tsx,
+prompts/age-band-journey.txt, prompts/life-challenge-guides.txt
+
 ---
 
 ## 2026-09-21 — The figure detector is MASTER for identity; the witnesses may only deadlock it; an independent ARBITER resolves the deadlock

@@ -4,6 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useRotatingMessage } from '@/hooks/useRotatingMessage';
 import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
+import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
 import type { Character } from '@/types/character';
 import type { StoryLanguageCode, IdeaWorld, IdeaWorldMode } from '@/types/story';
 import type { LayoutOverride } from '@/hooks/useDeveloperMode';
@@ -501,6 +502,11 @@ export function WizardStep6Summary({
             {[0, 1].map((index) => {
               const idea = editableIdeas[index] || '';
               const hasIdea = !!idea;
+              // Historical ideas open with a casting block ("Rollen: …"). It is
+              // instruction for the writer, not back-cover text — shown as a
+              // cast list, never inside the blurb. The full original travels on
+              // in editableIdeas (see joinIdeaRoles below).
+              const { rolesBlock, cast, blurb } = splitIdeaRoles(idea);
               // Show loading if we're generating this specific idea and don't have it yet
               const isLoading = (index === 0 ? isGeneratingIdea1 : isGeneratingIdea2) && !hasIdea;
               const isSelected = selectedOption === index;
@@ -570,14 +576,15 @@ export function WizardStep6Summary({
                     <>
                       {/* Textarea */}
                       <textarea
-                        value={idea}
+                        value={blurb}
                         onChange={(e) => {
+                          const full = joinIdeaRoles(rolesBlock, e.target.value);
                           const newIdeas = [...editableIdeas];
-                          newIdeas[index] = e.target.value;
+                          newIdeas[index] = full;
                           setEditableIdeas(newIdeas);
                           // If this option was selected, update the story details too
                           if (isSelected) {
-                            onSelectIdea(e.target.value);
+                            onSelectIdea(full);
                           }
                         }}
                         className={`w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none ${
@@ -585,6 +592,15 @@ export function WizardStep6Summary({
                         }`}
                         rows={10}
                       />
+                      {/* Cast list — the casting block, out of the blurb.
+                          Same small-text treatment as the world badge above. */}
+                      {cast.length > 0 && (
+                        <div className="px-4 py-1.5 text-xs font-semibold flex flex-col gap-0.5 bg-indigo-50 text-indigo-700">
+                          {cast.map((member, ci) => (
+                            <span key={ci}>{member.name}: {member.role}</span>
+                          ))}
+                        </div>
+                      )}
                       {/* Select button */}
                       <button
                         onClick={() => handleSelectOption(index)}

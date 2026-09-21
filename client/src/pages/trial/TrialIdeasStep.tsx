@@ -3,6 +3,7 @@ import { ArrowLeft, Check, Loader2, MapPin, Pencil, RefreshCw, Sparkles, X } fro
 import { storyTypes } from '@/constants/storyTypes';
 import type { CharacterData, StoryInput, GeneratedIdea } from '../TrialWizard';
 import { trackTrialStep } from '@/utils/trialFunnel';
+import { splitIdeaRoles, joinIdeaRoles } from '@/utils/ideaRoles';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -504,6 +505,13 @@ export default function TrialIdeasStep({
             const isSelected = selectedIdeaIndex === index;
             const hasText = !!idea.text;
             const isEditable = idea.isFinal || hasFinalIdeas;
+            // Sibling of WizardStep6Summary: a leading casting block ("Rollen: …")
+            // is writer instruction, not back-cover text. Shown as a cast list,
+            // rejoined verbatim before anything leaves the client.
+            const editText = hasFinalIdeas
+              ? generatedIdeas[index].title + (generatedIdeas[index].summary ? '\n' + generatedIdeas[index].summary : '')
+              : idea.text;
+            const { rolesBlock, cast, blurb } = splitIdeaRoles(isEditable ? editText : idea.text);
 
             return (
               <div
@@ -544,10 +552,10 @@ export default function TrialIdeasStep({
                 {hasText ? (
                   isEditable ? (
                     <textarea
-                      value={hasFinalIdeas ? generatedIdeas[index].title + (generatedIdeas[index].summary ? '\n' + generatedIdeas[index].summary : '') : idea.text}
+                      value={blurb}
                       onChange={(e) => {
                         e.stopPropagation();
-                        const text = e.target.value;
+                        const text = joinIdeaRoles(rolesBlock, e.target.value);
                         const lines = text.split('\n').filter(l => l.trim());
                         let title = lines[0] || '';
                         title = title.replace(/^[#*\s]+/, '').replace(/[*]+$/, '').trim();
@@ -562,7 +570,7 @@ export default function TrialIdeasStep({
                     />
                   ) : (
                     <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line flex-1">
-                      {idea.text}
+                      {blurb}
                       {idea.isStreaming && (
                         <span className="inline-block w-1.5 h-4 bg-indigo-500 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
                       )}
@@ -571,6 +579,16 @@ export default function TrialIdeasStep({
                 ) : (
                   <div className="flex items-center gap-2 py-8 justify-center flex-1">
                     <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+                  </div>
+                )}
+
+                {/* Cast list — the casting block, out of the blurb. Same
+                    small-text treatment as the world badge above. */}
+                {cast.length > 0 && (
+                  <div className="mt-3 -mx-5 px-5 py-1.5 text-xs font-semibold flex flex-col gap-0.5 bg-indigo-50 text-indigo-700">
+                    {cast.map((member, ci) => (
+                      <span key={ci}>{member.name}: {member.role}</span>
+                    ))}
                   </div>
                 )}
 
