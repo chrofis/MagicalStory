@@ -95,10 +95,37 @@ describe('the stored story carries no duplicate avatar provenance', () => {
  * story. storyService.getJobStatus()'s explicit field mapping is the real gate.
  */
 describe('result_data stores nothing the status poll cannot deliver', () => {
-  it('drops the three fields the client mapping never forwards', () => {
-    expect(pipeline).toMatch(/const \{ outlineReview: _unusedOutlineReview, tokenUsage: _unusedTokenUsage,/);
-    expect(pipeline).toMatch(/generationMode: _unusedGenerationMode, \.\.\.resultDataStorable \} = resultData;/);
-    expect(pipeline).toMatch(/\.\.\.resultDataStorable,/);
+  it('is built from an explicit allow-list, not by subtraction', () => {
+    expect(pipeline).toMatch(/const RESULT_DATA_FIELDS = \[/);
+    expect(pipeline).toMatch(/for \(const key of RESULT_DATA_FIELDS\) \{/);
+    // A field added to `resultData` must not reach the column by default.
+    expect(pipeline).not.toMatch(/\.\.\.resultDataStorable/);
+    expect(pipeline).not.toMatch(/\.\.\.resultData,/);
+  });
+
+  it('never stores the story a second time: no page, cover or scene payload', () => {
+    const list = pipeline.slice(pipeline.indexOf('const RESULT_DATA_FIELDS = ['));
+    const fields = list.slice(0, list.indexOf('];'));
+    for (const dup of ['sceneImages', 'sceneDescriptions', 'coverImages', 'finalChecksReport',
+                       'outlineReview', 'tokenUsage', 'generationMode']) {
+      expect(fields).not.toContain(`'${dup}'`);
+    }
+    // ...and the client no longer asks the poll for them.
+    const svc = lf(readFileSync(join(__dirname, '../..', 'client', 'src', 'services', 'storyService.ts'), 'utf-8'));
+    expect(svc).not.toMatch(/sceneImages: resultData\.sceneImages/);
+    expect(svc).not.toMatch(/coverImages: resultData\.coverImages/);
+    expect(svc).not.toMatch(/sceneDescriptions: resultData\.sceneDescriptions/);
+  });
+
+  it('keeps every field the client mapping does forward', () => {
+    const list = pipeline.slice(pipeline.indexOf('const RESULT_DATA_FIELDS = ['));
+    const fields = list.slice(0, list.indexOf('];'));
+    for (const keep of ['storyId', 'shareToken', 'title', 'outline', 'outlinePrompt',
+                        'outlineModelId', 'outlineUsage', 'story', 'storyTextPrompts',
+                        'visualBible', 'styledAvatarGeneration', 'costumedAvatarGeneration',
+                        'generationLog', 'sceneExpansionReport', 'estimatedCost']) {
+      expect(fields).toContain(`'${keep}'`);
+    }
   });
 
   it('keeps estimatedCost — storyMetrics queries it straight off the column', () => {

@@ -948,3 +948,14 @@ do not overwrite it. When witnesses and detector disagree, the resolution is a T
 to an independent model, not a rename by either side. Before building any conflict handler:
 (1) audit how often the case occurs across stored stories, (2) then design the arbiter.
 Pattern: never let a downstream judge overwrite an upstream master record; add an arbiter.
+
+## 2026-09-21 — Enumerate the columns; do not sample the ones you know about
+Asked whether images were still in the database, I scanned `stories.data`, `story_jobs.result_data`
+and `characters.data` on the newest rows of both environments, found nothing, and told the owner the
+corpus was clean. It was not. A whole-corpus sweep driven by `information_schema` found ~134 MB of
+image bytes in four columns I never looked at: `characters.metadata`, `story_jobs.input_data`,
+`testlab_experiments.results/params`, `users.trial_data`. The columns I checked were exactly the ones
+the offload path already covers, so my check could only ever confirm what was already working.
+**Rule:** when asked "does X exist anywhere", derive the search space from the schema, not from the
+places you remember. A clean sample of the covered paths is not evidence about the uncovered ones.
+Related: negative inference is not proof; read the artefacts, not the counts.

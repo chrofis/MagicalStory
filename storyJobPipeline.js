@@ -7621,38 +7621,51 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       finalChecksReport: finalChecksReport || null
     };
 
-    // Mark job as completed
-    // Strip ALL base64 image data from result_data to keep it lightweight
-    // Images are already saved in story_images table via upsertStory
-    // The client only needs metadata from result_data to navigate to the story
-    const stripImageData = (img) => {
-      if (!img) return img;
-      const { imageData, referencePhotos, visualBibleGrid, bboxOverlayImage, ...metadata } = img;
-      // Keep referencePhotos metadata but strip actual photo data (rebuild from character avatars on demand)
-      const strippedRefPhotos = referencePhotos?.map(p => ({
-        name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
-        clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
-      }));
-      // landmarkPhotos: bytes are dropped by dropInlineBase64 below (hasPhoto
-      // flag set → client lazy-loads from stories.data, which holds R2 URLs).
-      // No image bytes are stored in the database — R2 is the only byte store.
-      const stripped = { ...metadata, hasImage: !!imageData, hasVisualBibleGrid: !!visualBibleGrid, referencePhotos: strippedRefPhotos };
-      // Strip imageData from imageVersions
-      if (stripped.imageVersions) {
-        stripped.imageVersions = stripped.imageVersions.map(v => {
-          const { imageData: vData, ...vMeta } = v;
-          return { ...vMeta, hasImage: !!vData };
-        });
-      }
-      // Strip imageData from retryHistory
-      if (stripped.retryHistory) {
-        stripped.retryHistory = stripped.retryHistory.map(r => {
-          const { imageData: rData, ...rMeta } = r;
-          return { ...rMeta, hasImage: !!rData };
-        });
-      }
-      return stripped;
-    };
+    // Mark job as completed.
+    //
+    // WHAT story_jobs.result_data IS FOR (2026-09-21).
+    //
+    // It is the payload of the job-status poll and nothing else. `stories.data`
+    // is the story; this column is a PROJECTION of it, built from an explicit
+    // allow-list so a new field on `resultData` cannot silently re-inflate it.
+    //
+    // The gate for "does anyone read it" is `storyService.getJobStatus()`'s
+    // explicit field mapping — a field it does not copy is `undefined` in the
+    // UI however faithfully we store it. Every name below has either a reader
+    // in that mapping or a server-side reader:
+    //   storyId / shareToken               StoryWizard nav, GenerationContext
+    //   title, outline, outlinePrompt,     StoryWizard completion branch
+    //   outlineModelId, outlineUsage,
+    //   story, storyTextPrompts,
+    //   visualBible, generationLog,
+    //   styledAvatarGeneration,
+    //   costumedAvatarGeneration,
+    //   sceneExpansionReport
+    //   estimatedCost                      server/lib/storyMetrics.js queries
+    //                                      result_data->>'estimatedCost'
+    //
+    // DELIBERATELY NOT STORED (measured on job_1789853503332_riqncqg1i, the
+    // four together were 7.74 MB of the 7.83 MB raw column):
+    //   sceneImages (5.21 MB), sceneDescriptions (2.09 MB), coverImages
+    //   (0.26 MB) — GET /api/stories/:id/metadata already builds all three
+    //   from `stories.data` + `story_images`, including per-version dev
+    //   metadata, and the wizard's completion branch loads them from there.
+    //   Mid-generation page data comes from the `partial_page` /
+    //   `partial_cover` / `story_text` checkpoints this same endpoint returns,
+    //   never from a second copy of the book.
+    //   finalChecksReport (0.18 MB) — no reader at all: getJobStatus() never
+    //   copied it, so StoryWizard's `status.result.finalChecksReport` was
+    //   always undefined. Its live value comes from the dev-metadata route.
+    //   outlineReview / tokenUsage — same, live values via getStoryMetadata().
+    //   generationMode — never forwarded.
+    const RESULT_DATA_FIELDS = [
+      'storyId', 'shareToken', 'title',
+      'outline', 'outlinePrompt', 'outlineModelId', 'outlineUsage',
+      'story', 'storyTextPrompts',
+      'visualBible', 'styledAvatarGeneration', 'costumedAvatarGeneration',
+      'generationLog', 'sceneExpansionReport',
+      'estimatedCost',
+    ];
     // Strip photo data from visualBible locations
     const strippedVisualBible = resultData.visualBible ? {
       ...resultData.visualBible,
@@ -7661,42 +7674,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         return { ...locMeta, hasPhoto: !!referencePhotoData };
       })
     } : resultData.visualBible;
-    // WHAT story_jobs.result_data IS FOR (2026-09-21).
-    //
-    // It is the payload of the job-status poll and nothing else. The client
-    // gate is storyService.getJobStatus()'s explicit field mapping — a field it
-    // does not copy is undefined in the UI however faithfully we store it.
-    // Three fields were stored for nobody: `outlineReview`, `tokenUsage` and
-    // `generationMode` are never forwarded by that mapping, and the wizard's
-    // real copies of the first two come from stories.data via
-    // getStoryMetadata(). `estimatedCost` stays — it has no client reader
-    // either, but server/lib/storyMetrics.js queries
-    // result_data->>'estimatedCost' directly.
-    //
-    // This column is NOT a second home for the story: `stories.data` is, and
-    // anything a reader needs later belongs there. It is deliberately a
-    // projection, which is why it is built by subtraction from resultData
-    // rather than sharing its shape.
-    const { outlineReview: _unusedOutlineReview, tokenUsage: _unusedTokenUsage,
-            generationMode: _unusedGenerationMode, ...resultDataStorable } = resultData;
-    const resultDataForStorage = {
-      ...resultDataStorable,
-      visualBible: strippedVisualBible,
-      sceneImages: allImages.map(stripImageData),
-      coverImages: coverImages ? {
-        frontCover: stripImageData(coverImages.frontCover),
-        initialPage: stripImageData(coverImages.initialPage),
-        backCover: stripImageData(coverImages.backCover),
-      } : coverImages,
-    };
+    const resultDataForStorage = {};
+    for (const key of RESULT_DATA_FIELDS) {
+      if (resultData[key] !== undefined) resultDataForStorage[key] = resultData[key];
+    }
+    if (resultDataForStorage.visualBible) resultDataForStorage.visualBible = strippedVisualBible;
     log.debug(`📊 [UNIFIED] resultData generationLog has ${resultData.generationLog?.length || 0} entries`);
-    // Belt-and-suspenders: stripImageData above is an allow-list that only drops
-    // imageData — it leaves per-version debug base64 (charRepair*, grokRefImages,
-    // inpaintReferenceImages, bboxOverlayImage…) inline. On a repair-heavy story
-    // (dozens of repaired versions) that overflows PG's 256MB jsonb array cap on
-    // the result_data UPDATE below. result_data is navigation metadata only — no
-    // image bytes are needed (they live in story_images) — so drop ANY remaining
-    // inline base64 outright.
+    // Belt-and-suspenders: the allow-list above keeps whole objects, and some of
+    // them can still carry inline base64 (visualBible location photos,
+    // generationLog entries, avatar-generation records). No image bytes belong
+    // in the database at all — R2 is the only byte store — and a repair-heavy
+    // story used to overflow PG's 256MB jsonb array cap on the UPDATE below, so
+    // drop ANY remaining inline base64 outright.
     const dropInlineBase64 = (node, seen = new WeakSet()) => {
       if (!node || typeof node !== 'object' || seen.has(node)) return;
       seen.add(node);

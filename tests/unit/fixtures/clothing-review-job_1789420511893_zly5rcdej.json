@@ -1,0 +1,63 @@
+{
+ "model": "deepseek/deepseek-v4-pro",
+ "durationMs": 235106,
+ "analysis": "1. Costume recognisability:\n- Emma: “peasant blouse” names a different costume; replace with a pirate shirt. The locked page plan also requires Emma to have a tricorn.\n- Noah: “peasant shirt” names a different costume; replace with a pirate shirt.\n- Sarah: no fault.\n\n2. Drawability:\n- Emma: “wide-leg cropped breeches” is contradictory and could be drawn as culottes or capris; replace with pirate breeches gathered at the knee.\n\n3. Colour distinction:\n- Largest garments sharing a dominant colour: Noah’s green wool sleeveless vest and Hans’s green wool double-breasted overcoat.\n- Outside the allowed colour list: “cream” in Hans’s shirt and “gold” in Sarah’s tricorn trim.\n\n4. Slot conflicts: none.\n\n5. Face: none; no mask, visor, veil or low brim.\n\n6. Completeness:\n- The listed characters have top, bottom and footwear, but Emma’s page-plan tricorn is missing from her costume.\n- Kilian is named on pages 6, 11 and 16 but has no wardrobe entry; add a standard outfit.\n\n7. Style world: no named style world; not applied.\n\n8. Sex: none.\n\n9. Coverage: no tail, wings, animal form or disguise transformation is missing a wardrobe category.\n\n10. Child coverage: no bikini, bare chest or bare midriff.\n\n11. Garment variety: no two corrected outfits share the same set of garments with only colour differences.",
+ "changed": [
+  {
+   "name": "Emma",
+   "after": "A black felt tricorn hat with a red cockade; a red long-sleeved cotton pirate shirt with a gathered neckline and full sleeves; black cotton breeches ending just below the knee and gathered at the hem; a white linen sash tied at the waist; white knee-length cotton stockings; black leather buckle shoes.",
+   "before": "A red long-sleeved cotton peasant blouse with a wide round neckline and loose gathered sleeves, black cotton wide-leg cropped breeches ending just below the knee, a white linen sash tied at the waist, white knee-length cotton stockings, black leather buckle shoes.",
+   "category": "costumed:pirate"
+  },
+  {
+   "name": "Noah",
+   "after": "A blue long-sleeved cotton pirate shirt with an open neck and full gathered sleeves; brown cotton breeches ending at the knee; a black wool sleeveless vest with a straight open front; a black leather belt at the waist; brown leather cuffed boots reaching mid-calf.",
+   "before": "A blue long-sleeved cotton peasant shirt with a wide open collar and gathered sleeves, brown cotton breeches ending at the knee, a black leather belt at the waist, a green wool sleeveless vest with a straight open front, brown leather cuffed boots reaching mid-calf.",
+   "category": "costumed:pirate"
+  },
+  {
+   "name": "Sarah",
+   "after": "A long navy-blue wool captain’s coat with wide lapels, broad cuffs folded back, and a double-breasted front with brass buttons; a white linen high-collar blouse underneath; a wide black leather captain’s belt buckled at the waist; black wool straight trousers; black leather knee-high captain’s boots; a black tricorn hat with yellow braid trim.",
+   "before": "A long navy-blue wool captain's coat with wide lapels, broad cuffs folded back, and double-breasted brass-button front, a white linen high-collar blouse underneath, a wide black leather captain's belt buckled at the waist, black wool straight trousers, black leather knee-high captain's boots, a black tricorn hat with a gold braid trim.",
+   "category": "costumed:pirate"
+  },
+  {
+   "name": "Hans",
+   "after": "A brown wool flat cap; a green wool double-breasted overcoat with wide lapels; a white cotton button-up shirt with the collar open; dark grey wool trousers; brown leather lace-up shoes.",
+   "before": "A brown wool flat cap, a green wool double-breasted overcoat with wide lapels, a cream cotton button-up shirt with the collar open, dark grey wool trousers, brown leather lace-up shoes.",
+   "category": "standard"
+  }
+ ],
+ "outfitsIn": [
+  {
+   "name": "Emma",
+   "costume": "pirate",
+   "category": "costumed",
+   "description": "A black felt tricorn hat with a red cockade; a red long-sleeved cotton pirate shirt with a gathered neckline and full sleeves; black cotton breeches ending just below the knee and gathered at the hem; a white linen sash tied at the waist; white knee-length cotton stockings; black leather buckle shoes."
+  },
+  {
+   "name": "Noah",
+   "costume": "pirate",
+   "category": "costumed",
+   "description": "A blue long-sleeved cotton pirate shirt with an open neck and full gathered sleeves; brown cotton breeches ending at the knee; a black wool sleeveless vest with a straight open front; a black leather belt at the waist; brown leather cuffed boots reaching mid-calf."
+  },
+  {
+   "name": "Daniel",
+   "costume": null,
+   "category": "standard",
+   "description": "A dark grey wool overcoat buttoned to the chest with a broad lapel, a dark blue cotton roll-neck sweater underneath, dark brown corduroy trousers, brown leather lace-up ankle boots."
+  },
+  {
+   "name": "Sarah",
+   "costume": "pirate",
+   "category": "costumed",
+   "description": "A long navy-blue wool captain’s coat with wide lapels, broad cuffs folded back, and a double-breasted front with brass buttons; a white linen high-collar blouse underneath; a wide black leather captain’s belt buckled at the waist; black wool straight trousers; black leather knee-high captain’s boots; a black tricorn hat with yellow braid trim."
+  },
+  {
+   "name": "Hans",
+   "costume": null,
+   "category": "standard",
+   "description": "A brown wool flat cap; a green wool double-breasted overcoat with wide lapels; a white cotton button-up shirt with the collar open; dark grey wool trousers; brown leather lace-up shoes."
+  }
+ ]
+}

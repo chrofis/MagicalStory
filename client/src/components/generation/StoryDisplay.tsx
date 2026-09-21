@@ -16,6 +16,7 @@ import { EntityConsistencyView } from './EntityConsistencyView';
 import { IMAGE_REGENERATION_COST, COVER_REGENERATION_COST, TITLE_PAINT_COST, CHARACTER_REPAIR_COST } from '@/constants/credits';
 import { findingText } from '../../utils/findingText';
 import { resolveScenePrompt } from '../../utils/scenePrompt';
+import { summarizeClothingReview } from '../../utils/clothingReview';
 
 interface StoryTextPrompt {
   batch: number;
@@ -209,6 +210,8 @@ interface StoryDisplayProps {
   beatsReviewReport?: ReviewDiffReport | null;
   /** Per-page before/after from the scene review (beats pipeline, dev mode). */
   sceneReviewReport?: ReviewDiffReport | null;
+  /** What the wardrobe review was given and what it rewrote (dev mode). */
+  clothingReviewReport?: import('../../types/story').ClothingReviewReport | null;
   /** Per-function model/token/cost/time ledger (tokenUsage.byFunction). */
   tokenUsage?: { byFunction?: Record<string, { models?: string[]; provider?: string | null; calls?: number; input_tokens?: number; output_tokens?: number; thinking_tokens?: number; direct_cost?: number; cost?: number; elapsed_ms?: number }> } | null;
   storyTextPrompts?: StoryTextPrompt[];
@@ -383,6 +386,7 @@ export function StoryDisplay({
   arcReviewReport,
   beatsReviewReport,
   sceneReviewReport,
+  clothingReviewReport = null,
   storyTextPrompts = [],
   visualBible,
   sceneImages,
@@ -2651,7 +2655,110 @@ export function StoryDisplay({
                 label: 'text-xs font-bold text-amber-800 mb-1',
                 sub: 'cursor-pointer text-xs font-bold text-amber-700 hover:text-amber-900',
               },
+              rose: {
+                box: 'bg-rose-50 border-2 border-rose-300 rounded-xl p-4',
+                head: 'cursor-pointer text-lg font-bold text-rose-800 hover:text-rose-900 flex items-center gap-2 flex-wrap',
+                meta: 'text-xs font-normal text-rose-600',
+                card: 'bg-white border border-rose-200 rounded-lg p-3',
+                label: 'text-xs font-bold text-rose-800 mb-1',
+                sub: 'cursor-pointer text-xs font-bold text-rose-700 hover:text-rose-900',
+              },
             } as const;
+
+            // The wardrobe review (beats step 3b) has no pages, so renderDiffPanel
+            // cannot show it: its unit is an OUTFIT. It runs on every story and
+            // rewrote an outfit on about half of recent runs, and until now it
+            // was stored and shown nowhere -- a costume the review repaired, or
+            // one it faulted and left alone, was invisible.
+            const renderClothingPanel = () => {
+              const sum = summarizeClothingReview(clothingReviewReport);
+              if (!sum) return null;
+              const c = TONES.rose;
+              const L = (de: string, fr: string, en: string) => (language === 'de' ? de : language === 'fr' ? fr : en);
+              const slot = (r: { category: string; costume: string | null }) =>
+                r.costume ? `${r.category}: ${r.costume}` : r.category;
+              return (
+                <details key="clothing-review" className={c.box}>
+                  <summary className={c.head}>
+                    <FileText size={20} />
+                    {L('Garderoben-Review', 'Revue de la garde-robe', 'Wardrobe review')}
+                    <span className={c.meta}>
+                      [{sum.changedCount}/{sum.rows.length} {L('Outfits geändert', 'tenues modifiées', 'outfits rewritten')}
+                      {sum.model && ` · ${sum.model}`}
+                      {sum.durationMs != null && ` · ${(sum.durationMs / 1000).toFixed(0)}s`}]
+                    </span>
+                  </summary>
+                  {sum.prompt && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {L('Prompt an den Reviewer', 'Prompt envoyé au relecteur', 'Prompt sent to the reviewer')}
+                        <span className="ml-2 text-gray-500">({sum.prompt.length.toLocaleString()} {L('Zeichen', 'caractères', 'chars')})</span>
+                      </summary>
+                      <pre className="mt-2 text-[11px] text-gray-700 whitespace-pre-wrap break-words font-mono max-h-96 overflow-auto">{sum.prompt}</pre>
+                    </details>
+                  )}
+                  {sum.analysis && (
+                    <details className="mt-3 bg-white/70 border border-gray-200 rounded-lg p-2">
+                      <summary className={c.sub}>
+                        {L('Analyse', 'Analyse', 'Analysis')}
+                      </summary>
+                      <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap break-words font-sans">{sum.analysis}</pre>
+                    </details>
+                  )}
+                  <div className="mt-3 space-y-3">
+                    {sum.rows.map((r, i) => {
+                      const ops = r.changed ? wordDiff(r.before || '', r.final) : [];
+                      const { added, removed } = r.changed ? diffStats(ops) : { added: 0, removed: 0 };
+                      return (
+                        <div key={`${r.name}-${slot(r)}-${i}`} className={c.card}>
+                          <div className={c.label}>
+                            {r.name}
+                            <span className="font-normal text-gray-500"> · {slot(r)}</span>
+                            <span className={`ml-2 font-normal ${r.changed ? 'text-emerald-600' : 'text-gray-400'}`}>
+                              {r.changed
+                                ? L('überarbeitet', 'écrit à nouveau', 'rewritten')
+                                : L('unverändert', 'inchangé', 'unchanged')}
+                            </span>
+                            {r.changed && (
+                              <span className="font-normal text-gray-500">
+                                {' '}· <span className="text-green-700">+{added}</span>{' '}
+                                <span className="text-red-700">−{removed}</span>{' '}
+                                {L('Wörter', 'mots', 'words')}
+                              </span>
+                            )}
+                          </div>
+                          {r.changed && (
+                            <details open className="mt-1">
+                              <summary className={c.sub}>Diff</summary>
+                              <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                                {ops.map((op, j) => (
+                                  <span
+                                    key={j}
+                                    className={
+                                      op.type === 'add' ? 'bg-green-100 text-green-900'
+                                        : op.type === 'del' ? 'bg-red-100 text-red-900 line-through'
+                                          : 'text-gray-700'
+                                    }
+                                  >
+                                    {op.text}
+                                  </span>
+                                ))}
+                              </p>
+                            </details>
+                          )}
+                          <details className={r.changed ? 'mt-2' : 'mt-1'} open={!r.changed}>
+                            <summary className={c.sub}>
+                              {L('Gezeichnetes Outfit', 'Tenue dessinée', 'Outfit as drawn')}
+                            </summary>
+                            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap break-words text-gray-800">{r.final}</p>
+                          </details>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </details>
+              );
+            };
 
             const renderDiffPanel = (
               rep: (ReviewDiffReport & { rounds?: number }) | null | undefined,
@@ -3030,6 +3137,7 @@ export function StoryDisplay({
                   language === 'de' ? 'Beats-Review (Diff)' : language === 'fr' ? 'Revue des beats (diff)' : 'Beats review (diff)',
                   'sky',
                 )}
+                {renderClothingPanel()}
                 {renderDiffPanel(
                   sceneReviewReport,
                   'scene-review',

@@ -96,6 +96,133 @@ const looksLikeBytes = (s) =>
 
 const safe = (v) => String(v).replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 40);
 
+// -----------------------------------------------------------------------------
+// The standing guard for the IRON RULE: no image bytes in JSONB, R2 only.
+//
+// offloadInlineImages() below only cleans `characters.data` and `stories.data`
+// - the two columns it was built for. This sweep asks the question the rule
+// actually states, of EVERY json/jsonb column in the schema, discovered from
+// information_schema so a column added tomorrow is covered tomorrow. It is
+// read-only: it reports, it never writes, and the daily routine logs an error
+// when it finds anything, so a new leak is loud the next morning rather than
+// whenever someone thinks to look.
+// -----------------------------------------------------------------------------
+
+// `story_job_checkpoints.step_data` carries page/cover base64 on purpose for
+// these two steps: they ARE the progressive-display payload the status poll
+// streams to the wizard before the story row exists, and they die with the job.
+const TRANSIENT_CHECKPOINT_STEPS = new Set(['partial_page', 'partial_cover']);
+
+// Postgres caps a POSIX repetition count at 255, so "a long unbroken base64
+// run" is spelled as four chained quantifiers (~1000 chars). The prefilter is
+// deliberately looser than looksLikeBytes: it only decides which rows are
+// pulled into node, and the walker applies the real test.
+const BASE64_RUN_SQL = '[A-Za-z0-9+/]{250}'.repeat(4);
+
+/** Bytes with no recognisable header still count - a 1 KB base64 run is not prose. */
+const looksLikeHeaderlessBytes = (s) =>
+  typeof s === 'string' && s.length > 1024 && /^[A-Za-z0-9+/\r\n]+={0,2}$/.test(s);
+
+/** Walk a JSON value and list every inline-image string with its exact key path. */
+function findInlineImages(node, keyPath = '$', out = [], seen = new WeakSet()) {
+  if (typeof node === 'string') {
+    const kind = looksLikeBytes(node) ? 'header'
+      : looksLikeHeaderlessBytes(node) ? 'raw-base64' : null;
+    if (kind) out.push({ keyPath, kind, bytes: Buffer.byteLength(node) });
+    return out;
+  }
+  if (!node || typeof node !== 'object' || seen.has(node)) return out;
+  seen.add(node);
+  if (Array.isArray(node)) {
+    node.forEach((v, i) => findInlineImages(v, `${keyPath}[${i}]`, out, seen));
+    return out;
+  }
+  for (const k of Object.keys(node)) findInlineImages(node[k], `${keyPath}.${k}`, out, seen);
+  return out;
+}
+
+/** `$.sceneImages[7].imageData` -> `$.sceneImages[].imageData`, so 40 page leaks read as one path. */
+const collapsePath = (p) => p.replace(/\[\d+\]/g, '[]');
+
+async function listJsonColumns(pool) {
+  const { rows } = await pool.query(`
+    SELECT c.table_name, c.column_name
+    FROM information_schema.columns c
+    JOIN information_schema.tables t
+      ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+    WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE'
+      AND c.data_type IN ('json', 'jsonb')
+    ORDER BY c.table_name, c.column_name`);
+  return rows;
+}
+
+/**
+ * Sweep every json/jsonb column for inline image bytes.
+ *
+ * Returns { columns, rowsScanned, violations[], transient }, where a violation is
+ * { table, column, row, paths[{path,count,bytes}], bytes }. The declared
+ * checkpoint exception is counted separately and never reported as a violation.
+ */
+async function sweepInlineImages(pool) {
+  const columns = await listJsonColumns(pool);
+  const violations = [];
+  const transient = { rows: 0, bytes: 0 };
+  let rowsScanned = 0;
+
+  for (const { table_name: table, column_name: column } of columns) {
+    const { rows: candidates } = await pool.query(`
+      SELECT ctid::text AS ctid
+      FROM "${table}"
+      WHERE "${column}" IS NOT NULL
+        AND (strpos("${column}"::text, 'data:image/') > 0
+          OR strpos("${column}"::text, '"/9j/') > 0
+          OR strpos("${column}"::text, '"iVBORw0') > 0
+          OR strpos("${column}"::text, '"R0lGOD') > 0
+          OR strpos("${column}"::text, '"UklGR') > 0
+          OR "${column}"::text ~ '${BASE64_RUN_SQL}')`);
+    rowsScanned += candidates.length;
+
+    for (const { ctid } of candidates) {
+      const { rows } = await pool.query(`SELECT "${column}" AS v FROM "${table}" WHERE ctid = $1::tid`, [ctid]);
+      if (!rows.length) continue;
+      const value = typeof rows[0].v === 'string' ? JSON.parse(rows[0].v) : rows[0].v;
+      const found = findInlineImages(value);
+      if (!found.length) continue;
+
+      if (table === 'story_job_checkpoints' && column === 'step_data') {
+        const step = (await pool.query('SELECT step_name FROM story_job_checkpoints WHERE ctid = $1::tid', [ctid])).rows[0]?.step_name;
+        if (TRANSIENT_CHECKPOINT_STEPS.has(step)) {
+          transient.rows++;
+          transient.bytes += found.reduce((a, f) => a + f.bytes, 0);
+          continue;
+        }
+      }
+
+      let row = ctid;
+      for (const idCol of ['id', 'job_id', 'story_id', 'user_id']) {
+        try {
+          const r = await pool.query(`SELECT "${idCol}"::text AS id FROM "${table}" WHERE ctid = $1::tid`, [ctid]);
+          if (r.rows.length) { row = r.rows[0].id; break; }
+        } catch { /* no such column on this table */ }
+      }
+
+      const byPath = new Map();
+      for (const f of found) {
+        const key = collapsePath(f.keyPath);
+        const e = byPath.get(key) || { path: key, count: 0, bytes: 0 };
+        e.count++; e.bytes += f.bytes;
+        byPath.set(key, e);
+      }
+      violations.push({
+        table, column, row,
+        paths: [...byPath.values()].sort((a, b) => b.bytes - a.bytes),
+        bytes: found.reduce((a, f) => a + f.bytes, 0),
+      });
+    }
+  }
+  return { columns: columns.length, rowsScanned, violations, transient };
+}
+
 /** Queue every byte-string in the tree, keyed by its own JSON path. */
 function collect(data, prefix) {
   const tasks = [];
@@ -415,11 +542,39 @@ async function runDailyHousekeeping({ pool, log }) {
              `${offload.mb.toFixed(1)} MB, from ${offload.rows} row(s); ${offload.skipped} row(s) skipped`);
   }
 
+  // The standing guard. offloadInlineImages only reaches characters.data and
+  // stories.data; this asks the whole schema, so a leak in a column nobody
+  // thought about (characters.metadata, story_jobs.input_data and
+  // users.trial_data all held megabytes on 2026-09-21) is loud the next morning.
+  let inlineSweep = null;
+  try {
+    inlineSweep = await sweepInlineImages(pool);
+    if (inlineSweep.violations.length) {
+      const byColumn = new Map();
+      for (const v of inlineSweep.violations) {
+        const k = `${v.table}.${v.column}`;
+        const e = byColumn.get(k) || { rows: 0, bytes: 0, paths: new Set() };
+        e.rows++; e.bytes += v.bytes;
+        for (const p of v.paths) e.paths.add(p.path);
+        byColumn.set(k, e);
+      }
+      for (const [col, e] of byColumn) {
+        log.error(`[db-housekeeping] IRON RULE BROKEN: ${col} - ${e.rows} row(s), ` +
+                  `${MB(e.bytes).toFixed(1)} MB of image bytes in JSONB at ` +
+                  `${[...e.paths].slice(0, 8).join(', ')}. R2 is the only byte store.`);
+      }
+    } else {
+      log.info(`[db-housekeeping] inline-image sweep clean across ${inlineSweep.columns} json/jsonb column(s)`);
+    }
+  } catch (err) {
+    log.warn(`[db-housekeeping] inline-image sweep failed: ${err.message}`);
+  }
+
   await vacuumAnalyze(pool, log);
 
   const report = await bloatReport(pool);
   logBloatReport(report, log);
-  return { offload, report, pendingR2 };
+  return { offload, report, pendingR2, inlineSweep };
 }
 
 /**
@@ -552,6 +707,11 @@ module.exports = {
   shouldRun,
   collect,
   looksLikeBytes,
+  looksLikeHeaderlessBytes,
+  findInlineImages,
+  collapsePath,
+  sweepInlineImages,
+  TRANSIENT_CHECKPOINT_STEPS,
   databaseSize,
   TABLES,
 };

@@ -132,6 +132,25 @@ no confirm/production flag. `--report-only` on the deleting tool stays as a conv
 someone already in that tool. Both entrypoints and both guarantees are pinned by
 `tests/unit/r2-cohort-gc.test.ts`.
 
+### The other direction: is anything still IN the database?
+
+The bucket tools answer "is this object still referenced". The opposite question — are
+there image bytes sitting in a JSONB column instead of in R2 — is answered by
+`sweepInlineImages()` in `server/lib/dbHousekeeping.js`, which walks EVERY json/jsonb
+column discovered from `information_schema` (not a maintained list). It runs inside the
+daily Railway housekeeping routine and logs an error per offending column with the exact
+key paths; run it yourself with:
+
+```bash
+node scripts/admin/check-inline-images.js                  # staging (default)
+node scripts/admin/check-inline-images.js --env=production
+node scripts/admin/check-inline-images.js --env=both --json # exits 1 on any find
+```
+
+One declared exception: `story_job_checkpoints.step_data` for the `partial_page` /
+`partial_cover` steps, which ARE the progressive-display payload and die with their job.
+The save path is pinned by `tests/unit/no-inline-images-in-jsonb.test.ts`.
+
 Options: `--age-days=30` (cohort age floor — a cohort whose newest object is younger than
 this is never swept, which protects an in-flight generation), `--list=20` (sample keys per
 prefix), `--out=path.json` / `--no-manifest` (the review manifest).

@@ -21,6 +21,36 @@ superseded and link forward.
 
 ---
 
+## 2026-09-21 — The wardrobe review gets its own dev panel, and the saved-story route ships it without its prompt
+
+**Context.** `clothingReviewReport` (beats step 3b) runs on every story, is the last moment an
+outfit is still only text, and rewrote at least one outfit on 34 of the last 45 staging stories that have one.
+Its four sibling reports (arc, beats, scene, text-refine) all reach the developer panel; this one
+was stored and displayed nowhere, so a costume the review repaired — and, worse, one it faulted in
+its analysis and left alone — was invisible. `renderDiffPanel` cannot show it: that renderer is
+keyed on `pages[]`, and this report's unit is an OUTFIT.
+
+**Decision.** A dedicated renderer (`renderClothingPanel` in `StoryDisplay.tsx`, rose tone, same
+`TONES` vocabulary as its siblings) over one pure selector, `summarizeClothingReview`, which folds
+`outfitsIn[]` (the post-review wardrobe) and `changed[]` (before/after) into one row per outfit.
+The saved-story metadata route ships the report with its `prompt` key stripped — the same treatment
+the Art Director prompt got the same day — so a story load carries 2–5 KB instead of ~18 KB. The
+live generation payload still carries the prompt, and the panel's prompt block simply does not
+render when there is none.
+
+**Rationale.** The join is the part worth having in a tested function rather than inside JSX:
+`changed[].category` carries the costume inline (`costumed:pirate`) while `outfitsIn[]` splits it
+into `category` + `costume`, so a naive key leaves every costume rewrite unmatched. Replayed over
+45 real staging reports: 45 folded with zero unmatched rewrites, 15 rows with a null report degrade
+to no panel at all. The ~13 KB prompt is near-identical per story and nothing on a saved-story load
+reads it — shipping it on every load was the cost the sceneExpansionReport change had just removed.
+
+**Touched:** `client/src/utils/clothingReview.ts` (new), `client/src/components/generation/StoryDisplay.tsx`,
+`client/src/types/story.ts`, `client/src/services/storyService.ts`, `client/src/pages/StoryWizard.tsx`,
+`server/routes/stories.js`, `tests/unit/clothing-review-summary.test.ts`.
+**Status:** ✅ active
+
+
 ## 2026-09-20 — A brief may not people a setting its own `population` declares empty: the contradiction is a BRIEF fault the scene review fixes
 
 **Context.** `population` is the one field the evaluator's SETTING POPULATION line (N-09) and the
@@ -52746,6 +52776,9 @@ above — which flow into it automatically: 7.83 MB -> 2.93 MB (-62.6%) on repla
 Going further (dropping `sceneImages` / `sceneDescriptions` in favour of the
 metadata endpoint the wizard already calls) is a real client rewrite and an
 owner decision, not a safe unilateral trim.
+**SUPERSEDED the same day** by "story_jobs.result_data is now an allow-list, and
+the page/cover payload comes from stories.data (2026-09-21, D4)" — the owner
+approved the cut; 3.20 MB -> 0.31 MB.
 **Touched:** storyJobPipeline.js, tests/unit/scene-expansion-report.test.ts
 **Status:** ✅ active
 
@@ -53324,3 +53357,104 @@ Artefacts: `round-16.json` / `.md`, `dry-run-4-5-8.json`, and the three round-15
 `prompt-r15-c5-a1.txt`, `prompt-r15-c5-a2.txt`, `prompt-r15-c4-a2.txt`.
 
 **Status:** ✅ active — committed on `staging`, not pushed.
+
+## story_jobs.result_data is now an allow-list, and the page/cover payload comes from stories.data (2026-09-21, D4)
+
+**Context:** the earlier entry today ("result_data is the status payload, not a
+second copy of the story") trimmed three unread fields by subtraction and said
+the real cut — dropping `sceneImages` / `sceneDescriptions` / `coverImages` in
+favour of the metadata endpoint the wizard already calls — "is a real client
+rewrite and an owner decision, not a safe unilateral trim". The owner approved
+it. Measured before the change: `pg_column_size` 3.20 MB on staging
+(job_1789853503332_riqncqg1i) and 3.42 MB on production
+(job_1789945743706_8ayo2w19e), returned IN FULL on every status poll.
+
+**Decision:** the column is built from an explicit allow-list,
+`RESULT_DATA_FIELDS` (storyJobPipeline.js), not by subtracting from `resultData`.
+A new field on the result object no longer reaches the column by default. Stored:
+`storyId, shareToken, title, outline, outlinePrompt, outlineModelId,
+outlineUsage, story, storyTextPrompts, visualBible, styledAvatarGeneration,
+costumedAvatarGeneration, generationLog, sceneExpansionReport, estimatedCost`.
+
+Dropped, with where each reader gets it instead:
+- `sceneImages` (5.21 MB), `sceneDescriptions` (2.09 MB), `coverImages`
+  (0.26 MB) — `GET /api/stories/:id/metadata` already builds all three from
+  `stories.data` + `story_images`, in the same shape and including per-version
+  dev metadata. StoryWizard's completion branch now awaits that endpoint
+  instead of reading the job result, and throws if it cannot be loaded (no
+  fallback: a story that completed and whose metadata will not load is a real
+  failure, not something to render half of). Mid-generation page data already
+  comes from the `partial_page` / `partial_cover` / `story_text` checkpoints the
+  same poll returns — never from a second copy of the book.
+- `finalChecksReport` (0.18 MB) — had NO reader at all: `getJobStatus()`'s field
+  mapping never copied it, so `status.result.finalChecksReport` was always
+  `undefined`. Its live value arrives from the dev-metadata route, keyed on
+  `storyId`, which the same branch sets.
+- `outlineReview`, `tokenUsage`, `generationMode` — as this morning's entry.
+
+**Rationale:** `stories.data` is the story. A status poll should hand back
+identifiers and progress. The client-side gate is `getJobStatus()`'s explicit
+mapping, so the three dropped page fields were also removed from that mapping
+and from its declared return type — the compiler, not a comment, now stops a
+consumer from reading a field the column does not hold.
+
+**Measured (rung 1, replay of the projection over the stored rows, free):**
+staging 3.20 MB -> 0.31 MB (-90.2%), production 3.42 MB -> 0.29 MB (-91.4%);
+raw JSON 7.47 MB -> 0.29 MB (-96.1%).
+
+**Sibling checked:** the trial path has no `result_data` consumer at all —
+`server/routes/trial.js`, `TrialWizard.tsx` and `TrialGenerationPage.tsx`
+contain no reference to the job result; the trial flow does not run through
+`story_jobs`. `GenerationContext` reads only `storyId` and `shareToken`.
+
+**Touched:** storyJobPipeline.js, client/src/pages/StoryWizard.tsx,
+client/src/services/storyService.ts, tests/unit/scene-expansion-report.test.ts
+**Status:** ✅ active
+
+## The no-images-in-JSONB rule is checked, not remembered (2026-09-21)
+
+**Context:** the IRON RULE — no image bytes in JSONB, R2 only,
+`extractInlineImagesToR2()` is the offload path — has been restated to agents
+many times and re-broken every time a new field started carrying bytes. The
+existing automatic cleanup, `offloadInlineImages()` in the daily Railway
+housekeeping routine, only looks at `characters.data` and `stories.data`: the two
+columns it was built for. Nothing ever asked the question the rule actually
+states, of the whole schema.
+
+**Decision:** `sweepInlineImages(pool)` in `server/lib/dbHousekeeping.js` sweeps
+EVERY json/jsonb column, discovered from `information_schema` so a column added
+tomorrow is covered tomorrow. It runs inside `runDailyHousekeeping` (03:30 CH,
+each Railway service against its own database) and logs an `error` per offending
+column with the exact key paths; `scripts/admin/check-inline-images.js` is the
+same sweep on demand against either environment, exiting non-zero on any find.
+`tests/unit/no-inline-images-in-jsonb.test.ts` pins the save path: a blob with
+bytes in every at-risk slot goes through `extractInlineImagesToR2` and the sweep
+must find nothing left — so a NEW leak fails at the commit that adds it.
+
+**Declared exception:** `story_job_checkpoints.step_data` for the `partial_page`
+and `partial_cover` steps. Those bytes ARE the progressive-display payload the
+status poll streams to the wizard before the story row exists, and they are
+deleted with their job. They are reported under their own heading and do not
+fail the sweep. Any other `step_name` carrying bytes does fail.
+
+**What the first full sweep found (2026-09-21, read-only, both environments):**
+- staging: `characters.metadata` 20/45 rows, 39.96 MB, all at
+  `$.characters[].avatars.storyHistory[].sheetUrl`; `story_jobs.input_data`
+  5/14 rows, 40.8 MB (the whole character payload — photos, styled avatars,
+  pre-generated slides); `users.trial_data` 7 rows, 3.77 MB of
+  `$.characterData.photos.*`; `testlab_experiments.results` 11.98 MB and
+  `.params` 3.08 MB. `stories.data`, `story_jobs.result_data` and
+  `characters.data` were CLEAN.
+- production: `characters.metadata` 23/70 rows, 25.3 MB (same `sheetUrl` path,
+  plus `preGeneratedTitlePage` / `preGeneratedStyledAvatars`);
+  `users.trial_data` 11/70 rows, 8.4 MB. `stories.data`,
+  `story_jobs.result_data` and `characters.data` were CLEAN.
+
+**Still open (owner's call, NOT done here):** extending `offloadInlineImages` past
+`data` to `characters.metadata`, `story_jobs.input_data`, `users.trial_data` and
+the Test Lab columns would rewrite live production rows, which is a migration
+decision rather than a guard. The guard reports them every morning until then.
+
+**Touched:** server/lib/dbHousekeeping.js, scripts/admin/check-inline-images.js
+(new), tests/unit/no-inline-images-in-jsonb.test.ts (new)
+**Status:** ✅ active

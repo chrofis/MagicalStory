@@ -406,6 +406,7 @@ export default function StoryWizard() {
   const [textRefineReport, setTextRefineReport] = useState<any>(null); // Per-page refine before/after (dev mode)
   const [arcReviewReport, setArcReviewReport] = useState<any>(null); // Arc draft + review analysis (dev mode)
   const [beatsReviewReport, setBeatsReviewReport] = useState<any>(null); // Per-page beats-review before/after (dev mode)
+  const [clothingReviewReport, setClothingReviewReport] = useState<any>(null); // Wardrobe review: outfits in, outfits rewritten (dev mode)
   const [sceneReviewReport, setSceneReviewReport] = useState<any>(null); // Per-page scene-review before/after (dev mode)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
   const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
@@ -765,6 +766,12 @@ export default function StoryWizard() {
       // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
       setSceneDescriptions(devMetadata.sceneDescriptions);
       setSceneExpansionReport((devMetadata as any).sceneExpansionReport || null);
+    }
+
+    // The wardrobe review stands on its own (it has no pages), so it is loaded
+    // outside the scene-descriptions guard.
+    if ((devMetadata as any).clothingReviewReport) {
+      setClothingReviewReport((devMetadata as any).clothingReviewReport);
     }
 
     // Load visual bible from dev metadata
@@ -1143,6 +1150,7 @@ export default function StoryWizard() {
             setTextRefineReport((fullMeta as any).textRefineReport || null);
             setArcReviewReport((fullMeta as any).arcReviewReport || null);
             setBeatsReviewReport((fullMeta as any).beatsReviewReport || null);
+            setClothingReviewReport((fullMeta as any).clothingReviewReport || null);
             setSceneReviewReport((fullMeta as any).sceneReviewReport || null);
             setSceneExpansionReport((fullMeta as any).sceneExpansionReport || null);
             setStoryTextPrompts(fullMeta.storyTextPrompts || []);
@@ -4319,12 +4327,15 @@ export default function StoryWizard() {
           setTextRefineReport((status.result as any).textRefineReport || null);
           setArcReviewReport((status.result as any).arcReviewReport || null);
           setBeatsReviewReport((status.result as any).beatsReviewReport || null);
+          setClothingReviewReport((status.result as any).clothingReviewReport || null);
           setSceneReviewReport((status.result as any).sceneReviewReport || null);
           setStoryTextPrompts(status.result.storyTextPrompts || []);
           setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
           setCostumedAvatarGeneration(status.result.costumedAvatarGeneration || []);
           setGenerationLog(status.result.generationLog || []);
-          setFinalChecksReport(status.result.finalChecksReport || null);
+          // finalChecksReport is NOT on the job result (result_data is a projection,
+          // not a second copy of the story). The dev-metadata effect keyed on
+          // storyId loads it from stories.data once setStoryId above lands.
           // Ensure visualBible has required fields (backward compatibility)
           if (status.result.visualBible) {
             setVisualBible({
@@ -4348,12 +4359,21 @@ export default function StoryWizard() {
           }
           setGeneratedStory(status.result.story);
           setOriginalStory(status.result.story); // Store original for restore functionality
-          setSceneDescriptions(status.result.sceneDescriptions || []);
           setSceneExpansionReport((status.result as any).sceneExpansionReport || null);
-          // result_data has scene metadata but no imageData (stripped for performance)
-          // Merge with any imageData from progressive display or loadSavedStory
-          const resultSceneImages = status.result.sceneImages || [];
-          const resultCoverImages = status.result.coverImages || { frontCover: null, initialPage: null, backCover: null };
+          // Page and cover metadata are NOT on the job result any more: result_data
+          // is the status payload, not a second copy of the book (it was 7.7 MB of
+          // duplicate). stories.data + story_images are the store, and
+          // GET /api/stories/:id/metadata already builds the exact same
+          // sceneImages/coverImages/sceneDescriptions shape from them, including
+          // per-version dev metadata. Load it once here; imageData stays whatever
+          // progressive streaming already put in state.
+          const finalMeta = await storyService.getStoryMetadata(status.result.storyId, developerMode);
+          if (!finalMeta) {
+            throw new Error(`Story ${status.result.storyId} completed but its metadata could not be loaded`);
+          }
+          setSceneDescriptions(finalMeta.sceneDescriptions || []);
+          const resultSceneImages = finalMeta.sceneImages || [];
+          const resultCoverImages = finalMeta.coverImages || { frontCover: null, initialPage: null, backCover: null };
           setSceneImages(prev => {
             if (resultSceneImages.length === 0) return prev;
             return resultSceneImages.map(img => {
@@ -4367,7 +4387,7 @@ export default function StoryWizard() {
           setCoverImages(prev => ({
             frontCover: resultCoverImages.frontCover
               ? { ...resultCoverImages.frontCover, imageData: prev.frontCover?.imageData || resultCoverImages.frontCover?.imageData }
-              : prev.frontCover,  // Keep streaming data if result has no cover
+              : prev.frontCover,  // Keep streaming data if metadata has no cover
             initialPage: resultCoverImages.initialPage
               ? { ...resultCoverImages.initialPage, imageData: prev.initialPage?.imageData || resultCoverImages.initialPage?.imageData }
               : prev.initialPage,
@@ -4895,6 +4915,7 @@ export default function StoryWizard() {
               textRefineReport={textRefineReport}
               arcReviewReport={arcReviewReport}
               beatsReviewReport={beatsReviewReport}
+              clothingReviewReport={clothingReviewReport}
               sceneReviewReport={sceneReviewReport}
               storyTextPrompts={storyTextPrompts}
               visualBible={visualBible || undefined}

@@ -406,6 +406,15 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'arcReviewReport', data::jsonb->'arcReviewReport',
             'beatsReviewReport', data::jsonb->'beatsReviewReport',
             'sceneReviewReport', data::jsonb->'sceneReviewReport',
+            -- The wardrobe review, minus its ~13 KB prompt: it is the same text
+            -- for every story and nothing on a saved-story load reads it, so it
+            -- is stripped here the way the Art Director prompt was (2026-09-21).
+            -- The live generation payload still carries it.
+            'clothingReviewReport', CASE
+              WHEN jsonb_typeof(data::jsonb->'clothingReviewReport') = 'object'
+                THEN (data::jsonb->'clothingReviewReport') - 'prompt'
+              ELSE data::jsonb->'clothingReviewReport'
+            END,
             'storyTextPrompts', data::jsonb->'storyTextPrompts',
             'story', COALESCE(data::jsonb->'story', data::jsonb->'storyText'),
             'originalStory', COALESCE(data::jsonb->'originalStory', data::jsonb->'storyText'),

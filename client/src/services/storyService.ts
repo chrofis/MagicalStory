@@ -149,6 +149,7 @@ interface StoryDetailsServer {
   arcReviewReport?: SavedStory['arcReviewReport'];
   beatsReviewReport?: SavedStory['beatsReviewReport'];
   sceneReviewReport?: SavedStory['sceneReviewReport'];
+  clothingReviewReport?: SavedStory['clothingReviewReport'];
   id: string;
   title: string;
   storyType: string;
@@ -425,6 +426,7 @@ export const storyService = {
       arcReviewReport: s.arcReviewReport,
       beatsReviewReport: s.beatsReviewReport,
       sceneReviewReport: s.sceneReviewReport,
+      clothingReviewReport: s.clothingReviewReport,
       story: storyContent,
       storyTextPrompts: s.storyTextPrompts,
       visualBible: s.visualBible,
@@ -1995,12 +1997,8 @@ export const storyService = {
         } | null;
       }>;
       generationLog?: GenerationLogEntry[];
-      finalChecksReport?: FinalChecksReport;
-      sceneDescriptions: SceneDescription[];
       /** Art Director prompt table; sceneDescriptions[].scenePromptRef indexes into it. */
       sceneExpansionReport?: SceneExpansionReport | null;
-      sceneImages: SceneImage[];
-      coverImages?: CoverImages;
     };
     partialCovers?: CoverImages; // Cover images generated during streaming (before job completion)
     storyText?: {  // Story text for progressive display while images generate
@@ -2080,10 +2078,7 @@ export const storyService = {
         }>;
         generationLog?: GenerationLogEntry[];
         finalChecksReport?: FinalChecksReport;
-        sceneDescriptions?: SceneDescription[];
         sceneExpansionReport?: SceneExpansionReport | null;
-        sceneImages?: SceneImage[];
-        coverImages?: CoverImages;
       };
       errorMessage?: string;
       partialCovers?: CoverImages; // Cover images generated during streaming
@@ -2157,10 +2152,7 @@ export const storyService = {
         }>;
         generationLog?: GenerationLogEntry[];
         finalChecksReport?: FinalChecksReport;
-        sceneDescriptions?: SceneDescription[];
         sceneExpansionReport?: SceneExpansionReport | null;
-        sceneImages?: SceneImage[];
-        coverImages?: CoverImages;
       };
       // Bandwidth optimization: tell the server which page images the client already
       // has so it can omit their (large) base64 payloads. Absent/empty = full payload.
@@ -2190,12 +2182,12 @@ export const storyService = {
         styledAvatarGeneration: resultData.styledAvatarGeneration,
         costumedAvatarGeneration: resultData.costumedAvatarGeneration,
         generationLog: resultData.generationLog,
-        sceneDescriptions: resultData.sceneDescriptions || [],
         // The Art Director prompt table sceneDescriptions[].scenePromptRef
         // indexes into — one ~112 KB copy per story instead of one per page.
         sceneExpansionReport: resultData.sceneExpansionReport || null,
-        sceneImages: resultData.sceneImages || [],
-        coverImages: resultData.coverImages,
+        // sceneDescriptions / sceneImages / coverImages are NOT on the job
+        // result: result_data is the status payload, not a second copy of the
+        // story. Read them from GET /api/stories/:id/metadata.
       } : undefined,
       partialCovers: response.partialCovers, // Cover images generated during streaming
       storyText: response.storyText, // Story text for progressive display

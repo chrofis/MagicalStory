@@ -1111,6 +1111,32 @@ export interface ArcReviewReport {
   arcHints?: string;
 }
 
+/**
+ * The wardrobe review's record (beats pipeline, step 3b). It runs on every
+ * story before any avatar exists and rewrote an outfit on roughly half of
+ * recent staging runs, so what it changed is worth reading.
+ *
+ * Note the two category spellings: `outfitsIn[].category` is the wardrobe slot
+ * (`standard` | `costumed`) with the costume in its own field, while
+ * `changed[].category` carries the costume inline as `costumed:<costume>`.
+ * `outfitsIn[].description` is the outfit AFTER the review (the report is
+ * built once the rewrites are merged) — the pre-review text lives only in
+ * `changed[].before`.
+ */
+export interface ClothingReviewReport {
+  model?: string | null;
+  durationMs?: number;
+  analysis?: string;
+  changed?: { name: string; category: string; before: string; after: string }[];
+  outfitsIn?: { name: string; category: string; costume?: string | null; description: string }[];
+  /**
+   * The exact prompt the reviewer received (~13 KB). Present on the live
+   * generation payload only — the saved-story metadata route strips it rather
+   * than ship it on every story load.
+   */
+  prompt?: string | null;
+}
+
 export interface ReviewDiffReport {
   model?: string | null;
   durationMs?: number;
@@ -1197,6 +1223,8 @@ export interface SavedStory {
   beatsReviewReport?: ReviewDiffReport | null;
   /** Per-page before/after from the scene review (beats pipeline, dev-mode diff). */
   sceneReviewReport?: ReviewDiffReport | null;
+  /** What the wardrobe review was given and what it rewrote (dev-mode panel). */
+  clothingReviewReport?: ClothingReviewReport | null;
   story?: string;
   originalStory?: string;  // Original AI-generated story text (preserved on first edit)
   storyTextPrompts?: Array<{
