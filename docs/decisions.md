@@ -55210,3 +55210,61 @@ the whole time. Fixing the construction is the rule this repo already has
 `server/lib/images.js` (substitution), `server/lib/repairPipeline.js`,
 `server/lib/testlab.js` (thread `detectedFigures`).
 **Status:** ✅ active
+
+## 2026-09-22 — VALIDATED: the emotion loop closes end to end on p7
+
+Ran after the shared descriptor helper landed. Every step measured, nothing
+hand-written.
+
+**1. Detect** (Lab 1395, `semantic_eval` on the shipped page):
+
+| character | declared | drawn | severity |
+|---|---|---|---|
+| Levin | angry | smiling broadly | CRITICAL |
+| Julian | upset | smiling broadly | CRITICAL |
+| Max | shocked | smiling broadly | CRITICAL |
+| Kiaan | frowning | neutral / mildly frowning | MAJOR |
+
+Valence inversion CRITICAL, against-neutral MAJOR, one finding per character —
+the owner's rule exactly. Regression: p18 and p3 returned **zero**.
+
+**2. Consolidate + repair** (Lab 1397). One grouped `scene_fix`,
+`types: ["emotion"]`, severity CRITICAL, `per_character_fixes: 0`. The
+instruction reaching the image model:
+
+> the 5-year-old boy, second from the left in red fleece: remove smile, show
+> deeply furrowed brows and open shouting mouth; the 3-year-old boy, third from
+> the left in yellow gilet: remove smile, show trembling lip and wide sad eyes;
+> the 3-year-old boy, fourth from the left in orange hoodie: remove smile, show
+> mouth agape; the 3-year-old boy, on the far right in green anorak: remove
+> neutral frown, show pinched brows, pressed lips, and balled hands.
+
+Every child identified by age + position + garment, every clause carrying both
+the expression to remove and the one to show. Compare the previous attempt,
+which reached the model as "the 3-year-old male figure" three times over.
+
+**3. Result** (Lab 1398, the blind describer on the repaired render):
+
+| garment | declared | before | after |
+|---|---|---|---|
+| blue (Silvan) | triumphant | happy | happy |
+| red (Levin) | angry | neutral | **angry** |
+| yellow (Julian) | upset | happy | **sad** |
+| orange (Max) | shocked | happy | **angry** |
+| green (Kiaan) | frowning | neutral | **angry** |
+
+Four different, individually-correct faces — not the single flattened "angry"
+an earlier hand-written instruction produced. Silvan stays pleased, which is
+what the brief asks. Composition, poses, scooter, egg and background unchanged.
+
+**4. Re-judge** (Lab 1399, `semantic_eval` on the repaired render): **0 issues.**
+
+**Residual, stated:** Max reads `angry` where the brief says `shocked`. Right
+valence, flattened nuance — and correctly NOT a finding, because the gross-only
+rule protects exactly that distinction. Gaze was untouched here: the findings fed
+in were the semantic judge's own, which carry emotion and action_interaction but
+not the gaze comparison, so all five still read `at the viewer`.
+
+**Touched:** no code — this entry records the validation of the four rule
+changes plus the descriptor helper.
+**Status:** ✅ active
