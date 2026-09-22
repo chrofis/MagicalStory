@@ -55043,3 +55043,69 @@ work has a spec.
 
 **Touched:** no code. Lab 1390 (all four), 1391 (two), 1392/1393 (verification).
 **Status:** ✅ active
+
+## 2026-09-22 — Wrong expressions: four rules corrected, nothing built
+
+**Context:** The owner asked for detection and repair of wrong expressions,
+fitted to the existing pipeline, with no new calls. Recon found there was almost
+nothing to build.
+
+**What already existed, verified rather than assumed:**
+- `emotion` is a finding type in `image-semantic.txt`'s closed vocabulary.
+- `evalBuckets.js:231` aliases `expression` onto the `emotion` bucket (owner
+  `semantic`, kind `graded`, repair `inpaint`), so scoring and routing work.
+- `emotion` is in `SAFE_REPAIRABLE_TYPES` and absent from
+  `NOT_INPAINTABLE_TYPES`, so it admits a page to repair and survives the
+  inpaint type gate.
+- **The judge already detects it.** p7's stored eval carries three `[MAJOR]
+  emotion` findings naming Levin, Julian and Max, each quoting the declared
+  expression and the drawn one.
+- **The consolidator already plans it.** That page's stored plan carries all
+  three in `deduped_issues` and two as `per_character_fixes` with bbox and
+  instruction.
+- **The executor already applies it.** Replaying p7's OWN stored eval through
+  current code (Lab 1394) sent: "2. …Furrow this character's brows deeply.
+  3. …Widen this character's eyes."
+
+p7 shipped unrepaired because of the `semanticResult.issues` empty-but-truthy
+executor bug fixed earlier the same day — not because of anything about emotion.
+
+**Decision — four rule corrections, no new machinery:**
+
+1. `image-semantic.txt`: a gross contradiction in the OPPOSITE VALENCE on the
+   HEADLINE beat is **CRITICAL**. It was "never CRITICAL for an expression
+   alone", which meant a wrong face could never trigger a repair on a page that
+   was otherwise passing — and the owner's rule is that only CRITICAL and above
+   earn a repair.
+2. `image-semantic.txt`: **one emotion issue per CHARACTER**, was "at most ONE
+   per page". The judge already ignored the cap (p7 emitted three), so the rule
+   served only to make the behaviour undefined.
+3. `feedback-consolidator.txt` rule 8b: two or more `emotion` findings on
+   different characters become **ONE `scene_fix`** naming each character, so N
+   faces cost 1 of the 3 fix slots rather than N.
+4. `feedback-consolidator.txt` rule 8b: an `emotion` instruction must state that
+   the contradicting expression is **removed**, the one exception to the
+   critique's single-atomic-action rule.
+
+**Deliberately unchanged:** the clause "a neutral, mild, calm or gently-pleasant
+expression **SATISFIES** the beat and is a non-deduction". That is the owner's
+rule that a neutral face is not a defect and must never buy a paid repair, and it
+is also `N-03`'s instinct in `image-evaluation.txt`, which is left alone — that
+rule governs the SIGHTED quality judge, which is not the detector here.
+
+**Rationale, measured on p7 of job_1789853503332_riqncqg1i:**
+- Repainting all four wrong faces in one pass beat repainting the two
+  highest-severity and leaving the third still smiling (Lab 1390 vs 1391). Hence
+  rule 3: the trigger stays narrow, the pass goes wide. Those were being
+  conflated.
+- A thin instruction leaves the smile. "Furrow this character's brows deeply"
+  did not remove it; "repaint as upset … remove the smile completely" did. Hence
+  rule 4.
+- Repair flattens nuance: `upset` and `shocked` both came back `angry`. The
+  check must therefore compare VALENCE, never the exact word, or a correctly
+  repaired page would keep reporting findings.
+
+**Touched:** `prompts/image-semantic.txt`, `prompts/feedback-consolidator.txt`,
+`server/lib/evalBuckets.js` (the bucket comment stated the two reversed clauses
+as settled fact and now records the reversal).
+**Status:** ✅ active — rules landed; end-to-end rung-2 validation still owed.
