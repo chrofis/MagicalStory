@@ -55109,3 +55109,58 @@ rule governs the SIGHTED quality judge, which is not the detector here.
 `server/lib/evalBuckets.js` (the bucket comment stated the two reversed clauses
 as settled fact and now records the reversal).
 **Status:** ✅ active — rules landed; end-to-end rung-2 validation still owed.
+
+## 2026-09-22 — Validating the emotion rules found two defects IN the rules
+
+**Context:** The four rule corrections above were validated end-to-end on p7 of
+job_1789853503332_riqncqg1i. The severity and count rules landed exactly as
+specified; the consolidator rule did not.
+
+**What worked (Lab 1395, the re-judged page):**
+
+| character | declared | drawn | severity |
+|---|---|---|---|
+| Levin | angry | smiling broadly | **CRITICAL** |
+| Julian | upset | smiling broadly | **CRITICAL** |
+| Max | shocked | smiling broadly | **CRITICAL** |
+| Kiaan | frowning | neutral / mildly frowning | **MAJOR** |
+
+A valence inversion is CRITICAL, a mismatch against neutral is MAJOR, and the
+count is per character — all three exactly as intended. Regression held: p18 and
+p3 (semantic 100 before) returned **zero** issues, so the CRITICAL rule is not
+firing on correct pages.
+
+Grouping worked too: `scene_fix.types: ["emotion"]`, severity CRITICAL, ONE
+fix, `per_character_fixes: 0` — four faces in one of the three slots.
+
+**What broke (Lab 1396), both of them faults in rule 8b as written:**
+
+1. **It told the consolidator to NAME each character**, contradicting rule 3
+   ("Grok does NOT know character names. This is non-negotiable"). The
+   consolidator obeyed the newer rule and wrote "Remove the smiles from Levin,
+   Julian, Max, and Kiaan". The safety net at `images.js:3150` then substituted
+   each name — but grouping into `scene_fix` deletes the `per_character_fixes`
+   entries that `visual_identifier` comes from, so every name fell through to
+   the age/gender fallback. Four same-age boys reached the image model as "the
+   3-year-old male figure" three times over, which targets nobody.
+2. **It mandated the removal of the old expression but only suggested the new
+   one**, and the ≤10-word critique then dropped the new one. The page came back
+   with every smile gone and four expressionless children — better than smiling
+   through a theft, and not the declared beat.
+
+**Decision:** rule 8b now (a) requires each child identified by CLOTHING, per
+rule 3, since grouping removes the source of the good identifier, (b) requires
+each clause to carry BOTH halves — the expression to remove and the expression
+to show — and (c) is stated as an explicit exception to the single-action and
+≤10-word critique rules, because it is one clause per face and those rules exist
+to stop different changes being glued together, not the same change repeated.
+
+**Rationale:** the failure mode is instructive beyond emotion. A rule that moves
+work from `per_character_fixes` to `scene_fix` silently loses everything the
+per-character channel carries — `visual_identifier`, `bbox`, `characterName` —
+and the fallbacks behind them are tuned for a single stray name, not for a whole
+cast. Any future grouping rule has to re-supply what it drops.
+
+**Touched:** `prompts/feedback-consolidator.txt` (rule 8b).
+**Status:** ✅ active — severity/count/regression verified; the corrected
+grouped instruction is not yet re-measured on an image.
