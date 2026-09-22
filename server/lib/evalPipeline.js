@@ -3162,7 +3162,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                 declared: require('./vbIdGuard').gazeCharacters(declaredSceneMeta),
                 inventory: p1Result,
                 matches,
-                castNames: expectedCast.names,
                 resolveTarget: (t) => require('./compositeCastBuilder')
                   .resolveLooksAt(t, evalOptions.visualBible || null),
               });

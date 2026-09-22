@@ -118,13 +118,11 @@ function eyesNotVisible(inventory, figureLabel) {
  * @param {Object}   args.inventory  the prompt-blind inventory JSON
  * @param {Array}    args.matches    the eval's figure→character pairing, each
  *                                   entry carrying `reference` and `body_bbox`
- * @param {string[]} args.castNames  every character name in this story
  * @param {Function} [args.resolveTarget] (looksAt) => human-readable target name
  * @returns {Array} findings, each {type, severity, character, description, fix}
  */
-function checkDeclaredGaze({ declared, inventory, matches, castNames, resolveTarget } = {}) {
+function checkDeclaredGaze({ declared, inventory, matches, resolveTarget } = {}) {
   const chars = Array.isArray(declared) ? declared : [];
-  const cast = (Array.isArray(castNames) ? castNames : []).map(norm).filter(Boolean);
   if (!chars.length || !inventory) return [];
 
   // figure label -> the character standing there, both normalised
@@ -163,7 +161,6 @@ function checkDeclaredGaze({ declared, inventory, matches, castNames, resolveTar
     // any other target is a thing the brief did not name, so there is nothing
     // to disagree with.
     if (declaredAway && seen.kind !== 'viewer') continue;
-    const declaredIsCharacter = cast.includes(norm(targetName)) || cast.includes(norm(looksAt));
 
     let contradiction = null;
     if (seen.kind === 'viewer') {
@@ -182,22 +179,21 @@ function checkDeclaredGaze({ declared, inventory, matches, castNames, resolveTar
       // the picture therefore still goes unreported: the loss is real and is
       // preferred to a MAJOR finding that buys a repair on a correct figure.
       contradiction = null;
-    } else if (seen.kind === 'figure') {
+    } else if (seen.kind === 'figure' && !handsFull(inventory, seen.label)) {
+      // ONE RULE FOR BOTH (2026-09-22). The hands-full guard used to cover
+      // only the case where the brief named an OBJECT. But a story's animals
+      // are named cast members, so `looksAt: ANI001` resolved to "Zippi" and
+      // took the person-to-person branch, where the guard did not apply — and
+      // on the repaired p18 of job_1789853503332_riqncqg1i that reported three
+      // children as looking at the wrong thing when their eyes had landed on
+      // the child CARRYING the dragon they were sent to look at. The geometry
+      // does not care whether the held thing is an artifact or a creature with
+      // a name: eyes on a carrier and eyes on what they carry are one ray.
       const seenCharacter = charAt.get(norm(seen.label));
-      if (declaredIsCharacter) {
-        // Both sides name a person, so the finding needs both names: an
-        // unpaired figure might BE the declared character under another
-        // description, and there is no way from here to tell.
-        if (seenCharacter && seenCharacter !== norm(targetName) && seenCharacter !== norm(looksAt)) {
-          contradiction = `the eyes are on ${seen.label}`;
-        }
-      } else if (seenCharacter && !handsFull(inventory, seen.label)) {
-        // The brief sends the eyes to a THING and the witness sees them on a
-        // NAMED person — and the name is what proves the two are different
-        // entities. Without it this fired on p17 of job_1789853503332_riqncqg1i,
-        // where the brief said `ANI001` (the story's dragon) and the describer,
-        // which may not name anyone, wrote `the small green creature`: the same
-        // animal under two descriptions, reported as a defect.
+      // The finding needs a NAME for the figure the eyes landed on: an
+      // unpaired figure might BE the declared character under another
+      // description, and there is no way from here to tell.
+      if (seenCharacter && seenCharacter !== norm(targetName) && seenCharacter !== norm(looksAt)) {
         contradiction = `the eyes are on ${seen.label}`;
       }
     }

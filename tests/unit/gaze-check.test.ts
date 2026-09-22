@@ -25,7 +25,6 @@ import FIXTURE from './fixtures/gaze-declared-vs-observed-job_1789853503332_riqn
  * bought a repair on a correct figure.
  */
 const PAGES: any = FIXTURE.pages;
-const CAST = ['Levin', 'Julian', 'Max', 'Kiaan', 'Silvan', 'Zippi'];
 // The brief stores Visual Bible ids; a finding has to say the noun.
 const NOUNS: Record<string, string> = { ART001: 'large egg', ANI001: 'Zippi', LOC002: 'Schipfe Steps' };
 const resolveTarget = (id: string) => NOUNS[id] ?? null;
@@ -34,7 +33,6 @@ const run = (page: string) => checkDeclaredGaze({
   declared: PAGES[page].declared,
   inventory: PAGES[page].inventory,
   matches: PAGES[page].matches,
-  castNames: CAST,
   resolveTarget,
 });
 
@@ -106,20 +104,20 @@ describe('every uncertainty is a skip, never a finding', () => {
   it('no declared gaze — nothing to contradict', () => {
     expect(checkDeclaredGaze({
       declared: p6.declared.map((c: any) => ({ name: c.name })),
-      inventory: p6.inventory, matches: p6.matches, castNames: CAST, resolveTarget,
+      inventory: p6.inventory, matches: p6.matches, resolveTarget,
     })).toEqual([]);
   });
 
   it('no pairing — the finding could not name anyone truthfully', () => {
     expect(checkDeclaredGaze({
-      declared: p6.declared, inventory: p6.inventory, matches: [], castNames: CAST, resolveTarget,
+      declared: p6.declared, inventory: p6.inventory, matches: [], resolveTarget,
     })).toEqual([]);
   });
 
   it('declared at a person and observed at that same person is agreement', () => {
     expect(checkDeclaredGaze({
       declared: [{ name: 'Kiaan', looksAt: 'Max' }],
-      inventory: p6.inventory, matches: p6.matches, castNames: CAST, resolveTarget,
+      inventory: p6.inventory, matches: p6.matches, resolveTarget,
     })).toEqual([]);
   });
 
@@ -137,24 +135,65 @@ describe('every uncertainty is a skip, never a finding', () => {
           ? { ...f, items_held: { left: 'a large egg', right: 'a large egg' } } : f),
     };
     expect(checkDeclaredGaze({
-      declared: p6.declared, inventory: inv, matches: p6.matches, castNames: CAST, resolveTarget,
+      declared: p6.declared, inventory: inv, matches: p6.matches, resolveTarget,
     })).toEqual([]);
   });
 
   it('a Visual Bible id the bible cannot name is a skip, not a finding with an id in it', () => {
     expect(checkDeclaredGaze({
       declared: p6.declared, inventory: p6.inventory, matches: p6.matches,
-      castNames: CAST, resolveTarget: () => null,
+      resolveTarget: () => null,
     })).toEqual([]);
     expect(checkDeclaredGaze({
       declared: p6.declared, inventory: p6.inventory, matches: p6.matches,
-      castNames: CAST, resolveTarget: (t: string) => t,      // hands back the raw id
+      resolveTarget: (t: string) => t,      // hands back the raw id
     })).toEqual([]);
   });
 
   it('returns nothing at all without an inventory or a brief', () => {
     expect(checkDeclaredGaze({ declared: p6.declared, inventory: null, matches: p6.matches })).toEqual([]);
     expect(checkDeclaredGaze({})).toEqual([]);
+  });
+});
+
+/**
+ * THE REPAIRED RENDERS (Lab 1383/1384 inpaint, described by Lab 1385/1386).
+ *
+ * A detector that cannot tell a fixed page from a broken one is worse than no
+ * detector, so the repaired images are pinned here beside the broken ones.
+ */
+describe('after the page was actually repaired', () => {
+  const runAfter = (page: string) => checkDeclaredGaze({
+    declared: PAGES[page].declared, inventory: PAGES[page].inventory,
+    matches: PAGES[page].matches, resolveTarget,
+  });
+
+  it('p6: three of the four eyes moved onto the egg, and only the fourth is still reported', () => {
+    const before = PAGES['6'].inventory.figures.filter((f: any) => /egg/i.test(String(f.gaze))).length;
+    const after = PAGES['6_after_repair'].inventory.figures.filter((f: any) => /egg/i.test(String(f.gaze))).length;
+    expect(before).toBe(0);
+    expect(after).toBe(3);
+    const f = runAfter('6_after_repair');
+    expect(f).toHaveLength(1);
+    expect(f[0].character).toBe('Levin');            // genuinely still on another child
+  });
+
+  it('p18: eyes that landed on the child CARRYING the target are not a defect', () => {
+    // The repair moved all three from "at the viewer" onto the boy in yellow —
+    // who is holding the dragon they were sent to look at. Eyes on a carrier and
+    // eyes on what they carry are one ray.
+    const carrier = PAGES['18_after_repair'].inventory.figures
+      .find((x: any) => /yellow/.test(x.label));
+    expect(JSON.stringify(carrier.items_held)).toMatch(/dragon/i);
+    expect(runAfter('18_after_repair')).toEqual([]);
+  });
+
+  it('the carrier guard holds even though the target is a NAMED cast member', () => {
+    // `looksAt: ANI001` resolves to "Zippi", a name, which used to route past
+    // the guard down the person-to-person branch and fire three false MAJORs.
+    expect(PAGES['18_after_repair'].declared.some((d: any) => d.looksAt === 'ANI001')).toBe(true);
+    expect(NOUNS.ANI001).toBe('Zippi');
+    expect(runAfter('18_after_repair')).toEqual([]);
   });
 });
 

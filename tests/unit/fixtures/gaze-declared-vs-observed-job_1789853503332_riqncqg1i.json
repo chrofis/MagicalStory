@@ -4,7 +4,8 @@
     "matches": "story_jobs.result_data sceneImages[].imageVersions[].matches — the sighted evaluator, job_1789853503332_riqncqg1i",
     "declared": "sceneMetadata.fullData.characters[].looksAt via gazeCharacters()",
     "eyewitness": "12 pages independently re-described from the image alone by a second reader (workflow gaze-eyewitness, 2026-09-22) — used to decide which of the describer answers may fire",
-    "captured": "2026-09-22"
+    "captured": "2026-09-22",
+    "afterRepair": "Lab 1385/1386 — the same blind describer on the INPAINT-repaired renders (p6 v3, p18 v2, Lab 1383/1384). Kept as the regression case for the carrier guard."
   },
   "pages": {
     "2": {
@@ -848,6 +849,426 @@
             "from": "the child in yellow vest",
             "to": "the small green creature",
             "observed": "holds the eggshell that contains the creature, faces it, looks at it with a smile"
+          }
+        ]
+      }
+    },
+    "6_after_repair": {
+      "declared": [
+        {
+          "name": "Levin",
+          "looksAt": "ART001"
+        },
+        {
+          "name": "Julian",
+          "looksAt": "ART001"
+        },
+        {
+          "name": "Max",
+          "looksAt": "ART001"
+        },
+        {
+          "name": "Kiaan",
+          "looksAt": "ART001"
+        }
+      ],
+      "matches": [
+        {
+          "figure": 1,
+          "body_bbox": [
+            0,
+            0.38,
+            0.33,
+            0.86
+          ],
+          "face_bbox": [
+            0.14,
+            0.41,
+            0.23,
+            0.49
+          ],
+          "reference": "Levin",
+          "confidence": 0.9
+        },
+        {
+          "figure": 2,
+          "body_bbox": [
+            0.23,
+            0.41,
+            0.46,
+            0.89
+          ],
+          "face_bbox": [
+            0.29,
+            0.43,
+            0.38,
+            0.51
+          ],
+          "reference": "Julian",
+          "confidence": 0.9
+        },
+        {
+          "figure": 3,
+          "body_bbox": [
+            0.46,
+            0.42,
+            0.71,
+            0.9
+          ],
+          "face_bbox": [
+            0.55,
+            0.44,
+            0.64,
+            0.52
+          ],
+          "reference": "Max",
+          "confidence": 0.9
+        },
+        {
+          "figure": 4,
+          "body_bbox": [
+            0.63,
+            0.41,
+            0.99,
+            0.89
+          ],
+          "face_bbox": [
+            0.7,
+            0.43,
+            0.79,
+            0.51
+          ],
+          "reference": "Kiaan",
+          "confidence": 0.9
+        }
+      ],
+      "score": 85,
+      "inventory": {
+        "figures": [
+          {
+            "id": 1,
+            "label": "the young boy in red",
+            "facing": "right",
+            "gaze": "at the young boy in yellow",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0,
+              0.38,
+              0.33,
+              0.89
+            ],
+            "face_bbox": [
+              0.18,
+              0.46,
+              0.29,
+              0.57
+            ]
+          },
+          {
+            "id": 2,
+            "label": "the young boy in yellow",
+            "facing": "toward the egg",
+            "gaze": "at the egg",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.28,
+              0.42,
+              0.53,
+              0.91
+            ],
+            "face_bbox": [
+              0.38,
+              0.48,
+              0.47,
+              0.57
+            ]
+          },
+          {
+            "id": 3,
+            "label": "the young boy in orange",
+            "facing": "toward the egg",
+            "gaze": "at the egg",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.49,
+              0.42,
+              0.75,
+              0.92
+            ],
+            "face_bbox": [
+              0.59,
+              0.48,
+              0.68,
+              0.57
+            ]
+          },
+          {
+            "id": 4,
+            "label": "the young boy in green jacket",
+            "facing": "left",
+            "gaze": "at the egg",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.69,
+              0.41,
+              1,
+              0.89
+            ],
+            "face_bbox": [
+              0.71,
+              0.44,
+              0.82,
+              0.55
+            ]
+          }
+        ],
+        "interactions": [
+          {
+            "from": "the young boy in red",
+            "to": "the young boy in yellow",
+            "observed": "faces toward the young boy in yellow"
+          },
+          {
+            "from": "the young boy in yellow",
+            "to": "the young boy in red",
+            "observed": "gaze is not at the young boy in red"
+          },
+          {
+            "from": "the young boy in yellow",
+            "to": "the young boy in orange",
+            "observed": "gaze is not at the young boy in orange"
+          },
+          {
+            "from": "the young boy in orange",
+            "to": "the young boy in yellow",
+            "observed": "gaze is not at the young boy in yellow"
+          },
+          {
+            "from": "the young boy in orange",
+            "to": "the young boy in green jacket",
+            "observed": "gaze is not at the young boy in green jacket"
+          },
+          {
+            "from": "the young boy in green jacket",
+            "to": "the young boy in orange",
+            "observed": "gaze is not at the young boy in orange"
+          }
+        ]
+      }
+    },
+    "18_after_repair": {
+      "declared": [
+        {
+          "name": "Julian",
+          "looksAt": "away"
+        },
+        {
+          "name": "Levin",
+          "looksAt": "ANI001"
+        },
+        {
+          "name": "Max",
+          "looksAt": "ANI001"
+        },
+        {
+          "name": "Kiaan",
+          "looksAt": "ANI001"
+        }
+      ],
+      "matches": [
+        {
+          "figure": 1,
+          "body_bbox": [
+            0.06,
+            0.28,
+            0.26,
+            0.94
+          ],
+          "face_bbox": [
+            0.105,
+            0.29,
+            0.19,
+            0.38
+          ],
+          "reference": "Levin",
+          "confidence": 0.9
+        },
+        {
+          "figure": 2,
+          "body_bbox": [
+            0.21,
+            0.22,
+            0.41,
+            0.84
+          ],
+          "face_bbox": [
+            0.25,
+            0.23,
+            0.33,
+            0.31
+          ],
+          "reference": "Kiaan",
+          "confidence": 0.9
+        },
+        {
+          "figure": 3,
+          "body_bbox": [
+            0.36,
+            0.27,
+            0.56,
+            0.98
+          ],
+          "face_bbox": [
+            0.405,
+            0.28,
+            0.49,
+            0.37
+          ],
+          "reference": "Julian",
+          "confidence": 0.9
+        },
+        {
+          "figure": 4,
+          "body_bbox": [
+            0.7,
+            0.27,
+            0.9,
+            0.94
+          ],
+          "face_bbox": [
+            0.74,
+            0.28,
+            0.83,
+            0.37
+          ],
+          "reference": "Max",
+          "confidence": 0.9
+        }
+      ],
+      "score": 100,
+      "inventory": {
+        "figures": [
+          {
+            "id": 1,
+            "label": "the young boy in red",
+            "facing": "right",
+            "gaze": "at the young boy in yellow",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0,
+              0.27,
+              0.29,
+              0.99
+            ],
+            "face_bbox": [
+              0.11,
+              0.27,
+              0.23,
+              0.39
+            ]
+          },
+          {
+            "id": 2,
+            "label": "the young boy in green jacket",
+            "facing": "right",
+            "gaze": "at the young boy in yellow",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.24,
+              0.22,
+              0.49,
+              0.99
+            ],
+            "face_bbox": [
+              0.32,
+              0.22,
+              0.44,
+              0.34
+            ]
+          },
+          {
+            "id": 3,
+            "label": "the young boy in yellow",
+            "facing": "right",
+            "gaze": "at the young boy in orange",
+            "items_held": {
+              "left": "a green dragon toy",
+              "right": "a green dragon toy"
+            },
+            "body_bbox": [
+              0.41,
+              0.22,
+              0.72,
+              0.99
+            ],
+            "face_bbox": [
+              0.51,
+              0.22,
+              0.64,
+              0.35
+            ]
+          },
+          {
+            "id": 4,
+            "label": "the young boy in orange",
+            "facing": "left",
+            "gaze": "at the young boy in yellow",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.68,
+              0.28,
+              0.99,
+              0.99
+            ],
+            "face_bbox": [
+              0.78,
+              0.28,
+              0.91,
+              0.41
+            ]
+          }
+        ],
+        "interactions": [
+          {
+            "from": "the young boy in red",
+            "to": "the young boy in yellow",
+            "observed": "gazing at him"
+          },
+          {
+            "from": "the young boy in green jacket",
+            "to": "the young boy in yellow",
+            "observed": "gazing at him"
+          },
+          {
+            "from": "the young boy in yellow",
+            "to": "the young boy in orange",
+            "observed": "gazing at him"
+          },
+          {
+            "from": "the young boy in orange",
+            "to": "the young boy in yellow",
+            "observed": "gazing at him"
           }
         ]
       }

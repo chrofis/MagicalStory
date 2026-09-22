@@ -54829,3 +54829,57 @@ toward that decision, not as the decision.
 
 **Touched:** no code. Lab 1380, 1381, 1383, 1384.
 **Status:** ✅ active
+
+## 2026-09-22 — CORRECTION: the inpaint repair DID work, and the check was under-reading it
+
+**Context:** The entry above concluded that a wrong gaze is detected far better
+than it can be repaired, scoring the two repaired pages 1/4 and 0/4 from a
+single independent reader with a binary "eyes on the target" flag. The owner
+looked at the images and disagreed. He was right, on both pages.
+
+**What the production describer says,** run on the repaired renders themselves
+(Lab 1385/1386, qwen3-vl, the same prompt that judged the originals):
+
+| p6 | before (v0) | after inpaint |
+|---|---|---|
+| boy in red | at the viewer | at the boy in yellow |
+| boy in yellow | at the viewer | **at the egg** |
+| boy in orange | not visible | **at the egg** |
+| boy in green | at the boy in orange | **at the egg** |
+
+0 of 4 on the egg → **3 of 4**. On p18 all three children moved from `at the
+viewer` to `at the boy in yellow` — who is holding the dragon they were sent to
+look at.
+
+**Two errors of mine, both worth keeping:**
+
+1. **A binary flag is the wrong instrument for gaze.** The single reader scored
+   an 8° miss ("lands at the head height of the boy holding the dragon; the
+   dragon's head centre lies roughly 8 degrees below that line") exactly the
+   same as looking out of the picture entirely. Direction of change is the
+   measurement that matters; on/off is not. Its prose said the repair worked
+   while its flag said 0/4, and the flag was quoted.
+
+2. **The carrier guard did not cover named creatures.** `handsFull` suppressed
+   "eyes on the person carrying the declared object" only where the brief named
+   an OBJECT. A story's animals are named cast members, so `looksAt: ANI001`
+   resolved to "Zippi", took the person-to-person branch, and reported three
+   children as wrong when their eyes had landed on the child carrying the
+   dragon. Now one rule covers both: eyes on a carrier and eyes on what they
+   carry are one ray, whatever the carried thing is called. `castNames` became
+   dead with it and is deleted from the signature and the call site.
+
+**Corrected verdict:** the masked inpaint path fixes a wrong gaze on these two
+pages. p6 goes from 0/4 to 3/4 with one true finding left (the boy in red is
+genuinely on another child); p18 goes from three findings to zero. The earlier
+conclusion — "detected far better than repaired" — is withdrawn for the inpaint
+path. It stands only for the whole-image edit on p18, which moved nothing.
+
+**Also unchanged:** the `at the viewer` answer still never fires (2026-09-22
+entry above). Both repaired pages are now judged entirely on `at <figure>`
+answers, which is the branch that verified.
+
+**Touched:** `server/lib/gazeCheck.js`, `server/lib/evalPipeline.js`,
+`server/lib/testlab.js` (inventory stage can now load an is_test render),
+`tests/unit/gaze-check.test.ts` (22). Lab 1383-1386.
+**Status:** ✅ active
