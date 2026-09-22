@@ -84,10 +84,19 @@ const BUCKETS = {
   // "how much of our tax is emotion?" was unanswerable and the per-character
   // billing could not separate it from every other catch-all finding. This adds
   // a CODE, not a new deduction: the gross-only rule in image-semantic.txt is
-  // unchanged (a neutral/mild expression still satisfies the beat, at most one
-  // emotion finding per page, never CRITICAL) and image-evaluation's N-03
-  // non-deduction stands. Repair is an inpaint — a face repaint fixes an
-  // expression; a full regen is the expensive wrong answer.
+  // unchanged — a neutral or mild expression still SATISFIES the beat and is
+  // not a deduction — and image-evaluation's N-03 non-deduction stands. Repair
+  // is an inpaint: a face repaint fixes an expression; a full regen is the
+  // expensive wrong answer.
+  //
+  // TWO CLAUSES OF THAT RULE WERE REVERSED ON 2026-09-22 (owner), and this
+  // comment used to state them: it is no longer "at most one per page, never
+  // CRITICAL". A face drawn in the OPPOSITE valence to the headline beat — a
+  // broad smile where the beat is loss or fear — is CRITICAL, because nothing
+  // below CRITICAL reaches a repair on a page that is otherwise passing; and
+  // the count is one finding per CHARACTER, because three children smiling
+  // through the same loss is three faces to repaint, not one. The narrow
+  // trigger and the wide repaint are separate decisions and were conflated.
   emotion:              { owner: 'semantic', kind: 'graded', repair: 'inpaint' },
   // Posing for the camera instead of engaging the scene — the owner's
   // "position / facing" (2026-08-19). Measured over the last 40 stories, 89
