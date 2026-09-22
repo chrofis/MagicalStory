@@ -54804,10 +54804,16 @@ target object, reporting per figure whether the EYES rest on it:
   latter.
 - A downward gaze (p6: the egg sits 36-56° below every eye line) is the case
   that moved at all. A lateral gaze to an object at chest height (p18) did not.
-- The whole-image edit also drifted the composition — figure spacing, tree roots
-  and the egg's size and position all changed, against an instruction that
-  forbade it. The masked inpaint preserved the frame, which is its advantage
-  even though it fixed less.
+- NO MEANINGFUL COMPOSITION DRIFT, on either method. An earlier reading of this
+  experiment claimed the whole-image edit moved figure spacing, removed the
+  foreground objects and resized the egg. That was a BASELINE ERROR, not a
+  result: the comparison image had been fetched as MAX(version_index), which
+  for p6 is v1 — a leftover `is_test` render from Lab 1357. The repairs load
+  through getStoryImage, which filters test rows, so both started from v0.
+  Against v0 both outputs keep the figure spacing, the roots, the egg and the
+  background. The lesson is the pairing, not the pixels: an active-version load
+  and a MAX(version_index) load are different images the moment any Lab step
+  has run on that page.
 
 **Consequence, not yet acted on:** routing `action_interaction` gaze findings to
 the repair pipeline buys a paid call that usually does not fix the page and can
