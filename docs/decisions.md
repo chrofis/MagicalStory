@@ -54883,3 +54883,52 @@ answers, which is the branch that verified.
 `server/lib/testlab.js` (inventory stage can now load an is_test render),
 `tests/unit/gaze-check.test.ts` (22). Lab 1383-1386.
 **Status:** ✅ active
+
+## 2026-09-22 — Split attention is NOT the hard case; figure SCALE is
+
+**Context:** With the inpaint repair shown to work on two pages where the whole
+cast shares one target, the owner asked the sharper question: is there a page
+where two characters look at EACH OTHER while a third looks elsewhere, and is
+that harder?
+
+**There is exactly one** in job_1789853503332_riqncqg1i. p7 stages
+`Silvan->Levin, Levin->Silvan` (a mutual pair) plus `Julian->Silvan,
+Max->Silvan, Kiaan->Silvan` (three onlookers) — five figures, three attention
+targets. It is also the lowest-scoring page of the run at 23.
+
+**It repaired BETTER than the simple pages.** Two findings were fed to the
+production inpaint path: Silvan's eyes to the child in red, and Kiaan's to the
+boy on the scooter. The blind describer afterwards (Lab 1388):
+
+| figure | before | after |
+|---|---|---|
+| boy in blue (Silvan) | at the viewer | **at the young boy in red** |
+| boy in green (Kiaan) | at the viewer | **at the young boy in blue** |
+| red / yellow / orange | at the viewer | unchanged (not repaired) |
+
+Both landed on the exact declared target, named. The mutual pair now reads. The
+check reports zero findings, and the composition — scooter, egg, buildings,
+leaves, every pose — is untouched.
+
+**So the difficulty is not the number of targets.** Each fix is an independent
+head-and-eye turn on one identifiable figure; three targets are no harder than
+one, because nothing about the instruction couples them.
+
+**The real limit is SCALE.** On p7 the four onlookers are a distant row: each
+body box is ~0.11 x 0.35 of the frame against Silvan's 0.32 x 0.86, so their
+faces are roughly 25px and their eyes a few pixels across. Consequences:
+- the describer cannot read them — it answered `at the viewer` for all five
+  before the repair and for all three unrepaired children after it, while an
+  independent reader put those three on Silvan;
+- only HEAD direction can be conveyed at that size, not pupil position, so
+  "turn the eyes" and "turn the head" stop being separable — which is why
+  Kiaan's fix reads cleanly and a pupil-only change would not;
+- the repair is therefore verifiable only for the large figures on the page.
+
+This is the same wall as the eye-colour verdict (owner, 2026-09-21: eyes are too
+small at reading size to carry a colour). Gaze survives further down the size
+range than colour because head direction carries it, but it does not survive to
+a 25px face.
+
+**Touched:** no code. Lab 1387 (repair), 1388 (verification).
+**Status:** ✅ active
