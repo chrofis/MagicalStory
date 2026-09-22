@@ -55268,3 +55268,50 @@ not the gaze comparison, so all five still read `at the viewer`.
 **Touched:** no code — this entry records the validation of the four rule
 changes plus the descriptor helper.
 **Status:** ✅ active
+
+## 2026-09-22 — Gaze and emotion repair in ONE round, verified
+
+**Context:** the owner asked whether a gaze fix and an emotion fix land in the
+same repair round, and stated the requirement: not one round for emotion and a
+second for gaze. The earlier p7 demonstration looked like two, which was an
+artefact of the test harness feeding a single hand-built list.
+
+**It is one round, by construction.** `consolidateEvaluation` reads both lists
+off the SAME evaluation object (`feedbackConsolidator.js:356-363`):
+
+    const rawFixable   = evaluation.fixableIssues || [];                     // gaze lands here
+    const semanticIssues = semanticFindings(evaluation.semanticResult);      // emotion lands here
+
+One call, one plan, one inpaint. Nothing routes gaze separately.
+
+**Verified, not asserted** (Lab 1400/1401/1402 on p15 of
+job_1789853503332_riqncqg1i):
+
+1. The gaze comparison is LIVE in the deployed quality eval — p6 and p15 return
+   real findings carrying `source: 'gaze-check'` inside `fixableIssues`.
+2. One evaluation carrying both lists produced ONE plan whose `deduped_issues`
+   holds all three findings: two gaze (from `fixableIssues`) and one action
+   (from `semanticResult`).
+3. The single instruction sent to the image model covered both, with the
+   descriptor helper supplying discriminating identifiers:
+
+       1. For the preschooler in the green front-zip anorak: Hold the large warm
+          egg extended toward the preschooler in the orange hooded sweatshirt.
+       2. For the preschooler in the orange hooded sweatshirt: Turn this
+          character's eyes to look at the large warm egg.
+
+4. The repaired render delivers both: the egg is held out, and the second child
+   is looking at it.
+
+**One note on consolidation:** three findings became two instructions. Kiaan
+carried both a gaze finding and the action finding, and the consolidator kept
+the higher-severity action for that character. That is the intended one-fix-per-
+character behaviour, not a dropped gaze check.
+
+**No page in this story carries a gaze AND an emotion finding at once**, so the
+merge was demonstrated with gaze + semantic action. The merge is list-level, not
+type-level — `emotion` arrives by the same `semanticResult` path the action
+finding used here.
+
+**Touched:** no code. Lab 1400, 1401, 1402.
+**Status:** ✅ active
