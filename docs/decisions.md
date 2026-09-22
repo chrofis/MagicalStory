@@ -54769,3 +54769,57 @@ becomes trustworthy. The measurement stands regardless of what fires.
 
 **Touched:** no code — this entry is the finding. Lab 1379.
 **Status:**    ✅ active
+
+## 2026-09-22 — A wrong gaze is detected far better than it can be repaired (2 pages, 4 attempts, measured)
+
+**Context:** The declared-vs-observed gaze comparison finds pages where nobody
+looks at what the brief named. The owner's question was the right one: a
+detector is overhead unless the defect can be fixed. So the two worst
+multi-figure pages of job_1789853503332_riqncqg1i were repaired and the results
+read blind.
+
+**What was tried,** both on the stored page image:
+1. `edit_image` — whole-image Grok edit with a hand-written instruction using
+   visual identifiers only (garment colour + position), naming the anatomy to
+   change ("pupils drop to the lower part of the eye, upper eyelid comes down")
+   and forbidding every other change (Lab 1380/1381).
+2. `inpaint` — the PRODUCTION repair path, consolidator → masked inpaint, fed
+   the gaze findings as the evaluation (Lab 1383/1384).
+
+**Result,** each output described blind by a reader given only the image and the
+target object, reporting per figure whether the EYES rest on it:
+
+| page | before | whole-image edit | production inpaint |
+|---|---|---|---|
+| p6 — four children, egg in a tree hollow below eye level | 0/4 | **2/4** | 1/4 |
+| p18 — four children, small dragon held at chest height | 0/4 | **0/4** | 0/4 |
+
+**Findings:**
+- The best single result is 2 of 4, from the CRUDER method. The production
+  inpaint path did worse on p6 and did nothing on p18.
+- p18 did not move at all under either method. On the inpaint output the heads
+  turned toward the dragon while the pupils stayed level and passed above it —
+  the exact head-vs-eyes distinction the check exists to make. Turning a head is
+  not turning a gaze, and the image models do the former when asked for the
+  latter.
+- A downward gaze (p6: the egg sits 36-56° below every eye line) is the case
+  that moved at all. A lateral gaze to an object at chest height (p18) did not.
+- The whole-image edit also drifted the composition — figure spacing, tree roots
+  and the egg's size and position all changed, against an instruction that
+  forbade it. The masked inpaint preserved the frame, which is its advantage
+  even though it fixed less.
+
+**Consequence, not yet acted on:** routing `action_interaction` gaze findings to
+the repair pipeline buys a paid call that usually does not fix the page and can
+damage the frame. The value of this detector may be at GENERATION time — fed
+back into the page prompt or driving a regenerate — rather than as a patch on a
+finished render. That is untested and is a separate experiment.
+
+**NOT a SETTLED reversal.** `docs/SETTLED.md` says "Grok inpaint handles
+structural changes (pose, gaze, body rotation)". This measurement contradicts it
+for gaze specifically, but the reversal protocol wants three or more pages and
+owner sign-off; this is two pages and four attempts. Recorded as evidence
+toward that decision, not as the decision.
+
+**Touched:** no code. Lab 1380, 1381, 1383, 1384.
+**Status:** ✅ active
