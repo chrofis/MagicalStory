@@ -1392,5 +1392,79 @@ function detectionForRetryEntry(scene, entry, index = null) {
   return versions[vi]?.bboxDetection || null;
 }
 
+/**
+ * WHO IS THIS, in words the image model can act on.
+ *
+ * A fix instruction may only identify a figure visually — the image model has
+ * never heard the cast's names (feedback-consolidator rule 3). Everything needed
+ * to say it properly is already on the page: the character's age, the garment
+ * THIS page dresses them in, and where the detector found them standing.
+ *
+ * Built because the substitution in images.js fell back to age plus gender when
+ * a name reached it without a `per_character_fixes` entry to borrow a
+ * `visual_identifier` from. On a cast of four three-year-old boys that renders
+ * as "the 3-year-old male figure" three times over and targets nobody
+ * (measured 2026-09-22 on p7 of job_1789853503332_riqncqg1i). Clothing is what
+ * separates them, and the pipeline has always known it.
+ *
+ * Every part is optional and the phrase degrades one clause at a time, because
+ * a weaker identifier still beats a name the model cannot resolve.
+ *
+ * @returns {string|null} e.g. "the 3-year-old boy in the red fleece jacket,
+ *   second from the left" — or null when nothing identifying is known.
+ */
+function describeFigureForRepair({
+  name, characters = null, characterClothing = null, clothingRequirements = null,
+  artStyle = null, detectedFigures = null,
+} = {}) {
+  const wanted = String(name || '').trim().toLowerCase();
+  if (!wanted) return null;
+  const character = (characters || []).find(c => String(c?.name || '').trim().toLowerCase() === wanted);
+
+  // NOUN. Age plus the child/adult word, never bare "male figure".
+  const age = character?.age != null && String(character.age).trim() ? String(character.age).trim() : null;
+  const genderWord = (() => {
+    const g = String(character?.gender || '').trim().toLowerCase();
+    if (g === 'male') return age && Number(age) <= 12 ? 'boy' : 'man';
+    if (g === 'female') return age && Number(age) <= 12 ? 'girl' : 'woman';
+    return 'child';
+  })();
+  const noun = age ? `${age}-year-old ${genderWord}` : genderWord;
+
+  // GARMENT. The one renderer that knows this story's wardrobe — never the
+  // character's cross-story avatars (see project_clothing_canonical_source).
+  let garment = null;
+  try {
+    const category = characterClothing && typeof characterClothing === 'object'
+      ? characterClothing[character?.name || name] : null;
+    if (character && category) {
+      const { buildClothingDescription } = require('./entityConsistency');
+      const worn = buildClothingDescription(character, category, artStyle, clothingRequirements);
+      if (worn && String(worn).trim()) garment = String(worn).trim().replace(/[.]\s*$/, '');
+    }
+  } catch { /* a missing wardrobe is one clause fewer, never a thrown repair */ }
+
+  // PLACE. Rank by the box centre so the phrase says which of several it is.
+  // Detector boxes are [ymin, xmin, ymax, xmax].
+  let place = null;
+  const figs = (detectedFigures || []).filter(f => f?.name && Array.isArray(f.bodyBox || f.box));
+  if (figs.length > 1) {
+    const cx = (f) => { const b = f.bodyBox || f.box; return (b[1] + b[3]) / 2; };
+    const ordered = [...figs].sort((a, b) => cx(a) - cx(b));
+    const idx = ordered.findIndex(f => String(f.name).trim().toLowerCase() === wanted);
+    if (idx >= 0) {
+      const ORDINAL = ['', 'second', 'third', 'fourth', 'fifth'];
+      if (idx === 0) place = 'on the far left';
+      else if (idx === ordered.length - 1) place = 'on the far right';
+      else if (idx < ORDINAL.length) place = `${ORDINAL[idx]} from the left`;
+    }
+  }
+
+  const clauses = [garment ? `the ${noun} in ${garment}` : `the ${noun}`];
+  if (place) clauses.push(place);
+  return clauses.join(', ');
+}
+
 module.exports = {
+  describeFigureForRepair,
   repairAttemptFromResult, detectionForRetryEntry, findBadPages, applyRoundCap, LAST_ROUND_CRITICAL_MAX, planBookAuditRound, admitPagesFromAudit, summarizeRepairRound, baseRepairMethod, AUDIT_ADMIT_MAX, AUDIT_ADMIT_SEVERITIES, collectShippedDefective, collectSurvivingCriticals, resolveDeclaredCast, inheritSceneContract, resolveVersionCompressedScene, resolveVersionPrompt, resolveOwnRenderPrompt, SAFE_REPAIRABLE_TYPES, typesAreInpaintable, semanticFindings, findSafeRepairableFinding, selectCharRepairTasks, decideRepairMethod, NOT_INPAINTABLE_TYPES, hasCriticalSeverityFinding, collectCriticalFindings, buildPreserveClause, PRESERVE_MAX };

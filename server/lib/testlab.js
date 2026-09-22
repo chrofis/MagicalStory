@@ -4827,6 +4827,7 @@ async function runInpaintStage(ctx, { experimentId, params = {} }) {
   const t0 = Date.now();
   const result = await inpaintPage(imageData, evaluation, {
     consolidatedPlan: params.consolidatedPlan || consolidated.plan || null,
+    detectedFigures: ctx.scene?.bboxDetection?.figures || null,
     visualBible: ctx.visualBible,
     characters: storyData.characters || [],
     pageNumber: ctx.pageNumber,

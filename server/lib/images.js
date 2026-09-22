@@ -2973,6 +2973,9 @@ async function inpaintPage(imageData, evaluation, options = {}) {
     era = null,
     // The page's scene metadata, so an element cited in a state (ART002.4)
     // resolves to the cell for the state THIS page needs.
+    // The detector's named figures for THIS page. Only used to say WHERE a
+    // figure stands when a fix instruction has to identify one by sight.
+    detectedFigures = null,
     sceneMetadata = null,
     // The consolidated repair plan for THIS evaluation, produced once where the
     // evaluation was scored (see the B2 note below). Required — inpaint never
@@ -3142,15 +3145,28 @@ async function inpaintPage(imageData, evaluation, options = {}) {
         visualIdByName.set(pcf.characterName.toLowerCase(), pcf.visual_identifier);
       }
     }
-    // Fallback identifier when a name has no per_character_fixes entry: a
-    // short age/gender descriptor from the character data. "the character"
-    // loses WHO — observed: "Add <object> held in one of the character'
-    // hands" let Grok pick the wrong figure entirely.
+    // Fallback identifier when a name has no per_character_fixes entry to
+    // borrow a `visual_identifier` from. "the character" loses WHO — observed:
+    // "Add <object> held in one of the character's hands" let Grok pick the
+    // wrong figure entirely.
+    //
+    // This used to be age + gender, built here. On a cast of four
+    // three-year-old boys that is the SAME STRING for three of them —
+    // "the 3-year-old male figure" — and it targets nobody (measured
+    // 2026-09-22, p7 of job_1789853503332_riqncqg1i, where a grouped face fix
+    // put every name down this path at once). What separates children is what
+    // they are WEARING and where they STAND, and the page knows both, so the
+    // descriptor is built by one helper off the canonical wardrobe renderer
+    // rather than re-derived here.
+    const { describeFigureForRepair } = require('./repairLogic');
     const descriptorByName = new Map();
     for (const c of (characters || [])) {
       if (!c?.name) continue;
-      const bits = [c.age ? `${c.age}-year-old` : null, c.gender || null].filter(Boolean).join(' ');
-      descriptorByName.set(c.name.toLowerCase(), bits ? `the ${bits} figure` : 'the character');
+      const described = describeFigureForRepair({
+        name: c.name, characters, characterClothing, clothingRequirements, artStyle,
+        detectedFigures,
+      });
+      descriptorByName.set(c.name.toLowerCase(), described || 'the character');
     }
     // ONE PASS, NEVER RE-SCANNING WHAT WE INJECTED (owner, 2026-08-26). This
     // looped name-by-name, replacing into the running result. A

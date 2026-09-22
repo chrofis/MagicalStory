@@ -55164,3 +55164,49 @@ cast. Any future grouping rule has to re-supply what it drops.
 **Touched:** `prompts/feedback-consolidator.txt` (rule 8b).
 **Status:** ✅ active — severity/count/regression verified; the corrected
 grouped instruction is not yet re-measured on an image.
+
+## 2026-09-22 — One helper says WHO a fix is about; every repair reuses it
+
+**Context:** A fix instruction may only identify a figure visually — the image
+model has never heard the cast's names (feedback-consolidator rule 3). When a
+name reaches `images.js` without a `per_character_fixes` entry to borrow a
+`visual_identifier` from, the code substituted a descriptor it built inline from
+age plus gender. On four three-year-old boys that is the SAME STRING three times
+— "the 3-year-old male figure" — and it targets nobody.
+
+It was always weak; the grouped face fix made it systematic, because grouping
+into `scene_fix` deletes the per-character entries the good identifier comes
+from and sends the whole cast down the fallback at once.
+
+**Decision:** `describeFigureForRepair()` in `server/lib/repairLogic.js` is the
+one place that turns a character name into something the image model can act on:
+
+    the 3-year-old boy in the red fleece jacket, second from the left
+
+- **age + noun** from the character record (`boy`/`girl` under 12, never "male figure");
+- **garment** from `buildClothingDescription()` — the canonical wardrobe renderer,
+  keyed by THIS page's `characterClothing` category, never the character's
+  cross-story avatars;
+- **position** ranked from the detector's own boxes, so the phrase says which of
+  several it is.
+
+Every clause is optional and the phrase degrades one clause at a time: a weaker
+identifier still beats a name the model cannot resolve.
+
+`images.js` now calls it instead of re-deriving a descriptor. Because every
+named fix passes through that same substitution, GAZE and EMOTION and pose fixes
+all get it from one change — none of them needed their own path.
+
+`detectedFigures` is threaded into `inpaintPage` from both call sites
+(`repairPipeline.js`, `testlab.js`); it is read only to place the figure.
+
+**Rationale:** the same defect had been worked around twice in prompt text — once
+by telling the consolidator to write clothing itself. Prompt wording cannot
+repair a code fallback that overwrites it afterwards, and the data was in scope
+the whole time. Fixing the construction is the rule this repo already has
+(`feedback_fix_the_mirror_class`).
+
+**Touched:** `server/lib/repairLogic.js` (new helper + export),
+`server/lib/images.js` (substitution), `server/lib/repairPipeline.js`,
+`server/lib/testlab.js` (thread `detectedFigures`).
+**Status:** ✅ active

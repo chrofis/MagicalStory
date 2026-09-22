@@ -1292,6 +1292,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       sceneDescription: img.sceneDescription || img.description || '',
       artStyle: storyData?.artStyle || artStyle || null,
       characterClothing: pageCharacterClothing,
+      // Lets a fix instruction say WHERE a figure stands, not only what it wears.
+      detectedFigures: img?.sharedBboxDetection?.figures || img?.bboxDetection?.figures || null,
       clothingRequirements: storyData?.clothingRequirements || null,
       // Thread storyId + round so consolidator calls get persisted
       storyId: storyData?.id || jobId || null,
