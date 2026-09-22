@@ -54932,3 +54932,60 @@ a 25px face.
 
 **Touched:** no code. Lab 1387 (repair), 1388 (verification).
 **Status:** ✅ active
+
+## 2026-09-22 — The blind describer names the FEELING, in a closed vocabulary
+
+**Context:** The owner's first report of this story, on 2026-09-21, was "the boys
+are smiling while another boy is stealing" — p7. A whole session went into gaze
+without returning to it. His point: gaze is not the only declared thing a render
+can ignore; the brief declares an expression for every character on every page
+and nothing compares it either.
+
+**The declared side is rich and was never checked.** All 18 pages declare an
+expression for every character: `focused`, `cautious`, `panicked`, `despondent`,
+`tearful`, `triumphant`, `scared but defiant` — around thirty distinct words
+across the story.
+
+**Decision:** `figures[].emotion` is added to `image-inventory-unified.txt` as a
+CLOSED field — exactly one of `happy`, `sad`, `angry`, `afraid`, `surprised`,
+`disgusted`, `neutral`, `cannot tell at this size`. The existing free-prose
+`expression` stays and keeps its job: the visible muscle detail. Two fields,
+two questions, the same split `facing` (closed) and `action` (prose) already use.
+
+Closed on purpose. The declared side is Art Director prose and the observed side
+was prose too, and comparing two prose strings in code is exactly the
+pattern-matching this project forbids. A comparison needs an enum on both sides.
+
+**Measured** on all 18 pages of job_1789853503332_riqncqg1i, qwen3-vl, the model
+production runs (Lab 1389): the field came back on **52 of 52 figures** with
+**0 off-vocabulary** answers, and it tracks the brief where the render is right
+— `despondent`→`sad` (p13), `overjoyed`→`happy` (p17), `panicked`→`surprised`
+and `alarmed`→`afraid` (p9), `triumphant/proud/delighted/amazed`→`happy` ×4
+(p18).
+
+**It isolates p7, and only p7:**
+
+| p7 | declared | drawn |
+|---|---|---|
+| Silvan | triumphant | happy |
+| Levin | **angry** | neutral |
+| Julian | **upset** | **happy** |
+| Max | **shocked** | **happy** |
+| Kiaan | **frowning** | neutral |
+
+Three characters declared negative, three drawn happy. No other page in the
+story shows a declared-negative / drawn-happy clash, so the signal is specific
+rather than noisy. p7 scored 23 — the judges did mark the page down, but not for
+this.
+
+**NOT YET A CHECK.** This ships the OBSERVATION only. Comparing it needs the
+declared side in the same closed vocabulary, which belongs in the Art Director
+schema (`scene-expansion-all.txt`), with the vocabulary as one JS constant
+injected into both templates — the generator-and-critic pattern the sibling
+registry already enforces. Classifying the AD's prose in code instead would be
+the forbidden shortcut, and the valence buckets used to produce the table above
+were applied BY HAND for the report; no such classification exists in shipped
+code.
+
+**Touched:** `prompts/image-inventory-unified.txt`. Lab 1389.
+**Status:** ✅ active
