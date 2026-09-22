@@ -54989,3 +54989,57 @@ code.
 
 **Touched:** `prompts/image-inventory-unified.txt`. Lab 1389.
 **Status:** ✅ active
+
+## 2026-09-22 — Expression: only a VALENCE INVERSION is critical, and a triggered pass repaints every face on the page
+
+**Context:** With the closed `emotion` observation shipped, the question was what
+may fire and what a repair should touch. Measured on p7 of
+job_1789853503332_riqncqg1i, the page the owner reported first.
+
+**Why no judge ever caught it.** `image-evaluation.txt` carries **N-03
+Expressions** among its licensed NON-faults: "A specific expression not matching
+('calm surprise' vs 'curious'). Any expression that reads at all satisfies the
+beat." And there is no `emotion` in the 31-type finding vocabulary. Smiling
+theft victims are, by the current prompt, explicitly not a fault. That is the
+root cause of the original report, and it is a prompt rule, not a code bug.
+
+**The owner's rule (2026-09-22), and it is a severity rule, not a new check:**
+
+| declared vs drawn | severity | triggers a repair? |
+|---|---|---|
+| declared distressed, drawn HAPPY (valence inversion) | CRITICAL | yes |
+| declared anything, drawn NEUTRAL | MAJOR / MINOR | **no** |
+
+"A neutral expression does not get flagged or repaired. Only a clear mismatch
+needs repair." N-03's instinct is right — a face reading `neutral` where the
+brief said `frowning` is not worth a paid call. A face **smiling** while its egg
+is carried off is a different thing entirely.
+
+**But once a page IS repaired, repaint every face on it.** "If you change, I
+would change all 4." Measured, and the owner is right — the same page repaired
+two ways:
+
+| | declared | before | all four repainted | only the two clear mismatches |
+|---|---|---|---|---|
+| Levin | angry | neutral | **angry** | surprised |
+| Julian | upset | happy | **angry** | neutral |
+| Max | shocked | happy | **angry** | **happy** (unfixed) |
+| Kiaan | frowning | neutral | neutral | neutral |
+
+The narrow pass left Max still smiling and drifted Levin, who was not even
+targeted. The whole-page pass removed every smile and the scene finally reads:
+the older boy makes off with the egg looking pleased while three small children
+shout and cry. So the trigger is narrow and the pass is wide — the two are
+separate decisions and were being conflated.
+
+**Known limit: repair flattens nuance.** `upset` and `shocked` both came back
+`angry`. On a page whose faces are ~25px that may be the whole available range
+(see the scale entry above), but it means the check must compare valence, never
+the exact word, or a repaired page would still report findings.
+
+**Still not built:** the comparison needs the Art Director emitting the same
+closed vocabulary. This entry fixes the severity and repair-scope design so that
+work has a spec.
+
+**Touched:** no code. Lab 1390 (all four), 1391 (two), 1392/1393 (verification).
+**Status:** ✅ active
