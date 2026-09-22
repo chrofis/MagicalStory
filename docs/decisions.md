@@ -55315,3 +55315,62 @@ finding used here.
 
 **Touched:** no code. Lab 1400, 1401, 1402.
 **Status:** ✅ active
+
+## 2026-09-22 — Dragon run 6: the emotion rule earned its keep, the gaze check did not
+
+**Context:** the dragon story was rerun on staging (`job_1790100385959_1nitlympp`,
+"Das Ei im Laub") with byte-identical inputs to run 5, on commit b03c64b03 —
+every change of the day deployed. Run 5 is `job_1789853503332_riqncqg1i`.
+
+**Caveat that governs everything below:** the two runs are DIFFERENT STORIES. Same
+prompt, different plot and different pages. Page-for-page comparison is
+meaningless; only aggregates compare.
+
+| | run 5 | run 6 |
+|---|---|---|
+| mean final score | 80.9 | 76.8 |
+| pages below 70 | 5 | 4 |
+| pages regenerated | 4 | 4 |
+| emotion findings | 3 (0 CRITICAL) | 3 (**1 CRITICAL**) |
+| gaze-check findings | n/a | **0** |
+
+**The emotion work fired in production.** One CRITICAL emotion finding appeared —
+the severity that did not exist before this day and that is what admits a page to
+repair. The repair round pulled in 11 pages, against 4 in run 5.
+
+**The gaze check produced nothing, and that is structural, not a bug.** It ran
+(probed directly on p9, p11 and p12 — the stage returns figures, reasoning and an
+issuesSummary, and zero gaze findings). Its surface on this story:
+
+| declared target | count | can the check act? |
+|---|---|---|
+| an OBJECT or LOCATION (`ART002.1`, `LOC002.4`, `ANI002`) | 21 | no — it cannot tell WHICH object the eyes are on |
+| another CHARACTER | 5 | yes |
+| `away` | 6 | only via eyes-meet-reader, which is disabled |
+
+**5 of 32 declarations were actionable at all**, and of those five the carrier
+guard suppresses any whose target is holding something — which on an egg story is
+most of them. Each narrowing was individually right: `facing` describes the body;
+the `at the viewer` answer was wrong on five of twelve checked pages; the carrier
+guard stopped three false MAJORs on p18. Together they leave a check that on this
+story could not speak.
+
+**What the run actually failed on** — neither gaze nor emotion:
+- p12 (score 10): `duplicate_character` CRITICAL (Max rendered twice), a missing
+  gilet, and three declared actions not staged.
+- p16 (score 20): two CRITICAL `action_interaction` — declared actions absent.
+
+`action_interaction` accounts for 39 of the run's 70 findings. The dominant
+defect class is a declared ACTION that the render does not stage, not where the
+eyes point.
+
+**Open question for the owner:** the gaze check costs nothing per page (it is
+code over two artefacts already computed) but on this evidence earns nothing
+either. The honest options are (a) leave it as a rarely-firing guard, (b) widen
+it by teaching the blind describer to name WHICH object a gaze rests on, so the
+21 object-targeted declarations become checkable, or (c) drop it. (b) is the only
+one that would have caught run 5's p6, which is the page that started this.
+
+**Touched:** no code. Lab 1403; run 6 captured to scratch before anything could
+delete it.
+**Status:** ✅ active
