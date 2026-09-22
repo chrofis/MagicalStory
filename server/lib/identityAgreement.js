@@ -352,9 +352,15 @@ function checkIdentityAgreement(evalMatches, detFigures, opts = {}) {
 function pairInventoryFiguresToNames(evalMatches, inventoryFigures, opts = {}) {
   const { maxCentreDistance = 0.15 } = opts;
   const { canonicalName } = require('./castResolver');
+  const low = (v) => String(v == null ? '' : v).trim().toLowerCase();
 
+  // `unmatched` is the evaluator's word for a person it could NOT put a cast
+  // name to (image-evaluation.txt: the literal `unmatched` with confidence 0).
+  // It is not a name; pairing a figure to it hands the caller a character
+  // called "unmatched" — seen on p10 of job_1789853503332_riqncqg1i.
   const evs = (evalMatches || [])
-    .filter(m => m && m.reference && (evalCentre(m.body_bbox) || evalCentre(m.face_bbox)))
+    .filter(m => m && m.reference && low(m.reference) !== 'unmatched'
+      && (evalCentre(m.body_bbox) || evalCentre(m.face_bbox)))
     .map(m => ({
       name: String(m.reference),
       canon: canonicalName(m.reference),

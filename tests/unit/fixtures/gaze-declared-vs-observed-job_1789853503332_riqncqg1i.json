@@ -1,10 +1,10 @@
 {
   "source": {
-    "inventory": "Test Lab exp 1376 (gemini-2.5-flash) — the prompt-blind describer, image only",
-    "matches": "story_jobs.result_data sceneImages[].imageVersions[0].matches — the sighted evaluator, job_1789853503332_riqncqg1i",
-    "declared": "sceneMetadata.fullData.characters[].looksAt via gazeCharacters() — the brief",
-    "captured": "2026-09-21",
-    "inventoryProduction": "Test Lab exp 1377 (qwen3-vl, runtime.js inventoryModel = the describer production actually runs) — same three pages, same template. Boxes normalised exactly as evalPipeline.js:293 does before the inventory leaves runVisualInventory."
+    "inventory": "Test Lab exp 1379 — prompt-blind describer (qwen3-vl, runtime.js inventoryModel = what production runs), image only, with the per-figure gaze field. Boxes normalised as evalPipeline.js:293 does.",
+    "matches": "story_jobs.result_data sceneImages[].imageVersions[].matches — the sighted evaluator, job_1789853503332_riqncqg1i",
+    "declared": "sceneMetadata.fullData.characters[].looksAt via gazeCharacters()",
+    "eyewitness": "12 pages independently re-described from the image alone by a second reader (workflow gaze-eyewitness, 2026-09-22) — used to decide which of the describer answers may fire",
+    "captured": "2026-09-22"
   },
   "pages": {
     "2": {
@@ -18,59 +18,6 @@
           "looksAt": "ART001"
         }
       ],
-      "inventory": {
-        "figures": [
-          {
-            "id": 1,
-            "label": "the young boy in red",
-            "facing": "toward viewer",
-            "items_held": {
-              "left": "a large egg",
-              "right": "a large egg"
-            },
-            "body_bbox": [
-              0.22,
-              0.15,
-              0.53,
-              0.96
-            ],
-            "face_bbox": [
-              0.31,
-              0.15,
-              0.44,
-              0.27
-            ]
-          },
-          {
-            "id": 2,
-            "label": "the young boy in yellow",
-            "facing": "left",
-            "items_held": {
-              "left": "nothing",
-              "right": "nothing"
-            },
-            "body_bbox": [
-              0.49,
-              0.23,
-              0.82,
-              0.89
-            ],
-            "face_bbox": [
-              0.59,
-              0.23,
-              0.71,
-              0.34
-            ]
-          }
-        ],
-        "interactions": [
-          {
-            "from": "the young boy in yellow",
-            "to": "the young boy in red",
-            "observed": "faces him"
-          }
-        ]
-      },
       "matches": [
         {
           "figure": 1,
@@ -107,48 +54,51 @@
           "confidence": 0.9
         }
       ],
-      "inventoryQwen": {
+      "score": 100,
+      "inventory": {
         "figures": [
           {
             "id": 1,
             "label": "the young boy in red",
             "facing": "toward viewer",
+            "gaze": "at the viewer",
             "items_held": {
-              "left": "a large oval object",
-              "right": "a large oval object"
+              "left": "a large beige egg",
+              "right": "a large beige egg"
             },
             "body_bbox": [
               0.23,
-              0.156,
+              0.158,
               0.534,
-              0.967
+              0.96
             ],
             "face_bbox": [
-              0.3,
-              0.16,
+              0.29,
+              0.162,
               0.46,
-              0.358
+              0.35
             ]
           },
           {
             "id": 2,
             "label": "the young boy in yellow",
-            "facing": "toward the young boy in red",
+            "facing": "left",
+            "gaze": "at the young boy in red",
             "items_held": {
               "left": "nothing",
               "right": "nothing"
             },
             "body_bbox": [
-              0.554,
+              0.555,
               0.23,
-              0.823,
-              0.9
+              0.825,
+              0.897
             ],
             "face_bbox": [
-              0.56,
+              0.57,
               0.234,
-              0.72,
-              0.425
+              0.73,
+              0.4
             ]
           }
         ],
@@ -156,7 +106,7 @@
           {
             "from": "the young boy in yellow",
             "to": "the young boy in red",
-            "observed": "faces him and looks at him"
+            "observed": "faces him and looks at him directly"
           }
         ]
       }
@@ -172,59 +122,6 @@
           "looksAt": "Julian"
         }
       ],
-      "inventory": {
-        "figures": [
-          {
-            "id": 1,
-            "label": "the young boy in yellow",
-            "facing": "right",
-            "items_held": {
-              "left": "nothing",
-              "right": "nothing"
-            },
-            "body_bbox": [
-              0,
-              0.27,
-              0.49,
-              0.98
-            ],
-            "face_bbox": [
-              0.22,
-              0.27,
-              0.4,
-              0.43
-            ]
-          },
-          {
-            "id": 2,
-            "label": "the young boy in red",
-            "facing": "right",
-            "items_held": {
-              "left": "a large egg",
-              "right": "a large egg"
-            },
-            "body_bbox": [
-              0.33,
-              0.27,
-              0.74,
-              0.98
-            ],
-            "face_bbox": [
-              0.45,
-              0.27,
-              0.62,
-              0.43
-            ]
-          }
-        ],
-        "interactions": [
-          {
-            "from": "the young boy in yellow",
-            "to": "the young boy in red",
-            "observed": "places his right hand cupped to the right ear of the young boy in red, and his left hand on the right shoulder of the young boy in red"
-          }
-        ]
-      },
       "matches": [
         {
           "figure": 1,
@@ -261,12 +158,14 @@
           "confidence": 0.9
         }
       ],
-      "inventoryQwen": {
+      "score": 100,
+      "inventory": {
         "figures": [
           {
             "id": 1,
             "label": "the child in yellow vest",
             "facing": "toward the child in red jacket",
+            "gaze": "at the child in red jacket",
             "items_held": {
               "left": "nothing",
               "right": "nothing"
@@ -279,18 +178,19 @@
             ],
             "face_bbox": [
               0.23,
-              0.29,
+              0.28,
               0.4,
-              0.45
+              0.46
             ]
           },
           {
             "id": 2,
             "label": "the child in red jacket",
             "facing": "toward the child in yellow vest",
+            "gaze": "at the child in yellow vest",
             "items_held": {
-              "left": "a large brown egg-shaped object",
-              "right": "a large brown egg-shaped object"
+              "left": "a large brown egg",
+              "right": "a large brown egg"
             },
             "body_bbox": [
               0.34,
@@ -300,9 +200,9 @@
             ],
             "face_bbox": [
               0.39,
-              0.29,
-              0.57,
-              0.45
+              0.28,
+              0.56,
+              0.46
             ]
           }
         ],
@@ -310,12 +210,7 @@
           {
             "from": "the child in yellow vest",
             "to": "the child in red jacket",
-            "observed": "faces and presses left hand against the right cheek of the child in red jacket"
-          },
-          {
-            "from": "the child in red jacket",
-            "to": "the child in yellow vest",
-            "observed": "faces and looks at the child in yellow vest"
+            "observed": "faces and looks at, left hand pressed against the right cheek of the child in red jacket"
           }
         ]
       }
@@ -339,116 +234,6 @@
           "looksAt": "ART001"
         }
       ],
-      "inventory": {
-        "figures": [
-          {
-            "id": 1,
-            "label": "the young boy in red",
-            "facing": "right",
-            "items_held": {
-              "left": "nothing",
-              "right": "nothing"
-            },
-            "body_bbox": [
-              0,
-              0.38,
-              0.28,
-              0.89
-            ],
-            "face_bbox": [
-              0.13,
-              0.43,
-              0.24,
-              0.54
-            ]
-          },
-          {
-            "id": 2,
-            "label": "the young boy in yellow",
-            "facing": "right",
-            "items_held": {
-              "left": "nothing",
-              "right": "nothing"
-            },
-            "body_bbox": [
-              0.18,
-              0.42,
-              0.46,
-              0.91
-            ],
-            "face_bbox": [
-              0.29,
-              0.45,
-              0.4,
-              0.56
-            ]
-          },
-          {
-            "id": 3,
-            "label": "the young boy in orange",
-            "facing": "left",
-            "items_held": {
-              "left": "nothing",
-              "right": "nothing"
-            },
-            "body_bbox": [
-              0.49,
-              0.43,
-              0.77,
-              0.91
-            ],
-            "face_bbox": [
-              0.59,
-              0.46,
-              0.7,
-              0.57
-            ]
-          },
-          {
-            "id": 4,
-            "label": "the young boy in olive green",
-            "facing": "left",
-            "items_held": {
-              "left": "nothing",
-              "right": "nothing"
-            },
-            "body_bbox": [
-              0.68,
-              0.41,
-              1,
-              0.89
-            ],
-            "face_bbox": [
-              0.79,
-              0.44,
-              0.9,
-              0.55
-            ]
-          }
-        ],
-        "interactions": [
-          {
-            "from": "the young boy in red",
-            "to": "the young boy in yellow",
-            "observed": "looks toward the young boy in yellow"
-          },
-          {
-            "from": "the young boy in yellow",
-            "to": "the young boy in red",
-            "observed": "looks toward the young boy in red"
-          },
-          {
-            "from": "the young boy in orange",
-            "to": "the young boy in olive green",
-            "observed": "looks toward the young boy in olive green"
-          },
-          {
-            "from": "the young boy in olive green",
-            "to": "the young boy in orange",
-            "observed": "looks toward the young boy in orange"
-          }
-        ]
-      },
       "matches": [
         {
           "figure": 1,
@@ -519,133 +304,550 @@
           "confidence": 0.9
         }
       ],
-      "inventoryQwen": {
+      "score": 85,
+      "inventory": {
         "figures": [
           {
             "id": 1,
-            "label": "the child in red",
+            "label": "the young boy in red",
             "facing": "toward viewer",
+            "gaze": "at the viewer",
             "items_held": {
               "left": "nothing",
               "right": "nothing"
             },
             "body_bbox": [
-              0.02,
-              0.385,
+              0.05,
+              0.382,
               0.279,
-              0.825
+              0.828
             ],
             "face_bbox": [
               0.134,
-              0.406,
-              0.275,
-              0.545
+              0.415,
+              0.276,
+              0.54
             ]
           },
           {
             "id": 2,
-            "label": "the child in yellow vest",
+            "label": "the young boy in yellow vest",
             "facing": "toward viewer",
+            "gaze": "at the viewer",
             "items_held": {
               "left": "nothing",
               "right": "nothing"
             },
             "body_bbox": [
-              0.137,
-              0.42,
-              0.431,
-              0.909
+              0.136,
+              0.421,
+              0.432,
+              0.907
             ],
             "face_bbox": [
-              0.275,
-              0.445,
-              0.428,
-              0.575
+              0.282,
+              0.452,
+              0.425,
+              0.578
             ]
           },
           {
             "id": 3,
-            "label": "the child in orange",
-            "facing": "toward viewer",
+            "label": "the young boy in orange hoodie",
+            "facing": "away from viewer",
+            "gaze": "not visible",
             "items_held": {
               "left": "nothing",
               "right": "nothing"
             },
             "body_bbox": [
-              0.546,
-              0.439,
+              0.545,
+              0.438,
               0.828,
-              0.92
+              0.922
             ],
-            "face_bbox": [
-              0.555,
-              0.47,
-              0.678,
-              0.595
-            ]
+            "face_bbox": null
           },
           {
             "id": 4,
-            "label": "the child in green",
-            "facing": "toward viewer",
+            "label": "the young boy in green jacket",
+            "facing": "left",
+            "gaze": "at the young boy in orange hoodie",
             "items_held": {
               "left": "nothing",
               "right": "nothing"
             },
             "body_bbox": [
-              0.705,
-              0.411,
-              0.972,
-              0.852
+              0.701,
+              0.413,
+              0.973,
+              0.848
             ],
             "face_bbox": [
-              0.708,
-              0.435,
-              0.82,
+              0.706,
+              0.44,
+              0.815,
               0.55
             ]
           }
         ],
         "interactions": [
           {
-            "from": "the child in red",
-            "to": "the child in yellow vest",
-            "observed": "faces and looks at the child in yellow vest"
+            "from": "the young boy in green jacket",
+            "to": "the young boy in orange hoodie",
+            "observed": "faces him and looks at him"
+          }
+        ]
+      }
+    },
+    "7": {
+      "declared": [
+        {
+          "name": "Silvan",
+          "looksAt": "Levin"
+        },
+        {
+          "name": "Levin",
+          "looksAt": "Silvan"
+        },
+        {
+          "name": "Julian",
+          "looksAt": "Silvan"
+        },
+        {
+          "name": "Max",
+          "looksAt": "Silvan"
+        },
+        {
+          "name": "Kiaan",
+          "looksAt": "Silvan"
+        }
+      ],
+      "matches": [
+        {
+          "figure": 1,
+          "body_bbox": [
+            0.17,
+            0.12,
+            0.49,
+            0.98
+          ],
+          "face_bbox": [
+            0.26,
+            0.13,
+            0.38,
+            0.25
+          ],
+          "reference": "Silvan",
+          "confidence": 0.9
+        },
+        {
+          "figure": 2,
+          "body_bbox": [
+            0.54,
+            0.36,
+            0.65,
+            0.71
+          ],
+          "face_bbox": [
+            0.56,
+            0.37,
+            0.62,
+            0.43
+          ],
+          "reference": "Levin",
+          "confidence": 0.9
+        },
+        {
+          "figure": 3,
+          "body_bbox": [
+            0.61,
+            0.36,
+            0.72,
+            0.71
+          ],
+          "face_bbox": [
+            0.63,
+            0.37,
+            0.69,
+            0.43
+          ],
+          "reference": "Julian",
+          "confidence": 0.9
+        },
+        {
+          "figure": 4,
+          "body_bbox": [
+            0.69,
+            0.36,
+            0.8,
+            0.71
+          ],
+          "face_bbox": [
+            0.71,
+            0.36,
+            0.77,
+            0.43
+          ],
+          "reference": "Max",
+          "confidence": 0.9
+        },
+        {
+          "figure": 5,
+          "body_bbox": [
+            0.82,
+            0.36,
+            0.93,
+            0.71
+          ],
+          "face_bbox": [
+            0.84,
+            0.37,
+            0.9,
+            0.43
+          ],
+          "reference": "Kiaan",
+          "confidence": 0.9
+        }
+      ],
+      "score": 23,
+      "inventory": {
+        "figures": [
+          {
+            "id": 1,
+            "label": "the young boy in blue",
+            "facing": "toward viewer",
+            "gaze": "at the viewer",
+            "items_held": {
+              "left": "a large brown egg",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.16,
+              0.138,
+              0.495,
+              0.917
+            ],
+            "face_bbox": [
+              0.29,
+              0.14,
+              0.428,
+              0.295
+            ]
           },
+          {
+            "id": 2,
+            "label": "the child in red",
+            "facing": "toward viewer",
+            "gaze": "at the viewer",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.548,
+              0.37,
+              0.667,
+              0.71
+            ],
+            "face_bbox": [
+              0.585,
+              0.375,
+              0.635,
+              0.445
+            ]
+          },
+          {
+            "id": 3,
+            "label": "the child in yellow vest",
+            "facing": "toward viewer",
+            "gaze": "at the viewer",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.658,
+              0.37,
+              0.768,
+              0.715
+            ],
+            "face_bbox": [
+              0.685,
+              0.375,
+              0.74,
+              0.445
+            ]
+          },
+          {
+            "id": 4,
+            "label": "the child in orange",
+            "facing": "toward viewer",
+            "gaze": "at the viewer",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.75,
+              0.362,
+              0.855,
+              0.725
+            ],
+            "face_bbox": [
+              0.768,
+              0.365,
+              0.83,
+              0.445
+            ]
+          },
+          {
+            "id": 5,
+            "label": "the child in green jacket",
+            "facing": "toward viewer",
+            "gaze": "at the viewer",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.838,
+              0.368,
+              0.968,
+              0.738
+            ],
+            "face_bbox": [
+              0.865,
+              0.37,
+              0.935,
+              0.445
+            ]
+          }
+        ],
+        "interactions": []
+      }
+    },
+    "15": {
+      "declared": [
+        {
+          "name": "Max",
+          "looksAt": "ART001"
+        },
+        {
+          "name": "Kiaan",
+          "looksAt": "ART001"
+        },
+        {
+          "name": "Silvan",
+          "looksAt": "ART001"
+        }
+      ],
+      "matches": [
+        {
+          "figure": 1,
+          "body_bbox": [
+            0.29,
+            0.26,
+            0.52,
+            0.95
+          ],
+          "face_bbox": [
+            0.34,
+            0.27,
+            0.46,
+            0.38
+          ],
+          "reference": "Max",
+          "confidence": 0.9
+        },
+        {
+          "figure": 2,
+          "body_bbox": [
+            0.49,
+            0.28,
+            0.7,
+            0.95
+          ],
+          "face_bbox": [
+            0.53,
+            0.29,
+            0.64,
+            0.39
+          ],
+          "reference": "Kiaan",
+          "confidence": 0.9
+        },
+        {
+          "figure": 3,
+          "body_bbox": [
+            0.11,
+            0.42,
+            0.19,
+            0.6
+          ],
+          "face_bbox": null,
+          "reference": "unmatched",
+          "confidence": 0
+        }
+      ],
+      "score": 50,
+      "inventory": {
+        "figures": [
+          {
+            "id": 1,
+            "label": "the young boy in orange",
+            "facing": "right",
+            "gaze": "at the young boy in green",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.28,
+              0.264,
+              0.525,
+              0.945
+            ],
+            "face_bbox": [
+              0.347,
+              0.305,
+              0.475,
+              0.44
+            ]
+          },
+          {
+            "id": 2,
+            "label": "the young boy in green",
+            "facing": "left",
+            "gaze": "at the young boy in orange",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.52,
+              0.309,
+              0.745,
+              0.958
+            ],
+            "face_bbox": [
+              0.565,
+              0.33,
+              0.685,
+              0.465
+            ]
+          },
+          {
+            "id": 3,
+            "label": "the child in blue",
+            "facing": "toward viewer",
+            "gaze": "at the viewer",
+            "items_held": {
+              "left": "nothing",
+              "right": "nothing"
+            },
+            "body_bbox": [
+              0.115,
+              0.424,
+              0.2,
+              0.615
+            ],
+            "face_bbox": [
+              0.135,
+              0.435,
+              0.175,
+              0.475
+            ]
+          }
+        ],
+        "interactions": [
+          {
+            "from": "the young boy in orange",
+            "to": "the young boy in green",
+            "observed": "faces him and raises both hands with palms forward"
+          },
+          {
+            "from": "the young boy in green",
+            "to": "the young boy in orange",
+            "observed": "faces him and looks at him"
+          }
+        ]
+      }
+    },
+    "17": {
+      "declared": [
+        {
+          "name": "Julian",
+          "looksAt": "ANI001"
+        }
+      ],
+      "matches": [
+        {
+          "figure": 1,
+          "body_bbox": [
+            0.23,
+            0.32,
+            0.75,
+            0.98
+          ],
+          "face_bbox": [
+            0.27,
+            0.33,
+            0.42,
+            0.46
+          ],
+          "reference": "Julian",
+          "confidence": 0.9
+        },
+        {
+          "figure": 2,
+          "body_bbox": [
+            0.47,
+            0.42,
+            0.65,
+            0.6
+          ],
+          "face_bbox": [
+            0.48,
+            0.42,
+            0.6,
+            0.5
+          ],
+          "reference": "Zippi",
+          "confidence": 0.9
+        }
+      ],
+      "score": 85,
+      "inventory": {
+        "figures": [
+          {
+            "id": 1,
+            "label": "the child in yellow vest",
+            "facing": "right",
+            "gaze": "at the small green creature",
+            "items_held": {
+              "left": "a large cracked eggshell",
+              "right": "a large cracked eggshell"
+            },
+            "body_bbox": [
+              0.26,
+              0.25,
+              0.87,
+              0.99
+            ],
+            "face_bbox": [
+              0.31,
+              0.26,
+              0.49,
+              0.48
+            ]
+          }
+        ],
+        "interactions": [
           {
             "from": "the child in yellow vest",
-            "to": "the child in red",
-            "observed": "faces and looks at the child in red"
-          },
-          {
-            "from": "the child in orange",
-            "to": "the child in green",
-            "observed": "faces and looks at the child in green"
-          },
-          {
-            "from": "the child in green",
-            "to": "the child in orange",
-            "observed": "faces and looks at the child in orange"
-          },
-          {
-            "from": "the child in red",
-            "to": "the child in orange",
-            "observed": "looks toward the child in orange"
-          },
-          {
-            "from": "the child in yellow vest",
-            "to": "the child in orange",
-            "observed": "looks toward the child in orange"
-          },
-          {
-            "from": "the child in orange",
-            "to": "the child in red",
-            "observed": "looks toward the child in red"
-          },
-          {
-            "from": "the child in green",
-            "to": "the child in red",
-            "observed": "looks toward the child in red"
+            "to": "the small green creature",
+            "observed": "holds the eggshell that contains the creature, faces it, looks at it with a smile"
           }
         ]
       }

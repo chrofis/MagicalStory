@@ -54679,3 +54679,93 @@ refrain set bare after a colon instead of in Swiss guillemets. All filed in `tas
 `.../blind-key-r25.json`, `.../blind-scores-r25.md`, `.../ideas-r25.html`.
 
 **Status:** ✅ active on `staging` only; not on master.
+
+## 2026-09-22 — The blind describer gets a `gaze` field, and only ONE of its two answers is allowed to fire
+
+**Context:** The gaze comparison shipped on 2026-09-21 could only read
+`interactions[]`, which is pairwise: it cannot express "looking at an object" or
+"looking out of the picture", and its `observed` prose mixes gaze with facing
+and contact. The `facing` field was tried as the second witness and deleted the
+same day — it describes the body.
+
+**Decision:** `prompts/image-inventory-unified.txt` gains a per-figure `gaze`
+field, asked about the eyes and nothing else. `observedGaze` reads it and
+returns one of three kinds: `viewer`, `figure` (another figure in the same
+picture) or `thing`. Only **`figure`** produces a finding.
+
+**Rationale — measured, not assumed.** All 18 pages of
+job_1789853503332_riqncqg1i were described blind on qwen3-vl (Lab 1379, the
+model production runs). Compliance was total: the field came back on **52 of 52
+figures**, and it discriminates rather than collapsing — p4, p12 and p13 answer
+`at the large egg`, which is what those pictures show.
+
+Twelve of the pages were then described a SECOND time by an independent reader
+working from the image alone, and the two were compared per figure:
+
+| describer's answer | against the second reader | verdict |
+|---|---|---|
+| `at <another figure>` | agreed every time | fires |
+| `at the viewer` | wrong on p6, p7, p8, p10, p18 | never fires |
+
+The describer writes `at the viewer` for any gaze leaving the frame on the
+camera's side and cannot separate eyes ON the reader from eyes PAST them. On p7
+it called three children `at the viewer` who are looking straight at the
+character the brief named. Firing that branch would have produced three MAJOR
+findings, each buying a repair on a correct figure — the same failure as the
+`facing` reading a day earlier, and the reason this branch is measured but
+silent.
+
+**The cost, stated:** a page whose cast looks out of the picture is still not
+reported. p2 and p3 both score 100 with the egg-holder staring at the reader,
+and both stay silent. Under-reporting remains the chosen error.
+
+**A pairing bug found on the way:** `pairInventoryFiguresToNames` accepted the
+evaluator's literal `unmatched` as a character name (image-evaluation.txt emits
+it with confidence 0 for a person it could not name), so a figure could pair to
+a character called "unmatched". Seen on p10. Now filtered.
+
+**Siblings-Checked, named explicitly:** the `inventory-schema` set pairs
+`image-inventory-unified.txt` with `image-evaluation.txt`. The field is
+deliberately NOT added to the evaluator: that judge receives the brief and the
+picture in ONE call, and the 2026-09-21 measurement (Lab 1373/1374) is that it
+answers a gaze question by reading the declaration back — "down at the large
+warm egg" for four figures including two it had recorded as seen from behind.
+Adding the field there would manufacture agreement, which is the opposite of
+what this comparison needs. No other set is touched by this commit.
+
+**Touched:** `prompts/image-inventory-unified.txt`, `server/lib/gazeCheck.js`,
+`server/lib/identityAgreement.js`, `tests/unit/gaze-check.test.ts` (19),
+fixture from Lab 1379 + the eyewitness pass.
+**Status:**    ✅ active
+
+## 2026-09-22 — #76 answered: the over-scoring IS the declared gaze going undelivered
+
+**Context:** Seven high-scoring pages of the dragon run looked wrong to the
+owner while the judges scored them 85-100. p6 was diagnosed on 2026-09-21; the
+open question was whether the others shared its cause.
+
+**Finding:** They do. Across all 18 pages the brief declares a gaze on every
+single one, and the blind describer contradicts it on seven — including four
+pages scored **100** with zero findings:
+
+| page | score | brief | what the picture shows |
+|---|---|---|---|
+| p2 | 100 | both boys on the egg | the boy holding it looks out at the reader |
+| p3 | 100 | three boys on the egg | the holder looks at the reader, the others at him |
+| p6 | 85 | four boys on the egg | two pairs looking at each other; the egg ignored |
+| p8 | 100 | three `away`, one at the steps | two look straight out at the reader |
+| p15 | 50 | three on the egg | two look at each other |
+| p17 | 85 | at the dragon | looks past it, out of the frame |
+| p18 | 100 | three on the dragon | all four look up and away; nobody at it |
+
+p2, p3, p6, p17 and p18 were confirmed by eye on the rendered image; twelve
+pages were independently re-described. This is one defect class, not seven
+unrelated ones, and no judge could see it: the quality evaluator receives the
+brief in the same call and reads it back.
+
+**Not closed by this:** the check above reports only the `figure`-target subset,
+so five of the seven rows stay unreported until the `at the viewer` answer
+becomes trustworthy. The measurement stands regardless of what fires.
+
+**Touched:** no code — this entry is the finding. Lab 1379.
+**Status:**    ✅ active

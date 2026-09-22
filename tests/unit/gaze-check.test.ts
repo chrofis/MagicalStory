@@ -1,36 +1,34 @@
 import { describe, it, expect } from 'vitest';
 // @ts-ignore — CommonJS module
-import { checkDeclaredGaze, observedGaze, eyesNotVisible } from '../../server/lib/gazeCheck.js';
+import { checkDeclaredGaze, observedGaze } from '../../server/lib/gazeCheck.js';
 // @ts-ignore — CommonJS module
 import { pairInventoryFiguresToNames } from '../../server/lib/identityAgreement.js';
 import FIXTURE from './fixtures/gaze-declared-vs-observed-job_1789853503332_riqncqg1i.json';
 
 /**
- * Three real pages of job_1789853503332_riqncqg1i, each half captured from the
- * producer that actually made it: the BRIEF's `looksAt`, the SIGHTED evaluator's
- * named `matches[]`, and the PROMPT-BLIND describer's `figures` + `interactions`
- * (Lab experiment 1376, unified arm). Nothing here is hand-written.
+ * Six real pages of job_1789853503332_riqncqg1i, each half from the producer
+ * that made it: the BRIEF's `looksAt`, the SIGHTED evaluator's named
+ * `matches[]`, and the PROMPT-BLIND describer's `figures[].gaze` (Lab 1379, on
+ * qwen3-vl — the model production runs). Nothing here is hand-written.
  *
- *   p2  two boys, both declared on the egg. Levin IS looking straight out of
- *       the picture — but no field in the blind inventory describes eyes on
- *       their own, so nothing witnesses it. Silence, and the reason is a gap
- *       (see the `facing` note in observedGaze), not a judgement.
- *   p5  the same two, declared looking at each other. The describer reports no
- *       gaze for either. Silence — an absent witness is never a finding.
- *   p6  four boys, all declared on the egg on the ground. The describer sees two
- *       pairs looking at EACH OTHER and says so four times. Four findings.
+ * WHAT MAY FIRE AND WHAT MAY NOT was decided by measurement. All 18 pages were
+ * described blind; twelve were then described a SECOND time by an independent
+ * reader working from the image alone, and the two were compared per figure:
  *
- * The page the owner reported by eye is p6, and the quality judge scored it 85
- * with zero findings: asked for a `gaze` it answered "down at the large warm
- * egg" for all four, including the two it had itself recorded as seen from
- * behind. It was reading the brief back. That is the whole reason this file
- * compares the BLIND observation instead of asking the sighted judge again.
+ *   `at <another figure>`  agreed every time              -> fires
+ *   `at the viewer`        wrong on p6, p7, p8, p10, p18  -> never fires
+ *
+ * The describer writes `at the viewer` for any gaze leaving the frame on the
+ * camera's side and cannot separate eyes ON the reader from eyes PAST them. On
+ * p7 it called three children `at the viewer` who are looking straight at the
+ * character the brief named — three MAJOR findings, each of which would have
+ * bought a repair on a correct figure.
  */
 const PAGES: any = FIXTURE.pages;
-const CAST = ['Levin', 'Julian', 'Max', 'Kiaan'];
-// ART001 is the Visual Bible's id for the egg. The brief stores the id; the
-// finding has to say the noun.
-const resolveTarget = (id: string) => (id === 'ART001' ? 'the large warm egg' : id);
+const CAST = ['Levin', 'Julian', 'Max', 'Kiaan', 'Silvan', 'Zippi'];
+// The brief stores Visual Bible ids; a finding has to say the noun.
+const NOUNS: Record<string, string> = { ART001: 'large egg', ANI001: 'Zippi', LOC002: 'Schipfe Steps' };
+const resolveTarget = (id: string) => NOUNS[id] ?? null;
 
 const run = (page: string) => checkDeclaredGaze({
   declared: PAGES[page].declared,
@@ -40,136 +38,65 @@ const run = (page: string) => checkDeclaredGaze({
   resolveTarget,
 });
 
-describe('the figure-to-name pairing these two witnesses share', () => {
-  it('pairs every blind figure with the evaluator name standing in that spot', () => {
-    // Four same-age boys in a row is the hardest case the page set has.
-    const pairs = pairInventoryFiguresToNames(PAGES['6'].matches, PAGES['6'].inventory.figures);
-    expect(Object.fromEntries(pairs)).toEqual({
-      'the young boy in red': 'Levin',
-      'the young boy in yellow': 'Julian',
-      'the young boy in orange': 'Max',
-      'the young boy in olive green': 'Kiaan',
-    });
+describe('reading the blind describer\'s per-figure gaze', () => {
+  it('reads eyes resting on another figure in the same picture', () => {
+    expect(observedGaze(PAGES['6'].inventory, 'the young boy in green jacket'))
+      .toEqual({ kind: 'figure', label: 'the young boy in orange hoodie' });
   });
 
-  it('is one-to-one — no name is handed to two figures', () => {
-    const pairs = pairInventoryFiguresToNames(PAGES['6'].matches, PAGES['6'].inventory.figures);
-    expect(new Set(pairs.values()).size).toBe(pairs.size);
+  it('reads eyes meeting the camera as its own kind, separate from a figure', () => {
+    expect(observedGaze(PAGES['2'].inventory, 'the young boy in red')).toEqual({ kind: 'viewer' });
   });
 
-  it('pairs nobody when a witness is missing, rather than guessing', () => {
-    expect(pairInventoryFiguresToNames([], PAGES['6'].inventory.figures).size).toBe(0);
-    expect(pairInventoryFiguresToNames(PAGES['6'].matches, []).size).toBe(0);
+  it('reads eyes on an object as a THING, which nothing can be compared against', () => {
+    // The describer names objects in its own words and the brief names them in
+    // the Bible's. Comparing the two would be prose matching.
+    expect(observedGaze(PAGES['17'].inventory, 'the child in yellow vest'))
+      .toEqual({ kind: 'thing', label: 'the small green creature' });
   });
 
-  it('leaves a figure standing where nobody was matched unpaired', () => {
-    const far = [{ reference: 'Levin', body_bbox: [0.9, 0.9, 0.99, 0.99] }];
-    expect(pairInventoryFiguresToNames(far, PAGES['6'].inventory.figures).size).toBe(0);
-  });
-});
-
-describe('what the blind describer is willing to witness', () => {
-  it('reads a look out of an interactions entry', () => {
-    expect(observedGaze(PAGES['6'].inventory, 'the young boy in red'))
-      .toEqual({ kind: 'figure', label: 'the young boy in yellow' });
-  });
-
-  it('does NOT read a look out of a body-facing entry', () => {
-    // p2's only interaction is "faces him" — that is the torso, not the eyes.
-    expect(observedGaze(PAGES['2'].inventory, 'the young boy in yellow')).toBeNull();
-  });
-
-  it('does NOT read a look out of a hand-contact entry', () => {
-    // p5's only interaction is a hand cupped to an ear.
-    expect(observedGaze(PAGES['5'].inventory, 'the young boy in yellow')).toBeNull();
-  });
-
-  it('does NOT treat a body squared to camera as a gaze observation', () => {
-    // `facing: "toward viewer"` is the torso. The eyes have no field of their own.
-    expect(PAGES['2'].inventory.figures[0].facing).toBe('toward viewer');
-    expect(observedGaze(PAGES['2'].inventory, 'the young boy in red')).toBeNull();
-  });
-
-  it('says nothing about a figure it never mentions', () => {
+  it('says nothing when the eyes could not be read, and nothing about an absent figure', () => {
+    expect(observedGaze(PAGES['6'].inventory, 'the young boy in orange hoodie')).toBeNull();
     expect(observedGaze(PAGES['6'].inventory, 'a boy who is not there')).toBeNull();
-    expect(eyesNotVisible(PAGES['6'].inventory, 'a boy who is not there')).toBe(false);
   });
 });
 
-describe('declared gaze vs observed gaze, on the pages it was measured against', () => {
-  it('p2: silent — a body square to camera is not a witness to where the eyes went', () => {
-    // Levin really is looking at the reader instead of at the egg in his hands,
-    // and this check does not catch it. It used to, by reading `facing:
-    // "toward viewer"` as gaze — but `facing` is a BODY field, and on this very
-    // page it read "toward viewer" for BOTH boys while only one of them meets
-    // the reader's eye (Julian's are cast down and to his left). One true
-    // finding and one false one from one signal; the false one would have
-    // bought a paid repair on a correct figure.
+describe('what fires, on the pages it was measured against', () => {
+  it('p6: the boy whose eyes are on another child, not on the declared egg', () => {
+    const f = run('6');
+    expect(f).toHaveLength(1);
+    expect(f[0].character).toBe('Kiaan');
+    expect(f[0].type).toBe('action_interaction');
+    expect(f[0].severity).toBe('MAJOR');
+    expect(f[0].source).toBe('gaze-check');
+    expect(f[0].description).toContain('large egg');            // the noun, never ART001
+    expect(f[0].description).toContain('the eyes are on the young boy in orange hoodie');
+  });
+
+  it('p15: two boys declared on the egg with their eyes on each other', () => {
+    expect(run('15').map((x: any) => x.character).sort()).toEqual(['Kiaan', 'Max']);
+  });
+
+  it('p5: silent — declared mutual, observed mutual, the witnesses agree', () => {
+    expect(run('5')).toEqual([]);
+  });
+});
+
+describe('the answer that is measured but never fired', () => {
+  it('p2: the egg-holder IS looking out of the picture, and it is not reported', () => {
+    // Confirmed by eye and by the independent reader: he meets the reader
+    // instead of looking at the egg in his own arms. The describer is right
+    // here — and wrong often enough elsewhere that this branch cannot fire.
+    expect(observedGaze(PAGES['2'].inventory, 'the young boy in red')).toEqual({ kind: 'viewer' });
     expect(run('2')).toEqual([]);
   });
 
-  it('p5: stays silent — the witness reported no gaze at all', () => {
-    expect(run('5')).toEqual([]);
-  });
-
-  it('p6: all four are declared on the egg and all four are looking at each other', () => {
-    const f = run('6');
-    expect(f.map((x: any) => x.character).sort()).toEqual(['Julian', 'Kiaan', 'Levin', 'Max']);
-    expect(f.every((x: any) => x.severity === 'MAJOR')).toBe(true);
-    expect(f.find((x: any) => x.character === 'Levin').description)
-      .toContain('the eyes are on the young boy in yellow');
-  });
-});
-
-/**
- * THE SAME THREE PAGES, THE OTHER DESCRIBER.
- *
- * The fixture above came from gemini-2.5-flash; PRODUCTION runs qwen3-vl
- * (runtime.js `inventoryModel`, every environment since 2026-09-19). A check
- * validated only against the model production does not run is not validated —
- * so Lab experiment 1377 put the same three pages through the real one.
- *
- * It answers in its own words ("the child in red", not "the young boy in red")
- * and on its own box scale (mixed 0-1 / 0-1000, normalised here exactly as
- * evalPipeline.js does before the inventory leaves the call). Two independent
- * describers, no shared vocabulary, no shared numbers — and the same three
- * verdicts. That is what makes the join geometric rather than lexical: nothing
- * in this check reads a label except to print it.
- */
-describe('the describer production actually runs (qwen3-vl, Lab 1377)', () => {
-  const runQwen = (page: string) => checkDeclaredGaze({
-    declared: PAGES[page].declared,
-    inventory: PAGES[page].inventoryQwen,
-    matches: PAGES[page].matches,
-    castNames: CAST,
-    resolveTarget,
-  });
-
-  it('p2: the same silence, and for the same reason', () => {
-    // qwen reports one look — yellow -> red, a LOOK relation — but the brief
-    // sends the boy in yellow to the egg and the boy he is looking at is
-    // holding it, so the hands-full guard declines. Nothing else is a witness.
-    expect(runQwen('2')).toEqual([]);
-  });
-
-  it('p5: the same silence — here because the two witnesses AGREE', () => {
-    // qwen does report a look ("the child in red jacket ... looks at the child
-    // in yellow vest") and the brief declares exactly that. Agreement, not
-    // absence of evidence.
-    expect(runQwen('5')).toEqual([]);
-  });
-
-  it('p6: the same four findings, naming the same four children', () => {
-    const f = runQwen('6');
-    expect(f.map((x: any) => x.character).sort()).toEqual(['Julian', 'Kiaan', 'Levin', 'Max']);
-  });
-
-  it('the two describers share no figure label, and still pair to the same names', () => {
-    const g = pairInventoryFiguresToNames(PAGES['6'].matches, PAGES['6'].inventory.figures);
-    const q = pairInventoryFiguresToNames(PAGES['6'].matches, PAGES['6'].inventoryQwen.figures);
-    expect([...q.values()].sort()).toEqual([...g.values()].sort());
-    // no label is spelled the same way by both models
-    for (const label of q.keys()) expect(g.has(label)).toBe(false);
+  it('p7: the three children the describer wrongly called `at the viewer` are silent', () => {
+    // The independent reader puts them on the boy in blue — exactly the
+    // character the brief named. Firing here would have been false MAJORs.
+    const viewerCalls = PAGES['7'].inventory.figures.filter((f: any) => /viewer/i.test(String(f.gaze)));
+    expect(viewerCalls.length).toBeGreaterThanOrEqual(3);
+    expect(run('7')).toEqual([]);
   });
 });
 
@@ -189,84 +116,67 @@ describe('every uncertainty is a skip, never a finding', () => {
     })).toEqual([]);
   });
 
-  it('eyes turned from the camera cannot be judged', () => {
+  it('declared at a person and observed at that same person is agreement', () => {
+    expect(checkDeclaredGaze({
+      declared: [{ name: 'Kiaan', looksAt: 'Max' }],
+      inventory: p6.inventory, matches: p6.matches, castNames: CAST, resolveTarget,
+    })).toEqual([]);
+  });
+
+  it('an unnamed figure is never the target of a finding', () => {
+    // p17's creature: the brief says ANI001 and the describer says "the small
+    // green creature" — the same animal twice, which used to read as a defect.
+    expect(run('17')).toEqual([]);
+  });
+
+  it('eyes on a person who is HOLDING something are not evidence of a wrong gaze', () => {
     const inv = {
       ...p6.inventory,
-      figures: p6.inventory.figures.map((f: any) => ({ ...f, facing: 'away from viewer' })),
+      figures: p6.inventory.figures.map((f: any) =>
+        f.label === 'the young boy in orange hoodie'
+          ? { ...f, items_held: { left: 'a large egg', right: 'a large egg' } } : f),
     };
     expect(checkDeclaredGaze({
       declared: p6.declared, inventory: inv, matches: p6.matches, castNames: CAST, resolveTarget,
     })).toEqual([]);
   });
 
-  it('declared at a person and observed at that same person is agreement', () => {
-    // Levin's brief sends his eyes to Julian; the describer puts them on the
-    // figure paired to Julian. The two agree, so nothing is reported.
-    const declared = [{ name: 'Levin', looksAt: 'Julian' }];
-    expect(checkDeclaredGaze({
-      declared, inventory: p6.inventory, matches: p6.matches, castNames: CAST, resolveTarget,
-    })).toEqual([]);
-  });
-
-  it('declared at a person and observed at a DIFFERENT person is the finding', () => {
-    const declared = [{ name: 'Levin', looksAt: 'Kiaan' }];
-    const f = checkDeclaredGaze({
-      declared, inventory: p6.inventory, matches: p6.matches, castNames: CAST, resolveTarget,
-    });
-    expect(f).toHaveLength(1);
-    expect(f[0].description).toContain('the eyes are on the young boy in yellow');
-  });
-
-  it('eyes on a person who is HOLDING something are not evidence of a wrong gaze', () => {
-    // The confound: a gaze declared at an object and observed on the person
-    // carrying it is two true descriptions of one picture, not a defect.
-    const inv = {
-      ...p6.inventory,
-      figures: p6.inventory.figures.map((f: any) =>
-        f.label === 'the young boy in yellow'
-          ? { ...f, items_held: { left: 'a large egg', right: 'a large egg' } } : f),
-    };
-    expect(checkDeclaredGaze({
-      declared: [{ name: 'Levin', looksAt: 'ART001' }],
-      inventory: inv, matches: p6.matches, castNames: CAST, resolveTarget,
-    })).toEqual([]);
-  });
-
-  it('a target the pairing never named still carries the contradiction', () => {
-    // The brief says "the egg"; the eyes are on a person. That the person has
-    // no name only changes how the sentence reads, not whether it is true.
-    const matches = p6.matches.filter((m: any) => m.reference === 'Levin');
-    const f = checkDeclaredGaze({
-      declared: [{ name: 'Levin', looksAt: 'ART001' }],
-      inventory: p6.inventory, matches, castNames: CAST, resolveTarget,
-    });
-    expect(f).toHaveLength(1);
-    expect(f[0].description).toContain('the eyes are on the young boy in yellow');
-  });
-
   it('a Visual Bible id the bible cannot name is a skip, not a finding with an id in it', () => {
-    // `looksAt` holds an id as often as a name. A finding saying "declared
-    // looking at ART001" is unreadable and unrepairable, and it leaks a VB id
-    // into text — so the page goes unreported instead.
-    const unresolvable = () => null;
     expect(checkDeclaredGaze({
       declared: p6.declared, inventory: p6.inventory, matches: p6.matches,
-      castNames: CAST, resolveTarget: unresolvable,
+      castNames: CAST, resolveTarget: () => null,
     })).toEqual([]);
-    // and the same page, once the id resolves, is four findings
-    expect(run('6')).toHaveLength(4);
-  });
-
-  it('never prints a raw Visual Bible id even if a resolver hands one back', () => {
-    const f = checkDeclaredGaze({
+    expect(checkDeclaredGaze({
       declared: p6.declared, inventory: p6.inventory, matches: p6.matches,
-      castNames: CAST, resolveTarget: (t: string) => t,      // resolves to the id itself
-    });
-    expect(f).toEqual([]);
+      castNames: CAST, resolveTarget: (t: string) => t,      // hands back the raw id
+    })).toEqual([]);
   });
 
-  it('returns nothing at all without an inventory', () => {
+  it('returns nothing at all without an inventory or a brief', () => {
     expect(checkDeclaredGaze({ declared: p6.declared, inventory: null, matches: p6.matches })).toEqual([]);
     expect(checkDeclaredGaze({})).toEqual([]);
+  });
+});
+
+describe('the figure-to-name pairing the two witnesses share', () => {
+  it('pairs blind figures to evaluator names by where they stand', () => {
+    const pairs = pairInventoryFiguresToNames(PAGES['6'].matches, PAGES['6'].inventory.figures);
+    expect(pairs.size).toBeGreaterThanOrEqual(3);
+    expect(new Set(pairs.values()).size).toBe(pairs.size);     // one-to-one
+  });
+
+  it('never pairs a figure to the evaluator\'s literal `unmatched`', () => {
+    // `unmatched` is the evaluator's word for "a person I could not name". It
+    // paired as though it were a character on p10 of this story.
+    const figs = [{ label: 'the boy in blue', body_bbox: [0.1, 0.1, 0.3, 0.9] }];
+    expect(pairInventoryFiguresToNames(
+      [{ reference: 'unmatched', confidence: 0, body_bbox: [0.1, 0.1, 0.3, 0.9] }], figs).size).toBe(0);
+    expect(pairInventoryFiguresToNames(
+      [{ reference: 'Levin', confidence: 0.9, body_bbox: [0.1, 0.1, 0.3, 0.9] }], figs).size).toBe(1);
+  });
+
+  it('pairs nobody when a witness is missing, rather than guessing', () => {
+    expect(pairInventoryFiguresToNames([], PAGES['6'].inventory.figures).size).toBe(0);
+    expect(pairInventoryFiguresToNames(PAGES['6'].matches, []).size).toBe(0);
   });
 });

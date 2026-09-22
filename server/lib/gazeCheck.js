@@ -47,38 +47,38 @@ const AWAY_FROM_VIEWER = 'away from viewer';
 
 const norm = (s) => String(s == null ? '' : s).trim().toLowerCase();
 
+/** The describer's two ways of saying "I could not read the eyes". */
+const UNREADABLE = new Set(['not visible', 'cannot tell', 'cannot tell at this size', 'none', 'n/a', '']);
+/** The describer's phrase for the eyes meeting the camera. */
+const AT_VIEWER = new Set(['at the viewer', 'the viewer', 'at viewer', 'viewer', 'at the camera']);
+
 /**
- * What the inventory says one figure's eyes rest on.
+ * What the inventory says one figure's EYES rest on.
  *
- * @returns {{kind:'figure', label:string} | null}
- *   null when the inventory says nothing about this figure's gaze, which is a
- *   SKIP and never a finding.
+ * Reads `figures[].gaze`, the field that asks about eyes and nothing else. That
+ * field is the whole witness: `interactions[]` was tried first and is weaker on
+ * both sides — it is pairwise, so it cannot express "looking at an object" or
+ * "looking out of the picture", and its `observed` prose mixes gaze with facing
+ * and contact, so reading it means classifying prose. Measured over all 18 pages
+ * of job_1789853503332_riqncqg1i, `gaze` came back on 52 of 52 figures.
+ *
+ * @returns {{kind:'viewer'} | {kind:'figure', label:string} | {kind:'thing', label:string} | null}
+ *   null when the describer could not read the eyes, which is a SKIP.
  */
 function observedGaze(inventory, figureLabel) {
-  const label = norm(figureLabel);
-  if (!label) return null;
+  const figures = Array.isArray(inventory?.figures) ? inventory.figures : [];
+  const fig = figures.find(f => norm(f?.label) === norm(figureLabel));
+  const raw = norm(fig?.gaze).replace(/[.]$/, '');
+  if (UNREADABLE.has(raw)) return null;
+  if (AT_VIEWER.has(raw)) return { kind: 'viewer' };
 
-  for (const it of (Array.isArray(inventory?.interactions) ? inventory.interactions : [])) {
-    if (norm(it?.from) !== label) continue;
-    if (!LOOK_RELATION.test(String(it?.observed || ''))) continue;
-    const to = String(it?.to || '').trim();
-    if (to) return { kind: 'figure', label: to };
-  }
-
-  // NO FALLBACK TO `facing` (2026-09-22 — it shipped for one run and produced a
-  // false finding on its first real page). `facing` is a BODY field: the
-  // inventory spec lists it among pose and garment attributes, its values are
-  // body orientations (`left`, `right`, `toward <label>`), and the face has its
-  // own field. On p2 of job_1789853503332_riqncqg1i both boys stand squarely to
-  // camera and `facing` read `toward viewer` for both — but only the one
-  // holding the egg meets the reader's eye; the other's eyes are cast down and
-  // to his left. One true finding and one false one out of the same signal.
-  //
-  // A signal that cannot separate the two cases is not evidence, so the only
-  // witness left is a LOOK relation the describer states outright. Nothing in
-  // the inventory reports eyes meeting the camera, so that defect is currently
-  // invisible here — under-reported, which is this module's chosen error.
-  return null;
+  const target = raw.replace(/^(?:at|toward|towards|on)\s+/, '').trim();
+  if (!target || UNREADABLE.has(target)) return null;
+  // Another figure in this same picture, matched on the label the describer was
+  // told to copy in full.
+  const other = figures.find(f => f !== fig && norm(f?.label) === target);
+  if (other) return { kind: 'figure', label: String(other.label) };
+  return { kind: 'thing', label: target };
 }
 
 /**
@@ -146,17 +146,43 @@ function checkDeclaredGaze({ declared, inventory, matches, castNames, resolveTar
     const seen = observedGaze(inventory, label);
     if (!seen) continue;                        // the witness said nothing — skip
 
-    const targetName = typeof resolveTarget === 'function'
-      ? String(resolveTarget(looksAt) || '').trim() : looksAt;
+    // `away` is a real value, not a target: the Art Director schema offers a
+    // name, a Visual Bible id, or `away` for eyes that rest on nobody in the
+    // frame. It still contradicts eyes on the reader — the same schema says a
+    // figure never meets the reader's eye — so it is compared, but it has to
+    // read as a phrase rather than be plugged in as a noun.
+    const declaredAway = norm(looksAt) === 'away';
+    const targetName = declaredAway ? 'away from everyone in the frame'
+      : (typeof resolveTarget === 'function' ? String(resolveTarget(looksAt) || '').trim() : looksAt);
     // A finding has to SAY what the eyes were meant to be on. `looksAt`
     // holds a Visual Bible id as often as a name, and an id the bible
     // cannot name is not a sentence a repair or a reader can act on — so
     // an unresolved target is a skip, and no id ever reaches the text.
     if (!targetName || baseVbId(targetName)) continue;
+    // Eyes resting on nobody can only be contradicted by eyes on the reader;
+    // any other target is a thing the brief did not name, so there is nothing
+    // to disagree with.
+    if (declaredAway && seen.kind !== 'viewer') continue;
     const declaredIsCharacter = cast.includes(norm(targetName)) || cast.includes(norm(looksAt));
 
     let contradiction = null;
-    {
+    if (seen.kind === 'viewer') {
+      // MEASURED AND NOT FIRED (2026-09-22). `at the viewer` is the one answer
+      // this describer cannot be trusted on: it writes it for any gaze running
+      // out toward the camera's side of the frame, and cannot separate eyes ON
+      // the reader from eyes PAST them. Twelve pages of
+      // job_1789853503332_riqncqg1i were described a second time by an
+      // independent reader working from the image alone: on p7 it called three
+      // children `at the viewer` who are looking straight at the character the
+      // brief named, and it repeated the error on p6, p8, p10 and p18. Every
+      // clear false positive in the set came from this branch.
+      //
+      // The sibling answer — `at <another figure>` — matched that reader every
+      // time, so it is the only one that fires. A page whose cast looks out of
+      // the picture therefore still goes unreported: the loss is real and is
+      // preferred to a MAJOR finding that buys a repair on a correct figure.
+      contradiction = null;
+    } else if (seen.kind === 'figure') {
       const seenCharacter = charAt.get(norm(seen.label));
       if (declaredIsCharacter) {
         // Both sides name a person, so the finding needs both names: an
@@ -165,15 +191,19 @@ function checkDeclaredGaze({ declared, inventory, matches, castNames, resolveTar
         if (seenCharacter && seenCharacter !== norm(targetName) && seenCharacter !== norm(looksAt)) {
           contradiction = `the eyes are on ${seen.label}`;
         }
-      } else if (!handsFull(inventory, seen.label)) {
+      } else if (seenCharacter && !handsFull(inventory, seen.label)) {
         // The brief sends the eyes to a THING and the witness sees them on a
-        // person. A name for that person is not needed — it would only make
-        // the sentence read better, and the label already does that.
+        // NAMED person — and the name is what proves the two are different
+        // entities. Without it this fired on p17 of job_1789853503332_riqncqg1i,
+        // where the brief said `ANI001` (the story's dragon) and the describer,
+        // which may not name anyone, wrote `the small green creature`: the same
+        // animal under two descriptions, reported as a defect.
         contradiction = `the eyes are on ${seen.label}`;
       }
-      // declared a thing, observed a thing: the inventory pairs figures, not
-      // objects, so it cannot tell WHICH thing — no evidence, no finding.
     }
+    // seen.kind === 'thing': the describer names an object in its own words and
+    // the brief names one in the Bible's. Comparing the two is prose matching,
+    // which this module does not do — no evidence, no finding.
     if (!contradiction) continue;
 
     findings.push({
@@ -181,8 +211,12 @@ function checkDeclaredGaze({ declared, inventory, matches, castNames, resolveTar
       severity: 'MAJOR',
       character: name,
       source: 'gaze-check',
-      description: `${name} is declared looking at ${targetName}, but ${contradiction}.`,
-      fix: `Turn ${name}'s eyes to ${targetName}.`,
+      description: declaredAway
+        ? `${name} is declared looking ${targetName}, but ${contradiction}.`
+        : `${name} is declared looking at ${targetName}, but ${contradiction}.`,
+      fix: declaredAway
+        ? `Turn ${name}'s eyes ${targetName}.`
+        : `Turn ${name}'s eyes to ${targetName}.`,
     });
   }
   return findings;
