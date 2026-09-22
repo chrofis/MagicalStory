@@ -7059,7 +7059,16 @@ async function runInventoryAbStage(ctx, { experimentId, params = {} }) {
 
   // A pinned target version is the case: comparing describers on a page whose
   // active version is a repaired render answers a different question.
-  const imageDataUri = await loadActivePageImage(ctx.storyId, ctx.pageNumber, ctx.versionIndex ?? null);
+  //
+  // `params.imageType` reaches loadTestImage, which is the only path that can
+  // see an `is_test` row — every Lab-produced render is one, and getStoryImage
+  // filters them out. Without it a repaired version cannot be described at all
+  // ("No version 3 for ... page 6"), which is exactly the question a repair
+  // experiment needs answered. Same shape as the detection stage at ~1405.
+  const pinnedVersion = params.versionIndex ?? ctx.versionIndex ?? null;
+  const imageDataUri = await loadActivePageImage(
+    ctx.storyId, ctx.pageNumber, pinnedVersion,
+    pinnedVersion != null ? (params.imageType || 'scene') : null);
   if (!imageDataUri) throw new Error(`No image for page ${ctx.pageNumber}`);
   // The image ALONE — every arm here is a blind describer.
   const parts = [{
