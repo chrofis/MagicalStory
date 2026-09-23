@@ -1434,6 +1434,30 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "c9484709c",
       "fix": "requiredText.coverRequiredTexts turns the structured cover contract (expectedText/textMode) into a required-text item; evaluateImageQuality folds it into the one {TEXT_RULES} block all three judges get, returns it as result.requiredTexts (carried by carryEvalEvidence), and the consolidator renders it as lettering that must never be removed. inpaintPage adds it to its required-text clause (repairPipeline + Lab inpaint pass the contract). cover-evaluation-notes.txt TEXT_RULES allow-list replaced by COVER_TEXT (what the string is; missing/misspelled = required_text CATASTROPHIC), given to quality and semantic judges. Generator title block headed **REQUIRED TEXT:**, the exception its preamble names. Replay on stored v0/v1: v0 100 with no text finding; v1 semantic [CATASTROPHIC] required_text missing, score 40."
+    },
+    {
+      "id": "wardrobe-bible-slot-by-noun-list",
+      "title": "The wardrobe-vs-bible check found garment slots only through a fixed garment-word list, so a linked garment the list does not name (a hooded sweatshirt typed outerwear) was never compared",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6 (staging job_1790100385959_1nitlympp): ART005 purple hooded sweatshirt, wornAs Max.outer layer, type outerwear, produced no finding while ART004/ART006 did (beats_wardrobe_bible_conflict at 20:39 CH lists only Levin and Kiaan).",
+      "rootCause": "clothingCheck.bibleEntrySlot read type only when it was literally a slot name and otherwise derived the slot from the name via SLOT_NOUNS, ignoring the declared wornAs slot and the TYPE_SLOTS map; the clause was located by the same noun list.",
+      "impact": "Any linked garment whose name and type are outside the noun list is invisible to the contract/bible comparison. Staging.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "6a2b0e121",
+      "fix": "bibleEntrySlot: wornAs slot, then wornItems.slotFromType, then name nouns; a linked element finds its own clause via wornItems.indexOfElementAmong over name/label/aliases, the slot occupant only otherwise. Replay: Max ART005 now compared (reconcile, rewording). Pinned by tests/unit/worn-garment-review-chain.test.ts."
+    },
+    {
+      "id": "wardrobe-bible-splice-drops-joiner",
+      "title": "A Visual Bible clause spliced into the wardrobe contract dropped the clause joiner and article",
+      "reportedAt": "2026-09-23",
+      "source": "Reproduced from stored data, dragon run 6: final contract Kiaan \"…dark brown lace-up boots, rust-brown sleeveless front-zip body warmer…\" and Levin \"…sneakers, forest green long-sleeve zip-up fleece jacket…\" (04-clothingRequirements.final.json).",
+      "rootCause": "checkWardrobeAgainstBible built after as description.split(clause).join(replacement), replacing the leading \"and a\" together with the garment.",
+      "impact": "Every applied wardrobe-vs-bible correction on a non-first clause reads as a run-on list in the contract every downstream prompt uses. Staging.",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "6a2b0e121",
+      "fix": "spliceClause keeps the clause joiner and article (dropping a leading article from the replacement when the clause had one); the same-words check compares bodies, so a second pass finds nothing. Replay: all three outfits read \", and a <garment>\". Pinned by tests/unit/worn-garment-review-chain.test.ts."
     }
   ]
 }
