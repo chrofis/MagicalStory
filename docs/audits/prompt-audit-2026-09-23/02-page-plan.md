@@ -6,6 +6,7 @@ Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the c
 
 - FIXED: W1 "(none" commissioned character — `86d6ff4a7`. W10 over-the-shoulder on a contact page was already fixed before the audit (`be213ec9a` / `50e150c21`).
 - OPEN: W2 page-order / hint placement unchecked (plan-check gets no hints), W5 replan fixes by swapping, W6 who-column completeness unchecked, W8 Q4 answer instability, W11 filler pages and the replan breaking a shot floor, W12 landmark vantage unchecked, W13 Q2 recall; plan_recheck prompt not stored.
+- OWNER DECIDED 2026-09-23: two rules â€” every child acts in the arc; every child appears in enough images (target 3-4, scaled) with their action staged as a picture; affects the NO_FOCAL / UNDER_COVERED counters behind W5.
 - OWNER CALL: W3 (b) TWO_HEIGHTS exemption for a flight (changes the 2026-09-10 Q10 ruling), W4 round 1 exempt from the discard test (doc gap or bug), W7 profile pets / unnamed parent counted as invented, W9 Q9 split and dropping advisory lines from the replan; BLOAT landmark list for a divide-only stage.
 
 ---

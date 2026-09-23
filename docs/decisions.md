@@ -70,6 +70,25 @@ age bucket (A9); trimming the landmark list (the AD decides which places are lan
 server/lib/promptBuilders.js, server/lib/sceneBriefCheck.js, server/lib/shotVocabulary.js,
 server/lib/beatsPipeline.js, scripts/admin/sibling-registry.json, tests/unit/art-director-audit-2026-09-23.test.ts.
 
+## 2026-09-23 — SETTLED.md's Visual Bible element line says FOUR and names no enforcer (factual refresh, owner-approved)
+**Context:** The 2026-09-23 prompt audit (docs/audits/prompt-audit-2026-09-23/04-art-director.md, "Stale docs") found `docs/SETTLED.md` still saying "Three Visual Bible elements per page", enforced by `rankPageElements` / `truncateBriefToBudget`. The code has been FOUR since 2026-09-11 (`VB_ELEMENT_BUDGET`, server/lib/vbElementBudget.js; entry "VB element budget raised to FOUR; the location cell is what gives way (2026-09-11)"), and every code-side enforcer was removed that day: the budget is a rule the Art Director is given and a fault the scene review is handed; an overflow is reported (`vbElementOverflow`) and ships.
+**Decision:** Owner approved 2026-09-23 updating the SETTLED line to FOUR and deleting the named enforcers. The verdict itself — a per-page element budget, and locations are never elements — is unchanged.
+**Rationale:** Not a reversal: the line described code that no longer exists; the evidence is the 2026-09-11 entry and the vbElementBudget.js header. A settled line that states the wrong number invites the next session to "restore" three.
+**Touched:** docs/SETTLED.md
+**Status:** ✅ active
+
+## 2026-09-23 — The Art Director is not given the art style
+**Decision:** Owner reason: the style is added in the image prompt next; the Art Director gains nothing from it. The scene-expansion template's "must render in the named illustration style" line is stale. **Status:** ✅ active (docs/prompt-inventory.md, *What each call sees*)
+
+## 2026-09-23 — The story bible is not given the stored clothing
+**Decision:** Owner reason: clothing is per story; the bible writes the story's default outfit, from which the avatars are drawn. The bible template's "Start from the character's stored clothing above" is stale. **Status:** ✅ active (docs/prompt-inventory.md, *What each call sees*)
+
+## 2026-09-23 — The scene review is not given the page text
+**Decision:** Owner reason: the images are made before the text is written; the reviewer's job is drawability. **Status:** ✅ active (docs/prompt-inventory.md, *What each call sees*)
+
+## 2026-09-23 — The avatar style anchor keeps its figures
+**Decision:** Owner reason: a figure-free anchor was tested and does not work; the 2026-08-12 decision ("Style-anchor people bleed: swatch wording + de-echoed style eval" — anchors keep their family figures on purpose) stands. Audit 06 S2-2 is closed on that basis. **Status:** ✅ active
+
 ## 2026-09-23 — Absence findings: a duplicate needs the detector's room for it, a CRITICAL/MAJOR "missing" needs a second look, a false-finding drop is never charged
 
 **Context:** Staging `job_1790100385959_1nitlympp` p12 v0. The quality judge listed a figure on empty

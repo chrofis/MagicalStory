@@ -8,6 +8,7 @@ Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the c
 - FIXED F1 direction (owner ruling 2026-09-23: the contract owns garment wording): `reconcile` deleted; a linked same garment `adopt`s the contract clause, the contract is untouched, no re-render; the AD's clothing list carries each version's outfit — `8dbe8d28b`. Replay on this run: 3 adopt, 0 re-renders.
 - FIXED F2 (prompt side): review prompt 12,708 → 11,627 chars (wardrobe brief + cast, no binding paragraph / strengths / flaws) — `8dbe8d28b`. Reasoning effort: Lab `noReasoning` knob added; measurement in decisions.md.
 - FIXED F3 (check 9 scoped to listed characters), F4 (base layers in bible rule + check 11), F5 (bible gets the arc; new check 12 plot garments), F6 (owner: no saved clothing; dead sentence deleted), F7 (colour words alone, both sides), F8, F9; `wardrobeBibleReport`, bible prompt + raw reply and review raw reply stored — `8dbe8d28b`.
+- OWNER DECIDED 2026-09-23: the clothing plan wins over the Art Director's wording; the AD only selects outfit versions (with / without coat etc., each its own avatar). The bible is deliberately not given the stored clothing (clothing is per story).
 - OWNER CALL: a `conflict` (a DIFFERENT garment in a filled slot) still rewrites the contract and re-renders; under the ruling it either becomes an error or a new wardrobe version (who creates versions mid-pipeline). Also the cover dedupe's slot-conflict branch (same question). J1 (reviewer blind to appearance / art style), J3 (STYLE_WARDROBE VB line), J4, J5 open.
 ---
 

@@ -6,7 +6,8 @@ Checked against staging `31fd7db0c` (after the evening fix round). FIXED = the c
 
 - FIXED: the reconcile re-render — a same-garment rewording re-renders nobody (option b) — `ee8890278`. S1-1 row judges copying the example and S1-2 style judge copying TASK text — `86d6ff4a7` (placeholder examples, per-cell reasons, one echo guard `isEchoedJudgeVerdict` behind `askSheetJudge` for all four judges: re-ask once, then throw). S2-1 cell 4/8 pose — `86d6ff4a7` (`REAR_TURN_POSE`, one constant in both row generators and all four judges). S3-3 wrong bodies example and the `anglesScore` field name — `86d6ff4a7` (placeholder examples, `angles.score`).
 - OPEN: S2-3 head row not head-and-shoulders, S2-4 collar/placket rule only in dead `buildPrompt`, S2-5 pass 2 paints backdrops and drops dividers (no judge), S3-2 colour drift (compare pass 2 to pass 1), S3-3 `reviewHeadRow` trusts the model's `finalScore`, S3-4 hair text reaches no critic, mojibake check; S4 dead code and Lab prefills; sheet-eval prompts and raw replies still not stored.
-- OWNER CALL: option (c) re-render a VISIBLE change from the approved sheet instead of the photos; S2-2 figure-free style anchor (reverses 2026-08-12); S3-1 drawn-younger age (standing ruling — report only).
+- OWNER DECIDED 2026-09-23: S2-2 closed — the anchor keeps its figures; a figure-free anchor was tested and does not work (2026-08-12 stands).
+- OWNER CALL: option (c) re-render a VISIBLE change from the approved sheet instead of the photos; S3-1 drawn-younger age (standing ruling — report only).
 
 ---
 
