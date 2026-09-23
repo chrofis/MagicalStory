@@ -55442,7 +55442,13 @@ lens that covers the mirror case is extended on both sides:
   the story's own facts undo". One constant, both generators.
 
 **Touched:** `prompts/arc-panel.txt`, `server/lib/promptBuilders.js`.
-**Status:** 🟡 conditional — validate with `arc_panel_replay` on run 6's arc.
+**Status:** ✅ kept — Lab 1406 (`arc_panel_replay`, run 6's committed arc): 2 of 3 panelists now
+raise the loss unprompted — grok-4.6 "a football-sized egg is lost only because the text says so";
+gpt-5.6-luna-pro "Replaceable loss … nothing prevents them from tracking it directly or finding it
+quickly" plus "a football-sized, warm, watched object cannot simply vanish into nearby leaves".
+deepseek-v4-pro did not. The production panel on the same arc let it through (the committed arc
+still loses the egg). Not yet shown: that the critique/retell then rewrites the loss — the next
+dragon run tests that end to end.
 
 ## 2026-09-23 — Writing nobody asked for is captured in code and becomes a finding
 
