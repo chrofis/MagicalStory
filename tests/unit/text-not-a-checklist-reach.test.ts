@@ -1,5 +1,5 @@
 /**
- * THE PAGE TEXT IS NOT A CHECKLIST FOR THE PICTURE — reaching all eight sites.
+ * THE PAGE TEXT IS NOT A CHECKLIST FOR THE PICTURE — reaching all six sites that see the page text.
  *
  * Owner directive, 2026-09-18: "Not all characters mentioned in text must
  * appear in the image. Add that rule everywhere! A text can be 3 actions the
@@ -131,7 +131,6 @@ const BUILT: Array<{ name: string; template: string; text: string }> = [];
 // author view is a strict prefix of the judge view, so "reaches every site"
 // still means one constant, cut to its reader, never a hand-kept copy.
 const AUTHOR_TEMPLATES = new Set([
-  'prompts/scene-expansion-all.txt',
   'prompts/scene-expansion.txt',
   'prompts/scene-iteration.txt',
   'prompts/scene-iteration-free.txt',
@@ -228,12 +227,7 @@ beforeAll(async () => {
       template: 'prompts/image-prompt-compliance.txt',
       text: await buildCompliancePrompt(),
     },
-    // The four brief authors.
-    {
-      name: 'scene-expansion-all.txt (Art Director, all pages)',
-      template: 'prompts/scene-expansion-all.txt',
-      text: String(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {})),
-    },
+    // The three brief authors that see the page text.
     {
       name: 'scene-expansion.txt (Art Director, per page)',
       template: 'prompts/scene-expansion.txt',
@@ -258,15 +252,7 @@ beforeAll(async () => {
         { composition: 'a render', fixIssues: ['the lantern is missing'], previousScore: -20 },
         { freeIterate: true, textInImage: true, story: inputData })),
     },
-    // The cross-page brief reviewer and the finished-book audit.
-    {
-      name: 'scene-review.txt (all-briefs reviewer)',
-      template: 'prompts/scene-review.txt',
-      text: String(PB.buildSceneReviewPrompt(
-        inputData,
-        [{ pageNumber: 1, brief: BRIEF }, { pageNumber: 2, brief: BRIEF }],
-        { beats: BEATS })),
-    },
+    // The finished-book audit.
     {
       name: 'book-audit.txt (finished-book audit)',
       template: 'prompts/book-audit.txt',
@@ -319,11 +305,11 @@ describe('the rule is one exported constant carrying both halves', () => {
   });
 });
 
-// ── The eight built prompts ─────────────────────────────────────────────────
+// ── The six built prompts ─────────────────────────────────────────────────
 
-describe('the constant reaches all eight BUILT prompts', () => {
-  it('all eight build non-empty', () => {
-    expect(BUILT).toHaveLength(8);
+describe('the constant reaches all six BUILT prompts', () => {
+  it('all six build non-empty', () => {
+    expect(BUILT).toHaveLength(6);
     for (const b of BUILT) expect(b.text.length, `${b.name} built empty`).toBeGreaterThan(400);
   });
 
@@ -353,7 +339,21 @@ describe('the constant reaches all eight BUILT prompts', () => {
     expect(gaps).toEqual([]);
   });
 
-  it('each one states the rule exactly once — eight copies, not eight-plus-a-hand-copy', () => {
+  // 2026-09-23 (owner): the all-pages Art Director and the scene review run
+  // before any page text is written and are shown none, so a rule about the
+  // page text cannot apply there. Neither half may reach them.
+  it('the two stages that never see the page text carry neither half', () => {
+    const blind = [
+      String(PB.buildSceneExpansionAllPrompt(inputData, BEATS, {})),
+      String(PB.buildSceneReviewPrompt(inputData, [{ pageNumber: 1, brief: BRIEF }, { pageNumber: 2, brief: BRIEF }], { beats: BEATS })),
+    ];
+    for (const text of blind) {
+      expect(text.length).toBeGreaterThan(400);
+      expect(text).not.toContain(AUTHOR_RULE);
+    }
+  });
+
+  it('each one states the rule exactly once — six copies, not six-plus-a-hand-copy', () => {
     const dupes = BUILT
       .map(b => ({ name: b.name, n: b.text.split(viewFor(b)).length - 1 }))
       .filter(e => e.n !== 1);
@@ -361,10 +361,10 @@ describe('the constant reaches all eight BUILT prompts', () => {
   });
 });
 
-// ── The registry keeps the eight together ───────────────────────────────────
+// ── The registry keeps the six together ───────────────────────────────────
 
-describe('the sibling set holds the eight', () => {
-  it('is registered, blocks, and names exactly the eight templates the builders fill', () => {
+describe('the sibling set holds the six', () => {
+  it('is registered, blocks, and names exactly the six templates the builders fill', () => {
     expect(SET, 'sibling set text-not-a-checklist is gone from the registry').toBeTruthy();
     expect(SET.severity).toBe('block');
     expect(SET.members.slice().sort()).toEqual(BUILT.map(b => b.template).sort());
@@ -463,6 +463,6 @@ describe('the quality judge is deliberately NOT a consumer', () => {
 
   it('the sibling set does not name it, so gate 9 does not demand it move', () => {
     expect(SET.members).not.toContain('prompts/image-evaluation.txt');
-    expect(SET.members).toHaveLength(8);
+    expect(SET.members).toHaveLength(6);
   });
 });

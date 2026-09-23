@@ -95,9 +95,22 @@ describe('the landmark rule is stated ONCE, and only its consumer hears the JSON
   });
 
   it('the Art Director, which does emit those fields, still gets the contract', () => {
-    const s = buildAvailableLandmarksSection(landmarks, '', { jsonFields: true });
-    expect(s).toContain('"isRealLandmark": true');
+    const s = buildAvailableLandmarksSection(landmarks, '', { forArtDirector: true });
+    expect(s).toContain('`isRealLandmark`: true');
     expect(s).toContain('landmarkQuery');
-    expect(s).toContain('Enchanted Castle');
+    expect(s).toContain('two to four is the target');
+  });
+
+  // 2026-09-23: the Art Director writes no story. The writer's wording told it
+  // to weave landmarks "into the story's action" (adding to a plan line, which
+  // its rule 1 forbids) and its worked example carried a "description" key the
+  // locations schema does not have.
+  it("the Art Director gets none of the story writer's wording", () => {
+    const s = buildAvailableLandmarksSection(landmarks, '', { forArtDirector: true });
+    expect(s).not.toContain("woven into the story's action");
+    expect(s).not.toContain('into your story');
+    expect(s).not.toContain('can be creative');
+    expect(s).not.toContain('Enchanted Castle');
+    expect(s).not.toContain('"description"');
   });
 });

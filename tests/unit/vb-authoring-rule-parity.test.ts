@@ -36,7 +36,7 @@ describe('shared Visual-Bible authoring rules reach every authoring site', () =>
       const text = read(rel);
       expect(/isRealLandmark/.test(text), path.basename(rel)).toBe(true);
       expect(
-        /[Nn]o (AVAILABLE )?LANDMARKS section/.test(text),
+        /[Nn]o (AVAILABLE |REAL )?LANDMARKS section/.test(text),
         `${path.basename(rel)} states what happens with no landmark list`
       ).toBe(true);
     }

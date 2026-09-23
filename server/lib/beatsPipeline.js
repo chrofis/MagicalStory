@@ -2179,6 +2179,13 @@ async function generateStoryViaBeats(inputData, opts = {}) {
   let expansions = [];
   // The Visual Bible + cover hints the Art Director emits ahead of page 1.
   let adBible = null;
+  // THE REPLY AS RETURNED, one row per all-pages attempt (2026-09-23). Only
+  // parsed parts were stored — the briefs, and the bible after the post-review
+  // usage rebuild and every sync had rewritten it — so the prompt audit of
+  // staging job_1790100385959_1nitlympp compared the checker's page table with
+  // the REBUILT one, took it for the Art Director's, and reported a mutation
+  // that never happened. Stored beside the prompt in sceneExpansionReport.
+  const adReplies = [];
   // No rulings travel here any more (2026-09-01): the beats reviewer that
   // produced them is gone, and the plan check never rules on anything — it
   // counts, and the planner re-divides. CARRY_ROUTES stays for the Lab.
@@ -2216,6 +2223,7 @@ async function generateStoryViaBeats(inputData, opts = {}) {
         const res = await textModels.callTextModelStreaming(allPrompt, null, onChunk, sceneModel, { usageLabel: 'beats_scene_expansion' });
         allRaw = res?.text || '';
         allModelId = res?.modelId || sceneModel;
+        adReplies.push({ attempt, modelId: allModelId, text: allRaw });
       } catch (err) {
         log.error(`🚨 [BEATS] All-pages scene expansion attempt ${attempt} failed (${err.message}) — falling back to per-page expansion`);
         gl.warn('beats_scene_expansion_failed', `All-pages call failed on attempt ${attempt}: ${err.message} — falling back to per-page expansion`);
@@ -2499,6 +2507,7 @@ ${bibleBody}` : bibleBody;
   const sceneExpansionReport = {
     durationMs: meta.timings.sceneExpansionMs,
     fallbackPages: missingBriefs.map(b => b.pageNumber),
+    replies: adReplies,
   };
 
   gl.info('beats_scenes', `${expansions.length} scene briefs expanded by ${sceneModel} in one call${missingBriefs.length ? ` (+${missingBriefs.length} per-page fallback)` : ''} (${(meta.timings.sceneExpansionMs / 1000).toFixed(1)}s)`, null, {

@@ -171,6 +171,12 @@ describe('the brief-authoring contracts reach every site that writes a brief', (
     'REACHABLE_CONTACT_RULE', 'EXPRESSION_FIELD_RULE']) {
     it(`all four brief-authoring sites carry ${rule}, from that one constant`, () => {
       for (const [site, prompt] of Object.entries(built)) {
+        // A page-TEXT rule, and the all-pages Art Director runs before any
+        // page text exists (owner, 2026-09-23): it must NOT carry it.
+        if (rule === 'STAGED_PROP_RULE' && site === 'AD all-pages') {
+          expect(prompt.includes(PB[rule]), `${site} carries a page-text rule it cannot apply`).toBe(false);
+          continue;
+        }
         expect(prompt.includes(PB[rule]), `${site} lost ${rule}`).toBe(true);
       }
     });

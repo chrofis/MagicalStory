@@ -556,6 +556,15 @@ if ([...PLATE_DERIVED_SHOTS].some(id => !SHOT_TYPES.includes(id))) {
 const PLATE_BASE_CLASS = 'eye-level';
 
 /**
+ * The vantage half of the same line, for the Art Director that groups pages
+ * into vantages (2026-09-23). A page at eye level on an angled vantage is drawn
+ * on the angled plate — nothing derives that way — which is what the brief
+ * check `shot_off_plate` (sceneBriefCheck.js) reports. Built from
+ * PLATE_DERIVED_SHOTS so the rule and the check cannot name different shots.
+ */
+const VANTAGE_SHOT_RULE = `a vantage whose shot is ${[...PLATE_DERIVED_SHOTS].map(id => '`' + id + '`').join(', ').replace(/, ([^,]*)$/, ' or $1')} holds only pages with that same shot; any other vantage holds any page`;
+
+/**
  * Which plate a page belongs on. Pages sharing a class share a plate; a page
  * whose class is not the base one gets a plate derived from the base.
  */
@@ -612,6 +621,7 @@ module.exports = {
   SHOT_AXIS,
   PLATE_DERIVED_SHOTS,
   PLATE_BASE_CLASS,
+  VANTAGE_SHOT_RULE,
   plateClass,
   buildPlateDeriveInstruction,
   DISTANCE_SHOTS,

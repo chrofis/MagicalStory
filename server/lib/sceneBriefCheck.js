@@ -818,6 +818,14 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
     }
   }
 
+  // L — the page cites a real landmark and never says how it sees it.
+  const landmarkView = checkLandmarkView(page, metadata, visualBible);
+  if (landmarkView) findings.push(landmarkView);
+
+  // M — the page's camera is one its vantage's plate cannot hold.
+  const offPlate = checkShotOffPlate(page, metadata, visualBible);
+  if (offPlate) findings.push(offPlate);
+
   // H — prose peoples a setting the metadata declares empty. Cast names are the
   // same roster check A compares against, so a clause naming one of them is the
   // cast being staged, never the setting's own people.
@@ -832,6 +840,79 @@ function checkPage(page, castNames = [], visualBible = null, opts = {}) {
   }
 
   return findings;
+}
+
+/** A brief's own JSON field, wherever extractSceneMetadata left it. */
+function briefField(metadata, key) {
+  return String((metadata && ((metadata.fullData && metadata.fullData[key]) || metadata[key])) || '').trim();
+}
+
+/**
+ * L — a real-landmark page with no `landmarkView` (2026-09-23).
+ *
+ * The field picks the landmark's reference photo (storyHelpers
+ * resolveLandmarkPhotoForLocation); without it every page is served the
+ * exterior, including a page set inside the landmark or looking out from it.
+ * On staging job_1790100385959_1nitlympp it was missing on all 17 landmark
+ * pages and nothing downstream said so. Structured only: the cited LOC ids, the
+ * bible's `isRealLandmark` and the field's presence.
+ */
+function checkLandmarkView(page, metadata, visualBible) {
+  const n = Number(page && page.pageNumber);
+  if (!Number.isFinite(n) || n <= 0 || briefField(metadata, 'landmarkView')) return null;
+  const locations = Array.isArray(visualBible && visualBible.locations) ? visualBible.locations : [];
+  const cited = citedBaseIds(metadata);
+  const landmarks = locations.filter(l => l && l.isRealLandmark && cited.has(String(l.id || '').trim().toUpperCase()));
+  if (landmarks.length === 0) return null;
+  const { elementDisplayLabel } = require('./vbIdGuard');
+  return {
+    pageNumber: n,
+    type: 'landmark_view_missing',
+    ids: landmarks.map(l => String(l.id).toUpperCase()),
+    detail: `Cites the real landmark ${landmarks.map(l => `${elementDisplayLabel(l) || l.name || l.id} (${l.id})`).join(' and ')} with no \`landmarkView\`, so it gets the exterior photo. `
+      + `Set it: ${LANDMARK_VIEWS.join(' | ')}.`,
+  };
+}
+
+/** The `landmarkView` values the photo picker reads (landmarkPhotos.pickVariantForView). */
+const LANDMARK_VIEWS = ['exterior', 'distant', 'close', 'interior', 'view-from', 'underwater', 'none'];
+
+/**
+ * M — a page whose `shot` its vantage's plate cannot hold (2026-09-23).
+ *
+ * One plate is painted per vantage, from the vantage's own `shot`. Pages at eye
+ * level share an eye-level plate, and an angled page on one gets a plate DERIVED
+ * from it (shotVocabulary.plateClass, storyJobPipeline). Nothing derives the
+ * other way: a page at eye level on an angled plate is drawn on the angled one.
+ * On staging job_1790100385959_1nitlympp five pages were: a close-up on the
+ * aerial plate (p13), three eye-level pages on the high-angle one (p14, p16,
+ * p17) and a medium on the ultra-wide one (p18). The page is resolved to its
+ * vantage by getPrimaryVantageForPage, the function the plate grouping uses.
+ */
+function checkShotOffPlate(page, metadata, visualBible) {
+  const n = Number(page && page.pageNumber);
+  const shot = briefField(metadata, 'shot');
+  if (!Number.isFinite(n) || n <= 0 || !shot || !visualBible) return null;
+  const { plateClass, PLATE_BASE_CLASS } = require('./shotVocabulary');
+  const { getPrimaryVantageForPage } = require('./sceneMetadata');
+  const objects = (metadata && Array.isArray(metadata.objects)) ? metadata.objects
+    : ((metadata && metadata.fullData && Array.isArray(metadata.fullData.objects)) ? metadata.fullData.objects : []);
+  const hit = getPrimaryVantageForPage({ objects, fullData: { shot } }, visualBible, { pageNumber: n });
+  const vantages = hit && hit.location && Array.isArray(hit.location.vantages) ? hit.location.vantages : [];
+  if (!hit || !vantages.includes(hit.vantage)) return null; // no authored vantage: the plate follows the page's shot
+  const plateShot = String(hit.vantage.shot || '').trim();
+  const plate = plateClass(plateShot);
+  if (plate === PLATE_BASE_CLASS || plateClass(shot) === plate) return null;
+  const fits = vantages.filter(v => v && v !== hit.vantage && [PLATE_BASE_CLASS, plateClass(shot)].includes(plateClass(v.shot)));
+  return {
+    pageNumber: n,
+    type: 'shot_off_plate',
+    ids: [String(hit.vantageId)],
+    detail: `This page is a \`${shot}\` and cites ${hit.vantageId}, whose plate is painted \`${plateShot}\`; a \`${plateShot}\` plate cannot hold a \`${shot}\`. `
+      + (fits.length
+        ? `Cite a vantage of this place whose plate can: ${fits.map(v => `${v.id} (\`${v.shot}\`)`).join(', ')}. If none shows the place this page needs, set \`shot\` to \`${plateShot}\`.`
+        : `This place has no vantage whose plate can, so set \`shot\` to \`${plateShot}\` and stage the moment at that distance.`),
+  };
 }
 
 /**
@@ -1011,6 +1092,10 @@ const REVIEWABLE = new Set(['cast_unlisted', 'cast_id_unresolved', 'interaction_
   // The review owns `population` the same way it owns every other metadata
   // field it rewrites, and the fix is one field or one clause — no extra round.
   'population_contradicted',
+  // Both one metadata field on the page the review already rewrites
+  // (2026-09-23): the Art Director is given each rule and the reviewer had no
+  // check for either — see checkLandmarkView / checkShotOffPlate.
+  'landmark_view_missing', 'shot_off_plate',
   'textzone_character_collision', 'textzone_fullwidth_floor', 'textzone_top_floor', 'textzone_bottom_floor', 'textzone_half_streak']);
 
 // Reserved `action` labels for characters who are present but not acting. They
@@ -1048,4 +1133,5 @@ module.exports = {
   checkBiblePageTable, bibleEntries, citedBaseIds, CITABLE_POOLS,
   checkTextZoneDistribution, checkTextZoneCollision, parseTextPosition,
   checkPopulationContradiction,
+  checkLandmarkView, checkShotOffPlate, LANDMARK_VIEWS,
 };

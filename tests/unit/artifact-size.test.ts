@@ -172,7 +172,10 @@ describe('artifact scale — authoring instruction contract', () => {
     // constant, so there is one place to read it and one place to change it.
     it(file + ' takes its scaleClass instruction from the code constant', () => {
       const text = read(file);
-      expect(text.includes('"scaleClass": "{SCALE_CLASS_SPEC}"'),
+      // The all-pages Art Director states the spec ONCE, in its scaleClass
+      // rule, and its five schema slots point at that rule (2026-09-23 — the
+      // spec was sent five times, 5.1k of repetition).
+      expect(text.includes('{SCALE_CLASS_SPEC}'),
         file + ' no longer declares the scaleClass placeholder').toBe(true);
       expect(text.includes('"scaleClass": "[the element'),
         file + ' hand-types the scaleClass instruction again').toBe(false);

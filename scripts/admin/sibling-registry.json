@@ -389,7 +389,6 @@
           "{NEVER_NAME_ABSENT}",
           "{SCENE_INTENT_FIELD}",
           "{CONCEALED_OBJECT}",
-          "{STAGED_PROP}",
           "{CONTACT_VERB}",
           "{REACHABLE_CONTACT}",
           "{PLAN_LINE_CAST}",
@@ -400,7 +399,7 @@
           "{SHOT_ENUM}",
           "{SEASON}"
         ],
-        "anchorsNote": "Placeholders, not prose: each is ONE exported constant filled at all four sites, so the anchor proves the rule reaches the template and tests/unit/ad-iterate-parity.test.ts proves the constant reaches the BUILT prompt byte-identically. Three iterate-only placeholders stay deliberately unanchored because they have no Art Director counterpart to keep in step: {OBJECT_ID_STABILITY} (the Art Director MINTS the ids, so it has none to substitute), {DECLARED_TRAIT_VERBATIM} (declared where the drift was measured — see DECLARED_TRAIT_VERBATIM_RULE), and {MAX_CHARACTERS_PER_SCENE} (the image model’s face cap, which the Art Director expresses as its own staging rules)."
+        "anchorsNote": "Placeholders, not prose: each is ONE exported constant filled at all four sites, so the anchor proves the rule reaches the template and tests/unit/ad-iterate-parity.test.ts proves the constant reaches the BUILT prompt byte-identically. Three iterate-only placeholders stay deliberately unanchored because they have no Art Director counterpart to keep in step: {OBJECT_ID_STABILITY} (the Art Director MINTS the ids, so it has none to substitute), {DECLARED_TRAIT_VERBATIM} (declared where the drift was measured — see DECLARED_TRAIT_VERBATIM_RULE), and {MAX_CHARACTERS_PER_SCENE} (the image model’s face cap, which the Art Director expresses as its own staging rules). {STAGED_PROP} left the anchors on 2026-09-23: it is a page-TEXT rule, and the all-pages Art Director runs before any page text exists (owner) — the three sites that see the text carry it, pinned by tests/unit/brief-authoring-contracts.test.ts."
       }
     },
     {
@@ -469,16 +468,14 @@
     },
     {
       "id": "text-not-a-checklist",
-      "axis": "the eight templates that author or judge a page against its text",
-      "reason": "A page's text may name several characters and several actions; its picture stages one moment, the one its brief names. Settled twice (docs/SETTLED.md, 2026-09-13: semantic eval judges image-vs-BRIEF; 'the Art Director trims cast by design') and violated repeatedly, so the owner ruled on 2026-09-18 that the rule goes to every template that sees a page's text beside a picture - and as ONE constant, promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, not eight hand-kept copies. Three partial copies already existed and had already drifted: image-semantic.txt's CHARACTER AUTHORITY paragraph covered characters and said nothing about actions, image-prompt-compliance.txt's STORY_TEXT DECLARES NOTHING block covered characters and dialogue and said nothing about actions, and book-audit.txt stated it only inside one weight's definition. The rule carries a SECOND half the first must not erase - a character the story gives a moment of their own that no page's plan line ever stages is a fault against the PLAN - because a first-half-only rule would excuse staging job_1789681157795_wkt20ckod, where an invented antagonist fell out of the plan across three pages and three of that book's six CRITICAL faults followed. prompts/image-evaluation.txt is deliberately NOT a member (owner, 2026-09-18): it is handed no page text on any path - all three sites that build it pass a brief as ORIGINAL_PROMPT, and storyText is a separate argument only the semantic and compliance judges receive - so the rule could never fire there, and an unreachable line still competes for attention in the heaviest-deducting prompt in the system. Add it back only together with a call site that actually passes the page text.",
+      "axis": "the six templates that author or judge a page against its text",
+      "reason": "A page's text may name several characters and several actions; its picture stages one moment, the one its brief names. Settled twice (docs/SETTLED.md, 2026-09-13: semantic eval judges image-vs-BRIEF; 'the Art Director trims cast by design') and violated repeatedly, so the owner ruled on 2026-09-18 that the rule goes to every template that sees a page's text beside a picture - and as ONE constant, promptBuilders.TEXT_NOT_A_CHECKLIST_RULE, not eight hand-kept copies. Three partial copies already existed and had already drifted: image-semantic.txt's CHARACTER AUTHORITY paragraph covered characters and said nothing about actions, image-prompt-compliance.txt's STORY_TEXT DECLARES NOTHING block covered characters and dialogue and said nothing about actions, and book-audit.txt stated it only inside one weight's definition. The rule carries a SECOND half the first must not erase - a character the story gives a moment of their own that no page's plan line ever stages is a fault against the PLAN - because a first-half-only rule would excuse staging job_1789681157795_wkt20ckod, where an invented antagonist fell out of the plan across three pages and three of that book's six CRITICAL faults followed. prompts/image-evaluation.txt is deliberately NOT a member (owner, 2026-09-18): it is handed no page text on any path - all three sites that build it pass a brief as ORIGINAL_PROMPT, and storyText is a separate argument only the semantic and compliance judges receive - so the rule could never fire there, and an unreachable line still competes for attention in the heaviest-deducting prompt in the system. Add it back only together with a call site that actually passes the page text. The same rule took prompts/scene-expansion-all.txt and prompts/scene-review.txt OUT on 2026-09-23 (owner): the all-pages Art Director and the scene review run before any page text is written and are shown none, so 5f, 12j and the reviewer's copy referenced a text they never see (docs/audits/prompt-audit-2026-09-23/04-art-director.md A10).",
       "members": [
         "prompts/image-semantic.txt",
         "prompts/image-prompt-compliance.txt",
-        "prompts/scene-expansion-all.txt",
         "prompts/scene-expansion.txt",
         "prompts/scene-iteration.txt",
         "prompts/scene-iteration-free.txt",
-        "prompts/scene-review.txt",
         "prompts/book-audit.txt"
       ],
       "severity": "block",
@@ -486,7 +483,7 @@
         "anchors": [
           "{TEXT_NOT_A_CHECKLIST}"
         ],
-        "anchorsNote": "The placeholder, not the prose: ONE exported constant (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE) filled at eight sites across four files - promptBuilders.js fills five of them through four builders (buildSceneDescriptionPrompt serves both scene-iteration templates), and evalPipeline.js, sceneValidator.js and bookAudit.js one each. The anchor proves the rule reaches the TEMPLATE; tests/unit/text-not-a-checklist-reach.test.ts proves the constant reaches the BUILT prompt, because fillTemplate deletes an undeclared placeholder silently - and pins image-evaluation.txt as carrying neither the placeholder nor the prose."
+        "anchorsNote": "The placeholder, not the prose: ONE exported constant (promptBuilders.TEXT_NOT_A_CHECKLIST_RULE) filled at six sites across four files - promptBuilders.js fills three of them through two builders (buildSceneDescriptionPrompt serves both scene-iteration templates), and evalPipeline.js, sceneValidator.js and bookAudit.js one each. The anchor proves the rule reaches the TEMPLATE; tests/unit/text-not-a-checklist-reach.test.ts proves the constant reaches the BUILT prompt, because fillTemplate deletes an undeclared placeholder silently - and pins image-evaluation.txt as carrying neither the placeholder nor the prose."
       }
     },
     {

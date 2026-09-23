@@ -32,11 +32,10 @@
 5c. **One instant, no history.** {ONE_INSTANT}
 5d. **The plan line's verb and shot are the default.** Follow the plan line's action verb and shot size unless they cannot be staged. A plan line naming an in-progress movement — wading, climbing, swimming toward something — is staged mid-effort in that element, never as the arrived or dry state (the no-partial-immersion rule restages the pose, not the moment). A close-up is not widened into an establishing shot without need.
 5e. **The plan line's stakes set the faces and the effort.** A plan line that carries threat, hurry or strain is drawn under it: every `expression` names the strain in brows, eyes and mouth, bodies brace, lean or hurry, and nothing in the frame rests. A calm plan line is drawn calm. Mood is shown through faces, bodies, light and weather — never named.
-5f. **The page text is not a checklist.** {TEXT_NOT_A_CHECKLIST}
 6. **Characters are active.** Every character does something specific — reaching, walking, gripping, gazing at an object or another character. Never standing-and-smiling. Eyes look at what they interact with, not at the camera.
 6b. **A group acts together.** When several characters share the frame, show them mid-action on one shared task, turned toward it and each other — never lined up abreast facing the viewer.
 6c. **One gaze target per page.** {GAZE_TARGET}
-6d. **Eyes are open.** No closed eyes and no eyes shut on any rendered figure — write "eyes narrowed", "a focused gaze", "looking down at the work".
+6d. **Eyes are open.** {EYES_OPEN}
 7. **Physically possible.** Two hands = max two items. If a character holds a book and a flashlight and waves — that's three hands. Fix it. One hand-duty per figure: a second grip written onto the same figure grows a third hand or fuses the fingers of the first.
 7b. **Contact is written as the pose, in the prose.** `hand on the hasp`, `grips the rung`, `touches the spoke` render as a hand hovering near the object. In the prose name what the fingers wrap, which way the weight leans, what the body presses against: "fingers curled right around the rung, arms taking her weight, chest against the ladder". The `interactions[]` `where` field stays terse — the visible grip lives in the prose.
 7c. **Force is a shape.** `taut`, `strained`, `braced`, `pulling hard` all render at rest. Name the shape the force makes instead: "the rope is a straight line from the post to her hands", "the sail curves out toward the bow".
@@ -55,7 +54,7 @@
 8f. **True relative size.** {TRUE_RELATIVE_SIZE}
 8g. **An everyday prop carries a size anchor.** A prop on the ground, at a character's feet, in hand or on a surface gets a familiar-size term whenever its size matters — "a fist-sized apple", "a forearm-length crossbow", "a palm-sized cup". Those terms are for props only: a garment is sized by where it falls on the body ("knee-length", "falls to mid-back"), never by a prop calibration term.
 8h. **One scale per page.** A page is at HUMAN scale, figures large enough to read an expression, or at OBJECT scale, a building, tower or vessel whole in frame — never both. A page that needs an expression shows the structure only in part.
-8l. **A creature in frame has a written face.** Every page holding a creature states its brow, eyes and mouth in the prose, in the terms below — including a creature acting hard, diving, chasing, calling or lifting, and at any distance the face can be read at.
+8l. **A creature in frame has a written face.** {CREATURE_FACE} Write it in the terms of the creature-tone block below.
 {CREATURE_TONE}
 9. **No age collectives.** Never write "the children", "the kids", "the boys", "the girls". Use names or group size ("all three", "the group").
 10. **Prose construction.** Each page is one continuous paragraph followed by its metadata block — no headers, labels, bullet points, or section breaks inside a page. Open with the main subject and main action. Weave each character's physical description on first mention from CHARACTER DETAILS — age look, build, hair, eyes, distinctive features, clothing — as flowing language, not a labeled list. Clothing means the outfit itself; `standard`, `summer`, `winter` and `costumed` are metadata keys and never appear in prose. A character wears the outfit CHARACTER DETAILS gives them; never move a garment onto a character of the other sex, and never give a male character a garment made for girls or women, or the reverse. Name the TOP, the BOTTOM and the FOOTWEAR for every character on every page (a character whose outfit replaces the legs has no footwear — name the tail or fin instead, and never give them feet or shoes) — the image model draws only what the prose names, so a character given a hat and a shirt is drawn in a hat and a shirt and nothing else. Every page repeats the full physical description: each brief is read on its own by the image model. Same for recurring Visual Bible elements: name them and interleave their identifying detail naturally.
@@ -65,7 +64,7 @@
 
 10e. **A worn item on someone else.** {WORN_ON_OTHER}
 11. **One figure acting on another across a gap.** {GAP_ACTION_FRAMING}
-11b. **Camera-action consistency.** When a character moves INTO, descends INTO, climbs INTO, or steps THROUGH a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold), expand the prose so the camera sits OUTSIDE that space and the character is seen from `back view` or in profile — never facing the camera with the interior behind them. Name the camera POV in the prose ("camera positioned outside the cellar door looking past the threshold; steep stairs descend into the dark beyond").
+11b. **Camera-action consistency.** When a character moves INTO, descends INTO, climbs INTO, or steps THROUGH a space whose interior or far-side carries plot meaning (descending stairs, doorway into another room, tunnel, cave, threshold), expand the prose so the camera sits OUTSIDE that space and the character is seen in profile or over the shoulder, the interior visible past them — never facing the camera with the interior behind them, and never straight behind with their body hiding it. Name the camera POV in the prose ("camera positioned outside the cellar door looking past the threshold; steep stairs descend into the dark beyond").
 11c. **A close-up carries no environment.** A `close-up` brief describes only what that frame holds — the character, what their hands touch, the surface behind them. A long setting paragraph overrides the close-up tag and the wide shot is drawn instead; leave the setting to the vantage's plate, or make the page a `medium` shot.
 11d. **Aboard is not alongside.** When the camera is aboard a vessel or inside a structure, that vessel or structure is the ground the shot stands on — deck, railing, mast base, planking, walls, floor — and only those near surfaces are described. Its exterior (hull, figurehead, name, complete silhouette) never appears as an object in the frame, and no second copy of it stands in the background. Such a page cites a vantage whose plate is the view FROM that position — the planking, rail, mast base and the water or sky beyond, or the interior walls and floor — never the vessel or structure seen from outside. Set `aboard` to that element's id.
 11e. **Inside is not outside.** A character inside, below or at the bottom of something the camera sees from outside — a shaft, a pit, a hollow trunk, a tank — is a fault. Three things change together: `shot` looks into it (high angle down into it, or from inside looking up), the cited vantage's plate is the interior the character occupies (its floor, its walls rising, the opening above), and the character's `depth` is `foreground` or `midground` — never `background` inside their own container. `depth` is distance from the camera, never elevation.
@@ -81,8 +80,6 @@
 
 12h. **An object out of sight.** {CONCEALED_OBJECT}
 
-12j. **A prop the page text puts against a character.** {STAGED_PROP}
-
 12k. **An object several characters touch.** {REACHABLE_CONTACT}
 
 12d. **A held document is read, not displayed.** A map, letter, note or book in a character's hands stays angled toward the character reading it, its face foreshortened or turned away from the camera — the shot shows the characters reading, never the document presented flat to the viewer. This holds even when the page's plan line is what the document says: stage the readers' reactions and pointing hands from the reader's side, and never make the document the frame-filling focal object.
@@ -96,7 +93,7 @@
 
 C1. **Location continuity.** Consecutive pages stay in the same place unless a plan line states the move. Never jump from an exterior to an interior — or between two unrelated locations — on a page whose plan line says nothing about travelling or entering. If a plan line implies a move, the arriving page's prose must name the transition ("steps in through the farmhouse door"). Reuse the same Visual Bible location id on every page set there.
 C2. **Monotonic time of day.** Time moves forward across the book, never backwards. Pick the lighting of page 1, then hold or advance it: morning → midday → afternoon → dusk → night. Two consecutive pages in the same scene share the same light. Only a plan line that states a jump (next morning, days later) resets it. Weather holds the same across every outdoor page unless a plan line changes it; an indoor page has no weather, and shows it only through a window.
-C3. **Clothing consistency.** A character wears the same clothing category on every page unless a plan line changes it (weather, costume, sleep). The category must come from AVAILABLE_AVATARS. Once a character changes, later pages keep the new one.
+C3. **Clothing consistency.** A character wears the same clothing category on every page unless a plan line changes it (weather, costume, sleep). The category must come from AVAILABLE CLOTHING PER CHARACTER. Once a character changes, later pages keep the new one.
 C4. **No two consecutive pages with near-identical composition.** Neighbouring pages must differ in at least one of: camera distance ({DISTANCE_SHOTS}), where the camera stands ({SHOT_POSITIONS}), or character grouping. Same location on two pages is fine; the same shot twice is not.
 C5. **Recurring elements stay identical.** A location, animal, vehicle or artifact keeps its description across pages — same colours, same shape, same markings. Take them from the Visual Bible you write below and do not re-invent details per page.
 C6. **Visual arc.** Framing builds with the plot: the widest establishing shot near the start, the tightest and most intense framing on the page whose plan line carries the climax.
@@ -138,10 +135,11 @@ Work from the plan lines: an element a plan line only implies still needs an ent
 {CHILD_AGE_BAND}
 - An entry shaped like a person — an invented figure, a small winged being, a doll, a figurine, a statue, a puppet — states its HAIR in `description`: colour, length and how it is worn, or plainly that it has none. Such an entry reaches the image model as its description and nothing else, and a head described only by its eyes is drawn bald. State the head the same way a face is stated: hair, then whatever else the figure's head carries.
 - Every named or story-significant vehicle, vessel or structure gets its own `vehicles` entry — the antagonist's and the rival's included, never folded into `locations`. When two of them can share one frame, both need entries.
-- Every Visual Bible element carries `scaleClass`, and it is the only place an element’s size is stated. It is never omitted, and an adjective is not a band — massive, tiny, huge name none. No entry gives a size of its own, in words or in units.
-- A generic element is named in the page's scene prose like any other physical fact, and never appears in `objects[]`. It has no id to cite.
+- Every Visual Bible element carries `scaleClass`, and it is the only place an element’s size is stated: {SCALE_CLASS_SPEC} An adjective is not a band — massive, tiny, huge name none. No entry gives a size of its own, in words or in units.
+- `generic: true` only when any instance of the thing would serve: swap it between two pages and no reader could tell. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic. A generic element gets no entry beyond that flag, no id and no reference image: it is named in the page's scene prose like any other physical fact and never appears in `objects[]`. Omit the field on every other element.
 - {REQUIRED_TEXT_AUTHORING}
 - A name the story gives an element lives in `properName` and nowhere else — never in `label`, `name`, `description` or the page prose. One `properName` belongs to one id: two entries never share a name. An object that transforms later in the story and the creature it becomes are separate ids, and only one of them carries the name.
+- `label` is the one English name every prompt uses for an element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language.
 - English `name` and `description` for artifacts, locations, vehicles and clothing, even for a non-English story; those strings are copied into English image prompts. Characters and animals keep their given names.
 - Every item in exactly one category. A worn garment belongs to `clothing` only, never also to `artifacts`. Exception: a prop the story turns into costume (a hat found in a chest, a cloak handed over) is ONE `artifacts` entry with `wornAs`: `"<CharacterName>.<slot>"`. Every garment a listed character wears is one their outfits in AVAILABLE CLOTHING PER CHARACTER name, and its entry's `description` repeats the outfit's words for it. Never dress a listed character in a garment their outfits do not name, and never reword one; a page without a garment says so in a `wornItems` row. The slot is one of `headwear`, `top`, `bottom`, `footwear`, `belt/waist`, `outer layer`, `accessories` and never another word; neckwear, handwear and eyewear are `accessories`. `wornAs` is REQUIRED on any entry whose `type` is an outfit slot or whose item an outfit above also describes; without it no page can say who wears it. `wornAs` names where the item lives and never changes — which character wears it on a given page is that page's `wornItems` row.
 - A change to an object, an animal or an invented figure is a state, not a second entry. One physical thing is ONE entry however the story alters it — broken, mended, opened, filled; a wing broken then whole; a coat lost then found. Almost every entry has no states at all: the field exists for the rare thing the story itself changes, and an entry without one is the normal case. `description` holds how it is BUILT — the material, shape and size that survive every state. `states[]` lists every look it wears, each with its own `pages`, because each state is drawn as its own reference cell and there is no separate cell for the object at rest. The FIRST state is therefore not optional and not implied by `description`: it is the object before the story changes anything, and it carries every page up to the first change. Leave it out and those pages are drawn in the first CHANGE instead — an object already broken, muddied or emptied on the page it is found. Two entries for one object give it two canonical descriptions and two reference renders that disagree on how it is built.
@@ -149,8 +147,7 @@ Work from the plan lines: an element a plan line only implies still needs an ent
 - A `delta` describes the object's own look and nothing else: no place, no figure, no body part, no other element. On the first state it is how the object looks before anything happens to it; on every later state it is what changed.
 - A state describes the object's OWN look — never what arrives at it from elsewhere on that page (water jetting in, a shadow falling on it, a thing thrown toward it). The arrival is the action's result and belongs with the characters in that page's prose.
 - A part added to an object — a filling, an insert, a fitting, a lid, a cover — is a state of it. It earns its own entry only when BOTH hold: some page stages it on its own, away from the thing it belongs to, and it has a look worth specifying once separated.
-- An object's `description` is drawn literally. Material, colour, size and shape in plain terms, the colour named with a plain colour word and a material-colour compound only where no plain word fits; a size comparison is fine ("about as wide as a coin"), but never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
-- A vehicle's `description` states its real-world dimensions in everyday terms — hull or body length in metres, mast or overall height in storeys of a house.
+- An object's `description` is drawn literally. Material, colour, size and shape in plain terms, the colour named with a plain colour word and a material-colour compound only where no plain word fits; never compare its SHAPE to another object ("curved like a shallow bowl") and never say who holds, carries or wears it.
 - As many entries as the story needs, no more. Include an element even if it appears once.
 - `pages` is earned: a page belongs to an element only when your brief for that page puts it in frame, never a blanket 1-{PAGE_COUNT} range. Being physically present is not earning: a worn satchel, a leash on a wrist, the room they stand in are on many pages and earn only the pages that make something of them. At most {VB_ELEMENT_BUDGET} elements claim any one page (locations do not count); when more could, the ones the plan line names come first and the rest leave that page. An element the story leaves behind ends its range there. A character's or a tracked animal's entry claims only pages whose plan line names it — a brief never earns one for it (rule 3). {ELEMENT_ENTRY_PAGE} An entry's `pages` and the `objects[]` of the page briefs below say the same thing.
 - Empty categories are `[]`.
@@ -160,21 +157,17 @@ Every entry needs specific colours, one signature element, and a description tha
 
 Two or more beings of one kind — two cats, two horses, a grown creature and its young — are written against each other: each entry names the dimensions they share and the dimensions that tell them apart. Unrelated ones differ in at least two a child reads at a glance: colour, markings, coat or scale texture, build, ear or horn or tail shape. Ones the story makes kin share the family look — palette, markings, eye colour, head and snout shape — and part only on age and size.
 
-{CREATURE_TONE}
-Every description — characters, creatures, clothing, objects — must render in the named illustration style. A photorealistic style gets physically plausible beings, materials and colours (no glowing, luminous, or iridescent features, no impossible anatomy); a stylised style may use its idiom.
-
 The `description` is copied verbatim into image prompts, so write it as image-prompt text:
 - **It must read as that thing at a glance.** Name the thing with the word that names it, and name the one feature that separates it from the everyday object its bare geometry would otherwise describe — what it attaches to, what it is part of, what it does. Naming that thing identifies the object and never puts it in the picture. Geometry serves recognition; it is never the whole description.
 - Describe the SHAPE for objects the model confuses — name the parts and how they connect (`perpendicular`, `parallel`, `spans across`, `forms a T from above`, `mounted at right angles to`). No analogies, no negations; both mislead the model.
 - Name every functional part the model tends to drop, with its position and state (a taut string, evenly spaced rungs, a tensioned sail).
-- No lettering unless this entry names the exact words it carries in `text`; every other prop's writing is called illegible / weathered / smudged. Describe an object's build by shape and parts ("two-masted with square topsails"), never by a style name ("brigantine-style").
-- A prop whose interest lies on its face — map, letter, note, chart, book, page, sign, board, plaque — is ONE entry, and which side is turned to us is a state: the side away from the viewer first (the back of the sheet, the closed cover, the outer face of the roll), then `"face to camera"`, each with its own `pages`. The `description` gives material, size, edge wear and dominant colour and says nothing about what is drawn or written on the face; words the reader must be able to read go in the entry's `text`.
+- A two-sided prop (rule above) lists the side away from the viewer first (the back of the sheet, the closed cover, the outer face of the roll), then `"face to camera"`, each with its own `pages`. Its `description` gives material, edge wear and dominant colour and says nothing about what is drawn or written on the face; words the reader must be able to read go in `text`.
 
 Ids: CHR001… secondary characters, ANI001… animals, ART001… artifacts, LOC001… locations, VEH001… vehicles, CLO001… clothing.
 
-Only a place listed in an AVAILABLE LANDMARKS section above gets `isRealLandmark: true` and `landmarkQuery` set to its exact name as listed. Every other location — a town, a street, a square, a building, any place that exists in reality but is not on that list — stays `isRealLandmark: false` with `landmarkQuery: null`. No AVAILABLE LANDMARKS section means no landmarks are available: every location is `false` and `null`.
+Only a place listed in the REAL LANDMARKS section above gets `isRealLandmark: true` and `landmarkQuery` set to its exact name as listed. Every other location — a town, a street, a square, a building, any place that exists in reality but is not on that list — stays `isRealLandmark: false` with `landmarkQuery: null`. No REAL LANDMARKS section means no landmarks are available: every location is `false` and `null`.
 
-A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Do not split for lighting, weather, time of day or a different cast. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (`wide|medium|close-up|ultra-wide|wide-low|aerial` — a vantage is a camera ANGLE on the place, so unlike a page's `shot` this list carries angles too), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`. Every page in the location's `pages` appears in exactly one vantage.
+A location shown from one viewpoint needs no `vantages[]`. Give it `vantages[]` and split it when the same place appears from a fundamentally different camera position — exterior/interior, on a structure/beside it, wide vista/close on one element, approach/arrival. Split it too when its pages differ in time of day or weather: the plate carries the light. Never split for a different cast. An object with `states[]` is cited by a page as `ART###.N`, the state whose `pages` include that page; otherwise the bare `ART###`. Vantage ids are `LOC###.N` from 1; each carries `name` (3-8 words), `shot` (one of {SHOT_ENUM}; {VANTAGE_SHOT}), a 2-3 sentence background-only `description` of what the place looks like from here, an `emptyScenePrompt` (the plate, rules below), and `pages`. Every page in the location's `pages` appears in exactly one vantage.
 
 One backdrop plate is painted per vantage, and every page of that vantage is drawn on it. A location with no `vantages[]` carries its single plate in its own `emptyScenePrompt`. A page whose backdrop the shared plate cannot hold — a different camera position, a different part of the place, a framing the plate has no room for — takes a vantage of its own, with its own plate. Decide that split here, from the plan lines: a plate is written once for the pages that share it, never once per page.
 
@@ -195,7 +188,6 @@ One backdrop plate is painted per vantage, and every page of that vantage is dra
 - Scene-anchor artifacts are allowed and, when the pages on this vantage centre on them, must be described as the focal point — "prominent at the centre, dominating the foreground composition, readable and sharply defined," not "a pole stands somewhere." This covers stationary anchors (pole-with-banner, throne, monument, pedestal, altar, signpost) AND the vehicle or vessel when the pages take place in or on one (boat, raft, wagon, carriage, cart, train compartment, sled). Name the key visual marker (the hat on top, the inscription, the crown, the boat's stern) so the model doesn't substitute a generic building.
 - Never write hypothetical references like "where children would stand" — image models render those literally.
 - When the vantage goes down into a cellar, basement, cave, or other below-ground space, write the backdrop from inside at the top of the steps looking down — the stairs recede downward and away into the space below. Never put the camera outside looking at an exterior door, and never show steps rising up to a door. When a character is at the bottom of a shaft, pit or hollow, the backdrop is its interior: from the rim looking down onto its floor, or from the floor looking up at the opening.
-- Read all photo variant descriptions of a real landmark before writing, and use the most common structural features across variants.
 
 ---
 
@@ -217,8 +209,7 @@ Each cover is a structured spec, not prose. The fields are the spec.
 - When the story centres on a creature or animal — the title names it, or the plot turns on it — the Title Page lists that `ANI###` in `Objects:` right after the LOC, and the creature appears in the cover scene.
 - No perspective or depth on covers — every figure faces the viewer and is fully visible. If the cast does not fit, drop the least essential character instead of hiding them.
 
-Title Page: only {MAIN_CHARACTER_NAMES}.
-Initial Page and Back Cover: up to 5 characters from {MAIN_CHARACTER_NAMES} and {PRIMARY_CHARACTER_NAMES}, always including the main characters. Over 5, drop the least important primary characters entirely.
+{COVER_CAST}
 
 ---
 
@@ -236,7 +227,7 @@ First, exactly:
       "id": "CHR001",
       "name": "[Name]",
       "pages": [1],
-      "scaleClass": "{SCALE_CLASS_SPEC}",
+      "scaleClass": "[one band from the scaleClass rule]",
       "age": [age in years as a number],
       "peer": "[yes|no — yes only for an invented child who plays, competes or shares a group with the commissioned children]",
       "build": "[height, body type]",
@@ -252,8 +243,8 @@ First, exactly:
       "id": "ANI001",
       "name": "[Name]",
       "pages": [1],
-      "scaleClass": "{SCALE_CLASS_SPEC}",
-      "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]",
+      "scaleClass": "[one band from the scaleClass rule]",
+      "generic": "[OMIT unless generic — see the generic rule]",
       "species": "[type and breed]",
       "coloring": "[exact colours and full pattern]",
       "features": "[collar, markings, accessories]",
@@ -263,12 +254,12 @@ First, exactly:
   "artifacts": [
     {
       "id": "ART001",
-      "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]",
+      "label": "[see the label rule]",
       "name": "[plain English noun phrase for the thing, e.g. 'brass telescope', 'oak sea chest' — English even for a non-English story; never a proper noun, and never a bare category]",
       "properName": "[OMIT unless the story gives this object a name of its own]",
       "pages": [1],
-      "scaleClass": "{SCALE_CLASS_SPEC}",
-      "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]",
+      "scaleClass": "[one band from the scaleClass rule]",
+      "generic": "[OMIT unless generic — see the generic rule]",
       "type": "[the category the reference-sheet gate checks the cell against, in English: 'hand tool', 'sea chest']",
       "text": "[OMIT unless the story asks a reader to read words on this object; then the exact characters, in the order they must appear — a few words, or a run of letters or digits]",
       "states": "[OMIT unless the story alters this object or turns a face prop's two sides to us. Otherwise the COMPLETE set of looks it wears, at most 4 in all. The FIRST row is the object before the story changes anything, and every page up to the first change belongs to it: {\"name\": \"unaltered\", \"delta\": \"[how it looks before any change, one clause]\", \"pages\": [X, Y]}. Then the rest, in the order the story reaches them: {\"name\": \"[one or two words]\", \"delta\": \"[the change to the object itself, one clause, at most 15 words — never material, colour or scale, those are the entry’s own; the object's own light belongs here when the story turns it on or off, how the scene lights it never does; never a place, a holder or another element]\", \"pages\": [X, Y]}. Every page in this entry's `pages` falls in exactly one state's `pages`.]",
@@ -278,10 +269,10 @@ First, exactly:
   "locations": [
     {
       "id": "LOC001",
-      "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]",
+      "label": "[see the label rule]",
       "name": "[Name]",
       "pages": [1],
-      "scaleClass": "{SCALE_CLASS_SPEC}",
+      "scaleClass": "[one band from the scaleClass rule]",
       "setting": "[indoor/outdoor, type]",
       "colors": "[specific colours]",
       "features": "[distinctive visual elements]",
@@ -295,12 +286,12 @@ First, exactly:
   "vehicles": [
     {
       "id": "VEH001",
-      "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]",
+      "label": "[see the label rule]",
       "name": "[plain English noun phrase; a name the story gives it goes in properName]",
       "properName": "[OMIT unless the story names it]",
       "pages": [1],
-      "scaleClass": "{SCALE_CLASS_SPEC}",
-      "generic": "[OMIT for every element that must look the same on every page it appears on. Set to true only when any instance of the thing would serve: swap it between two pages and no reader could tell. A generic element gets no entry beyond this one, no id and no reference image — it is written into the page prose by name and nothing else. If the story ever refers back to THIS one — it is found, lost, given, marked, recognised, or a character owns it — it is not generic.]",
+      "scaleClass": "[one band from the scaleClass rule]",
+      "generic": "[OMIT unless generic — see the generic rule]",
       "colorAndDetails": "[appearance: shape, colour, material, size, distinctive features]",
       "signatureElement": "[one unique detail]"
     }
@@ -308,7 +299,7 @@ First, exactly:
   "clothing": [
     {
       "id": "CLO001",
-      "label": "[the one English name every prompt uses for this element: one to four words ending in the noun, unique in this bible, never a bare category, never a proper noun, never a word from the story language]",
+      "label": "[see the label rule]",
       "name": "[plain English noun phrase; a name the story gives it goes in properName]",
       "properName": "[OMIT unless the story names it]",
       "pages": [1],
@@ -425,9 +416,8 @@ Then a single-line JSON object:
   - `"ambient"` — a public place that simply has people in it: a city square, a park, a promenade, a quay, a playground, a station concourse, a shop. Distant passers-by, someone on a bench, a figure by a wall belong in the picture and are not cast.
   - `"cast_only"` — nobody but the listed figures: a private room, a garden, a forest clearing, an empty night street.
   Omit it and the page is read as `"cast_only"`. Choose `"ambient"` over `"cast_only"` whenever the location is one the public can walk into; a square with nobody on it reads as abandoned. The prose then must NOT claim the place is empty — never write "no other people are present" about an `ambient` or `crowd` setting. Describe background people the way the setting holds them ("a few distant passers-by cross the far side of the square"), and keep them unnamed, distant and small. The rule runs both ways: prose that puts unnamed figures in the frame — people crossing the square, riders passing, adults at the tables, onlookers — is a setting with people in it, so `population` is `ambient` or `crowd` on that page, never `cast_only`.
-- `landmarkView` is how the page sees a real landmark, when one is cited: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
+- `landmarkView` is required on every page citing a real landmark — how the page sees it: `exterior` (from outside), `distant` (skyline or backdrop), `close` (a detail of the structure), `interior` (inside it), `view-from` (looking out from it, structure not visible), or `underwater` / `none` when no photograph of the place could show this scene. It selects the reference photo; a view with no matching photo attaches none and your prose carries the place.
 - A `close-up` frame ends at the waist. A pose the frame simply crops — sitting, kneeling, crouching — is fine there: the legs fall below the bottom edge, which is what a close-up IS, and a crouch or a kneel brings the head DOWN to what it is looking at. What a close-up cannot show is an action whose subject lies below the frame line — no {CLOSEUP_BELOW_WAIST}, and nothing placed behind the character. The outfit list still names all garments including footwear. A plan line whose point is below the waist is a `medium` shot, not a close-up.
-- Only add `depth` when the character is in the background (default is foreground/midground).
 
 **`objects[]`**
 - String array of Visual Bible IDs only (`LOC001`, `ART002.2`, `CHR001`).
@@ -499,8 +489,6 @@ Distance rule: an action across a gap is framed by rule 11 and its `where` carri
 **Landmark accuracy:** Read all photo variant descriptions before writing. Use the most common structural features across variants. If characters are inside an enclosed landmark, describe the scene from inside.
 
 **Prop placement vs landmark.** When a separate prop shares a depth band with the landmark, position the prop relative to the landmark (in front of, beside, between camera and landmark) — not by an unanchored frame slot.
-
-**Camera at thresholds.** When a character moves into, descends into, or steps through a space whose far side carries the moment (stairs, doorway, tunnel, cave), compose over-the-shoulder or from the side so the interior is visible past them — never straight behind the character, whose body would hide it.
 
 **Self-check per page before moving on:** the prose and the metadata describe the same single moment; every character the prose places in the scene has a `characters[]` entry and the same outfit in both; one gaze target, and a character gazing at a background-depth target is `back view`, never facing the camera; every demanded grip is written as a visible pose.
 

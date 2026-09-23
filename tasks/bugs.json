@@ -1527,6 +1527,42 @@
       "fixedAt": "2026-09-23",
       "fixedIn": "8dbe8d28b",
       "fix": "Default is MODEL_DEFAULTS.clothingReviewModel."
+    },
+    {
+      "id": "ad-cover-cast-and-none",
+      "title": "The Art Director's cover cast line read \"up to 5 characters from Levin, Julian, Max, Kiaan and None\"",
+      "source": "Stored prompt of staging job_1790100385959_1nitlympp (sceneExpansionReport.prompts[0]); namedByMain returns the literal \"None\" for an empty primary cast.",
+      "rootCause": "The template spliced two namedByMain() lists into one sentence; an empty list renders as \"None\".",
+      "impact": "Every story whose cast has no primary (or no main) characters: a phantom name in the cover cast rule.",
+      "fix": "buildCoverCastLines builds both lines in code from the cast; pinned by tests/unit/art-director-audit-2026-09-23.test.ts.",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "4994fe530"
+    },
+    {
+      "id": "scene-review-check4-overrides-scattered-plan",
+      "title": "Scene review check 4 forced a scattered search group together against its own plan line",
+      "source": "Staging job_1790100385959_1nitlympp p12: plan \"each searching a different pile\"; check 4 \"a searching group stands together scanning, never split across separate spots\"; the rewrite fused four actors into one row while the prose kept them apart, and the image prompt gave Julian a digging pose against prose that has him standing and crying.",
+      "rootCause": "Check 4 stated a staging rule the plan line may contradict, while the review preamble names the plan line as the authority.",
+      "impact": "Any page whose plan line scatters a same-goal group.",
+      "fix": "Check 4 stages a same-goal group where the plan line puts it, together or each at their own spot, and never regroups figures the plan line places apart.",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "4994fe530"
+    },
+    {
+      "id": "landmark-view-and-plate-shot-unchecked",
+      "title": "Pages shipped with no landmarkView (0 of 17) and with shots their vantage plate cannot hold, and nothing reported either",
+      "source": "Staging job_1790100385959_1nitlympp final briefs: no landmarkView on any LOC001/LOC002 page; p13 close-up on the aerial vantage LOC002.4, p14/p16/p17 on the high-angle LOC002.5, p18 medium on the ultra-wide LOC002.1.",
+      "rootCause": "The AD was told both rules; no code check and no review check existed; the plate derive only runs eye-level -> angled.",
+      "impact": "Every real-landmark page is served the exterior photo whatever it shows; an eye-level page on an angled vantage is drawn on the angled plate.",
+      "fix": "sceneBriefCheck landmark_view_missing and shot_off_plate (REVIEWABLE); the AD vantage rule from shotVocabulary.VANTAGE_SHOT_RULE; replay flags 17/17 and 5/5.",
+      "reportedAt": "2026-09-23",
+      "status": "fixed",
+      "fixedAt": "2026-09-23",
+      "fixedIn": "4994fe530"
     }
   ]
 }

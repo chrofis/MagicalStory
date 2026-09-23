@@ -429,7 +429,9 @@ describe('the authored `label` — one English name per element', () => {
     const templates = cjs('../../server/services/prompts.js').PROMPT_TEMPLATES;
     for (const key of ['storyTrial', 'sceneExpansionAll']) {
       expect(templates[key], key).toBeTruthy();
-      expect(templates[key], key).toMatch(/"label":\s*"\[the one English name every prompt uses/);
+      // The schema slot, or (all-pages Art Director, 2026-09-23) one rule its
+      // four schema slots point at.
+      expect(templates[key], key).toMatch(/"label":\s*"\[the one English name every prompt uses|`label` is the one English name every prompt uses/);
     }
   });
 });

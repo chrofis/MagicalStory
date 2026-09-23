@@ -70,7 +70,6 @@ describe('the text-is-not-a-checklist rule is cut to its reader', () => {
         { freeIterate, textInImage: true, story: inputData });
 
       authored = {
-        'scene-expansion-all': PB.buildSceneExpansionAllPrompt(inputData, BEATS, {}),
         'scene-expansion': PB.buildSceneExpansionPrompt(1, TEXT, CHARACTERS, 'en', null, '', null, { story: inputData }),
         'scene-iteration': iterate(false),
         'scene-iteration-free': iterate(true),
@@ -85,9 +84,15 @@ describe('the text-is-not-a-checklist rule is cut to its reader', () => {
       }
     });
 
-    it('a template that JUDGES a brief keeps the whole rule', () => {
-      expect(judged).toContain(PERMISSION);
-      expect(judged).toContain(VERDICT);
+    // 2026-09-23 (owner): the scene review and the all-pages Art Director are
+    // shown no page text (it is written after them), so neither half reaches
+    // them. The judges that are shown the text keep the whole rule
+    // (text-not-a-checklist-reach.test.ts).
+    it('the two stages shown no page text carry neither half', () => {
+      for (const prompt of [judged, PB.buildSceneExpansionAllPrompt(inputData, BEATS, {})]) {
+        expect(prompt).not.toContain(PERMISSION);
+        expect(prompt).not.toContain(VERDICT);
+      }
     });
   });
 });
