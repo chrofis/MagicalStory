@@ -170,6 +170,10 @@ for 4 of 5, Lab 723): a flat cartoon figure gives a VLM nothing to recognise.
 
 `image`, `empty_scene`, `quality_eval`, `semantic_eval`, `bbox`, `char_repair`, `entity`, `text_zone`, `consolidate`, `inpaint`, `iterate`, `repair_round`, `edit_image`, `artifact_repair`, `scale_repair`, `style_transfer`, `pick_best`, `scene_expansion`, `scene_expansion_ab`, `scene_variant`, `scene_description`, `rewrite_blocked`, `repair_verify`, `qwen_insert`, `avatar_realistic`, `avatar_style`, `avatar_eval`, `cover`, `style_check`, `style_repair`.
 
+`edit_image` with `params.source: 'empty_scene'` edits the page's stored background plate the way the
+production plate-derive step does (plate model, no art-style block) — the stage for testing a derive
+instruction (ultra-wide / high-angle / low-angle plates). Target the page that holds the vantage's BASE plate.
+
 `style_repair` (story-level, target `{storyId}`): the missing repair half of the detection-only
 `style_check` — finds style-outlier pages via `checkStoryStyleConsistency`, repaints each toward the
 dominant cluster with BOTH Gemini and Grok (`repairPageStyle`, model-parameterized), and surfaces the

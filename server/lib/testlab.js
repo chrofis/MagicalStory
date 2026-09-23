@@ -5438,20 +5438,32 @@ async function runEditImageStage(ctx, { experimentId, promptOverride, params = {
   const { loadPromptTemplates } = require('../services/prompts');
   await loadPromptTemplates();
   const { editImageWithPrompt } = require('./images');
+  const { MODEL_DEFAULTS } = require('../config/models');
 
   const instruction = params.instruction || promptOverride;
   if (!instruction) throw new Error('edit_image requires params.instruction (or a prompt override) — the edit text');
-  const imageData = await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  // params.source='empty_scene' edits the page's stored background plate
+  // exactly as the plate-derive step does in production (storyJobPipeline.js,
+  // "AN ANGLED PAGE TAKES A PLATE DERIVED FROM THIS ONE"): the plate model and
+  // no art-style block. Pick the page that carries the vantage's BASE plate.
+  const onPlate = params.source === 'empty_scene';
+  const imageData = onPlate
+    ? await loadEmptyScene(ctx.storyId, ctx.pageNumber)
+    : await loadActivePageImage(ctx.storyId, ctx.pageNumber);
+  if (!imageData) throw new Error(`no ${onPlate ? 'empty_scene plate' : 'page image'} for p${ctx.pageNumber}`);
 
   const t0 = Date.now();
-  const result = await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
+  const result = onPlate
+    ? await editImageWithPrompt(imageData, instruction, MODEL_DEFAULTS.emptyScenePlateModel, [], null)
+    : await editImageWithPrompt(imageData, instruction, null, [], ctx.artStyle);
   const elapsedMs = Date.now() - t0;
   const edited = result?.imageData || null;
   if (!edited) throw new Error('edit produced no image');
 
-  const versionIndex = await saveTestVersion(ctx.storyId, 'scene', ctx.pageNumber, edited, experimentId);
+  const imageType = onPlate ? 'empty_scene' : 'scene';
+  const versionIndex = await saveTestVersion(ctx.storyId, imageType, ctx.pageNumber, edited, experimentId);
   // editImageWithPrompt reports the model at usage.model (no top-level modelId).
-  return { imageType: 'scene', versionIndex, elapsedMs, modelId: result.usage?.model || null, promptUsed: instruction };
+  return { imageType, versionIndex, elapsedMs, modelId: result.usage?.model || null, promptUsed: instruction };
 }
 
 /**
