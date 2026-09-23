@@ -55773,3 +55773,67 @@ reach the planner, the four brief templates and the image prompt through the exi
 **Result (Lab 1420, 4th paid p10 render):** camera now behind the near figure (back of head and ear, face turned
 away, crop at the shoulders); the subject is still drawn large and close, about a third of the frame height.
 Owner accepted this state; to be judged on the next full run. Untried: a measurable subject size.
+
+## 2026-09-23 — Arc create at effort `max`, arc re-tell at `medium` (staging trial)
+
+**Context:** Both arc creator calls sent no `effort`, so Opus 5 ran them at its default `high`.
+Lab #1375 swept the Opus 5 create over low/medium/high/xhigh/max; Lab #1416-1418 and #1421
+tested Opus 5.5 (entry above). On 5.5 a low re-tell of the same panel output held within noise of
+a high one (#1416 A vs B).
+
+**Decision (owner, 2026-09-23): staging trial, pending evidence from the next stories.** Same
+model for both calls (`arcCreatorModel` = `claude-opus`, Opus 5). `MODEL_DEFAULTS.arcCreateEffort
+= 'max'` is sent as `effort` on `arc_create`; `MODEL_DEFAULTS.arcRetellEffort = 'medium'` on
+`arc_retell` (both through `creatorCall` in beatsPipeline.js). max_tokens stays null = the model
+ceiling, 128,000 for `claude-opus`; Opus 5 at max used ~53k output tokens in #1375. The Lab's
+`arc_panel_replay` re-tell mirrors production, so it takes `arcRetellEffort` too; `arc_effort`
+keeps its own swept `efforts` / `createEffort` / `retellEfforts` params. The trial path has no arc
+machine. Master/production still runs high/high until a master push is approved.
+
+**Owner-side reading of all arcs (2026-09-23)**
+- All 13 committed arcs from Lab #1375 (Opus 5 low/medium/high/xhigh/max), #1416-1418 (Opus 5.5
+  create low/medium/high + retells A-D) and #1421 (Opus 5.5 xhigh; max returned no arc: 128k
+  output tokens all thinking) were read in full and scored 1-10 by hand. Text:
+  `tests/manual/arc-effort/all-arcs.txt`, `tests/manual/arc-effort/opus55-xhigh-max.txt`.
+- Hand scores, create: Opus 5 low 6.0, medium 7.5, high 7.5, xhigh 7.5, max 9.0; Opus 5.5 low 6.5,
+  medium 6.5, high 6.5, xhigh 7.0, max failed. Re-tell (all 5.5): A high-on-high 7.0, B
+  low-on-high 6.5, C low-on-medium 6.5, D high-on-low 6.0.
+- Opus 5 max is the only arc where every thread pays off: the little brother's twice-ignored hint
+  becomes the solution, the hatchling relights its mother's fire, the hat stays behind as a
+  blanket. Every Opus 5.5 arc ends on a named feeling ("proud", "brave").
+- Correction on a reread: the first-pass claim "Opus 5 beats 5.5 at every level from medium up" is
+  withdrawn. Opus 5 medium and Opus 5.5 xhigh are a tie (judges 5.93 vs 5.96). 5.5 xhigh is
+  arguably better for the age (child-scale attempts, no grown-up hands over the key idea); Opus 5
+  medium has a nonsense first line and an adult-supplied clue. Keeping Opus 5 rests on cost at
+  equal quality (Opus 5 medium $0.30 vs 5.5 xhigh $1.29: 5.5 thinks far longer despite the lower
+  per-token price) and on Opus 5 max being the only clearly better arc.
+- Hand scores shifted between readings; single-reader scores on n=1 are not decisive. A pairwise
+  blind comparison was proposed, not run.
+- Opus 5 cost/time per arc: high $0.78 / 9.9 min, xhigh $0.94 / 11.3 min, max $1.37 / 14.9 min.
+  The staging switch to max is the owner's trial on that basis.
+- Total spend on the 5.5 tests: $6.78 (incl. a $1.45 overrun on #1421 because the estimate used
+  Opus 5 costs).
+
+**Rationale:** Opus 5 max is the only arc the owner's reading ranks clearly above the rest
+(+$0.59 and +5 min over high per story). The re-tell is bounded by the committed arc and the
+panel's solutions; `medium` is a step down from today's `high` with the low-effort re-tell
+evidence from #1416 behind it. No Opus 5 re-tell below high has been measured.
+
+**Touched:** `server/config/models.js` (`arcCreateEffort`, `arcRetellEffort`),
+`server/lib/beatsPipeline.js` (`creatorCall` takes an effort; the two call sites),
+`server/lib/testlab.js` (`arc_panel_replay` re-tell), `tests/unit/arc-creator-effort.test.ts`.
+
+**Status:** 🟡 staging trial, pending evidence from the next stories.
+
+## 2026-09-23 — The idea contract check is written in the review, never in the idea
+
+**Context:** A staging call to /api/generate-story-ideas (this session, 126 s) returned as the customer's first idea
+":\n\nSatz 1 — setup: … Satz 2 — hook: …" — the model's contract-check labels, not an idea. Cause: both contract
+checks in `ideaContract.js` said "number the sentences of **the final**" / "quote each of the five slots from **the
+final**", while the check is run before the final exists, so the model did the labelling inside `[FINAL_1]`. The
+two-idea template's FINAL block said only "Corrected final version of story 1."; the single-idea template already
+had "[FINAL] holds the idea text only".
+**Decision:** Both checks say "written in the review and never in the idea itself" and refer to the corrected
+idea. The two-idea template's FINAL blocks ask for plain sentences only: no numbers, slot labels, check notes or
+headings. No parser-side stripping: the output format is fixed at the source.
+**Touched:** server/lib/ideaContract.js, prompts/generate-story-ideas.txt, tests/unit/idea-contract.test.ts.

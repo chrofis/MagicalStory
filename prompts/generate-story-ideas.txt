@@ -88,7 +88,7 @@ A question with no quote to answer it means that part of the final gets rewritte
 CUT_1: the numbers and the full text of every sentence the contract check cut, listed on one line, or "nothing to cut". None of these sentences may appear in [FINAL_1].
 
 [FINAL_1]
-Corrected final version of story 1.
+The corrected idea 1 as plain sentences only: no numbers, slot labels, check notes or headings.
 
 [DRAFT_2]
 {PREMISE_SHAPE_2}{PATTERN_SEED_2}
@@ -105,7 +105,7 @@ Same process - first check language, then list what you changed and why, one lin
 CUT_2: the numbers and the full text of every sentence the contract check cut, listed on one line, or "nothing to cut". None of these sentences may appear in [FINAL_2].
 
 [FINAL_2]
-Corrected final version of story 2.
+The corrected idea 2 as plain sentences only: no numbers, slot labels, check notes or headings.
 
 ---
 

@@ -75,10 +75,17 @@ describe('the two contracts hold their own slots and not the other one', () => {
   });
 
   it('each contract carries its own CUT step', () => {
-    expect(contract.IDEA_CONTRACT_PREMISE).toMatch(/CONTRACT CHECK: number the sentences/);
+    expect(contract.IDEA_CONTRACT_PREMISE).toMatch(/CONTRACT CHECK[^:]*: number the sentences/);
     expect(contract.IDEA_CONTRACT_PREMISE).toMatch(/List every cut sentence, not one of them/);
-    expect(contract.IDEA_CONTRACT_PATTERN).toMatch(/CONTRACT CHECK: quote each of the five slots/);
+    expect(contract.IDEA_CONTRACT_PATTERN).toMatch(/CONTRACT CHECK[^:]*: quote each of the five slots/);
     expect(contract.IDEA_CONTRACT_PATTERN).toMatch(/List every cut sentence, not one of them/);
+  });
+
+  it('the check is done in the review, never inside the idea (a labelled "Satz 1 — setup" final reached a customer, 2026-09-23)', () => {
+    for (const c of [contract.IDEA_CONTRACT_PREMISE, contract.IDEA_CONTRACT_PATTERN]) {
+      expect(c).toMatch(/written in the review and never in the idea itself/);
+      expect(c).not.toMatch(/sentences of the final|slots from the final/);
+    }
   });
 
   it('both contracts are generic — no name, no place, no cell', () => {
